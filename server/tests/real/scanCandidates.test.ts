@@ -7,6 +7,7 @@ import { createApp } from "../../src/app.ts";
 import { CandidatePoolChangedError } from "../../src/errors.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 function snapshotTree(root: string): string[] {
   const snapshot: string[] = [];
@@ -30,7 +31,7 @@ test("listScanCandidatesは最後のスキャン結果を返し、再帰走査�
   writeWav(join(initial, "track.wav"), 1);
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan();
 
   const before = await adapter.listScanCandidates();
@@ -63,7 +64,7 @@ test("選択した候補だけを登録し、除外した候補は以後返さ�
   writeWav(join(excluded, "track.wav"), 1);
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   const beforeScan = snapshotTree(root);
   const scanned = await adapter.scan();
   assert.deepEqual(
@@ -108,14 +109,14 @@ test("root変更後の候補登録・除外はCandidatePoolChangedErrorで拒否
   writeWav(join(candidateDirB, "track.wav"), 1);
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: rootA });
+  await configureRoot(adapter, rootA);
   await adapter.scan();
   assert.deepEqual(
     (await adapter.listScanCandidates()).map((candidate) => candidate.path),
     ["同名候補"],
   );
 
-  await adapter.updateSettings({ rootFolder: rootB });
+  await configureRoot(adapter, rootB);
 
   await assert.rejects(
     () => adapter.registerScanCandidates([{ path: workspacePath("同名候補") }]),
@@ -139,7 +140,7 @@ test("rootフォルダー消失後の候補登録はCandidatePoolChangedError(40
   writeWav(join(candidateDir, "track.wav"), 1);
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan();
   assert.deepEqual(
     (await adapter.listScanCandidates()).map((candidate) => candidate.path),
@@ -166,7 +167,7 @@ test("stale候補を含む一括登録は書込み前に全件拒否する", asy
   mkdirSync(current, { recursive: true });
   writeWav(join(current, "track.wav"), 1);
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   await assert.rejects(
     () =>
@@ -199,7 +200,7 @@ test("files-kind: 除外→再スキャン→除外解除で候補が復活す�
       thumbnailCacheDir: join(directory.path, "data", "cache", "thumbnails"),
     }),
   );
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan();
   await adapter.excludeScanCandidates(["除外対象"]);
   assert.deepEqual(
@@ -233,7 +234,7 @@ test("候補除外はuser DBを再オープンしても保持される", async (
     thumbnailCacheDir: join(directory.path, "data", "cache", "thumbnails"),
   };
   const first = createTestRealAdapter(options);
-  await first.updateSettings({ rootFolder: root });
+  await configureRoot(first, root);
   await first.scan();
   await first.excludeScanCandidates(["除外対象"]);
   first.close();
@@ -253,7 +254,7 @@ test("スキャン候補の親登録は配下の子作品がある場合に失�
   writeWav(join(child, "track.wav"), 1);
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   const app = createApp(adapter);
   const childRes = await app.request("/api/works", {
     method: "POST",

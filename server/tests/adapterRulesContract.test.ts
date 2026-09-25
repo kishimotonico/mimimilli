@@ -13,6 +13,7 @@ import { WorkRegisterError } from "../src/errors.ts";
 import { createTestRealAdapter } from "./helpers/realAdapter.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "./helpers/sampleLibrary.ts";
 import { nts } from "./helpers/tag.ts";
+import { configureRoot } from "./helpers/rootFolder.ts";
 
 const RESUME_WORK_ID = "resume-contract-work";
 
@@ -56,7 +57,7 @@ async function realResumeAdapter(
   mkdirSync(workDir, { recursive: true });
   writeWav(join(workDir, "track.wav"), 1);
   const adapter = dir.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   const scan = await adapter.scan();
   const registration = await adapter.registerScanCandidates(
     scan.candidates.map((candidate) => ({ path: candidate.path })),
@@ -205,7 +206,7 @@ test("dlsiteApply: tags/title/urlのパッチ構築がreal/fixtureで一致す�
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
   const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: lib.root });
+  await configureRoot(adapter, lib.root);
   await adapter.scan();
   await assertDlsiteApplyContract(adapter, lib.existingWorkId, "real");
 });
@@ -286,7 +287,7 @@ test("createWork: 重複登録の拒否メッセージがreal/fixtureで一致�
   mkdirSync(workDir, { recursive: true });
   writeWav(join(workDir, "track.wav"), 1);
   const adapter = dir.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   const scan = await adapter.scan();
   await adapter.registerScanCandidates(
     scan.candidates.map((candidate) => ({ path: candidate.path })),
@@ -340,7 +341,7 @@ test("createWork: 配下に登録済み作品がある親の登録拒否がreal/
   writeWav(join(parent, "intro.wav"), 1);
   writeWav(join(child, "track.wav"), 1);
   const adapter = dir.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   const childResult = await adapter.createWork({
     path: "parent/child" as never,
     title: "子作品",

@@ -6,6 +6,7 @@ import { test, type TestContext } from "node:test";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { createApp } from "../../src/app.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 async function setup(t: TestContext) {
   const directory = makeTestDirectory("workspace-media");
@@ -26,7 +27,7 @@ async function setup(t: TestContext) {
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   return { app, root, audioPath, secretPath: join(root, "secret.wav") };
 }

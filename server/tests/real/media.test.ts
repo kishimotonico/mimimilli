@@ -9,6 +9,7 @@ import { WorkQueryRepository } from "../../src/adapters/real/workQueryRepository
 import { createApp } from "../../src/app.ts";
 import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 async function setup(t: TestContext, chunkSizeBytes?: number) {
   const lib = makeSampleLibrary();
@@ -17,7 +18,7 @@ async function setup(t: TestContext, chunkSizeBytes?: number) {
   writeFileSync(join(lib.root, "secret.txt"), "library-secret");
   const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter, chunkSizeBytes ? { media: { chunkSizeBytes } } : undefined);
-  await adapter.updateSettings({ rootFolder: lib.root });
+  await configureRoot(adapter, lib.root);
   await scanAndRegisterCandidates(adapter);
 
   const res = await app.request("/api/works");
@@ -149,7 +150,7 @@ test("メディア解決: getWork・probe cache問い合わせを伴わない", 
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan();
 
   try {

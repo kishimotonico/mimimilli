@@ -15,6 +15,7 @@ import { UserWorkStateRepository } from "../../src/adapters/real/userWorkStateRe
 import type { Scanner } from "../../src/adapters/real/scanner.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 test("resolveRootFolder / beginRootReconfiguration は receiver なしで呼び出せる", async () => {
   const rootDir = mkdtempSync(join(tmpdir(), "mimimilli-settings-methods-"));
@@ -87,13 +88,13 @@ test("同一rootの再保存（正規化後一致）では候補除外を破棄�
   writeWav(join(target, "track.wav"), 1);
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan();
   await adapter.excludeScanCandidates(["候補"]);
   assert.deepEqual(await adapter.listScanCandidateExclusions(), ["候補"]);
 
   // 同じパスを再度そのまま保存する（realpath正規化後は同一root）。
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   assert.deepEqual(await adapter.listScanCandidateExclusions(), ["候補"]);
 });
 
@@ -110,7 +111,7 @@ test("異なるrootへの変更で候補除外とScanCandidateSessionを破棄�
   writeWav(join(targetB, "track.wav"), 1);
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: rootA });
+  await configureRoot(adapter, rootA);
   await adapter.scan();
   await adapter.excludeScanCandidates(["候補A"]);
   assert.deepEqual(await adapter.listScanCandidateExclusions(), ["候補A"]);
@@ -119,7 +120,7 @@ test("異なるrootへの変更で候補除外とScanCandidateSessionを破棄�
     [],
   );
 
-  await adapter.updateSettings({ rootFolder: rootB });
+  await configureRoot(adapter, rootB);
 
   assert.deepEqual(await adapter.listScanCandidateExclusions(), []);
   // rootA走査時のScanCandidateSessionも破棄され、rootBの再スキャン前は候補を返さない。
@@ -135,7 +136,7 @@ test("失敗したroot変更では候補除外を破棄しない", async (t) => 
   writeWav(join(target, "track.wav"), 1);
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan();
   await adapter.excludeScanCandidates(["候補"]);
   assert.deepEqual(await adapter.listScanCandidateExclusions(), ["候補"]);

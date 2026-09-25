@@ -11,6 +11,7 @@ import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../src/adapters/real/dlsiteConfig
 import { htmlResponse, mockDlsiteTransport, sampleWorkHtml } from "./helpers/dlsiteTransport.ts";
 import { makeSampleLibrary, makeTestDirectory } from "./helpers/sampleLibrary.ts";
 import { nt, nts } from "./helpers/tag.ts";
+import { configureRoot } from "./helpers/rootFolder.ts";
 
 const FAST_DLSITE_REQUEST_CONFIG = {
   ...DEFAULT_DLSITE_REQUEST_CONFIG,
@@ -54,7 +55,7 @@ test("fill-unset: サークルは既存と異なる値でも2値共存にしな�
       }),
     }),
   );
-  await realAdapter.updateSettings({ rootFolder: lib.root });
+  await configureRoot(realAdapter, lib.root);
   await realAdapter.scan();
   const realResult = await realAdapter.dlsiteApplyMissing([lib.existingWorkId]);
   assert.equal(realResult.applied, 1, "real: genre/ratingが新規なので適用は起きる");
@@ -104,7 +105,7 @@ test("replace: 単体適用で明示的に選んだサークルは既存の同pr
       }),
     }),
   );
-  await realAdapter.updateSettings({ rootFolder: lib.root });
+  await configureRoot(realAdapter, lib.root);
   await realAdapter.scan();
   const realInfo: DlsiteWorkInfo = {
     rjCode: "RJ900002",

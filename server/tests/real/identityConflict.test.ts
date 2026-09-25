@@ -5,6 +5,7 @@ import { test } from "node:test";
 import { createApp } from "../../src/app.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 const WORK_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -57,7 +58,7 @@ test("重複Work IDはmimimilli.jsonを変更せず、catalog公開せずに全p
   writeFileSync(second, `${JSON.stringify(duplicateLocalIdentity, null, 2)}\n`);
   const before = [readFileSync(first, "utf-8"), readFileSync(second, "utf-8")];
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const result = await adapter.scan({ full: true });
 
@@ -81,7 +82,7 @@ test("既存投影は競合pathの順序にかかわらず保持し、解消後�
   const root = join(directory.path, "library");
   const owner = makeWork(root, "work-z-owner", "既存投影");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan({ full: true });
 
   const duplicate = makeWork(root, "work-a-copy", "新しい競合path");
@@ -106,7 +107,7 @@ test("identity_conflictの指定pathだけを別作品として取り込み、Wo
   const copy = makeWork(root, "work-copy", "複製側");
   const before = JSON.parse(readFileSync(copy, "utf-8"));
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan({ full: true });
 
   const app = directory.ownFn(createApp(adapter), (a) => a.shutdown());
@@ -145,7 +146,7 @@ test("壊れたコピーのcandidateIdで既存作品の投影を乗っ取らな
   const root = join(directory.path, "library");
   makeWork(root, "work-owner", "元作品");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan({ full: true });
 
   const ownerBefore = await adapter.getWork(WORK_ID);
@@ -190,7 +191,7 @@ test("root変更後、旧rootの作品IDと衝突する壊れたメタがあっ�
   const OTHER_WORK_ID = "22222222-2222-4222-8222-222222222222";
   makeWork(rootA, "work-owner", "旧root作品");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: rootA });
+  await configureRoot(adapter, rootA);
   await adapter.scan({ full: true });
 
   const ownerBefore = await adapter.getWork(WORK_ID);
@@ -199,7 +200,7 @@ test("root変更後、旧rootの作品IDと衝突する壊れたメタがあっ�
   assert.equal(ownerBefore!.status, "ok");
 
   makeWork(rootB, "work-other", "新root作品", OTHER_WORK_ID);
-  await adapter.updateSettings({ rootFolder: rootB });
+  await configureRoot(adapter, rootB);
   await adapter.scan({ full: true });
 
   const ownerAfterRootChange = await adapter.getWork(WORK_ID);
@@ -238,7 +239,7 @@ test("reassign対象のmimimilli.jsonが削除・破損していると構造化�
   makeWork(root, "work-owner", "元作品");
   const copy = makeWork(root, "work-copy", "複製側");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan({ full: true });
 
   const app = directory.ownFn(createApp(adapter), (a) => a.shutdown());
@@ -270,7 +271,7 @@ test("同一ディレクトリの壊れたメタは従来どおり作品をerror
   const root = join(directory.path, "library");
   const metaPath = makeWork(root, "work-a", "作品A");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan({ full: true });
 
   writeFileSync(

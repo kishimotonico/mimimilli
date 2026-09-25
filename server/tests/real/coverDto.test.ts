@@ -8,6 +8,7 @@ import { openDb } from "../../src/adapters/real/db.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { createWorkRepos, folderMetaPath, resolvedDuration } from "../helpers/workTestUtils.ts";
 import { makeTestDirectory, writeSampleCover } from "../helpers/sampleLibrary.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 const MISSING_COVER_WORK_ID = "missing-cover-file-work";
 const PRESENT_COVER_WORK_ID = "present-cover-file-work";
@@ -102,7 +103,7 @@ async function setupMissingCoverListQuery(t: TestContext) {
     createTestRealAdapter({ database: { kind: "files", catalogPath, userPath } }),
   );
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   return { app, work, presentWork };
 }
 

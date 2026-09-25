@@ -11,6 +11,7 @@ import { DlsiteScheduler } from "../../src/adapters/real/dlsiteScheduler.ts";
 import { ScanUpsertBatch } from "../../src/adapters/real/scanUpsertBatch.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 const OWNER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const PLAYLIST_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -50,7 +51,7 @@ async function setupLibrary(t: TestContext, name: string) {
   writeWork(workDir, OWNER_ID, "before");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan({ full: true });
   return { app, adapter, root, workDir };
 }
@@ -177,7 +178,7 @@ test("新規登録がunpublishedでも201になり同じpathの再投影でcatal
   writeWav(join(workDir, "track.wav"), 1);
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   let rewrite = false;
   const spy = wrapBatchAdd((metaPath) => {
@@ -251,7 +252,7 @@ test("apply-missingは1件の投影例外をpendingに数え後続はappliedに�
       }),
     }),
   );
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan({ full: true });
   await adapter.runDlsiteBulk("existing", [firstId, secondId]);
 
@@ -329,7 +330,7 @@ test("登録がpendingで終わった作品はprojectionでpublishedになった
   writeWav(join(workDir, "track.wav"), 1);
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   let rewrite = false;
   const spy = wrapBatchAdd((metaPath) => {

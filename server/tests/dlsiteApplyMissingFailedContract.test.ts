@@ -11,6 +11,7 @@ import { createRealAdapter } from "../src/adapters/real/index.ts";
 import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../src/adapters/real/dlsiteConfig.ts";
 import { htmlResponse, mockDlsiteTransport, sampleWorkHtml } from "./helpers/dlsiteTransport.ts";
 import { makeTestDirectory, writeWav } from "./helpers/sampleLibrary.ts";
+import { configureRoot } from "./helpers/rootFolder.ts";
 
 const FAST_DLSITE_REQUEST_CONFIG = {
   ...DEFAULT_DLSITE_REQUEST_CONFIG,
@@ -117,7 +118,7 @@ test("dlsiteApplyMissing: 取得失敗はfailedへ数え、他の作品の適用
       }),
     }),
   );
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan();
 
   const result = await adapter.dlsiteApplyMissing();

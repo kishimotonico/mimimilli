@@ -9,6 +9,7 @@ import { Scanner } from "../../src/adapters/real/scanner.ts";
 import { readMetaSource } from "../../src/adapters/real/meta.ts";
 import { createWorkRepos, getTestWork } from "../helpers/workTestUtils.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 function metaWithSingleTrack(id: string, title: string, dlsite = emptyDlsiteState()) {
   return {
@@ -82,7 +83,7 @@ test("候補登録は検出コードを1回の正本書込みに含め、直後�
   writeWav(join(workDir, "track.wav"), 1);
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan();
   const registered = await adapter.registerScanCandidates([
     { path: workspacePath("RJ123456_自動検出作品") },

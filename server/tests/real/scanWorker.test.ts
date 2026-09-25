@@ -9,6 +9,7 @@ import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
 import { pollUntil } from "../helpers/poll.ts";
 import { DlsiteCache, resolveDlsiteCacheConfig } from "../../src/adapters/real/dlsiteCache.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 async function waitForTerminal(
   app: ReturnType<typeof createApp>,
@@ -38,7 +39,7 @@ test("file scan Workerの同期停止中もworks/Range mediaへ応答し、cance
     dataRoot: join(library.baseDir, "data"),
     thumbnailCacheDir,
   });
-  await seed.updateSettings({ rootFolder: library.root });
+  await configureRoot(seed, library.root);
   await scanAndRegisterCandidates(seed);
   const settingsBeforeCancel = await seed.getSettings();
   seed.close();
@@ -128,7 +129,7 @@ test("app shutdown は同期停止中のfile scan Workerを終了まで待機す
     dataRoot: join(library.baseDir, "data"),
     thumbnailCacheDir,
   });
-  await seed.updateSettings({ rootFolder: library.root });
+  await configureRoot(seed, library.root);
   await scanAndRegisterCandidates(seed);
   seed.close();
 
@@ -173,7 +174,7 @@ test("file scan Workerはfull:trueをscannerへ伝播し全件再処理する", 
       thumbnailCacheDir,
     }),
   );
-  await adapter.updateSettings({ rootFolder: library.root });
+  await configureRoot(adapter, library.root);
   await scanAndRegisterCandidates(adapter);
 
   const second = await adapter.scan({ full: true });
@@ -209,7 +210,7 @@ test("file scan WorkerはMIMIMILLI_DLSITE_CACHE_DBで解決したDLsiteキャッ
   const adapter = library.own(
     createTestRealAdapter({ database, dataRoot, thumbnailCacheDir, dlsiteCache }),
   );
-  await adapter.updateSettings({ rootFolder: library.root });
+  await configureRoot(adapter, library.root);
   await adapter.scan();
 
   const work = await adapter.getWork(library.existingWorkId);

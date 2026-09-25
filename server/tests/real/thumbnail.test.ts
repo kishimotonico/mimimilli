@@ -11,6 +11,7 @@ import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { createApp } from "../../src/app.ts";
 import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 async function writeCoverJpeg(
   path: string,
@@ -36,7 +37,7 @@ async function setup(t: TestContext) {
     }),
   );
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: lib.root });
+  await configureRoot(adapter, lib.root);
   await scanAndRegisterCandidates(adapter);
 
   const res = await app.request("/api/works");

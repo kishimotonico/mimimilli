@@ -23,6 +23,7 @@ import { workStates } from "../../src/adapters/real/userSchema.ts";
 import { createWorkRepos, folderMetaPath } from "../helpers/workTestUtils.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 interface FileSnapshot {
   path: string;
@@ -69,7 +70,7 @@ async function setupRegisteredWork(t: TestContext) {
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const createRes = await app.request("/api/works", {
     method: "POST",
@@ -153,7 +154,7 @@ test("DELETE /works/:id: 存在しない作品IDは 404", async (t) => {
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const res = await app.request("/api/works/00000000-0000-4000-8000-000000000000", {
     method: "DELETE",
@@ -169,7 +170,7 @@ test("DELETE /works/:id: 不正な作品IDは 404", async (t) => {
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const res = await app.request("/api/works/not-a-valid-id", { method: "DELETE" });
   assert.equal(res.status, 404);
@@ -249,7 +250,7 @@ test("DELETE /works/:id: DBのmeta_pathが古い場合でもid一致のmimimilli
     }),
   );
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const createRes = await app.request("/api/works", {
     method: "POST",
@@ -287,7 +288,7 @@ test("DELETE /works/:id: id不一致のmimimilli.jsonは削除しない", async 
     }),
   );
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const createRes = await app.request("/api/works", {
     method: "POST",
@@ -332,7 +333,7 @@ test("unregisterWork: DB削除失敗時に退避したメタ正本を復元す�
     }),
   );
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const createRes = await app.request("/api/works", {
     method: "POST",
@@ -381,7 +382,7 @@ test("unregisterWork: catalog削除後のuser削除失敗時はメタを復元�
     }),
   );
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const createRes = await app.request("/api/works", {
     method: "POST",
@@ -450,7 +451,7 @@ test("unregisterWork: 退避済みメタのまま再実行するとDB削除後�
     }),
   );
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const createRes = await app.request("/api/works", {
     method: "POST",
@@ -492,7 +493,7 @@ test("スキャン: 退避のみ残存（catalogあり）でメタ正本を復�
     }),
   );
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const createRes = await app.request("/api/works", {
     method: "POST",
@@ -536,7 +537,7 @@ test("スキャン: 退避のみ残存（catalogなし）で孤児退避ファ�
     }),
   );
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const createRes = await app.request("/api/works", {
     method: "POST",
@@ -576,7 +577,7 @@ test("スキャン: 正本と退避の併存では退避を削除し、その後
     }),
   );
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const createRes = await app.request("/api/works", {
     method: "POST",
@@ -618,7 +619,7 @@ test("スキャン: 退避メタの回収でfs操作が失敗してもスキャ�
     }),
   );
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const createRes = await app.request("/api/works", {
     method: "POST",
@@ -657,7 +658,7 @@ test("スキャン: Work IDを読めない退避ファイルはスキップし�
   writeFileSync(stagedPath, "{ not valid json");
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan();
 
   assert.ok(existsSync(stagedPath));

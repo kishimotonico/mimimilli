@@ -475,7 +475,7 @@ test("fixture: 異なるrootへの変更で候補sessionを破棄し、次のsca
   const paths = async () => (await adapter.listScanCandidates()).map((c) => c.path);
   assert.deepEqual(await paths(), ["未登録作品", "朗読/候補"]);
 
-  await adapter.updateSettings({ rootFolder: "/library/root-b" });
+  await configureRoot(adapter, "/library/root-b");
   assert.deepEqual(await paths(), []);
 
   const result = await adapter.scan();

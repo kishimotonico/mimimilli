@@ -15,6 +15,7 @@ import {
 } from "../helpers/dlsiteTransport.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 const FAST_DLSITE_REQUEST_CONFIG = {
   ...DEFAULT_DLSITE_REQUEST_CONFIG,
@@ -39,7 +40,7 @@ test("title: 単発適用は applyTitle に従い、一括取得は作品情報�
       }),
     }),
   );
-  await adapter.updateSettings({ rootFolder: lib.root });
+  await configureRoot(adapter, lib.root);
   const scan = await adapter.scan();
 
   const customTitle = "ユーザー編集タイトル";
@@ -133,7 +134,7 @@ test("cover: 単発適用は applyCover で既存カバーを上書きし、一�
       }),
     }),
   );
-  await adapter.updateSettings({ rootFolder: lib.root });
+  await configureRoot(adapter, lib.root);
   await adapter.scan();
 
   const info: DlsiteWorkInfo = {
@@ -193,7 +194,7 @@ test("登録時のDLsite指定はregistration bodyでタイトルを上書きし
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const formTitle = "フォームで指定したタイトル";
   const res = await app.request("/api/works", {
@@ -247,7 +248,7 @@ test("missing-only一括適用はcache結果だけを使い、既存フィール
       }),
     }),
   );
-  await adapter.updateSettings({ rootFolder: lib.root });
+  await configureRoot(adapter, lib.root);
   await adapter.scan();
   const before = await adapter.getWork(lib.existingWorkId);
   const metaPath = join(before!.physicalPath, META_FILE_NAME);
@@ -288,7 +289,7 @@ test("missing-only一括適用プレビューは書き込みをせず、適用�
       }),
     }),
   );
-  await adapter.updateSettings({ rootFolder: lib.root });
+  await configureRoot(adapter, lib.root);
   await adapter.scan();
   const before = await adapter.getWork(lib.existingWorkId);
   const metaPath = join(before!.physicalPath, META_FILE_NAME);
@@ -373,7 +374,7 @@ async function setupTwoWorkMissingApply(t: { after: (fn: () => void) => void }, 
       }),
     }),
   );
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan({ full: true });
   await adapter.runDlsiteBulk("existing", [firstId, secondId]);
   return { adapter, firstId, secondId, firstMetaPath };
@@ -430,7 +431,7 @@ test("missing-only一括適用: 取得失敗後もcatalog投影で通知集計�
       }),
     }),
   );
-  await adapter.updateSettings({ rootFolder: lib.root });
+  await configureRoot(adapter, lib.root);
   await adapter.scan();
   const metaPath = join((await adapter.getWork(lib.existingWorkId))!.physicalPath, META_FILE_NAME);
   const bytesBefore = readFileSync(metaPath);
@@ -476,7 +477,7 @@ test("一括取得はカバーをキャッシュも適用もせず、明示適�
       }),
     }),
   );
-  await adapter.updateSettings({ rootFolder: lib.root });
+  await configureRoot(adapter, lib.root);
   await adapter.scan();
 
   await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);

@@ -15,6 +15,7 @@ import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
 import { makeSampleLibrary, writeWav } from "../helpers/sampleLibrary.ts";
 import { makeTestScope } from "../helpers/sampleLibrary.ts";
 import { upsertTestWork } from "../helpers/workTestUtils.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 function sampleWork(id: string, physicalPath: string): Work {
   return makeWork({
@@ -33,7 +34,7 @@ async function setup(t: TestContext, prepare?: (root: string) => void) {
   prepare?.(lib.root);
   const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: lib.root });
+  await configureRoot(adapter, lib.root);
   await scanAndRegisterCandidates(adapter);
   return { app, root: resolve(lib.root), existingWorkId: lib.existingWorkId };
 }
