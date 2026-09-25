@@ -332,6 +332,23 @@ test("large: 1000件の作品が生成され、IDが一意でスキーマ検証�
   assert.equal(detail.status, 200);
 });
 
+test("large: 生成直後のDLsite取得失敗が未失効で反映される（not_found/error）", async () => {
+  const app = buildApp("large");
+
+  const pages = await Promise.all(
+    [1, 2].map(async (page) => {
+      const res = await app.request(`/api/works?limit=500&page=${page}`);
+      assert.equal(res.status, 200);
+      return res.json() as Promise<{ items: Array<{ dlsite: { status: string } }> }>;
+    }),
+  );
+  const items = pages.flatMap((page) => page.items);
+  const failed = items.filter(
+    (w) => w.dlsite.status === "not_found" || w.dlsite.status === "error",
+  );
+  assert.ok(failed.length > 0);
+});
+
 test("large: 生成データが決定的（同じシナリオを2回作っても同一）", () => {
   const first = createFixtureScenario("large", "2026-08-11T00:00:00.000Z");
   const second = createFixtureScenario("large", "2026-08-11T00:00:00.000Z");

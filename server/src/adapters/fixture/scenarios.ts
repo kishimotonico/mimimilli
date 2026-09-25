@@ -146,7 +146,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
   }
 
   if (id === "large") {
-    const bulk = createBulkWorks(LARGE_SCENARIO_WORK_COUNT - SEED_WORKS.length);
+    const bulk = createBulkWorks(LARGE_SCENARIO_WORK_COUNT - SEED_WORKS.length, nowMs);
     const dlsiteLinkages = cloneDlsiteLinkages();
     const dlsiteFetchFailures = cloneDlsiteFailures(nowMs);
     for (const [workId, linkage] of bulk.linkages) dlsiteLinkages.set(workId, linkage);

@@ -189,9 +189,11 @@ const START_MS = Date.UTC(2021, 0, 1);
 const END_MS = Date.UTC(2026, 5, 1);
 
 /** 作品ごとのmeta linkageと、あれば取得キャッシュ相当の失敗記録を組み立てる。
- *  取得失敗（not_found/parse_error）はlinkageではなくfailureへ持たせる。 */
+ *  取得失敗（not_found/parse_error）はlinkageではなくfailureへ持たせる。
+ *  attemptedAt/fetchedAtはnowMs（状態生成時刻）基準からTTL未満だけ過去へずらし、常に未失効に保つ。 */
 function buildDlsiteLinkageAndFailure(
   random: () => number,
+  nowMs: number,
   id: string,
   tags: string[],
 ): { linkage: MetaDlsiteState; failure?: DlsiteCacheResolution } {
@@ -214,7 +216,7 @@ function buildDlsiteLinkageAndFailure(
     return { linkage: { rjCode: null, status: "none", appliedTags: [] } };
   }
   if (roll < 0.92) {
-    const attemptedAt = START_MS + random() * (END_MS - START_MS);
+    const attemptedAt = nowMs - random() * DEFAULT_DLSITE_CACHE_TTLS_MS.not_found * 0.9;
     return {
       linkage: { rjCode: id, status: "none", appliedTags: [] },
       failure: {
@@ -226,7 +228,7 @@ function buildDlsiteLinkageAndFailure(
     };
   }
   if (roll < 0.95) {
-    const fetchedAt = START_MS + random() * (END_MS - START_MS);
+    const fetchedAt = nowMs - random() * DEFAULT_DLSITE_CACHE_TTLS_MS.parse_error * 0.9;
     return {
       linkage: { rjCode: id, status: "none", appliedTags: [] },
       failure: {
@@ -248,8 +250,9 @@ export interface BulkWorks {
 }
 
 /** 大量件数シナリオ用の作品を count 件生成する。
- *  ID は RJ6xxxxx 帯で、手書きシード（RJ5010xx）と衝突しない。 */
-export function createBulkWorks(count: number): BulkWorks {
+ *  ID は RJ6xxxxx 帯で、手書きシード（RJ5010xx）と衝突しない。
+ *  nowMsは状態生成時刻（呼び出し側が決める）で、取得失敗キャッシュの基準に使う。 */
+export function createBulkWorks(count: number, nowMs: number): BulkWorks {
   const random = createRandom(20260811);
   const works: FixtureWorkRecord[] = [];
   const linkages = new Map<string, MetaDlsiteState>();
@@ -320,7 +323,7 @@ export function createBulkWorks(count: number): BulkWorks {
     } satisfies Omit<WorkSummary, "dlsite" | "cover"> & { cover: CoverValueBase | null };
 
     works.push({ ...raw, cover: fixtureCoverFromColumns(raw, fixtureCoverColumnsForWork(raw)) });
-    const { linkage, failure } = buildDlsiteLinkageAndFailure(random, id, tags);
+    const { linkage, failure } = buildDlsiteLinkageAndFailure(random, nowMs, id, tags);
     linkages.set(id, linkage);
     if (failure) failures.set(id, failure);
   }
