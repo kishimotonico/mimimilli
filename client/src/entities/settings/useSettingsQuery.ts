@@ -10,6 +10,10 @@ export function useSettingsQuery() {
     // root再設定中(running)は進捗をこのクエリで追う（GET /api/settingsはロック中も許可される）。
     refetchInterval: (query) =>
       query.state.data?.rootReconfiguration?.status === "running" ? 1000 : false,
+    // 全体既定はfalseだが、このクエリだけはtrueにする。タブへ戻った時点で
+    // rootFolder/completedAtの変化（別クライアントでの再設定）を観測できるように
+    // （ADR-0029、RootReconfigurationDriftEffect参照）。
+    refetchOnWindowFocus: true,
   });
 }
 
