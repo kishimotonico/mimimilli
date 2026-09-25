@@ -18,9 +18,10 @@ import {
 } from "@mimimilli/shared";
 import { META_FILE_NAME, MetaParseError, readMetaFile, readMetaFileRaw } from "./meta.ts";
 import { metaStagingPath } from "./metaStaging.ts";
-import { resolveWithin } from "./paths.ts";
+import { resolveWithin, toPortableRelativePath } from "./paths.ts";
 import { restoreIdentityConflictError, WorkRegisterError } from "../../errors.ts";
 import { assertRegistrationAllowed } from "../../core/workRegistrationGuard.ts";
+import { removeIdentityConflictPath } from "../../core/identityConflicts.ts";
 import type { Db } from "./db.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
@@ -188,6 +189,7 @@ export function unregisterWork(
   query: WorkQueryRepository,
   catalog: CatalogWorkRepository,
   user: UserWorkStateRepository,
+  root: string,
   workId: string,
 ): boolean {
   const target = catalog.getWorkDeleteTarget(workId);
@@ -204,6 +206,10 @@ export function unregisterWork(
       return false;
     }
     user.deleteWorkUserState(workId);
+    const conflictPath = toPortableRelativePath(root, dirname(target.metaPath));
+    catalog.replaceIdentityConflicts(
+      removeIdentityConflictPath(catalog.listIdentityConflicts(), workId, conflictPath),
+    );
     if (metaPlan) deleteStagedMeta(metaPlan);
     return true;
   } catch (error) {

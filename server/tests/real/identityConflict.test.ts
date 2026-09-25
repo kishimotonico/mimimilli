@@ -232,6 +232,59 @@ test("root変更後、旧rootの作品IDと衝突する壊れたメタがあっ�
   assert.deepEqual((await response.json()).diagnostics, []);
 });
 
+test("登録解除すると該当pathがidentity_conflict診断から消え、残り1pathなら診断ごと消える", async (t) => {
+  const directory = makeTestDirectory("identity-conflict-unregister");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "library");
+  makeWork(root, "work-z-owner", "既存投影");
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  await configureRoot(adapter, root);
+  await adapter.scan({ full: true });
+
+  makeWork(root, "work-a-copy", "重複コピー");
+  const conflict = await adapter.scan({ full: true });
+  assert.deepEqual(conflict.identityConflicts, [
+    { kind: "identity_conflict", workId: WORK_ID, paths: ["work-a-copy", "work-z-owner"] },
+  ]);
+
+  const app = directory.ownFn(createApp(adapter), (a) => a.shutdown());
+  const response = await app.request(`/api/works/${WORK_ID}`, { method: "DELETE" });
+  assert.equal(response.status, 204);
+
+  assert.deepEqual(await adapter.listScanDiagnostics(), []);
+  const diagnosticsResponse = await app.request("/api/scan/diagnostics");
+  assert.deepEqual((await diagnosticsResponse.json()).diagnostics, []);
+});
+
+test("登録解除しても残りpathが2以上なら診断は残り、該当pathだけが消える", async (t) => {
+  const directory = makeTestDirectory("identity-conflict-unregister-keep");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "library");
+  makeWork(root, "work-owner", "既存投影");
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  await configureRoot(adapter, root);
+  await adapter.scan({ full: true });
+
+  makeWork(root, "work-copy-1", "重複コピー1");
+  makeWork(root, "work-copy-2", "重複コピー2");
+  const conflict = await adapter.scan({ full: true });
+  assert.deepEqual(conflict.identityConflicts, [
+    {
+      kind: "identity_conflict",
+      workId: WORK_ID,
+      paths: ["work-copy-1", "work-copy-2", "work-owner"],
+    },
+  ]);
+
+  const app = directory.ownFn(createApp(adapter), (a) => a.shutdown());
+  const response = await app.request(`/api/works/${WORK_ID}`, { method: "DELETE" });
+  assert.equal(response.status, 204);
+
+  assert.deepEqual(await adapter.listScanDiagnostics(), [
+    { kind: "identity_conflict", workId: WORK_ID, paths: ["work-copy-1", "work-copy-2"] },
+  ]);
+});
+
 test("reassign対象のmimimilli.jsonが削除・破損していると構造化エラーを返す", async (t) => {
   const directory = makeTestDirectory("identity-conflict-reassign-broken-meta");
   t.after(directory.cleanup);

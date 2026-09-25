@@ -55,6 +55,42 @@ test("unregisterMissingWorksはmissingな作品のdlsiteLinkagesエントリだ�
   assert.ok(state.dlsiteLinkages.has("w2"));
 });
 
+test("deleteWorkは登録解除した作品のpathをidentity_conflict診断から外し、残り1pathなら診断ごと消す", async () => {
+  const state = createInitialState({
+    works: [makeWork("w1", { physicalPath: "/library/a" })],
+  });
+  state.identityConflicts = [{ kind: "identity_conflict", workId: "w1", paths: ["a", "b"] }];
+  const adapter = createWorkMethods(state);
+
+  assert.equal(await adapter.deleteWork("w1"), true);
+  assert.deepEqual(state.identityConflicts, []);
+});
+
+test("deleteWorkは残りpathが2以上なら診断を残し、該当pathだけを外す", async () => {
+  const state = createInitialState({
+    works: [makeWork("w1", { physicalPath: "/library/a" })],
+  });
+  state.identityConflicts = [{ kind: "identity_conflict", workId: "w1", paths: ["a", "b", "c"] }];
+  const adapter = createWorkMethods(state);
+
+  assert.equal(await adapter.deleteWork("w1"), true);
+  assert.deepEqual(state.identityConflicts, [
+    { kind: "identity_conflict", workId: "w1", paths: ["b", "c"] },
+  ]);
+});
+
+test("unregisterMissingWorksはmissingな作品のpathをidentity_conflict診断から外す", async () => {
+  const state = createInitialState({
+    works: [makeWork("w1", { status: "missing", physicalPath: "/library/a" })],
+  });
+  state.identityConflicts = [{ kind: "identity_conflict", workId: "w1", paths: ["a", "b"] }];
+  const adapter = createWorkMethods(state);
+
+  const result = await adapter.unregisterMissingWorks();
+  assert.deepEqual(result, { deletedCount: 1, failedCount: 0 });
+  assert.deepEqual(state.identityConflicts, []);
+});
+
 test("reassignIdentityConflictはdlsiteLinkagesを新idへ付け替える", async () => {
   const state = createInitialState({
     works: [makeWork("w1", { physicalPath: "/library/a" })],
