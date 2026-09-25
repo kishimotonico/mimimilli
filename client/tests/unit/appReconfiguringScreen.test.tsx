@@ -9,6 +9,7 @@ import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import * as workApi from "../../src/entities/work/api";
+import * as scanApi from "../../src/features/scan/api";
 import type { Settings } from "@mimimilli/shared";
 
 const EMPTY_SCAN_RESULT = {
@@ -117,26 +118,17 @@ describe("root再設定中の画面", () => {
 });
 
 describe("root再設定完了後のDLsite自動取得attach", () => {
+  // settings更新→reconfiguring突入検知effect→queryClient.fetchQuery→.then→attach()→
+  // getDlsiteBulkStatusという多段の非同期チェーンを待つ。汎用fetchスタブ経由の
+  // JSON往復（stringify/Response/zod解析）を挟むと並列実行時の負荷でwaitFor既定の
+  // 1000msを超えてflakyになるため、getLastScanResultを直接spyしてチェーンを短くし、
+  // 明示的に長めのtimeoutも与えて安定させる。
   it("新規作品があればdlsiteBulk.attach相当（getDlsiteBulkStatus）を呼ぶ", async () => {
     const getDlsiteBulkStatus = vi.spyOn(workApi, "getDlsiteBulkStatus").mockResolvedValue(null);
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.endsWith("/scan/last")) {
-          return new Response(
-            JSON.stringify({
-              result: { ...EMPTY_SCAN_RESULT, insertedWorkIds: ["work-1"] },
-              finishedAt: "2026-01-01T00:00:00.000Z",
-            }),
-            { headers: { "Content-Type": "application/json" } },
-          );
-        }
-        return new Response(JSON.stringify([]), {
-          headers: { "Content-Type": "application/json" },
-        });
-      }),
-    );
+    vi.spyOn(scanApi, "getLastScanResult").mockResolvedValue({
+      result: { ...EMPTY_SCAN_RESULT, insertedWorkIds: ["work-1"] },
+      finishedAt: "2026-01-01T00:00:00.000Z",
+    });
 
     const { queryClient } = renderAppWithSettings({
       rootFolder: "/audio/library",
@@ -157,26 +149,15 @@ describe("root再設定完了後のDLsite自動取得attach", () => {
       rootReconfiguration: { status: "idle" },
     });
 
-    await waitFor(() => expect(getDlsiteBulkStatus).toHaveBeenCalled());
+    await waitFor(() => expect(getDlsiteBulkStatus).toHaveBeenCalled(), { timeout: 5000 });
   });
 
   it("新規作品が無ければgetDlsiteBulkStatusを呼ばない", async () => {
     const getDlsiteBulkStatus = vi.spyOn(workApi, "getDlsiteBulkStatus").mockResolvedValue(null);
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.endsWith("/scan/last")) {
-          return new Response(
-            JSON.stringify({ result: EMPTY_SCAN_RESULT, finishedAt: "2026-01-01T00:00:00.000Z" }),
-            { headers: { "Content-Type": "application/json" } },
-          );
-        }
-        return new Response(JSON.stringify([]), {
-          headers: { "Content-Type": "application/json" },
-        });
-      }),
-    );
+    const getLastScanResult = vi.spyOn(scanApi, "getLastScanResult").mockResolvedValue({
+      result: EMPTY_SCAN_RESULT,
+      finishedAt: "2026-01-01T00:00:00.000Z",
+    });
 
     const { queryClient } = renderAppWithSettings({
       rootFolder: "/audio/library",
@@ -197,7 +178,13 @@ describe("root再設定完了後のDLsite自動取得attach", () => {
       rootReconfiguration: { status: "idle" },
     });
 
-    await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
+    // getDlsiteBulkStatusが呼ばれないことの確認は「呼ばれる経路自体は完了した」ことを
+    // 待ってから行う。そうしないと、まだチェーンの途中（getLastScanResult未解決）な
+    // だけで判定してしまい、偽陰性（呼ばれるはずが間に合わず未検出）になりうる。
+    await waitFor(() => expect(getLastScanResult).toHaveBeenCalled(), { timeout: 5000 });
+    await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument(), {
+      timeout: 5000,
+    });
     expect(getDlsiteBulkStatus).not.toHaveBeenCalled();
   });
 });
