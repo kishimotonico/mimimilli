@@ -21,7 +21,7 @@ export function useResumePersistenceController({
 }: UseResumePersistenceOptions) {
   const savePromiseRef = useRef<Promise<void> | null>(null);
 
-  const enqueueResumeSave = useCallback((workId: string, resume: ResumeBody) => {
+  const enqueueResumeSave = useCallback((workId: string, resume: ResumeBody): Promise<void> => {
     const save = () => saveResumePosition(workId, resume).catch(() => {});
     const currentSave = savePromiseRef.current;
     const nextSave = currentSave ? currentSave.then(save, save) : save();
@@ -32,21 +32,25 @@ export function useResumePersistenceController({
         savePromiseRef.current = null;
       }
     });
+    return nextSave;
   }, []);
 
   const saveCurrentResume = useCallback(
-    (absolutePosition?: number, loadedTrack: LoadedTrack | null = refs.loadedTrack.current) => {
-      if (!loadedTrack) return;
+    (
+      absolutePosition?: number,
+      loadedTrack: LoadedTrack | null = refs.loadedTrack.current,
+    ): Promise<void> => {
+      if (!loadedTrack) return Promise.resolve();
 
       const position = absolutePosition ?? refs.engine.current?.getCurrentTime();
-      if (position === undefined) return;
+      if (position === undefined) return Promise.resolve();
 
-      if (loadedTrack.playlistId === null || !loadedTrack.workId) return;
+      if (loadedTrack.playlistId === null || !loadedTrack.workId) return Promise.resolve();
       const trackDuration = isResolvedTrack(loadedTrack.track)
         ? loadedTrack.track.durationSec
         : Number.POSITIVE_INFINITY;
       const offsetSec = toTrackRelativeTime(position, loadedTrack.track, trackDuration);
-      enqueueResumeSave(loadedTrack.workId, {
+      return enqueueResumeSave(loadedTrack.workId, {
         playlistId: loadedTrack.playlistId,
         trackId: loadedTrack.track.id,
         offsetSec,
