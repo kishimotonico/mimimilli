@@ -285,6 +285,61 @@ test("登録解除しても残りpathが2以上なら診断は残り、該当pat
   ]);
 });
 
+test("root外を指すmissing作品を単体登録解除しても成功し、他の診断は壊れない", async (t) => {
+  const directory = makeTestDirectory("identity-conflict-unregister-stale-root");
+  t.after(directory.cleanup);
+  const rootA = join(directory.path, "library-a");
+  const rootB = join(directory.path, "library-b");
+  const OTHER_WORK_ID = "22222222-2222-4222-8222-222222222222";
+  makeWork(rootA, "work-owner", "旧root作品");
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  await configureRoot(adapter, rootA);
+  await adapter.scan({ full: true });
+
+  makeWork(rootB, "work-other-owner", "新root作品", OTHER_WORK_ID);
+  await configureRoot(adapter, rootB);
+  await adapter.scan({ full: true });
+  assert.equal((await adapter.getWork(WORK_ID))?.status, "missing");
+
+  makeWork(rootB, "work-other-copy", "新root複製", OTHER_WORK_ID);
+  const conflict = await adapter.scan({ full: true });
+  assert.deepEqual(conflict.identityConflicts, [
+    {
+      kind: "identity_conflict",
+      workId: OTHER_WORK_ID,
+      paths: ["work-other-copy", "work-other-owner"],
+    },
+  ]);
+
+  const app = directory.ownFn(createApp(adapter), (a) => a.shutdown());
+  const response = await app.request(`/api/works/${WORK_ID}`, { method: "DELETE" });
+  assert.equal(response.status, 204);
+  assert.equal(await adapter.getWork(WORK_ID), null);
+  assert.deepEqual(await adapter.listScanDiagnostics(), conflict.identityConflicts);
+});
+
+test("root外を指すmissing作品はunregister-missing一括でも成功扱いになる", async (t) => {
+  const directory = makeTestDirectory("identity-conflict-unregister-missing-stale-root");
+  t.after(directory.cleanup);
+  const rootA = join(directory.path, "library-a");
+  const rootB = join(directory.path, "library-b");
+  makeWork(rootA, "work-owner", "旧root作品");
+  mkdirSync(rootB, { recursive: true });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  await configureRoot(adapter, rootA);
+  await adapter.scan({ full: true });
+
+  await configureRoot(adapter, rootB);
+  await adapter.scan({ full: true });
+  assert.equal((await adapter.getWork(WORK_ID))?.status, "missing");
+
+  const app = directory.ownFn(createApp(adapter), (a) => a.shutdown());
+  const response = await app.request("/api/works/unregister-missing", { method: "POST" });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { deletedCount: 1, failedCount: 0 });
+  assert.equal(await adapter.getWork(WORK_ID), null);
+});
+
 test("reassign対象のmimimilli.jsonが削除・破損していると構造化エラーを返す", async (t) => {
   const directory = makeTestDirectory("identity-conflict-reassign-broken-meta");
   t.after(directory.cleanup);

@@ -22,6 +22,7 @@ import { resolveWithin, toPortableRelativePath } from "./paths.ts";
 import { restoreIdentityConflictError, WorkRegisterError } from "../../errors.ts";
 import { assertRegistrationAllowed } from "../../core/workRegistrationGuard.ts";
 import { removeIdentityConflictPath } from "../../core/identityConflicts.ts";
+import { isPathWithin } from "../../lib/path.ts";
 import type { Db } from "./db.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
@@ -199,6 +200,11 @@ export function unregisterWork(
   const metaPlan = resolveMetaDeletionPlan(workId, target.metaPath, mediaRoot?.physicalPath);
   if (metaPlan) stageMetaForDeletion(metaPlan);
 
+  const metaDir = dirname(target.metaPath);
+  // 旧rootを指すmissing作品などmetaPathが現在のroot配下にない場合、identity_conflict診断に
+  // このpathは載り得ないので算出をスキップする（root外パスの相対化は例外になる）。
+  const conflictPath = isPathWithin(root, metaDir) ? toPortableRelativePath(root, metaDir) : null;
+
   try {
     const deleted = catalog.deleteWorkCatalog(workId);
     if (!deleted) {
@@ -206,10 +212,11 @@ export function unregisterWork(
       return false;
     }
     user.deleteWorkUserState(workId);
-    const conflictPath = toPortableRelativePath(root, dirname(target.metaPath));
-    catalog.replaceIdentityConflicts(
-      removeIdentityConflictPath(catalog.listIdentityConflicts(), workId, conflictPath),
-    );
+    if (conflictPath !== null) {
+      catalog.replaceIdentityConflicts(
+        removeIdentityConflictPath(catalog.listIdentityConflicts(), workId, conflictPath),
+      );
+    }
     if (metaPlan) deleteStagedMeta(metaPlan);
     return true;
   } catch (error) {

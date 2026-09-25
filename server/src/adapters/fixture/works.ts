@@ -93,11 +93,12 @@ export function fixtureSourceMutation(
   return { snapshot: fixtureEditSnapshot(state, work), projection: { status: "published" } };
 }
 
-/** 登録解除対象workのroot相対pathをidentity_conflict診断から外す。対象がなければ何もしない。 */
+/** 登録解除対象workのroot相対pathをidentity_conflict診断から外す。対象がroot配下になければ何もしない。 */
 function removeIdentityConflictForWork(state: FixtureState, workId: string): void {
   const work = state.works.find((candidate) => candidate.id === workId);
   if (!work) return;
   const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+  if (!isPathWithin(rootAbs, work.physicalPath, posix)) return;
   const path = work.physicalPath.slice(rootAbs.length + 1);
   state.identityConflicts = removeIdentityConflictPath(state.identityConflicts, workId, path);
 }
