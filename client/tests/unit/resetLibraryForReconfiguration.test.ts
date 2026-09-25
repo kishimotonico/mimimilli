@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   markReconfigurationAffectedQueriesStale,
   removeReconfigurationAffectedQueries,
+  resetReconfigurationAffectedQueries,
 } from "../../src/app/model/resetLibraryForReconfiguration";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
@@ -63,6 +64,48 @@ describe("removeReconfigurationAffectedQueries", () => {
     removeReconfigurationAffectedQueries(queryClient);
 
     await vi.waitFor(() => expect(queryFn).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("resetReconfigurationAffectedQueries", () => {
+  it("実行中のfetchを取り消さず、マウント中のuseQueryはpendingで止まらず新しいデータを取得する", async () => {
+    const queryClient = new QueryClient();
+    let resolveFirst!: (value: { seeded: boolean; refreshed: boolean }) => void;
+    const queryFn = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<{ seeded: boolean; refreshed: boolean }>((resolve) => {
+            resolveFirst = resolve;
+          }),
+      )
+      .mockResolvedValue({ seeded: true, refreshed: true });
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client: queryClient }, children);
+
+    const { result } = renderHook(() => useQuery({ queryKey: WORK_QUERY_KEYS.all(), queryFn }), {
+      wrapper,
+    });
+    await vi.waitFor(() =>
+      expect(queryClient.getQueryState(WORK_QUERY_KEYS.all())?.fetchStatus).toBe("fetching"),
+    );
+
+    // ready到達時点で既に走っているfetchがある状況を模す。
+    resetReconfigurationAffectedQueries(queryClient);
+    resolveFirst({ seeded: true, refreshed: false });
+
+    await vi.waitFor(() => expect(result.current.status).toBe("success"));
+    expect(result.current.data).toEqual({ seeded: true, refreshed: true });
+    expect(result.current.isPending).toBe(false);
+  });
+
+  it("settingsクエリなど再設定に無関係なキャッシュは対象にしない", () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(["settings"], { rootFolder: "/audio/library" });
+
+    resetReconfigurationAffectedQueries(queryClient);
+
+    expect(queryClient.getQueryData(["settings"])).toEqual({ rootFolder: "/audio/library" });
   });
 });
 

@@ -1,9 +1,12 @@
 // root再設定に入った時点で、旧rootに紐づくキャッシュを丸ごと破棄する（ADR-0029）。
-// markReconfigurationAffectedQueriesStale（202直後、refetchType:"none"でstale化のみ）と
-// removeReconfigurationAffectedQueries（通常UIのobserverが確実に消えた後にだけ呼ぶ、
-// 実際の破棄）の2つに分かれているのは、生きたobserverがある間にremoveすると即座に
-// 再フェッチしてロック中APIへ409を飛ばすため（呼び出し側はApp.ReconfigurationEntryEffect・
-// ReconfigurationExitEffect参照）。
+// markReconfigurationAffectedQueriesStale（202直後、refetchType:"none"でstale化のみ）に
+// 加え、実際の破棄は呼び出し元の状況で使い分ける（App.ReconfigurationEntryEffect・
+// ReconfigurationExitEffect参照）:
+// - removeReconfigurationAffectedQueries: observerがいない側（reconfiguring画面）専用。
+//   生きたobserverがある間にremoveすると即座に再フェッチしてロック中APIへ409を飛ばす。
+// - resetReconfigurationAffectedQueries: observerがいる側（ready復帰後）専用。removeだと
+//   その時点で走っているfetchごと破棄してobserverが再開せずpendingのまま残るため、
+//   reset（active分は自動で再取得を伴う）を使う。
 import type { QueryClient } from "@tanstack/react-query";
 import { WORK_QUERY_KEYS } from "../../entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../entities/smart-folder/queryKeys";
@@ -39,5 +42,11 @@ export function markReconfigurationAffectedQueriesStale(queryClient: QueryClient
 export function removeReconfigurationAffectedQueries(queryClient: QueryClient): void {
   for (const queryKey of reconfigurationAffectedQueryKeys()) {
     queryClient.removeQueries({ queryKey });
+  }
+}
+
+export function resetReconfigurationAffectedQueries(queryClient: QueryClient): void {
+  for (const queryKey of reconfigurationAffectedQueryKeys()) {
+    void queryClient.resetQueries({ queryKey });
   }
 }

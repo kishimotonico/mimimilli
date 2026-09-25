@@ -45,7 +45,7 @@ import {
   useRootFolderOrNull,
   requireRootFolder,
 } from "../entities/settings/useSettingsQuery";
-import { reconfigurationExitPendingAtom } from "../entities/settings/reconfigurationExitAtom";
+import { reconfigurationExitEpochAtom } from "../entities/settings/reconfigurationExitAtom";
 import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
 import { setAppModeAtom } from "../shared/model/appModeAtoms";
 import { openPathInFilesAtom } from "../entities/file-system/model/navigationAtoms";
@@ -72,7 +72,7 @@ export default function App() {
   const openWorkDetail = useSetAtom(openWorkDetailAtom);
   const setActiveModal = useSetAtom(activeModalAtom);
   const setDlsiteBulkApplyOpen = useSetAtom(dlsiteBulkApplyOpenAtom);
-  const setReconfigurationExitPending = useSetAtom(reconfigurationExitPendingAtom);
+  const bumpReconfigurationExitEpoch = useSetAtom(reconfigurationExitEpochAtom);
   const playRequestGuard = useRef(createPlayRequestGuard()).current;
 
   // ── Settings ─────────────────────────────────────────────
@@ -114,7 +114,7 @@ export default function App() {
     resetLibraryNavigation();
     resetLibraryNavigationUrl();
     setScanCandidateHiddenPaths(new Set());
-    setReconfigurationExitPending(true);
+    bumpReconfigurationExitEpoch((epoch) => epoch + 1);
     markReconfigurationAffectedQueriesStale(queryClient);
   }, [
     queryClient,
@@ -122,7 +122,7 @@ export default function App() {
     scanActions,
     setActiveModal,
     setDlsiteBulkApplyOpen,
-    setReconfigurationExitPending,
+    bumpReconfigurationExitEpoch,
     setScanCandidateHiddenPaths,
     stopPlaybackAndInvalidateGuard,
   ]);

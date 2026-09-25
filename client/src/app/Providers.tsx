@@ -7,7 +7,7 @@ import ScanRuntime from "../features/scan/ui/ScanRuntime";
 import { PlayerRuntimeProvider } from "../features/player/model/PlayerRuntimeProvider";
 import { queryClient } from "./model/queryClient";
 import { useRootReconfiguringApiErrorHandler } from "./model/useRootReconfiguringApiErrorHandler";
-import { reconfigurationExitPendingAtom } from "../entities/settings/reconfigurationExitAtom";
+import { reconfigurationExitEpochAtom } from "../entities/settings/reconfigurationExitAtom";
 
 interface ProvidersProps {
   children: ReactNode;
@@ -28,15 +28,15 @@ const ReactQueryDevtools =
       )
     : null;
 
-// useRootReconfiguringApiErrorHandlerはreconfigurationExitPendingAtomを書くため、
+// useRootReconfiguringApiErrorHandlerはreconfigurationExitEpochAtomを書くため、
 // JotaiProviderの内側（子として）でマウントする必要がある。Providers自身の関数本体は
 // 自分が返すJotaiProviderの外側にあたるので、ここで呼んではいけない。
 function RootApiErrorSubscription() {
   const client = useQueryClient();
-  const setReconfigurationExitPending = useSetAtom(reconfigurationExitPendingAtom);
+  const bumpReconfigurationExitEpoch = useSetAtom(reconfigurationExitEpochAtom);
   const onRootReconfiguring = useCallback(
-    () => setReconfigurationExitPending(true),
-    [setReconfigurationExitPending],
+    () => bumpReconfigurationExitEpoch((epoch) => epoch + 1),
+    [bumpReconfigurationExitEpoch],
   );
   useRootReconfiguringApiErrorHandler(client, onRootReconfiguring);
   return null;
