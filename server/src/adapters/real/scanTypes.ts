@@ -1,4 +1,10 @@
-import type { MetaFile, ScanCandidate, ScanResult, Work } from "@mimimilli/shared";
+import type {
+  MetaFile,
+  ScanCandidate,
+  ScanResult,
+  Work,
+  WorkPlacementResolution,
+} from "@mimimilli/shared";
 
 /** スキャン実行の戻り値。候補プールは HTTP 契約の ScanResult とは分離する。 */
 export type ScanExecutionResult = {
@@ -30,6 +36,7 @@ export interface PreparedMeta {
   kind: "ok";
   metaPath: string;
   meta: MetaFile;
+  placement: WorkPlacementResolution;
   bytes: Buffer;
   revisions: WorkRevisions;
   cachedRevisions: WorkRevisions | undefined;
@@ -37,6 +44,8 @@ export interface PreparedMeta {
   cachedStatus: Work["status"] | undefined;
   /** カバー欠損判定（DBの寸法充足状況）。false ならfingerprint一致でも再処理が必要。 */
   coverSatisfied: boolean;
+  /** 配置が整合し、catalogに記録済みのmeta_pathと同じか。false なら再処理が必要。 */
+  placementSettled: boolean;
 }
 
 interface PreparedError {
@@ -59,16 +68,18 @@ export interface PreparedIdentityConflict {
 
 export type PreparedEntry = PreparedMeta | PreparedError | PreparedSkip | PreparedIdentityConflict;
 
-/** fingerprint 一致かつカバー充足のとき増分スキャンでスキップできるか。 */
+/** fingerprint 一致・カバー充足・配置が記録どおりのとき増分スキャンでスキップできるか。 */
 export function canSkipIncremental(
   full: boolean,
   cachedFingerprint: WorkRevisions | undefined,
   revisions: WorkRevisions,
   coverSatisfied: boolean,
   cachedStatus: Work["status"] | undefined,
+  placementSettled: boolean,
 ): boolean {
   if (full) return false;
   if (cachedStatus === "error") return false;
+  if (!placementSettled) return false;
   return (
     cachedFingerprint?.sourceRevision === revisions.sourceRevision &&
     cachedFingerprint.projectionRevision === revisions.projectionRevision &&

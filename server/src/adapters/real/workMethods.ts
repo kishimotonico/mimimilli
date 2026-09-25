@@ -23,7 +23,12 @@ import type {
   WorksQuery,
 } from "@mimimilli/shared";
 import type { WorkSourceProjectionResult } from "../../adapter/work.ts";
-import { isAudioFileName, sidecarMetaFileName, tagEquals } from "@mimimilli/shared";
+import {
+  isAudioFileName,
+  resolveWorkPlacement,
+  sidecarMetaFileName,
+  tagEquals,
+} from "@mimimilli/shared";
 import { type Db } from "./db.ts";
 import {
   META_FILE_NAME,
@@ -35,7 +40,7 @@ import {
 import { SourceChangedError } from "../../errors.ts";
 import { removeIdentityConflictPath } from "../../core/identityConflicts.ts";
 import { validateResumeRequest } from "../../core/resumeValidation.ts";
-import { resolveWithin, toPortableRelativePath } from "./paths.ts";
+import { identityConflictMetaPath, identityConflictPathOf, resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
@@ -43,7 +48,6 @@ import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import { getWorkFromCatalog, getWorkWithLiveProbe } from "./workRefresh.ts";
-import { physicalPathForMeta } from "./scanRegister.ts";
 import { naturalCompare } from "./naturalCompare.ts";
 import {
   mapMetaReadError,
@@ -73,14 +77,10 @@ export function createWorkMethods(deps: {
 }) {
   const { db, query, catalog, user, scanner, requireRoot, cachedCover } = deps;
 
-  function recordIdentityConflict(
-    workId: string,
-    ownerPhysicalPath: string,
-    conflictPhysicalPath: string,
-  ) {
+  function recordIdentityConflict(workId: string, ownerMetaPath: string, conflictMetaPath: string) {
     const root = requireRoot();
-    const ownerPath = toPortableRelativePath(root, ownerPhysicalPath);
-    const conflictPath = toPortableRelativePath(root, conflictPhysicalPath);
+    const ownerPath = identityConflictPathOf(root, ownerMetaPath);
+    const conflictPath = identityConflictPathOf(root, conflictMetaPath);
     const diagnostics = catalog.listIdentityConflicts();
     const existing = diagnostics.find(
       (diagnostic): diagnostic is Extract<ScanDiagnostic, { kind: "identity_conflict" }> =>
@@ -190,9 +190,9 @@ export function createWorkMethods(deps: {
       if (!diagnostic) return null;
 
       const root = requireRoot();
-      const workDir = resolveWithin(root, join(root, body.path));
-      if (!workDir) return null;
-      const metaPath = join(workDir, META_FILE_NAME);
+      const target = resolveWithin(root, join(root, body.path));
+      if (!target) return null;
+      const metaPath = identityConflictMetaPath(target);
       let source;
       try {
         source = readMetaSource(metaPath);
@@ -204,7 +204,7 @@ export function createWorkMethods(deps: {
       const updated = patchMetaFileCas(metaPath, source.sourceRevision, {
         id: crypto.randomUUID(),
       });
-      const physicalPath = physicalPathForMeta(metaPath, updated.meta);
+      const physicalPath = resolveWorkPlacement(metaPath, updated.meta).physicalPath;
       const outcome = await scanner.projectMetaFile(metaPath, updated);
       catalog.replaceIdentityConflicts(
         removeIdentityConflictPath(catalog.listIdentityConflicts(), diagnostic.workId, body.path),
@@ -224,11 +224,11 @@ export function createWorkMethods(deps: {
       } catch (error) {
         mapMetaReadError(error);
       }
-      const physicalPath = physicalPathForMeta(metaPath, source.meta);
+      const physicalPath = resolveWorkPlacement(metaPath, source.meta).physicalPath;
       const existing = query.getScanWorkMap().get(source.meta.id);
       const hadCatalogRow = existing !== undefined;
-      if (existing && existing.physicalPath !== physicalPath && existing.status !== "missing") {
-        recordIdentityConflict(source.meta.id, existing.physicalPath, physicalPath);
+      if (existing && existing.metaPath !== metaPath && existing.status !== "missing") {
+        recordIdentityConflict(source.meta.id, existing.metaPath, metaPath);
         return {
           snapshot: toEditSnapshot(source, physicalPath),
           projection: { status: "pending", reason: "identity_conflict" },
@@ -254,7 +254,7 @@ export function createWorkMethods(deps: {
     },
 
     async deleteWork(id: string): Promise<boolean> {
-      return unregisterWork(query, catalog, user, requireRoot(), id);
+      return unregisterWork(catalog, user, requireRoot(), id);
     },
 
     async countMissingWorks(): Promise<number> {
@@ -268,7 +268,7 @@ export function createWorkMethods(deps: {
       let failedCount = 0;
       for (const id of ids) {
         try {
-          if (unregisterWork(query, catalog, user, root, id)) deletedCount++;
+          if (unregisterWork(catalog, user, root, id)) deletedCount++;
           else failedCount++;
         } catch {
           failedCount++;

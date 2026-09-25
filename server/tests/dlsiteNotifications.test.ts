@@ -5,7 +5,12 @@ import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { createApp } from "../src/app.ts";
 import { openDb } from "../src/adapters/real/db.ts";
 import { createTestRealAdapter } from "./helpers/realAdapter.ts";
-import { createWorkRepos, makeWorkSummary, upsertTestWork } from "./helpers/workTestUtils.ts";
+import {
+  createWorkRepos,
+  folderFixtureWork,
+  makeWorkSummary,
+  upsertTestWork,
+} from "./helpers/workTestUtils.ts";
 import { makeSampleLibrary } from "./helpers/sampleLibrary.ts";
 import { nts } from "./helpers/tag.ts";
 import { configureRoot } from "./helpers/rootFolder.ts";
@@ -88,7 +93,7 @@ test("DLsite通知のページングパラメータが不正なら400", async ()
 test("201件超の通知はfixtureとrealで集計・ページングの欠落や重複がない", async () => {
   const works = notificationWorks(402);
   const fixture = createFixtureAdapter({
-    works,
+    works: works.map(folderFixtureWork),
     dlsiteFetchFailures: [
       {
         rjCode: "RJ123456",

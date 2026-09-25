@@ -12,9 +12,11 @@ import type {
   WorkSummary,
 } from "@mimimilli/shared";
 import {
+  SEED_PLAYLIST_SPECS,
   fixtureCoverColumnsForWork,
   type FixtureCoverColumns,
   type FixtureWorkRecord,
+  type SeedPlaylistSpec,
 } from "./data.ts";
 import { createFixtureScenario, type FixtureRootReconfiguration } from "./scenarios.ts";
 
@@ -55,6 +57,7 @@ export interface FixtureState {
   /** 作品ごとのレジューム位置 */
   resumes: Map<string, ResumeBody>;
   playbackIds: Map<string, PlaybackIds>;
+  playlistSpecs: ReadonlyMap<string, SeedPlaylistSpec[]>;
   /** scan() が insertedWorkIds として返す、未取り込みの新規作品ID（シナリオ "new-work" 用） */
   scanInsertedWorkIds: string[];
   /** scan() が updatedWorkIds として返す作品ID */
@@ -115,9 +118,10 @@ export function dlsiteFetchFailureFor(
 /** 作品レコードとlinkage・取得キャッシュから、API向けの合成済みWorkSummaryを読み出し時に組み立てる。
  *  合成結果はどこにも保存しない。 */
 export function composeWork(state: FixtureState, record: FixtureWorkRecord): WorkSummary {
+  const { metaPath: _metaPath, ...summary } = record;
   const linkage = dlsiteLinkageOf(state, record.id);
   return {
-    ...record,
+    ...summary,
     dlsite: projectDlsiteState(linkage, dlsiteFetchFailureFor(state, linkage.rjCode)),
   };
 }
@@ -129,6 +133,9 @@ export function composeWorks(state: FixtureState): WorkSummary[] {
 /** dataIntegrityWarning のダミー除外対象workId（実在の works には含めない） */
 const DATA_INTEGRITY_WARNING_SKIPPED_WORK_ID = "RJ501099";
 
+/** 契約テスト用の作品。fixture の作品レコードと同じく metaPath を持つ */
+export type FixtureSeedWork = WorkSummary & { metaPath: string };
+
 export interface FixtureAdapterOptions {
   /** データシナリオ（省略時 "default"）。不明なIDはエラー */
   scenario?: string;
@@ -136,9 +143,11 @@ export interface FixtureAdapterOptions {
   rootRebuildStepMs?: number;
   /** 契約テスト用に差し替える作品一覧。省略時はscenarioのseedを使う。dlsiteはrjCode/status/appliedTags
    *  （linkage相当）だけを取り出して使い、lastAttemptAt/error/errorKindは読まない。 */
-  works?: WorkSummary[];
+  works?: FixtureSeedWork[];
   /** works差し替え時に、rjCodeごとのDLsite取得キャッシュ相当を明示的に与える（省略時は空）。 */
   dlsiteFetchFailures?: ReadonlyArray<{ rjCode: string; resolution: DlsiteCacheResolution }>;
+  /** 作品IDごとのプレイリスト定義（meta の playlists に相当）。シードの定義に上書きで足す */
+  playlistSpecs?: Readonly<Record<string, SeedPlaylistSpec[]>>;
 }
 
 export function createInitialState(options: FixtureAdapterOptions): FixtureState {
@@ -198,6 +207,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     nextSmartFolderId: maxSmartFolderNum + 1,
     resumes: new Map(),
     playbackIds: new Map(),
+    playlistSpecs: new Map(Object.entries({ ...SEED_PLAYLIST_SPECS, ...options.playlistSpecs })),
     scanInsertedWorkIds: scenario.scanInsertedWorkIds,
     scanUpdatedWorkIds: scenario.scanUpdatedWorkIds,
     scanCandidateExclusions: [],

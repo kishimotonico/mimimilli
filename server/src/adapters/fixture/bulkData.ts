@@ -1,7 +1,12 @@
 // 大量件数シナリオ（"large"）用の作品データ生成。
 // 実ライブラリ規模（数百〜数千件）でのページング・ファセット・仮想スクロールを
 // 手元で確認するために、決定的な擬似乱数で作品を組み立てる。
-import { DEFAULT_DLSITE_CACHE_TTLS_MS, dedupeTags, normalizeTags } from "@mimimilli/shared";
+import {
+  DEFAULT_DLSITE_CACHE_TTLS_MS,
+  META_FILE_NAME,
+  dedupeTags,
+  normalizeTags,
+} from "@mimimilli/shared";
 import type {
   CoverValueBase,
   DlsiteCacheResolution,
@@ -298,12 +303,14 @@ export function createBulkWorks(count: number, nowMs: number): BulkWorks {
     const addedAt = new Date(START_MS + random() * (END_MS - START_MS)).toISOString();
     const played = random() < 0.45;
 
+    const physicalPath = `/library/dlsite/${circle}/${id}_${pick(random, TITLE_TAILS)}`;
     const raw = {
       id,
       title,
       cover: coverImage ? { image: coverImage, dimensions } : null,
       status,
-      physicalPath: `/library/dlsite/${circle}/${id}_${pick(random, TITLE_TAILS)}`,
+      physicalPath,
+      metaPath: `${physicalPath}/${META_FILE_NAME}`,
       totalDurationSec,
       addedAt,
       errorMessage:
@@ -320,7 +327,10 @@ export function createBulkWorks(count: number, nowMs: number): BulkWorks {
       lastPlayedAt: played
         ? new Date(Date.parse(addedAt) + random() * (END_MS - Date.parse(addedAt))).toISOString()
         : null,
-    } satisfies Omit<WorkSummary, "dlsite" | "cover"> & { cover: CoverValueBase | null };
+    } satisfies Omit<WorkSummary, "dlsite" | "cover"> & {
+      metaPath: string;
+      cover: CoverValueBase | null;
+    };
 
     works.push({ ...raw, cover: fixtureCoverFromColumns(raw, fixtureCoverColumnsForWork(raw)) });
     const { linkage, failure } = buildDlsiteLinkageAndFailure(random, nowMs, id, tags);

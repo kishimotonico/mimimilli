@@ -2,10 +2,10 @@
 // client/mocks からは import せず、本ファイル内で完結させる。
 import {
   dedupeTags,
-  isAudioWorkPath,
   normalizeTags,
   TEXT_PREVIEW_LIMIT_BYTES,
   DEFAULT_DLSITE_CACHE_TTLS_MS,
+  workPlacementOf,
 } from "@mimimilli/shared";
 import type {
   CoverValueBase,
@@ -27,7 +27,7 @@ export interface FixtureCoverColumns {
 /** state.works が持つ作品レコード。DLsite合成状態（dlsite）を含まない。
  *  meta linkageはFixtureState.dlsiteLinkages、取得キャッシュ相当はdlsiteFetchFailuresが正本で、
  *  API向けの合成状態（WorkSummary.dlsite）はcomposeWorkが読み出し時に組み立てる。 */
-export type FixtureWorkRecord = Omit<WorkSummary, "dlsite">;
+export type FixtureWorkRecord = Omit<WorkSummary, "dlsite"> & { metaPath: string };
 
 /** シード作品のカバー列。表示用 cover とは別に保持し unmeasured 等を表現する */
 export const SEED_COVER_COLUMNS: Partial<Record<string, FixtureCoverColumns>> = {
@@ -55,7 +55,11 @@ export { fixtureCoverFromColumns } from "./coverDto.ts";
  *  - trackCount は1〜20の範囲でばらつかせる
  */
 const RAW_SEED_WORKS: Array<
-  Omit<WorkSummary, "dlsite" | "tags" | "cover"> & { tags: string[]; cover: CoverValueBase | null }
+  Omit<WorkSummary, "dlsite" | "tags" | "cover"> & {
+    metaPath: string;
+    tags: string[];
+    cover: CoverValueBase | null;
+  }
 > = [
   {
     id: "RJ501001",
@@ -63,6 +67,7 @@ const RAW_SEED_WORKS: Array<
     cover: { image: "cover.jpg", dimensions: { width: 800, height: 1200 } },
     status: "ok",
     physicalPath: "/library/dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読",
+    metaPath: "/library/dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読/mimimilli.json",
     totalDurationSec: 5400, // 1時間30分
     addedAt: "2025-04-12T09:00:00.000Z",
     errorMessage: null,
@@ -88,6 +93,7 @@ const RAW_SEED_WORKS: Array<
     cover: { image: "cover.jpg", dimensions: { width: 1200, height: 800 } },
     status: "ok",
     physicalPath: "/library/dlsite/夜想曲スタジオ/RJ501002_添い寝カフェへようこそ",
+    metaPath: "/library/dlsite/夜想曲スタジオ/RJ501002_添い寝カフェへようこそ/mimimilli.json",
     totalDurationSec: 9000, // 2時間30分
     addedAt: "2025-05-20T10:30:00.000Z",
     errorMessage: null,
@@ -112,6 +118,7 @@ const RAW_SEED_WORKS: Array<
     cover: null,
     status: "ok",
     physicalPath: "/library/dlsite/月白製作所/RJ501003_幼馴染と過ごす雨の日",
+    metaPath: "/library/dlsite/月白製作所/RJ501003_幼馴染と過ごす雨の日/mimimilli.json",
     totalDurationSec: 1800, // 30分
     addedAt: "2025-06-03T08:00:00.000Z",
     errorMessage: null,
@@ -135,6 +142,7 @@ const RAW_SEED_WORKS: Array<
     cover: { image: "cover.jpg", dimensions: { width: 900, height: 900 } },
     status: "ok",
     physicalPath: "/library/dlsite/月白製作所/RJ501004_意識がとろける誘導ボイス",
+    metaPath: "/library/dlsite/月白製作所/RJ501004_意識がとろける誘導ボイス/mimimilli.json",
     totalDurationSec: 7200, // 2時間
     addedAt: "2024-09-15T12:00:00.000Z",
     errorMessage: null,
@@ -159,6 +167,7 @@ const RAW_SEED_WORKS: Array<
     cover: { image: "cover.jpg", dimensions: { width: 750, height: 1000 } },
     status: "ok",
     physicalPath: "/library/dlsite/夜想曲スタジオ/RJ501005_耳かき専門店みみより",
+    metaPath: "/library/dlsite/夜想曲スタジオ/RJ501005_耳かき専門店みみより/mimimilli.json",
     totalDurationSec: 10800, // 3時間
     addedAt: "2024-11-02T07:30:00.000Z",
     errorMessage: null,
@@ -184,6 +193,7 @@ const RAW_SEED_WORKS: Array<
     cover: null,
     status: "ok",
     physicalPath: "/library/dlsite/月白製作所/RJ501006_辺境の魔法使いと旅する日々",
+    metaPath: "/library/dlsite/月白製作所/RJ501006_辺境の魔法使いと旅する日々/mimimilli.json",
     totalDurationSec: 18000, // 5時間
     addedAt: "2024-07-19T11:00:00.000Z",
     errorMessage: null,
@@ -210,6 +220,7 @@ const RAW_SEED_WORKS: Array<
     cover: null,
     status: "ok",
     physicalPath: "/library/dlsite/_その他/RJ501007_環境音と読み聞かせ",
+    metaPath: "/library/dlsite/_その他/RJ501007_環境音と読み聞かせ/mimimilli.json",
     totalDurationSec: 14400, // 4時間
     addedAt: "2023-12-08T06:00:00.000Z",
     errorMessage: null,
@@ -225,6 +236,8 @@ const RAW_SEED_WORKS: Array<
     cover: { image: "cover.jpg", dimensions: { width: 1000, height: 1000 } },
     status: "ok",
     physicalPath: "/library/dlsite/月白製作所/RJ501008_ツンデレ後輩との放課後トレーニング",
+    metaPath:
+      "/library/dlsite/月白製作所/RJ501008_ツンデレ後輩との放課後トレーニング/mimimilli.json",
     totalDurationSec: 3600, // 1時間
     addedAt: "2026-05-25T13:00:00.000Z",
     errorMessage: null,
@@ -249,6 +262,7 @@ const RAW_SEED_WORKS: Array<
     cover: null,
     status: "error",
     physicalPath: "/library/dlsite/_その他/RJ501009_破損ファイル",
+    metaPath: "/library/dlsite/_その他/RJ501009_破損ファイル/mimimilli.json",
     totalDurationSec: 0,
     addedAt: "2025-03-01T00:00:00.000Z",
     errorMessage: "メタデータの生成に失敗しました: 音声ファイルのヘッダーが読み取れません",
@@ -264,6 +278,7 @@ const RAW_SEED_WORKS: Array<
     cover: null,
     status: "missing",
     physicalPath: "/library/dlsite/夜想曲スタジオ/RJ501010_朗読劇",
+    metaPath: "/library/dlsite/夜想曲スタジオ/RJ501010_朗読劇/mimimilli.json",
     totalDurationSec: 6300, // 1時間45分
     addedAt: "2023-05-30T15:00:00.000Z",
     errorMessage: null,
@@ -281,6 +296,7 @@ const RAW_SEED_WORKS: Array<
     cover: { image: "cover.jpg", dimensions: { width: 850, height: 1100 } },
     status: "ok",
     physicalPath: "/library/dlsite/月白製作所/RJ501011_ツンデレ後輩の秘密のお世話ボイス",
+    metaPath: "/library/dlsite/月白製作所/RJ501011_ツンデレ後輩の秘密のお世話ボイス/mimimilli.json",
     totalDurationSec: 2100, // 35分
     addedAt: "2026-06-12T00:00:00.000Z",
     errorMessage: null,
@@ -555,8 +571,8 @@ export function buildFsRoot(
   identityConflicts: ScanDiagnostic[] = [],
   invalidMetaFiles: InvalidMetaFile[] = [],
 ): FsNode {
-  const folderWorks = works.filter((work) => !isAudioWorkPath(work.physicalPath));
-  const fileWorks = works.filter((work) => isAudioWorkPath(work.physicalPath));
+  const folderWorks = works.filter((work) => workPlacementOf(work.metaPath).kind === "folder");
+  const fileWorks = works.filter((work) => workPlacementOf(work.metaPath).kind === "audio-file");
   const byCircle = new Map<string, FixtureWorkRecord[]>();
   for (const work of folderWorks) {
     const circle = circleFromPhysicalPath(work.physicalPath);

@@ -1,6 +1,5 @@
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
-import { workMediaRoot } from "@mimimilli/shared";
 import { resolveWithin } from "./paths.ts";
 import { thumbnailCacheNames } from "./thumbnailCache.ts";
 import type { ListSummariesResult } from "./workRowMapping.ts";
@@ -55,7 +54,9 @@ export async function buildCoverSnapshot(
   for (const work of result.summaries) {
     checkpoint();
     if (!work.cover) continue;
-    const mediaRoot = workMediaRoot(work.physicalPath);
+    const placement = result.placements.get(work.id);
+    if (!placement) throw new Error(`作品の配置がありません: ${work.id}`);
+    const { mediaRoot } = placement;
     const resolved = resolveWithin(mediaRoot, join(mediaRoot, work.cover.image));
     if (!resolved) {
       gaps.push({ workId: work.id, reason: "cover-path-unresolved" });

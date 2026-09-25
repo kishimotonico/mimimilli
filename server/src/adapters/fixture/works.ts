@@ -1,10 +1,14 @@
 import { posix } from "node:path";
 import {
-  isAudioWorkPath,
+  META_FILE_NAME,
+  isAudioFileName,
   isDlsiteFetchFailed,
   isDlsiteParseFailed,
   isRjCodeMissing,
+  sidecarMetaFileName,
   tagEquals,
+  unresolvedWorkPhysicalPath,
+  workPlacementOf,
   type NormalizedTag,
 } from "@mimimilli/shared";
 import type {
@@ -36,10 +40,9 @@ import { validateResumeRequest } from "../../core/resumeValidation.ts";
 import { assertRegistrationAllowed } from "../../core/workRegistrationGuard.ts";
 import { applyWorksQuery, toWorksPage } from "../../core/worksQuery.ts";
 import { isPathWithin } from "../../lib/path.ts";
-import { buildFullWorkFromState } from "./playback.ts";
+import { buildFullWorkFromState, checkWorkPlacement } from "./playback.ts";
 import { normalizeFsPath } from "./fsResolve.ts";
 import {
-  composeWork,
   composeWorks,
   coverColumnsOf,
   dlsiteLinkageOf,
@@ -98,9 +101,18 @@ function removeIdentityConflictForWork(state: FixtureState, workId: string): voi
   const work = state.works.find((candidate) => candidate.id === workId);
   if (!work) return;
   const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
-  if (!isPathWithin(rootAbs, work.physicalPath, posix)) return;
-  const path = work.physicalPath.slice(rootAbs.length + 1);
+  const workPath = unresolvedWorkPhysicalPath(workPlacementOf(work.metaPath));
+  if (!isPathWithin(rootAbs, workPath, posix)) return;
+  const path = workPath.slice(rootAbs.length + 1);
   state.identityConflicts = removeIdentityConflictPath(state.identityConflicts, workId, path);
+}
+
+/** fixtureには実体のファイルシステムが無いため、登録の境界ではパス名で形式を決める */
+function registrationMetaPath(target: string): string {
+  const name = posix.basename(target);
+  return isAudioFileName(name)
+    ? posix.join(posix.dirname(target), sidecarMetaFileName(name))
+    : posix.join(target, META_FILE_NAME);
 }
 
 export function createWorkMethods(state: FixtureState): WorkAdapter {
@@ -109,14 +121,14 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
     const target = normalizeFsPath(`${rootAbs}/${path}`);
     if (!isPathWithin(rootAbs, target, posix)) return null;
     const name = target.split("/").filter(Boolean).pop() ?? target;
-    const isFile = isAudioWorkPath(target);
+    const isFile = workPlacementOf(registrationMetaPath(target)).kind === "audio-file";
     const descendants = isFile
       ? []
       : state.works.filter(
           (work) => work.physicalPath.startsWith(`${target}/`) && work.physicalPath !== target,
         );
     const ancestorRegistered = state.works.some((work) => {
-      if (isAudioWorkPath(work.physicalPath)) return false;
+      if (workPlacementOf(work.metaPath).kind === "audio-file") return false;
       return target === work.physicalPath || target.startsWith(`${work.physicalPath}/`);
     });
     const rjMatch = name.match(/RJ\d{6,8}/i);
@@ -180,12 +192,12 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
 
     async getWork(id: string): Promise<Work | null> {
       const work = state.works.find((w) => w.id === id);
-      return work ? buildFullWorkFromState(state, composeWork(state, work)) : null;
+      return work ? buildFullWorkFromState(state, work) : null;
     },
 
     async prepareWorkPlayback(id: string): Promise<Work | null> {
       const work = state.works.find((w) => w.id === id);
-      return work ? buildFullWorkFromState(state, composeWork(state, work)) : null;
+      return work ? buildFullWorkFromState(state, work) : null;
     },
 
     async createWork(body: WorkCreateBody): Promise<WorkSourceMutationResult | null> {
@@ -193,10 +205,12 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       if (!preview) return null;
       const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
       const workDir = normalizeFsPath(`${rootAbs}/${body.path}`);
+      const metaPath = registrationMetaPath(workDir);
+      const isFile = workPlacementOf(metaPath).kind === "audio-file";
       assertRegistrationAllowed({
         alreadyRegistered: preview.alreadyRegistered,
         descendantWorkCount: preview.descendantWorkCount,
-        kind: isAudioWorkPath(workDir) ? "file" : "folder",
+        kind: isFile ? "file" : "folder",
       });
       const now = new Date().toISOString();
       const applyTags = body.dlsite?.applyTags ?? [];
@@ -206,8 +220,9 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
         cover: null,
         status: "ok",
         physicalPath: workDir,
+        metaPath,
         totalDurationSec: 0,
-        trackCount: isAudioWorkPath(workDir) ? 1 : 0,
+        trackCount: isFile ? 1 : 0,
         addedAt: now,
         errorMessage: null,
         urls:
@@ -218,13 +233,17 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
         bookmarked: false,
         lastPlayedAt: null,
       };
-      state.works.push(work);
+      const registered = checkWorkPlacement(state, work);
+      state.works.push(registered);
       state.sourceRevisions.set(work.id, "fixture");
       const linkage: MetaDlsiteState = body.dlsite
         ? { rjCode: body.dlsite.info.rjCode, status: "applied", appliedTags: applyTags }
         : { rjCode: preview.detectedRjCode, status: "none", appliedTags: [] };
       setDlsiteLinkage(state, work.id, linkage);
-      return { snapshot: fixtureEditSnapshot(state, work), projection: { status: "published" } };
+      return {
+        snapshot: fixtureEditSnapshot(state, registered),
+        projection: { status: "published" },
+      };
     },
 
     async reassignIdentityConflict(
@@ -333,7 +352,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
     async saveResume(id: string, body: import("@mimimilli/shared").ResumeBody): Promise<boolean> {
       const work = state.works.find((w) => w.id === id);
       if (!work) return false;
-      const fullWork = buildFullWorkFromState(state, composeWork(state, work));
+      const fullWork = buildFullWorkFromState(state, work);
       const playlist = fullWork.playlists.find((candidate) => candidate.id === body.playlistId);
       const track = playlist?.tracks.find((candidate) => candidate.id === body.trackId);
       validateResumeRequest(track ? { durationSec: track.durationSec } : null, body.offsetSec);

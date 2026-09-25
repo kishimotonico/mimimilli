@@ -12,6 +12,7 @@ import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../src/adapters/real/dlsiteConfig
 import { htmlResponse, mockDlsiteTransport, sampleWorkHtml } from "./helpers/dlsiteTransport.ts";
 import { makeTestDirectory, writeWav } from "./helpers/sampleLibrary.ts";
 import { configureRoot } from "./helpers/rootFolder.ts";
+import { folderFixtureWork } from "./helpers/workTestUtils.ts";
 
 const FAST_DLSITE_REQUEST_CONFIG = {
   ...DEFAULT_DLSITE_REQUEST_CONFIG,
@@ -49,7 +50,7 @@ test("dlsiteApplyMissing: 取得失敗はfailedへ数え、他の作品の適用
       dlsite: { ...emptyDlsiteState(), rjCode: FIXTURE_DLSITE_FETCH_FAILURE_RJ_CODE },
     },
   ];
-  const adapter = createFixtureAdapter({ works });
+  const adapter = createFixtureAdapter({ works: works.map(folderFixtureWork) });
 
   const result = await adapter.dlsiteApplyMissing(["ok-1", "fail-1"]);
   assert.deepEqual(result, { applied: 1, pending: 0, skipped: 0, failed: 1 });

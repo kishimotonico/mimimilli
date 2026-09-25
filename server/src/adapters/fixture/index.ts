@@ -9,7 +9,7 @@ import { createSettingsScanMethods } from "./settingsScan.ts";
 import { createInitialState, resetState, type FixtureAdapterOptions } from "./state.ts";
 import { createWorkMethods } from "./works.ts";
 
-export type { FixtureAdapterOptions } from "./state.ts";
+export type { FixtureAdapterOptions, FixtureSeedWork } from "./state.ts";
 
 export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataAdapter {
   const state = createInitialState(options);

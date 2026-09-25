@@ -234,89 +234,6 @@ test("DELETE /works/:id: メタ削除に失敗した場合はDB上の作品デ�
   chmodSync(folder, 0o755);
 });
 
-test("DELETE /works/:id: DBのmeta_pathが古い場合でもid一致のmimimilli.jsonを削除する", async (t) => {
-  const directory = makeTestDirectory("work-unregister-stale-meta-path");
-  t.after(directory.cleanup);
-  const catalogPath = join(directory.path, "catalog.db");
-  const userPath = join(directory.path, "user.db");
-  const root = join(directory.path, "lib");
-  const folder = join(root, "RJ900021_stale_meta");
-  mkdirSync(folder, { recursive: true });
-  writeWav(join(folder, "track.wav"), 2);
-
-  const adapter = directory.own(
-    createTestRealAdapter({
-      database: { kind: "files", catalogPath, userPath },
-    }),
-  );
-  const app = createApp(adapter);
-  await configureRoot(adapter, root);
-
-  const createRes = await app.request("/api/works", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, folder), title: "古いmeta_pathテスト" }),
-  });
-  assert.equal(createRes.status, 201);
-  const work = { id: (await createRes.json()).snapshot.id } as Work;
-  const actualMetaPath = folderMetaPath(folder);
-  assert.ok(existsSync(actualMetaPath));
-
-  const staleMetaPath = join(folder, ".meta.json");
-  const db = openDb({ kind: "files", catalogPath, userPath });
-  db.sqlite.run("UPDATE main.works SET meta_path = ? WHERE id = ?", [staleMetaPath, work.id]);
-  db.close();
-
-  const res = await app.request(`/api/works/${work.id}`, { method: "DELETE" });
-  assert.equal(res.status, 204);
-  assert.ok(!existsSync(actualMetaPath));
-});
-
-test("DELETE /works/:id: id不一致のmimimilli.jsonは削除しない", async (t) => {
-  const directory = makeTestDirectory("work-unregister-meta-id-mismatch");
-  t.after(directory.cleanup);
-  const catalogPath = join(directory.path, "catalog.db");
-  const userPath = join(directory.path, "user.db");
-  const root = join(directory.path, "lib");
-  const folder = join(root, "RJ900022_meta_mismatch");
-  mkdirSync(folder, { recursive: true });
-  writeWav(join(folder, "track.wav"), 2);
-
-  const adapter = directory.own(
-    createTestRealAdapter({
-      database: { kind: "files", catalogPath, userPath },
-    }),
-  );
-  const app = createApp(adapter);
-  await configureRoot(adapter, root);
-
-  const createRes = await app.request("/api/works", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, folder), title: "id不一致テスト" }),
-  });
-  assert.equal(createRes.status, 201);
-  const work = { id: (await createRes.json()).snapshot.id } as Work;
-  const actualMetaPath = folderMetaPath(folder);
-  assert.ok(existsSync(actualMetaPath));
-
-  const otherId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
-  const meta = JSON.parse(readFileSync(actualMetaPath, "utf-8")) as { id: string };
-  meta.id = otherId;
-  writeFileSync(actualMetaPath, JSON.stringify(meta, null, 2));
-
-  const staleMetaPath = join(folder, ".meta.json");
-  const db = openDb({ kind: "files", catalogPath, userPath });
-  db.sqlite.run("UPDATE main.works SET meta_path = ? WHERE id = ?", [staleMetaPath, work.id]);
-  db.close();
-
-  const res = await app.request(`/api/works/${work.id}`, { method: "DELETE" });
-  assert.equal(res.status, 204);
-  assert.ok(existsSync(actualMetaPath));
-  const remaining = JSON.parse(readFileSync(actualMetaPath, "utf-8")) as { id: string };
-  assert.equal(remaining.id, otherId);
-});
-
 test("unregisterWork: DB削除失敗時に退避したメタ正本を復元する", async (t) => {
   const directory = makeTestDirectory("work-unregister-db-failure");
   t.after(directory.cleanup);
@@ -347,13 +264,13 @@ test("unregisterWork: DB削除失敗時に退避したメタ正本を復元す�
   assert.ok(existsSync(metaPath));
 
   const db = openDb({ kind: "files", catalogPath, userPath });
-  const { query, catalog, user } = createWorkRepos(db);
+  const { catalog, user } = createWorkRepos(db);
   catalog.deleteWorkCatalog = () => {
     throw new Error("simulated db delete failure");
   };
 
   assert.throws(
-    () => unregisterWork(query, catalog, user, root, work.id),
+    () => unregisterWork(catalog, user, root, work.id),
     (error: Error) => error.message.includes("simulated db delete failure"),
   );
   db.close();
@@ -396,13 +313,13 @@ test("unregisterWork: catalog削除後のuser削除失敗時はメタを復元�
   const stagedPath = join(folder, `.${META_FILE_NAME}.unregistering`);
 
   const db = openDb({ kind: "files", catalogPath, userPath });
-  const { query, catalog, user } = createWorkRepos(db);
+  const { catalog, user } = createWorkRepos(db);
   user.deleteWorkUserState = () => {
     throw new Error("simulated user delete failure");
   };
 
   assert.throws(
-    () => unregisterWork(query, catalog, user, root, work.id),
+    () => unregisterWork(catalog, user, root, work.id),
     (error: Error) => error.message.includes("simulated user delete failure"),
   );
 
@@ -467,8 +384,8 @@ test("unregisterWork: 退避済みメタのまま再実行するとDB削除後�
   assert.ok(existsSync(stagedPath));
 
   const db = openDb({ kind: "files", catalogPath, userPath });
-  const { query, catalog, user } = createWorkRepos(db);
-  assert.equal(unregisterWork(query, catalog, user, root, work.id), true);
+  const { catalog, user } = createWorkRepos(db);
+  assert.equal(unregisterWork(catalog, user, root, work.id), true);
   db.close();
 
   assert.ok(!existsSync(metaPath));

@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-09-25
-- 関連: [ADR-0012](0012-library-axis-as-value-browse.md)（軸の値選択）、[ADR-0013](0013-tag-click-replaces-all.md)（タグ操作）、[ADR-0026](0026-value-list-as-global-entry.md)（値一覧はq・tagsを持たない）、[ADR-0029](0029-root-reconfiguration-workflow.md)（root再設定の突入時リセット）、[アーキテクチャレビュー2026-09-20 R4](../architecture-review-2026-09-20.md)、backlog TASK-466
+- 関連: [ADR-0012](0012-library-axis-as-value-browse.md)（軸の値選択）、[ADR-0013](0013-tag-click-replaces-all.md)（タグ操作）、[ADR-0026](0026-value-list-as-global-entry.md)（値一覧はq・tagsを持たない）、[ADR-0029](0029-root-reconfiguration-workflow.md)（root再設定の突入時リセット）、backlog TASK-466
 
 ## 文脈
 

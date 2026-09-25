@@ -15,12 +15,6 @@ mimimilli のドキュメント一覧と、どれが「現行の正」かの地�
 
 API 契約の正典はドキュメントではなく **`shared/src/`（Zod スキーマ）**。HANDOFF の API 表は概観にすぎない。
 
-## 設計検討資料
-
-- [アーキテクチャレビュー 2026-09-20](architecture-review-2026-09-20.md) — master `119aef15` の静的レビュー。改善案と既存設計の評価であり、現行仕様の正典ではない。未処理の指摘はTASK-465〜468・338
-- [仕様・拡張性レビュー 2026-09-20](specification-review-2026-09-20.md) — 仕様の単純化、状態の寿命、データ量に応じた処理構造、UIの複雑さの評価。未処理の指摘はTASK-469・470
-- [スキャンとDLsite連携の調査・再設計案 2026-09-21](dlsite-flow-review-2026-09-21.md) — 調査・再設計案、未採用。DRAFT-74・76の前提資料
-
 ## 規約として参照するもの
 
 - [design-system.md](design-system.md) — デザインシステムの規約（カラートークン・テーマ・z-index・motion・カーソル・アイコン等）。実装から読み取れない設計意図・規約だけを抜粋したもので、レイアウト・機能の正は実装済みのフロントエンド。アイコンライブラリ選定の経緯は [ADR-0009](adr/0009-icon-library-lucide.md)
@@ -32,6 +26,8 @@ API 契約の正典はドキュメントではなく **`shared/src/`（Zod ス�
 
 ## 削除済み（Git 履歴に残る）
 
+- `architecture-review-2026-09-20.md`、`specification-review-2026-09-20.md` — 2026-09-20のアーキテクチャ・仕様レビュー。指摘はADR-0025〜0032とTASK-465〜470へ反映済み、残りはTASK-338へ引き継ぎ済み（2026-09-25削除）
+- `dlsite-flow-review-2026-09-21.md`（と `assets/dlsite-flow-review-2026-09-21/`）— スキャンとDLsite連携の調査・再設計案。未採用で、論点はDRAFT-74・76へ引き継ぎ済み（2026-09-25削除）
 - `review-todo-2026-09-20.md`、`core-design-review-2026-09-20.md`、`core-design-review-scope-2026-09-20.md`、`data-lifecycle-review-2026-09-21.md`、`design-contract-review-2026-09-21.md`、`review-handoff-answers-2026-09-21.md`、`review-handoff-answers-2-2026-09-21.md`、`change-simulation-2026-09-20.md` — 2026-09-20〜21のAstra設計レビュー群のうち、指摘がADR-0025・0026・TASK-452〜463へ実装済み、またはTASK-465〜470・338へ引き継ぎ済みのもの（2026-09-24削除）
 - `application-architecture-review-2026-08-12.md` — 2026-08-12の設計レビュー。指摘はADR-0006・0017・0023・0025・0026とTASK群（309・310・313・315・317〜320・324・356・452〜470・338）へ移行済み（2026-09-24削除）
 - `web-architecture-proposal.md` — のちの architecture-v2 提案（これも削除済み）が置き換えた旧提案（2026-07-03 削除）

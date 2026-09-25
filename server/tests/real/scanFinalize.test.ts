@@ -12,6 +12,7 @@ import sharp from "sharp";
 import { finalizeScan, LAST_SCAN_TIME_KEY } from "../../src/adapters/real/scanFinalize.ts";
 import { captureLogs, recordMessage, scanRecords } from "../helpers/logCapture.ts";
 import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
+import { folderSummariesResult } from "../helpers/workTestUtils.ts";
 
 function makeSummary(
   overrides: Partial<WorkSummary> & Pick<WorkSummary, "id" | "physicalPath">,
@@ -54,11 +55,12 @@ test("finalizeScan: サムネイルGC後に last_scan_time を記録する", asy
     setScanState: (key: string, value: string | null) => scanStates.set(key, value),
   };
   const query = {
-    listSummaries: () => ({
-      summaries: [],
-      skipped: [],
-      unmeasuredCovers: [],
-    }),
+    listSummaries: () =>
+      folderSummariesResult({
+        summaries: [],
+        skipped: [],
+        unmeasuredCovers: [],
+      }),
   };
 
   await finalizeScan({
@@ -80,11 +82,12 @@ test("finalizeScan: throwIfCancelled が呼ばれたら last_scan_time を記録
     setScanState: (key: string, value: string | null) => scanStates.set(key, value),
   };
   const query = {
-    listSummaries: () => ({
-      summaries: [],
-      skipped: [],
-      unmeasuredCovers: [],
-    }),
+    listSummaries: () =>
+      folderSummariesResult({
+        summaries: [],
+        skipped: [],
+        unmeasuredCovers: [],
+      }),
   };
 
   await assert.rejects(
@@ -128,7 +131,10 @@ test("finalizeScan: 作品0件でも既存キャッシュは削除されず、�
   };
 
   await finalizeScan({
-    query: { listSummaries: () => ({ summaries: [], skipped: [], unmeasuredCovers: [] }) },
+    query: {
+      listSummaries: () =>
+        folderSummariesResult({ summaries: [], skipped: [], unmeasuredCovers: [] }),
+    },
     catalog,
     thumbnailCacheDir,
   });
@@ -136,21 +142,22 @@ test("finalizeScan: 作品0件でも既存キャッシュは削除されず、�
 
   await finalizeScan({
     query: {
-      listSummaries: () => ({
-        summaries: [
-          makeSummary({
-            id: "work-fixed",
-            physicalPath: workDir,
-            cover: {
-              image: "cover.jpg",
-              dimensions: { width: 100, height: 100 },
-              version: "cover",
-            },
-          }),
-        ],
-        skipped: [],
-        unmeasuredCovers: [],
-      }),
+      listSummaries: () =>
+        folderSummariesResult({
+          summaries: [
+            makeSummary({
+              id: "work-fixed",
+              physicalPath: workDir,
+              cover: {
+                image: "cover.jpg",
+                dimensions: { width: 100, height: 100 },
+                version: "cover",
+              },
+            }),
+          ],
+          skipped: [],
+          unmeasuredCovers: [],
+        }),
     },
     catalog,
     thumbnailCacheDir,
@@ -170,11 +177,12 @@ test("finalizeScan: listSummaries の skipped がある場合は削除されな�
 
   await finalizeScan({
     query: {
-      listSummaries: () => ({
-        summaries: [makeSummary({ id: "work-ok", physicalPath: workDir })],
-        skipped: [{ workId: "work-bad", reason: "formatVersion missing" }],
-        unmeasuredCovers: [],
-      }),
+      listSummaries: () =>
+        folderSummariesResult({
+          summaries: [makeSummary({ id: "work-ok", physicalPath: workDir })],
+          skipped: [{ workId: "work-bad", reason: "formatVersion missing" }],
+          unmeasuredCovers: [],
+        }),
     },
     catalog: { setScanState: () => {} },
     thumbnailCacheDir,
@@ -195,21 +203,22 @@ test("finalizeScan: resolveWithin 失敗がある場合は削除されない", a
 
   await finalizeScan({
     query: {
-      listSummaries: () => ({
-        summaries: [
-          makeSummary({
-            id: "work-missing-cover",
-            physicalPath: workDir,
-            cover: {
-              image: "missing-cover.jpg",
-              dimensions: { width: 100, height: 100 },
-              version: "missing",
-            },
-          }),
-        ],
-        skipped: [],
-        unmeasuredCovers: [],
-      }),
+      listSummaries: () =>
+        folderSummariesResult({
+          summaries: [
+            makeSummary({
+              id: "work-missing-cover",
+              physicalPath: workDir,
+              cover: {
+                image: "missing-cover.jpg",
+                dimensions: { width: 100, height: 100 },
+                version: "missing",
+              },
+            }),
+          ],
+          skipped: [],
+          unmeasuredCovers: [],
+        }),
     },
     catalog: { setScanState: () => {} },
     thumbnailCacheDir,
@@ -226,7 +235,10 @@ test("finalizeScan: GCスキップ時も last_scan_time を更新する", async 
   };
 
   await finalizeScan({
-    query: { listSummaries: () => ({ summaries: [], skipped: [], unmeasuredCovers: [] }) },
+    query: {
+      listSummaries: () =>
+        folderSummariesResult({ summaries: [], skipped: [], unmeasuredCovers: [] }),
+    },
     catalog,
     thumbnailCacheDir,
   });
@@ -242,11 +254,12 @@ test("finalizeScan: GCスキップ時に reason・件数・cacheDir を含む wa
   await captureLogs(async (records) => {
     await finalizeScan({
       query: {
-        listSummaries: () => ({
-          summaries: [makeSummary({ id: "work-1", physicalPath: workDir })],
-          skipped: [{ workId: "work-bad", reason: "invalid" }],
-          unmeasuredCovers: [],
-        }),
+        listSummaries: () =>
+          folderSummariesResult({
+            summaries: [makeSummary({ id: "work-1", physicalPath: workDir })],
+            skipped: [{ workId: "work-bad", reason: "invalid" }],
+            unmeasuredCovers: [],
+          }),
       },
       catalog: { setScanState: () => {} },
       thumbnailCacheDir,
@@ -277,11 +290,12 @@ test("finalizeScan: 作品あり・全作品カバーなしの場合はGCが実�
 
   await finalizeScan({
     query: {
-      listSummaries: () => ({
-        summaries: [makeSummary({ id: "work-no-cover", physicalPath: workDir, cover: null })],
-        skipped: [],
-        unmeasuredCovers: [],
-      }),
+      listSummaries: () =>
+        folderSummariesResult({
+          summaries: [makeSummary({ id: "work-no-cover", physicalPath: workDir, cover: null })],
+          skipped: [],
+          unmeasuredCovers: [],
+        }),
     },
     catalog: { setScanState: () => {} },
     thumbnailCacheDir,
@@ -302,11 +316,12 @@ test("finalizeScan: 寸法未計測カバーがある場合は削除されない
 
   await finalizeScan({
     query: {
-      listSummaries: () => ({
-        summaries: [makeSummary({ id: "work-unmeasured", physicalPath: workDir, cover: null })],
-        skipped: [],
-        unmeasuredCovers: ["work-unmeasured"],
-      }),
+      listSummaries: () =>
+        folderSummariesResult({
+          summaries: [makeSummary({ id: "work-unmeasured", physicalPath: workDir, cover: null })],
+          skipped: [],
+          unmeasuredCovers: ["work-unmeasured"],
+        }),
     },
     catalog: { setScanState: () => {} },
     thumbnailCacheDir,
@@ -323,14 +338,15 @@ test("finalizeScan: 寸法未計測カバーでGCスキップ時に unmeasured-c
   await captureLogs(async (records) => {
     await finalizeScan({
       query: {
-        listSummaries: () => ({
-          summaries: [
-            makeSummary({ id: "work-unmeasured", physicalPath: workDir, cover: null }),
-            makeSummary({ id: "work-ok", physicalPath: workDir, cover: null }),
-          ],
-          skipped: [],
-          unmeasuredCovers: ["work-unmeasured"],
-        }),
+        listSummaries: () =>
+          folderSummariesResult({
+            summaries: [
+              makeSummary({ id: "work-unmeasured", physicalPath: workDir, cover: null }),
+              makeSummary({ id: "work-ok", physicalPath: workDir, cover: null }),
+            ],
+            skipped: [],
+            unmeasuredCovers: ["work-unmeasured"],
+          }),
       },
       catalog: { setScanState: () => {} },
       thumbnailCacheDir,
@@ -359,11 +375,12 @@ test("finalizeScan: 寸法未計測カバーでGCスキップ時も last_scan_ti
 
   await finalizeScan({
     query: {
-      listSummaries: () => ({
-        summaries: [makeSummary({ id: "work-unmeasured", physicalPath: workDir, cover: null })],
-        skipped: [],
-        unmeasuredCovers: ["work-unmeasured"],
-      }),
+      listSummaries: () =>
+        folderSummariesResult({
+          summaries: [makeSummary({ id: "work-unmeasured", physicalPath: workDir, cover: null })],
+          skipped: [],
+          unmeasuredCovers: ["work-unmeasured"],
+        }),
     },
     catalog,
     thumbnailCacheDir,
@@ -394,21 +411,22 @@ test("finalizeScan: カバーの stat 失敗がある場合は削除されない
 
   await finalizeScan({
     query: {
-      listSummaries: () => ({
-        summaries: [
-          makeSummary({
-            id: "work-stat-fail",
-            physicalPath: workDir,
-            cover: {
-              image: "cover.jpg",
-              dimensions: { width: 100, height: 100 },
-              version: "cover",
-            },
-          }),
-        ],
-        skipped: [],
-        unmeasuredCovers: [],
-      }),
+      listSummaries: () =>
+        folderSummariesResult({
+          summaries: [
+            makeSummary({
+              id: "work-stat-fail",
+              physicalPath: workDir,
+              cover: {
+                image: "cover.jpg",
+                dimensions: { width: 100, height: 100 },
+                version: "cover",
+              },
+            }),
+          ],
+          skipped: [],
+          unmeasuredCovers: [],
+        }),
     },
     catalog: { setScanState: () => {} },
     thumbnailCacheDir,

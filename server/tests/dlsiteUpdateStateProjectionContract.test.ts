@@ -13,6 +13,7 @@ import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../src/adapters/real/dlsiteConfig
 import { htmlResponse, mockDlsiteTransport } from "./helpers/dlsiteTransport.ts";
 import { makeTestDirectory, writeWav } from "./helpers/sampleLibrary.ts";
 import { configureRoot } from "./helpers/rootFolder.ts";
+import { folderFixtureWork } from "./helpers/workTestUtils.ts";
 
 const FAST_DLSITE_REQUEST_CONFIG = {
   ...DEFAULT_DLSITE_REQUEST_CONFIG,
@@ -61,7 +62,7 @@ const CACHED_NOT_FOUND: DlsiteCacheResolution = {
 
 test("updateDlsiteState: 同じRJコードの再送信は取得失敗表示を保持する（fixture）", async () => {
   const adapter = createFixtureAdapter({
-    works: [makeWork()],
+    works: [folderFixtureWork(makeWork())],
     dlsiteFetchFailures: [{ rjCode: RJ_CODE, resolution: CACHED_NOT_FOUND }],
   });
   const before = await adapter.getWork(WORK_ID);
@@ -81,7 +82,7 @@ test("updateDlsiteState: 同じRJコードの再送信は取得失敗表示を�
 
 test("updateDlsiteState: RJコード変更は取得失敗表示をリセットする（fixture）", async () => {
   const adapter = createFixtureAdapter({
-    works: [makeWork()],
+    works: [folderFixtureWork(makeWork())],
     dlsiteFetchFailures: [{ rjCode: RJ_CODE, resolution: CACHED_NOT_FOUND }],
   });
   const snapshot = await adapter.getWorkEditSnapshot(WORK_ID);
@@ -96,7 +97,7 @@ test("updateDlsiteState: RJコード変更は取得失敗表示をリセット�
 
 test("updateDlsiteState: スキップ切替は取得失敗表示より優先される（fixture）", async () => {
   const adapter = createFixtureAdapter({
-    works: [makeWork()],
+    works: [folderFixtureWork(makeWork())],
     dlsiteFetchFailures: [{ rjCode: RJ_CODE, resolution: CACHED_NOT_FOUND }],
   });
   const snapshot = await adapter.getWorkEditSnapshot(WORK_ID);

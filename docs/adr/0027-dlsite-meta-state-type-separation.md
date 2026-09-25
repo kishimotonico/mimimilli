@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-09-24
-- 関連: [ADR-0017](0017-meta-source-projection-and-work-identity.md)（DLsite `status` の正本と投影）、[設計レビュー2026-09-20 R6](../architecture-review-2026-09-20.md)、backlog TASK-468
+- 関連: [ADR-0017](0017-meta-source-projection-and-work-identity.md)（DLsite `status` の正本と投影）、backlog TASK-468
 
 ## 文脈
 

@@ -27,7 +27,7 @@ import {
   writeMetaFile,
 } from "./meta.ts";
 import type { SeenMetaIds } from "./duplicateMetaIdRepair.ts";
-import { excludeDescendantPaths, toPortableRelativePath } from "./paths.ts";
+import { excludeDescendantPaths, identityConflictPathOf, toPortableRelativePath } from "./paths.ts";
 import { isPathWithin } from "../../lib/path.ts";
 import { createProgressThrottle } from "./progressThrottle.ts";
 import { measureCoverDimensions, type CoverDimensions } from "./thumbnailCache.ts";
@@ -89,7 +89,7 @@ function findIdentityConflicts(root: string, metaPaths: string[]): ScanDiagnosti
       if (typeof value !== "object" || value === null || !("id" in value)) continue;
       if (typeof value.id !== "string") continue;
       const paths = pathsByWorkId.get(value.id) ?? [];
-      paths.push(toPortableRelativePath(root, dirname(metaPath)));
+      paths.push(identityConflictPathOf(root, metaPath));
       pathsByWorkId.set(value.id, paths);
     } catch {
       // 不正JSONは登録フェーズで parse error として扱う。
@@ -173,8 +173,8 @@ export class Scanner {
     checkAbort();
     const seenIds: SeenMetaIds = { work: new Set() };
     const existingWorks = this.query.getScanWorkMap();
-    const existingByPhysicalPath = new Map(
-      [...existingWorks].map(([id, state]) => [state.physicalPath, { id, state }]),
+    const existingByMetaPath = new Map(
+      [...existingWorks].map(([id, state]) => [state.metaPath, { id, state }]),
     );
     result.identityConflicts = findIdentityConflicts(root, tree.metaPaths);
 
@@ -186,7 +186,7 @@ export class Scanner {
       full,
       seenIds,
       existingWorks,
-      existingByPhysicalPath,
+      existingByMetaPath,
       batch,
       result,
       emit,
@@ -240,7 +240,7 @@ export class Scanner {
     full: boolean,
     seenIds: SeenMetaIds,
     existingWorks: Map<string, ScanWorkState>,
-    existingByPhysicalPath: Map<string, { id: string; state: ScanWorkState }>,
+    existingByMetaPath: Map<string, { id: string; state: ScanWorkState }>,
     batch: ScanUpsertBatch,
     result: ScanResult,
     emit: NonNullable<ScanOptions["onProgress"]>,
@@ -274,7 +274,7 @@ export class Scanner {
             seenIds,
             result,
             existingWorks,
-            existingByPhysicalPath,
+            existingByMetaPath,
             root,
             result.identityConflicts,
           );
@@ -311,7 +311,7 @@ export class Scanner {
             seenIds,
             result,
             existingWorks,
-            existingByPhysicalPath,
+            existingByMetaPath,
             root,
             result.identityConflicts,
           );

@@ -5,9 +5,11 @@ import { test } from "node:test";
 import { workspacePath, type WorkSummary } from "@mimimilli/shared";
 import { createInitialState } from "../src/adapters/fixture/state.ts";
 import { createWorkMethods } from "../src/adapters/fixture/works.ts";
+import type { FixtureSeedWork } from "../src/adapters/fixture/index.ts";
+import { folderFixtureWork } from "./helpers/workTestUtils.ts";
 
-function makeWork(id: string, overrides: Partial<WorkSummary> = {}): WorkSummary {
-  return {
+function makeWork(id: string, overrides: Partial<WorkSummary> = {}): FixtureSeedWork {
+  return folderFixtureWork({
     id,
     title: `作品 ${id}`,
     cover: null,
@@ -30,7 +32,7 @@ function makeWork(id: string, overrides: Partial<WorkSummary> = {}): WorkSummary
       appliedTags: [],
     },
     ...overrides,
-  };
+  });
 }
 
 test("deleteWorkは作品と一緒にdlsiteLinkagesのエントリも消す", async () => {

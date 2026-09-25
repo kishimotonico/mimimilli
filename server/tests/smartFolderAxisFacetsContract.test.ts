@@ -39,6 +39,7 @@ function buildFixtureAdapter() {
     cover: null,
     status: "ok",
     physicalPath: `/library/${spec.id}`,
+    metaPath: `/library/${spec.id}/mimimilli.json`,
     totalDurationSec: spec.totalDurationSec,
     addedAt: "2026-01-01T00:00:00.000Z",
     errorMessage: null,

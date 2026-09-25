@@ -3,7 +3,7 @@ import {
   buildDlsiteApplyPatch,
   buildDlsiteMissingApplyPatch,
   computeMissingDiff,
-  workMediaRoot,
+  workPlacementOf,
   type DlsiteApplyBody,
   type DlsiteStateUpdateBody,
   type DlsiteWorkInfo,
@@ -78,7 +78,7 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
 
       let coverImage: string | undefined;
       if (body.applyCover && body.info.coverUrl) {
-        const mediaRoot = workMediaRoot(current.physicalPath);
+        const mediaRoot = workPlacementOf(current.metaPath).mediaRoot;
         coverImage = await cachedCover(body.info.coverUrl, mediaRoot, signal);
         throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
         const cover = await measureDownloadedCover(mediaRoot, coverImage);
@@ -127,7 +127,7 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
 
       let coverImage: string | undefined;
       if (planned.applyCover && info.coverUrl) {
-        const mediaRoot = workMediaRoot(current.physicalPath);
+        const mediaRoot = workPlacementOf(current.metaPath).mediaRoot;
         coverImage = await cachedCover(info.coverUrl, mediaRoot);
         const cover = await measureDownloadedCover(mediaRoot, coverImage);
         if (!cover) return "skipped";

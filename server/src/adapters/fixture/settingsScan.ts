@@ -1,4 +1,4 @@
-import { isRjCodeMissing, workspacePath } from "@mimimilli/shared";
+import { META_FILE_NAME, isRjCodeMissing, workspacePath } from "@mimimilli/shared";
 import type { ScanCandidate, ScanCandidatesRegisterResponse, ScanResult } from "@mimimilli/shared";
 import type {
   RootReconfigurationAdapter,
@@ -9,6 +9,7 @@ import type {
 } from "../../adapter/index.ts";
 import type { FixtureWorkRecord } from "./data.ts";
 import { isFsPathWithin, normalizeFsPath } from "./fsResolve.ts";
+import { checkWorkPlacement } from "./playback.ts";
 import { FIXTURE_UNREADABLE_ROOT } from "./scenarios.ts";
 import { dlsiteLinkageOf, setDlsiteLinkage, type FixtureState } from "./state.ts";
 
@@ -54,6 +55,7 @@ async function runPseudoScan(
   checkAbort();
   emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
 
+  state.works = state.works.map((work) => checkWorkPlacement(state, work));
   state.lastScanTime = new Date().toISOString();
   state.scanCandidates = [...state.scanCandidatePool];
   const excluded = new Set(state.scanCandidateExclusions);
@@ -161,12 +163,14 @@ export function createSettingsScanMethods(
         const candidate = candidatesByPath.get(item.path);
         if (!candidate) return [];
         const rjCode = resolveRegisteredRjCode(candidate.rjCode, item.rjCode);
+        const physicalPath = normalizeFsPath(`${rootAbs}/${candidate.path}`);
         const work: FixtureWorkRecord = {
           id: crypto.randomUUID(),
           title: candidate.inferredTitle,
           cover: null,
           status: "ok",
-          physicalPath: normalizeFsPath(`${rootAbs}/${candidate.path}`),
+          physicalPath,
+          metaPath: `${physicalPath}/${META_FILE_NAME}`,
           totalDurationSec: 0,
           trackCount: candidate.audioFileCount,
           addedAt: now,

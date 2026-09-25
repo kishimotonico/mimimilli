@@ -10,7 +10,7 @@ import {
   toTrackDurationFields,
   toWorkListItemDlsite,
   workListItemSchema,
-  workMediaRoot,
+  workPlacementOf,
   workSchema,
   workSummarySchema,
 } from "@mimimilli/shared";
@@ -20,6 +20,7 @@ import type {
   ResolvedPlaylist,
   Work,
   WorkListItem,
+  WorkPlacement,
   WorkSummary,
 } from "@mimimilli/shared";
 import { z } from "zod";
@@ -44,6 +45,7 @@ export type SummaryRow = Pick<
   | "coverHeight"
   | "status"
   | "physicalPath"
+  | "metaPath"
   | "totalDurationSec"
   | "addedAt"
   | "errorMessage"
@@ -68,12 +70,14 @@ export type RawWorkListRow = {
   totalDurationSec: number | null;
   trackCount: number;
   physicalPath: string;
+  metaPath: string;
   bookmarked: number;
   lastPlayedAt: string | null;
   dlsiteStateJson: string | null;
 };
 
 export interface ScanWorkState {
+  metaPath: string;
   sourceRevision: string | null;
   projectionRevision: string | null;
   mediaRevision: string | null;
@@ -91,14 +95,10 @@ export interface CoverColumns {
   dimensions: { width: number; height: number } | null;
 }
 
-export interface CoverLocationRow {
+export interface CoverLocation {
   id: string;
-  physicalPath: string;
+  placement: WorkPlacement;
   coverImage: string | null;
-}
-
-export interface MediaRootRow {
-  physicalPath: string;
 }
 
 export interface AxisFacetRow {
@@ -132,6 +132,7 @@ export interface ListSummariesResult {
   skipped: SummaryLoadSkip[];
   /** coverImage はあるが寸法未計測で cover: null に潰れた作品のID */
   unmeasuredCovers: string[];
+  placements: ReadonlyMap<string, WorkPlacement>;
 }
 
 export function parseJsonField(
@@ -196,7 +197,7 @@ export function rowToSummary(
       title: row.title,
       cover: coverDtoFromColumns(
         row.id,
-        row.physicalPath,
+        workPlacementOf(row.metaPath),
         row.coverImage,
         row.coverWidth,
         row.coverHeight,
@@ -231,7 +232,7 @@ export function rowToWorkListItem(
       title: row.title,
       cover: coverDtoFromColumns(
         row.id,
-        row.physicalPath,
+        workPlacementOf(row.metaPath),
         row.coverImage,
         row.coverWidth,
         row.coverHeight,
@@ -298,11 +299,12 @@ export function rowToWork(
   fileProbes: Map<string, ProbeDurationResult>,
   options?: { totalDurationFromCatalog?: boolean },
 ): Work {
+  const placement = workPlacementOf(row.metaPath);
   const playlists: ResolvedPlaylist[] = rowsToPlaylists(rawPlaylists).map((playlist) => ({
     id: playlist.id,
     name: playlist.name,
     tracks: playlist.tracks.map((track) => {
-      const probe = fileProbes.get(join(workMediaRoot(row.physicalPath), track.file)) ?? {
+      const probe = fileProbes.get(join(placement.mediaRoot, track.file)) ?? {
         kind: "unprobed",
       };
       return { ...track, ...toTrackDurationFields(resolveTrackDuration(track, probe)) };
@@ -316,7 +318,7 @@ export function rowToWork(
   const coverFields = coverFieldsFromColumns(row.coverImage, row.coverWidth, row.coverHeight);
   const cover = coverDtoFromColumns(
     row.id,
-    row.physicalPath,
+    placement,
     row.coverImage,
     row.coverWidth,
     row.coverHeight,

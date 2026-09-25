@@ -1,4 +1,8 @@
-import type { WorkEditSnapshot, WorkSourceMutationResult } from "@mimimilli/shared";
+import {
+  resolveWorkPlacement,
+  type WorkEditSnapshot,
+  type WorkSourceMutationResult,
+} from "@mimimilli/shared";
 import {
   SOURCE_FILE_BROKEN_MESSAGE,
   SOURCE_FILE_MISSING_MESSAGE,
@@ -18,7 +22,6 @@ import {
   readMetaSource,
   type MetaSource,
 } from "./meta.ts";
-import { physicalPathForMeta } from "./scanRegister.ts";
 import type { Scanner } from "./scanner.ts";
 import type { ProjectOutcome } from "./scanTypes.ts";
 
@@ -54,7 +57,7 @@ export function assertSourceMatchesCatalog(
   if (source.meta.id !== workId) {
     throw new SourceConflictError(SOURCE_IDENTITY_MISMATCH_MESSAGE);
   }
-  if (physicalPathForMeta(location.metaPath, source.meta) !== location.physicalPath) {
+  if (resolveWorkPlacement(location.metaPath, source.meta).physicalPath !== location.physicalPath) {
     throw new SourceConflictError(SOURCE_LOCATION_MISMATCH_MESSAGE);
   }
 }

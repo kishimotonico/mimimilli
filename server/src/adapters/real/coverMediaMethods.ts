@@ -1,10 +1,6 @@
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  TEXT_PREVIEW_LIMIT_BYTES,
-  workMediaRoot,
-  type WorkspaceResourceRef,
-} from "@mimimilli/shared";
+import { TEXT_PREVIEW_LIMIT_BYTES, type WorkspaceResourceRef } from "@mimimilli/shared";
 import type { FsListing } from "@mimimilli/shared";
 import {
   createCoverValidators,
@@ -29,7 +25,7 @@ export function createCoverMediaMethods(deps: {
     const work = query.getCoverLocation(workId);
     if (!work?.coverImage) return null;
 
-    const mediaRoot = workMediaRoot(work.physicalPath);
+    const { mediaRoot } = work.placement;
     const sourceAbsolutePath = resolveWithin(mediaRoot, join(mediaRoot, work.coverImage));
     if (!sourceAbsolutePath) return null;
 
@@ -99,15 +95,15 @@ export function createCoverMediaMethods(deps: {
       workId: string,
       relPath?: string,
     ): Promise<MediaLocation | null> {
-      const root = query.getMediaRoot(workId);
-      if (!root) return null;
+      const placement = query.getWorkPlacement(workId);
+      if (!placement) return null;
 
       const rel = relPath;
       if (!rel) return null;
 
       if (kind === "audio" && !query.hasTrackFile(workId, rel)) return null;
 
-      const mediaRoot = workMediaRoot(root.physicalPath);
+      const { mediaRoot } = placement;
       const resolved = resolveWithin(mediaRoot, join(mediaRoot, rel));
       if (!resolved) return null;
 

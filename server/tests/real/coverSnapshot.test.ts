@@ -15,6 +15,7 @@ import {
 } from "../../src/adapters/real/coverSnapshot.ts";
 import { thumbnailCacheNames } from "../../src/adapters/real/thumbnailCache.ts";
 import type { ListSummariesResult } from "../../src/adapters/real/workRowMapping.ts";
+import { folderSummariesResult } from "../helpers/workTestUtils.ts";
 
 function makeSummary(
   overrides: Partial<WorkSummary> & Pick<WorkSummary, "id" | "physicalPath">,
@@ -43,13 +44,15 @@ function makeSummary(
   };
 }
 
-function emptyResult(overrides: Partial<ListSummariesResult> = {}): ListSummariesResult {
-  return {
+function emptyResult(
+  overrides: Partial<Omit<ListSummariesResult, "placements">> = {},
+): ListSummariesResult {
+  return folderSummariesResult({
     summaries: [],
     skipped: [],
     unmeasuredCovers: [],
     ...overrides,
-  };
+  });
 }
 
 test("isCoverSnapshotComplete: 作品0件は不完全", () => {
