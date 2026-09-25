@@ -96,6 +96,8 @@ type RootReconfigurationState =
 
 `running` の `progress` は構築中のフルスキャンの最新進捗である。再起動後の中断は `failed` として返し、`message` で中断を伝える。
 
+scanとDLsite一括取得の進捗SSE・状態GETの契約は [ADR-0030](0030-job-progress-sse-current-state.md) に従う。ジョブ追跡中の確定GETが409 `root_reconfiguring` を受けたら、クライアントはそのジョブの追跡を終える。
+
 ### 実装の置き場所と real/fixture の分担
 
 ワークフローは `server/src/rootReconfiguration.ts` に置く。`ScanJobManager` / `DlsiteJobManager` と同じく、プロセス内状態を持つアプリケーションサービスである。`core/` は純粋関数の層なので置かない。`app.ts` がワークフローを生成し、job manager、操作ロックのmiddleware、ルートを配線する。

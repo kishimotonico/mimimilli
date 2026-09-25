@@ -82,7 +82,7 @@ oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメン
 
 - 開発時（fixture）: server（Bun、`MIMIMILLI_ADAPTER=fixture`）と client（Vite）を別々の portless サービスとして起動する。client は Vite proxy で同じ worktree の `api.mimi` へ接続する
 - 開発時（real）: server と client を別々の portless サービスとして起動する。client は Vite proxy で同じ worktree の `api.mimi` へ接続する
-- スキャン: `POST /api/scan` はジョブを開始して 202 とスナップショットを即返す（`Location: /api/scan/:id`）。同時実行は1件のみで、実行中の二重POSTは409。進捗は `GET /api/scan/:id/events` の SSE で配信し、`Last-Event-ID` で欠損イベントをリプレイする（履歴切れ時は `reset` で現スナップショットを送る）。進捗無音区間は15秒間隔の `ping` で接続を維持。`GET /api/scan/active` で実行中ジョブを取得、`GET /api/scan/last` で直近完了結果（メモリ保持）を取得する
+- スキャン: `POST /api/scan` はジョブを開始して 202 とスナップショットを即返す（`Location: /api/scan/:id`）。同時実行は1件のみで、実行中の二重POSTは409。進捗は `GET /api/scan/:id/events` の SSE で配信する。接続時に現在スナップショットを `state` で1件送り、以後は live のイベントだけを送る（履歴の再生はしない。[ADR-0030](adr/0030-job-progress-sse-current-state.md)）。進捗無音区間は15秒間隔の `ping` で接続を維持。`GET /api/scan/active` で実行中ジョブを取得、`GET /api/scan/last` で直近完了結果（メモリ保持）を取得する
 - root再設定: root変更と初回設定は `POST /api/root-reconfiguration` だけで行う。実行中のscan・DLsite一括ジョブを取り消してから `root_folder` と再設定中状態を user DB へ同時に確定し、202 を返したあと、新rootの配下にない作品のcatalog行を削除してフルスキャンでcatalogと候補を作り直す。再設定中と失敗中は `app.ts` のmiddlewareが許可リスト以外の `/api` を409 `root_reconfiguring` で拒否する。状態は `GET /api/root-reconfiguration` と `GET /api/settings` の `rootReconfiguration` で取得する（[ADR-0029](adr/0029-root-reconfiguration-workflow.md)）
 - ファイルDB経路のフルスキャンは `scanWorker.ts` の Worker スレッドで実行し、メインスレッドのイベントループを塞がない。完了時の `ScanExecutionResult`（`ScanResult` + 候補プール）を `ScanCandidateSession` へ丸ごと置き換えて、候補の参照・登録・除外はメインスレッド常駐のセッションが担う
 - メディア配信: client がメディア URL を組み立て（`entities/work/api.ts`）、`/api/media/*` ルートが `DataAdapter.locateMedia()` 経由でアダプタ（実ファイル or fixture の合成メディア）から実体を取得して配信する

@@ -243,8 +243,8 @@ export async function updateDlsiteState(
   return patchParsed(workSourceMutationResultSchema, `/dlsite/${encodeURIComponent(workId)}`, body);
 }
 
-export async function startDlsiteBulk(): Promise<void> {
-  await postParsed(dlsiteBulkStartResponseSchema, "/dlsite/bulk");
+export async function startDlsiteBulk(): Promise<string> {
+  return (await postParsed(dlsiteBulkStartResponseSchema, "/dlsite/bulk")).jobId;
 }
 
 export async function applyDlsiteMissing(workIds?: string[]) {
@@ -263,8 +263,8 @@ export async function previewDlsiteMissing(workIds?: string[]) {
   );
 }
 
-export async function getDlsiteBulkStatus(): Promise<DlsiteBulkSnapshot | null> {
-  return getParsed(dlsiteBulkSnapshotSchema, "/dlsite/bulk", { noContentAsNull: true });
+export async function getDlsiteBulkStatus(): Promise<DlsiteBulkSnapshot> {
+  return getParsed(dlsiteBulkSnapshotSchema, "/dlsite/bulk");
 }
 
 export async function cancelDlsiteBulk(): Promise<void> {

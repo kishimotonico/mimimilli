@@ -1,7 +1,9 @@
+import { randomUUID } from "node:crypto";
 import type {
   DlsiteBulkMode,
   DlsiteBulkProgressEvent,
   DlsiteBulkSnapshot,
+  DlsiteBulkTerminal,
 } from "@mimimilli/shared";
 import type { DataAdapter } from "./adapter/index.ts";
 import { formatError, getCategoryLogger } from "./lib/logger.ts";
@@ -13,6 +15,7 @@ type Progress = Extract<DlsiteBulkProgressEvent, { type: "progress" }>;
 type Terminal = Extract<DlsiteBulkProgressEvent, { type: "complete" | "cancelled" | "error" }>;
 
 interface ActiveJob {
+  jobId: string;
   listeners: Set<Listener>;
   lastProgress: Progress | null;
   controller: AbortController;
@@ -22,6 +25,7 @@ interface ActiveJob {
 }
 
 interface PendingJob {
+  jobId: string;
   mode: DlsiteBulkMode;
   workIds: string[] | undefined;
 }
@@ -43,32 +47,29 @@ export class DlsiteJobManager {
     return this.currentJob !== null;
   }
 
-  getSnapshot(): DlsiteBulkSnapshot | null {
+  getSnapshot(): DlsiteBulkSnapshot {
     const job = this.currentJob;
-    if (job) {
-      const progress = job.lastProgress
-        ? {
-            processed: job.lastProgress.processed,
-            total: job.lastProgress.total,
-            work: job.lastProgress.work,
-          }
-        : null;
-      return { status: job.cancelling ? "cancelling" : "running", progress };
-    }
-    if (!this.lastTerminal) return null;
-    if (this.lastTerminal.type === "complete") {
-      return { status: "complete", result: this.lastTerminal.result };
-    }
-    if (this.lastTerminal.type === "cancelled") {
-      return { status: "cancelled", result: this.lastTerminal.result };
-    }
-    return { status: "error", message: this.lastTerminal.message };
+    const current = job
+      ? {
+          jobId: job.jobId,
+          status: job.cancelling ? ("cancelling" as const) : ("running" as const),
+          progress: job.lastProgress
+            ? {
+                processed: job.lastProgress.processed,
+                total: job.lastProgress.total,
+                work: job.lastProgress.work,
+              }
+            : null,
+        }
+      : null;
+    return { current, lastTerminal: this.lastTerminal ? toTerminal(this.lastTerminal) : null };
   }
 
-  startJob(): ActiveJob {
+  startJob(jobId: string): ActiveJob {
     const listeners = new Set<Listener>();
     const controller = new AbortController();
     const job: ActiveJob = {
+      jobId,
       listeners,
       lastProgress: null,
       controller,
@@ -83,7 +84,6 @@ export class DlsiteJobManager {
       },
     };
     this.currentJob = job;
-    this.lastTerminal = null;
     return job;
   }
 
@@ -93,7 +93,7 @@ export class DlsiteJobManager {
     this.pendingJobs.length = 0;
     if (!job.cancelling) {
       job.cancelling = true;
-      job.emit({ type: "cancelling" });
+      job.emit({ type: "cancelling", jobId: job.jobId });
     }
     job.controller.abort();
     return true;
@@ -116,10 +116,13 @@ export class DlsiteJobManager {
     };
   }
 
-  enqueue(mode: DlsiteBulkMode, workIds: string[] | undefined): void {
-    if (this.shuttingDown) return;
-    this.pendingJobs.push({ mode, workIds });
+  /** 待機キューへ積み、採番したジョブIDを返す。終了処理中は積まずにnullを返す */
+  enqueue(mode: DlsiteBulkMode, workIds: string[] | undefined): string | null {
+    if (this.shuttingDown) return null;
+    const jobId = randomUUID();
+    this.pendingJobs.push({ jobId, mode, workIds });
     void this.drainQueue();
+    return jobId;
   }
 
   async shutdown(): Promise<void> {
@@ -162,14 +165,15 @@ export class DlsiteJobManager {
     while (!this.shuttingDown) {
       const next = this.pendingJobs.shift();
       if (!next) return;
-      const job = this.startJob();
+      const job = this.startJob(next.jobId);
+      const jobId = job.jobId;
       try {
         const result = await this.adapter.runDlsiteBulk(next.mode, next.workIds, {
           signal: job.controller.signal,
-          onProgress: (event) => job.emit(event),
+          onProgress: (progress) => job.emit({ type: "progress", jobId, ...progress }),
         });
-        if (job.controller.signal.aborted) job.emit({ type: "cancelled", result });
-        else job.emit({ type: "complete", result });
+        if (job.controller.signal.aborted) job.emit({ type: "cancelled", jobId, result });
+        else job.emit({ type: "complete", jobId, result });
       } catch (error) {
         const aborted =
           job.controller.signal.aborted ||
@@ -177,11 +181,13 @@ export class DlsiteJobManager {
         if (aborted) {
           job.emit({
             type: "cancelled",
+            jobId,
             result: { fetched: 0, failed: 0, parseErrors: 0, skipped: 0 },
           });
         } else {
           job.emit({
             type: "error",
+            jobId,
             message: error instanceof Error ? error.message : "DLsite一括取得に失敗しました",
           });
         }
@@ -190,4 +196,11 @@ export class DlsiteJobManager {
       }
     }
   }
+}
+
+function toTerminal(event: Terminal): DlsiteBulkTerminal {
+  if (event.type === "error") {
+    return { jobId: event.jobId, status: "error", message: event.message };
+  }
+  return { jobId: event.jobId, status: event.type, result: event.result };
 }

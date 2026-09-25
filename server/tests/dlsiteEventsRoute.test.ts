@@ -41,13 +41,13 @@ test("GET /dlsite/events は進捗とterminalを配信し完了後はreplayす�
   const app = new Hono();
   app.route("/", dlsiteRoute(createFixtureAdapter(), manager));
 
-  const job = manager.startJob();
-  job.emit({ type: "progress", processed: 1, total: 2, work: progressWork });
+  const job = manager.startJob("job-1");
+  job.emit({ type: "progress", jobId: "job-1", processed: 1, total: 2, work: progressWork });
 
   const live = await app.request("/dlsite/events");
   assert.equal(live.status, 200);
 
-  job.emit({ type: "complete", result: emptyResult });
+  job.emit({ type: "complete", jobId: "job-1", result: emptyResult });
   job.finish();
 
   const text = await live.text();
@@ -63,8 +63,8 @@ test("SSE切断後の書込失敗でもhandlerが永久待機しない", async (
   const app = new Hono();
   app.route("/", dlsiteRoute(createFixtureAdapter(), manager));
 
-  const job = manager.startJob();
-  job.emit({ type: "progress", processed: 1, total: 2, work: progressWork });
+  const job = manager.startJob("job-1");
+  job.emit({ type: "progress", jobId: "job-1", processed: 1, total: 2, work: progressWork });
 
   const response = await app.request("/dlsite/events");
   const reader = response.body!.getReader();
@@ -73,7 +73,7 @@ test("SSE切断後の書込失敗でもhandlerが永久待機しない", async (
 
   const handlerDone = drainReader(reader);
 
-  job.emit({ type: "complete", result: emptyResult });
+  job.emit({ type: "complete", jobId: "job-1", result: emptyResult });
   job.finish();
 
   await handlerDone;
@@ -88,8 +88,8 @@ test("terminal前の切断でもunsubscribeされ後続接続が成立する", a
   const app = new Hono();
   app.route("/", dlsiteRoute(createFixtureAdapter(), manager));
 
-  const job = manager.startJob();
-  job.emit({ type: "progress", processed: 1, total: 2, work: progressWork });
+  const job = manager.startJob("job-1");
+  job.emit({ type: "progress", jobId: "job-1", processed: 1, total: 2, work: progressWork });
 
   const response = await app.request("/dlsite/events");
   const reader = response.body!.getReader();
@@ -98,7 +98,7 @@ test("terminal前の切断でもunsubscribeされ後続接続が成立する", a
 
   await drainReader(reader);
 
-  job.emit({ type: "complete", result: emptyResult });
+  job.emit({ type: "complete", jobId: "job-1", result: emptyResult });
   job.finish();
 
   const replay = await app.request("/dlsite/events");
@@ -110,15 +110,15 @@ test("切断直後のterminal書込失敗でもactive listenerが残らない", 
   const app = new Hono();
   app.route("/", dlsiteRoute(createFixtureAdapter(), manager));
 
-  const job = manager.startJob();
-  job.emit({ type: "progress", processed: 1, total: 2, work: progressWork });
+  const job = manager.startJob("job-1");
+  job.emit({ type: "progress", jobId: "job-1", processed: 1, total: 2, work: progressWork });
 
   const response = await app.request("/dlsite/events");
   const reader = response.body!.getReader();
   await reader.read();
   await reader.cancel();
 
-  job.emit({ type: "complete", result: emptyResult });
+  job.emit({ type: "complete", jobId: "job-1", result: emptyResult });
 
   await drainReader(reader);
   const deadline = Date.now() + 500;
@@ -140,7 +140,6 @@ test("createApp経由の一括取得完了時にSSEで全イベントを受信�
     ...fixture,
     runDlsiteBulk: async (_mode, _workIds, options) => {
       options?.onProgress?.({
-        type: "progress",
         processed: 1,
         total: 1,
         work: progressWork,

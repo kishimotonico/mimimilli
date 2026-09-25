@@ -3,7 +3,7 @@ import type {
   DlsiteApplyMissingPreview,
   DlsiteBulkMode,
   DlsiteBulkApplyMissingResult,
-  DlsiteBulkProgressEvent,
+  DlsiteBulkProgressSnapshot,
   DlsiteBulkResult,
   DlsiteFetchResult,
   DlsiteStateUpdateBody,
@@ -40,7 +40,7 @@ export interface DlsiteAdapter {
     workIds: string[] | undefined,
     options?: {
       signal?: AbortSignal;
-      onProgress?: (event: Extract<DlsiteBulkProgressEvent, { type: "progress" }>) => void;
+      onProgress?: (progress: DlsiteBulkProgressSnapshot) => void;
     },
   ): Promise<DlsiteBulkResult>;
 }

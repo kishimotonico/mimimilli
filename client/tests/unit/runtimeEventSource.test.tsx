@@ -3,13 +3,15 @@ import { render, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ScanJobEvent, ScanJobSnapshot } from "@mimimilli/shared";
+import type { DlsiteBulkSnapshot, ScanJobEvent, ScanJobSnapshot } from "@mimimilli/shared";
 import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import {
   dlsiteBulkActiveAtom,
   dlsiteBulkActionsAtom,
+  dlsiteBulkCancellingAtom,
+  dlsiteBulkJobIdAtom,
   dlsiteBulkProgressAtom,
   dlsiteBulkStartingAtom,
 } from "../../src/entities/dlsite/model/bulkAtoms";
@@ -114,6 +116,18 @@ function dispatchScan(source: FakeEventSource, event: ScanJobEvent): void {
   });
 }
 
+function dlsiteStatus(snapshot: Partial<DlsiteBulkSnapshot>): Response {
+  return response({ current: null, lastTerminal: null, ...snapshot });
+}
+
+function isDlsiteStatusRequest(input: RequestInfo | URL, init?: RequestInit): boolean {
+  return String(input).endsWith("/dlsite/bulk") && (init?.method ?? "GET") === "GET";
+}
+
+function invalidatedKeys(spy: { mock: { calls: unknown[][] } }): unknown[] {
+  return spy.mock.calls.map((call) => (call[0] as { queryKey: unknown }).queryKey);
+}
+
 function dispatchDlsite(source: FakeEventSource, type: string, data: unknown): void {
   act(() => {
     source.dispatchEvent(new MessageEvent(type, { data: JSON.stringify(data) }));
@@ -204,7 +218,6 @@ describe("ScanRuntime EventSource ownership", () => {
     const source = FakeEventSource.instances[0]!;
     const completed = {
       type: "completed" as const,
-      seq: 1,
       result: scanResult,
     };
     dispatchScan(source, completed);
@@ -271,7 +284,7 @@ describe("ScanRuntime EventSource ownership", () => {
 
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
-    const completed = { type: "completed" as const, seq: 1, result: scanResult };
+    const completed = { type: "completed" as const, result: scanResult };
     dispatchScan(source, completed);
 
     // 完了処理が確定する前に、ユーザーが候補を登録して非表示化したと想定する。
@@ -322,7 +335,7 @@ describe("ScanRuntime EventSource ownership", () => {
     const source = FakeEventSource.instances[0]!;
 
     await expectNoUnhandledRejection(async () => {
-      dispatchScan(source, { type: "completed", seq: 1, result: scanResult });
+      dispatchScan(source, { type: "completed", result: scanResult });
       await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
     });
   });
@@ -346,7 +359,9 @@ describe("Runtime間連携: ScanRuntime → DlsiteBulkRuntime", () => {
           return response({ candidates: scanResultWithNewWorks.candidates });
         }
         // attach() が実在確認する後乗り先ジョブ。実行中を返す。
-        if (url.endsWith("/dlsite/bulk")) return response({ status: "running", progress: null });
+        if (url.endsWith("/dlsite/bulk")) {
+          return dlsiteStatus({ current: { jobId: "job-2", status: "running", progress: null } });
+        }
         return response(null, 204);
       }),
     );
@@ -359,7 +374,7 @@ describe("Runtime間連携: ScanRuntime → DlsiteBulkRuntime", () => {
 
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const scanSource = FakeEventSource.instances[0]!;
-    const completed = { type: "completed" as const, seq: 1, result: scanResultWithNewWorks };
+    const completed = { type: "completed" as const, result: scanResultWithNewWorks };
     dispatchScan(scanSource, completed);
     dispatchScan(scanSource, completed);
 
@@ -386,7 +401,7 @@ describe("ScanRuntime: 完了・中止トースト", () => {
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
 
-    dispatchScan(source, { type: "completed", seq: 1, result: scanResult });
+    dispatchScan(source, { type: "completed", result: scanResult });
     await waitFor(() =>
       expect(latestToastRequest(store)?.message).toBe(
         "スキャン完了: 登録 1件・新規 0件・エラー 0件・行方不明 0件",
@@ -413,7 +428,7 @@ describe("ScanRuntime: 完了・中止トースト", () => {
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
 
-    dispatchScan(source, { type: "completed", seq: 1, result: needsAttentionResult });
+    dispatchScan(source, { type: "completed", result: needsAttentionResult });
     await waitFor(() => expect(latestToastRequest(store)?.actionLabel).toBe("要対応を見る"));
 
     latestToastRequest(store)!.onAction!();
@@ -438,7 +453,7 @@ describe("ScanRuntime: 完了・中止トースト", () => {
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
 
-    dispatchScan(source, { type: "cancelled", seq: 1 });
+    dispatchScan(source, { type: "cancelled" });
     await waitFor(() => expect(latestToastRequest(store)?.message).toBe("スキャンを中止しました"));
   });
 
@@ -458,7 +473,7 @@ describe("ScanRuntime: 完了・中止トースト", () => {
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
 
-    dispatchScan(source, { type: "completed", seq: 1, result: scanResult });
+    dispatchScan(source, { type: "completed", result: scanResult });
     await waitFor(() => expect(store.get(scanJobAtom)?.status).toBe("completed"));
     expect(latestToastRequest(store)).toBeUndefined();
   });
@@ -473,7 +488,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
 
     const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
     act(() => {
-      store.set(dlsiteBulkActiveAtom, true);
+      store.set(dlsiteBulkJobIdAtom, "job-1");
     });
 
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
@@ -483,18 +498,24 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
   it("complete イベントを2回流しても完了処理は1回だけ", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => response({ ok: true })),
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+        isDlsiteStatusRequest(input, init)
+          ? dlsiteStatus({
+              lastTerminal: { jobId: "job-1", status: "complete", result: dlsiteResult },
+            })
+          : response({ ok: true }),
+      ),
     );
 
     const { store, queryClient } = renderRuntime(createElement(DlsiteBulkRuntime));
     const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
 
     act(() => {
-      store.set(dlsiteBulkActiveAtom, true);
+      store.set(dlsiteBulkJobIdAtom, "job-1");
     });
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
-    const complete = { type: "complete", result: dlsiteResult };
+    const complete = { type: "complete", jobId: "job-1", result: dlsiteResult };
     dispatchDlsite(source, "complete", complete);
 
     await waitFor(() => expect(invalidateQueries).toHaveBeenCalled());
@@ -518,7 +539,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
 
     const { store, unmount } = renderRuntime(createElement(DlsiteBulkRuntime));
     act(() => {
-      store.set(dlsiteBulkActiveAtom, true);
+      store.set(dlsiteBulkJobIdAtom, "job-1");
     });
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
@@ -538,7 +559,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
         const url = String(input);
         if (url.endsWith("/dlsite/bulk") && init?.method === "POST") {
           await postGate;
-          return response({ started: true }, 202);
+          return response({ jobId: "job-1" }, 202);
         }
         return response(null, 204);
       }),
@@ -561,12 +582,16 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
     expect(store.get(dlsiteBulkActiveAtom)).toBe(true);
   });
 
-  it("start()から購読を開始した場合、完了時は処理対象workIdの詳細キャッシュだけを無効化する（skippedを含む全作品は無効化しない）", async () => {
+  it("progressの大半を受け取れないまま完了しても、GETの直近終端で結果を反映し全詳細と一覧系を無効化する", async () => {
+    const result = { fetched: 2, failed: 0, parseErrors: 0, skipped: 3 };
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         if (String(input).endsWith("/dlsite/bulk") && init?.method === "POST") {
-          return response({ started: true }, 202);
+          return response({ jobId: "job-1" }, 202);
+        }
+        if (isDlsiteStatusRequest(input, init)) {
+          return dlsiteStatus({ lastTerminal: { jobId: "job-1", status: "complete", result } });
         }
         return response({ ok: true });
       }),
@@ -582,87 +607,177 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
 
     dispatchDlsite(source, "progress", {
       type: "progress",
+      jobId: "job-1",
       processed: 1,
-      total: 2,
+      total: 5,
       work: { id: "work-1", rjCode: "RJ111111", title: "作品1" },
     });
-    dispatchDlsite(source, "progress", {
-      type: "progress",
-      processed: 2,
-      total: 2,
-      work: { id: "work-2", rjCode: "RJ222222", title: "作品2" },
-    });
-
     const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
-    dispatchDlsite(source, "complete", {
-      type: "complete",
-      result: { fetched: 2, failed: 0, parseErrors: 0, skipped: 3 },
-    });
+    dispatchDlsite(source, "complete", { type: "complete", jobId: "job-1", result });
 
-    await waitFor(() => expect(invalidateQueries).toHaveBeenCalled());
-    const invalidatedKeys = invalidateQueries.mock.calls.map((call) => call[0]!.queryKey);
-    expect(invalidatedKeys).toContainEqual(["work", "work-1"]);
-    expect(invalidatedKeys).toContainEqual(["work", "work-2"]);
-    // skippedだった（progressイベントが来なかった）作品を含む全作品プレフィックスは含めない
-    expect(invalidatedKeys).not.toContainEqual(["work"]);
+    await waitFor(() => expect(store.get(dlsiteBulkActiveAtom)).toBe(false));
+    expect(latestToastRequest(store)?.message).toBe(
+      `DLsite一括取得: ${formatDlsiteBulkResult(result)}`,
+    );
+    expect(store.get(dlsiteBulkProgressAtom)).toBeNull();
+    await waitFor(() => expect(invalidatedKeys(invalidateQueries)).toContainEqual(["work"]));
+    expect(invalidatedKeys(invalidateQueries)).toContainEqual(["works"]);
+    expect(source.closed).toBe(true);
   });
 
-  it("start()後にSSEが切断→再接続した場合、progressの取りこぼしがあり得るため完了時は全作品を無効化する", async () => {
+  it("attach()で後乗りし進捗を1件も受け取らずに取消されても、取消結果を反映し全詳細を無効化する", async () => {
+    const result = { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 };
+    let terminated = false;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        if (String(input).endsWith("/dlsite/bulk") && init?.method === "POST") {
-          return response({ started: true }, 202);
-        }
-        return response({ ok: true });
+        if (!isDlsiteStatusRequest(input, init)) return response({ ok: true });
+        return terminated
+          ? dlsiteStatus({ lastTerminal: { jobId: "job-1", status: "cancelled", result } })
+          : dlsiteStatus({
+              current: {
+                jobId: "job-1",
+                status: "cancelling",
+                progress: { processed: 2, total: 5, work: null },
+              },
+            });
       }),
     );
 
     const { store, queryClient } = renderRuntime(createElement(DlsiteBulkRuntime));
     await waitFor(() => expect(store.get(dlsiteBulkActionsAtom)).not.toBeNull());
-    await act(async () => {
-      await store.get(dlsiteBulkActionsAtom)!.start();
+    act(() => store.get(dlsiteBulkActionsAtom)!.attach());
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    expect(store.get(dlsiteBulkCancellingAtom)).toBe(true);
+    const source = FakeEventSource.instances[0]!;
+
+    terminated = true;
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+    dispatchDlsite(source, "cancelled", { type: "cancelled", jobId: "job-1", result });
+
+    await waitFor(() => expect(store.get(dlsiteBulkActiveAtom)).toBe(false));
+    expect(latestToastRequest(store)?.message).toBe(
+      `DLsite一括取得を中断しました（${formatDlsiteBulkResult(result)}）`,
+    );
+    expect(store.get(dlsiteBulkProgressAtom)).toBeNull();
+    expect(store.get(dlsiteBulkCancellingAtom)).toBe(false);
+    await waitFor(() => expect(invalidatedKeys(invalidateQueries)).toContainEqual(["work"]));
+  });
+
+  it("切断中に追跡中のジョブが終わり次のジョブへ進んでいたら、通知せず全無効化して次のジョブへ乗り換える", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+        isDlsiteStatusRequest(input, init)
+          ? dlsiteStatus({
+              current: {
+                jobId: "job-3",
+                status: "running",
+                progress: { processed: 1, total: 4, work: null },
+              },
+              lastTerminal: { jobId: "job-2", status: "complete", result: dlsiteResult },
+            })
+          : response({ ok: true }),
+      ),
+    );
+
+    const { store, queryClient } = renderRuntime(createElement(DlsiteBulkRuntime));
+    act(() => {
+      store.set(dlsiteBulkJobIdAtom, "job-1");
+    });
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const first = FakeEventSource.instances[0]!;
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+    first.readyState = FakeEventSource.CONNECTING;
+    act(() => {
+      first.dispatchEvent(new Event("error"));
+    });
+
+    await waitFor(() => expect(store.get(dlsiteBulkJobIdAtom)).toBe("job-3"));
+    expect(store.get(dlsiteBulkProgressAtom)).toEqual({ processed: 1, total: 4, work: null });
+    expect(latestToastRequest(store)).toBeUndefined();
+    await waitFor(() => expect(invalidatedKeys(invalidateQueries)).toContainEqual(["work"]));
+    expect(first.closed).toBe(true);
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(2));
+  });
+
+  it("追跡中でないjobIdのイベントを受けたらGETで確定し、追跡中ジョブの終端を反映する", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+      isDlsiteStatusRequest(input, init)
+        ? dlsiteStatus({
+            current: { jobId: "job-2", status: "running", progress: null },
+            lastTerminal: { jobId: "job-1", status: "complete", result: dlsiteResult },
+          })
+        : response({ ok: true }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
+    act(() => {
+      store.set(dlsiteBulkJobIdAtom, "job-1");
     });
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
-
     dispatchDlsite(source, "progress", {
       type: "progress",
+      jobId: "job-2",
       processed: 1,
-      total: 2,
-      work: { id: "work-1", rjCode: "RJ111111", title: "作品1" },
+      total: 3,
+      work: null,
     });
-    // ネイティブerror（再接続）: この間のprogressイベントを取りこぼした可能性がある
+
+    await waitFor(() =>
+      expect(latestToastRequest(store)?.message).toBe(
+        `DLsite一括取得: ${formatDlsiteBulkResult(dlsiteResult)}`,
+      ),
+    );
+    expect(store.get(dlsiteBulkJobIdAtom)).toBeNull();
+    expect(
+      fetchMock.mock.calls.filter(([input, init]) => isDlsiteStatusRequest(input, init)),
+    ).toHaveLength(1);
+  });
+
+  it("確定GETが409（root_reconfiguring）なら追跡を終えて進捗を片付け、トーストを出さない", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+        isDlsiteStatusRequest(input, init)
+          ? response({ error: { code: "root_reconfiguring", message: "再設定中です" } }, 409)
+          : response({ ok: true }),
+      ),
+    );
+
+    const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
+    act(() => {
+      store.set(dlsiteBulkJobIdAtom, "job-1");
+      store.set(dlsiteBulkProgressAtom, { processed: 1, total: 5, work: null });
+      store.set(dlsiteBulkCancellingAtom, true);
+    });
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
     source.readyState = FakeEventSource.CONNECTING;
     act(() => {
       source.dispatchEvent(new Event("error"));
     });
-    await act(async () => {
-      await Promise.resolve();
-    });
 
-    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
-    dispatchDlsite(source, "complete", {
-      type: "complete",
-      result: { fetched: 2, failed: 0, parseErrors: 0, skipped: 0 },
-    });
-
-    await waitFor(() => expect(invalidateQueries).toHaveBeenCalled());
-    const invalidatedKeys = invalidateQueries.mock.calls.map((call) => call[0]!.queryKey);
-    expect(invalidatedKeys).toContainEqual(["work"]);
+    await waitFor(() => expect(store.get(dlsiteBulkActiveAtom)).toBe(false));
+    expect(store.get(dlsiteBulkProgressAtom)).toBeNull();
+    expect(store.get(dlsiteBulkCancellingAtom)).toBe(false);
+    expect(latestToastRequest(store)).toBeUndefined();
+    expect(source.closed).toBe(true);
   });
 
   it("接続が CLOSED かつジョブなしのとき active を解除してエラーを表示する", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) =>
-        String(input).endsWith("/dlsite/bulk") ? response(null, 204) : response({ ok: true }),
+        String(input).endsWith("/dlsite/bulk") ? dlsiteStatus({}) : response({ ok: true }),
       ),
     );
 
     const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
     act(() => {
-      store.set(dlsiteBulkActiveAtom, true);
+      store.set(dlsiteBulkJobIdAtom, "job-1");
     });
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
@@ -687,7 +802,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
       const url = String(input);
       if (url.endsWith("/dlsite/bulk") && init?.method === "POST") {
         await postGate;
-        return response({ started: true }, 202);
+        return response({ jobId: "job-1" }, 202);
       }
       return response(null, 204);
     });
@@ -721,7 +836,13 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
   it("ネイティブ error で status 照会は1回だけ走る", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input).endsWith("/dlsite/bulk") && init?.method !== "POST") {
-        return response({ status: "running", progress: { processed: 1, total: 5, work: null } });
+        return dlsiteStatus({
+          current: {
+            jobId: "job-1",
+            status: "running",
+            progress: { processed: 1, total: 5, work: null },
+          },
+        });
       }
       return response({ ok: true });
     });
@@ -729,7 +850,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
 
     const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
     act(() => {
-      store.set(dlsiteBulkActiveAtom, true);
+      store.set(dlsiteBulkJobIdAtom, "job-1");
     });
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
@@ -754,14 +875,20 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL) =>
         String(input).endsWith("/dlsite/bulk")
-          ? response({ status: "running", progress: { processed: 1, total: 5, work: null } })
+          ? dlsiteStatus({
+              current: {
+                jobId: "job-1",
+                status: "running",
+                progress: { processed: 1, total: 5, work: null },
+              },
+            })
           : response({ ok: true }),
       ),
     );
 
     const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
     act(() => {
-      store.set(dlsiteBulkActiveAtom, true);
+      store.set(dlsiteBulkJobIdAtom, "job-1");
     });
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
@@ -782,14 +909,20 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL) =>
         String(input).endsWith("/dlsite/bulk")
-          ? response({ status: "running", progress: { processed: 1, total: 5, work: null } })
+          ? dlsiteStatus({
+              current: {
+                jobId: "job-1",
+                status: "running",
+                progress: { processed: 1, total: 5, work: null },
+              },
+            })
           : response({ ok: true }),
       ),
     );
 
     const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
     act(() => {
-      store.set(dlsiteBulkActiveAtom, true);
+      store.set(dlsiteBulkJobIdAtom, "job-1");
     });
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
@@ -822,7 +955,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
 
     const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
     act(() => {
-      store.set(dlsiteBulkActiveAtom, true);
+      store.set(dlsiteBulkJobIdAtom, "job-1");
     });
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
@@ -832,11 +965,14 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
     });
     dispatchDlsite(source, "progress", {
       type: "progress",
+      jobId: "job-1",
       processed: 3,
       total: 5,
       work: { id: "work-1", rjCode: "RJ111111", title: "作品1" },
     });
-    resolveStatus(response({ status: "complete", result: staleResult }));
+    resolveStatus(
+      dlsiteStatus({ lastTerminal: { jobId: "job-1", status: "complete", result: staleResult } }),
+    );
 
     await act(async () => {
       await Promise.resolve();
@@ -859,11 +995,11 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
 
     const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
     act(() => {
-      store.set(dlsiteBulkActiveAtom, true);
+      store.set(dlsiteBulkJobIdAtom, "job-1");
     });
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
-    dispatchDlsite(source, "complete", { type: "complete", result: "invalid" });
+    dispatchDlsite(source, "complete", { type: "complete", jobId: "job-1", result: "invalid" });
 
     await waitFor(() => expect(store.get(dlsiteBulkActiveAtom)).toBe(false));
     await waitFor(() =>
@@ -874,7 +1010,13 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
   it("キャッシュ無効化が失敗しても unhandled rejection にならない", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => response({ ok: true })),
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+        isDlsiteStatusRequest(input, init)
+          ? dlsiteStatus({
+              lastTerminal: { jobId: "job-1", status: "complete", result: dlsiteResult },
+            })
+          : response({ ok: true }),
+      ),
     );
 
     const { store, queryClient } = renderRuntime(createElement(DlsiteBulkRuntime));
@@ -883,7 +1025,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
       .mockRejectedValue(new Error("invalidate failed"));
 
     act(() => {
-      store.set(dlsiteBulkActiveAtom, true);
+      store.set(dlsiteBulkJobIdAtom, "job-1");
     });
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
@@ -891,6 +1033,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
     await expectNoUnhandledRejection(async () => {
       dispatchDlsite(source, "complete", {
         type: "complete",
+        jobId: "job-1",
         result: dlsiteResult,
       });
       await waitFor(() => expect(invalidateQueries).toHaveBeenCalled());

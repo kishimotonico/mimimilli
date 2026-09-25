@@ -81,7 +81,7 @@ smokeテストの注意:
 | GET          | `/scan/last`                                 | サーバー起動後に一度でも完了した直近スキャンの結果（`finishedAt` 付き）。なければ204（メモリのみ保持）                    |
 | GET          | `/scan/:id`                                  | ジョブスナップショット。なければ404                                                                                       |
 | DELETE       | `/scan/:id`                                  | キャンセル（`status` → `cancelling`）。なければ404                                                                        |
-| GET          | `/scan/:id/events`                           | ジョブ進捗のSSE（`reset`/`state`/`progress`/`completed`/`failed`/`cancelled`・15秒`ping`）。`Last-Event-ID` 対応          |
+| GET          | `/scan/:id/events`                           | ジョブ進捗のSSE（接続時に現在の`state`、以後`state`/`progress`/`completed`/`failed`/`cancelled`・15秒`ping`）             |
 | GET          | `/scan/diagnostics`                          | スキャン診断（候補プール・identity conflict 等のサマリー）                                                                |
 | GET          | `/scan/candidates`                           | 未登録候補一覧                                                                                                            |
 | POST         | `/scan/candidates/exclude`                   | 候補の除外                                                                                                                |
@@ -111,10 +111,10 @@ smokeテストの注意:
 | POST         | `/dlsite/apply-missing`                      | 未取得作品への一括適用（既存値は上書きしない。dry-runとcomputeMissingDiffを共有）                                         |
 | POST         | `/dlsite/apply-missing/preview`              | `/dlsite/apply-missing` のdry-run。作品ごとの追加タグ・cover/url適用有無を書き込みせず返す                                |
 | PATCH        | `/dlsite/:id`                                | RJコード修正・skipped切替                                                                                                 |
-| GET          | `/dlsite/bulk`                               | 実行中または直近の一括取得ジョブスナップショット。なければ204                                                             |
-| POST         | `/dlsite/bulk`                               | none/error作品の一括取得ジョブを開始                                                                                      |
+| GET          | `/dlsite/bulk`                               | 実行中ジョブ（`current`）と直近に終わったジョブ（`lastTerminal`）。どちらもジョブID付き、無ければ`null`                   |
+| POST         | `/dlsite/bulk`                               | none/error作品の一括取得ジョブを開始し、`jobId` を返す                                                                    |
 | DELETE       | `/dlsite/bulk`                               | 実行中の一括取得をキャンセル                                                                                              |
-| GET          | `/dlsite/events`                             | 一括取得ジョブの進捗SSE                                                                                                   |
+| GET          | `/dlsite/events`                             | 一括取得ジョブの進捗SSE（各イベントに`jobId`）                                                                            |
 | GET          | `/dlsite/notifications`                      | RJコード未検出・取得失敗・パース失敗の件数サマリー                                                                        |
 | GET          | `/dlsite/notifications/:kind`                | `rj-missing` / `fetch-failed` / `parse-failed` の該当作品一覧（詳細は docs/dlsite.md）                                    |
 | GET          | `/tags`                                      | フラット/構造化タグの一覧                                                                                                 |

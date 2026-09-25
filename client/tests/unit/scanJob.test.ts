@@ -88,8 +88,7 @@ describe("useScanJob", () => {
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
     dispatch(source, {
-      type: "reset",
-      seq: 0,
+      type: "state",
       snapshot: {
         ...running,
         progress: { phase: "walking", processed: 10, total: 0 },
@@ -98,19 +97,17 @@ describe("useScanJob", () => {
     expect(first.result.current.job?.progress?.processed).toBe(10);
     dispatch(source, {
       type: "progress",
-      seq: 1,
       progress: { phase: "registering", processed: 2, total: 5 },
     });
     expect(first.result.current.job?.progress?.processed).toBe(2);
     dispatch(source, {
       type: "state",
-      seq: 2,
       snapshot: { ...running, status: "cancelling" },
     });
     expect(first.result.current.job?.status).toBe("cancelling");
-    dispatch(source, { type: "completed", seq: 3, result });
+    dispatch(source, { type: "completed", result });
     await waitFor(() => expect(onTerminal).toHaveBeenCalledTimes(1));
-    dispatch(source, { type: "completed", seq: 3, result });
+    dispatch(source, { type: "completed", result });
     await waitFor(() => expect(onTerminal).toHaveBeenCalledTimes(1));
     first.unmount();
 
@@ -177,7 +174,7 @@ describe("useScanJob", () => {
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     act(() => hook.result.current.attach(running));
     const sourceA = FakeEventSource.instances.at(-1)!;
-    dispatch(sourceA, { type: "completed", seq: 1, result });
+    dispatch(sourceA, { type: "completed", result });
 
     const jobB: ScanJobSnapshot = { ...running, id: "job-2" };
     act(() => hook.result.current.attach(jobB));
@@ -212,13 +209,86 @@ describe("useScanJob", () => {
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
     act(() => source.onerror?.(new Event("error")));
-    dispatch(source, { type: "completed", seq: 2, result });
+    dispatch(source, { type: "completed", result });
     await waitFor(() => expect(hook.result.current.job?.status).toBe("completed"));
     resolveRunning(response(running));
     await act(async () => {
       await Promise.resolve();
     });
     expect(hook.result.current.job?.status).toBe("completed");
+  });
+
+  it("接続エラー時のGETと再接続時のstateで、途中のprogressを欠いても現在状態へ再同期する", async () => {
+    const onTerminal = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/scan/active")) return response(running);
+        if (url.endsWith("/scan/job-1")) {
+          return response({
+            ...running,
+            progress: { phase: "registering", processed: 5, total: 10 },
+          });
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+    const hook = renderHook(() => useScanJob({ onTerminal }));
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+    dispatch(source, {
+      type: "progress",
+      progress: { phase: "registering", processed: 1, total: 10 },
+    });
+
+    act(() => source.onerror?.(new Event("error")));
+    await waitFor(() => expect(hook.result.current.job?.progress?.processed).toBe(5));
+
+    dispatch(source, {
+      type: "state",
+      snapshot: { ...running, progress: { phase: "registering", processed: 9, total: 10 } },
+    });
+    expect(hook.result.current.job?.progress?.processed).toBe(9);
+
+    dispatch(source, { type: "state", snapshot: completed });
+    expect(hook.result.current.job?.status).toBe("completed");
+    expect(onTerminal).toHaveBeenCalledTimes(1);
+    expect(source.closed).toBe(true);
+  });
+
+  it("attachし直した後、古い接続のstate/progress/terminalは新しいjobの状態を上書きしない", async () => {
+    const onTerminal = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/scan/active")) return response(null, 204);
+        if (url.endsWith("/scan/job-1")) return response(completed);
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+    const hook = renderHook(() => useScanJob({ onTerminal }));
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    act(() => hook.result.current.attach(running));
+    const sourceA = FakeEventSource.instances.at(-1)!;
+    const jobB: ScanJobSnapshot = { ...running, id: "job-2" };
+    act(() => hook.result.current.attach(jobB));
+    const sourceB = FakeEventSource.instances.at(-1)!;
+
+    dispatch(sourceA, {
+      type: "progress",
+      progress: { phase: "registering", processed: 3, total: 10 },
+    });
+    dispatch(sourceA, { type: "state", snapshot: completed });
+    dispatch(sourceA, { type: "completed", result });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(hook.result.current.job).toEqual(jobB);
+    expect(onTerminal).not.toHaveBeenCalled();
+    expect(sourceB.closed).toBe(false);
   });
 
   it("遅延active discoveryの失敗は後からattachしたjobのerrorを汚染しない", async () => {

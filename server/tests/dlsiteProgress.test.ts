@@ -14,45 +14,61 @@ function createManager(adapter?: DataAdapter): DlsiteJobManager {
   );
 }
 
-test("getSnapshot は実行中・終了後の状態を返す", () => {
+test("getSnapshot は実行中ジョブと直近の終端をジョブID付きで返し、次のジョブ開始後も直近の終端を保つ", () => {
   const manager = createManager();
-  assert.equal(manager.getSnapshot(), null);
+  assert.deepEqual(manager.getSnapshot(), { current: null, lastTerminal: null });
 
-  const job = manager.startJob();
+  const job = manager.startJob("job-1");
   const work = { id: "work-1", rjCode: "RJ111111", title: "作品1" };
-  job.emit({ type: "progress", processed: 2, total: 5, work });
+  job.emit({ type: "progress", jobId: "job-1", processed: 2, total: 5, work });
   assert.deepEqual(manager.getSnapshot(), {
-    status: "running",
-    progress: { processed: 2, total: 5, work },
+    current: { jobId: "job-1", status: "running", progress: { processed: 2, total: 5, work } },
+    lastTerminal: null,
   });
 
-  job.emit({ type: "complete", result: { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 } });
+  const result = { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 };
+  job.emit({ type: "complete", jobId: "job-1", result });
   job.finish();
   assert.deepEqual(manager.getSnapshot(), {
-    status: "complete",
-    result: { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 },
+    current: null,
+    lastTerminal: { jobId: "job-1", status: "complete", result },
+  });
+
+  manager.startJob("job-2");
+  assert.deepEqual(manager.getSnapshot(), {
+    current: { jobId: "job-2", status: "running", progress: null },
+    lastTerminal: { jobId: "job-1", status: "complete", result },
   });
 });
 
 test("DLsiteジョブは進捗を購読者へ配信し、完了を再接続時にreplayする", () => {
   const manager = createManager();
   const received: string[] = [];
-  const job = manager.startJob();
+  const job = manager.startJob("job-1");
   const subscription = manager.subscribe((event) => received.push(event.type));
   job.emit({
     type: "progress",
+    jobId: "job-1",
     processed: 1,
     total: 2,
     work: { id: "work-1", rjCode: "RJ111111", title: "作品1" },
   });
-  job.emit({ type: "complete", result: { fetched: 1, failed: 1, parseErrors: 0, skipped: 0 } });
+  job.emit({
+    type: "complete",
+    jobId: "job-1",
+    result: { fetched: 1, failed: 1, parseErrors: 0, skipped: 0 },
+  });
   job.finish();
   subscription.unsubscribe();
   assert.deepEqual(received, ["progress", "complete"]);
 
   const replay = manager.subscribe(() => {});
   assert.deepEqual(replay.replay, [
-    { type: "complete", result: { fetched: 1, failed: 1, parseErrors: 0, skipped: 0 } },
+    {
+      type: "complete",
+      jobId: "job-1",
+      result: { fetched: 1, failed: 1, parseErrors: 0, skipped: 0 },
+    },
   ]);
 });
 
@@ -197,6 +213,47 @@ test("実行中に追加された自動取得をFIFOで後続実行する", asyn
     { mode: "existing", workIds: undefined },
     { mode: "new", workIds: ["new-work"] },
   ]);
+});
+
+test("enqueueのjobIdがイベントとsnapshotに載り、終端直後に次のジョブが始まるとcurrentとlastTerminalが別jobIdで両方返る", async () => {
+  const gates: Array<() => void> = [];
+  const adapter = {
+    async runDlsiteBulk(
+      _mode: string,
+      _workIds: string[] | undefined,
+      options?: {
+        onProgress?: (progress: { processed: number; total: number; work: null }) => void;
+      },
+    ) {
+      options?.onProgress?.({ processed: 0, total: 1, work: null });
+      await new Promise<void>((resolve) => gates.push(resolve));
+      return { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 };
+    },
+  } as unknown as DataAdapter;
+  const manager = createManager(adapter);
+  const events: Array<{ type: string; jobId: string }> = [];
+  const firstId = manager.enqueue("existing", undefined);
+  const secondId = manager.enqueue("new", ["new-work"]);
+  assert.ok(firstId && secondId && firstId !== secondId);
+  const subscription = manager.subscribe((event) => events.push(event));
+  assert.equal(manager.getSnapshot().current?.jobId, firstId);
+
+  gates.shift()!();
+  while (gates.length === 0) await new Promise((resolve) => setImmediate(resolve));
+  subscription.unsubscribe();
+
+  assert.deepEqual(
+    events.map((event) => [event.type, event.jobId]),
+    [["complete", firstId]],
+  );
+  const snapshot = manager.getSnapshot();
+  assert.equal(snapshot.current?.jobId, secondId);
+  assert.deepEqual(snapshot.lastTerminal, {
+    jobId: firstId,
+    status: "complete",
+    result: { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 },
+  });
+  gates.shift()!();
 });
 
 test("createApp ごとに DLsite ジョブ状態が隔離される", async () => {

@@ -10,7 +10,7 @@ import { ScanJobManager } from "../src/scanJobManager.ts";
 test("受理済みリクエストのdrainが終わるまでジョブ取消・catalog再構築を始めない", async () => {
   const adapter = createFixtureAdapter({ rootRebuildStepMs: 1 });
   const dlsiteJobs = new DlsiteJobManager(adapter);
-  const scanJobs = new ScanJobManager(adapter, undefined, undefined, (insertedWorkIds) =>
+  const scanJobs = new ScanJobManager(adapter, undefined, (insertedWorkIds) =>
     dlsiteJobs.enqueue("new", insertedWorkIds),
   );
 

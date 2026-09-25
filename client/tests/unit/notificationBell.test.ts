@@ -11,7 +11,7 @@ import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
 import {
   dlsiteBulkActionsAtom,
-  dlsiteBulkActiveAtom,
+  dlsiteBulkJobIdAtom,
   dlsiteBulkProgressAtom,
 } from "../../src/entities/dlsite/model/bulkAtoms";
 
@@ -72,7 +72,7 @@ function renderBell(
     dismiss: vi.fn(),
   });
   if (atomOverrides?.active !== undefined) {
-    store.set(dlsiteBulkActiveAtom, atomOverrides.active);
+    store.set(dlsiteBulkJobIdAtom, atomOverrides.active ? "job-1" : null);
   }
   if (atomOverrides?.progress !== undefined) {
     store.set(dlsiteBulkProgressAtom, atomOverrides.progress);

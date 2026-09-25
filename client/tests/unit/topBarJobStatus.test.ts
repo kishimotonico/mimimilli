@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import TopBar from "../../src/app/ui/TopBar";
 import {
   dlsiteBulkActionsAtom,
-  dlsiteBulkActiveAtom,
+  dlsiteBulkJobIdAtom,
   dlsiteBulkProgressAtom,
 } from "../../src/entities/dlsite/model/bulkAtoms";
 import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
@@ -31,7 +31,7 @@ function renderTopBar(atomState?: {
     store.set(scanJobAtom, atomState.scanJob);
   }
   if (atomState?.dlsiteActive !== undefined) {
-    store.set(dlsiteBulkActiveAtom, atomState.dlsiteActive);
+    store.set(dlsiteBulkJobIdAtom, atomState.dlsiteActive ? "job-1" : null);
   }
   if (atomState?.dlsiteProgress !== undefined) {
     store.set(dlsiteBulkProgressAtom, atomState.dlsiteProgress);

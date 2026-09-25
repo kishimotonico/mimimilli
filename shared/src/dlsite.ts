@@ -542,7 +542,7 @@ export type DlsiteBulkMode = z.infer<typeof dlsiteBulkModeSchema>;
 
 /** POST /api/dlsite/bulk のジョブ開始レスポンス */
 export const dlsiteBulkStartResponseSchema = z.object({
-  started: z.literal(true),
+  jobId: z.string(),
 });
 export type DlsiteBulkStartResponse = z.infer<typeof dlsiteBulkStartResponseSchema>;
 
@@ -565,17 +565,19 @@ export const dlsiteBulkProgressWorkSchema = z.object({
 });
 export type DlsiteBulkProgressWork = z.infer<typeof dlsiteBulkProgressWorkSchema>;
 
+const dlsiteBulkProgressSnapshotSchema = z.object({
+  processed: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  work: dlsiteBulkProgressWorkSchema.nullable(),
+});
+export type DlsiteBulkProgressSnapshot = z.infer<typeof dlsiteBulkProgressSnapshotSchema>;
+
 export const dlsiteBulkProgressEventSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("progress"),
-    processed: z.number().int().nonnegative(),
-    total: z.number().int().nonnegative(),
-    work: dlsiteBulkProgressWorkSchema.nullable(),
-  }),
-  z.object({ type: z.literal("cancelling") }),
-  z.object({ type: z.literal("complete"), result: dlsiteBulkResultSchema }),
-  z.object({ type: z.literal("cancelled"), result: dlsiteBulkResultSchema }),
-  z.object({ type: z.literal("error"), message: z.string() }),
+  dlsiteBulkProgressSnapshotSchema.extend({ type: z.literal("progress"), jobId: z.string() }),
+  z.object({ type: z.literal("cancelling"), jobId: z.string() }),
+  z.object({ type: z.literal("complete"), jobId: z.string(), result: dlsiteBulkResultSchema }),
+  z.object({ type: z.literal("cancelled"), jobId: z.string(), result: dlsiteBulkResultSchema }),
+  z.object({ type: z.literal("error"), jobId: z.string(), message: z.string() }),
 ]);
 export type DlsiteBulkProgressEvent = z.infer<typeof dlsiteBulkProgressEventSchema>;
 
@@ -585,25 +587,23 @@ export const dlsiteBulkCancelResponseSchema = z.object({
 });
 export type DlsiteBulkCancelResponse = z.infer<typeof dlsiteBulkCancelResponseSchema>;
 
-const dlsiteBulkProgressSnapshotSchema = z.object({
-  processed: z.number().int().nonnegative(),
-  total: z.number().int().nonnegative(),
-  work: dlsiteBulkProgressWorkSchema.nullable(),
+export const dlsiteBulkCurrentJobSchema = z.object({
+  jobId: z.string(),
+  status: z.enum(["running", "cancelling"]),
+  progress: dlsiteBulkProgressSnapshotSchema.nullable(),
 });
-export type DlsiteBulkProgressSnapshot = z.infer<typeof dlsiteBulkProgressSnapshotSchema>;
+export type DlsiteBulkCurrentJob = z.infer<typeof dlsiteBulkCurrentJobSchema>;
 
-/** GET /api/dlsite/bulk のジョブ状態（実行中・直近の終了結果）。未実行・終了後クリア時は 204 */
-export const dlsiteBulkSnapshotSchema = z.discriminatedUnion("status", [
-  z.object({
-    status: z.literal("running"),
-    progress: dlsiteBulkProgressSnapshotSchema.nullable(),
-  }),
-  z.object({
-    status: z.literal("cancelling"),
-    progress: dlsiteBulkProgressSnapshotSchema.nullable(),
-  }),
-  z.object({ status: z.literal("complete"), result: dlsiteBulkResultSchema }),
-  z.object({ status: z.literal("cancelled"), result: dlsiteBulkResultSchema }),
-  z.object({ status: z.literal("error"), message: z.string() }),
+export const dlsiteBulkTerminalSchema = z.discriminatedUnion("status", [
+  z.object({ jobId: z.string(), status: z.literal("complete"), result: dlsiteBulkResultSchema }),
+  z.object({ jobId: z.string(), status: z.literal("cancelled"), result: dlsiteBulkResultSchema }),
+  z.object({ jobId: z.string(), status: z.literal("error"), message: z.string() }),
 ]);
+export type DlsiteBulkTerminal = z.infer<typeof dlsiteBulkTerminalSchema>;
+
+/** GET /api/dlsite/bulk の実行中ジョブと直近に終わったジョブ。両方存在しうる */
+export const dlsiteBulkSnapshotSchema = z.object({
+  current: dlsiteBulkCurrentJobSchema.nullable(),
+  lastTerminal: dlsiteBulkTerminalSchema.nullable(),
+});
 export type DlsiteBulkSnapshot = z.infer<typeof dlsiteBulkSnapshotSchema>;

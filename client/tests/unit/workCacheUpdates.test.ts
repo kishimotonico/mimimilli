@@ -295,35 +295,10 @@ describe("DLsite の必須更新", () => {
     );
   });
 
-  it("一括取得の完了は処理対象の詳細だけを無効化する", async () => {
+  it("一括取得の終端は処理対象を問わず全詳細と一覧系を無効化する", async () => {
     const queryClient = seededClient();
 
-    await updateCachesAfterDlsiteBulkFetch(queryClient, {
-      processedWorkIds: ["w2"],
-      progressMayBeMissed: false,
-    });
-
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(["detail2", ...LIBRARY_VIEWS]));
-  });
-
-  it("一括取得の処理対象が0件なら詳細を一切無効化しない", async () => {
-    const queryClient = seededClient();
-
-    await updateCachesAfterDlsiteBulkFetch(queryClient, {
-      processedWorkIds: [],
-      progressMayBeMissed: false,
-    });
-
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(LIBRARY_VIEWS));
-  });
-
-  it("進捗を取りこぼした可能性があれば全詳細を無効化する", async () => {
-    const queryClient = seededClient();
-
-    await updateCachesAfterDlsiteBulkFetch(queryClient, {
-      processedWorkIds: ["w2"],
-      progressMayBeMissed: true,
-    });
+    await updateCachesAfterDlsiteBulkFetch(queryClient);
 
     expect(sorted(invalidatedKeys(queryClient))).toEqual(
       sorted(["detail1", "source1", "detail2", "source2", ...LIBRARY_VIEWS]),
