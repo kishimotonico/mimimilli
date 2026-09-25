@@ -4,13 +4,13 @@ client のエラー所有権・Promise 契約・best-effort 失敗の基準。�
 
 ## ユーザーに見せる操作失敗
 
-- **スキャン start / cancel**: 所有者は `ScanRuntime`。エラー状態は `scanErrorAtom`（`SetupScreen` のインライン表示にも使う）に保持しつつ、表示は `useToast().show({ variant: "error", ... })` で行う。Promise は reject しない
+- **スキャン start / cancel**: 所有者は `ScanRuntime`。専用の error atom は持たず `useToast().show({ variant: "error", ... })` で表示する。Promise は reject しない
 - **DLsite 一括 start / cancel**: 所有者は `DlsiteBulkRuntime`。専用の error atom は持たず `useToast().error(...)` で表示する。Promise は reject しない
 - **その他の mutation**（再生・エクスポート等）: 呼び出し側が catch し `useToast().error(...)` で表示する
 
-表示は単一ホストの `GlobalToast`（`toastRequestsAtom` の要求を受けて描画）に集約される。variant="error" は発行元の priority に関わらず最優先で表示される。scan / DLsite の SSE 由来の失敗（イベント解析エラー・接続切断等）も、それぞれの runtime が上記と同じ経路（ScanRuntimeはscanErrorAtomへの保存＋useToast表示、DlsiteBulkRuntimeはuseToastのみ）で扱う。
+表示は単一ホストの `GlobalToast`（`toastRequestsAtom` の要求を受けて描画）に集約される。variant="error" は発行元の priority に関わらず最優先で表示される。scan / DLsite の SSE 由来の失敗（イベント解析エラー・接続切断等）も、それぞれの runtime が上記と同じ `useToast` 経路で扱う。
 
-初回セットアップ（`App.handleSetupComplete`）だけは例外。`scanActions.start()` の戻り値が `{ ok: false, error }` のときは `error` を throw し `rootFolder` をキャッシュへ確定しない。SetupScreen には `GlobalToast` が無いため、失敗理由は戻り値の `error` 文字列で渡す。runtime の操作 Promise は reject しない契約は変えない。
+初回セットアップ・root再設定（`RootConfigurationScreen`、ADR-0029）だけは例外。`GlobalToast` を使わず、送信（`onSubmit`）が reject したエラーを `formatUserError` で整形して画面内にインライン表示する。
 
 ## HTTP 層
 
@@ -29,7 +29,7 @@ client のエラー所有権・Promise 契約・best-effort 失敗の基準。�
 - `useAudioEngineLifecycle` の `updateLastPlayed` — 同上。サイドバーの「最終再生」表示が更新されないだけ
 - `audioEngine` の `AudioContext.resume()` — ブラウザの自動再生ポリシーでよく失敗する。次の `play()` で再試行
 - `audioEngine` の `AudioContext.close()`（`destroy` 時）— 破棄時のクリーンアップ。既に再生は止まっている
-- `useScanJob` の SSE 切断後 `getScanJob` 一時失敗 — EventSource の標準再接続に任せる。404/410 とスキーマ不一致だけ error atom へ
+- `useScanJob` の SSE 切断後 `getScanJob` 一時失敗 — EventSource の標準再接続に任せる。404/410 とスキーマ不一致だけ `scanJob.error`（ScanRuntimeが読みuseToastへ渡す）へ
 
 **ローカル UI で扱う箇所**
 

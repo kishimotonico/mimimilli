@@ -21,8 +21,6 @@ export const scanProgressAtom = atom<ScanProgress | null>((get) => {
 
 export const scanProgressLabelAtom = atom((get) => formatScanProgressLabel(get(scanProgressAtom)));
 
-export const scanErrorAtom = atom<string | null>(null);
-
 /** ScanModal がマウント中かどうか。activeModalAtomから導出する（読み取り専用） */
 export const scanModalOpenAtom = atom((get) => get(activeModalAtom)?.kind === "scan");
 

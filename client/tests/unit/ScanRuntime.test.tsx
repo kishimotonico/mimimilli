@@ -7,9 +7,19 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import GlobalToast from "../../src/app/ui/GlobalToast";
-import { scanActionsAtom, scanErrorAtom } from "../../src/entities/scan/model/atoms";
+import { scanActionsAtom } from "../../src/entities/scan/model/atoms";
 import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
+import { toastRequestsAtom } from "../../src/shared/model/toastRequestsAtom";
 import type { ScanJobEvent, ScanResult } from "@mimimilli/shared";
+
+/** 現在表示中のerror variantトーストのメッセージ。無ければnull。 */
+function getErrorToastMessage(store: ReturnType<typeof createStore>): string | null {
+  const requests = store.get(toastRequestsAtom);
+  for (const request of requests.values()) {
+    if (request.variant === "error") return request.message;
+  }
+  return null;
+}
 
 class FakeEventSource extends EventTarget {
   static instances: FakeEventSource[] = [];
@@ -74,7 +84,7 @@ afterEach(() => {
 });
 
 describe("ScanRuntime", () => {
-  it("スキャン開始に失敗するとerrorトーストを出し、閉じるとscanErrorAtomも消える", async () => {
+  it("スキャン開始に失敗するとerrorトーストを出し、閉じると消える", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
@@ -92,13 +102,13 @@ describe("ScanRuntime", () => {
       await store.get(scanActionsAtom)!.start();
     });
 
-    await waitFor(() => expect(store.get(scanErrorAtom)).not.toBeNull());
-    const message = store.get(scanErrorAtom)!;
+    await waitFor(() => expect(getErrorToastMessage(store)).not.toBeNull());
+    const message = getErrorToastMessage(store)!;
     expect(screen.getByText(message)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
 
-    await waitFor(() => expect(store.get(scanErrorAtom)).toBeNull());
+    await waitFor(() => expect(getErrorToastMessage(store)).toBeNull());
     await waitFor(() => expect(screen.queryByText(message)).toBeNull());
   });
 
@@ -150,15 +160,15 @@ describe("ScanRuntime", () => {
       await store.get(scanActionsAtom)!.start();
     });
 
-    await waitFor(() => expect(store.get(scanErrorAtom)).not.toBeNull());
-    const message = store.get(scanErrorAtom)!;
+    await waitFor(() => expect(getErrorToastMessage(store)).not.toBeNull());
+    const message = getErrorToastMessage(store)!;
     expect(screen.getByText(message)).toBeTruthy();
 
     await act(async () => {
       await store.get(scanActionsAtom)!.start();
     });
 
-    await waitFor(() => expect(store.get(scanErrorAtom)).toBeNull());
+    await waitFor(() => expect(getErrorToastMessage(store)).toBeNull());
     await waitFor(() => expect(screen.queryByText(message)).toBeNull());
   });
 
@@ -225,15 +235,15 @@ describe("ScanRuntime", () => {
     await act(async () => {
       await store.get(scanActionsAtom)!.cancel();
     });
-    await waitFor(() => expect(store.get(scanErrorAtom)).not.toBeNull());
-    const errorMessage = store.get(scanErrorAtom)!;
+    await waitFor(() => expect(getErrorToastMessage(store)).not.toBeNull());
+    const errorMessage = getErrorToastMessage(store)!;
     expect(screen.getByText(errorMessage)).toBeTruthy();
 
-    // その直後に同じジョブのSSEが完了を届ける。setError(null)とonTerminalの完了トーストが
+    // その直後に同じジョブのSSEが完了を届ける。errorToast.dismiss()とonTerminalの完了トーストが
     // 同じバッチで走る経路（cancel()のHTTP失敗＋SSE生存）を再現する。
     dispatch(source, { type: "completed", seq: 1, result: scanResult });
 
-    await waitFor(() => expect(store.get(scanErrorAtom)).toBeNull());
+    await waitFor(() => expect(getErrorToastMessage(store)).toBeNull());
     await waitFor(() => expect(screen.getByText(/^スキャン完了/)).toBeTruthy());
     expect(screen.queryByText(errorMessage)).toBeNull();
   });

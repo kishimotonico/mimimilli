@@ -47,7 +47,7 @@ describe("formatUserError", () => {
     expect(result.message).toBe("予期しないエラーが発生しました");
   });
 
-  it("文字列化済みエラー（scanErrorAtom等）でも通信不能パターンを検出する", () => {
+  it("文字列化済みエラーでも通信不能パターンを検出する", () => {
     const result = formatUserError("Failed to fetch", "スキャンに失敗しました");
     expect(result.message).toBe(
       "mimimilliのサーバーに接続できませんでした。サーバーを起動し直してから再試行してください。",

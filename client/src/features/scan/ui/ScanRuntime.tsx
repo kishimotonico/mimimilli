@@ -10,7 +10,6 @@ import { invalidateLibraryQueries } from "../model/libraryInvalidation";
 import {
   scanActionsAtom,
   scanCandidateHiddenPathsAtom,
-  scanErrorAtom,
   scanJobAtom,
   scanModalOpenAtom,
   type ScanActions,
@@ -25,7 +24,6 @@ export default function ScanRuntime() {
   const queryClient = useQueryClient();
   const dlsiteBulk = useDlsiteBulkActions();
   const setJob = useSetAtom(scanJobAtom);
-  const setError = useSetAtom(scanErrorAtom);
   const setActions = useSetAtom(scanActionsAtom);
   const setHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
   const setActiveModal = useSetAtom(activeModalAtom);
@@ -101,19 +99,17 @@ export default function ScanRuntime() {
   }, [scanJob.job, setJob]);
 
   useEffect(() => {
-    setError(scanJob.error);
     if (!scanJob.error) {
       errorToast.dismiss();
       return;
     }
-    // 表示自体はここからuseToastへ出す
     errorToast.show({
       message: scanJob.error,
       variant: "error",
       priority: "notice",
       onDismiss: () => scanJobRef.current.clearError(),
     });
-  }, [scanJob.error, setError, errorToast]);
+  }, [scanJob.error, errorToast]);
 
   const actionsRef = useRef<ScanActions>({
     start: async (options?: StartScanRequest) => scanJobRef.current.start(options),
