@@ -15,7 +15,6 @@ import TopBar from "./ui/TopBar";
 import LeftNav from "./ui/LeftNav";
 import AddressBar from "./ui/AddressBar";
 import NotificationBell from "./ui/NotificationBell";
-import { WORK_QUERY_KEYS } from "../entities/work/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../entities/settings/queryKeys";
 import { SCAN_QUERY_KEYS } from "../entities/scan/queryKeys";
 import { getLastScanResult } from "../features/scan/api";
@@ -31,7 +30,7 @@ import { apiErrorMessage } from "../shared/lib/apiError";
 import { activeModalAtom } from "../shared/model/activeModalAtom";
 import type { RootReconfigurationState, Settings, Work, WorkListItem } from "@mimimilli/shared";
 import { prepareWorkPlayback } from "../entities/work/api";
-import { invalidateWorkViewQueries } from "../entities/work/invalidateWorkViewQueries";
+import { updateCachesAfterPlaybackPrepared } from "../entities/work/model/workCacheUpdates";
 import { useDownloadLibraryExport } from "../features/library/useDownloadLibraryExport";
 import { useDlsiteBulkActions } from "../entities/dlsite/useDlsiteBulkActions";
 import { startRootReconfiguration } from "../entities/settings/api";
@@ -191,8 +190,7 @@ export default function App() {
       try {
         const fullWork = await prepareWorkPlayback(work.id);
         if (!playRequestGuard.isCurrent(requestId)) return;
-        queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), fullWork);
-        await invalidateWorkViewQueries(queryClient, work.id);
+        await updateCachesAfterPlaybackPrepared(queryClient, fullWork);
         if (!playRequestGuard.isCurrent(requestId)) return;
         const playlist =
           fullWork.playlists.find((p) => p.id === fullWork.defaultPlaylistId) ??
@@ -215,8 +213,7 @@ export default function App() {
       try {
         const fullWork = await prepareWorkPlayback(work.id);
         if (!playRequestGuard.isCurrent(requestId)) return;
-        queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), fullWork);
-        await invalidateWorkViewQueries(queryClient, work.id);
+        await updateCachesAfterPlaybackPrepared(queryClient, fullWork);
         if (!playRequestGuard.isCurrent(requestId)) return;
         player.playWithResume(fullWork);
       } catch (err) {

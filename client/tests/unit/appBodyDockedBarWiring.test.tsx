@@ -50,7 +50,6 @@ vi.mock("../../src/features/library/model/useLibraryQueries", () => ({
     refetchTagPrefixes: vi.fn(),
   }),
   useMissingWorksCountQuery: () => ({ data: undefined }),
-  useLibraryBulkUnregisterMissingMutation: () => ({ isPending: false, mutate: vi.fn() }),
   useSmartFolderMutation: () => ({ isPending: false, reset: vi.fn(), mutate: vi.fn() }),
   useSmartFolderDeleteMutation: () => ({ isPending: false, reset: vi.fn(), mutate: vi.fn() }),
 }));

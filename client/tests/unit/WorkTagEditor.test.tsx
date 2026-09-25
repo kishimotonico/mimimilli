@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import type { Work } from "@mimimilli/shared";
 import { emptyDlsiteState } from "@mimimilli/shared";
-import type { LibraryTagIntentMutation } from "../../src/features/library/model/useLibraryQueries";
+import type { WorkTagMutation } from "../../src/entities/work/model/workMutations";
 import { WorkTagEditor } from "../../src/features/library/ui/preview/WorkTagEditor";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import { ApiRequestError } from "../../src/shared/api/http";
@@ -55,9 +55,7 @@ function makeWork(overrides: Partial<Work> = {}): Work {
   };
 }
 
-function makeTagMutation(
-  overrides: Partial<LibraryTagIntentMutation> = {},
-): LibraryTagIntentMutation {
+function makeTagMutation(overrides: Partial<WorkTagMutation> = {}): WorkTagMutation {
   return {
     isPending: false,
     error: null,
@@ -65,7 +63,7 @@ function makeTagMutation(
     mutate: vi.fn(),
     mutateAsync: vi.fn(),
     ...overrides,
-  } as LibraryTagIntentMutation;
+  } as WorkTagMutation;
 }
 
 vi.mock("../../src/entities/tag/useTagPrefixes", () => ({

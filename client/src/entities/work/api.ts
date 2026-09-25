@@ -22,6 +22,14 @@ import {
   dlsiteBulkCancelResponseSchema,
   dlsiteBulkSnapshotSchema,
   missingWorksCountSchema,
+  workCreateResponseSchema,
+  identityConflictReassignResponseSchema,
+  scanCandidatesRegisterRequestSchema,
+  scanCandidatesRegisterResponseSchema,
+  type ScanCandidateRegisterItem,
+  type ScanCandidatesRegisterResponse,
+  type WorkCreateBodyInput,
+  type WorkCreateResponse,
   unregisterMissingWorksResultSchema,
   createRandomSeed,
   type DlsiteBulkSnapshot,
@@ -150,6 +158,29 @@ export async function removeWorkTag(
     workSourceMutationResultSchema,
     `/works/${encodeURIComponent(workId)}/tags/${encodeWorkTagPath(tag)}`,
   );
+}
+
+/** フォルダーを作品として登録する */
+export async function createWork(body: WorkCreateBodyInput): Promise<WorkCreateResponse> {
+  return postParsed(workCreateResponseSchema, "/works", body);
+}
+
+export async function registerScanCandidates(
+  items: ScanCandidateRegisterItem[],
+): Promise<ScanCandidatesRegisterResponse> {
+  return postParsed(
+    scanCandidatesRegisterResponseSchema,
+    "/scan/candidates/register",
+    scanCandidatesRegisterRequestSchema.parse({ items }),
+  );
+}
+
+export async function reassignIdentityConflict(
+  path: WorkspacePath,
+): Promise<WorkSourceMutationResult> {
+  return postParsed(identityConflictReassignResponseSchema, "/works/identity-conflicts/reassign", {
+    path,
+  });
 }
 
 /** 作品登録を解除する（DB・メタファイルのみ。物理ファイルは残す） */

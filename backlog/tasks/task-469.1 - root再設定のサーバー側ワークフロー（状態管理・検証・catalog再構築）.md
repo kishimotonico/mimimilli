@@ -1,9 +1,11 @@
 ---
 id: TASK-469.1
 title: root再設定のサーバー側ワークフロー（状態管理・検証・catalog再構築）
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-24 07:22'
+updated_date: '2026-09-25 03:28'
 labels:
   - settings
   - scan

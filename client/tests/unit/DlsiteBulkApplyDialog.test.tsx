@@ -5,10 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DlsiteApplyMissingPreview } from "@mimimilli/shared";
 import DlsiteBulkApplyRuntime from "../../src/features/dlsite/ui/DlsiteBulkApplyRuntime";
-import {
-  dlsiteBulkApplyOpenAtom,
-  dlsiteInvalidateAtom,
-} from "../../src/entities/dlsite/model/bulkAtoms";
+import { dlsiteBulkApplyOpenAtom } from "../../src/entities/dlsite/model/bulkAtoms";
 import { toastRequestsAtom } from "../../src/shared/model/toastRequestsAtom";
 
 /** DlsiteBulkApplyRuntimeは単一のuseToast()しか持たないため、要求は高々1件 */
@@ -37,7 +34,6 @@ function renderRuntime() {
   });
   const store = createStore();
   store.set(dlsiteBulkApplyOpenAtom, true);
-  store.set(dlsiteInvalidateAtom, { run: vi.fn(async () => {}) });
 
   render(
     createElement(

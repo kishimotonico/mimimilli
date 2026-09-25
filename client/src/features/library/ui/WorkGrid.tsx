@@ -1,8 +1,11 @@
 import { useCallback, useRef, useState } from "react";
 import { useAtom, useAtomValue } from "jotai";
-import type { AxisId } from "../../../entities/library/types";
 import { libraryGridLayoutModeAtom, libraryTileSizeAtom } from "../model/atoms";
-import type { WorkListItem } from "@mimimilli/shared";
+import {
+  playerIsPlayingOrLoadingAtom,
+  playingWorkIdAtom,
+} from "../../../entities/player/model/atoms";
+import type { WorkResultsProps } from "./workResultsProps";
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
 import { GRID_COLUMN_GAP, GRID_ROW_GAP, clampTileSize } from "../../../shared/lib/gridSizing";
@@ -30,61 +33,28 @@ import { useRovingIndex } from "./useRovingIndex";
 import { firstFlatIndexOfRow, rowIndexOfFlatIndex } from "../../../shared/lib/gridNavigation";
 import WorkGridVirtualContent from "./workGrid/WorkGridVirtualContent";
 
-interface WorkGridProps {
-  axis: AxisId;
-  works: WorkListItem[];
-  /** 検索・軸・ソート・タグ変更を検知してスクロール位置をリセットする key */
-  worksQueryKey: string;
-  selectedWorkId: string | null;
-  searchQuery: string;
-  hasSelectedTags: boolean;
-  playingWorkId?: string | null;
-  isPlaybackActive?: boolean;
-  /** 画面下張り付きの再生バーが表示中か（末尾余白の確保に使う） */
-  dockedBarActive?: boolean;
-  /** 遷移中は直前の一覧を薄く表示する。 */
-  isPending?: boolean;
-  /** 次ページがあるか（追加読み込みボタンの表示判定。TASK-73） */
-  hasNextPage?: boolean;
-  /** サーバー側の総件数（残件数の表示用） */
-  worksTotal?: number;
-  isFetchingNextPage?: boolean;
-  onLoadMore?: () => void;
-  onWorkSelect: (id: string) => void;
-  onWorkPlay: (work: WorkListItem) => void;
-  onClearSearch: () => void;
-  /** Esc・グリッド背景クリック時の選択解除 */
-  onDeselect: () => void;
-  /** スマートフォルダー軸か。0件時に専用の空状態（条件を編集・絞り込みをすべてクリア）を
-   *  出す */
-  isSmartFolder?: boolean;
-  onEditSmartFolderRules?: () => void;
-  onClearAllFilters?: () => void;
-}
-
 export default function WorkGrid({
-  axis,
+  nav,
   works,
   worksQueryKey,
-  selectedWorkId,
-  searchQuery,
-  hasSelectedTags,
-  playingWorkId = null,
-  isPlaybackActive = false,
-  dockedBarActive = false,
   isPending = false,
-  hasNextPage = false,
-  worksTotal,
-  isFetchingNextPage = false,
-  onLoadMore,
-  onWorkSelect,
+  dockedBarActive = false,
   onWorkPlay,
-  onClearSearch,
-  onDeselect,
-  isSmartFolder = false,
-  onEditSmartFolderRules,
-  onClearAllFilters,
-}: WorkGridProps) {
+  pagination: { hasNextPage = false, worksTotal, isFetchingNextPage = false, onLoadMore },
+  emptyState: { searchQuery, isSmartFolder = false, onClearSearch, onEditSmartFolderRules },
+}: WorkResultsProps) {
+  const axis = nav.activeAxis;
+  const selectedWorkId = nav.selectedWorkId;
+  const hasSelectedTags = nav.selectedTags.length > 0;
+  const onWorkSelect = nav.selectWork;
+  const onClearAllFilters = nav.clearTags;
+  const onDeselect = useCallback(
+    () => nav.selectWork(null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nav は毎レンダー新規オブジェクトのため参照する値だけに依存を絞る
+    [nav.selectWork],
+  );
+  const playingWorkId = useAtomValue(playingWorkIdAtom) ?? null;
+  const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
   const [tileSize, setTileSize] = useAtom(libraryTileSizeAtom);
   const gridLayoutMode = useAtomValue(libraryGridLayoutModeAtom);
   const safeTileSize = clampTileSize(tileSize);

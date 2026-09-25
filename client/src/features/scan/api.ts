@@ -17,14 +17,10 @@ import {
   scanJobSnapshotSchema,
   scanLastResultResponseSchema,
   scanCandidatesMutationSchema,
-  scanCandidatesRegisterRequestSchema,
-  scanCandidatesRegisterResponseSchema,
   startScanRequestSchema,
   startScanResponseSchema,
-  type ScanCandidateRegisterItem,
   type ScanJobSnapshot,
   type ScanLastResultResponse,
-  type ScanCandidatesRegisterResponse,
 } from "@mimimilli/shared";
 
 export { SCAN_QUERY_KEYS };
@@ -76,16 +72,6 @@ export async function cancelScan(id: string): Promise<ScanJobSnapshot> {
 /** サーバー起動後に一度でも完了したスキャンの結果（TASK-56）。一度も完了していなければnull。 */
 export async function getLastScanResult(): Promise<ScanLastResultResponse | null> {
   return getParsed(scanLastResultResponseSchema, "/scan/last", { noContentAsNull: true });
-}
-
-export async function registerScanCandidates(
-  items: ScanCandidateRegisterItem[],
-): Promise<ScanCandidatesRegisterResponse> {
-  return postParsed(
-    scanCandidatesRegisterResponseSchema,
-    "/scan/candidates/register",
-    scanCandidatesRegisterRequestSchema.parse({ items }),
-  );
 }
 
 export async function excludeScanCandidates(paths: string[]): Promise<void> {

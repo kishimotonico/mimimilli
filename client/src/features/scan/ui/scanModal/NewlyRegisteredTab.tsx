@@ -8,11 +8,11 @@ export interface NewlyRegisteredTabProps {
 }
 
 export default function NewlyRegisteredTab({ workIds }: NewlyRegisteredTabProps) {
-  const { works, error, truncatedTotal, queryKey } = useScanResultWorks(
+  const { works, error, truncatedTotal } = useScanResultWorks(
     workIds,
     "新規作品の読み込みに失敗しました",
   );
-  const edit = useInlineTitleEdit(queryKey);
+  const edit = useInlineTitleEdit();
 
   return (
     <div className="flex flex-col gap-2">

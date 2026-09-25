@@ -7,23 +7,18 @@ import {
   useQuery,
   useQueryClient,
   useSuspenseInfiniteQuery,
-  type UseMutationResult,
 } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useAtomValue } from "jotai";
 import { randomSeedAtom } from "../../../entities/library/model/navigationAtoms";
 import {
   WORKS_DEFAULT_PAGE_SIZE,
-  type NormalizedTag,
   type SmartFolder,
   type SmartFolderCreate,
   type SmartFolderRule,
-  type UnregisterMissingWorksResult,
-  type UrlEntry,
-  type WorkSourceMutationResult,
   type WorksPage,
 } from "@mimimilli/shared";
-import { searchWorks } from "../../../entities/work/api";
+import { getWork, searchWorks } from "../../../entities/work/api";
 import {
   listSmartFolders,
   createSmartFolder,
@@ -33,48 +28,10 @@ import {
   previewSmartFolderRuleCount,
 } from "../../../entities/smart-folder/api";
 import { getAllTags } from "../../../entities/tag/api";
-import {
-  addWorkTag,
-  deleteWork,
-  getWork,
-  patchWorkBookmark,
-  patchWorkSource,
-  removeWorkTag,
-  unregisterMissingWorks,
-} from "../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 import { invalidateSmartFolderSaveQueries } from "./smartFolderInvalidation";
-
-type LibraryBookmarkPatchVariables = { workId: string; bookmarked: boolean };
-type LibraryTagIntentVariables = { workId: string; tag: string };
-/** 一括draft保存（ADR-0025）のPATCH変数。未変更のフィールドはキー自体を含めない
- *  （呼び出し側=WorkEditDialogがdirtyなフィールドだけ渡す） */
-type LibraryWorkEditVariables = {
-  workId: string;
-  sourceRevision: string;
-  title?: string;
-  tags?: NormalizedTag[];
-  urls?: UrlEntry[];
-};
-
-export type LibraryBookmarkPatchMutation = UseMutationResult<
-  { bookmarked: boolean },
-  Error,
-  LibraryBookmarkPatchVariables
->;
-
-export type LibraryTagIntentMutation = UseMutationResult<
-  WorkSourceMutationResult,
-  Error,
-  LibraryTagIntentVariables
->;
-export type LibraryWorkEditMutation = UseMutationResult<
-  WorkSourceMutationResult,
-  Error,
-  LibraryWorkEditVariables
->;
 import {
   buildSmartFolderFilterParams,
   buildWorksParams,
@@ -84,12 +41,13 @@ import {
 import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
 import { useAxisFacetsQuery } from "./useAxisFacetsQuery";
 import { useDebouncedValue } from "../../../shared/lib/useDebouncedValue";
-import { invalidateWorkViewQueries } from "../../../entities/work/invalidateWorkViewQueries";
 import {
-  applyBookmarkListCaches,
-  applyBookmarkToWorkCache,
-  smartOrWorksListKey,
-} from "./workPatchInvalidation";
+  useAddWorkTagMutation,
+  useBookmarkWorkMutation,
+  useEditWorkSourceMutation,
+  useRemoveWorkTagMutation,
+} from "../../../entities/work/model/workMutations";
+import { bookmarkActiveListHandler, smartOrWorksListKey } from "./workPatchInvalidation";
 import { getSmartFolderId } from "../../../entities/library/axisDefinitions";
 import type { LibraryViewState } from "./useLibraryNavigation";
 
@@ -259,14 +217,12 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
   };
 }
 
-function useWorkPatchMutationContext(nav: LibraryViewState, searchQuery: string) {
-  const queryClient = useQueryClient();
+/** 編集ダイアログの一括保存（title・tags・urls）・ブックマーク・詳細ペイン常駐タグの
+ *  意図コマンドを独立した mutation として提供する。ブックマークだけは表示中の一覧を
+ *  画面側で揃え、その一覧の再取得を省く */
+export function useLibraryWorkPatchMutations(nav: LibraryViewState, searchQuery: string) {
   const randomSeed = useAtomValue(randomSeedAtom);
-  const debouncedSearchQuery = useDebouncedValue(
-    searchQuery,
-    SEARCH_DEBOUNCE_MS,
-    searchQuery === "",
-  );
+  const debouncedSearchQuery = useLibraryDebouncedSearchQuery(searchQuery);
   const worksParams = buildWorksParams({
     activeAxis: nav.activeAxis,
     sort: nav.sort,
@@ -275,105 +231,20 @@ function useWorkPatchMutationContext(nav: LibraryViewState, searchQuery: string)
     randomSeed,
   });
   const activeListQueryKey = smartOrWorksListKey(nav, worksParams, debouncedSearchQuery);
-  return { queryClient, activeListQueryKey };
-}
 
-/** 編集ダイアログの一括保存（title・tags・urls）・ブックマーク・詳細ペイン常駐タグの
- *  意図コマンドを独立した mutation として提供する */
-export function useLibraryWorkPatchMutations(nav: LibraryViewState, searchQuery: string) {
-  const { queryClient, activeListQueryKey } = useWorkPatchMutationContext(nav, searchQuery);
-  const refetchAfterSourceError = (_error: unknown, variables: { workId: string }) =>
-    queryClient.invalidateQueries({
-      queryKey: WORK_QUERY_KEYS.detail(variables.workId),
-      exact: true,
-    });
-
-  /** 作品編集ダイアログの一括draft保存（ADR-0025）。dirtyなフィールドだけ渡す。 */
-  const editMutation = useMutation<WorkSourceMutationResult, Error, LibraryWorkEditVariables>({
-    mutationFn: ({ workId, sourceRevision, title, tags, urls }) =>
-      patchWorkSource(workId, { sourceRevision, title, tags, urls }),
-    onSuccess: async (result, { workId }) => {
-      queryClient.setQueryData(WORK_QUERY_KEYS.source(workId), result.snapshot);
-      await invalidateWorkViewQueries(queryClient, workId);
-    },
-    onError: refetchAfterSourceError,
+  const editMutation = useEditWorkSourceMutation();
+  const bookmarkMutation = useBookmarkWorkMutation({
+    activeList: bookmarkActiveListHandler(nav, activeListQueryKey),
   });
-
-  const bookmarkMutation = useMutation<
-    { bookmarked: boolean },
-    Error,
-    LibraryBookmarkPatchVariables
-  >({
-    mutationFn: ({ workId, bookmarked }) => patchWorkBookmark(workId, { bookmarked }),
-    onSuccess: async (result, { workId }) => {
-      applyBookmarkToWorkCache(queryClient, workId, result.bookmarked);
-      await applyBookmarkListCaches({
-        queryClient,
-        workId,
-        bookmarked: result.bookmarked,
-        nav,
-        activeListQueryKey,
-      });
-    },
-    onError: refetchAfterSourceError,
-  });
-
-  const addTagMutation = useMutation<WorkSourceMutationResult, Error, LibraryTagIntentVariables>({
-    mutationFn: ({ workId, tag }) => addWorkTag(workId, tag),
-    onSuccess: async (result, { workId }) => {
-      queryClient.setQueryData(WORK_QUERY_KEYS.source(workId), result.snapshot);
-      await invalidateWorkViewQueries(queryClient, workId);
-    },
-    onError: refetchAfterSourceError,
-  });
-
-  const removeTagMutation = useMutation<WorkSourceMutationResult, Error, LibraryTagIntentVariables>(
-    {
-      mutationFn: ({ workId, tag }) => removeWorkTag(workId, tag),
-      onSuccess: async (result, { workId }) => {
-        queryClient.setQueryData(WORK_QUERY_KEYS.source(workId), result.snapshot);
-        await invalidateWorkViewQueries(queryClient, workId);
-      },
-      onError: refetchAfterSourceError,
-    },
-  );
+  const addTagMutation = useAddWorkTagMutation();
+  const removeTagMutation = useRemoveWorkTagMutation();
 
   return { editMutation, bookmarkMutation, addTagMutation, removeTagMutation };
-}
-
-/** 作品登録の解除（削除）mutation。成功時に一覧系クエリを無効化し、詳細キャッシュを
- *  破棄したうえで onDeleted（選択解除・詳細パネルを閉じる）を呼ぶ */
-export function useLibraryWorkDeleteMutation(onDeleted: (workId: string) => void) {
-  const queryClient = useQueryClient();
-
-  return useMutation<void, Error, string>({
-    mutationFn: (workId) => deleteWork(workId),
-    onSuccess: async (_data, workId) => {
-      await queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
-      queryClient.removeQueries({ queryKey: WORK_QUERY_KEYS.detail(workId) });
-      onDeleted(workId);
-    },
-  });
 }
 
 /** エラービュー表示中だけ、missing件数を取得する（一括登録解除の導線・確認ダイアログ用） */
 export function useMissingWorksCountQuery(enabled: boolean) {
   return useQuery({ ...missingWorksCountQueryOptions, enabled });
-}
-
-/** missing作品の一括登録解除 mutation。成功時にworks系クエリを無効化する */
-export function useLibraryBulkUnregisterMissingMutation(
-  onSuccess: (result: UnregisterMissingWorksResult) => void,
-) {
-  const queryClient = useQueryClient();
-
-  return useMutation<UnregisterMissingWorksResult, Error, void>({
-    mutationFn: unregisterMissingWorks,
-    onSuccess: async (result) => {
-      await queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
-      onSuccess(result);
-    },
-  });
 }
 
 // ── スマートフォルダー作成・編集 mutation ─────────────────────

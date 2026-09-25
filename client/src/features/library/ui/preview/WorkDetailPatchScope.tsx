@@ -1,9 +1,7 @@
 import type { NormalizedTag, Work } from "@mimimilli/shared";
 import type { LibraryViewState, LibraryViewActions } from "../../model/useLibraryNavigation";
-import {
-  useLibraryWorkDeleteMutation,
-  useLibraryWorkPatchMutations,
-} from "../../model/useLibraryQueries";
+import { useLibraryWorkPatchMutations } from "../../model/useLibraryQueries";
+import { useUnregisterWorkMutation } from "../../../../entities/work/model/workMutations";
 import { WorkDetail } from "./WorkDetail";
 
 interface WorkDetailPatchScopeProps {
@@ -30,12 +28,13 @@ export function WorkDetailPatchScope({
   ...rest
 }: WorkDetailPatchScopeProps) {
   const workPatchMutations = useLibraryWorkPatchMutations(nav, searchQuery);
-  const deleteMutation = useLibraryWorkDeleteMutation(() => nav.selectWork(null));
+  const deleteMutation = useUnregisterWorkMutation();
   return (
     <WorkDetail
       work={work}
       workPatchMutations={workPatchMutations}
       deleteMutation={deleteMutation}
+      onUnregistered={() => nav.selectWork(null)}
       {...rest}
     />
   );

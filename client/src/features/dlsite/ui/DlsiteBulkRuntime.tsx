@@ -15,7 +15,7 @@ import {
   createSseGeneration,
   parseTypedSseMessage,
 } from "../../../shared/api/sseTransport";
-import { invalidateDlsiteCache } from "../model/dlsiteInvalidation";
+import { updateCachesAfterDlsiteBulkFetch } from "../../../entities/work/model/workCacheUpdates";
 import {
   dlsiteBulkActionsAtom,
   dlsiteBulkActiveAtom,
@@ -23,7 +23,6 @@ import {
   dlsiteBulkStartingAtom,
   dlsiteBulkCancellingAtom,
   dlsiteBulkProgressAtom,
-  dlsiteInvalidateAtom,
   type DlsiteBulkActions,
 } from "../../../entities/dlsite/model/bulkAtoms";
 import { formatDlsiteBulkResult } from "../model/formatDlsiteBulkResult";
@@ -47,15 +46,7 @@ export default function DlsiteBulkRuntime() {
   const setProgress = useSetAtom(dlsiteBulkProgressAtom);
   const setApplyOpen = useSetAtom(dlsiteBulkApplyOpenAtom);
   const setActions = useSetAtom(dlsiteBulkActionsAtom);
-  const setInvalidate = useSetAtom(dlsiteInvalidateAtom);
   const toast = useToast();
-
-  const invalidateDlsiteQueries = useCallback(
-    (workIds?: string | string[]) => {
-      void invalidateDlsiteCache(queryClient, workIds).catch(() => {});
-    },
-    [queryClient],
-  );
 
   const showComplete = useCallback(
     (result: DlsiteBulkResult) => {
@@ -90,7 +81,7 @@ export default function DlsiteBulkRuntime() {
   // start()自身がジョブを開始した直後にSSE購読するときだけ、進捗イベントを
   // 最初から取りこぼさず全て捕捉できると確信できる。attach()は既に走っている
   // かもしれないジョブへ後から繋ぐため、この確信が持てない
-  // （invalidateDlsiteQueriesの選択的無効化に使うupdatedWorkIdsの信頼性に関わる）。
+  // （完了時の詳細キャッシュを処理対象だけに絞れるかどうかに関わる）。
   const freshStartRef = useRef(false);
 
   const start = useCallback(async () => {
@@ -169,12 +160,6 @@ export default function DlsiteBulkRuntime() {
   }, [actions, setActions]);
 
   useEffect(() => {
-    const invalidate = (workIds?: string | string[]) => invalidateDlsiteCache(queryClient, workIds);
-    setInvalidate({ run: invalidate });
-    return () => setInvalidate(null);
-  }, [queryClient, setInvalidate]);
-
-  useEffect(() => {
     if (!active) return;
 
     let disposed = false;
@@ -183,7 +168,7 @@ export default function DlsiteBulkRuntime() {
     const connection = connectSse(`${API_BASE}/dlsite/events`);
     const source = connection.source;
     // progressイベントが伝える処理中作品のIDを集め、完了時にskippedでない（実際に処理対象だった）
-    // 作品の詳細キャッシュだけを選択的に無効化する（getDlsiteInvalidationKeys参照）。
+    // 作品の詳細キャッシュだけを選択的に無効化する。
     // SSE切断→再接続、またはattach()での後乗り（開始直後からの購読と確信できない）
     // でprogressイベントを取りこぼした可能性がある場合はmissedProgressを立て、
     // 安全側に倒して全作品を無効化する。
@@ -216,7 +201,10 @@ export default function DlsiteBulkRuntime() {
         toast.error(event.message);
       }
       detach();
-      invalidateDlsiteQueries(missedProgress ? undefined : [...updatedWorkIds]);
+      void updateCachesAfterDlsiteBulkFetch(queryClient, {
+        processedWorkIds: [...updatedWorkIds],
+        progressMayBeMissed: missedProgress,
+      }).catch(() => {});
     };
 
     const applySnapshot = (snapshot: DlsiteBulkSnapshot): void => {
@@ -301,7 +289,7 @@ export default function DlsiteBulkRuntime() {
     };
   }, [
     active,
-    invalidateDlsiteQueries,
+    queryClient,
     setActive,
     setCancelling,
     setProgress,

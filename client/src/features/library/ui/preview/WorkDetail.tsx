@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useSetAtom } from "jotai";
-import type { UseMutationResult } from "@tanstack/react-query";
 import type { NormalizedTag, Work } from "@mimimilli/shared";
 import { useToast } from "../../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
@@ -20,6 +19,7 @@ import Button from "../../../../shared/ui/Button";
 import { formatDuration, formatTime } from "../../../../shared/lib/format";
 import { getWorkStatusLabel } from "../../../../entities/work/workStatusLabel";
 import type { useLibraryWorkPatchMutations } from "../../model/useLibraryQueries";
+import type { UnregisterWorkMutation } from "../../../../entities/work/model/workMutations";
 import { WorkMetadataActions } from "./WorkMetadataActions";
 import { WorkPlayButton } from "./WorkPlayButton";
 import { WorkStatusWarnings } from "./WorkStatusWarnings";
@@ -37,7 +37,9 @@ interface WorkDetailProps {
   isPlaybackActive?: boolean;
   tagSuggestions: string[];
   workPatchMutations: ReturnType<typeof useLibraryWorkPatchMutations>;
-  deleteMutation: UseMutationResult<void, Error, string>;
+  deleteMutation: UnregisterWorkMutation;
+  /** 登録解除の成功後、必須キャッシュ更新が済んでから呼ばれる（選択解除・遷移） */
+  onUnregistered: () => void;
   /** タグチップクリック時のハンドラ（絞り込み遷移。ADR-0013） */
   onTagClick: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
   /** "pane" = 右ペイン（既定）、"full" = 全画面詳細。カバー・余白のサイズだけを変える */
@@ -58,6 +60,7 @@ export function WorkDetail({
   tagSuggestions,
   workPatchMutations,
   deleteMutation,
+  onUnregistered,
   onTagClick,
   layout = "pane",
   onExpand,
@@ -91,20 +94,23 @@ export function WorkDetail({
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
   const rootFolder = useRootFolder();
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     const title = work.title;
-    deleteMutation.mutate(work.id, {
-      onSuccess: () =>
-        toast.show({
-          message: `「${title}」の登録を解除しました`,
-          variant: "success",
-          priority: "notice",
-          // 解除成功で画面遷移してWorkDetailが直後にアンマウントされるため、
-          // 通知は発行元の生存に縛らない
-          dismissOnUnmount: false,
-        }),
-      onError: (cause) => toast.error(apiErrorMessage(cause, "作品登録の解除に失敗しました")),
+    try {
+      await deleteMutation.mutateAsync(work.id);
+    } catch (cause) {
+      toast.error(apiErrorMessage(cause, "作品登録の解除に失敗しました"));
+      return;
+    }
+    toast.show({
+      message: `「${title}」の登録を解除しました`,
+      variant: "success",
+      priority: "notice",
+      // 解除成功で画面遷移してWorkDetailが直後にアンマウントされるため、
+      // 通知は発行元の生存に縛らない
+      dismissOnUnmount: false,
     });
+    onUnregistered();
   };
 
   return (
@@ -273,7 +279,7 @@ export function WorkDetail({
           confirmLabel="解除する"
           onConfirm={() => {
             setIsDeleteConfirmOpen(false);
-            handleDeleteConfirm();
+            void handleDeleteConfirm();
           }}
           onCancel={() => setIsDeleteConfirmOpen(false)}
         />
