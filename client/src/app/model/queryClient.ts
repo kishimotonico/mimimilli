@@ -6,10 +6,17 @@ import { createBaseQueryClientOptions } from "../../shared/api/queryClient";
 import { onApiError } from "../../shared/api/http";
 import { SETTINGS_QUERY_KEYS } from "../../entities/settings/queryKeys";
 
+// createQueryClientは通常アプリで一度だけ呼ぶが、テストでは複数回呼ばれる。
+// 呼ぶたびに前回分の購読を解除し、shared/api/httpのapiErrorListenersにリスナーが
+// 溜まり続けないようにする。
+let unsubscribePreviousApiErrorListener: (() => void) | null = null;
+
 export function createQueryClient(): QueryClient {
+  unsubscribePreviousApiErrorListener?.();
+
   const client = new QueryClient(createBaseQueryClientOptions());
 
-  onApiError((error) => {
+  unsubscribePreviousApiErrorListener = onApiError((error) => {
     if (error.code === "root_reconfiguring") {
       void client.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
     }

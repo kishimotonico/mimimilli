@@ -184,7 +184,7 @@ export default function DlsiteBulkRuntime() {
     const detach = (): void => {
       if (disposed) return;
       setActive(false);
-      setCancelling(false);
+      resetTerminalState();
       connection.close();
     };
 
@@ -300,6 +300,7 @@ export default function DlsiteBulkRuntime() {
   }, [
     active,
     queryClient,
+    resetTerminalState,
     setActive,
     setCancelling,
     setProgress,

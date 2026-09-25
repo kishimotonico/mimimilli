@@ -71,4 +71,26 @@ describe("createQueryClient（app/model/queryClient）", () => {
 
     vi.unstubAllGlobals();
   });
+
+  it("複数回呼んでも古いclientへの購読が残らない", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({ error: { code: "root_reconfiguring", message: "再設定中です" } }, 409),
+      ),
+    );
+
+    const first = createQueryClient();
+    const firstInvalidate = vi.spyOn(first, "invalidateQueries");
+
+    const second = createQueryClient();
+    const secondInvalidate = vi.spyOn(second, "invalidateQueries");
+
+    await expect(getParsed(z.object({}), "/works/some-work/playback")).rejects.toThrow();
+
+    await vi.waitFor(() => expect(secondInvalidate).toHaveBeenCalled());
+    expect(firstInvalidate).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+  });
 });
