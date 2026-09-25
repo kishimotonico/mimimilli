@@ -1,5 +1,6 @@
 import {
   coverFieldsFromColumns,
+  resolveWorkPlacement,
   toTrackDurationFieldsFromSec,
   workPlacementOf,
 } from "@mimimilli/shared";
@@ -11,7 +12,7 @@ import type {
   WorkPlacement,
   WorkSummary,
 } from "@mimimilli/shared";
-import { SEED_PLAYLIST_SPECS, SEED_TRACK_NAMES, type FixtureCoverColumns } from "./data.ts";
+import { SEED_TRACK_NAMES, type FixtureCoverColumns, type SeedPlaylistSpec } from "./data.ts";
 import { fixtureCoverFromColumns } from "./coverDto.ts";
 import type { FixtureWorkRecord } from "./data.ts";
 import type { FixtureState, PlaybackIds } from "./state.ts";
@@ -27,12 +28,12 @@ function splitDurationSec(totalDurationSec: number, trackCount: number, index: n
 /** 作品の playlist/track 数に対応する安定したIDを割り当てる（初回のみ生成しキャッシュ） */
 function ensurePlaybackIds(
   summary: WorkSummary,
+  specPlaylists: SeedPlaylistSpec[] | undefined,
   playbackIds: Map<string, PlaybackIds>,
 ): PlaybackIds {
   const cached = playbackIds.get(summary.id);
   if (cached) return cached;
 
-  const specPlaylists = SEED_PLAYLIST_SPECS[summary.id];
   const trackCounts = specPlaylists
     ? specPlaylists.map((p) => p.tracks.length)
     : summary.trackCount > 0
@@ -52,6 +53,7 @@ export function buildFullWorkFromState(state: FixtureState, record: FixtureWorkR
   return buildFullWork(
     composeWork(state, record),
     workPlacementOf(record.metaPath),
+    state.playlistSpecs.get(record.id),
     coverColumnsOf(state, record.id),
     state.resumes,
     state.playbackIds,
@@ -61,12 +63,12 @@ export function buildFullWorkFromState(state: FixtureState, record: FixtureWorkR
 export function buildFullWork(
   summary: WorkSummary,
   placement: WorkPlacement,
+  specPlaylists: SeedPlaylistSpec[] | undefined,
   coverColumns: FixtureCoverColumns,
   resumes: Map<string, ResumeBody>,
   playbackIds: Map<string, PlaybackIds>,
 ): Work {
-  const ids = ensurePlaybackIds(summary, playbackIds);
-  const specPlaylists = SEED_PLAYLIST_SPECS[summary.id];
+  const ids = ensurePlaybackIds(summary, specPlaylists, playbackIds);
   const namedTracks = SEED_TRACK_NAMES[summary.id];
 
   const playlists: ResolvedPlaylist[] = specPlaylists
@@ -134,4 +136,19 @@ export function findTrackByFile(work: Work, relPath: string): ResolvedTrack | un
     if (track) return track;
   }
   return undefined;
+}
+
+/** scan・登録の境界で配置を検査する。不整合なら real と同じ文言で作品を error にする */
+export function checkWorkPlacement(
+  state: FixtureState,
+  record: FixtureWorkRecord,
+): FixtureWorkRecord {
+  const resolution = resolveWorkPlacement(record.metaPath, buildFullWorkFromState(state, record));
+  if (resolution.ok) return record;
+  return {
+    ...record,
+    status: "error",
+    errorMessage: resolution.message,
+    physicalPath: resolution.physicalPath,
+  };
 }

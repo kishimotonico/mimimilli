@@ -13,6 +13,7 @@ export function getScanWorkMap(db: Db): Map<string, ScanWorkState> {
             works.media_revision AS mediaRevision,
             works.status AS status,
             works.physical_path AS physicalPath,
+            works.meta_path AS metaPath,
             works.cover_image AS coverImage,
             works.cover_width AS coverWidth,
             works.cover_height AS coverHeight,
@@ -33,6 +34,7 @@ export function getScanWorkMap(db: Db): Map<string, ScanWorkState> {
     mediaRevision: string | null;
     status: Work["status"];
     physicalPath: string;
+    metaPath: string;
     coverImage: string | null;
     coverWidth: number | null;
     coverHeight: number | null;
@@ -46,6 +48,7 @@ export function getScanWorkMap(db: Db): Map<string, ScanWorkState> {
   const map = new Map<string, ScanWorkState>();
   for (const row of rows) {
     map.set(row.id, {
+      metaPath: row.metaPath,
       sourceRevision: row.sourceRevision,
       projectionRevision: row.projectionRevision,
       mediaRevision: row.mediaRevision,

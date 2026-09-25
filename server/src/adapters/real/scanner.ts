@@ -173,8 +173,8 @@ export class Scanner {
     checkAbort();
     const seenIds: SeenMetaIds = { work: new Set() };
     const existingWorks = this.query.getScanWorkMap();
-    const existingByPhysicalPath = new Map(
-      [...existingWorks].map(([id, state]) => [state.physicalPath, { id, state }]),
+    const existingByMetaPath = new Map(
+      [...existingWorks].map(([id, state]) => [state.metaPath, { id, state }]),
     );
     result.identityConflicts = findIdentityConflicts(root, tree.metaPaths);
 
@@ -186,7 +186,7 @@ export class Scanner {
       full,
       seenIds,
       existingWorks,
-      existingByPhysicalPath,
+      existingByMetaPath,
       batch,
       result,
       emit,
@@ -240,7 +240,7 @@ export class Scanner {
     full: boolean,
     seenIds: SeenMetaIds,
     existingWorks: Map<string, ScanWorkState>,
-    existingByPhysicalPath: Map<string, { id: string; state: ScanWorkState }>,
+    existingByMetaPath: Map<string, { id: string; state: ScanWorkState }>,
     batch: ScanUpsertBatch,
     result: ScanResult,
     emit: NonNullable<ScanOptions["onProgress"]>,
@@ -274,7 +274,7 @@ export class Scanner {
             seenIds,
             result,
             existingWorks,
-            existingByPhysicalPath,
+            existingByMetaPath,
             root,
             result.identityConflicts,
           );
@@ -311,7 +311,7 @@ export class Scanner {
             seenIds,
             result,
             existingWorks,
-            existingByPhysicalPath,
+            existingByMetaPath,
             root,
             result.identityConflicts,
           );

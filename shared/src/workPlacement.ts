@@ -40,6 +40,11 @@ export function workPlacementOf(metaPath: string): WorkPlacement {
   throw new Error(`メタファイル名ではありません: ${metaPath}`);
 }
 
+/** メタの中身から音声ファイルを特定できないときの physicalPath */
+export function unresolvedWorkPhysicalPath(placement: WorkPlacement): string {
+  return placement.kind === "folder" ? placement.mediaRoot : placement.metaPath;
+}
+
 /** 配置からの相対パスを、metaPath と同じ区切りで絶対パスにする */
 function joinMediaRoot(placement: WorkPlacement, file: string): string {
   const { metaPath } = placement;
@@ -63,7 +68,7 @@ export function resolveWorkPlacement(
   const mismatch = (detail: string): WorkPlacementResolution => ({
     ok: false,
     placement,
-    physicalPath: metaPath,
+    physicalPath: unresolvedWorkPhysicalPath(placement),
     message: `${WORK_PLACEMENT_MISMATCH_PREFIX}${metaName} ${detail}`,
   });
 

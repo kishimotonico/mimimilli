@@ -9,6 +9,7 @@ import type {
 } from "../../adapter/index.ts";
 import type { FixtureWorkRecord } from "./data.ts";
 import { isFsPathWithin, normalizeFsPath } from "./fsResolve.ts";
+import { checkWorkPlacement } from "./playback.ts";
 import { FIXTURE_UNREADABLE_ROOT } from "./scenarios.ts";
 import { dlsiteLinkageOf, setDlsiteLinkage, type FixtureState } from "./state.ts";
 
@@ -54,6 +55,7 @@ async function runPseudoScan(
   checkAbort();
   emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
 
+  state.works = state.works.map((work) => checkWorkPlacement(state, work));
   state.lastScanTime = new Date().toISOString();
   state.scanCandidates = [...state.scanCandidatePool];
   const excluded = new Set(state.scanCandidateExclusions);

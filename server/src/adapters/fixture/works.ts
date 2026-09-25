@@ -39,7 +39,7 @@ import { validateResumeRequest } from "../../core/resumeValidation.ts";
 import { assertRegistrationAllowed } from "../../core/workRegistrationGuard.ts";
 import { applyWorksQuery, toWorksPage } from "../../core/worksQuery.ts";
 import { isPathWithin } from "../../lib/path.ts";
-import { buildFullWorkFromState } from "./playback.ts";
+import { buildFullWorkFromState, checkWorkPlacement } from "./playback.ts";
 import { normalizeFsPath } from "./fsResolve.ts";
 import {
   composeWorks,
@@ -231,13 +231,17 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
         bookmarked: false,
         lastPlayedAt: null,
       };
-      state.works.push(work);
+      const registered = checkWorkPlacement(state, work);
+      state.works.push(registered);
       state.sourceRevisions.set(work.id, "fixture");
       const linkage: MetaDlsiteState = body.dlsite
         ? { rjCode: body.dlsite.info.rjCode, status: "applied", appliedTags: applyTags }
         : { rjCode: preview.detectedRjCode, status: "none", appliedTags: [] };
       setDlsiteLinkage(state, work.id, linkage);
-      return { snapshot: fixtureEditSnapshot(state, work), projection: { status: "published" } };
+      return {
+        snapshot: fixtureEditSnapshot(state, registered),
+        projection: { status: "published" },
+      };
     },
 
     async reassignIdentityConflict(

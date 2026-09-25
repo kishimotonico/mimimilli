@@ -1,12 +1,22 @@
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import {
   coverFieldsFromColumns,
   metaFileSchema,
   resolveWorkPlacement,
   selectDefaultPlaylist,
+  unresolvedWorkPhysicalPath,
+  workPlacementNotAFileMessage,
+  workPlacementOf,
 } from "@mimimilli/shared";
-import type { Cover, MetaFile, ScanDiagnostic, ScanResult, Work } from "@mimimilli/shared";
+import type {
+  Cover,
+  MetaFile,
+  ScanDiagnostic,
+  ScanResult,
+  Work,
+  WorkPlacementResolution,
+} from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import { computeWorkRevisions } from "./fingerprint.ts";
 import { MetaParseError } from "./meta.ts";
@@ -52,6 +62,22 @@ function assertUniqueMetaIds(metaPath: string, meta: MetaFile, seenIds: SeenMeta
     throw new MetaParseError(metaPath, `Work IDが重複しています: ${id}`, id);
   }
   seenIds.work.add(id);
+}
+
+function isFile(path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function placementErrorMessage(resolution: WorkPlacementResolution): string | null {
+  if (!resolution.ok) return resolution.message;
+  if (resolution.placement.kind === "audio-file" && !isFile(resolution.physicalPath)) {
+    return workPlacementNotAFileMessage(resolution.placement, basename(resolution.physicalPath));
+  }
+  return null;
 }
 
 function deriveWorkErrorMessage(
@@ -314,17 +340,22 @@ export function handleMetaParseError(
   seenIds: SeenMetaIds,
   result: ScanErrorTracking,
   existingWorks: Map<string, ScanWorkState>,
-  existingByPhysicalPath: Map<string, { id: string; state: ScanWorkState }>,
+  existingByMetaPath: Map<string, { id: string; state: ScanWorkState }>,
   root: string,
   identityConflicts: ScanDiagnostic[],
 ): void {
   scanLogger.warn(error.message, { metaPath });
   const workDir = dirname(metaPath);
-  const existingByPath = existingByPhysicalPath.get(workDir) ?? null;
-  if (existingByPath) {
-    batch.addError(existingByPath.id, workDir, metaPath, error.message);
-    seenIds.work.add(existingByPath.id);
-    trackUpsertedWork(result, existingByPath.id, false);
+  const existing = existingByMetaPath.get(metaPath) ?? null;
+  if (existing) {
+    batch.addError(
+      existing.id,
+      unresolvedWorkPhysicalPath(workPlacementOf(metaPath)),
+      metaPath,
+      error.message,
+    );
+    seenIds.work.add(existing.id);
+    trackUpsertedWork(result, existing.id, false);
     result.errors += 1;
     return;
   }
@@ -410,7 +441,8 @@ export async function registerMetaFile(
     checkAbort,
   );
 
-  const errorMessage = deriveWorkErrorMessage(mediaRoot, meta, invalidStartTracks);
+  const errorMessage =
+    placementErrorMessage(placement) ?? deriveWorkErrorMessage(mediaRoot, meta, invalidStartTracks);
   const totalDurationSec = totalDurationFromResolved(resolvedPlaylists, meta.defaultPlaylistId);
 
   const existing = existingWorks.get(id);

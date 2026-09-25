@@ -12,9 +12,11 @@ import type {
   WorkSummary,
 } from "@mimimilli/shared";
 import {
+  SEED_PLAYLIST_SPECS,
   fixtureCoverColumnsForWork,
   type FixtureCoverColumns,
   type FixtureWorkRecord,
+  type SeedPlaylistSpec,
 } from "./data.ts";
 import { createFixtureScenario, type FixtureRootReconfiguration } from "./scenarios.ts";
 
@@ -55,6 +57,7 @@ export interface FixtureState {
   /** 作品ごとのレジューム位置 */
   resumes: Map<string, ResumeBody>;
   playbackIds: Map<string, PlaybackIds>;
+  playlistSpecs: ReadonlyMap<string, SeedPlaylistSpec[]>;
   /** scan() が insertedWorkIds として返す、未取り込みの新規作品ID（シナリオ "new-work" 用） */
   scanInsertedWorkIds: string[];
   /** scan() が updatedWorkIds として返す作品ID */
@@ -143,6 +146,8 @@ export interface FixtureAdapterOptions {
   works?: FixtureSeedWork[];
   /** works差し替え時に、rjCodeごとのDLsite取得キャッシュ相当を明示的に与える（省略時は空）。 */
   dlsiteFetchFailures?: ReadonlyArray<{ rjCode: string; resolution: DlsiteCacheResolution }>;
+  /** 作品IDごとのプレイリスト定義（meta の playlists に相当）。シードの定義に上書きで足す */
+  playlistSpecs?: Readonly<Record<string, SeedPlaylistSpec[]>>;
 }
 
 export function createInitialState(options: FixtureAdapterOptions): FixtureState {
@@ -202,6 +207,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     nextSmartFolderId: maxSmartFolderNum + 1,
     resumes: new Map(),
     playbackIds: new Map(),
+    playlistSpecs: new Map(Object.entries({ ...SEED_PLAYLIST_SPECS, ...options.playlistSpecs })),
     scanInsertedWorkIds: scenario.scanInsertedWorkIds,
     scanUpdatedWorkIds: scenario.scanUpdatedWorkIds,
     scanCandidateExclusions: [],
