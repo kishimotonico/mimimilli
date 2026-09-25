@@ -1,5 +1,5 @@
 import { createElement, useMemo } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -67,6 +67,14 @@ beforeEach(() => {
         new Response(JSON.stringify([]), { headers: { "Content-Type": "application/json" } }),
     ),
   );
+  // happy-domはネイティブ<dialog>のshowModal/closeを実装していないため、
+  // SettingsModalを開くテストのためにスタブする（settingsModal.test.tsと同様）。
+  HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
+    this.open = true;
+  });
+  HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
+    this.open = false;
+  });
 });
 
 describe("root再設定中の画面", () => {
@@ -186,5 +194,43 @@ describe("root再設定完了後のDLsite自動取得attach", () => {
       timeout: 5000,
     });
     expect(getDlsiteBulkStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe("root再設定突入時のモーダル初期化", () => {
+  it("設定モーダルを開いたままreconfiguringに入ると閉じ、復帰後も開いたままにならない", async () => {
+    const { queryClient } = renderAppWithSettings({
+      rootFolder: "/audio/library",
+      lastScanTime: "2026-01-01T00:00:00.000Z",
+      rootReconfiguration: { status: "idle" },
+    });
+    await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "設定" }));
+    await waitFor(() => expect(screen.getByRole("dialog", { name: "設定" })).toBeInTheDocument());
+
+    queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
+      rootFolder: "/audio/library",
+      lastScanTime: "2026-01-01T00:00:00.000Z",
+      rootReconfiguration: {
+        status: "running",
+        rootFolder: "/audio/library",
+        progress: null,
+      },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText("ライブラリを再構築しています")).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("dialog", { name: "設定" })).not.toBeInTheDocument();
+
+    queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
+      rootFolder: "/audio/library",
+      lastScanTime: "2026-01-01T00:00:00.000Z",
+      rootReconfiguration: { status: "idle" },
+    });
+
+    await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
+    expect(screen.queryByRole("dialog", { name: "設定" })).not.toBeInTheDocument();
   });
 });
