@@ -27,7 +27,7 @@ import {
   writeMetaFile,
 } from "./meta.ts";
 import type { SeenMetaIds } from "./duplicateMetaIdRepair.ts";
-import { excludeDescendantPaths, toPortableRelativePath } from "./paths.ts";
+import { excludeDescendantPaths, identityConflictPathOf, toPortableRelativePath } from "./paths.ts";
 import { isPathWithin } from "../../lib/path.ts";
 import { createProgressThrottle } from "./progressThrottle.ts";
 import { measureCoverDimensions, type CoverDimensions } from "./thumbnailCache.ts";
@@ -89,7 +89,7 @@ function findIdentityConflicts(root: string, metaPaths: string[]): ScanDiagnosti
       if (typeof value !== "object" || value === null || !("id" in value)) continue;
       if (typeof value.id !== "string") continue;
       const paths = pathsByWorkId.get(value.id) ?? [];
-      paths.push(toPortableRelativePath(root, dirname(metaPath)));
+      paths.push(identityConflictPathOf(root, metaPath));
       pathsByWorkId.set(value.id, paths);
     } catch {
       // 不正JSONは登録フェーズで parse error として扱う。

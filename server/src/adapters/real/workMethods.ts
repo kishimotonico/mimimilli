@@ -40,7 +40,7 @@ import {
 import { SourceChangedError } from "../../errors.ts";
 import { removeIdentityConflictPath } from "../../core/identityConflicts.ts";
 import { validateResumeRequest } from "../../core/resumeValidation.ts";
-import { resolveWithin, toPortableRelativePath } from "./paths.ts";
+import { identityConflictPathOf, resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
@@ -77,14 +77,10 @@ export function createWorkMethods(deps: {
 }) {
   const { db, query, catalog, user, scanner, requireRoot, cachedCover } = deps;
 
-  function recordIdentityConflict(
-    workId: string,
-    ownerPhysicalPath: string,
-    conflictPhysicalPath: string,
-  ) {
+  function recordIdentityConflict(workId: string, ownerMetaPath: string, conflictMetaPath: string) {
     const root = requireRoot();
-    const ownerPath = toPortableRelativePath(root, ownerPhysicalPath);
-    const conflictPath = toPortableRelativePath(root, conflictPhysicalPath);
+    const ownerPath = identityConflictPathOf(root, ownerMetaPath);
+    const conflictPath = identityConflictPathOf(root, conflictMetaPath);
     const diagnostics = catalog.listIdentityConflicts();
     const existing = diagnostics.find(
       (diagnostic): diagnostic is Extract<ScanDiagnostic, { kind: "identity_conflict" }> =>
@@ -119,6 +115,12 @@ export function createWorkMethods(deps: {
     } catch {
       return null;
     }
+  }
+
+  /** identity_conflict のパスはフォルダー形式ならフォルダー、単一ファイル形式ならメタファイルを指す */
+  function metaPathOfIdentityConflictTarget(target: string): string {
+    const isFile = statSync(target, { throwIfNoEntry: false })?.isFile() ?? false;
+    return isFile ? target : join(target, META_FILE_NAME);
   }
 
   async function persistSourceMutation(
@@ -194,9 +196,9 @@ export function createWorkMethods(deps: {
       if (!diagnostic) return null;
 
       const root = requireRoot();
-      const workDir = resolveWithin(root, join(root, body.path));
-      if (!workDir) return null;
-      const metaPath = join(workDir, META_FILE_NAME);
+      const target = resolveWithin(root, join(root, body.path));
+      if (!target) return null;
+      const metaPath = metaPathOfIdentityConflictTarget(target);
       let source;
       try {
         source = readMetaSource(metaPath);
@@ -232,7 +234,7 @@ export function createWorkMethods(deps: {
       const existing = query.getScanWorkMap().get(source.meta.id);
       const hadCatalogRow = existing !== undefined;
       if (existing && existing.physicalPath !== physicalPath && existing.status !== "missing") {
-        recordIdentityConflict(source.meta.id, existing.physicalPath, physicalPath);
+        recordIdentityConflict(source.meta.id, existing.metaPath, metaPath);
         return {
           snapshot: toEditSnapshot(source, physicalPath),
           projection: { status: "pending", reason: "identity_conflict" },

@@ -32,6 +32,11 @@ const META_CASES: PlacementCase[] = [
     expected: `${PREFIX}renamed.mimimilli.json のトラックが参照する other.wav は、このメタファイルに対応する音声ファイルではありません`,
   },
   {
+    stem: "noext",
+    playlists: [{ name: "default", files: ["noext"] }],
+    expected: `${PREFIX}noext.mimimilli.json のトラックが参照する noext は、このメタファイルに対応する音声ファイルではありません`,
+  },
+  {
     stem: "bonus",
     playlists: [
       { name: "default", files: ["bonus.wav"] },
@@ -178,6 +183,35 @@ test("単一ファイル形式のメタが壊れると、既存の作品がerror
   const after = await adapter.getWork(workIdOf("single"));
   assert.equal(after?.status, "error");
   assert.equal(after?.physicalPath, metaPath);
+});
+
+test("単一ファイル形式の壊れたメタのコピーはメタファイルのパスでidentity_conflictになる（real）", async (t) => {
+  const directory = makeTestDirectory("work-placement-identity-conflict");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "library");
+  const meta = metaOf("single", [{ name: "default", files: ["single.wav"] }]);
+  for (const dir of ["a", "b"]) {
+    mkdirSync(join(root, dir), { recursive: true });
+    writeWav(join(root, dir, "single.wav"), 1);
+  }
+  writeMetaFile(join(root, "a", "single.mimimilli.json"), meta);
+
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  await configureRoot(adapter, root);
+  await adapter.scan();
+  writeFileSync(join(root, "b", "single.mimimilli.json"), `{ "id": "${meta.id}", broken`);
+  const result = await adapter.scan();
+
+  assert.deepEqual(result.identityConflicts, [
+    {
+      kind: "identity_conflict",
+      workId: meta.id,
+      paths: ["a/single.mimimilli.json", "b/single.mimimilli.json"],
+    },
+  ]);
+  const owner = await adapter.getWork(meta.id);
+  assert.equal(owner?.status, "ok");
+  assert.equal(owner?.physicalPath, join(root, "a", "single.wav"));
 });
 
 test("音声拡張子で終わる名前のフォルダーはフォルダー作品としてトラックを解決する（real）", async (t) => {

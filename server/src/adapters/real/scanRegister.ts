@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, join } from "node:path";
 import {
   coverFieldsFromColumns,
   metaFileSchema,
@@ -38,7 +38,7 @@ import type { CoverDimensions } from "./thumbnailCache.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
 import { resolveMetaDlsiteProjection } from "./dlsiteProjection.ts";
 import { naturalCompare } from "./naturalCompare.ts";
-import { toPortableRelativePath } from "./paths.ts";
+import { identityConflictPathOf } from "./paths.ts";
 import { isPathWithin } from "../../lib/path.ts";
 
 const scanLogger = getCategoryLogger("scan");
@@ -345,7 +345,6 @@ export function handleMetaParseError(
   identityConflicts: ScanDiagnostic[],
 ): void {
   scanLogger.warn(error.message, { metaPath });
-  const workDir = dirname(metaPath);
   const existing = existingByMetaPath.get(metaPath) ?? null;
   if (existing) {
     batch.addError(
@@ -367,11 +366,11 @@ export function handleMetaParseError(
     // 現root配下のpathで表現できないためidentity_conflictにはせず、独立したerrorとして扱う。
     if (
       existingById &&
-      existingById.physicalPath !== workDir &&
-      isPathWithin(root, existingById.physicalPath)
+      existingById.metaPath !== metaPath &&
+      isPathWithin(root, existingById.metaPath)
     ) {
-      const brokenPath = toPortableRelativePath(root, workDir);
-      const ownerPath = toPortableRelativePath(root, existingById.physicalPath);
+      const brokenPath = identityConflictPathOf(root, metaPath);
+      const ownerPath = identityConflictPathOf(root, existingById.metaPath);
       const existingConflict = identityConflicts.find(
         (diagnostic): diagnostic is Extract<ScanDiagnostic, { kind: "identity_conflict" }> =>
           diagnostic.kind === "identity_conflict" && diagnostic.workId === candidateId,

@@ -7,6 +7,7 @@ import {
   isRjCodeMissing,
   sidecarMetaFileName,
   tagEquals,
+  unresolvedWorkPhysicalPath,
   workPlacementOf,
   type NormalizedTag,
 } from "@mimimilli/shared";
@@ -100,8 +101,9 @@ function removeIdentityConflictForWork(state: FixtureState, workId: string): voi
   const work = state.works.find((candidate) => candidate.id === workId);
   if (!work) return;
   const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
-  if (!isPathWithin(rootAbs, work.physicalPath, posix)) return;
-  const path = work.physicalPath.slice(rootAbs.length + 1);
+  const workPath = unresolvedWorkPhysicalPath(workPlacementOf(work.metaPath));
+  if (!isPathWithin(rootAbs, workPath, posix)) return;
+  const path = workPath.slice(rootAbs.length + 1);
   state.identityConflicts = removeIdentityConflictPath(state.identityConflicts, workId, path);
 }
 

@@ -9,6 +9,8 @@ import {
   TEXT_PREVIEW_LIMIT_BYTES,
   type MediaKind,
   type PreviewCapability,
+  unresolvedWorkPhysicalPath,
+  workPlacementOf,
 } from "@mimimilli/shared";
 
 /** SQLite LIKE の ESCAPE 文字（`ESCAPE '!'` とセットで使う。パス区切り `\` と衝突しない） */
@@ -59,6 +61,11 @@ export function toPortableRelativePath(base: string, target: string): string {
     throw new Error(`基準パス配下ではありません: ${target}`);
   }
   return relative(base, target).split(sep).join("/");
+}
+
+/** identity_conflict 診断に載せる作品の root 相対パス。フォルダー形式はフォルダー、単一ファイル形式はメタファイル */
+export function identityConflictPathOf(root: string, metaPath: string): string {
+  return toPortableRelativePath(root, unresolvedWorkPhysicalPath(workPlacementOf(metaPath)));
 }
 
 // ── 祖先パス除外（スキャンの workRoots 統合用。TASK-62） ─────────
