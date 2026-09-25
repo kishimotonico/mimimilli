@@ -8,7 +8,6 @@ const ScanModal = lazy(() => import("../../features/scan/ui/ScanModal"));
 
 interface AppModalsProps {
   lastScanTime: string | null;
-  lastScanRootFolder: string | null;
   onChangeFolder: (path: string) => Promise<unknown>;
   onExport: () => void;
   onOpenFiles: (path: string) => void;
@@ -19,7 +18,6 @@ interface AppModalsProps {
 // 各モーダル本体（SettingsModal / ScanModal / DlsiteNotificationModals）は props 駆動のまま保つ。
 export default function AppModals({
   lastScanTime,
-  lastScanRootFolder,
   onChangeFolder,
   onExport,
   onOpenFiles,
@@ -37,7 +35,6 @@ export default function AppModals({
         <Suspense fallback={null}>
           <SettingsModal
             lastScanTime={lastScanTime}
-            lastScanRootFolder={lastScanRootFolder}
             onClose={handleClose}
             onOpenScan={() => setActiveModal({ kind: "scan" })}
             onChangeFolder={onChangeFolder}

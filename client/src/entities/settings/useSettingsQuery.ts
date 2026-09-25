@@ -7,6 +7,9 @@ export function useSettingsQuery() {
     queryKey: SETTINGS_QUERY_KEYS.all(),
     queryFn: getSettings,
     retry: 1,
+    // root再設定中(running)は進捗をこのクエリで追う（GET /api/settingsはロック中も許可される）。
+    refetchInterval: (query) =>
+      query.state.data?.rootReconfiguration?.status === "running" ? 1000 : false,
   });
 }
 

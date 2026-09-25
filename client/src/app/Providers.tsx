@@ -5,7 +5,7 @@ import DlsiteBulkRuntime from "../features/dlsite/ui/DlsiteBulkRuntime";
 import DlsiteBulkApplyRuntime from "../features/dlsite/ui/DlsiteBulkApplyRuntime";
 import ScanRuntime from "../features/scan/ui/ScanRuntime";
 import { PlayerRuntimeProvider } from "../features/player/model/PlayerRuntimeProvider";
-import { queryClient } from "../shared/api/queryClient";
+import { queryClient } from "./model/queryClient";
 
 interface ProvidersProps {
   children: ReactNode;

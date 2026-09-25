@@ -9,19 +9,7 @@ import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import * as settingsApi from "../../src/entities/settings/api";
-import * as scanApi from "../../src/features/scan/api";
 import { ApiRequestError } from "../../src/shared/api/http";
-
-const runningJob = {
-  id: "job-1",
-  status: "running" as const,
-  createdAt: "2026-01-01T00:00:00.000Z",
-  startedAt: "2026-01-01T00:00:00.000Z",
-  finishedAt: null,
-  progress: { phase: "walking" as const, processed: 0, total: 0 },
-  result: null,
-  error: null,
-};
 
 function renderSetupApp() {
   const queryClient = new QueryClient({
@@ -34,6 +22,7 @@ function renderSetupApp() {
     rootFolder: null,
     lastScanTime: null,
     lastScanRootFolder: null,
+    rootReconfiguration: { status: "idle" },
   });
 
   function Wrapper() {
@@ -89,7 +78,7 @@ describe("SetupScreen 経路", () => {
     expect(screen.getByRole("button", { name: /スキャン開始/ })).toBeInTheDocument();
   });
 
-  it("パス送信で startRootReconfiguration とスキャン開始を呼ぶ", async () => {
+  it("パス送信で startRootReconfiguration を呼び、成功後は settings を再取得する", async () => {
     const startRootReconfiguration = vi
       .spyOn(settingsApi, "startRootReconfiguration")
       .mockResolvedValue({
@@ -97,7 +86,6 @@ describe("SetupScreen 経路", () => {
         rootFolder: "/audio/library",
         progress: null,
       });
-    const startScan = vi.spyOn(scanApi, "startScan").mockResolvedValue(runningJob);
 
     renderSetupApp();
     await waitFor(() => expect(screen.getByText("ようこそ")).toBeInTheDocument());
@@ -109,7 +97,12 @@ describe("SetupScreen 経路", () => {
     });
 
     await waitFor(() => expect(startRootReconfiguration).toHaveBeenCalledWith("/audio/library"));
-    expect(startScan).toHaveBeenCalledTimes(1);
+    // 成功後は settings を再取得する（staleTime=Infinityの初期データが無効化され、再フェッチが走る）
+    await waitFor(() =>
+      expect(fetch as unknown as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
+        expect.stringContaining("/settings"),
+      ),
+    );
   });
 
   it("送信が失敗したらエラーを表示する", async () => {
@@ -128,6 +121,7 @@ describe("SetupScreen 経路", () => {
     });
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("保存に失敗しました"));
+    expect(screen.getByText("ようこそ")).toBeInTheDocument();
   });
 
   it("ルートフォルダー検証エラー（InvalidRootFolderError由来のApiRequestError）はサーバーの文言をそのまま表示する", async () => {
@@ -152,62 +146,6 @@ describe("SetupScreen 経路", () => {
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent(
         "指定されたルートフォルダーが存在しません: /no/such/path",
-      ),
-    );
-    expect(screen.queryByText("初回セットアップに失敗しました")).not.toBeInTheDocument();
-  });
-
-  it("スキャン開始に失敗したら SetupScreen に留まり rootFolder を確定しない", async () => {
-    vi.spyOn(settingsApi, "startRootReconfiguration").mockResolvedValue({
-      status: "running",
-      rootFolder: "/audio/library",
-      progress: null,
-    });
-    vi.spyOn(scanApi, "startScan").mockRejectedValue(new Error("start failed"));
-
-    const { queryClient } = renderSetupApp();
-    await waitFor(() => expect(screen.getByText("ようこそ")).toBeInTheDocument());
-
-    fireEvent.change(screen.getByPlaceholderText(/Users\/yourname/), {
-      target: { value: "/audio/library" },
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /スキャン開始/ }));
-    });
-
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("start failed"));
-    expect(screen.queryByText("初回セットアップに失敗しました")).not.toBeInTheDocument();
-    expect(screen.getByText("ようこそ")).toBeInTheDocument();
-    expect(queryClient.getQueryData(SETTINGS_QUERY_KEYS.all())).toEqual({
-      rootFolder: null,
-      lastScanTime: null,
-      lastScanRootFolder: null,
-    });
-  });
-
-  it("スキャン開始失敗時はサーバー由来のメッセージをインライン表示する", async () => {
-    vi.spyOn(settingsApi, "startRootReconfiguration").mockResolvedValue({
-      status: "running",
-      rootFolder: "/audio/library",
-      progress: null,
-    });
-    vi.spyOn(scanApi, "startScan").mockRejectedValue(
-      new Error("ルートフォルダーにアクセスできません: /audio/library"),
-    );
-
-    renderSetupApp();
-    await waitFor(() => expect(screen.getByText("ようこそ")).toBeInTheDocument());
-
-    fireEvent.change(screen.getByPlaceholderText(/Users\/yourname/), {
-      target: { value: "/audio/library" },
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /スキャン開始/ }));
-    });
-
-    await waitFor(() =>
-      expect(screen.getByRole("alert")).toHaveTextContent(
-        "ルートフォルダーにアクセスできません: /audio/library",
       ),
     );
     expect(screen.queryByText("初回セットアップに失敗しました")).not.toBeInTheDocument();

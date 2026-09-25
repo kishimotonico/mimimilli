@@ -1,13 +1,6 @@
-import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
-import {
-  scanningAtom,
-  scanErrorAtom,
-  scanProgressLabelAtom,
-} from "../../../entities/scan/model/atoms";
-import { useScanActions } from "../../../entities/scan/useScanActions";
 import { formatUserError, type UserErrorDisplay } from "../../../shared/lib/formatUserError";
 
 interface SetupScreenProps {
@@ -15,29 +8,20 @@ interface SetupScreenProps {
 }
 
 export default function SetupScreen({ onComplete }: SetupScreenProps) {
-  const scanningFromJob = useAtomValue(scanningAtom);
-  const scanProgressLabel = useAtomValue(scanProgressLabelAtom);
-  const scanError = useAtomValue(scanErrorAtom);
-  const { cancel } = useScanActions();
   const [path, setPath] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [setupError, setSetupError] = useState<UserErrorDisplay | null>(null);
   const pathInputRef = useRef<HTMLInputElement | null>(null);
-  const scanning = isSubmitting || scanningFromJob;
-  // scanErrorはuseScanJob側で既にformatUserErrorを通した分類済みメッセージ（詳細は持たない）
-  const alertDisplay: UserErrorDisplay | null = scanError
-    ? { message: scanError, detail: null }
-    : setupError;
-  const canSubmit = Boolean(path.trim()) && !scanning;
+  const canSubmit = Boolean(path.trim()) && !isSubmitting;
 
   useEffect(() => {
-    if (scanning) return;
+    if (isSubmitting) return;
     pathInputRef.current?.focus({ preventScroll: true });
-  }, [scanning]);
+  }, [isSubmitting]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!path.trim() || scanning) return;
+    if (!path.trim() || isSubmitting) return;
     setSetupError(null);
     setIsSubmitting(true);
     try {
@@ -77,7 +61,7 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
               onChange={(e) => setPath(e.target.value)}
               placeholder="/Users/yourname/Music/ASMR"
               className="min-w-0 flex-1 border-none bg-transparent font-mono text-xs text-ink-0"
-              disabled={scanning}
+              disabled={isSubmitting}
             />
           </div>
           <Button
@@ -86,10 +70,10 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
             disabled={!canSubmit}
             className="h-10 w-full justify-center gap-2 rounded-[8px] text-[13px] font-semibold"
           >
-            {scanning ? (
+            {isSubmitting ? (
               <>
                 <I.refresh size={14} className="animate-spin" />
-                {scanProgressLabel ?? "スキャン中..."}
+                設定中...
               </>
             ) : (
               <>
@@ -97,28 +81,18 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
               </>
             )}
           </Button>
-          {scanning && (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => void cancel()}
-              className="h-9 w-full justify-center rounded-[8px] border border-line bg-paper-1 text-control font-semibold text-ink-2 hover:bg-paper-1 hover:text-ink-2"
-            >
-              スキャンを中止
-            </Button>
-          )}
-          {alertDisplay && (
+          {setupError && (
             <div className="flex flex-col gap-1">
               <p role="alert" className="mll-selectable m-0 text-xs text-[var(--r-coral)]">
-                {alertDisplay.message}
+                {setupError.message}
               </p>
-              {alertDisplay.detail ? (
+              {setupError.detail ? (
                 <details className="w-full text-left">
                   <summary className="cursor-pointer text-secondary text-ink-3">
                     技術的な詳細
                   </summary>
                   <pre className="mll-selectable mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all text-left text-secondary text-ink-3">
-                    {alertDisplay.detail}
+                    {setupError.detail}
                   </pre>
                 </details>
               ) : null}
