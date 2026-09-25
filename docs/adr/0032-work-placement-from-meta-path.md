@@ -86,7 +86,7 @@ adapterが実体で検査するもの:
 ### fixture adapter
 
 - `FixtureWorkRecord` に `metaPath` を持たせ、シードデータにも明示的に書く。
-- fixtureの登録（Filesからの登録、候補の登録）は、fixtureのファイルツリー上のノードがディレクトリか音声ファイルかで形式を決め、その時点で `metaPath` を作る。
+- fixtureの登録（Filesからの登録、候補の登録）は、その時点で形式を決めて `metaPath` を作る。fixtureは実体のファイルシステムを持たず、ファイルツリーも作品を並べ直した表示用のものなので、`stat` の代わりに登録対象のパス名が音声ファイル名かどうかで決める。この判定は登録の境界だけで行い、後段は `metaPath` だけを見る。
 - fixtureの疑似scanは、各作品のプレイリストを `resolveWorkPlacement` に通し、不整合なら作品をエラーにする。realと同じ関数と同じ文言を使う。fixtureは実体の検査をしない。
 - ファイルツリーの構築や再生用のプレイリスト合成は、形式を `workPlacementOf(metaPath)` で判定する。
 - 単一ファイル形式の不整合がエラーになることを、realとfixtureの両方でadapterを通して確かめる契約テストを置く。
