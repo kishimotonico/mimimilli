@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-09-25
-- 関連: [ADR-0028](0028-work-management-mutation-ownership.md)（作品変更後のキャッシュ更新）、[ADR-0029](0029-root-reconfiguration-workflow.md)（root再設定。ジョブの取消と409ロック）、[仕様レビュー2026-09-20 S2](../specification-review-2026-09-20.md)、backlog TASK-470・470.1・470.2
+- 関連: [ADR-0028](0028-work-management-mutation-ownership.md)（作品変更後のキャッシュ更新）、[ADR-0029](0029-root-reconfiguration-workflow.md)（root再設定。ジョブの取消と409ロック）、backlog TASK-470・470.1・470.2
 
 ## 文脈
 
