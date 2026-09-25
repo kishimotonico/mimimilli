@@ -1,9 +1,11 @@
 ---
 id: TASK-470
 title: ジョブ進捗SSEを現在状態の同期に統一する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-09-24 07:22'
+updated_date: '2026-09-25 13:33'
 labels:
   - scan
   - dlsite
@@ -23,5 +25,17 @@ DRAFT-76（一括取得結果API・失敗内訳・個別再取得導線）とは
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 子タスク(S2.1・S2.2)がすべて完了している
+- [x] #1 子タスク(S2.1・S2.2)がすべて完了している
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+設計方針（アドバイザー承認 2026-09-25）: 詳細は ADR-0030 に記録予定。scanのseq/reset/SSE idを削除し接続時にstate snapshot→live、終端・エラー・再接続はGETで確定をscan/DLsite共通の正とする、世代とstatusRankは既存ヘルパーで共通化、470.2は終端で常に一覧系+全作品詳細を無効化しDlsiteBulkResultは拡張しない（AC#3の選択的無効化は不要と判断、DRAFT-76と重ねない）。1 worktree（task/470）で470.1→470.2を直列、段階1（ADR+plan）で停止しレビュー。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+子タスク470.1（scanの現在状態同期）と470.2（DLsiteジョブID化とprogress表示専用化）で完了。ADR-0030。master aa3b08c3。
+<!-- SECTION:FINAL_SUMMARY:END -->
