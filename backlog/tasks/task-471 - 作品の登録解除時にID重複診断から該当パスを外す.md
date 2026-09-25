@@ -1,9 +1,11 @@
 ---
 id: TASK-471
 title: 作品の登録解除時にID重複診断から該当パスを外す
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-09-25 03:57'
+updated_date: '2026-09-25 12:59'
 labels:
   - bug
   - server
@@ -25,7 +27,13 @@ ordinal: 529000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 登録解除後にlistIdentityConflictsから該当pathが消え、残りpathが2未満なら診断ごと消えることをreal adapterのテストで確認している
-- [ ] #2 reassignIdentityConflictが同じ共通関数を経由している
-- [ ] #3 pnpm check && pnpm test が通る
+- [x] #1 登録解除後にlistIdentityConflictsから該当pathが消え、残りpathが2未満なら診断ごと消えることをreal adapterのテストで確認している
+- [x] #2 reassignIdentityConflictが同じ共通関数を経由している
+- [x] #3 pnpm check && pnpm test が通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+登録解除（単体・Files側・missing一括）時にidentity_conflict診断から該当path（metaPathの親のroot相対パス）を外し、残りpathが2未満なら診断ごと消すようにした。ID再採番と共通の純粋関数 server/src/core/identityConflicts.ts（removeIdentityConflictPath）に集約し、fixtureも同じ意味論に揃えた。root外のmetaPathは削除前に判定して診断更新をスキップ。検証: real/fixtureのテスト追加、pnpm check・pnpm test緑、Sonnet・Codexレビューで指摘なし。master c4303739。
+<!-- SECTION:FINAL_SUMMARY:END -->
