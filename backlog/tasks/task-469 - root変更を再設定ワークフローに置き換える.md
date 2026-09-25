@@ -4,6 +4,7 @@ title: root変更を再設定ワークフローに置き換える
 status: To Do
 assignee: []
 created_date: '2026-09-24 07:22'
+updated_date: '2026-09-25 02:30'
 labels:
   - settings
   - scan
@@ -42,3 +43,19 @@ ordinal: 523000
 <!-- AC:BEGIN -->
 - [ ] #1 子タスク(S1.1・S1.2)がすべて完了している
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## 現状調査（2026-09-25、master基準）
+
+- root変更: server/src/adapters/real/settingsScanMethods.ts updateSettings がrealpath検証→root_folder保存(user DB)→候補session破棄(TASK-459)のみ。catalog再構築・ジョブ終了・ロックはしない。routes/settings.ts PUT /settings はそのまま委譲。fixture(settingsScan.ts)も同じ意味論。
+- client: App.tsx changeFolderMutation は SETTINGS/SCAN候補のinvalidateとトーストのみ。再生停止・画面初期化なし。UIは SettingsModal 内のフォームで、同モーダルにscan開始・DLsite一括ボタンが同居。
+- ジョブ終了: scanJobManager.cancelActiveAndAwait / dlsiteJobManager.cancelActiveAndAwait が既にあり、app.ts の /api/__test__/reset で併用済み。ただしjob managerはcreateAppローカルで settingsRoute/adapter からは触れない → 配線が必要。
+- 状態の持ち方: root_folder はuser DB(永続)、candidateSession はprocess内変数。再設定中/失敗の専用フィールドは無い。AC#5(再起動後も未完了判断)を満たすには永続化が要る。
+- API拒否: 共通の状態依存middlewareは無い(app.use はログのみ)。NotConfiguredError→409 の変換パターンが流用候補。
+- 再生: URL構築は useAudioEngineLifecycle.ts(getWorkspaceMediaUrl(track.file))。root変更後も旧root相対パスのURLが残る。usePlayerActions の stop はあるが root変更時に呼ぶフックが無い。queryClient.clear/resetQueries の使用例はclientに無い。
+- 前例: SetupScreen(startupState==="setup-required")が通常UIを丸ごと置き換える。resolveAppStartupState の4値に "reconfiguring" 相当を足せば同じ枠組みで実現できる。
+
+設計判断が要る論点: 再設定中の取消可否 / 状態の永続化先 / root_folderをいつ確定するか / 旧rootのみの作品のcatalog行を削除か非表示か / fixtureでの対称実装 / 状態とmiddlewareの置き場所(adapter層かapp層か)。
+<!-- SECTION:NOTES:END -->
