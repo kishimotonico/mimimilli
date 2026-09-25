@@ -11,8 +11,12 @@ import type { QueryClient } from "@tanstack/react-query";
 import { WORK_QUERY_KEYS } from "../../entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../entities/tag/queryKeys";
-import { SCAN_QUERY_KEYS } from "../../entities/scan/queryKeys";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../entities/file-system/queryKeys";
+
+// entities/scan/queryKeys.ts の全キー（last/candidates/candidateExclusions/diagnostics）は
+// すべて["scan", ...]配下なので、ルートの["scan"]だけで丸ごと対象にできる
+// （個別に列挙すると新規キー追加時に破棄漏れが起きる）。
+const SCAN_QUERY_KEYS_ROOT = ["scan"] as const;
 
 function reconfigurationAffectedQueryKeys(): readonly (readonly unknown[])[] {
   return [
@@ -24,8 +28,7 @@ function reconfigurationAffectedQueryKeys(): readonly (readonly unknown[])[] {
     SMART_FOLDER_QUERY_KEYS.allWorks(),
     TAG_QUERY_KEYS.all(),
     TAG_QUERY_KEYS.prefixes(),
-    SCAN_QUERY_KEYS.last(),
-    SCAN_QUERY_KEYS.candidates(),
+    SCAN_QUERY_KEYS_ROOT,
     FILE_SYSTEM_QUERY_KEYS.all(),
   ];
 }

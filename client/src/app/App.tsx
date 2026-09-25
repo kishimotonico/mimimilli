@@ -17,6 +17,8 @@ import AddressBar from "./ui/AddressBar";
 import NotificationBell from "./ui/NotificationBell";
 import { WORK_QUERY_KEYS } from "../entities/work/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../entities/settings/queryKeys";
+import { SCAN_QUERY_KEYS } from "../entities/scan/queryKeys";
+import { getLastScanResult } from "../features/scan/api";
 import PlayerDock from "../features/player/ui/PlayerDock";
 import { resolveAppStartupState } from "./model/resolveAppStartupState";
 import SetupScreen from "../features/setup/ui/SetupScreen";
@@ -32,12 +34,15 @@ import type { RootReconfigurationState, Settings, Work, WorkListItem } from "@mi
 import { prepareWorkPlayback } from "../entities/work/api";
 import { invalidateWorkViewQueries } from "../entities/work/invalidateWorkViewQueries";
 import { useDownloadLibraryExport } from "../features/library/useDownloadLibraryExport";
+import { useDlsiteBulkActions } from "../entities/dlsite/useDlsiteBulkActions";
 import { startRootReconfiguration } from "../entities/settings/api";
 import { runStartRootReconfiguration } from "./model/runStartRootReconfiguration";
 import {
   markReconfigurationAffectedQueriesStale,
   removeReconfigurationAffectedQueries,
 } from "./model/resetLibraryForReconfiguration";
+import { resetLibraryNavigationUrl } from "./model/resetLibraryNavigationUrl";
+import { createPlayRequestGuard } from "./model/playRequestGuard";
 import {
   useSettingsQuery,
   useRootFolderOrNull,
@@ -58,6 +63,7 @@ export default function App() {
   const player = usePlayerActions();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const dlsiteBulk = useDlsiteBulkActions();
   const setAppMode = useSetAtom(setAppModeAtom);
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
   const setLibraryAxis = useSetAtom(setLibraryAxisAtom);
@@ -66,7 +72,7 @@ export default function App() {
   const setScanCandidateHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
   const openWorkDetail = useSetAtom(openWorkDetailAtom);
   const setActiveModal = useSetAtom(activeModalAtom);
-  const playRequestIdRef = useRef(0);
+  const playRequestGuard = useRef(createPlayRequestGuard()).current;
 
   // ── Settings ─────────────────────────────────────────────
   const settingsQuery = useSettingsQuery();
@@ -92,31 +98,54 @@ export default function App() {
   // removeQueriesではなくmarkStale（refetchType:"none"）にするのは、生きたobserverの
   // 即時再フェッチがロック中のAPIへ409を飛ばすのを避けるため。フィクスチャの高速完了レースに
   // 備え、reconfiguring状態を実際に観測できなくてもここで選択・検索・候補は必ず初期化される。
+  // playRequestGuardも無効化する: handlePlay/handleResumeが進行中に開始されると、
+  // このトークンチェックを通過して旧作品のplayer.playが後から呼ばれうるため。
   const applyImmediateReconfigurationReset = useCallback(() => {
+    playRequestGuard.invalidate();
     resetLibraryNavigation();
+    resetLibraryNavigationUrl();
     setScanCandidateHiddenPaths(new Set());
     markReconfigurationAffectedQueriesStale(queryClient);
-  }, [queryClient, resetLibraryNavigation, setScanCandidateHiddenPaths]);
+  }, [queryClient, resetLibraryNavigation, setScanCandidateHiddenPaths, playRequestGuard]);
 
-  // reconfiguringに入った瞬間を一度だけ検知する。startReconfiguration経由（自分で開始した場合）に
+  // reconfiguringへの出入りを検知する。startReconfiguration経由（自分で開始した場合）に
   // 加え、起動時に既にrunning/failedだった場合・他所からの409検知でsettingsが切り替わった場合も拾う。
-  // ここでは通常UIが実際にアンマウント済みなので、removeQueriesで作品系クエリを丸ごと破棄できる
-  // （復帰時に古いデータのstale-while-revalidate表示を挟まず必ず新規取得になる）。
-  // player.stop()もここで呼ぶ: PlayerRuntimeProviderは startupState に関わらず常時マウントされて
-  // いるため、自分で開始した経路（runStartRootReconfiguration側で既に停止済み）以外の入り口
-  // （別タブ開始の409検知・起動時に既にrunning/failedだった場合）でも再生を止める必要がある。
-  // 自分で開始した経路と重複して呼ばれても無害（idle時のstopRequestedは何もしない）。
+  // 突入時: 通常UIが実際にアンマウント済みなので、removeQueriesで作品系クエリを丸ごと破棄できる
+  // （復帰時に古いデータのstale-while-revalidate表示を挟まず必ず新規取得になる）。player.stop()も
+  // ここで呼ぶ: PlayerRuntimeProviderはstartupStateに関わらず常時マウントされているため、
+  // 自分で開始した経路（runStartRootReconfiguration側で既に停止済み）以外の入り口でも再生を止める
+  // 必要がある（重複して呼ばれても無害）。
+  // 離脱時: サーバーは再構築完了時に新規作品をDLsite取得（new）へ渡す（ADR-0029）。
+  // 従来スキャン完了時はScanRuntimeがdlsiteBulk.attach()して進捗・完了通知・クエリ無効化を
+  // 拾っていたのと同じ経路を、再構築完了でも通す。
   const wasReconfiguringRef = useRef(false);
   useEffect(() => {
     const isReconfiguring = startupState === "reconfiguring";
     if (isReconfiguring && !wasReconfiguringRef.current) {
       player.stop();
+      playRequestGuard.invalidate();
       resetLibraryNavigation();
+      resetLibraryNavigationUrl();
       setScanCandidateHiddenPaths(new Set());
       removeReconfigurationAffectedQueries(queryClient);
+    } else if (!isReconfiguring && wasReconfiguringRef.current) {
+      void queryClient
+        .fetchQuery({ queryKey: SCAN_QUERY_KEYS.last(), queryFn: getLastScanResult })
+        .then((last) => {
+          if (last && last.result.insertedWorkIds.length > 0) dlsiteBulk.attach();
+        })
+        .catch(() => {});
     }
     wasReconfiguringRef.current = isReconfiguring;
-  }, [startupState, queryClient, player, resetLibraryNavigation, setScanCandidateHiddenPaths]);
+  }, [
+    startupState,
+    queryClient,
+    player,
+    dlsiteBulk,
+    playRequestGuard,
+    resetLibraryNavigation,
+    setScanCandidateHiddenPaths,
+  ]);
 
   // 202応答をsettingsキャッシュへ即時反映する。再取得（invalidateSettings）がそれより先に
   // idleを返す競合（フィクスチャの高速完了等）があっても、これで一度は確実にreconfiguring
@@ -131,15 +160,16 @@ export default function App() {
   );
 
   const startReconfiguration = useCallback(
-    (path: string) =>
-      runStartRootReconfiguration(path, {
+    async (path: string): Promise<void> => {
+      await runStartRootReconfiguration(path, {
         startRootReconfiguration,
         stopPlayback: player.stop,
         resetLibraryForReconfiguration: applyImmediateReconfigurationReset,
         applyRootReconfigurationState,
         invalidateSettings: () =>
           queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() }),
-      }),
+      });
+    },
     [applyImmediateReconfigurationReset, applyRootReconfigurationState, player.stop, queryClient],
   );
 
@@ -148,13 +178,13 @@ export default function App() {
     async (work: WorkListItem, trackIndex: number) => {
       // ファイル欠損・メタ読み込みエラーの作品は再生できない（UI側の無効化が第一線、これは防衛線）。
       if (work.status !== "ok") return;
-      const requestId = ++playRequestIdRef.current;
+      const requestId = playRequestGuard.next();
       try {
         const fullWork = await prepareWorkPlayback(work.id);
-        if (requestId !== playRequestIdRef.current) return;
+        if (!playRequestGuard.isCurrent(requestId)) return;
         queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), fullWork);
         await invalidateWorkViewQueries(queryClient, work.id);
-        if (requestId !== playRequestIdRef.current) return;
+        if (!playRequestGuard.isCurrent(requestId)) return;
         const playlist =
           fullWork.playlists.find((p) => p.id === fullWork.defaultPlaylistId) ??
           fullWork.playlists[0];
@@ -166,32 +196,25 @@ export default function App() {
         toast.error(apiErrorMessage(err, "作品の再生に失敗しました"));
       }
     },
-    [player, queryClient, toast],
+    [player, queryClient, toast, playRequestGuard],
   );
 
   const handleResume = useCallback(
     async (work: Work) => {
       if (work.status !== "ok") return;
-      const requestId = ++playRequestIdRef.current;
+      const requestId = playRequestGuard.next();
       try {
         const fullWork = await prepareWorkPlayback(work.id);
-        if (requestId !== playRequestIdRef.current) return;
+        if (!playRequestGuard.isCurrent(requestId)) return;
         queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), fullWork);
         await invalidateWorkViewQueries(queryClient, work.id);
-        if (requestId !== playRequestIdRef.current) return;
+        if (!playRequestGuard.isCurrent(requestId)) return;
         player.playWithResume(fullWork);
       } catch (err) {
         toast.error(apiErrorMessage(err, "作品の再生に失敗しました"));
       }
     },
-    [player, queryClient, toast],
-  );
-
-  const handleSetupComplete = useCallback(
-    async (path: string) => {
-      await startReconfiguration(path);
-    },
-    [startReconfiguration],
+    [player, queryClient, toast, playRequestGuard],
   );
 
   const handleChangeFolder = useCallback(
@@ -250,7 +273,7 @@ export default function App() {
   if (startupState === "setup-required") {
     return (
       <MotionConfig reducedMotion="user">
-        <SetupScreen onComplete={handleSetupComplete} />
+        <SetupScreen onComplete={startReconfiguration} />
       </MotionConfig>
     );
   }
@@ -264,9 +287,7 @@ export default function App() {
       <MotionConfig reducedMotion="user">
         <RootReconfigurationScreen
           state={settings.rootReconfiguration}
-          onRetry={async (path) => {
-            await startReconfiguration(path);
-          }}
+          onRetry={startReconfiguration}
         />
       </MotionConfig>
     );

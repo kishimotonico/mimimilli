@@ -8,7 +8,22 @@ import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
+import * as workApi from "../../src/entities/work/api";
 import type { Settings } from "@mimimilli/shared";
+
+const EMPTY_SCAN_RESULT = {
+  registered: 0,
+  insertedWorkIds: [] as string[],
+  updatedWorkIds: [],
+  errors: 0,
+  missing: 0,
+  rjCodeMissingCount: 0,
+  skipped: 0,
+  coverErrors: 0,
+  identityConflicts: [],
+  invalidMetaFiles: [],
+  candidates: [],
+};
 
 function renderAppWithSettings(settings: Settings) {
   const queryClient = new QueryClient({
@@ -43,6 +58,7 @@ function renderAppWithSettings(settings: Settings) {
 }
 
 beforeEach(() => {
+  vi.restoreAllMocks();
   vi.stubGlobal(
     "fetch",
     vi.fn(
@@ -97,5 +113,91 @@ describe("root再設定中の画面", () => {
 
     await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
     expect(screen.queryByText("ライブラリを再構築しています")).not.toBeInTheDocument();
+  });
+});
+
+describe("root再設定完了後のDLsite自動取得attach", () => {
+  it("新規作品があればdlsiteBulk.attach相当（getDlsiteBulkStatus）を呼ぶ", async () => {
+    const getDlsiteBulkStatus = vi.spyOn(workApi, "getDlsiteBulkStatus").mockResolvedValue(null);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/scan/last")) {
+          return new Response(
+            JSON.stringify({
+              result: { ...EMPTY_SCAN_RESULT, insertedWorkIds: ["work-1"] },
+              finishedAt: "2026-01-01T00:00:00.000Z",
+            }),
+            { headers: { "Content-Type": "application/json" } },
+          );
+        }
+        return new Response(JSON.stringify([]), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+
+    const { queryClient } = renderAppWithSettings({
+      rootFolder: "/audio/library",
+      lastScanTime: "2026-01-01T00:00:00.000Z",
+      rootReconfiguration: {
+        status: "running",
+        rootFolder: "/audio/library",
+        progress: null,
+      },
+    });
+    await waitFor(() =>
+      expect(screen.getByText("ライブラリを再構築しています")).toBeInTheDocument(),
+    );
+
+    queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
+      rootFolder: "/audio/library",
+      lastScanTime: "2026-01-01T00:00:00.000Z",
+      rootReconfiguration: { status: "idle" },
+    });
+
+    await waitFor(() => expect(getDlsiteBulkStatus).toHaveBeenCalled());
+  });
+
+  it("新規作品が無ければgetDlsiteBulkStatusを呼ばない", async () => {
+    const getDlsiteBulkStatus = vi.spyOn(workApi, "getDlsiteBulkStatus").mockResolvedValue(null);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/scan/last")) {
+          return new Response(
+            JSON.stringify({ result: EMPTY_SCAN_RESULT, finishedAt: "2026-01-01T00:00:00.000Z" }),
+            { headers: { "Content-Type": "application/json" } },
+          );
+        }
+        return new Response(JSON.stringify([]), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+
+    const { queryClient } = renderAppWithSettings({
+      rootFolder: "/audio/library",
+      lastScanTime: "2026-01-01T00:00:00.000Z",
+      rootReconfiguration: {
+        status: "running",
+        rootFolder: "/audio/library",
+        progress: null,
+      },
+    });
+    await waitFor(() =>
+      expect(screen.getByText("ライブラリを再構築しています")).toBeInTheDocument(),
+    );
+
+    queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
+      rootFolder: "/audio/library",
+      lastScanTime: "2026-01-01T00:00:00.000Z",
+      rootReconfiguration: { status: "idle" },
+    });
+
+    await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
+    expect(getDlsiteBulkStatus).not.toHaveBeenCalled();
   });
 });

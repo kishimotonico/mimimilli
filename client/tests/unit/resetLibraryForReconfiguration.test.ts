@@ -21,6 +21,8 @@ const AFFECTED_KEYS = [
   TAG_QUERY_KEYS.prefixes(),
   SCAN_QUERY_KEYS.last(),
   SCAN_QUERY_KEYS.candidates(),
+  SCAN_QUERY_KEYS.candidateExclusions(),
+  SCAN_QUERY_KEYS.diagnostics(),
   FILE_SYSTEM_QUERY_KEYS.directory("dlsite"),
 ];
 
