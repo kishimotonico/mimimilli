@@ -1,15 +1,19 @@
 import { createElement, useMemo } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { Provider as JotaiProvider } from "jotai";
+import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../../src/app/App";
 import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
+import DlsiteBulkApplyRuntime from "../../src/features/dlsite/ui/DlsiteBulkApplyRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
+import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
+import { dlsiteBulkApplyOpenAtom } from "../../src/entities/dlsite/model/bulkAtoms";
 import * as workApi from "../../src/entities/work/api";
 import * as scanApi from "../../src/features/scan/api";
+import * as settingsApi from "../../src/entities/settings/api";
 import type { Settings } from "@mimimilli/shared";
 
 const EMPTY_SCAN_RESULT = {
@@ -34,6 +38,7 @@ function renderAppWithSettings(settings: Settings) {
     },
   });
   queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), settings);
+  const store = createStore();
 
   function Wrapper() {
     const client = useMemo(() => queryClient, []);
@@ -42,11 +47,12 @@ function renderAppWithSettings(settings: Settings) {
       { client },
       createElement(
         JotaiProvider,
-        null,
+        { store },
         createElement(
           PlayerRuntimeProvider,
           null,
           createElement(DlsiteBulkRuntime),
+          createElement(DlsiteBulkApplyRuntime),
           createElement(ScanRuntime),
           createElement(App),
         ),
@@ -55,7 +61,7 @@ function renderAppWithSettings(settings: Settings) {
   }
 
   render(createElement(Wrapper));
-  return { queryClient };
+  return { queryClient, store };
 }
 
 beforeEach(() => {
@@ -232,5 +238,80 @@ describe("root再設定突入時のモーダル初期化", () => {
 
     await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
     expect(screen.queryByRole("dialog", { name: "設定" })).not.toBeInTheDocument();
+  });
+});
+
+describe("root再設定突入時のDLsite一括適用ダイアログ初期化", () => {
+  it("プレビューを開いたままreconfiguringに入ると閉じる", async () => {
+    // previewDlsiteMissingを解決させないことで、dlsiteBulkApplyOpenAtomがopen中の
+    // 内部エフェクト（失敗時に自動でreset()する）に邪魔されず、突入リセットだけを縛れる。
+    vi.spyOn(workApi, "previewDlsiteMissing").mockReturnValue(new Promise(() => {}));
+
+    const { queryClient, store } = renderAppWithSettings({
+      rootFolder: "/audio/library",
+      lastScanTime: "2026-01-01T00:00:00.000Z",
+      rootReconfiguration: { status: "idle" },
+    });
+    await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
+
+    store.set(dlsiteBulkApplyOpenAtom, true);
+    expect(store.get(dlsiteBulkApplyOpenAtom)).toBe(true);
+
+    queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
+      rootFolder: "/audio/library",
+      lastScanTime: "2026-01-01T00:00:00.000Z",
+      rootReconfiguration: {
+        status: "running",
+        rootFolder: "/audio/library",
+        progress: null,
+      },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText("ライブラリを再構築しています")).toBeInTheDocument(),
+    );
+    expect(store.get(dlsiteBulkApplyOpenAtom)).toBe(false);
+  });
+});
+
+describe("root再設定の高速完了（runningが描画されない）競合", () => {
+  it("settings再取得がidleを即座に返しても、突入側のクエリ破棄と離脱側のDLsite attachが行われる", async () => {
+    vi.spyOn(settingsApi, "startRootReconfiguration").mockResolvedValue({
+      status: "running",
+      rootFolder: "/new/root",
+      progress: null,
+    });
+    // invalidateSettings（GET /api/settings再取得）が即座にidleを返す競合を模す。
+    // Reactが中間状態（running）の描画を挟まないケースでも、performEntryReset・
+    // reconfigurationExitPendingAtomは描画観測に依存せず必ず実行される想定。
+    vi.spyOn(settingsApi, "getSettings").mockResolvedValue({
+      rootFolder: "/new/root",
+      lastScanTime: "2026-01-01T00:00:00.000Z",
+      rootReconfiguration: { status: "idle" },
+    });
+    vi.spyOn(scanApi, "getLastScanResult").mockResolvedValue({
+      result: { ...EMPTY_SCAN_RESULT, insertedWorkIds: ["work-2"] },
+      finishedAt: "2026-01-01T00:00:00.000Z",
+    });
+    const getDlsiteBulkStatus = vi.spyOn(workApi, "getDlsiteBulkStatus").mockResolvedValue(null);
+
+    const { queryClient } = renderAppWithSettings({
+      rootFolder: "/audio/library",
+      lastScanTime: "2026-01-01T00:00:00.000Z",
+      rootReconfiguration: { status: "idle" },
+    });
+    await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
+    queryClient.setQueryData(WORK_QUERY_KEYS.detail("work-1"), { id: "work-1" });
+
+    fireEvent.click(screen.getByRole("button", { name: "設定" }));
+    await waitFor(() => expect(screen.getByRole("dialog", { name: "設定" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "変更" }));
+    fireEvent.change(screen.getByLabelText("ルートフォルダーのパス"), {
+      target: { value: "/new/root" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(getDlsiteBulkStatus).toHaveBeenCalled(), { timeout: 5000 });
+    expect(queryClient.getQueryData(WORK_QUERY_KEYS.detail("work-1"))).toBeUndefined();
   });
 });

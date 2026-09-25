@@ -9,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
 import { usePlayerActions } from "../features/player/model/usePlayerActions";
 import PlayerRuntime from "../features/player/ui/PlayerRuntime";
+import ReconfigurationExitEffect from "./ReconfigurationExitEffect";
 import AppShell from "./AppShell";
 import AppBody from "./AppBody";
 import TopBar from "./ui/TopBar";
@@ -16,8 +17,6 @@ import LeftNav from "./ui/LeftNav";
 import AddressBar from "./ui/AddressBar";
 import NotificationBell from "./ui/NotificationBell";
 import { SETTINGS_QUERY_KEYS } from "../entities/settings/queryKeys";
-import { SCAN_QUERY_KEYS } from "../entities/scan/queryKeys";
-import { getLastScanResult } from "../features/scan/api";
 import PlayerDock from "../features/player/ui/PlayerDock";
 import { resolveAppStartupState } from "./model/resolveAppStartupState";
 import RootConfigurationScreen from "../features/setup/ui/RootConfigurationScreen";
@@ -33,14 +32,10 @@ import type { RootReconfigurationState, Settings, Work, WorkListItem } from "@mi
 import { prepareWorkPlayback } from "../entities/work/api";
 import { updateCachesAfterPlaybackPrepared } from "../entities/work/model/workCacheUpdates";
 import { useDownloadLibraryExport } from "../features/library/useDownloadLibraryExport";
-import { useDlsiteBulkActions } from "../entities/dlsite/useDlsiteBulkActions";
 import { useScanActions } from "../entities/scan/useScanActions";
 import { startRootReconfiguration } from "../entities/settings/api";
 import { runStartRootReconfiguration } from "./model/runStartRootReconfiguration";
-import {
-  markReconfigurationAffectedQueriesStale,
-  removeReconfigurationAffectedQueries,
-} from "./model/resetLibraryForReconfiguration";
+import { resetReconfigurationAffectedQueriesForEntry } from "./model/resetLibraryForReconfiguration";
 import { resetLibraryNavigationUrl } from "./model/resetLibraryNavigationUrl";
 import { createPlayRequestGuard } from "./model/playRequestGuard";
 import {
@@ -48,6 +43,7 @@ import {
   useRootFolderOrNull,
   requireRootFolder,
 } from "../entities/settings/useSettingsQuery";
+import { reconfigurationExitPendingAtom } from "../entities/settings/reconfigurationExitAtom";
 import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
 import { setAppModeAtom } from "../shared/model/appModeAtoms";
 import { openPathInFilesAtom } from "../entities/file-system/model/navigationAtoms";
@@ -57,13 +53,13 @@ import {
   resetLibraryNavigationAtom,
 } from "../entities/library/model/navigationActions";
 import { scanCandidateHiddenPathsAtom } from "../entities/scan/model/atoms";
+import { dlsiteBulkApplyOpenAtom } from "../entities/dlsite/model/bulkAtoms";
 import { openWorkDetailAtom } from "../entities/work/model/navigationActions";
 
 export default function App() {
   const player = usePlayerActions();
   const queryClient = useQueryClient();
   const toast = useToast();
-  const dlsiteBulk = useDlsiteBulkActions();
   const scanActions = useScanActions();
   const setAppMode = useSetAtom(setAppModeAtom);
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
@@ -73,6 +69,8 @@ export default function App() {
   const setScanCandidateHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
   const openWorkDetail = useSetAtom(openWorkDetailAtom);
   const setActiveModal = useSetAtom(activeModalAtom);
+  const setDlsiteBulkApplyOpen = useSetAtom(dlsiteBulkApplyOpenAtom);
+  const setReconfigurationExitPending = useSetAtom(reconfigurationExitPendingAtom);
   const playRequestGuard = useRef(createPlayRequestGuard()).current;
 
   // ── Settings ─────────────────────────────────────────────
@@ -102,72 +100,58 @@ export default function App() {
     playRequestGuard.invalidate();
   }, [player, playRequestGuard]);
 
-  // 開始成功の直後（通常UIがまだアンマウントされる前）に呼ぶ軽量な初期化。
-  // removeQueriesではなくmarkStale（refetchType:"none"）にするのは、生きたobserverの
-  // 即時再フェッチがロック中のAPIへ409を飛ばすのを避けるため。フィクスチャの高速完了レースに
-  // 備え、reconfiguring状態を実際に観測できなくてもここで選択・検索・候補は必ず初期化される。
-  const applyImmediateReconfigurationReset = useCallback(() => {
+  // 突入側の後処理。自分で開始した経路（runStartRootReconfiguration経由）・起動時に
+  // 既にrunning/failedだった場合・他所からの409検知でsettingsが切り替わった場合の
+  // いずれからも呼ぶ共通の関数にすることで、reconfiguring状態を実際に観測できたか
+  // （settings再取得がReactのレンダー前にidleへ戻る競合等）に依存しない。
+  // stopPlaybackAndInvalidateGuard・setActiveModal(null)・scanActions.reset()は
+  // PlayerRuntimeProvider・activeModalAtom・ScanRuntimeが常時マウントのstoreに
+  // 状態を持つため、重複して呼ばれても無害。setDlsiteBulkApplyOpen(false)も同様
+  // （DlsiteBulkApplyRuntimeはactiveModalAtomと独立の自前atomでダイアログを開く）。
+  // クエリの破棄はmarkStale→（レンダー猶予）→removeの2段階（resetLibraryForReconfiguration
+  // 側のコメント参照）。最後にreconfigurationExitPendingAtomをtrueにし、離脱側
+  // （DLsite attach等）はreadyへ到達した後の別effectに任せる。
+  const performReconfigurationEntryReset = useCallback(async () => {
+    stopPlaybackAndInvalidateGuard();
     setActiveModal(null);
+    setDlsiteBulkApplyOpen(false);
     scanActions.reset();
     resetLibraryNavigation();
     resetLibraryNavigationUrl();
     setScanCandidateHiddenPaths(new Set());
-    markReconfigurationAffectedQueriesStale(queryClient);
+    setReconfigurationExitPending(true);
+    await resetReconfigurationAffectedQueriesForEntry(queryClient);
   }, [
     queryClient,
     resetLibraryNavigation,
-    setScanCandidateHiddenPaths,
-    setActiveModal,
     scanActions,
+    setActiveModal,
+    setDlsiteBulkApplyOpen,
+    setReconfigurationExitPending,
+    setScanCandidateHiddenPaths,
+    stopPlaybackAndInvalidateGuard,
   ]);
 
-  // reconfiguringへの出入りを検知する。startReconfiguration経由（自分で開始した場合）に
-  // 加え、起動時に既にrunning/failedだった場合・他所からの409検知でsettingsが切り替わった場合も拾う。
-  // 突入時: 通常UIが実際にアンマウント済みなので、removeQueriesで作品系クエリを丸ごと破棄できる
-  // （復帰時に古いデータのstale-while-revalidate表示を挟まず必ず新規取得になる）。停止も
-  // ここで呼ぶ: PlayerRuntimeProviderはstartupStateに関わらず常時マウントされているため、
-  // 自分で開始した経路（runStartRootReconfiguration側で既に停止済み）以外の入り口でも再生を止める
-  // 必要がある（重複して呼ばれても無害）。activeModalAtomも常時マウントのstoreに残るので閉じる。
-  // scanActions.reset()も同様: サーバーは再設定開始時に実行中scanを取り消すが、ロック中は
-  // /scan系APIが409を返しSSE再接続も失敗するため、ScanRuntimeが追跡中のジョブ状態
-  // （cancelling等）に固着しうる。終端イベントを待たずここでローカル状態を初期状態へ戻す。
-  // 離脱時: サーバーは再構築完了時に新規作品をDLsite取得（new）へ渡す（ADR-0029）。
-  // 従来スキャン完了時はScanRuntimeがdlsiteBulk.attach()して進捗・完了通知・クエリ無効化を
-  // 拾っていたのと同じ経路を、再構築完了でも通す。
+  // reconfiguringへの突入を検知する。自分で開始した経路はrunStartRootReconfiguration側で
+  // 既にperformReconfigurationEntryResetを呼んでいるので、ここでの再呼び出しは無害な重複
+  // （runningの描画がそもそも起きた場合のみ発火する）。起動時に既にrunning/failedだった
+  // 場合・他所からの409検知でsettingsが切り替わった場合はこの効果だけが突入を検知する。
   const wasReconfiguringRef = useRef(false);
   useEffect(() => {
     const isReconfiguring = startupState === "reconfiguring";
     if (isReconfiguring && !wasReconfiguringRef.current) {
-      stopPlaybackAndInvalidateGuard();
-      setActiveModal(null);
-      scanActions.reset();
-      resetLibraryNavigation();
-      resetLibraryNavigationUrl();
-      setScanCandidateHiddenPaths(new Set());
-      removeReconfigurationAffectedQueries(queryClient);
-    } else if (!isReconfiguring && wasReconfiguringRef.current) {
-      void queryClient
-        .fetchQuery({ queryKey: SCAN_QUERY_KEYS.last(), queryFn: getLastScanResult })
-        .then((last) => {
-          if (last && last.result.insertedWorkIds.length > 0) dlsiteBulk.attach();
-        })
-        .catch(() => {});
+      void performReconfigurationEntryReset();
     }
     wasReconfiguringRef.current = isReconfiguring;
-  }, [
-    startupState,
-    queryClient,
-    dlsiteBulk,
-    stopPlaybackAndInvalidateGuard,
-    setActiveModal,
-    scanActions,
-    resetLibraryNavigation,
-    setScanCandidateHiddenPaths,
-  ]);
+  }, [startupState, performReconfigurationEntryReset]);
+
+  // 離脱側の後処理（DLsite一括取得のattach判定）はReconfigurationExitEffectへ分離する
+  // （App.tsxはJotaiのread APIを持たない方針のため）。reconfigurationExitPendingAtomが
+  // trueのままreadyへ到達したら実行してクリアする。
 
   // 202応答をsettingsキャッシュへ即時反映する。再取得（invalidateSettings）がそれより先に
-  // idleを返す競合（フィクスチャの高速完了等）があっても、これで一度は確実にreconfiguring
-  // 画面へ切り替わり、通常UIのアンマウント→作品系クエリの破棄が起きる。
+  // idleを返す競合（フィクスチャの高速完了等）があっても、performEntryResetのクエリ破棄
+  // より先にこれを呼ぶことで、reconfiguring画面へ切り替わるレンダーの猶予を作る。
   const applyRootReconfigurationState = useCallback(
     (state: RootReconfigurationState) => {
       queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), (prev: Settings | undefined) =>
@@ -181,19 +165,14 @@ export default function App() {
     async (path: string): Promise<void> => {
       await runStartRootReconfiguration(path, {
         startRootReconfiguration,
-        stopPlayback: stopPlaybackAndInvalidateGuard,
-        resetLibraryForReconfiguration: applyImmediateReconfigurationReset,
+        persistFinalResume: player.flushCurrentResume,
+        performEntryReset: performReconfigurationEntryReset,
         applyRootReconfigurationState,
         invalidateSettings: () =>
           queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() }),
       });
     },
-    [
-      applyImmediateReconfigurationReset,
-      applyRootReconfigurationState,
-      stopPlaybackAndInvalidateGuard,
-      queryClient,
-    ],
+    [applyRootReconfigurationState, performReconfigurationEntryReset, player, queryClient],
   );
 
   // ── Play handler ──────────────────────────────────────────
@@ -338,6 +317,7 @@ export default function App() {
           overlays={
             <>
               <PlayerRuntime />
+              <ReconfigurationExitEffect />
               <NavigationHistorySync />
               <AppModals
                 lastScanTime={settings?.lastScanTime ?? null}

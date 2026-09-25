@@ -2,10 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import { runStartRootReconfiguration } from "../../src/app/model/runStartRootReconfiguration";
 
 describe("runStartRootReconfiguration", () => {
-  it("成功時は再生停止・Libraryリセット・settings即時反映・settings再取得の順に行う", async () => {
+  it("resume保存・開始API・settings即時反映・突入リセット・settings再取得の順に行う", async () => {
     const calls: string[] = [];
-    const stopPlayback = vi.fn(() => calls.push("stop"));
-    const resetLibraryForReconfiguration = vi.fn(() => calls.push("reset"));
+    const persistFinalResume = vi.fn(async () => {
+      calls.push("persistResume");
+    });
+    const performEntryReset = vi.fn(async () => {
+      calls.push("entryReset");
+    });
     const applyRootReconfigurationState = vi.fn((state) =>
       calls.push(`applyState:${state.status}`),
     );
@@ -19,29 +23,68 @@ describe("runStartRootReconfiguration", () => {
 
     const result = await runStartRootReconfiguration("/audio/library", {
       startRootReconfiguration,
-      stopPlayback,
-      resetLibraryForReconfiguration,
+      persistFinalResume,
+      performEntryReset,
       applyRootReconfigurationState,
       invalidateSettings,
     });
 
     expect(result).toEqual({ status: "running", rootFolder: "/audio/library", progress: null });
-    expect(calls).toEqual(["start", "stop", "reset", "applyState:running", "invalidate"]);
+    expect(calls).toEqual([
+      "persistResume",
+      "start",
+      "applyState:running",
+      "entryReset",
+      "invalidate",
+    ]);
   });
 
-  it("202の応答をsettingsへ即時反映してから再取得する（再取得がidleを返す競合に対する備え）", async () => {
-    // invalidateSettingsが解決した時点では既にapplyRootReconfigurationStateが
-    // runningを反映済みであることを確認する。呼び出し順の検証だけでなく、
-    // invalidateSettingsの解決を遅らせても順序が変わらないことも縛る。
+  it("resume保存は開始APIを呼ぶ前にawaitで完了させる（並列にしない）", async () => {
+    const order: string[] = [];
+    let resolvePersist!: () => void;
+    const persistFinalResume = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolvePersist = resolve;
+        }),
+    );
+    const startRootReconfiguration = vi.fn(async () => {
+      order.push("start");
+      return { status: "running" as const, rootFolder: "/audio/library", progress: null };
+    });
+
+    const donePromise = runStartRootReconfiguration("/audio/library", {
+      startRootReconfiguration,
+      persistFinalResume,
+      performEntryReset: vi.fn(),
+      applyRootReconfigurationState: vi.fn(),
+      invalidateSettings: vi.fn(),
+    });
+
+    // persistFinalResumeが解決するまでstartRootReconfigurationは呼ばれない
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(order).toEqual([]);
+    expect(startRootReconfiguration).not.toHaveBeenCalled();
+
+    resolvePersist();
+    await donePromise;
+    expect(order).toEqual(["start"]);
+  });
+
+  it("202の応答をsettingsへ即時反映してから突入リセットする（再取得がidleを返す競合に対する備え）", async () => {
+    // performEntryResetが解決する前の時点で、既にapplyRootReconfigurationStateが
+    // runningを反映済みであることを確認する。reconfiguring画面への切り替えレンダーの
+    // 猶予を、クエリ破棄より先に作るための順序。
     let settingsState: string | null = null;
     const applyRootReconfigurationState = vi.fn((state) => {
       settingsState = state.status;
     });
-    let resolveInvalidate!: () => void;
-    const invalidateSettings = vi.fn(
+    let resolveEntryReset!: () => void;
+    const performEntryReset = vi.fn(
       () =>
         new Promise<void>((resolve) => {
-          resolveInvalidate = resolve;
+          resolveEntryReset = resolve;
         }),
     );
     const startRootReconfiguration = vi.fn(async () => ({
@@ -52,23 +95,23 @@ describe("runStartRootReconfiguration", () => {
 
     const donePromise = runStartRootReconfiguration("/audio/library", {
       startRootReconfiguration,
-      stopPlayback: vi.fn(),
-      resetLibraryForReconfiguration: vi.fn(),
+      persistFinalResume: vi.fn(),
+      performEntryReset,
       applyRootReconfigurationState,
-      invalidateSettings,
+      invalidateSettings: vi.fn(),
     });
 
-    // invalidateSettingsがまだ解決していない時点で、既にsettingsへrunningが反映されている
-    await vi.waitFor(() => expect(applyRootReconfigurationState).toHaveBeenCalled());
+    // performEntryResetがまだ解決していない時点で、既にsettingsへrunningが反映されている
+    await vi.waitFor(() => expect(performEntryReset).toHaveBeenCalled());
     expect(settingsState).toBe("running");
 
-    resolveInvalidate();
+    resolveEntryReset();
     await donePromise;
   });
 
-  it("検証失敗（400等）では再生停止・リセット・反映・invalidateのどれも呼ばない", async () => {
-    const stopPlayback = vi.fn();
-    const resetLibraryForReconfiguration = vi.fn();
+  it("検証失敗（400等）ではresume保存以外（突入リセット・反映・invalidate）は呼ばない", async () => {
+    const persistFinalResume = vi.fn();
+    const performEntryReset = vi.fn();
     const applyRootReconfigurationState = vi.fn();
     const invalidateSettings = vi.fn();
     const startRootReconfiguration = vi.fn(async () => {
@@ -78,15 +121,15 @@ describe("runStartRootReconfiguration", () => {
     await expect(
       runStartRootReconfiguration("/no/such/path", {
         startRootReconfiguration,
-        stopPlayback,
-        resetLibraryForReconfiguration,
+        persistFinalResume,
+        performEntryReset,
         applyRootReconfigurationState,
         invalidateSettings,
       }),
     ).rejects.toThrow("指定されたルートフォルダーが存在しません");
 
-    expect(stopPlayback).not.toHaveBeenCalled();
-    expect(resetLibraryForReconfiguration).not.toHaveBeenCalled();
+    expect(persistFinalResume).toHaveBeenCalled();
+    expect(performEntryReset).not.toHaveBeenCalled();
     expect(applyRootReconfigurationState).not.toHaveBeenCalled();
     expect(invalidateSettings).not.toHaveBeenCalled();
   });

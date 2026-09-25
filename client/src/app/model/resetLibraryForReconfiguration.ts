@@ -44,3 +44,14 @@ export function removeReconfigurationAffectedQueries(queryClient: QueryClient): 
     queryClient.removeQueries({ queryKey });
   }
 }
+
+/** 突入時にまとめて呼ぶ。settingsキャッシュへの反映（呼び出し側で先に行う）がReactの
+ *  再レンダーを起こす猶予としてマイクロタスク1回分空けてからremoveする。runningの
+ *  描画を実際に観測できたかには依存しない。 */
+export async function resetReconfigurationAffectedQueriesForEntry(
+  queryClient: QueryClient,
+): Promise<void> {
+  markReconfigurationAffectedQueriesStale(queryClient);
+  await Promise.resolve();
+  removeReconfigurationAffectedQueries(queryClient);
+}

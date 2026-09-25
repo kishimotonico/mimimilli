@@ -5,15 +5,16 @@ import type { RootReconfigurationState } from "@mimimilli/shared";
 export interface RunStartRootReconfigurationDeps {
   /** POST /api/root-reconfiguration。400/409はrejectする */
   startRootReconfiguration: (path: string) => Promise<RootReconfigurationState>;
-  /** 202成功後にのみ呼ぶ。検証失敗（400）では再生を止めない */
-  stopPlayback: () => void;
-  /** 202成功後にのみ呼ぶ。Libraryの選択・検索・タグ・軸・候補、作品系クエリをstale化する
-   *  （まだ通常UIがアンマウントされる前なので、removeではなく即時フェッチを起こさない形にする） */
-  resetLibraryForReconfiguration: () => void;
+  /** 開始APIを呼ぶ前に完了させる（awaitで直列、並列にしない）。ロック確立後は
+   *  resumeの保存が409になり黙って失われるため、ロック前に最終位置を確定させる */
+  persistFinalResume: () => Promise<void>;
+  /** 202成功後にのみ呼ぶ。検証失敗（400）では再生を止めない。再生停止・nav/URL/
+   *  モーダル等のリセット・作品系クエリの破棄をまとめて行う。runningの描画を実際に
+   *  観測できたかに依存せず必ず実行する（App.performReconfigurationEntryResetと共有） */
+  performEntryReset: () => Promise<void>;
   /** 202成功後にのみ呼ぶ。settingsキャッシュのrootReconfigurationを202応答で即時反映する。
-   *  再取得（invalidateSettings）が先に完了しidleを返す競合（フィクスチャの高速完了等）があっても、
-   *  この呼び出しだけで確実にreconfiguring画面へ一度切り替わり、通常UIのアンマウントとそれに続く
-   *  作品系クエリの破棄（App側のreconfiguring突入検知）が必ず起きるようにする */
+   *  performEntryResetのクエリ破棄より先に呼び、reconfiguring画面への切り替えレンダーの
+   *  猶予を作る */
   applyRootReconfigurationState: (state: RootReconfigurationState) => void;
   /** 202成功後にのみ呼ぶ。GET /api/settingsを再取得し、実際の状態と同期する */
   invalidateSettings: () => Promise<unknown>;
@@ -23,10 +24,10 @@ export async function runStartRootReconfiguration(
   path: string,
   deps: RunStartRootReconfigurationDeps,
 ): Promise<RootReconfigurationState> {
+  await deps.persistFinalResume();
   const state = await deps.startRootReconfiguration(path);
-  deps.stopPlayback();
-  deps.resetLibraryForReconfiguration();
   deps.applyRootReconfigurationState(state);
+  await deps.performEntryReset();
   await deps.invalidateSettings();
   return state;
 }
