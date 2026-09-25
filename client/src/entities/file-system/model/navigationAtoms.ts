@@ -1,16 +1,21 @@
 import { atom } from "jotai";
-import { relativeToRoot } from "@mimimilli/shared";
-import { setAppModeAtom } from "../../../shared/model/appModeAtoms";
-import type { WorkspacePath } from "@mimimilli/shared";
+import { relativeToRoot, workspacePath, type WorkspacePath } from "@mimimilli/shared";
+import type { RouteTransition } from "../../../shared/model/routeStore";
+import type { AppRoute } from "../../navigation/model/appRoute";
+import { appRouteAtom, appRouteStore } from "../../navigation/model/appRouteStore";
 
 /** カレントディレクトリのルート相対 segments（[] = ルート） */
-export const filesRelPathAtom = atom<string[]>([]);
+export const filesRelPathAtom = atom((get) => get(appRouteAtom).files.relPath);
 
 /** 選択中エントリ（ファイル or dir）の WorkspacePath。プレビュー対象 */
-export const filesSelectedPathAtom = atom<WorkspacePath | null>(null);
+export const filesSelectedPathAtom = atom<WorkspacePath | null>((get) => {
+  const { selectedRelPath } = get(appRouteAtom).files;
+  return selectedRelPath ? workspacePath(selectedRelPath.join("/")) : null;
+});
 
-/** カラム遷移方向（1 = 子へ潜る / -1 = 親へ遡る）。アニメーションの向きに使う */
-export const filesDirectionAtom = atom<1 | -1>(1);
+export function toSelectedRelPath(path: string | null): string[] | null {
+  return path ? path.split("/") : null;
+}
 
 export interface OpenPathInFilesArgs {
   /** ライブラリルート絶対パス（root相対のportable pathでも渡してよい。relativeToRootは
@@ -22,11 +27,19 @@ export interface OpenPathInFilesArgs {
 
 /** 絶対パス・root相対パスのどちらで渡されてもFilesモードで開き、当該エントリを選択する
  *  （要対応タブ・エラー作品の「Filesで開く」導線が共有する）。 */
-export const openPathInFilesAtom = atom(null, (_get, set, { path, root }: OpenPathInFilesArgs) => {
+export function openPathInFiles(
+  route: AppRoute,
+  { path, root }: OpenPathInFilesArgs,
+): RouteTransition<AppRoute> {
   const relativePath = relativeToRoot(path, root);
   const segments = relativePath.split("/").filter(Boolean);
-  const directory = segments.slice(0, -1);
-  set(setAppModeAtom, "files");
-  set(filesRelPathAtom, directory);
-  set(filesSelectedPathAtom, relativePath);
-});
+  return {
+    route: {
+      mode: "files",
+      library: route.library,
+      files: { relPath: segments.slice(0, -1), selectedRelPath: toSelectedRelPath(relativePath) },
+    },
+  };
+}
+
+export const openPathInFilesAtom = appRouteStore.action(openPathInFiles);

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createStore } from "jotai";
-import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
+import { appModeAtom, setAppModeAtom } from "../../src/entities/navigation/model/appRouteStore";
 
 const initialUrl = `${window.location.pathname}${window.location.search}`;
 
@@ -20,7 +20,7 @@ describe("appModeAtom", () => {
   it("書き込み後はURLではなく書き込んだ値を返す", () => {
     history.replaceState(null, "", "/library/all");
     const store = createStore();
-    store.set(appModeAtom, "files");
+    store.set(setAppModeAtom, "files");
     history.replaceState(null, "", "/library/cv");
     expect(store.get(appModeAtom)).toBe("files");
   });

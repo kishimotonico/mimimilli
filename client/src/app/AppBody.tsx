@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { useAtomValue } from "jotai";
-import { appModeAtom } from "../shared/model/appModeAtoms";
+import { appModeAtom } from "../entities/navigation/model/appRouteStore";
 import LibraryView from "../features/library/ui/LibraryView";
 import WorkDetailPage from "../features/library/ui/WorkDetailPage";
 import NowPlayingView from "../features/player/ui/NowPlayingView";

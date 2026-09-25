@@ -11,7 +11,7 @@ import {
   playingTrackIndexAtom,
   playingWorkIdAtom,
 } from "../../../entities/player/model/atoms";
-import type { AppMode } from "../../../shared/model/appMode";
+import type { SwitchableAppMode } from "../../../entities/navigation/model/appRoute";
 
 interface UseLibraryPreviewActionsOptions {
   selectedWork: Work | null;
@@ -19,7 +19,7 @@ interface UseLibraryPreviewActionsOptions {
   onPlay: (work: WorkListItem, trackIndex: number) => void;
   onResume: (work: Work) => void;
   openWorkDetail: (workId: string) => void;
-  setAppMode: (mode: AppMode) => void;
+  setAppMode: (mode: SwitchableAppMode) => void;
 }
 
 /** 選択中作品プレビューの再生系ハンドラーと、その作品が再生中かどうかの判定をまとめる。 */

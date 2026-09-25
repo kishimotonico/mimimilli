@@ -3,8 +3,9 @@ import { useAtomValue, useSetAtom } from "jotai";
 import type { NormalizedTag, Work, WorkListItem } from "@mimimilli/shared";
 import { libraryViewModeAtom } from "../model/atoms";
 import { librarySearchQueryAtom } from "../../../entities/library/model/navigationAtoms";
-import { setAppModeAtom } from "../../../shared/model/appModeAtoms";
+import { setAppModeAtom } from "../../../entities/navigation/model/appRouteStore";
 import { openWorkDetailAtom } from "../../../entities/work/model/navigationActions";
+import { setLibrarySearchQueryAtom } from "../../../entities/library/model/navigationActions";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import {
   useLibraryDebouncedSearchQuery,
@@ -46,7 +47,7 @@ export default function LibraryView({
   const rootFolder = useRootFolder();
   const searchQuery = useAtomValue(librarySearchQueryAtom);
   const debouncedSearchQuery = useLibraryDebouncedSearchQuery(searchQuery);
-  const setSearchQuery = useSetAtom(librarySearchQueryAtom);
+  const setSearchQuery = useSetAtom(setLibrarySearchQueryAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
   const openWorkDetail = useSetAtom(openWorkDetailAtom);
   const viewMode = useAtomValue(libraryViewModeAtom);

@@ -1,5 +1,5 @@
 import { useAtom, useAtomValue } from "jotai";
-import { appModeAtom } from "../../shared/model/appModeAtoms";
+import { appModeAtom } from "../../entities/navigation/model/appRouteStore";
 import { libraryViewModeAtom } from "../../features/library/model/atoms";
 import { activeAxisAtom } from "../../entities/library/model/navigationAtoms";
 import { isGridViewActive } from "../../features/library/model/libraryPresentation";

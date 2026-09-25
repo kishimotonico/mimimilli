@@ -38,8 +38,6 @@ import { useScanActions } from "../entities/scan/useScanActions";
 import { startRootReconfiguration } from "../entities/settings/api";
 import { runStartRootReconfiguration } from "./model/runStartRootReconfiguration";
 import { markReconfigurationAffectedQueriesStale } from "./model/resetLibraryForReconfiguration";
-import { resetLibraryNavigationUrl } from "./model/resetLibraryNavigationUrl";
-import { resetNavigationToDefaultAtom } from "./model/resetNavigationToDefault";
 import { createPlayRequestGuard } from "./model/playRequestGuard";
 import {
   useSettingsQuery,
@@ -47,14 +45,10 @@ import {
   requireRootFolder,
 } from "../entities/settings/useSettingsQuery";
 import { reconfigurationExitEpochAtom } from "../entities/settings/reconfigurationExitAtom";
-import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
-import { setAppModeAtom } from "../shared/model/appModeAtoms";
+import { navigateAtom } from "../entities/navigation/model/appRouteStore";
+import { DEFAULT_APP_ROUTE } from "../entities/navigation/model/appRoute";
 import { openPathInFilesAtom } from "../entities/file-system/model/navigationAtoms";
-import {
-  setLibraryAxisAtom,
-  selectLibraryWorkAtom,
-  resetLibraryNavigationAtom,
-} from "../entities/library/model/navigationActions";
+import { showLibraryWorkAtom } from "../entities/library/model/navigationActions";
 import { scanCandidateHiddenPathsAtom } from "../entities/scan/model/atoms";
 import { dlsiteBulkApplyOpenAtom } from "../entities/dlsite/model/bulkAtoms";
 import { openWorkDetailAtom } from "../entities/work/model/navigationActions";
@@ -64,12 +58,9 @@ export default function App() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const scanActions = useScanActions();
-  const setAppMode = useSetAtom(setAppModeAtom);
+  const navigate = useSetAtom(navigateAtom);
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
-  const setLibraryAxis = useSetAtom(setLibraryAxisAtom);
-  const selectLibraryWork = useSetAtom(selectLibraryWorkAtom);
-  const resetLibraryNavigation = useSetAtom(resetLibraryNavigationAtom);
-  const resetNavigationToDefault = useSetAtom(resetNavigationToDefaultAtom);
+  const showLibraryWork = useSetAtom(showLibraryWorkAtom);
   const setScanCandidateHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
   const openWorkDetail = useSetAtom(openWorkDetailAtom);
   const setActiveModal = useSetAtom(activeModalAtom);
@@ -108,23 +99,18 @@ export default function App() {
   // DriftEffect（別タブでの完了検知）で共有する。作品系クエリの実際の破棄
   // （removeQueries）は通常UIのobserverがまだ生きている可能性があるためここではしない
   // （stale化のみ。実際の破棄はReconfigurationEntryEffect/ReconfigurationExitEffect）。
-  // appMode・Filesのパス・作品詳細IDはURLと同期する状態のため、resetNavigationToDefault
-  // でLibraryモード内部の状態（resetLibraryNavigation）とは別に既定へ戻す。
   const performReconfigurationEntryReset = useCallback(() => {
     stopPlaybackAndInvalidateGuard();
     setActiveModal(null);
     setDlsiteBulkApplyOpen(false);
     scanActions.reset();
-    resetNavigationToDefault();
-    resetLibraryNavigation();
-    resetLibraryNavigationUrl();
+    navigate(DEFAULT_APP_ROUTE, { replace: true });
     setScanCandidateHiddenPaths(new Set());
     bumpReconfigurationExitEpoch((epoch) => epoch + 1);
     markReconfigurationAffectedQueriesStale(queryClient);
   }, [
+    navigate,
     queryClient,
-    resetLibraryNavigation,
-    resetNavigationToDefault,
     scanActions,
     setActiveModal,
     setDlsiteBulkApplyOpen,
@@ -225,12 +211,8 @@ export default function App() {
   const handleExport = useDownloadLibraryExport();
 
   const handleOpenLibraryWork = useCallback(
-    (workId: string) => {
-      setAppMode("library");
-      setLibraryAxis("all");
-      selectLibraryWork(workId);
-    },
-    [selectLibraryWork, setAppMode, setLibraryAxis],
+    (workId: string) => showLibraryWork(workId),
+    [showLibraryWork],
   );
 
   const handleOpenWorkDetail = useCallback(
@@ -319,7 +301,6 @@ export default function App() {
               <PlayerRuntime />
               <ReconfigurationExitEffect />
               <RootReconfigurationDriftEffect onDrift={performReconfigurationEntryReset} />
-              <NavigationHistorySync />
               <AppModals
                 lastScanTime={settings?.lastScanTime ?? null}
                 onChangeFolder={handleChangeFolder}

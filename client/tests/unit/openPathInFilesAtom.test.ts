@@ -8,7 +8,7 @@ import {
   filesSelectedPathAtom,
   openPathInFilesAtom,
 } from "../../src/entities/file-system/model/navigationAtoms";
-import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
+import { appModeAtom } from "../../src/entities/navigation/model/appRouteStore";
 
 describe("openPathInFilesAtom", () => {
   it("絶対パス（work.physicalPath相当）をrootで剥がしたroot相対パスへ変換する", () => {

@@ -4,8 +4,8 @@ import { focusManager, QueryClient, QueryClientProvider } from "@tanstack/react-
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TopBar from "../../src/app/ui/TopBar";
-import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
+import { seedAppMode } from "../helpers/route";
 
 const candidate = {
   path: "未登録作品" as const,
@@ -28,7 +28,7 @@ function scanCandidatesFetchCalls(fetchMock: ReturnType<typeof vi.fn>): unknown[
 
 function renderTopBar(queryClient: QueryClient) {
   const store = createStore();
-  store.set(appModeAtom, "library");
+  seedAppMode(store, "library");
 
   render(
     createElement(

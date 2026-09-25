@@ -4,7 +4,7 @@
 
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
-import type { SmartFolder, TagPrefix } from "@mimimilli/shared";
+import { createRandomSeed, type SmartFolder, type TagPrefix } from "@mimimilli/shared";
 import type { AxisId, GridLayoutMode, ViewMode } from "../../../entities/library/types";
 import {
   getAxisLabel,
@@ -16,6 +16,13 @@ import { DEFAULT_AXIS_VALUE_SORT, type AxisValueSortState } from "./axisValueSor
 // 値一覧のソート状態。sortAtom（作品一覧）とは別に保持する（ADR-0012 帰結）。
 // ソートメニューと list の列見出しクリックは同一のこの state への別入口。
 export const axisValueSortAtom = atom<AxisValueSortState>(DEFAULT_AXIS_VALUE_SORT);
+
+// sort=random の作品一覧が使う seed。URLには載せない
+export const randomSeedAtom = atom(createRandomSeed());
+
+export const reshuffleLibraryRandomSeedAtom = atom(null, (_get, set) => {
+  set(randomSeedAtom, createRandomSeed());
+});
 
 // URLには含めない表示設定。ブラウザーを再起動しても直前の見た目を復元する。
 export const libraryViewModeAtom = atomWithStorage<ViewMode>("mimimilli:libraryViewMode", "list");

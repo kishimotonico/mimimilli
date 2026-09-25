@@ -1,5 +1,5 @@
 import { createElement, useMemo } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,19 +7,26 @@ import App from "../../src/app/App";
 import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
 import DlsiteBulkApplyRuntime from "../../src/features/dlsite/ui/DlsiteBulkApplyRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
+import NavigationHistorySync from "../../src/features/navigation/ui/NavigationHistorySync";
 import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { dlsiteBulkApplyOpenAtom } from "../../src/entities/dlsite/model/bulkAtoms";
-import { appModeAtom } from "../../src/shared/model/appModeAtoms";
+import { appModeAtom, setAppModeAtom } from "../../src/entities/navigation/model/appRouteStore";
 import {
   filesRelPathAtom,
   filesSelectedPathAtom,
+  openPathInFilesAtom,
 } from "../../src/entities/file-system/model/navigationAtoms";
+import {
+  librarySearchQueryAtom,
+  selectedTagsAtom,
+  sortAtom,
+} from "../../src/entities/library/model/navigationAtoms";
 import * as workApi from "../../src/entities/work/api";
 import * as scanApi from "../../src/features/scan/api";
 import * as settingsApi from "../../src/entities/settings/api";
-import { workspacePath, type Settings } from "@mimimilli/shared";
+import type { Settings } from "@mimimilli/shared";
 
 const EMPTY_SCAN_RESULT = {
   registered: 0,
@@ -58,6 +65,7 @@ function renderAppWithSettings(settings: Settings) {
           null,
           createElement(DlsiteBulkRuntime),
           createElement(DlsiteBulkApplyRuntime),
+          createElement(NavigationHistorySync),
           createElement(ScanRuntime),
           createElement(App),
         ),
@@ -69,8 +77,14 @@ function renderAppWithSettings(settings: Settings) {
   return { queryClient, store };
 }
 
+function currentUrl(): string {
+  return `${window.location.pathname}${window.location.search}`;
+}
+
 beforeEach(() => {
   vi.restoreAllMocks();
+  sessionStorage.clear();
+  history.replaceState(null, "", "/");
   vi.stubGlobal(
     "fetch",
     vi.fn(
@@ -327,8 +341,9 @@ describe("root再設定の高速完了（runningが描画されない）競合",
   });
 });
 
-describe("別タブでの再設定完了検知（drift）時のナビゲーション初期化", () => {
-  it("Files表示中にdriftが起きるとLibrary既定画面に戻る", async () => {
+describe("root再設定とナビゲーションの既定化", () => {
+  it("Files表示中にdriftが起きるとLibrary既定画面に戻り、URLも既定へ置き換わる", async () => {
+    history.replaceState(null, "", "/library/all?tags=cv%2Fa&sort=title-asc&q=old");
     const { queryClient, store } = renderAppWithSettings({
       rootFolder: "/audio/library",
       lastScanTime: "2026-01-01T00:00:00.000Z",
@@ -336,10 +351,9 @@ describe("別タブでの再設定完了検知（drift）時のナビゲーシ�
     });
     await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
 
-    store.set(appModeAtom, "files");
-    store.set(filesRelPathAtom, ["dlsite"]);
-    store.set(filesSelectedPathAtom, workspacePath("dlsite/work.mp3"));
+    act(() => store.set(openPathInFilesAtom, { path: "dlsite/work.mp3", root: "/audio/library" }));
     expect(store.get(appModeAtom)).toBe("files");
+    expect(currentUrl()).toBe("/files/dlsite?sel=dlsite%2Fwork.mp3");
 
     // 別タブが同じrootFolderへ再設定を完了させた体（rootFolderは変わらずcompletedAtだけ進む）。
     queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
@@ -351,5 +365,51 @@ describe("別タブでの再設定完了検知（drift）時のナビゲーシ�
     await waitFor(() => expect(store.get(appModeAtom)).toBe("library"));
     expect(store.get(filesRelPathAtom)).toEqual([]);
     expect(store.get(filesSelectedPathAtom)).toBeNull();
+    expect(store.get(selectedTagsAtom)).toEqual([]);
+    expect(store.get(librarySearchQueryAtom)).toBe("");
+    expect(store.get(sortAtom)).toBe("added-desc");
+    expect(currentUrl()).toBe("/library/all");
+  });
+
+  it("再設定の画面へ入った時点でURLが既定になり、通常画面へ戻っても古い状態を復元しない", async () => {
+    history.replaceState(null, "", "/library/all?tags=cv%2Fa&sort=title-asc&q=old");
+    const { queryClient, store } = renderAppWithSettings({
+      rootFolder: "/audio/library",
+      lastScanTime: "2026-01-01T00:00:00.000Z",
+      rootReconfiguration: { status: "running", rootFolder: "/audio/library", progress: null },
+    });
+    await waitFor(() =>
+      expect(screen.getByText("ライブラリを再構築しています")).toBeInTheDocument(),
+    );
+    await waitFor(() => expect(currentUrl()).toBe("/library/all"));
+
+    queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
+      rootFolder: "/audio/library",
+      lastScanTime: "2026-01-01T00:00:00.000Z",
+      rootReconfiguration: { status: "idle", completedAt: "2026-01-01T00:05:00.000Z" },
+    });
+
+    await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
+    expect(store.get(selectedTagsAtom)).toEqual([]);
+    expect(store.get(librarySearchQueryAtom)).toBe("");
+    expect(store.get(sortAtom)).toBe("added-desc");
+    expect(currentUrl()).toBe("/library/all");
+  });
+
+  it("再設定の画面の表示中にrouteが変わってもURLへ反映するだけで、通常画面は描画しない", async () => {
+    const { store } = renderAppWithSettings({
+      rootFolder: "/audio/library",
+      lastScanTime: "2026-01-01T00:00:00.000Z",
+      rootReconfiguration: { status: "running", rootFolder: "/audio/library", progress: null },
+    });
+    await waitFor(() =>
+      expect(screen.getByText("ライブラリを再構築しています")).toBeInTheDocument(),
+    );
+
+    act(() => store.set(setAppModeAtom, "files"));
+
+    expect(currentUrl()).toBe("/files");
+    expect(screen.getByText("ライブラリを再構築しています")).toBeInTheDocument();
+    expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
   });
 });

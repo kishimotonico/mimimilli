@@ -10,11 +10,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, afterEach, vi } from "vitest";
 import AddressBar from "../../src/app/ui/AddressBar";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
-import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
-import { activeAxisAtom } from "../../src/entities/library/model/navigationAtoms";
 import { libraryViewModeAtom } from "../../src/features/library/model/atoms";
-import { filesRelPathAtom } from "../../src/entities/file-system/model/navigationAtoms";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
+import { seedAppMode, seedLibraryRoute, seedFilesRoute } from "../helpers/route";
 
 afterEach(cleanup);
 
@@ -26,10 +24,10 @@ function renderAddressBar(options?: {
   filesRelPath?: string[];
 }) {
   const store = createStore();
-  store.set(appModeAtom, options?.mode ?? "library");
-  store.set(activeAxisAtom, (options?.activeAxis ?? "all") as never);
+  seedAppMode(store, options?.mode ?? "library");
+  seedLibraryRoute(store, { activeAxis: (options?.activeAxis ?? "all") as never });
   store.set(libraryViewModeAtom, options?.libraryViewMode ?? "list");
-  if (options?.filesRelPath) store.set(filesRelPathAtom, options.filesRelPath);
+  if (options?.filesRelPath) seedFilesRoute(store, { relPath: options.filesRelPath });
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {

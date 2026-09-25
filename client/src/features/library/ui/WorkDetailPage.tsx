@@ -15,7 +15,10 @@ import { getAllTags } from "../../../entities/tag/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
-import { replaceAppModeAtom, setAppModeAtom } from "../../../shared/model/appModeAtoms";
+import {
+  replaceAppModeAtom,
+  setAppModeAtom,
+} from "../../../entities/navigation/model/appRouteStore";
 import {
   playerIsPlayingOrLoadingAtom,
   playingTrackIndexAtom,

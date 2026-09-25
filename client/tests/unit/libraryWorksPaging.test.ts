@@ -9,7 +9,7 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WORKS_DEFAULT_PAGE_SIZE, workspacePath } from "@mimimilli/shared";
 import { useSuspenseNormalLibraryWorks } from "../../src/features/library/model/useLibraryQueries";
-import { randomSeedAtom } from "../../src/entities/library/model/navigationAtoms";
+import { randomSeedAtom } from "../../src/features/library/model/atoms";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
 import type { WorkListItem } from "@mimimilli/shared";
 

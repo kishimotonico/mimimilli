@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
 import { buttonClass } from "../../shared/ui/Button";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { useMotionVariants } from "../../shared/ui/useMotionVariants";
 import { activeModalAtom } from "../../shared/model/activeModalAtom";
 import {
@@ -17,8 +17,9 @@ import {
   activeAxisAtom,
   librarySearchQueryAtom,
 } from "../../entities/library/model/navigationAtoms";
+import { setLibrarySearchQueryAtom } from "../../entities/library/model/navigationActions";
 import { computeResultsPaneKind } from "../../entities/library/resultsPane";
-import { appModeAtom, setAppModeAtom } from "../../shared/model/appModeAtoms";
+import { appModeAtom, setAppModeAtom } from "../../entities/navigation/model/appRouteStore";
 import {
   playerIsActiveAtom,
   playerStatusAtom,
@@ -62,7 +63,8 @@ export default function TopBar({ notificationBell }: TopBarProps) {
   const { cancel: onCancelDlsiteBulk } = useDlsiteBulkActions();
   const mode = useAtomValue(appModeAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
-  const [searchQuery, onSearchChange] = useAtom(librarySearchQueryAtom);
+  const searchQuery = useAtomValue(librarySearchQueryAtom);
+  const onSearchChange = useSetAtom(setLibrarySearchQueryAtom);
   const activeAxis = useAtomValue(activeAxisAtom);
   // 値一覧は現在の絞り込みと独立した全作品の入口で、作品検索は効かない（ADR-0026）。
   // 効かない入力欄を空のまま出し続けない（LibrarySortMenuのスマート軸disabledと同型）。
