@@ -4,7 +4,7 @@ import { toSafeExternalUrlHref } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import IconButton from "../../../../shared/ui/IconButton";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
-import type { LibraryBookmarkPatchMutation } from "../../model/useLibraryQueries";
+import type { BookmarkWorkMutation } from "../../../../entities/work/model/workMutations";
 import {
   useAnchoredPopover,
   type PopoverContainerResolver,
@@ -17,7 +17,7 @@ const actionPopoverContainerResolver: PopoverContainerResolver = (anchor) =>
 
 interface WorkMetadataActionsProps {
   work: Work;
-  bookmarkMutation: LibraryBookmarkPatchMutation;
+  bookmarkMutation: BookmarkWorkMutation;
   onEdit: () => void;
   onShowInfo: () => void;
   onDelete: () => void;

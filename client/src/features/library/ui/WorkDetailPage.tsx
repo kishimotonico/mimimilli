@@ -22,10 +22,8 @@ import {
   playingWorkIdAtom,
 } from "../../../entities/player/model/atoms";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
-import {
-  useLibraryWorkDeleteMutation,
-  useLibraryWorkPatchMutations,
-} from "../model/useLibraryQueries";
+import { useLibraryWorkPatchMutations } from "../model/useLibraryQueries";
+import { useUnregisterWorkMutation } from "../../../entities/work/model/workMutations";
 import { librarySearchQueryAtom } from "../../../entities/library/model/navigationAtoms";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import { WorkDetail } from "./preview/WorkDetail";
@@ -54,8 +52,7 @@ export default function WorkDetailPage({ onPlay, onResume, onTogglePlay }: WorkD
   });
   const tagsQuery = useQuery({ queryKey: TAG_QUERY_KEYS.all(), queryFn: getAllTags });
   const workPatchMutations = useLibraryWorkPatchMutations(nav, searchQuery);
-  // 削除で詳細が無効化された結果の退避も、404と同じくreplaceで抜ける（下のuseEffect参照）。
-  const deleteMutation = useLibraryWorkDeleteMutation(() => replaceAppMode("library"));
+  const deleteMutation = useUnregisterWorkMutation();
 
   // 削除済み作品などをURLで直接開いた場合、404を確認したらライブラリへ戻す（LibraryViewの
   // 選択解除と同じ考え方。ネットワーク断・5xx等の一時的な失敗では留まりエラー表示・再試行を出す）。
@@ -123,6 +120,8 @@ export default function WorkDetailPage({ onPlay, onResume, onTogglePlay }: WorkD
         tagSuggestions={tagsQuery.data ?? []}
         workPatchMutations={workPatchMutations}
         deleteMutation={deleteMutation}
+        // 解除後の退避も、404と同じくreplaceで抜ける（上のuseEffect参照）
+        onUnregistered={() => replaceAppMode("library")}
         onTagClick={handleTagClick}
         onGoToPlayingScreen={isCurrentWorkPlaying ? handleGoToPlayingScreen : undefined}
       />

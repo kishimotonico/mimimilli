@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TagPrefix } from "@mimimilli/shared";
-import type { LibraryTagIntentMutation } from "../../src/features/library/model/useLibraryQueries";
+import type { WorkTagMutation } from "../../src/entities/work/model/workMutations";
 import { useWorkTagEditor } from "../../src/features/library/ui/preview/useWorkTagEditor";
 
 const PREFIXES: TagPrefix[] = [
@@ -9,7 +9,7 @@ const PREFIXES: TagPrefix[] = [
   { prefix: "カテゴリ", label: "カテゴリ", color: null, showAsAxis: true, protected: false },
 ];
 
-function createIntentMutation(onIntent: (tag: string) => Promise<void>): LibraryTagIntentMutation {
+function createIntentMutation(onIntent: (tag: string) => Promise<void>): WorkTagMutation {
   const state = { isPending: false, error: null as Error | null };
   return {
     get isPending() {
@@ -34,7 +34,7 @@ function createIntentMutation(onIntent: (tag: string) => Promise<void>): Library
         state.isPending = false;
       }
     }),
-  } as unknown as LibraryTagIntentMutation;
+  } as unknown as WorkTagMutation;
 }
 
 function renderTagEditor(
@@ -241,7 +241,7 @@ describe("useWorkTagEditor", () => {
             };
           }),
       ),
-    } as unknown as LibraryTagIntentMutation;
+    } as unknown as WorkTagMutation;
     const addTagMutation = createIntentMutation(async () => {});
 
     const { result } = renderHook(() =>

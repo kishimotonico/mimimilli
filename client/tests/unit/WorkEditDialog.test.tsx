@@ -6,7 +6,7 @@ import type { Work, WorkEditSnapshot } from "@mimimilli/shared";
 import { emptyDlsiteState, toDlsiteLinkageStatus } from "@mimimilli/shared";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
-import type { LibraryWorkEditMutation } from "../../src/features/library/model/useLibraryQueries";
+import type { EditWorkSourceMutation } from "../../src/entities/work/model/workMutations";
 import { useLibraryWorkPatchMutations } from "../../src/features/library/model/useLibraryQueries";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
 import { WorkEditDialog } from "../../src/features/library/ui/preview/WorkEditDialog";
@@ -113,9 +113,7 @@ function renderDialog(ui: ReactElement) {
   };
 }
 
-function makeEditMutation(
-  overrides: Partial<LibraryWorkEditMutation> = {},
-): LibraryWorkEditMutation {
+function makeEditMutation(overrides: Partial<EditWorkSourceMutation> = {}): EditWorkSourceMutation {
   return {
     isPending: false,
     error: null,
@@ -123,7 +121,7 @@ function makeEditMutation(
     mutate: vi.fn(),
     mutateAsync: vi.fn().mockResolvedValue({ snapshot: makeSnapshot() }),
     ...overrides,
-  } as LibraryWorkEditMutation;
+  } as EditWorkSourceMutation;
 }
 
 /** 編集snapshotの初回読み込みが完了する（タイトル欄が有効になる）のを待つ。
@@ -137,7 +135,7 @@ function renderEditDialog(
   options: {
     work?: Work;
     onClose?: () => void;
-    editMutation?: LibraryWorkEditMutation;
+    editMutation?: EditWorkSourceMutation;
     tagSuggestions?: string[];
   } = {},
 ) {

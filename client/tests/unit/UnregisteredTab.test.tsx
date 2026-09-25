@@ -8,6 +8,7 @@ import { workspacePath, type ScanCandidate } from "@mimimilli/shared";
 import UnregisteredTab from "../../src/features/scan/ui/scanModal/UnregisteredTab";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import * as scanApi from "../../src/features/scan/api";
+import * as workApi from "../../src/entities/work/api";
 import * as scanEntityApi from "../../src/entities/scan/api";
 import * as scanCandidatesCache from "../../src/entities/scan/scanCandidatesCache";
 
@@ -103,7 +104,7 @@ describe("UnregisteredTab RJコード編集", () => {
 
   it("1行のRJコードが不正でも、正常な行だけを選んで登録できる（不正な行は自動的に除外される）", async () => {
     const registerSpy = vi
-      .spyOn(scanApi, "registerScanCandidates")
+      .spyOn(workApi, "registerScanCandidates")
       .mockResolvedValue({ registered: [{ path: candidateB.path, workId: "w2" }], failures: [] });
     renderTab([candidateA, candidateB]);
 
@@ -186,7 +187,7 @@ describe("UnregisteredTab 候補から外す", () => {
 
 describe("UnregisteredTab 登録失敗", () => {
   it("サーバーの失敗理由をそのまま表示する", async () => {
-    vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
+    vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
       registered: [],
       failures: [
         {

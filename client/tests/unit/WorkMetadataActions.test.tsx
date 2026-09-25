@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Work } from "@mimimilli/shared";
 import { emptyDlsiteState } from "@mimimilli/shared";
-import type { LibraryBookmarkPatchMutation } from "../../src/features/library/model/useLibraryQueries";
+import type { BookmarkWorkMutation } from "../../src/entities/work/model/workMutations";
 import { WorkMetadataActions } from "../../src/features/library/ui/preview/WorkMetadataActions";
 
 function makeWork(overrides: Partial<Work> = {}): Work {
@@ -31,9 +31,7 @@ function makeWork(overrides: Partial<Work> = {}): Work {
   };
 }
 
-function makeBookmarkMutation(
-  overrides: Partial<LibraryBookmarkPatchMutation> = {},
-): LibraryBookmarkPatchMutation {
+function makeBookmarkMutation(overrides: Partial<BookmarkWorkMutation> = {}): BookmarkWorkMutation {
   return {
     isPending: false,
     error: null,
@@ -41,7 +39,7 @@ function makeBookmarkMutation(
     mutate: vi.fn(),
     mutateAsync: vi.fn(),
     ...overrides,
-  } as LibraryBookmarkPatchMutation;
+  } as BookmarkWorkMutation;
 }
 
 describe("WorkMetadataActions", () => {

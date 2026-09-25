@@ -7,7 +7,12 @@ import {
 } from "react";
 import { useSetAtom } from "jotai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { hasRjCode, rjCodeFormatSchema, type ScanCandidate } from "@mimimilli/shared";
+import {
+  hasRjCode,
+  rjCodeFormatSchema,
+  type ScanCandidate,
+  type ScanCandidatesRegisterResponse,
+} from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
 import { useToast } from "../../../../shared/ui/useToast";
@@ -16,10 +21,10 @@ import { cn } from "../../../../shared/lib/cn";
 import { ApiRequestError } from "../../../../shared/api/http";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import { parentDirOf } from "../../../../shared/lib/workspacePath";
-import { excludeScanCandidates, registerScanCandidates, SCAN_QUERY_KEYS } from "../../api";
+import { excludeScanCandidates, SCAN_QUERY_KEYS } from "../../api";
 import { restoreScanCandidateExclusions } from "../../../../entities/scan/api";
 import { refreshScanCandidates } from "../../../../entities/scan/scanCandidatesCache";
-import { invalidateLibraryQueries } from "../../model/libraryInvalidation";
+import { useRegisterScanCandidatesMutation } from "../../../../entities/work/model/workMutations";
 import { scanCandidateHiddenPathsAtom } from "../../../../entities/scan/model/atoms";
 import type { CandidatesRegisteredResult } from "./types";
 
@@ -74,23 +79,21 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     if (editingPath) editingInputRef.current?.focus();
   }, [editingPath]);
 
-  const registerMutation = useMutation({
-    mutationFn: registerScanCandidates,
-    onSuccess: ({ registered, failures }) => {
+  const registerMutation = useRegisterScanCandidatesMutation();
+  const registerCallbacks = {
+    onSuccess: ({ registered, failures }: ScanCandidatesRegisterResponse) => {
       const registeredPaths = new Set(registered.map((entry) => entry.path));
       setHiddenPaths((previous) => new Set([...previous, ...registeredPaths]));
       setErrorMessage(
         failures.length > 0 ? failures.map((failure) => failure.message).join("\n") : null,
       );
-      // 部分失敗時も、実際に登録できた分だけがサーバー側の状態。再取得で正しい件数に揃える。
-      if (registered.length > 0) void invalidateLibraryQueries(queryClient);
       onRegistered({
         registeredWorkIds: registered.map((entry) => entry.workId),
         failedCount: failures.length,
         remainingCount: candidates.length - registeredPaths.size,
       });
     },
-    onError: async (error) => {
+    onError: async (error: Error) => {
       if (error instanceof ApiRequestError && error.status === 409) {
         setErrorMessage("候補が更新されたため表示を更新しました。選び直してください。");
         await refreshScanCandidates(queryClient);
@@ -98,7 +101,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
       }
       setErrorMessage(apiErrorMessage(error, "ライブラリへの追加に失敗しました"));
     },
-  });
+  };
 
   const excludeMutation = useMutation({
     mutationFn: (candidate: ScanCandidate) => excludeScanCandidates([candidate.path]),
@@ -216,7 +219,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
       path: candidate.path,
       rjCode: effectiveRjCode(candidate) ?? "",
     }));
-    registerMutation.mutate(items);
+    registerMutation.mutate(items, registerCallbacks);
   };
 
   return (

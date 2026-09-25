@@ -99,6 +99,7 @@ function renderDetail(props: Partial<React.ComponentProps<typeof WorkDetail>> = 
       tagSuggestions={[]}
       workPatchMutations={makeWorkPatchMutationsStub()}
       deleteMutation={makeDeleteMutationStub()}
+      onUnregistered={vi.fn()}
       onTagClick={vi.fn()}
       {...props}
     />,

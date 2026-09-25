@@ -1,16 +1,17 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "../../../shared/ui/useToast";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
-import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
-import { SCAN_QUERY_KEYS } from "../../../entities/scan/queryKeys";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
-import { deleteWork } from "../../../entities/work/api";
-import { getWorkRegisterPreview, reassignIdentityConflict } from "../api";
+import { SCAN_QUERY_KEYS } from "../../../entities/scan/queryKeys";
+import {
+  useReassignWorkIdentityMutation,
+  useUnregisterWorkMutation,
+} from "../../../entities/work/model/workMutations";
+import { getWorkRegisterPreview } from "../api";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
-import { useFilesCwd } from "../model/useFilesCwd";
 import { useIdentityConflictFor } from "../model/useIdentityConflict";
 import RegisterWorkDialog from "./RegisterWorkDialog";
 import { SourceProjectionNotice } from "../../../entities/work/ui/SourceProjectionNotice";
@@ -70,7 +71,6 @@ export default function FilePreviewWorkActions({
   playActions,
   onWorkRegistered,
 }: FilePreviewWorkActionsProps) {
-  const browsePath = useFilesCwd();
   const identityConflict = useIdentityConflictFor(entry.path);
   const isDir = classifyFile(entry) === "dir";
   const kind = classifyFile(entry);
@@ -84,49 +84,41 @@ export default function FilePreviewWorkActions({
   const [showReassignConfirm, setShowReassignConfirm] = useState(false);
   const [pendingProjection, setPendingProjection] = useState<WorkSourceMutationResult | null>(null);
 
-  const refreshFsState = useCallback(async () => {
-    const paths = new Set<string>([entry.path]);
-    if (browsePath) paths.add(browsePath);
-    await Promise.all(
-      [...paths].map((path) =>
-        queryClient.invalidateQueries({ queryKey: FILE_SYSTEM_QUERY_KEYS.directory(path) }),
-      ),
-    );
-    await queryClient.invalidateQueries({ queryKey: FILE_SYSTEM_QUERY_KEYS.all() });
-    await queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.diagnostics() });
-    await queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
-    await onWorkRegistered?.();
-  }, [browsePath, entry.path, onWorkRegistered, queryClient]);
+  const unregisterMutation = useUnregisterWorkMutation();
+  const unregister = (workId: string) =>
+    unregisterMutation.mutate(workId, {
+      onSuccess: async () => {
+        setShowUnregisterConfirm(false);
+        await onWorkRegistered?.();
+      },
+      onError: (cause) => {
+        toast.error(apiErrorMessage(cause, "作品登録の解除に失敗しました"));
+      },
+    });
 
-  const unregisterMutation = useMutation({
-    mutationFn: (workId: string) => deleteWork(workId),
-    onSuccess: async () => {
-      setShowUnregisterConfirm(false);
-      await refreshFsState();
-    },
-    onError: (cause) => {
-      toast.error(apiErrorMessage(cause, "作品登録の解除に失敗しました"));
-    },
-  });
-
-  const reassignMutation = useMutation({
-    mutationFn: (path: WorkspacePath) => reassignIdentityConflict(path),
-    onSuccess: async (result) => {
-      setShowReassignConfirm(false);
-      setPendingProjection(result);
-      await refreshFsState();
-    },
-    onError: (cause) => {
-      toast.error(sourceMutationErrorMessage(cause, "別作品としての取り込みに失敗しました"));
-    },
-  });
+  const reassignMutation = useReassignWorkIdentityMutation();
+  const reassign = (path: WorkspacePath) =>
+    reassignMutation.mutate(path, {
+      onSuccess: async (result) => {
+        setShowReassignConfirm(false);
+        setPendingProjection(result);
+        await onWorkRegistered?.();
+      },
+      onError: (cause) => {
+        toast.error(sourceMutationErrorMessage(cause, "別作品としての取り込みに失敗しました"));
+      },
+    });
 
   const registerPreviewMutation = useMutation({
     mutationFn: (path: WorkspacePath) => getWorkRegisterPreview(path),
     onSuccess: async (preview) => {
       if (preview.alreadyRegistered) {
         toast.error("この場所は既に作品として登録されています");
-        await refreshFsState();
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: FILE_SYSTEM_QUERY_KEYS.all() }),
+          queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.diagnostics() }),
+        ]);
+        await onWorkRegistered?.();
         return;
       }
       setRegisterPreview(preview);
@@ -197,7 +189,7 @@ export default function FilePreviewWorkActions({
           preview={registerPreview}
           onRegistered={(result) => {
             setPendingProjection(result);
-            void refreshFsState();
+            void onWorkRegistered?.();
           }}
           onClose={() => {
             setShowRegisterDialog(false);
@@ -216,7 +208,7 @@ export default function FilePreviewWorkActions({
           }
           confirmLabel="解除する"
           onConfirm={() => {
-            if (entry.workId) unregisterMutation.mutate(entry.workId);
+            if (entry.workId) unregister(entry.workId);
           }}
           onCancel={() => setShowUnregisterConfirm(false)}
         />
@@ -227,7 +219,7 @@ export default function FilePreviewWorkActions({
           title="別作品として取り込む"
           message={`「${entry.path}」のWork IDを新しくして、別作品として取り込みます。再生履歴やタグなどのユーザー状態は引き継ぎません。`}
           confirmLabel="取り込む"
-          onConfirm={() => reassignMutation.mutate(entry.path)}
+          onConfirm={() => reassign(entry.path)}
           onCancel={() => setShowReassignConfirm(false)}
         />
       )}

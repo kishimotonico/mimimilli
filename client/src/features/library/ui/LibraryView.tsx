@@ -19,7 +19,6 @@ import {
 } from "../../../entities/player/model/atoms";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import {
-  useLibraryBulkUnregisterMissingMutation,
   useLibraryDebouncedSearchQuery,
   useLibrarySupportingQueries,
   useMissingWorksCountQuery,
@@ -134,9 +133,6 @@ export default function LibraryView({
 
   const isErrorView = nav.activeAxis === "error";
   const missingWorksCountQuery = useMissingWorksCountQuery(isErrorView);
-  const bulkUnregisterMissingMutation = useLibraryBulkUnregisterMissingMutation(() => {
-    if (selectedWork?.status === "missing") nav.selectWork(null);
-  });
 
   // ── 表示導出（純粋計算は model/libraryPresentation に集約） ──
   const paneKind = computeResultsPaneKind(nav.activeAxis);
@@ -301,7 +297,9 @@ export default function LibraryView({
               ) : isErrorView ? (
                 <ErrorViewBulkUnregisterBanner
                   missingCount={missingWorksCountQuery.data}
-                  mutation={bulkUnregisterMissingMutation}
+                  onUnregistered={() => {
+                    if (selectedWork?.status === "missing") nav.selectWork(null);
+                  }}
                 />
               ) : undefined;
               return (

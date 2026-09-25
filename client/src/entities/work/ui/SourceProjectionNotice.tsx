@@ -1,10 +1,7 @@
 import type { WorkProjection, WorkSourceMutationResult, WorkspacePath } from "@mimimilli/shared";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Button from "../../../shared/ui/Button";
 import { useToast } from "../../../shared/ui/useToast";
-import { projectWorkSource } from "../api";
-import { invalidateWorkViewQueries } from "../invalidateWorkViewQueries";
-import { WORK_QUERY_KEYS } from "../queryKeys";
+import { useProjectWorkSourceMutation } from "../model/workMutations";
 import {
   canRetryProjection,
   projectionNoticeMessage,
@@ -22,19 +19,15 @@ export function SourceProjectionNotice({
   path,
   onProjected,
 }: SourceProjectionNoticeProps) {
-  const queryClient = useQueryClient();
   const toast = useToast();
-  const mutation = useMutation({
-    mutationFn: () => projectWorkSource(path!),
-    onSuccess: async (result) => {
-      queryClient.setQueryData(WORK_QUERY_KEYS.source(result.snapshot.id), result.snapshot);
-      await invalidateWorkViewQueries(queryClient, result.snapshot.id);
-      onProjected?.(result);
-    },
-    onError: (error) => {
-      toast.error(sourceMutationErrorMessage(error, "一覧への反映に失敗しました"));
-    },
-  });
+  const mutation = useProjectWorkSourceMutation();
+  const project = (target: WorkspacePath) =>
+    mutation.mutate(target, {
+      onSuccess: (result) => onProjected?.(result),
+      onError: (error) => {
+        toast.error(sourceMutationErrorMessage(error, "一覧への反映に失敗しました"));
+      },
+    });
 
   const message = projectionNoticeMessage(projection);
   if (!message) return null;
@@ -47,7 +40,7 @@ export function SourceProjectionNotice({
           size="sm"
           variant="ghost"
           disabled={mutation.isPending}
-          onClick={() => mutation.mutate()}
+          onClick={() => project(path)}
         >
           一覧へ反映する
         </Button>

@@ -1,8 +1,8 @@
 import { useSetAtom, useAtomValue } from "jotai";
-import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import type { DlsiteApplyMissingPreviewItem } from "@mimimilli/shared";
-import { applyDlsiteMissing, previewDlsiteMissing } from "../../../entities/work/api";
+import { previewDlsiteMissing } from "../../../entities/work/api";
+import { useApplyDlsiteMissingMutation } from "../../../entities/work/model/workMutations";
 import {
   dlsiteBulkApplyBusyAtom,
   dlsiteBulkApplyOpenAtom,
@@ -11,11 +11,10 @@ import { useToast } from "../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { sourceMutationErrorMessage } from "../../../entities/work/sourceMutation";
 import { formatDlsiteBulkApplyMissingResult } from "../model/formatDlsiteBulkApplyMissingResult";
-import { invalidateDlsiteCache } from "../model/dlsiteInvalidation";
 import DlsiteBulkApplyDialog from "./DlsiteBulkApplyDialog";
 
 export default function DlsiteBulkApplyRuntime() {
-  const queryClient = useQueryClient();
+  const applyMutation = useApplyDlsiteMissingMutation();
   const open = useAtomValue(dlsiteBulkApplyOpenAtom);
   const busy = useAtomValue(dlsiteBulkApplyBusyAtom);
   const setOpen = useSetAtom(dlsiteBulkApplyOpenAtom);
@@ -75,21 +74,20 @@ export default function DlsiteBulkApplyRuntime() {
   const apply = useCallback(async () => {
     setBusy(true);
     try {
-      const result = await applyDlsiteMissing([...selectedWorkIds]);
+      const result = await applyMutation.mutateAsync([...selectedWorkIds]);
       reset();
       toast.show({
         message: `未設定項目を適用: ${formatDlsiteBulkApplyMissingResult(result)}`,
         variant: "success",
         priority: "notice",
       });
-      await invalidateDlsiteCache(queryClient, [...selectedWorkIds]);
     } catch (cause) {
       reset();
       toast.error(sourceMutationErrorMessage(cause, "未設定項目の一括適用に失敗しました"));
     } finally {
       setBusy(false);
     }
-  }, [queryClient, reset, selectedWorkIds, setBusy, toast]);
+  }, [applyMutation, reset, selectedWorkIds, setBusy, toast]);
 
   if (!open || !items) return null;
 

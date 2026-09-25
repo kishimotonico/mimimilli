@@ -3,18 +3,19 @@ import Button from "../../../shared/ui/Button";
 import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
 import { useToast } from "../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
-import type { useLibraryBulkUnregisterMissingMutation } from "../model/useLibraryQueries";
+import { useUnregisterMissingWorksMutation } from "../../../entities/work/model/workMutations";
 
 interface ErrorViewBulkUnregisterBannerProps {
   missingCount: number | undefined;
-  mutation: ReturnType<typeof useLibraryBulkUnregisterMissingMutation>;
+  onUnregistered: () => void;
 }
 
 /** エラービュー表示中、missing作品が1件以上あるときだけ出す一括登録解除導線 */
 export function ErrorViewBulkUnregisterBanner({
   missingCount,
-  mutation,
+  onUnregistered,
 }: ErrorViewBulkUnregisterBannerProps) {
+  const mutation = useUnregisterMissingWorksMutation();
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const toast = useToast();
   if (!missingCount) return null;
@@ -40,6 +41,7 @@ export function ErrorViewBulkUnregisterBanner({
           onConfirm={() => {
             setIsConfirmOpen(false);
             mutation.mutate(undefined, {
+              onSuccess: onUnregistered,
               onError: (cause) =>
                 toast.error(apiErrorMessage(cause, "欠損作品の一括登録解除に失敗しました")),
             });
