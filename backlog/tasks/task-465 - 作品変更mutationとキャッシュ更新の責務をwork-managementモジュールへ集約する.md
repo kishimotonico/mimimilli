@@ -1,10 +1,11 @@
 ---
 id: TASK-465
 title: 作品変更mutationとキャッシュ更新の責務をwork-managementモジュールへ集約する
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-24 07:21'
-updated_date: '2026-09-25 02:30'
+updated_date: '2026-09-25 03:28'
 labels:
   - refactor
   - architecture

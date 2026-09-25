@@ -1,10 +1,11 @@
 ---
 id: TASK-469
 title: root変更を再設定ワークフローに置き換える
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-24 07:22'
-updated_date: '2026-09-25 02:30'
+updated_date: '2026-09-25 03:28'
 labels:
   - settings
   - scan
@@ -58,4 +59,10 @@ ordinal: 523000
 - 前例: SetupScreen(startupState==="setup-required")が通常UIを丸ごと置き換える。resolveAppStartupState の4値に "reconfiguring" 相当を足せば同じ枠組みで実現できる。
 
 設計判断が要る論点: 再設定中の取消可否 / 状態の永続化先 / root_folderをいつ確定するか / 旧rootのみの作品のcatalog行を削除か非表示か / fixtureでの対称実装 / 状態とmiddlewareの置き場所(adapter層かapp層か)。
+
+## ユーザー決定（2026-09-25）
+- 再設定中の取消は作らない。失敗時は再設定画面に留まり再試行のみ。旧rootへ戻すには旧パスを入れて再試行する。
+- root検証成功時点で root_folder を確定し、同時に「再設定中」状態をuser DBへ永続化する。完了時に状態を消す。再起動後も再設定画面へ戻れる。
+- 旧rootにのみ存在した作品はcatalogを新rootで作り直す（行削除）。user状態はWork UUIDで保持。missing扱いでは残さない。
+- 実装構造（統括推奨）: 再設定ワークフローはserver/coreのapplication service。job manager終了・adapter・再設定中は通常APIを409で拒否するmiddlewareを app.ts で配線。クライアントは startupState に再設定中を足してSetupScreen同様に通常UIを置き換える。
 <!-- SECTION:NOTES:END -->
