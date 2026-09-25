@@ -93,24 +93,28 @@ export default function App() {
   });
 
   // ── root再設定（ADR-0029） ──────────────────────────────────
+  // 再生停止とplayRequestGuardの無効化を1つの経路にまとめる。別々に呼ぶと
+  // 呼び忘れが起きうるため、「止める」操作は常にこの関数を通す。
+  const stopPlaybackAndInvalidateGuard = useCallback(() => {
+    player.stop();
+    playRequestGuard.invalidate();
+  }, [player, playRequestGuard]);
+
   // 開始成功の直後（通常UIがまだアンマウントされる前）に呼ぶ軽量な初期化。
   // removeQueriesではなくmarkStale（refetchType:"none"）にするのは、生きたobserverの
   // 即時再フェッチがロック中のAPIへ409を飛ばすのを避けるため。フィクスチャの高速完了レースに
   // 備え、reconfiguring状態を実際に観測できなくてもここで選択・検索・候補は必ず初期化される。
-  // playRequestGuardも無効化する: handlePlay/handleResumeが進行中に開始されると、
-  // このトークンチェックを通過して旧作品のplayer.playが後から呼ばれうるため。
   const applyImmediateReconfigurationReset = useCallback(() => {
-    playRequestGuard.invalidate();
     resetLibraryNavigation();
     resetLibraryNavigationUrl();
     setScanCandidateHiddenPaths(new Set());
     markReconfigurationAffectedQueriesStale(queryClient);
-  }, [queryClient, resetLibraryNavigation, setScanCandidateHiddenPaths, playRequestGuard]);
+  }, [queryClient, resetLibraryNavigation, setScanCandidateHiddenPaths]);
 
   // reconfiguringへの出入りを検知する。startReconfiguration経由（自分で開始した場合）に
   // 加え、起動時に既にrunning/failedだった場合・他所からの409検知でsettingsが切り替わった場合も拾う。
   // 突入時: 通常UIが実際にアンマウント済みなので、removeQueriesで作品系クエリを丸ごと破棄できる
-  // （復帰時に古いデータのstale-while-revalidate表示を挟まず必ず新規取得になる）。player.stop()も
+  // （復帰時に古いデータのstale-while-revalidate表示を挟まず必ず新規取得になる）。停止も
   // ここで呼ぶ: PlayerRuntimeProviderはstartupStateに関わらず常時マウントされているため、
   // 自分で開始した経路（runStartRootReconfiguration側で既に停止済み）以外の入り口でも再生を止める
   // 必要がある（重複して呼ばれても無害）。
@@ -121,8 +125,7 @@ export default function App() {
   useEffect(() => {
     const isReconfiguring = startupState === "reconfiguring";
     if (isReconfiguring && !wasReconfiguringRef.current) {
-      player.stop();
-      playRequestGuard.invalidate();
+      stopPlaybackAndInvalidateGuard();
       resetLibraryNavigation();
       resetLibraryNavigationUrl();
       setScanCandidateHiddenPaths(new Set());
@@ -139,9 +142,8 @@ export default function App() {
   }, [
     startupState,
     queryClient,
-    player,
     dlsiteBulk,
-    playRequestGuard,
+    stopPlaybackAndInvalidateGuard,
     resetLibraryNavigation,
     setScanCandidateHiddenPaths,
   ]);
@@ -162,14 +164,19 @@ export default function App() {
     async (path: string): Promise<void> => {
       await runStartRootReconfiguration(path, {
         startRootReconfiguration,
-        stopPlayback: player.stop,
+        stopPlayback: stopPlaybackAndInvalidateGuard,
         resetLibraryForReconfiguration: applyImmediateReconfigurationReset,
         applyRootReconfigurationState,
         invalidateSettings: () =>
           queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() }),
       });
     },
-    [applyImmediateReconfigurationReset, applyRootReconfigurationState, player.stop, queryClient],
+    [
+      applyImmediateReconfigurationReset,
+      applyRootReconfigurationState,
+      stopPlaybackAndInvalidateGuard,
+      queryClient,
+    ],
   );
 
   // ── Play handler ──────────────────────────────────────────
