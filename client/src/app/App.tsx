@@ -27,6 +27,7 @@ import GlobalToast from "./ui/GlobalToast";
 import AppModals from "./ui/AppModals";
 import { useToast } from "../shared/ui/useToast";
 import { apiErrorMessage } from "../shared/lib/apiError";
+import { isRootReconfiguringError } from "../entities/settings/apiErrorHelpers";
 import { activeModalAtom } from "../shared/model/activeModalAtom";
 import type { RootReconfigurationState, Settings, Work, WorkListItem } from "@mimimilli/shared";
 import { prepareWorkPlayback } from "../entities/work/api";
@@ -214,7 +215,9 @@ export default function App() {
           player.play(work, tracks, Math.min(trackIndex, tracks.length - 1), playlist!.id);
         }
       } catch (err) {
-        toast.error(apiErrorMessage(err, "作品の再生に失敗しました"));
+        if (!isRootReconfiguringError(err)) {
+          toast.error(apiErrorMessage(err, "作品の再生に失敗しました"));
+        }
       }
     },
     [player, queryClient, toast, playRequestGuard],
@@ -231,7 +234,9 @@ export default function App() {
         if (!playRequestGuard.isCurrent(requestId)) return;
         player.playWithResume(fullWork);
       } catch (err) {
-        toast.error(apiErrorMessage(err, "作品の再生に失敗しました"));
+        if (!isRootReconfiguringError(err)) {
+          toast.error(apiErrorMessage(err, "作品の再生に失敗しました"));
+        }
       }
     },
     [player, queryClient, toast, playRequestGuard],

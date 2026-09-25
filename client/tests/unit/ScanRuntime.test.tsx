@@ -336,4 +336,33 @@ describe("ScanRuntime", () => {
     // リトライや待機ループを足していないため、1回のGETで終わっている。
     expect(getJobCallCount).toBe(1);
   });
+
+  // App.handlePlay/handleResumeのprepareWorkPlayback呼び出しと同じ「直接API呼び出し→
+  // catch→isRootReconfiguringErrorで判定→トーストを出さない」パターンをstart()で縛る。
+  // 画面がreconfiguringへ切り替わるのが正しい応答であり、「失敗」トーストは不要。
+  it("start()が409（root_reconfiguring）で失敗してもトースト要求が積まれない", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/scan/active")) return response(null, 204);
+        if (url.endsWith("/scan") && init?.method === "POST") {
+          return new Response(
+            JSON.stringify({ error: { code: "root_reconfiguring", message: "再設定中です" } }),
+            { status: 409, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        return response(null, 204);
+      }),
+    );
+
+    const { store } = renderRuntime();
+    await waitFor(() => expect(store.get(scanActionsAtom)).not.toBeNull());
+
+    const result = await act(async () => store.get(scanActionsAtom)!.start());
+
+    expect(result.ok).toBe(false);
+    expect(getErrorToastMessage(store)).toBeNull();
+    expect(store.get(toastRequestsAtom).size).toBe(0);
+  });
 });

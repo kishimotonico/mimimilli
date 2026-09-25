@@ -10,6 +10,7 @@ import { cancelScan, getActiveScan, getScanJob, ScanAlreadyActiveError, startSca
 import type { ScanActionResult } from "../../../entities/scan/model/atoms";
 import { isTerminalScanJob } from "../../../entities/scan/model/scanJob";
 import { formatUserError } from "../../../shared/lib/formatUserError";
+import { isRootReconfiguringError } from "../../../entities/settings/apiErrorHelpers";
 
 function errorMessage(error: unknown): string {
   return formatUserError(error, "スキャン状態の取得に失敗しました").message;
@@ -20,10 +21,6 @@ function isDefinitiveRefreshError(error: unknown): boolean {
     error instanceof ApiResponseSchemaError ||
     (error instanceof ApiRequestError && (error.status === 404 || error.status === 410))
   );
-}
-
-function isReconfiguringLockError(error: unknown): boolean {
-  return error instanceof ApiRequestError && error.code === "root_reconfiguring";
 }
 
 function statusRank(status: ScanJobSnapshot["status"]): number {
@@ -143,7 +140,7 @@ export function useScanJob(options: UseScanJobOptions = {}) {
             if (!owns(generation, initial.id)) return;
             // root再設定中は/scan系APIが409で拒否される。追跡中のジョブは再設定側で
             // 取り消し済みなので、終端イベントを待たずここで追跡終了とする。
-            if (isReconfiguringLockError(cause)) {
+            if (isRootReconfiguringError(cause)) {
               reset();
               return;
             }
@@ -215,7 +212,11 @@ export function useScanJob(options: UseScanJobOptions = {}) {
         }
       })
       .catch((cause: unknown) => {
-        if (generationRef.current === discoveryGeneration && attachedJobIdRef.current === null) {
+        if (
+          generationRef.current === discoveryGeneration &&
+          attachedJobIdRef.current === null &&
+          !isRootReconfiguringError(cause)
+        ) {
           setError(errorMessage(cause));
         }
       });
@@ -242,7 +243,7 @@ export function useScanJob(options: UseScanJobOptions = {}) {
           return { ok: true, job: cause.active };
         }
         const message = errorMessage(cause);
-        setError(message);
+        if (!isRootReconfiguringError(cause)) setError(message);
         return { ok: false, error: message };
       }
     },
@@ -261,7 +262,7 @@ export function useScanJob(options: UseScanJobOptions = {}) {
       return { ok: true, job: next };
     } catch (cause) {
       const message = errorMessage(cause);
-      if (owns(generation, jobId)) setError(message);
+      if (owns(generation, jobId) && !isRootReconfiguringError(cause)) setError(message);
       return { ok: false, error: message };
     }
   }, [applyOwned, job, owns]);
