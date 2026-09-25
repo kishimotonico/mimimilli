@@ -94,22 +94,23 @@ export function WorkDetail({
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
   const rootFolder = useRootFolder();
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     const title = work.title;
-    deleteMutation.mutate(work.id, {
-      onSuccess: () => {
-        toast.show({
-          message: `「${title}」の登録を解除しました`,
-          variant: "success",
-          priority: "notice",
-          // 解除成功で画面遷移してWorkDetailが直後にアンマウントされるため、
-          // 通知は発行元の生存に縛らない
-          dismissOnUnmount: false,
-        });
-        onUnregistered();
-      },
-      onError: (cause) => toast.error(apiErrorMessage(cause, "作品登録の解除に失敗しました")),
+    try {
+      await deleteMutation.mutateAsync(work.id);
+    } catch (cause) {
+      toast.error(apiErrorMessage(cause, "作品登録の解除に失敗しました"));
+      return;
+    }
+    toast.show({
+      message: `「${title}」の登録を解除しました`,
+      variant: "success",
+      priority: "notice",
+      // 解除成功で画面遷移してWorkDetailが直後にアンマウントされるため、
+      // 通知は発行元の生存に縛らない
+      dismissOnUnmount: false,
     });
+    onUnregistered();
   };
 
   return (
@@ -278,7 +279,7 @@ export function WorkDetail({
           confirmLabel="解除する"
           onConfirm={() => {
             setIsDeleteConfirmOpen(false);
-            handleDeleteConfirm();
+            void handleDeleteConfirm();
           }}
           onCancel={() => setIsDeleteConfirmOpen(false)}
         />

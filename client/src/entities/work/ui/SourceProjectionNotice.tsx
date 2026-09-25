@@ -21,13 +21,16 @@ export function SourceProjectionNotice({
 }: SourceProjectionNoticeProps) {
   const toast = useToast();
   const mutation = useProjectWorkSourceMutation();
-  const project = (target: WorkspacePath) =>
-    mutation.mutate(target, {
-      onSuccess: (result) => onProjected?.(result),
-      onError: (error) => {
-        toast.error(sourceMutationErrorMessage(error, "一覧への反映に失敗しました"));
-      },
-    });
+  const project = async (target: WorkspacePath) => {
+    let result: WorkSourceMutationResult;
+    try {
+      result = await mutation.mutateAsync(target);
+    } catch (error) {
+      toast.error(sourceMutationErrorMessage(error, "一覧への反映に失敗しました"));
+      return;
+    }
+    onProjected?.(result);
+  };
 
   const message = projectionNoticeMessage(projection);
   if (!message) return null;
@@ -40,7 +43,7 @@ export function SourceProjectionNotice({
           size="sm"
           variant="ghost"
           disabled={mutation.isPending}
-          onClick={() => project(path)}
+          onClick={() => void project(path)}
         >
           一覧へ反映する
         </Button>

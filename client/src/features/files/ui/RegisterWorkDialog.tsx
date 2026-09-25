@@ -5,6 +5,7 @@ import { normalizeTag } from "@mimimilli/shared";
 import type {
   DlsiteRegistrationBody,
   DlsiteWorkInfo,
+  WorkCreateResponse,
   WorkRegisterPreview,
   WorkSourceMutationResult,
 } from "@mimimilli/shared";
@@ -67,7 +68,7 @@ export default function RegisterWorkDialog({
   });
 
   const registerMutation = useRegisterWorkMutation();
-  const register = () => {
+  const register = async () => {
     const dlsiteAppliedTags = dlsiteInfo
       ? dlsiteInfoTags(dlsiteInfo).filter((tag) => tags.includes(tag))
       : [];
@@ -79,15 +80,19 @@ export default function RegisterWorkDialog({
           applyTags: dlsiteAppliedTags,
         })
       : undefined;
-    registerMutation.mutate(
-      { path: folderPath, title: title.trim(), tags, dlsite },
-      {
-        onSuccess: (result) => {
-          onRegistered(result);
-          onClose();
-        },
-      },
-    );
+    let result: WorkCreateResponse;
+    try {
+      result = await registerMutation.mutateAsync({
+        path: folderPath,
+        title: title.trim(),
+        tags,
+        dlsite,
+      });
+    } catch {
+      return;
+    }
+    onRegistered(result);
+    onClose();
   };
 
   useEffect(() => {
@@ -290,7 +295,7 @@ export default function RegisterWorkDialog({
           <Button
             variant="primary"
             disabled={submitBusy || title.trim().length === 0 || preview.descendantWorkCount > 0}
-            onClick={register}
+            onClick={() => void register()}
           >
             登録
           </Button>

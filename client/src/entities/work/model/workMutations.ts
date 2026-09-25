@@ -1,5 +1,6 @@
-// 作品を変更する操作の mutation hook（ADR-0028）。必須キャッシュ更新は hook 定義側の onSuccess が
-// 済ませるため、画面の後処理は mutate(variables, { onSuccess }) の呼び出し単位で書く。
+// 作品を変更する操作の mutation hook（ADR-0028）。必須キャッシュ更新は hook 定義側の onSuccess が済ませる。
+// アンマウント後も必要な画面の後処理（グローバル atom・QueryClient・親コールバック・トースト）は
+// mutateAsync を await した後に書き、mutate の呼び出し単位 callback は UI ローカルな state 更新に限る。
 
 import {
   useMutation,

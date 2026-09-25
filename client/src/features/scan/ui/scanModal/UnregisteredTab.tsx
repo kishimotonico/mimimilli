@@ -11,6 +11,7 @@ import {
   hasRjCode,
   rjCodeFormatSchema,
   type ScanCandidate,
+  type ScanCandidateRegisterItem,
   type ScanCandidatesRegisterResponse,
 } from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
@@ -38,6 +39,10 @@ export interface UnregisteredTabProps {
 interface FieldError {
   value: string;
   message: string;
+}
+
+function isCandidatesStale(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.status === 409;
 }
 
 export default function UnregisteredTab({ candidates, onRegistered }: UnregisteredTabProps) {
@@ -80,27 +85,33 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   }, [editingPath]);
 
   const registerMutation = useRegisterScanCandidatesMutation();
-  const registerCallbacks = {
-    onSuccess: ({ registered, failures }: ScanCandidatesRegisterResponse) => {
-      const registeredPaths = new Set(registered.map((entry) => entry.path));
-      setHiddenPaths((previous) => new Set([...previous, ...registeredPaths]));
-      setErrorMessage(
-        failures.length > 0 ? failures.map((failure) => failure.message).join("\n") : null,
-      );
-      onRegistered({
-        registeredWorkIds: registered.map((entry) => entry.workId),
-        failedCount: failures.length,
-        remainingCount: candidates.length - registeredPaths.size,
+  const register = async (items: ScanCandidateRegisterItem[]) => {
+    const candidateCount = candidates.length;
+    let response: ScanCandidatesRegisterResponse;
+    try {
+      response = await registerMutation.mutateAsync(items, {
+        onSuccess: ({ failures }) =>
+          setErrorMessage(
+            failures.length > 0 ? failures.map((failure) => failure.message).join("\n") : null,
+          ),
+        onError: (error) =>
+          setErrorMessage(
+            isCandidatesStale(error)
+              ? "候補が更新されたため表示を更新しました。選び直してください。"
+              : apiErrorMessage(error, "ライブラリへの追加に失敗しました"),
+          ),
       });
-    },
-    onError: async (error: Error) => {
-      if (error instanceof ApiRequestError && error.status === 409) {
-        setErrorMessage("候補が更新されたため表示を更新しました。選び直してください。");
-        await refreshScanCandidates(queryClient);
-        return;
-      }
-      setErrorMessage(apiErrorMessage(error, "ライブラリへの追加に失敗しました"));
-    },
+    } catch (error) {
+      if (isCandidatesStale(error)) await refreshScanCandidates(queryClient).catch(() => {});
+      return;
+    }
+    const registeredPaths = new Set(response.registered.map((entry) => entry.path));
+    setHiddenPaths((previous) => new Set([...previous, ...registeredPaths]));
+    onRegistered({
+      registeredWorkIds: response.registered.map((entry) => entry.workId),
+      failedCount: response.failures.length,
+      remainingCount: candidateCount - registeredPaths.size,
+    });
   };
 
   const excludeMutation = useMutation({
@@ -219,7 +230,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
       path: candidate.path,
       rjCode: effectiveRjCode(candidate) ?? "",
     }));
-    registerMutation.mutate(items, registerCallbacks);
+    void register(items);
   };
 
   return (

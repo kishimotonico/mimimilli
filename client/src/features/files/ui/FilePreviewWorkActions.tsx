@@ -85,29 +85,33 @@ export default function FilePreviewWorkActions({
   const [pendingProjection, setPendingProjection] = useState<WorkSourceMutationResult | null>(null);
 
   const unregisterMutation = useUnregisterWorkMutation();
-  const unregister = (workId: string) =>
-    unregisterMutation.mutate(workId, {
-      onSuccess: async () => {
-        setShowUnregisterConfirm(false);
-        await onWorkRegistered?.();
-      },
-      onError: (cause) => {
-        toast.error(apiErrorMessage(cause, "作品登録の解除に失敗しました"));
-      },
-    });
+  const unregister = async (workId: string) => {
+    try {
+      await unregisterMutation.mutateAsync(workId, {
+        onSuccess: () => setShowUnregisterConfirm(false),
+      });
+    } catch (cause) {
+      toast.error(apiErrorMessage(cause, "作品登録の解除に失敗しました"));
+      return;
+    }
+    await onWorkRegistered?.();
+  };
 
   const reassignMutation = useReassignWorkIdentityMutation();
-  const reassign = (path: WorkspacePath) =>
-    reassignMutation.mutate(path, {
-      onSuccess: async (result) => {
-        setShowReassignConfirm(false);
-        setPendingProjection(result);
-        await onWorkRegistered?.();
-      },
-      onError: (cause) => {
-        toast.error(sourceMutationErrorMessage(cause, "別作品としての取り込みに失敗しました"));
-      },
-    });
+  const reassign = async (path: WorkspacePath) => {
+    try {
+      await reassignMutation.mutateAsync(path, {
+        onSuccess: (result) => {
+          setShowReassignConfirm(false);
+          setPendingProjection(result);
+        },
+      });
+    } catch (cause) {
+      toast.error(sourceMutationErrorMessage(cause, "別作品としての取り込みに失敗しました"));
+      return;
+    }
+    await onWorkRegistered?.();
+  };
 
   const registerPreviewMutation = useMutation({
     mutationFn: (path: WorkspacePath) => getWorkRegisterPreview(path),
@@ -208,7 +212,7 @@ export default function FilePreviewWorkActions({
           }
           confirmLabel="解除する"
           onConfirm={() => {
-            if (entry.workId) unregister(entry.workId);
+            if (entry.workId) void unregister(entry.workId);
           }}
           onCancel={() => setShowUnregisterConfirm(false)}
         />
@@ -219,7 +223,7 @@ export default function FilePreviewWorkActions({
           title="別作品として取り込む"
           message={`「${entry.path}」のWork IDを新しくして、別作品として取り込みます。再生履歴やタグなどのユーザー状態は引き継ぎません。`}
           confirmLabel="取り込む"
-          onConfirm={() => reassign(entry.path)}
+          onConfirm={() => void reassign(entry.path)}
           onCancel={() => setShowReassignConfirm(false)}
         />
       )}

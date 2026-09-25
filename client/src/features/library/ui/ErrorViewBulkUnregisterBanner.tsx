@@ -18,6 +18,15 @@ export function ErrorViewBulkUnregisterBanner({
   const mutation = useUnregisterMissingWorksMutation();
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const toast = useToast();
+  const unregisterMissing = async () => {
+    try {
+      await mutation.mutateAsync();
+    } catch (cause) {
+      toast.error(apiErrorMessage(cause, "欠損作品の一括登録解除に失敗しました"));
+      return;
+    }
+    onUnregistered();
+  };
   if (!missingCount) return null;
 
   return (
@@ -40,11 +49,7 @@ export function ErrorViewBulkUnregisterBanner({
           confirmLabel="まとめて解除する"
           onConfirm={() => {
             setIsConfirmOpen(false);
-            mutation.mutate(undefined, {
-              onSuccess: onUnregistered,
-              onError: (cause) =>
-                toast.error(apiErrorMessage(cause, "欠損作品の一括登録解除に失敗しました")),
-            });
+            void unregisterMissing();
           }}
           onCancel={() => setIsConfirmOpen(false)}
         />

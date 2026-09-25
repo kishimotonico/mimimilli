@@ -1,7 +1,7 @@
 import type { WorkListItem } from "@mimimilli/shared";
 import type { LibraryViewActions, LibraryViewState } from "../model/useLibraryNavigation";
 
-/** 次ページ読み込み関連（TASK-73） */
+/** 次ページ読み込み関連 */
 export interface WorkResultsPagination {
   hasNextPage?: boolean;
   worksTotal?: number;

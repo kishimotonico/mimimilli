@@ -36,7 +36,10 @@
 - scan 候補の非表示集合（`scanCandidateHiddenPathsAtom`）や、Files の表示中ディレクトリの再取得など、画面の表示状態
 - DLsite 一括取得ジョブと SSE の寿命管理（TASK-448.3 の範囲）
 
-画面の後処理は `mutate(variables, { onSuccess })` の呼び出し単位の callback で書く。hook 定義側の `onSuccess`（必須更新）が完了してから呼ばれるため、画面の処理は必須更新の後に走る。
+画面の後処理は、hook 定義側の `onSuccess`（必須更新）が完了してから走る。書き方は後処理の種類で分ける。
+
+- アンマウント後も必要な後処理（グローバル atom の更新、`QueryClient` の操作、親への結果通知、トースト）は、`mutateAsync` を `await` した後に書き、reject は必ず `catch` する。`mutateAsync` の Promise は呼び出し元がアンマウントされても解決する。
+- `mutate(variables, { onSuccess })`（`mutateAsync` の第 2 引数を含む）の呼び出し単位の callback は、ダイアログを閉じるなど UI ローカルな state の更新に限る。TanStack Query は observer がアンマウントされるとこの callback を呼ばない。アンマウント済みのコンポーネントのローカル state は `await` の後で更新しない。
 
 ### 配置
 
