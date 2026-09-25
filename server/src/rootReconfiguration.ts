@@ -39,14 +39,21 @@ export class RootReconfigurationWorkflow {
   private readonly adapter: WorkflowAdapter;
   private readonly scanJobs: ScanJobManager;
   private readonly dlsiteJobs: DlsiteJobManager;
+  private readonly drainAdmittedRequests: () => Promise<void>;
   private run: ActiveRun | null = null;
   private resolving = false;
   private shuttingDown = false;
 
-  constructor(adapter: WorkflowAdapter, scanJobs: ScanJobManager, dlsiteJobs: DlsiteJobManager) {
+  constructor(
+    adapter: WorkflowAdapter,
+    scanJobs: ScanJobManager,
+    dlsiteJobs: DlsiteJobManager,
+    drainAdmittedRequests: () => Promise<void>,
+  ) {
     this.adapter = adapter;
     this.scanJobs = scanJobs;
     this.dlsiteJobs = dlsiteJobs;
+    this.drainAdmittedRequests = drainAdmittedRequests;
   }
 
   async getState(): Promise<RootReconfigurationState> {
@@ -111,6 +118,9 @@ export class RootReconfigurationWorkflow {
   ): Promise<void> {
     const { signal } = run.controller;
     try {
+      // ロック確立前に受理済みのリクエストが、取消・再構築と並走して書き込むのを防ぐ
+      // （ADR-0029「開始・再試行の手順」手順2・3の間。リトライや待機ループは設けない）。
+      await this.drainAdmittedRequests();
       await this.scanJobs.cancelActiveAndAwait();
       await this.dlsiteJobs.cancelActiveAndAwait();
       if (signal.aborted) throw new Error("サーバーの終了処理中です");

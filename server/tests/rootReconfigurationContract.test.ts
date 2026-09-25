@@ -245,6 +245,49 @@ for (const [kind, createHarness] of harnesses) {
     }
   });
 
+  test(`${kind}: ロック確立前に受理済みのscan開始要求は再構築開始前に取り消され、削除済み作品を再投入しない`, async (t) => {
+    const h = await createHarness(t);
+    let releaseBody: (() => void) | undefined;
+    const bodyReady = new Promise<void>((resolve) => {
+      releaseBody = resolve;
+    });
+    const body = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        await bodyReady;
+        controller.enqueue(new TextEncoder().encode("{}"));
+        controller.close();
+      },
+    });
+
+    // ロック判定はscanのbody受信より前に行われるため、bodyを止めたまま送出しても
+    // 再設定を開始していない時点ではロックに引っかからず受理される。
+    const scanPromise = h.app.request("/api/scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      duplex: "half",
+    } as RequestInit);
+
+    const reconfigurePromise = reconfigure(h.app, h.newRoot);
+    // scanのbody到着を、再設定開始要求より後まで遅らせる。
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    releaseBody?.();
+
+    const scanRes = await scanPromise;
+    assert.equal(scanRes.status, 202);
+    const { job } = (await scanRes.json()) as { job: { id: string } };
+
+    assert.deepEqual(await reconfigurePromise, { status: "idle" });
+
+    const scanJob = await h.app.request(`/api/scan/${job.id}`);
+    assert.equal(scanJob.status, 200);
+    assert.equal(((await scanJob.json()) as { status: string }).status, "cancelled");
+
+    const ids = await listWorkIds(h.app);
+    assert.ok(ids.includes(h.keptWorkId));
+    assert.ok(!ids.includes(h.droppedWorkId));
+  });
+
   test(`${kind}: 再起動後も失敗・中断した再設定を状態から判断できる`, async (t) => {
     const h = await createHarness(t);
     const failed = await reconfigure(h.app, h.unreadableRoot);

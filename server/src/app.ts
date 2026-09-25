@@ -6,6 +6,7 @@ import type { ApiError } from "@mimimilli/shared";
 import { NotConfiguredError, RootReconfiguringError } from "./errors.ts";
 import type { DataAdapter } from "./adapter/index.ts";
 import { formatError, getCategoryLogger } from "./lib/logger.ts";
+import { InFlightRequestGate } from "./lib/inFlightRequestGate.ts";
 import { axesRoute } from "./routes/axes.ts";
 import { dlsiteRoute } from "./routes/dlsite.ts";
 import { fsRoute } from "./routes/fs.ts";
@@ -68,15 +69,28 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
   const scanJobs = new ScanJobManager(adapter, undefined, undefined, (insertedWorkIds) =>
     dlsiteJobs.enqueue("new", insertedWorkIds),
   );
-  const rootReconfiguration = new RootReconfigurationWorkflow(adapter, scanJobs, dlsiteJobs);
+  const admittedRequestGate = new InFlightRequestGate();
+  const rootReconfiguration = new RootReconfigurationWorkflow(adapter, scanJobs, dlsiteJobs, () =>
+    admittedRequestGate.drain(),
+  );
   api.use("*", async (c, next) => {
-    if (
-      !ROOT_RECONFIGURATION_ALLOWED_REQUESTS.has(`${c.req.method} ${c.req.path}`) &&
-      (await rootReconfiguration.isLocked())
-    ) {
+    const allowed = ROOT_RECONFIGURATION_ALLOWED_REQUESTS.has(`${c.req.method} ${c.req.path}`);
+    if (!allowed && (await rootReconfiguration.isLocked())) {
       throw new RootReconfiguringError();
     }
-    await next();
+    if (allowed) {
+      await next();
+      return;
+    }
+    // ロック判定を通過した後にrootReconfiguration.start()がロックを確立しても、
+    // このリクエストは既に受理済みのまま進行する。開始側はcatalog再構築前に
+    // このゲートが空になるのを待つ（drainAdmittedRequests）。
+    admittedRequestGate.enter();
+    try {
+      await next();
+    } finally {
+      admittedRequestGate.leave();
+    }
   });
   api.route("/", settingsRoute(adapter, rootReconfiguration));
   api.route("/", rootReconfigurationRoute(rootReconfiguration));
