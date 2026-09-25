@@ -7,11 +7,13 @@ import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-quer
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   WORKS_DEFAULT_PAGE_SIZE,
+  toDlsiteLinkageStatus,
   workspacePath,
   type ScanCandidate,
   type ScanJobSnapshot,
   type ScanResult,
   type Work,
+  type WorkEditSnapshot,
   type WorkListItem,
   type WorksPage,
 } from "@mimimilli/shared";
@@ -100,7 +102,7 @@ const work: Work = {
   resume: null,
 };
 
-function scanSnapshot(title: string) {
+function scanSnapshot(title: string): WorkEditSnapshot {
   return {
     sourceRevision: "revision-1",
     id: work.id,
@@ -109,7 +111,11 @@ function scanSnapshot(title: string) {
     tags: work.tags,
     urls: work.urls,
     coverImage: work.coverImage,
-    dlsite: work.dlsite,
+    dlsite: {
+      rjCode: work.dlsite.rjCode,
+      status: toDlsiteLinkageStatus(work.dlsite.status),
+      appliedTags: work.dlsite.appliedTags,
+    },
   };
 }
 

@@ -86,7 +86,20 @@ test("DLsite通知のページングパラメータが不正なら400", async ()
 
 test("201件超の通知はfixtureとrealで集計・ページングの欠落や重複がない", async () => {
   const works = notificationWorks(402);
-  const fixture = createFixtureAdapter({ works });
+  const fixture = createFixtureAdapter({
+    works,
+    dlsiteFetchFailures: [
+      {
+        rjCode: "RJ123456",
+        resolution: {
+          kind: "failure",
+          outcome: "error",
+          attemptedAt: Date.now(),
+          expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+        },
+      },
+    ],
+  });
   const db = openDb({ kind: "memory" });
   const { query, catalog, user } = createWorkRepos(db);
   try {

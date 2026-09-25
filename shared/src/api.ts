@@ -1,7 +1,7 @@
 // エンドポイント横断の契約: 作品検索クエリ、ページングエンベロープ、部分更新、エラー形式。
 import { z } from "zod";
 import { dataIntegrityWarningSchema } from "./dataIntegrity.ts";
-import { dlsiteStateSchema } from "./dlsite.ts";
+import { metaDlsiteStateSchema } from "./dlsite.ts";
 import { smartFolderRuleSchema, sortIdSchema, viewIdSchema } from "./library.ts";
 import { normalizedTagArraySchema } from "./tagNormalize.ts";
 import {
@@ -188,7 +188,7 @@ export const workEditSnapshotSchema = z.object({
   tags: normalizedTagArraySchema,
   urls: z.array(urlEntrySchema),
   coverImage: z.string().nullable(),
-  dlsite: dlsiteStateSchema,
+  dlsite: metaDlsiteStateSchema,
 });
 export type WorkEditSnapshot = z.infer<typeof workEditSnapshotSchema>;
 

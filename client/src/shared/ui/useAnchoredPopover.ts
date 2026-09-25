@@ -28,9 +28,10 @@ import {
 
 const POPOVER_MARGIN = 8;
 const RIGHT_PLACEMENT_GAP = 6;
+const ABOVE_PLACEMENT_GAP = 7;
 
 export type { PopoverCloseReason };
-export type PopoverPlacement = "below" | "right";
+export type PopoverPlacement = "below" | "right" | "above";
 export type PopoverContainerResolver = (anchor: HTMLElement) => HTMLElement | null;
 
 const defaultContainerResolver: PopoverContainerResolver = (anchor) =>
@@ -57,6 +58,10 @@ export interface UseAnchoredPopoverOptions {
   getContainer?: PopoverContainerResolver;
   placement?: PopoverPlacement;
   referenceElement?: HTMLElement | null;
+  /** スクロールで自動的に閉じる。既定は無効（呼び出し側が明示的に有効化する） */
+  closeOnScroll?: boolean;
+  /** フォーカスが境界外へ外れたら自動的に閉じる。既定は無効（呼び出し側が明示的に有効化する） */
+  closeOnFocusOut?: boolean;
 }
 
 export type AnchoredPopoverFloatingRefCallback = (node: HTMLElement | null) => (() => void) | void;
@@ -78,6 +83,8 @@ export function useAnchoredPopover({
   getContainer = defaultContainerResolver,
   placement = "below",
   referenceElement,
+  closeOnScroll = false,
+  closeOnFocusOut = false,
 }: UseAnchoredPopoverOptions): UseAnchoredPopoverResult {
   const referenceRef = useRef<HTMLElement | null>(null);
   const floatingNodeRef = useRef<HTMLElement | null>(null);
@@ -90,7 +97,7 @@ export function useAnchoredPopover({
   const floatingBoundaryRef = useRef<HTMLElement | null>(null);
   const dismissalBoundaryRefs = useMemo(
     () =>
-      placement === "right"
+      placement !== "below"
         ? [...(additionalBoundaryRefs ?? []), floatingBoundaryRef]
         : additionalBoundaryRefs,
     [placement, additionalBoundaryRefs],
@@ -132,26 +139,31 @@ export function useAnchoredPopover({
   const middleware =
     placement === "right"
       ? [offset(RIGHT_PLACEMENT_GAP), shift(boundaryOptions), trackContainerWidth]
-      : [
-          offset(RIGHT_PLACEMENT_GAP),
-          flip(boundaryOptions),
-          shift(boundaryOptions),
-          size(() => ({
-            ...boundaryOptions(),
-            apply({ availableWidth }) {
-              const width = Math.min(preferredWidth, availableWidth);
-              setPopoverWidth(width);
-              const boundary = resolveBoundary();
-              if (boundary instanceof HTMLElement) {
-                setContainerWidth(readContainerWidth(boundary));
-              }
-            },
-          })),
-        ];
+      : placement === "above"
+        ? [offset(ABOVE_PLACEMENT_GAP), flip(boundaryOptions), shift(boundaryOptions)]
+        : [
+            offset(RIGHT_PLACEMENT_GAP),
+            flip(boundaryOptions),
+            shift(boundaryOptions),
+            size(() => ({
+              ...boundaryOptions(),
+              apply({ availableWidth }) {
+                const width = Math.min(preferredWidth, availableWidth);
+                setPopoverWidth(width);
+                const boundary = resolveBoundary();
+                if (boundary instanceof HTMLElement) {
+                  setContainerWidth(readContainerWidth(boundary));
+                }
+              },
+            })),
+          ];
+
+  const floatingPlacement =
+    placement === "below" ? "bottom-start" : placement === "right" ? "right-start" : "top-end";
 
   const { context, floatingStyles, refs } = useFloating({
     open: isOpen,
-    placement: placement === "below" ? "bottom-start" : "right-start",
+    placement: floatingPlacement,
     strategy: placement === "below" ? "absolute" : "fixed",
     transform: false,
     elements: {
@@ -208,6 +220,29 @@ export function useAnchoredPopover({
   useInteractions([dismiss]);
 
   useEffect(() => {
+    if (!isOpen || !closeOnScroll) return;
+    const handleScroll = () => close("scroll");
+    window.addEventListener("scroll", handleScroll, true);
+    return () => window.removeEventListener("scroll", handleScroll, true);
+  }, [isOpen, closeOnScroll, close]);
+
+  useEffect(() => {
+    if (!isOpen || !closeOnFocusOut) return;
+    const handleFocusOut = (event: FocusEvent) => {
+      const next = event.relatedTarget;
+      if (
+        next instanceof Node &&
+        isInsideBoundaries(next, referenceRef, boundaryRef, dismissalBoundaryRefs)
+      ) {
+        return;
+      }
+      close("focus-out");
+    };
+    document.addEventListener("focusout", handleFocusOut);
+    return () => document.removeEventListener("focusout", handleFocusOut);
+  }, [isOpen, closeOnFocusOut, boundaryRef, dismissalBoundaryRefs, close]);
+
+  useEffect(() => {
     if (!isOpen) return;
     if (placement === "right") {
       setPopoverWidth(preferredWidth);
@@ -224,7 +259,8 @@ export function useAnchoredPopover({
     setFloating,
     floatingStyles: {
       ...floatingStyles,
-      width: placement === "below" ? popoverWidth : preferredWidth,
+      width:
+        placement === "below" ? popoverWidth : placement === "right" ? preferredWidth : undefined,
     },
     containerWidth,
     close,

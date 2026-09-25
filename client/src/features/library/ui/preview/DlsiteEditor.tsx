@@ -362,9 +362,7 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
   const statusTone =
     snapshot.dlsite.status === "applied"
       ? "bg-[color-mix(in_oklch,var(--r-leaf)_12%,transparent)] text-[var(--r-leaf)]"
-      : snapshot.dlsite.status === "error" || snapshot.dlsite.status === "not_found"
-        ? "bg-[color-mix(in_oklch,var(--r-coral)_12%,transparent)] text-[var(--r-coral)]"
-        : "bg-paper-3 text-ink-2";
+      : "bg-paper-3 text-ink-2";
 
   return (
     <section aria-labelledby="work-edit-dlsite-title" className="flex flex-col gap-2.5">
@@ -373,10 +371,7 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
           <h3 id="work-edit-dlsite-title" className="font-sans text-label font-semibold text-ink-1">
             DLsite連携
           </h3>
-          <span
-            className={`rounded-pill px-2 py-0.5 font-sans text-label ${statusTone}`}
-            title={snapshot.dlsite.error ?? undefined}
-          >
+          <span className={`rounded-pill px-2 py-0.5 font-sans text-label ${statusTone}`}>
             {STATUS_LABEL[snapshot.dlsite.status]}
           </span>
         </div>

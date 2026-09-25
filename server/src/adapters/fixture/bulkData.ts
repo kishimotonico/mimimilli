@@ -1,9 +1,18 @@
 // 大量件数シナリオ（"large"）用の作品データ生成。
 // 実ライブラリ規模（数百〜数千件）でのページング・ファセット・仮想スクロールを
 // 手元で確認するために、決定的な擬似乱数で作品を組み立てる。
-import { dedupeTags, normalizeTags } from "@mimimilli/shared";
-import type { CoverValueBase, DlsiteState, WorkSummary } from "@mimimilli/shared";
-import { fixtureCoverColumnsForWork, fixtureCoverFromColumns } from "./data.ts";
+import { DEFAULT_DLSITE_CACHE_TTLS_MS, dedupeTags, normalizeTags } from "@mimimilli/shared";
+import type {
+  CoverValueBase,
+  DlsiteCacheResolution,
+  MetaDlsiteState,
+  WorkSummary,
+} from "@mimimilli/shared";
+import {
+  fixtureCoverColumnsForWork,
+  fixtureCoverFromColumns,
+  type FixtureWorkRecord,
+} from "./data.ts";
 
 /** 決定的な擬似乱数（mulberry32）。同じシードなら常に同じライブラリになる */
 function createRandom(seed: number): () => number {
@@ -179,73 +188,75 @@ function pickMany<T>(random: () => number, items: readonly T[], count: number): 
 const START_MS = Date.UTC(2021, 0, 1);
 const END_MS = Date.UTC(2026, 5, 1);
 
-function buildDlsiteState(random: () => number, id: string, tags: string[]): DlsiteState {
+/** 作品ごとのmeta linkageと、あれば取得キャッシュ相当の失敗記録を組み立てる。
+ *  取得失敗（not_found/parse_error）はlinkageではなくfailureへ持たせる。
+ *  attemptedAt/fetchedAtはnowMs（状態生成時刻）基準からTTL未満だけ過去へずらし、常に未失効に保つ。 */
+function buildDlsiteLinkageAndFailure(
+  random: () => number,
+  nowMs: number,
+  id: string,
+  tags: string[],
+): { linkage: MetaDlsiteState; failure?: DlsiteCacheResolution } {
   const roll = random();
   if (roll < 0.62) {
     return {
-      rjCode: id,
-      status: "applied",
-      lastAttemptAt: new Date(START_MS + random() * (END_MS - START_MS)).toISOString(),
-      error: null,
-      errorKind: null,
-      appliedTags: dedupeTags(normalizeTags(tags.filter((tag) => /^(?:cv|サークル)\//.test(tag)))),
+      linkage: {
+        rjCode: id,
+        status: "applied",
+        appliedTags: dedupeTags(
+          normalizeTags(tags.filter((tag) => /^(?:cv|サークル)\//.test(tag))),
+        ),
+      },
     };
   }
   if (roll < 0.82) {
-    return {
-      rjCode: id,
-      status: "none",
-      lastAttemptAt: null,
-      error: null,
-      errorKind: null,
-      appliedTags: [],
-    };
+    return { linkage: { rjCode: id, status: "none", appliedTags: [] } };
   }
   if (roll < 0.88) {
-    return {
-      rjCode: null,
-      status: "none",
-      lastAttemptAt: null,
-      error: null,
-      errorKind: null,
-      appliedTags: [],
-    };
+    return { linkage: { rjCode: null, status: "none", appliedTags: [] } };
   }
   if (roll < 0.92) {
+    const attemptedAt = nowMs - random() * DEFAULT_DLSITE_CACHE_TTLS_MS.not_found * 0.9;
     return {
-      rjCode: id,
-      status: "not_found",
-      lastAttemptAt: new Date(END_MS).toISOString(),
-      error: "作品が見つかりません",
-      errorKind: "not_found",
-      appliedTags: [],
+      linkage: { rjCode: id, status: "none", appliedTags: [] },
+      failure: {
+        kind: "failure",
+        outcome: "not_found",
+        attemptedAt,
+        expiresAt: attemptedAt + DEFAULT_DLSITE_CACHE_TTLS_MS.not_found,
+      },
     };
   }
   if (roll < 0.95) {
+    const fetchedAt = nowMs - random() * DEFAULT_DLSITE_CACHE_TTLS_MS.parse_error * 0.9;
     return {
-      rjCode: id,
-      status: "error",
-      lastAttemptAt: new Date(END_MS).toISOString(),
-      error: "DLsiteのHTML構造が想定と異なります",
-      errorKind: "parse_error",
-      appliedTags: [],
+      linkage: { rjCode: id, status: "none", appliedTags: [] },
+      failure: {
+        kind: "html",
+        outcome: "parse_error",
+        fetchedAt,
+        expiresAt: fetchedAt + DEFAULT_DLSITE_CACHE_TTLS_MS.parse_error,
+        html: "",
+      },
     };
   }
-  return {
-    rjCode: id,
-    status: "skipped",
-    lastAttemptAt: null,
-    error: null,
-    errorKind: null,
-    appliedTags: [],
-  };
+  return { linkage: { rjCode: id, status: "skipped", appliedTags: [] } };
+}
+
+export interface BulkWorks {
+  works: FixtureWorkRecord[];
+  linkages: Map<string, MetaDlsiteState>;
+  failures: Map<string, DlsiteCacheResolution>;
 }
 
 /** 大量件数シナリオ用の作品を count 件生成する。
- *  ID は RJ6xxxxx 帯で、手書きシード（RJ5010xx）と衝突しない。 */
-export function createBulkWorks(count: number): WorkSummary[] {
+ *  ID は RJ6xxxxx 帯で、手書きシード（RJ5010xx）と衝突しない。
+ *  nowMsは状態生成時刻（呼び出し側が決める）で、取得失敗キャッシュの基準に使う。 */
+export function createBulkWorks(count: number, nowMs: number): BulkWorks {
   const random = createRandom(20260811);
-  const works: WorkSummary[] = [];
+  const works: FixtureWorkRecord[] = [];
+  const linkages = new Map<string, MetaDlsiteState>();
+  const failures = new Map<string, DlsiteCacheResolution>();
 
   for (let i = 0; i < count; i++) {
     const id = `RJ${600000 + i}`;
@@ -311,12 +322,11 @@ export function createBulkWorks(count: number): WorkSummary[] {
         : null,
     } satisfies Omit<WorkSummary, "dlsite" | "cover"> & { cover: CoverValueBase | null };
 
-    works.push({
-      ...raw,
-      cover: fixtureCoverFromColumns(raw, fixtureCoverColumnsForWork(raw)),
-      dlsite: buildDlsiteState(random, id, tags),
-    });
+    works.push({ ...raw, cover: fixtureCoverFromColumns(raw, fixtureCoverColumnsForWork(raw)) });
+    const { linkage, failure } = buildDlsiteLinkageAndFailure(random, nowMs, id, tags);
+    linkages.set(id, linkage);
+    if (failure) failures.set(id, failure);
   }
 
-  return works;
+  return { works, linkages, failures };
 }

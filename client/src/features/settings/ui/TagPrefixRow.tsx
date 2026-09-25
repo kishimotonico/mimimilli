@@ -3,6 +3,7 @@ import type { TagPrefix, TagPrefixColorKey } from "@mimimilli/shared";
 import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
 import TextInput from "../../../shared/ui/TextInput";
+import { cn } from "../../../shared/lib/cn";
 import { ColorSwatches } from "./ColorSwatches";
 
 const TOGGLE_LABEL_CLASS =
@@ -57,12 +58,12 @@ export default function TagPrefixRow({
   const deleteDisabled = isMutating || p.protected;
   return (
     <div className="flex items-center gap-2 border-b border-line-soft px-2.5 py-1.5 last:border-b-0">
-      <div className="flex shrink-0 flex-col">
+      <div className="flex shrink-0 flex-col gap-px">
         <IconButton
           icon={I.chevD}
           label={`「${p.label}」を上へ移動`}
           size="xs"
-          className={`h-[13px] rotate-180${moveUpDisabled ? "" : ` ${ROW_ICON_CLASS}`}`}
+          className={cn("h-[13px] rotate-180", !moveUpDisabled && ROW_ICON_CLASS)}
           disabled={moveUpDisabled}
           onClick={onMoveUp}
         />
@@ -70,7 +71,7 @@ export default function TagPrefixRow({
           icon={I.chevD}
           label={`「${p.label}」を下へ移動`}
           size="xs"
-          className={`h-[13px]${moveDownDisabled ? "" : ` ${ROW_ICON_CLASS}`}`}
+          className={cn("h-[13px]", !moveDownDisabled && ROW_ICON_CLASS)}
           disabled={moveDownDisabled}
           onClick={onMoveDown}
         />

@@ -3,7 +3,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { emptyDlsiteState } from "@mimimilli/shared";
+import { emptyMetaDlsiteState } from "@mimimilli/shared";
 import { appendSuppressedError } from "../../src/lib/suppressedError.ts";
 
 /** 指定秒数の有効な 8kHz mono PCM WAV を生成する */
@@ -147,7 +147,7 @@ export function makeSampleLibrary(): SampleLibrary {
           },
         ],
         defaultPlaylistId: existingPlaylistId,
-        dlsite: { ...emptyDlsiteState(), rjCode: "RJ900002" },
+        dlsite: { ...emptyMetaDlsiteState(), rjCode: "RJ900002" },
       },
       null,
       2,

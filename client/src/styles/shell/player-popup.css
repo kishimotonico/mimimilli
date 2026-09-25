@@ -113,10 +113,9 @@
   bottom: 8px;
   z-index: 4;
 }
+/* document.body へポータル（useAnchoredPopover placement:"above"）。z-indexはdocs/design-system.md参照 */
 .mle-ratepick__pop {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 7px);
+  z-index: 50;
   min-width: 112px;
   padding: 4px;
   background: var(--paper-1);

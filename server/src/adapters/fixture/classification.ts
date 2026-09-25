@@ -17,7 +17,7 @@ import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder, evalSmartFolderRules } from "../../core/smartFolder.ts";
 import { toWorksPage } from "../../core/worksQuery.ts";
-import type { FixtureState } from "./state.ts";
+import { composeWorks, type FixtureState } from "./state.ts";
 
 export function createClassificationMethods(state: FixtureState): ClassificationAdapter {
   return {
@@ -29,10 +29,10 @@ export function createClassificationMethods(state: FixtureState): Classification
         const folder = state.smartFolders.find((f) => f.id === filter.smartFolder);
         // /smart-folders/:id/works と同じ「解決できない」応答（404）に揃える
         if (!folder) return null;
-        const matched = evalSmartFolderRules(folder.rules, state.works);
+        const matched = evalSmartFolderRules(folder.rules, composeWorks(state));
         return buildAxisFacets(axis, matched, filter);
       }
-      return buildAxisFacets(axis, state.works, filter);
+      return buildAxisFacets(axis, composeWorks(state), filter);
     },
 
     async listTagPrefixes(): Promise<TagPrefix[]> {
@@ -74,7 +74,7 @@ export function createClassificationMethods(state: FixtureState): Classification
 
     async listTagPrefixCandidates(): Promise<TagPrefixCandidate[]> {
       return buildTagPrefixCandidates(
-        state.works,
+        composeWorks(state),
         state.tagPrefixes.map((p) => p.prefix),
       );
     },
@@ -114,7 +114,7 @@ export function createClassificationMethods(state: FixtureState): Classification
       const folder = state.smartFolders.find((f) => f.id === id);
       if (!folder) return null;
       const page = toWorksPage(
-        evalSmartFolder(folder, state.works, query),
+        evalSmartFolder(folder, composeWorks(state), query),
         state.rootFolder ?? "/library",
       );
       return state.dataIntegrityWarning
@@ -123,7 +123,7 @@ export function createClassificationMethods(state: FixtureState): Classification
     },
 
     async previewSmartFolderRuleCount(rules: SmartFolderRule[]): Promise<number> {
-      return evalSmartFolderRules(rules, state.works).length;
+      return evalSmartFolderRules(rules, composeWorks(state)).length;
     },
   };
 }

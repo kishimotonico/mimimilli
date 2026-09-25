@@ -10,7 +10,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  dlsiteStateSchema,
+  metaDlsiteStateSchema,
   metaFileSchema,
   playlistSchema,
   trackSchema,
@@ -47,18 +47,10 @@ test("metaFileSchemaのキー集合とfingerprintのnormalizeMetaContent対象�
   );
 });
 
-test("dlsiteStateSchemaのキー集合とfingerprintが対象にするdlsiteサブセットが一致する", () => {
-  // lastAttemptAt / errorKind は機械的に変動しうる、またはサーバー付随情報のため対象外
-  const excluded = new Set(["lastAttemptAt", "errorKind"]);
-  const expectedTracked = ["appliedTags", "error", "rjCode", "status"].sort();
-
-  const schemaKeys = keysOf(dlsiteStateSchema).filter((key) => !excluded.has(key));
-  assert.deepEqual(
-    schemaKeys,
-    expectedTracked,
-    "dlsiteStateSchemaのフィールド増減に合わせて fingerprint.ts の dlsite サブセットと、" +
-      "このテストの期待値を更新してください",
-  );
+test("metaDlsiteStateSchemaのキー集合はfingerprintが完全にカバーする（除外なし）", () => {
+  // meta正本の dlsite は rjCode/status/appliedTags の連携分類だけを持ち、取得失敗・試行時刻などの
+  // 一時状態は型として存在しない（ADR-0027）ため、fingerprint.ts 側での除外は不要になった。
+  assert.deepEqual(keysOf(metaDlsiteStateSchema), ["appliedTags", "rjCode", "status"]);
 });
 
 test("playlistSchema/trackSchema/urlEntrySchemaのキー集合はfingerprintが完全にカバーする（除外なし）", () => {
@@ -67,36 +59,7 @@ test("playlistSchema/trackSchema/urlEntrySchemaのキー集合はfingerprintが�
   assert.deepEqual(keysOf(urlEntrySchema), ["label", "url"]);
 });
 
-test("errorKindを追加してもprojection revisionは変わらない", () => {
-  const base = {
-    formatVersion: 1,
-    id: "00000000-0000-4000-8000-000000000001",
-    title: "テスト作品",
-    tags: [],
-    playlists: [],
-    defaultPlaylistId: null,
-    urls: [],
-    coverImage: null,
-    dlsite: {
-      rjCode: "RJ123456",
-      status: "none" as const,
-      lastAttemptAt: null,
-      error: null,
-      appliedTags: [],
-    },
-  };
-  const withErrorKind = metaFileSchema.parse({
-    ...base,
-    dlsite: { ...base.dlsite, errorKind: "parse_error" },
-  });
-  const withoutErrorKind = metaFileSchema.parse(base);
-  assert.equal(
-    computeProjectionRevision(withoutErrorKind),
-    computeProjectionRevision(withErrorKind),
-  );
-});
-
-test("projection revisionは投影対象fieldだけを含みDLsiteの一時状態では変化しない", () => {
+test("projection revisionはdlsiteのstatusを含まずrjCode/appliedTagsだけで決まる", () => {
   const meta = metaFileSchema.parse({
     formatVersion: 1,
     id: "00000000-0000-4000-8000-000000000010",
@@ -105,23 +68,14 @@ test("projection revisionは投影対象fieldだけを含みDLsiteの一時状�
     dlsite: {
       rjCode: "RJ123456",
       status: "none",
-      lastAttemptAt: null,
-      error: null,
-      errorKind: null,
       appliedTags: [],
     },
   });
-  const transient = {
+  const applied = {
     ...meta,
-    dlsite: {
-      ...meta.dlsite,
-      status: "error" as const,
-      lastAttemptAt: "2026-08-12T00:00:00.000Z",
-      error: "offline",
-      errorKind: "offline" as const,
-    },
+    dlsite: { ...meta.dlsite, status: "applied" as const },
   };
-  assert.equal(computeProjectionRevision(meta), computeProjectionRevision(transient));
+  assert.equal(computeProjectionRevision(meta), computeProjectionRevision(applied));
   assert.notEqual(
     computeProjectionRevision(meta),
     computeProjectionRevision({ ...meta, title: "更新" }),

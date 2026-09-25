@@ -33,6 +33,7 @@ import {
   readMetaSource,
 } from "./meta.ts";
 import { SourceChangedError } from "../../errors.ts";
+import { validateResumeRequest } from "../../core/resumeValidation.ts";
 import { resolveWithin, toPortableRelativePath } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
@@ -333,7 +334,8 @@ export function createWorkMethods(deps: {
     async saveResume(id: string, body: ResumeBody): Promise<boolean> {
       if (!catalog.workExists(id)) return false;
       const track = catalog.resolveResumeTrackDuration(id, body.playlistId, body.trackId);
-      return user.saveResume(id, body, track);
+      validateResumeRequest(track, body.offsetSec);
+      return user.saveResume(id, body);
     },
 
     async touchLastPlayed(id: string): Promise<boolean> {

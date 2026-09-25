@@ -6,7 +6,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Work, WorkEditSnapshot } from "@mimimilli/shared";
-import { emptyDlsiteState } from "@mimimilli/shared";
+import { emptyDlsiteState, toDlsiteLinkageStatus } from "@mimimilli/shared";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { WorkEditDialog } from "../../src/features/library/ui/preview/WorkEditDialog";
 
@@ -60,7 +60,11 @@ function makeSnapshot(work: Work): WorkEditSnapshot {
     tags: work.tags,
     urls: work.urls,
     coverImage: work.coverImage,
-    dlsite: work.dlsite,
+    dlsite: {
+      rjCode: work.dlsite.rjCode,
+      status: toDlsiteLinkageStatus(work.dlsite.status),
+      appliedTags: work.dlsite.appliedTags,
+    },
   };
 }
 

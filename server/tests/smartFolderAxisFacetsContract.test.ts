@@ -5,14 +5,9 @@
 // 3) fixture と real が同値であることを縛る。
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  emptyDlsiteState,
-  type SmartFolder,
-  type SmartFolderRule,
-  type Work,
-  type WorkSummary,
-} from "@mimimilli/shared";
+import type { SmartFolder, SmartFolderRule, Work } from "@mimimilli/shared";
 import { createClassificationMethods as createFixtureClassificationMethods } from "../src/adapters/fixture/classification.ts";
+import type { FixtureWorkRecord } from "../src/adapters/fixture/data.ts";
 import type { FixtureState } from "../src/adapters/fixture/state.ts";
 import { createClassificationMethods as createRealClassificationMethods } from "../src/adapters/real/classificationMethods.ts";
 import { openDb } from "../src/adapters/real/db.ts";
@@ -38,7 +33,7 @@ const worksSpec: Array<{ id: string; tags: string[]; totalDurationSec: number }>
 ];
 
 function buildFixtureAdapter() {
-  const works: WorkSummary[] = worksSpec.map((spec) => ({
+  const works: FixtureWorkRecord[] = worksSpec.map((spec) => ({
     id: spec.id,
     title: `作品 ${spec.id}`,
     cover: null,
@@ -52,7 +47,6 @@ function buildFixtureAdapter() {
     trackCount: 1,
     bookmarked: false,
     lastPlayedAt: null,
-    dlsite: emptyDlsiteState(),
   }));
   const smartFolder: SmartFolder = {
     id: "sf-1",
@@ -63,6 +57,8 @@ function buildFixtureAdapter() {
   };
   const state = {
     works,
+    dlsiteLinkages: new Map(),
+    dlsiteFetchFailures: new Map(),
     tagPrefixes: [],
     smartFolders: [smartFolder],
     nextSmartFolderId: 2,

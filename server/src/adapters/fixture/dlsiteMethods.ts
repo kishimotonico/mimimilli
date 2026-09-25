@@ -1,21 +1,20 @@
 import {
   applyDlsiteStatePatch,
+  buildDlsiteApplyPatch,
+  buildDlsiteMissingApplyPatch,
   computeMissingDiff,
   hasRjCode,
-  mergeAppliedDlsiteTags,
 } from "@mimimilli/shared";
 import type {
   DlsiteApplyMissingPreviewItem,
   DlsiteBulkResult,
   DlsiteFetchResult,
-  DlsiteState,
   DlsiteStateUpdateBody,
   WorkSourceMutationResult,
-  WorkSummary,
 } from "@mimimilli/shared";
 import type { DlsiteAdapter } from "../../adapter/dlsite.ts";
 import { fixtureCoverFromColumns, type FixtureCoverColumns } from "./data.ts";
-import type { FixtureState } from "./state.ts";
+import { composeWork, dlsiteLinkageOf, setDlsiteLinkage, type FixtureState } from "./state.ts";
 import { fixtureSourceMutation, requireFixtureRevision } from "./works.ts";
 
 /** このRJコードを持つ作品は dlsiteFetchByCode が常に取得失敗を返す（real/fixture契約テスト用） */
@@ -50,10 +49,11 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       const work = state.works.find((candidate) => candidate.id === workId);
       if (!work)
         return { ok: false, kind: "not_found", message: `作品が見つかりません: ${workId}` };
-      if (!hasRjCode(work.dlsite)) {
+      const linkage = dlsiteLinkageOf(state, workId);
+      if (!hasRjCode(linkage)) {
         return { ok: false, kind: "not_found", message: "RJコードが検出されていません" };
       }
-      return dlsiteFetchByCode(work.dlsite.rjCode);
+      return dlsiteFetchByCode(linkage.rjCode);
     },
 
     dlsiteFetchByCode,
@@ -65,24 +65,29 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       let skipped = 0;
       let failed = 0;
       for (const work of candidates) {
-        if (!hasRjCode(work.dlsite) || work.dlsite.status === "skipped") {
+        const linkage = dlsiteLinkageOf(state, work.id);
+        if (!hasRjCode(linkage) || linkage.status === "skipped") {
           skipped += 1;
           continue;
         }
-        const fetched = await dlsiteFetchByCode(work.dlsite.rjCode);
+        const fetched = await dlsiteFetchByCode(linkage.rjCode);
         if (!fetched.ok) {
           failed += 1;
           continue;
         }
-        const { newTags, applyCover, applyUrl } = computeMissingDiff(work, fetched.info);
-        if (newTags.length === 0 && !applyCover && !applyUrl) {
+        const diff = computeMissingDiff(work, fetched.info);
+        const patch = buildDlsiteMissingApplyPatch(
+          { tags: work.tags, urls: work.urls, dlsite: linkage },
+          fetched.info,
+          diff,
+        );
+        if (!patch) {
           skipped += 1;
           continue;
         }
-        work.tags = mergeAppliedDlsiteTags(work.tags, newTags);
-        if (applyUrl) {
-          work.urls = [...work.urls, { label: "DLsite", url: fetched.info.url }];
-        }
+        if (patch.tags !== undefined) work.tags = patch.tags;
+        if (patch.urls !== undefined) work.urls = patch.urls;
+        setDlsiteLinkage(state, work.id, patch.dlsite);
         applied += 1;
       }
       return { applied, pending, skipped, failed };
@@ -92,8 +97,9 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       const candidates = state.works.filter((work) => !workIds || workIds.includes(work.id));
       const items: DlsiteApplyMissingPreviewItem[] = [];
       for (const work of candidates) {
-        if (!hasRjCode(work.dlsite) || work.dlsite.status === "skipped") continue;
-        const fetched = await dlsiteFetchByCode(work.dlsite.rjCode);
+        const linkage = dlsiteLinkageOf(state, work.id);
+        if (!hasRjCode(linkage) || linkage.status === "skipped") continue;
+        const fetched = await dlsiteFetchByCode(linkage.rjCode);
         if (!fetched.ok) continue;
         const { newTags, applyCover, applyUrl } = computeMissingDiff(work, fetched.info);
         if (newTags.length === 0 && !applyCover && !applyUrl) continue;
@@ -110,15 +116,18 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       const work = state.works.find((w) => w.id === workId);
       if (!work) return null;
       requireFixtureRevision(state, workId, body.sourceRevision);
-      if (body.applyTitle) work.title = body.info.title;
-      const { applyTags } = body;
-      work.tags = mergeAppliedDlsiteTags(work.tags, applyTags);
-      if (body.applyUrl && body.info.url) {
-        work.urls = [
-          ...work.urls.filter((entry) => !entry.url.includes("dlsite.com")),
-          { label: "DLsite", url: body.info.url },
-        ];
-      }
+      const patch = buildDlsiteApplyPatch(
+        {
+          title: work.title,
+          tags: work.tags,
+          urls: work.urls,
+          dlsite: dlsiteLinkageOf(state, workId),
+        },
+        body,
+      );
+      if (patch.title !== undefined) work.title = patch.title;
+      if (patch.tags !== undefined) work.tags = patch.tags;
+      if (patch.urls !== undefined) work.urls = patch.urls;
       if (body.applyCover && body.info.coverUrl) {
         const dimensions = work.cover?.dimensions ?? { width: 900, height: 900 };
         const columns: FixtureCoverColumns = {
@@ -128,6 +137,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
         state.coverColumns.set(workId, columns);
         work.cover = fixtureCoverFromColumns(work, columns);
       }
+      setDlsiteLinkage(state, workId, patch.dlsite);
       return fixtureSourceMutation(state, work);
     },
 
@@ -139,7 +149,8 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       if (!work) return null;
       requireFixtureRevision(state, workId, body.sourceRevision);
       const { sourceRevision: _sourceRevision, ...patch } = body;
-      work.dlsite = applyDlsiteStatePatch(work.dlsite, patch);
+      const nextLinkage = applyDlsiteStatePatch(dlsiteLinkageOf(state, workId), patch);
+      setDlsiteLinkage(state, workId, nextLinkage);
       return fixtureSourceMutation(state, work);
     },
 
@@ -147,11 +158,12 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       const requested = workIds
         ? state.works.filter((work) => workIds.includes(work.id))
         : state.works;
-      const targets = requested.filter(
-        (work): work is WorkSummary & { dlsite: DlsiteState & { rjCode: string } } =>
-          hasRjCode(work.dlsite) &&
-          (work.dlsite.status === "none" || work.dlsite.status === "error"),
-      );
+      const targets = requested.flatMap((work) => {
+        const composed = composeWork(state, work);
+        if (!hasRjCode(composed.dlsite)) return [];
+        if (composed.dlsite.status !== "none" && composed.dlsite.status !== "error") return [];
+        return [{ id: work.id, title: work.title, rjCode: composed.dlsite.rjCode }];
+      });
       const result: DlsiteBulkResult = {
         fetched: 0,
         failed: 0,
@@ -166,7 +178,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
           type: "progress",
           processed: index,
           total: targets.length,
-          work: { id: work.id, rjCode: work.dlsite.rjCode, title: work.title },
+          work: { id: work.id, rjCode: work.rjCode, title: work.title },
         });
         if (options?.signal?.aborted) return result;
         result.fetched += 1;

@@ -68,8 +68,6 @@ test("formatVersionのない既存mimimilli.jsonは自動互換せず拒否す�
     dlsite: {
       rjCode: "RJ123456",
       status: "none" as const,
-      lastAttemptAt: null,
-      error: null,
       appliedTags: [],
     },
   };
@@ -79,7 +77,21 @@ test("formatVersionのない既存mimimilli.jsonは自動互換せず拒否す�
 
 test("formatVersion 1はdlsiteキーを省略できる", () => {
   const parsed = metaFileSchema.parse(validMeta());
-  assert.equal(parsed.dlsite.errorKind, null);
+  assert.equal(parsed.dlsite.status, "none");
+  assert.equal(parsed.dlsite.rjCode, null);
+});
+
+test("mimimilli.jsonのdlsite.statusに取得失敗の一時値（not_found/error）は丸めず拒否する", () => {
+  const withNotFound = {
+    ...validMeta(),
+    dlsite: { rjCode: "RJ123456", status: "not_found", appliedTags: [] },
+  };
+  const withError = {
+    ...validMeta(),
+    dlsite: { rjCode: "RJ123456", status: "error", appliedTags: [] },
+  };
+  assert.equal(metaFileSchema.safeParse(withNotFound).success, false);
+  assert.equal(metaFileSchema.safeParse(withError).success, false);
 });
 
 test("タグは予約文字@始まりを拒否する", () => {
@@ -121,9 +133,6 @@ test("metaFileSchema.dlsite.appliedTags は正規化されていないタグを�
     dlsite: {
       rjCode: "RJ123456",
       status: "applied" as const,
-      lastAttemptAt: null,
-      error: null,
-      errorKind: null,
       appliedTags: [" CV/壊れ "],
     },
   };

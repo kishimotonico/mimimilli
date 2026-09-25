@@ -37,6 +37,127 @@ export function emptyDlsiteState(): DlsiteState {
   };
 }
 
+/** mimimilli.json正本が持つ連携分類。取得失敗（not_found/error）は正本の値になり得ない
+ *  （ADR-0017 DLsite `status` の正本と投影）。 */
+export const dlsiteLinkageStatusSchema = z.enum(["none", "applied", "skipped"]);
+export type DlsiteLinkageStatus = z.infer<typeof dlsiteLinkageStatusSchema>;
+
+/** mimimilli.json正本の `dlsite` フィールド専用の型。cacheと合成したAPI向けの `DlsiteState`
+ *  とは別型にし、取得失敗・試行時刻などの一時状態を型として持てないようにする。 */
+export const metaDlsiteStateSchema = z.object({
+  rjCode: z.string().nullable(),
+  status: dlsiteLinkageStatusSchema,
+  appliedTags: normalizedTagArraySchema.default([]),
+});
+export type MetaDlsiteState = z.infer<typeof metaDlsiteStateSchema>;
+
+export function emptyMetaDlsiteState(): MetaDlsiteState {
+  return { rjCode: null, status: "none", appliedTags: [] };
+}
+
+/** 合成済みAPI状態から、正本が持てる連携分類だけを取り出す。取得失敗（not_found/error）は
+ *  連携未確定として none に丸める。 */
+export function toDlsiteLinkageStatus(status: DlsiteStatus): DlsiteLinkageStatus {
+  return status === "applied" || status === "skipped" ? status : "none";
+}
+
+export type DlsiteHtmlOutcome = "ok" | "parse_error";
+export type DlsiteFailureOutcome = "not_found" | "error";
+export type DlsiteCacheMissReason = "not_cached" | "ttl_expired" | "snapshot_body_missing";
+
+/** DLsite取得キャッシュの既定TTL。real（DlsiteCache）・fixture（seedのキャッシュ相当）で共有する。 */
+export const DEFAULT_DLSITE_CACHE_TTLS_MS = {
+  ok: 30 * 24 * 60 * 60 * 1000,
+  parse_error: 60 * 60 * 1000,
+  not_found: 3 * 24 * 60 * 60 * 1000,
+  error: 60 * 60 * 1000,
+} as const;
+export type DlsiteCacheOutcome = keyof typeof DEFAULT_DLSITE_CACHE_TTLS_MS;
+
+/** DLsite取得キャッシュの通常取得判断結果。fresh HTML / 有効な失敗記録 / miss のいずれか。
+ *  real adapterのDlsiteCache（SQLite実装）とfixture adapterの両方が、この型を通じて
+ *  projectDlsiteStateと合成する（real/fixtureで合成ロジックを重複実装しない）。 */
+export type DlsiteCacheResolution =
+  | {
+      kind: "html";
+      outcome: DlsiteHtmlOutcome;
+      fetchedAt: number;
+      expiresAt: number;
+      html: string;
+    }
+  | { kind: "failure"; outcome: DlsiteFailureOutcome; attemptedAt: number; expiresAt: number }
+  | { kind: "miss"; reason: DlsiteCacheMissReason };
+
+function isoFromEpochMs(epochMs: number): string {
+  return new Date(epochMs).toISOString();
+}
+
+function dlsiteFailureMessage(rjCode: string, outcome: DlsiteFailureOutcome): string {
+  return outcome === "not_found"
+    ? `DLsite作品が見つかりません（${rjCode}）`
+    : `DLsite取得に失敗しました（${rjCode}）`;
+}
+
+function dlsiteParseErrorMessage(rjCode: string): string {
+  return `DLsiteのHTMLを解析できませんでした（${rjCode}）`;
+}
+
+function projectedDlsiteFetchFailure(
+  base: Pick<DlsiteState, "rjCode" | "appliedTags">,
+  status: "not_found" | "error",
+  errorKind: DlsiteFetchErrorKind,
+  message: string,
+  lastAttemptAt: string,
+): DlsiteState {
+  return { ...base, status, lastAttemptAt, error: message, errorKind };
+}
+
+/**
+ * mimimilli.json正本とDLsite取得キャッシュを合成し、catalog・APIが読む DlsiteState を組み立てる。
+ * applied/skipped はmimimilli.jsonの連携分類が優先し、none のときだけキャッシュの取得結果を反映する。
+ * real（DlsiteCacheの解決結果）・fixture（seedのキャッシュ相当）が共通で使う。
+ */
+export function projectDlsiteState(
+  metaDlsite: MetaDlsiteState,
+  cacheResolution: DlsiteCacheResolution | null,
+): DlsiteState {
+  const base = { rjCode: metaDlsite.rjCode, appliedTags: metaDlsite.appliedTags };
+  if (metaDlsite.status === "applied" || metaDlsite.status === "skipped") {
+    return {
+      ...base,
+      status: metaDlsite.status,
+      lastAttemptAt: null,
+      error: null,
+      errorKind: null,
+    };
+  }
+  if (!hasRjCode(metaDlsite) || !cacheResolution) {
+    return { ...base, status: "none", lastAttemptAt: null, error: null, errorKind: null };
+  }
+  const rjCode = metaDlsite.rjCode;
+  if (cacheResolution.kind === "failure") {
+    const status = cacheResolution.outcome === "not_found" ? "not_found" : "error";
+    const errorKind = cacheResolution.outcome === "not_found" ? "not_found" : "error";
+    return projectedDlsiteFetchFailure(
+      base,
+      status,
+      errorKind,
+      dlsiteFailureMessage(rjCode, cacheResolution.outcome),
+      isoFromEpochMs(cacheResolution.attemptedAt),
+    );
+  }
+  if (cacheResolution.kind === "html" && cacheResolution.outcome === "parse_error") {
+    return projectedDlsiteFetchFailure(
+      base,
+      "error",
+      "parse_error",
+      dlsiteParseErrorMessage(rjCode),
+      isoFromEpochMs(cacheResolution.fetchedAt),
+    );
+  }
+  return { ...base, status: "none", lastAttemptAt: null, error: null, errorKind: null };
+}
+
 /** RJコードが非空文字列として設定されているか。`null` と明示的な `""` は含まない。 */
 export function hasRjCode<T extends Pick<DlsiteState, "rjCode">>(
   state: T,
@@ -47,7 +168,7 @@ export function hasRjCode<T extends Pick<DlsiteState, "rjCode">>(
 /** RJコードが未検出のまま放置されている作品か（ユーザーが明示的にスキップした作品は除く）。
  *  `rjCode === ""` はユーザーが明示的にRJコードなしとした状態であり、未検出には含めない。
  *  スキャン完了通知・一覧の両方で判定基準を一致させるための正典 */
-export function isRjCodeMissing(state: DlsiteState): boolean {
+export function isRjCodeMissing(state: Pick<DlsiteState, "rjCode" | "status">): boolean {
   return state.rjCode === null && state.status !== "skipped";
 }
 
@@ -212,6 +333,74 @@ export function computeMissingDiff(
   return { newTags, applyCover, applyUrl };
 }
 
+/** dlsiteApplyMissing（未設定項目まとめ適用）のtags/urls/linkageパッチを組み立てる。
+ *  real/fixture 両adapterが共有する。差分が無ければnull（何も書かない）。
+ *  linkageは単体適用と同じ規則で status: "applied" にする（title/coverはこの関数の対象外）。 */
+export function buildDlsiteMissingApplyPatch(
+  current: {
+    tags: readonly NormalizedTag[];
+    urls: readonly { label: string; url: string }[];
+    dlsite: MetaDlsiteState;
+  },
+  info: DlsiteWorkInfo,
+  diff: { newTags: readonly NormalizedTag[]; applyCover: boolean; applyUrl: boolean },
+): Omit<DlsiteApplyPatch, "title"> | null {
+  if (diff.newTags.length === 0 && !diff.applyCover && !diff.applyUrl) return null;
+  return {
+    tags: diff.newTags.length > 0 ? mergeAppliedDlsiteTags(current.tags, diff.newTags) : undefined,
+    urls:
+      diff.applyUrl && info.url
+        ? [
+            ...current.urls.filter((entry) => !entry.url.includes("dlsite.com")),
+            { label: "DLsite", url: info.url },
+          ]
+        : undefined,
+    dlsite: {
+      rjCode: info.rjCode,
+      status: "applied",
+      appliedTags: dedupeTags([...current.dlsite.appliedTags, ...diff.newTags]),
+    },
+  };
+}
+
+/** dlsiteApply（単体適用）のパッチ。cover は非同期I/Oを伴うため呼び出し側が別途解決し、
+ *  {@link buildDlsiteApplyPatch} には含めない。title/tags/urls は未変更なら undefined。 */
+export interface DlsiteApplyPatch {
+  title?: string;
+  tags?: NormalizedTag[];
+  urls?: { label: string; url: string }[];
+  dlsite: MetaDlsiteState;
+}
+
+/** dlsiteApply（単体適用）のtitle/tags/urlsパッチを組み立てる。real/fixture 両adapterが共有する。 */
+export function buildDlsiteApplyPatch(
+  current: {
+    title: string;
+    tags: readonly NormalizedTag[];
+    urls: readonly { label: string; url: string }[];
+    dlsite: MetaDlsiteState;
+  },
+  body: DlsiteApplyBody,
+): DlsiteApplyPatch {
+  const { applyTags } = body;
+  return {
+    title: body.applyTitle && body.info.title ? body.info.title : undefined,
+    tags: applyTags.length > 0 ? mergeAppliedDlsiteTags(current.tags, applyTags) : undefined,
+    urls:
+      body.applyUrl && body.info.url
+        ? [
+            ...current.urls.filter((entry) => !entry.url.includes("dlsite.com")),
+            { label: "DLsite", url: body.info.url },
+          ]
+        : undefined,
+    dlsite: {
+      rjCode: body.info.rjCode,
+      status: "applied",
+      appliedTags: dedupeTags([...current.dlsite.appliedTags, ...applyTags]),
+    },
+  };
+}
+
 /** 単体適用（replace）: ユーザーが明示的に選んだタグ（applyTags）を既存タグへ反映する。
  *  単一値prefixは既存の同prefixタグを置き換え、2値共存を作らない。複数値prefixは加算する。
  *  既存タグと同じ値を選び直しただけの行は元の並び順のまま残す（不要な並べ替えをしない） */
@@ -325,33 +514,24 @@ export const dlsiteStateUpdateBodySchema = z
   .refine((patch) => patch.rjCode !== undefined || patch.skipped !== undefined);
 export type DlsiteStateUpdateBody = z.infer<typeof dlsiteStateUpdateBodySchema>;
 
-/** updateDlsiteState の状態遷移（real/fixture 共通）。
- *  RJコードが変わったときだけ旧コード由来の取得結果を捨てて未取得に戻す。
- *  skipped 指定時は従来どおり status/error/errorKind を上書きする（rjCode 変更より後に適用）。 */
-export function applyDlsiteStatePatch(current: DlsiteState, patch: DlsiteStatePatch): DlsiteState {
-  let next: DlsiteState = { ...current };
+/** updateDlsiteState の状態遷移（real/fixture 共通）。正本の連携分類（rjCode/status/
+ *  appliedTags）だけを対象にする。RJコードが変わったときだけ旧コード由来の適用済みタグを捨てて
+ *  未取得に戻す。skipped 指定時は従来どおり status を上書きする（rjCode 変更より後に適用）。 */
+export function applyDlsiteStatePatch(
+  current: MetaDlsiteState,
+  patch: DlsiteStatePatch,
+): MetaDlsiteState {
+  let next: MetaDlsiteState = { ...current };
 
   if (patch.rjCode !== undefined) {
     next.rjCode = patch.rjCode;
     if (patch.rjCode !== current.rjCode) {
-      next = {
-        ...next,
-        status: "none",
-        lastAttemptAt: null,
-        error: null,
-        errorKind: null,
-        appliedTags: [],
-      };
+      next = { ...next, status: "none", appliedTags: [] };
     }
   }
 
   if (patch.skipped !== undefined) {
-    next = {
-      ...next,
-      status: patch.skipped ? "skipped" : "none",
-      error: null,
-      errorKind: null,
-    };
+    next = { ...next, status: patch.skipped ? "skipped" : "none" };
   }
 
   return next;

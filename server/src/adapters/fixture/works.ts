@@ -1,6 +1,5 @@
 import { posix } from "node:path";
 import {
-  emptyDlsiteState,
   isAudioWorkPath,
   isDlsiteFetchFailed,
   isDlsiteParseFailed,
@@ -15,6 +14,7 @@ import type {
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
   IdentityConflictReassignBody,
+  MetaDlsiteState,
   Work,
   WorkBookmarkPatch,
   WorkBookmarkResult,
@@ -26,22 +26,28 @@ import type {
   WorkspacePath,
   WorksPage,
   WorksQuery,
-  WorkSummary,
 } from "@mimimilli/shared";
-import {
-  descendantsRegisteredError,
-  InvalidResumeError,
-  SourceChangedError,
-  WorkRegisterError,
-} from "../../errors.ts";
+import { SourceChangedError } from "../../errors.ts";
 import type { WorkAdapter } from "../../adapter/work.ts";
 import { summarizeDlsiteNotifications } from "../../core/dlsiteNotifications.ts";
 import { compareJapaneseSortKeys, compareUtf8Bytes } from "../../core/japaneseSortKey.ts";
+import { validateResumeRequest } from "../../core/resumeValidation.ts";
+import { assertRegistrationAllowed } from "../../core/workRegistrationGuard.ts";
 import { applyWorksQuery, toWorksPage } from "../../core/worksQuery.ts";
 import { isPathWithin } from "../../lib/path.ts";
 import { buildFullWorkFromState } from "./playback.ts";
 import { normalizeFsPath } from "./fsResolve.ts";
-import { type FixtureState, coverColumnsOf } from "./state.ts";
+import {
+  composeWork,
+  composeWorks,
+  coverColumnsOf,
+  dlsiteLinkageOf,
+  reassignWorkId,
+  removeWorks,
+  setDlsiteLinkage,
+  type FixtureState,
+} from "./state.ts";
+import type { FixtureWorkRecord } from "./data.ts";
 
 export function fixtureRevisionOf(state: FixtureState, workId: string): string {
   return state.sourceRevisions.get(workId) ?? "fixture";
@@ -62,7 +68,10 @@ export function requireFixtureRevision(
   if (fixtureRevisionOf(state, workId) !== expected) throw new SourceChangedError();
 }
 
-export function fixtureEditSnapshot(state: FixtureState, work: WorkSummary): WorkEditSnapshot {
+export function fixtureEditSnapshot(
+  state: FixtureState,
+  work: FixtureWorkRecord,
+): WorkEditSnapshot {
   return {
     sourceRevision: fixtureRevisionOf(state, work.id),
     id: work.id,
@@ -71,13 +80,13 @@ export function fixtureEditSnapshot(state: FixtureState, work: WorkSummary): Wor
     tags: work.tags,
     urls: work.urls,
     coverImage: coverColumnsOf(state, work.id).image,
-    dlsite: work.dlsite,
+    dlsite: dlsiteLinkageOf(state, work.id),
   };
 }
 
 export function fixtureSourceMutation(
   state: FixtureState,
-  work: WorkSummary,
+  work: FixtureWorkRecord,
 ): WorkSourceMutationResult {
   bumpFixtureRevision(state, work.id);
   return { snapshot: fixtureEditSnapshot(state, work), projection: { status: "published" } };
@@ -115,7 +124,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
   return {
     async queryWorks(params: WorksQuery): Promise<WorksPage> {
       const page = toWorksPage(
-        applyWorksQuery(state.works, params),
+        applyWorksQuery(composeWorks(state), params),
         state.rootFolder ?? "/library",
       );
       return state.dataIntegrityWarning
@@ -126,7 +135,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
     getWorkRegisterPreview,
 
     async getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary> {
-      return summarizeDlsiteNotifications(state.works.map((work) => work.dlsite));
+      return summarizeDlsiteNotifications(composeWorks(state).map((work) => work.dlsite));
     },
 
     async queryDlsiteNotifications(
@@ -143,7 +152,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
             return isDlsiteParseFailed;
         }
       })();
-      const matches = state.works
+      const matches = composeWorks(state)
         .filter((work) => predicate(work.dlsite))
         .sort((a, b) => compareJapaneseSortKeys(a.title, b.title) || compareUtf8Bytes(a.id, b.id));
       const start = (query.page - 1) * query.limit;
@@ -160,31 +169,27 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
 
     async getWork(id: string): Promise<Work | null> {
       const work = state.works.find((w) => w.id === id);
-      return work ? buildFullWorkFromState(state, work) : null;
+      return work ? buildFullWorkFromState(state, composeWork(state, work)) : null;
     },
 
     async prepareWorkPlayback(id: string): Promise<Work | null> {
       const work = state.works.find((w) => w.id === id);
-      return work ? buildFullWorkFromState(state, work) : null;
+      return work ? buildFullWorkFromState(state, composeWork(state, work)) : null;
     },
 
     async createWork(body: WorkCreateBody): Promise<WorkSourceMutationResult | null> {
       const preview = await getWorkRegisterPreview(body.path);
       if (!preview) return null;
-      if (preview.alreadyRegistered) {
-        throw new WorkRegisterError(
-          "already_registered",
-          "この場所は既に作品として登録されています",
-        );
-      }
-      if (preview.descendantWorkCount > 0) {
-        throw descendantsRegisteredError(preview.descendantWorkCount);
-      }
       const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
       const workDir = normalizeFsPath(`${rootAbs}/${body.path}`);
+      assertRegistrationAllowed({
+        alreadyRegistered: preview.alreadyRegistered,
+        descendantWorkCount: preview.descendantWorkCount,
+        kind: isAudioWorkPath(workDir) ? "file" : "folder",
+      });
       const now = new Date().toISOString();
       const applyTags = body.dlsite?.applyTags ?? [];
-      const work: WorkSummary = {
+      const work: FixtureWorkRecord = {
         id: crypto.randomUUID(),
         title: body.title,
         cover: null,
@@ -201,21 +206,13 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
         tags: body.tags,
         bookmarked: false,
         lastPlayedAt: null,
-        dlsite: body.dlsite
-          ? {
-              rjCode: body.dlsite.info.rjCode,
-              status: "applied",
-              lastAttemptAt: now,
-              error: null,
-              errorKind: null,
-              appliedTags: applyTags,
-            }
-          : preview.detectedRjCode
-            ? { ...emptyDlsiteState(), rjCode: preview.detectedRjCode }
-            : emptyDlsiteState(),
       };
       state.works.push(work);
       state.sourceRevisions.set(work.id, "fixture");
+      const linkage: MetaDlsiteState = body.dlsite
+        ? { rjCode: body.dlsite.info.rjCode, status: "applied", appliedTags: applyTags }
+        : { rjCode: preview.detectedRjCode, status: "none", appliedTags: [] };
+      setDlsiteLinkage(state, work.id, linkage);
       return { snapshot: fixtureEditSnapshot(state, work), projection: { status: "published" } };
     },
 
@@ -230,9 +227,11 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       const workDir = normalizeFsPath(`${rootAbs}/${_body.path}`);
       const work = state.works.find((candidate) => candidate.physicalPath === workDir);
       if (!work || work.id !== diagnostic.workId) return null;
+      const oldId = work.id;
       work.id = crypto.randomUUID();
       work.bookmarked = false;
       work.lastPlayedAt = null;
+      reassignWorkId(state, oldId, work.id);
       state.resumes.delete(diagnostic.workId);
       state.identityConflicts = state.identityConflicts.flatMap((candidate) => {
         if (candidate.workId !== diagnostic.workId) return [candidate];
@@ -252,9 +251,8 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
     },
 
     async deleteWork(id: string): Promise<boolean> {
-      const index = state.works.findIndex((w) => w.id === id);
-      if (index === -1) return false;
-      state.works.splice(index, 1);
+      if (!state.works.some((w) => w.id === id)) return false;
+      removeWorks(state, new Set([id]));
       return true;
     },
 
@@ -263,9 +261,11 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
     },
 
     async unregisterMissingWorks(): Promise<{ deletedCount: number; failedCount: number }> {
-      const deletedCount = state.works.filter((w) => w.status === "missing").length;
-      state.works = state.works.filter((w) => w.status !== "missing");
-      return { deletedCount, failedCount: 0 };
+      const missingIds = new Set(
+        state.works.filter((w) => w.status === "missing").map((w) => w.id),
+      );
+      removeWorks(state, missingIds);
+      return { deletedCount: missingIds.size, failedCount: 0 };
     },
 
     async getWorkEditSnapshot(id: string): Promise<WorkEditSnapshot | null> {
@@ -320,15 +320,10 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
     async saveResume(id: string, body: import("@mimimilli/shared").ResumeBody): Promise<boolean> {
       const work = state.works.find((w) => w.id === id);
       if (!work) return false;
-      const fullWork = buildFullWorkFromState(state, work);
+      const fullWork = buildFullWorkFromState(state, composeWork(state, work));
       const playlist = fullWork.playlists.find((candidate) => candidate.id === body.playlistId);
       const track = playlist?.tracks.find((candidate) => candidate.id === body.trackId);
-      if (!track) {
-        throw new InvalidResumeError("resumeのPlaylistまたはTrackが作品に属していません");
-      }
-      if (track.durationSec !== null && body.offsetSec > track.durationSec) {
-        throw new InvalidResumeError("resumeのoffsetSecがトラック区間外です");
-      }
+      validateResumeRequest(track ? { durationSec: track.durationSec } : null, body.offsetSec);
       state.resumes.set(id, body);
       return true;
     },
@@ -346,7 +341,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
 
     async exportLibrary(): Promise<{ data: string; dataIntegrityWarning?: DataIntegrityWarning }> {
       return {
-        data: JSON.stringify({ version: 1, works: state.works }, null, 2),
+        data: JSON.stringify({ version: 1, works: composeWorks(state) }, null, 2),
         ...(state.dataIntegrityWarning ? { dataIntegrityWarning: state.dataIntegrityWarning } : {}),
       };
     },

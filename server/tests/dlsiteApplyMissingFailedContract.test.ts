@@ -55,8 +55,12 @@ test("dlsiteApplyMissing: 取得失敗はfailedへ数え、他の作品の適用
 
   const applied = await adapter.getWork("ok-1");
   assert.ok(applied!.tags.length > 0, "取得できた作品は適用が続く");
+  assert.equal(applied!.dlsite.status, "applied", "差分適用でlinkageがappliedになる");
+  assert.equal(applied!.dlsite.rjCode, "RJ000001");
+  assert.deepEqual(applied!.dlsite.appliedTags, applied!.tags);
   const failedWork = await adapter.getWork("fail-1");
   assert.deepEqual(failedWork!.tags, [], "取得に失敗した作品は変更されない");
+  assert.equal(failedWork!.dlsite.status, "none", "取得に失敗した作品のlinkageは変更されない");
 });
 
 test("dlsiteApplyMissing: 取得失敗はfailedへ数え、他の作品の適用は続く（real）", async (t) => {
@@ -118,4 +122,11 @@ test("dlsiteApplyMissing: 取得失敗はfailedへ数え、他の作品の適用
 
   const result = await adapter.dlsiteApplyMissing();
   assert.deepEqual(result, { applied: 1, pending: 0, skipped: 0, failed: 1 });
+
+  const applied = await adapter.getWork(okId);
+  assert.equal(applied!.dlsite.status, "applied", "差分適用でlinkageがappliedになる");
+  assert.equal(applied!.dlsite.rjCode, "RJ900201");
+  assert.deepEqual(applied!.dlsite.appliedTags, applied!.tags);
+  const failedWork = await adapter.getWork(failId);
+  assert.equal(failedWork!.dlsite.status, "not_found", "取得失敗はキャッシュ由来の表示のまま");
 });

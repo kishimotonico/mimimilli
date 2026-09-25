@@ -11,20 +11,16 @@ import type {
 } from "@mimimilli/shared";
 import {
   detectRjCode,
-  emptyDlsiteState,
+  emptyMetaDlsiteState,
   isAudioFileName,
   isAudioWorkPath,
   sidecarMetaFileName,
 } from "@mimimilli/shared";
-import { toMetaDlsiteState } from "./dlsiteProjection.ts";
 import { META_FILE_NAME, MetaParseError, readMetaFile, readMetaFileRaw } from "./meta.ts";
 import { metaStagingPath } from "./metaStaging.ts";
 import { resolveWithin } from "./paths.ts";
-import {
-  descendantsRegisteredError,
-  restoreIdentityConflictError,
-  WorkRegisterError,
-} from "../../errors.ts";
+import { restoreIdentityConflictError, WorkRegisterError } from "../../errors.ts";
+import { assertRegistrationAllowed } from "../../core/workRegistrationGuard.ts";
 import type { Db } from "./db.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
@@ -285,7 +281,7 @@ export function buildFileWorkRegisterPreview(
 interface DlsiteAppliedMeta {
   urls: Work["urls"];
   coverImage?: string | null;
-  dlsite: Work["dlsite"];
+  dlsite: MetaFile["dlsite"];
 }
 
 export async function createWorkFromFolder(
@@ -311,15 +307,12 @@ export async function createWorkFromFolder(
 
   const metaPath = `${workDir}/${META_FILE_NAME}`;
   const dbWork = query.getWorkByPhysicalPathSync(workDir);
-  if (dbWork !== null) {
-    throw new WorkRegisterError(
-      "already_registered",
-      "このフォルダーは既に作品として登録されています",
-    );
-  }
-
   const descendants = query.listDescendantWorkRefs(workDir);
-  if (descendants.length > 0) throw descendantsRegisteredError(descendants.length);
+  assertRegistrationAllowed({
+    alreadyRegistered: dbWork !== null,
+    descendantWorkCount: descendants.length,
+    kind: "folder",
+  });
 
   const orphanedMeta = existsSync(metaPath);
   if (orphanedMeta) {
@@ -343,7 +336,7 @@ export async function createWorkFromFolder(
       tags?: string[];
       urls?: Work["urls"];
       coverImage?: string | null;
-      dlsite?: Work["dlsite"];
+      dlsite?: MetaFile["dlsite"];
     } = {};
 
     if (body.title !== meta.title) metaPatch.title = body.title;
@@ -373,7 +366,7 @@ export async function createWorkFromFolder(
   const tags = body.tags;
   let urls: Work["urls"] = [];
   let coverImage: string | null | undefined;
-  let dlsite = emptyDlsiteState();
+  let dlsite = emptyMetaDlsiteState();
 
   if (body.dlsite) {
     const applied = await buildMetaFromDlsiteApply(body.dlsite, workDir, applyDlsiteCover);
@@ -382,7 +375,7 @@ export async function createWorkFromFolder(
     dlsite = applied.dlsite;
   } else {
     const detectedRjCode = detectRjCode([basename(workDir), title]);
-    if (detectedRjCode) dlsite = { ...emptyDlsiteState(), rjCode: detectedRjCode };
+    if (detectedRjCode) dlsite = { ...emptyMetaDlsiteState(), rjCode: detectedRjCode };
   }
 
   return mutationResultFromProjectOutcome(
@@ -443,12 +436,11 @@ async function createWorkFromAudioFile(
 ): Promise<WorkSourceMutationResult> {
   const { query } = repos;
   const dbWork = query.getWorkByPhysicalPathSync(audioPath);
-  if (dbWork !== null || ancestorFolderIsRegistered(query, audioPath, root)) {
-    throw new WorkRegisterError(
-      "already_registered",
-      "このファイルは既に作品として登録されています",
-    );
-  }
+  assertRegistrationAllowed({
+    alreadyRegistered: dbWork !== null || ancestorFolderIsRegistered(query, audioPath, root),
+    descendantWorkCount: 0,
+    kind: "file",
+  });
 
   const metaPath = sidecarPathForAudio(audioPath);
   const parentDir = dirname(audioPath);
@@ -474,7 +466,7 @@ async function createWorkFromAudioFile(
       tags?: string[];
       urls?: Work["urls"];
       coverImage?: string | null;
-      dlsite?: Work["dlsite"];
+      dlsite?: MetaFile["dlsite"];
     } = {};
 
     if (body.title !== meta.title) metaPatch.title = body.title;
@@ -502,7 +494,7 @@ async function createWorkFromAudioFile(
   const tags = body.tags;
   let urls: Work["urls"] = [];
   let coverImage: string | null | undefined;
-  let dlsite = emptyDlsiteState();
+  let dlsite = emptyMetaDlsiteState();
 
   if (body.dlsite) {
     const applied = await buildMetaFromDlsiteApply(body.dlsite, parentDir, applyDlsiteCover);
@@ -511,7 +503,7 @@ async function createWorkFromAudioFile(
     dlsite = applied.dlsite;
   } else {
     const detectedRjCode = detectRjCode([basename(audioPath), title]);
-    if (detectedRjCode) dlsite = { ...emptyDlsiteState(), rjCode: detectedRjCode };
+    if (detectedRjCode) dlsite = { ...emptyMetaDlsiteState(), rjCode: detectedRjCode };
   }
 
   return mutationResultFromProjectOutcome(
@@ -545,13 +537,10 @@ async function buildMetaFromDlsiteApply(
   return {
     urls: body.applyUrl && body.info.url ? [{ label: "DLsite", url: body.info.url }] : [],
     coverImage,
-    dlsite: toMetaDlsiteState({
+    dlsite: {
       rjCode: body.info.rjCode,
       status: "applied",
-      lastAttemptAt: null,
-      error: null,
-      errorKind: null,
       appliedTags: body.applyTags,
-    }),
+    },
   };
 }

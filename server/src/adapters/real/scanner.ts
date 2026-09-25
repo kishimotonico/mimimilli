@@ -11,7 +11,7 @@ import type {
 } from "@mimimilli/shared";
 import {
   detectRjCode,
-  emptyDlsiteState,
+  emptyMetaDlsiteState,
   isRjCodeMissing,
   sidecarMetaFileName,
   workspacePath,
@@ -565,11 +565,13 @@ export class Scanner {
     if (dlsite === undefined) {
       if (options.rjCode === undefined) {
         const detected = detectRjCode([basename(workDir), options.title]);
-        dlsite = detected ? { ...emptyDlsiteState(), rjCode: detected } : emptyDlsiteState();
+        dlsite = detected
+          ? { ...emptyMetaDlsiteState(), rjCode: detected }
+          : emptyMetaDlsiteState();
       } else if (options.rjCode === "") {
-        dlsite = { ...emptyDlsiteState(), rjCode: "" };
+        dlsite = { ...emptyMetaDlsiteState(), rjCode: "" };
       } else {
-        dlsite = { ...emptyDlsiteState(), rjCode: options.rjCode };
+        dlsite = { ...emptyMetaDlsiteState(), rjCode: options.rjCode };
       }
     }
 
@@ -630,7 +632,7 @@ export class Scanner {
       options.dlsite ??
       (() => {
         const detected = detectRjCode([audioName, options.title]);
-        return detected ? { ...emptyDlsiteState(), rjCode: detected } : emptyDlsiteState();
+        return detected ? { ...emptyMetaDlsiteState(), rjCode: detected } : emptyMetaDlsiteState();
       })();
 
     const meta = createDraftMetaFile(dirname(audioPath), {

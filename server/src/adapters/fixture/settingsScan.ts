@@ -1,16 +1,16 @@
-import { emptyDlsiteState, isRjCodeMissing, workspacePath } from "@mimimilli/shared";
+import { isRjCodeMissing, workspacePath } from "@mimimilli/shared";
 import type {
   ScanCandidate,
   ScanCandidatesRegisterResponse,
   ScanResult,
   Settings,
   SettingsUpdate,
-  WorkSummary,
 } from "@mimimilli/shared";
 import type { ScanOptions } from "../../adapter/index.ts";
 import type { SettingsAdapter } from "../../adapter/settings.ts";
+import type { FixtureWorkRecord } from "./data.ts";
 import { normalizeFsPath } from "./fsResolve.ts";
-import type { FixtureState } from "./state.ts";
+import { dlsiteLinkageOf, setDlsiteLinkage, type FixtureState } from "./state.ts";
 
 const FIXTURE_SCAN_STEP_MS = 20;
 
@@ -82,7 +82,8 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
         updatedWorkIds: state.scanUpdatedWorkIds,
         errors: state.works.filter((w) => w.status === "error").length,
         missing: state.works.filter((w) => w.status === "missing").length,
-        rjCodeMissingCount: state.works.filter((w) => isRjCodeMissing(w.dlsite)).length,
+        rjCodeMissingCount: state.works.filter((w) => isRjCodeMissing(dlsiteLinkageOf(state, w.id)))
+          .length,
         skipped: 0,
         coverErrors: 0,
         unreadablePaths: [],
@@ -113,7 +114,7 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
         const candidate = candidatesByPath.get(item.path);
         if (!candidate) return [];
         const rjCode = resolveRegisteredRjCode(candidate.rjCode, item.rjCode);
-        const work: WorkSummary = {
+        const work: FixtureWorkRecord = {
           id: crypto.randomUUID(),
           title: candidate.inferredTitle,
           cover: null,
@@ -127,9 +128,9 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
           tags: [],
           bookmarked: false,
           lastPlayedAt: null,
-          dlsite: rjCode !== null ? { ...emptyDlsiteState(), rjCode } : emptyDlsiteState(),
         };
         state.works.push(work);
+        setDlsiteLinkage(state, work.id, { rjCode, status: "none", appliedTags: [] });
         return [{ path: candidate.path, workId: work.id }];
       });
       const failures = items.flatMap((item) =>
