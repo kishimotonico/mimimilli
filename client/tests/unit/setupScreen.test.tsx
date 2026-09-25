@@ -89,12 +89,14 @@ describe("SetupScreen 経路", () => {
     expect(screen.getByRole("button", { name: /スキャン開始/ })).toBeInTheDocument();
   });
 
-  it("パス送信で setRootFolder とスキャン開始を呼ぶ", async () => {
-    const setRootFolder = vi.spyOn(settingsApi, "setRootFolder").mockResolvedValue({
-      rootFolder: "/audio/library",
-      lastScanTime: null,
-      lastScanRootFolder: null,
-    });
+  it("パス送信で startRootReconfiguration とスキャン開始を呼ぶ", async () => {
+    const startRootReconfiguration = vi
+      .spyOn(settingsApi, "startRootReconfiguration")
+      .mockResolvedValue({
+        status: "running",
+        rootFolder: "/audio/library",
+        progress: null,
+      });
     const startScan = vi.spyOn(scanApi, "startScan").mockResolvedValue(runningJob);
 
     renderSetupApp();
@@ -106,12 +108,14 @@ describe("SetupScreen 経路", () => {
       fireEvent.click(screen.getByRole("button", { name: /スキャン開始/ }));
     });
 
-    await waitFor(() => expect(setRootFolder).toHaveBeenCalledWith("/audio/library"));
+    await waitFor(() => expect(startRootReconfiguration).toHaveBeenCalledWith("/audio/library"));
     expect(startScan).toHaveBeenCalledTimes(1);
   });
 
   it("送信が失敗したらエラーを表示する", async () => {
-    vi.spyOn(settingsApi, "setRootFolder").mockRejectedValue(new Error("保存に失敗しました"));
+    vi.spyOn(settingsApi, "startRootReconfiguration").mockRejectedValue(
+      new Error("保存に失敗しました"),
+    );
 
     renderSetupApp();
     await waitFor(() => expect(screen.getByText("ようこそ")).toBeInTheDocument());
@@ -127,7 +131,7 @@ describe("SetupScreen 経路", () => {
   });
 
   it("ルートフォルダー検証エラー（InvalidRootFolderError由来のApiRequestError）はサーバーの文言をそのまま表示する", async () => {
-    vi.spyOn(settingsApi, "setRootFolder").mockRejectedValue(
+    vi.spyOn(settingsApi, "startRootReconfiguration").mockRejectedValue(
       new ApiRequestError(
         400,
         "invalid_request",
@@ -154,10 +158,10 @@ describe("SetupScreen 経路", () => {
   });
 
   it("スキャン開始に失敗したら SetupScreen に留まり rootFolder を確定しない", async () => {
-    vi.spyOn(settingsApi, "setRootFolder").mockResolvedValue({
+    vi.spyOn(settingsApi, "startRootReconfiguration").mockResolvedValue({
+      status: "running",
       rootFolder: "/audio/library",
-      lastScanTime: null,
-      lastScanRootFolder: null,
+      progress: null,
     });
     vi.spyOn(scanApi, "startScan").mockRejectedValue(new Error("start failed"));
 
@@ -182,10 +186,10 @@ describe("SetupScreen 経路", () => {
   });
 
   it("スキャン開始失敗時はサーバー由来のメッセージをインライン表示する", async () => {
-    vi.spyOn(settingsApi, "setRootFolder").mockResolvedValue({
+    vi.spyOn(settingsApi, "startRootReconfiguration").mockResolvedValue({
+      status: "running",
       rootFolder: "/audio/library",
-      lastScanTime: null,
-      lastScanRootFolder: null,
+      progress: null,
     });
     vi.spyOn(scanApi, "startScan").mockRejectedValue(
       new Error("ルートフォルダーにアクセスできません: /audio/library"),

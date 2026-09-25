@@ -34,7 +34,7 @@ import { prepareWorkPlayback } from "../entities/work/api";
 import { invalidateWorkViewQueries } from "../entities/work/invalidateWorkViewQueries";
 import { useDownloadLibraryExport } from "../features/library/useDownloadLibraryExport";
 import { useScanActions } from "../entities/scan/useScanActions";
-import { setRootFolder } from "../entities/settings/api";
+import { startRootReconfiguration } from "../entities/settings/api";
 import {
   useSettingsQuery,
   useRootFolderOrNull,
@@ -83,7 +83,7 @@ export default function App() {
 
   // ── Change folder mutation ────────────────────────────────
   const changeFolderMutation = useMutation({
-    mutationFn: setRootFolder,
+    mutationFn: startRootReconfiguration,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
       queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidates() });
@@ -142,7 +142,7 @@ export default function App() {
 
   const handleSetupComplete = useCallback(
     async (path: string) => {
-      await setRootFolder(path);
+      await startRootReconfiguration(path);
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
       const result = await scanActions.start();
       if (!result.ok) {
