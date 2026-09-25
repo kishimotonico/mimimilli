@@ -159,6 +159,7 @@ export const JOINED_WORKS_SELECT = `
     works.created_at AS createdAt,
     works.status,
     works.physical_path AS physicalPath,
+    works.meta_path AS metaPath,
     works.total_duration_sec AS totalDurationSec,
     works.track_count AS trackCount,
     works.error_message AS errorMessage,

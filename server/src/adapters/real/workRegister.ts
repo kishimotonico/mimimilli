@@ -13,7 +13,6 @@ import {
   detectRjCode,
   emptyMetaDlsiteState,
   isAudioFileName,
-  isAudioWorkPath,
   sidecarMetaFileName,
 } from "@mimimilli/shared";
 import { META_FILE_NAME, MetaParseError, readMetaFile, readMetaFileRaw } from "./meta.ts";
@@ -96,10 +95,6 @@ interface MetaDeletionPlan {
   stagedPath: string;
 }
 
-function folderMetaPathOf(physicalPath: string): string {
-  return join(physicalPath, META_FILE_NAME);
-}
-
 function metaFileIdMatches(metaPath: string, workId: string): boolean {
   try {
     const raw = readMetaFileRaw(metaPath);
@@ -124,31 +119,12 @@ function findStagedMetaPlan(workId: string, canonicalPath: string): MetaDeletion
 }
 
 /** 登録解除時に退避・削除するメタファイルパスを解決する。 */
-function resolveMetaDeletionPlan(
-  workId: string,
-  recordedMetaPath: string,
-  physicalPath?: string,
-): MetaDeletionPlan | null {
-  const stagedAtRecorded = findStagedMetaPlan(workId, recordedMetaPath);
-  if (stagedAtRecorded) return stagedAtRecorded;
-  if (existsSync(recordedMetaPath)) {
-    return {
-      canonicalPath: recordedMetaPath,
-      stagedPath: metaStagingPath(recordedMetaPath),
-    };
+function resolveMetaDeletionPlan(workId: string, metaPath: string): MetaDeletionPlan | null {
+  const staged = findStagedMetaPlan(workId, metaPath);
+  if (staged) return staged;
+  if (existsSync(metaPath)) {
+    return { canonicalPath: metaPath, stagedPath: metaStagingPath(metaPath) };
   }
-
-  if (physicalPath) {
-    const canonicalPath = isAudioWorkPath(physicalPath)
-      ? sidecarPathForAudio(physicalPath)
-      : folderMetaPathOf(physicalPath);
-    const stagedAtFallback = findStagedMetaPlan(workId, canonicalPath);
-    if (stagedAtFallback) return stagedAtFallback;
-    if (existsSync(canonicalPath) && metaFileIdMatches(canonicalPath, workId)) {
-      return { canonicalPath, stagedPath: metaStagingPath(canonicalPath) };
-    }
-  }
-
   return null;
 }
 
@@ -187,7 +163,6 @@ function deleteStagedMeta(plan: MetaDeletionPlan): void {
 }
 
 export function unregisterWork(
-  query: WorkQueryRepository,
   catalog: CatalogWorkRepository,
   user: UserWorkStateRepository,
   root: string,
@@ -196,8 +171,7 @@ export function unregisterWork(
   const target = catalog.getWorkDeleteTarget(workId);
   if (!target) return false;
 
-  const mediaRoot = query.getMediaRoot(workId);
-  const metaPlan = resolveMetaDeletionPlan(workId, target.metaPath, mediaRoot?.physicalPath);
+  const metaPlan = resolveMetaDeletionPlan(workId, target.metaPath);
   if (metaPlan) stageMetaForDeletion(metaPlan);
 
   const metaDir = dirname(target.metaPath);

@@ -23,7 +23,12 @@ import type {
   WorksQuery,
 } from "@mimimilli/shared";
 import type { WorkSourceProjectionResult } from "../../adapter/work.ts";
-import { isAudioFileName, sidecarMetaFileName, tagEquals } from "@mimimilli/shared";
+import {
+  isAudioFileName,
+  resolveWorkPlacement,
+  sidecarMetaFileName,
+  tagEquals,
+} from "@mimimilli/shared";
 import { type Db } from "./db.ts";
 import {
   META_FILE_NAME,
@@ -43,7 +48,6 @@ import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import { getWorkFromCatalog, getWorkWithLiveProbe } from "./workRefresh.ts";
-import { physicalPathForMeta } from "./scanRegister.ts";
 import { naturalCompare } from "./naturalCompare.ts";
 import {
   mapMetaReadError,
@@ -204,7 +208,7 @@ export function createWorkMethods(deps: {
       const updated = patchMetaFileCas(metaPath, source.sourceRevision, {
         id: crypto.randomUUID(),
       });
-      const physicalPath = physicalPathForMeta(metaPath, updated.meta);
+      const physicalPath = resolveWorkPlacement(metaPath, updated.meta).physicalPath;
       const outcome = await scanner.projectMetaFile(metaPath, updated);
       catalog.replaceIdentityConflicts(
         removeIdentityConflictPath(catalog.listIdentityConflicts(), diagnostic.workId, body.path),
@@ -224,7 +228,7 @@ export function createWorkMethods(deps: {
       } catch (error) {
         mapMetaReadError(error);
       }
-      const physicalPath = physicalPathForMeta(metaPath, source.meta);
+      const physicalPath = resolveWorkPlacement(metaPath, source.meta).physicalPath;
       const existing = query.getScanWorkMap().get(source.meta.id);
       const hadCatalogRow = existing !== undefined;
       if (existing && existing.physicalPath !== physicalPath && existing.status !== "missing") {
@@ -254,7 +258,7 @@ export function createWorkMethods(deps: {
     },
 
     async deleteWork(id: string): Promise<boolean> {
-      return unregisterWork(query, catalog, user, requireRoot(), id);
+      return unregisterWork(catalog, user, requireRoot(), id);
     },
 
     async countMissingWorks(): Promise<number> {
@@ -268,7 +272,7 @@ export function createWorkMethods(deps: {
       let failedCount = 0;
       for (const id of ids) {
         try {
-          if (unregisterWork(query, catalog, user, root, id)) deletedCount++;
+          if (unregisterWork(catalog, user, root, id)) deletedCount++;
           else failedCount++;
         } catch {
           failedCount++;

@@ -4,7 +4,7 @@ import {
   parseTag,
   probeResultFromCache,
   resolveTrackDurationSec,
-  workMediaRoot,
+  workPlacementOf,
 } from "@mimimilli/shared";
 import type { NormalizedTag, DlsiteState, ScanDiagnostic, UrlEntry, Work } from "@mimimilli/shared";
 import { japaneseSortKey } from "../../core/japaneseSortKey.ts";
@@ -347,11 +347,11 @@ export class CatalogWorkRepository {
     workId: string,
     playlistId: string,
     trackId: string,
-  ): { durationSec: number | null; physicalPath: string; file: string } | null {
+  ): { durationSec: number | null } | null {
     const track = this.db.sqlite
       .query(`
         SELECT tracks.start, tracks.end, tracks.file,
-               works.physical_path AS physicalPath
+               works.meta_path AS metaPath
         FROM main.playlists
         INNER JOIN main.tracks
           ON tracks.work_id = playlists.work_id
@@ -364,13 +364,13 @@ export class CatalogWorkRepository {
       start: number | null;
       end: number | null;
       file: string;
-      physicalPath: string;
+      metaPath: string;
     } | null;
     if (!track) return null;
     const cacheRow = this.db.catalog
       .select({ durationSec: audioProbeCache.durationSec })
       .from(audioProbeCache)
-      .where(eq(audioProbeCache.path, join(workMediaRoot(track.physicalPath), track.file)))
+      .where(eq(audioProbeCache.path, join(workPlacementOf(track.metaPath).mediaRoot, track.file)))
       .get();
     const probe =
       track.end !== null ? ({ kind: "unprobed" } as const) : probeResultFromCache(cacheRow);
@@ -378,7 +378,7 @@ export class CatalogWorkRepository {
       { start: track.start ?? undefined, end: track.end ?? undefined },
       probe,
     );
-    return { durationSec, physicalPath: track.physicalPath, file: track.file };
+    return { durationSec };
   }
 
   workExists(id: string): boolean {

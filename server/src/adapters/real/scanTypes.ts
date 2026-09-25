@@ -1,4 +1,10 @@
-import type { MetaFile, ScanCandidate, ScanResult, Work } from "@mimimilli/shared";
+import type {
+  MetaFile,
+  ScanCandidate,
+  ScanResult,
+  Work,
+  WorkPlacementResolution,
+} from "@mimimilli/shared";
 
 /** スキャン実行の戻り値。候補プールは HTTP 契約の ScanResult とは分離する。 */
 export type ScanExecutionResult = {
@@ -30,6 +36,7 @@ export interface PreparedMeta {
   kind: "ok";
   metaPath: string;
   meta: MetaFile;
+  placement: WorkPlacementResolution;
   bytes: Buffer;
   revisions: WorkRevisions;
   cachedRevisions: WorkRevisions | undefined;

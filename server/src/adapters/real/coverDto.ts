@@ -1,14 +1,14 @@
 import { statSync } from "node:fs";
 import { join } from "node:path";
-import { coverFieldsFromColumns, workMediaRoot, type Cover } from "@mimimilli/shared";
+import { coverFieldsFromColumns, type Cover, type WorkPlacement } from "@mimimilli/shared";
 import { deriveCoverVersion } from "../../adapter/media.ts";
 
 export function statCoverSource(
-  physicalPath: string,
+  placement: WorkPlacement,
   coverImage: string,
 ): { size: number; mtimeMs: number } | null {
   try {
-    const stats = statSync(join(workMediaRoot(physicalPath), coverImage));
+    const stats = statSync(join(placement.mediaRoot, coverImage));
     if (!stats.isFile()) return null;
     return { size: stats.size, mtimeMs: stats.mtimeMs };
   } catch {
@@ -18,14 +18,14 @@ export function statCoverSource(
 
 export function coverDtoFromColumns(
   workId: string,
-  physicalPath: string,
+  placement: WorkPlacement,
   coverImage: string | null,
   coverWidth: number | null,
   coverHeight: number | null,
 ): Cover {
   const { cover } = coverFieldsFromColumns(coverImage, coverWidth, coverHeight);
   if (cover === null) return null;
-  const source = statCoverSource(physicalPath, coverImage!);
+  const source = statCoverSource(placement, coverImage!);
   if (source === null) return null;
   return { ...cover, version: deriveCoverVersion(workId, undefined, source) };
 }

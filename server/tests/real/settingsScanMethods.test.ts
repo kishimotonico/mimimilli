@@ -38,7 +38,12 @@ test("resolveRootFolder / beginRootReconfiguration は receiver なしで呼び�
     deleteWorksOutsideRoot: () => 0,
   };
   const query = {
-    listSummaries: () => ({ summaries: [], skipped: [], unmeasuredCovers: [] }),
+    listSummaries: () => ({
+      summaries: [],
+      skipped: [],
+      unmeasuredCovers: [],
+      placements: new Map(),
+    }),
   };
 
   try {

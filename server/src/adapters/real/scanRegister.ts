@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { dirname, join } from "node:path";
 import {
   coverFieldsFromColumns,
-  isSidecarMetaFileName,
   metaFileSchema,
+  resolveWorkPlacement,
   selectDefaultPlaylist,
 } from "@mimimilli/shared";
 import type { Cover, MetaFile, ScanDiagnostic, ScanResult, Work } from "@mimimilli/shared";
@@ -36,14 +36,6 @@ const scanLogger = getCategoryLogger("scan");
 type ScanUpsertTracking = Pick<ScanResult, "coverErrors" | "insertedWorkIds" | "updatedWorkIds">;
 type ScanErrorTracking = ScanUpsertTracking & Pick<ScanResult, "errors">;
 
-export function physicalPathForMeta(metaPath: string, meta: MetaFile): string {
-  const dir = dirname(metaPath);
-  if (!isSidecarMetaFileName(basename(metaPath))) return dir;
-  const playlist = selectDefaultPlaylist(meta.playlists, meta.defaultPlaylistId);
-  const file = playlist?.tracks[0]?.file;
-  return file ? join(dir, file) : dir;
-}
-
 function extractCandidateIdFromMetaContent(content: string): string | null {
   const match = content.match(/"id"\s*:\s*"([^"\\]+)"/);
   return match?.[1] ?? null;
@@ -63,12 +55,12 @@ function assertUniqueMetaIds(metaPath: string, meta: MetaFile, seenIds: SeenMeta
 }
 
 function deriveWorkErrorMessage(
-  workDir: string,
+  mediaRoot: string,
   meta: MetaFile,
   invalidStartTracks: Array<{ file: string; title: string }>,
 ): string | null {
   const playlist = selectDefaultPlaylist(meta.playlists, meta.defaultPlaylistId);
-  const missingFiles = (playlist?.tracks ?? []).filter((t) => !existsSync(join(workDir, t.file)));
+  const missingFiles = (playlist?.tracks ?? []).filter((t) => !existsSync(join(mediaRoot, t.file)));
   if (missingFiles.length > 0) {
     return `参照先ファイルが見つかりません: ${missingFiles.map((t) => t.file).join(", ")}`;
   }
@@ -105,23 +97,22 @@ async function assembleWorkForUpsert(
   checkAbort: () => void,
   dlsiteCache?: DlsiteCache | null,
 ): Promise<{ assembled: AssembledWork; coverErrors: number }> {
-  const { metaPath, meta, revisions } = prepared;
-  const workDir = dirname(metaPath);
-  const physicalPath = physicalPathForMeta(metaPath, meta);
+  const { meta, placement, revisions } = prepared;
+  const { mediaRoot } = placement.placement;
   const id = meta.id;
   checkAbort();
 
   const cover: CoverColumns = { image: meta.coverImage, dimensions: null };
   let coverErrors = 0;
   if (meta.coverImage) {
-    const dimensions = await measureCover(join(workDir, meta.coverImage));
+    const dimensions = await measureCover(join(mediaRoot, meta.coverImage));
     checkAbort();
     if (dimensions) cover.dimensions = dimensions;
     else coverErrors += 1;
   }
   const workCover: Cover = coverDtoFromColumns(
     id,
-    workDir,
+    placement.placement,
     cover.image,
     cover.dimensions?.width ?? null,
     cover.dimensions?.height ?? null,
@@ -141,7 +132,7 @@ async function assembleWorkForUpsert(
     defaultPlaylistId: meta.defaultPlaylistId,
     createdAt: meta.createdAt ?? null,
     status: "ok",
-    physicalPath,
+    physicalPath: placement.physicalPath,
     totalDurationSec: null,
     addedAt: existing?.addedAt ?? new Date().toISOString(),
     errorMessage: null,
@@ -223,6 +214,7 @@ export function prepareMetaEntries(
         );
       }
       const meta = parsed.data;
+      const placement = resolveWorkPlacement(metaPath, meta);
       const revisions = computeWorkRevisions(metaPath, meta, bytes);
       const state = existingWorks.get(meta.id);
       const cachedRevisions =
@@ -236,7 +228,7 @@ export function prepareMetaEntries(
       const coverSatisfied = coverSatisfiedForState(meta, state);
       if (
         canSkipIncremental(full, cachedRevisions, revisions, coverSatisfied, state?.status) &&
-        state?.physicalPath === physicalPathForMeta(metaPath, meta)
+        state?.physicalPath === placement.physicalPath
       ) {
         prepared.push({ kind: "skip", metaPath, id: meta.id });
         continue;
@@ -245,6 +237,7 @@ export function prepareMetaEntries(
         kind: "ok",
         metaPath,
         meta,
+        placement,
         bytes,
         revisions,
         cachedRevisions,
@@ -272,6 +265,7 @@ export function prepareSingleMeta(
     kind: "ok",
     metaPath,
     meta: snapshot.meta,
+    placement: resolveWorkPlacement(metaPath, snapshot.meta),
     bytes: snapshot.bytes,
     revisions,
     cachedRevisions: undefined,
@@ -302,11 +296,11 @@ export function buildProbeCache(
     )
       continue;
     if (entry.cachedStatus === "error") continue;
-    const workDir = dirname(entry.metaPath);
+    const { mediaRoot } = entry.placement.placement;
     for (const playlist of entry.meta.playlists) {
       for (const track of playlist.tracks) {
         checkAbort();
-        trackPaths.push(join(workDir, track.file));
+        trackPaths.push(join(mediaRoot, track.file));
       }
     }
   }
@@ -392,8 +386,9 @@ export async function registerMetaFile(
   dlsiteCache?: DlsiteCache | null,
 ): Promise<"skipped" | string> {
   const { full, idsAlreadyRegistered } = options;
-  const { metaPath, meta, revisions, cachedRevisions, cachedStatus, coverSatisfied } = prepared;
-  const workDir = dirname(metaPath);
+  const { metaPath, meta, placement, revisions, cachedRevisions, cachedStatus, coverSatisfied } =
+    prepared;
+  const { mediaRoot } = placement.placement;
   const id = meta.id;
 
   if (!idsAlreadyRegistered) {
@@ -409,13 +404,13 @@ export async function registerMetaFile(
 
   const { resolvedPlaylists, invalidStartTracks } = await resolvePlaylistDurations(
     db,
-    workDir,
+    placement.placement,
     meta.playlists,
     probeCacheForWork,
     checkAbort,
   );
 
-  const errorMessage = deriveWorkErrorMessage(workDir, meta, invalidStartTracks);
+  const errorMessage = deriveWorkErrorMessage(mediaRoot, meta, invalidStartTracks);
   const totalDurationSec = totalDurationFromResolved(resolvedPlaylists, meta.defaultPlaylistId);
 
   const existing = existingWorks.get(id);

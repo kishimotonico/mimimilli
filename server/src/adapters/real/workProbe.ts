@@ -4,10 +4,10 @@ import {
   probeResultFromCache,
   resolveTrackDuration,
   toTrackDurationFields,
-  workMediaRoot,
   type MetaFile,
   type ProbeDurationResult,
   type ResolvedPlaylist,
+  type WorkPlacement,
 } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import { probeDurationSec, type ProbeCacheEntry } from "./probe.ts";
@@ -30,11 +30,12 @@ async function mapWithConcurrency<T>(
 }
 
 function trackFilePaths(
-  physicalPath: string,
+  placement: WorkPlacement,
   playlists: Array<{ tracks: Array<{ file: string }> }>,
 ): string[] {
-  const mediaRoot = workMediaRoot(physicalPath);
-  return [...new Set(playlists.flatMap((p) => p.tracks).map((t) => join(mediaRoot, t.file)))];
+  return [
+    ...new Set(playlists.flatMap((p) => p.tracks).map((t) => join(placement.mediaRoot, t.file))),
+  ];
 }
 
 /**
@@ -43,11 +44,11 @@ function trackFilePaths(
  */
 export async function liveFileProbeMap(
   db: Db,
-  physicalPath: string,
+  placement: WorkPlacement,
   playlists: Array<{ tracks: Array<{ file: string }> }>,
   fetchProbeCache: (paths: string[]) => Map<string, ProbeCacheEntry>,
 ): Promise<Map<string, ProbeDurationResult>> {
-  const paths = trackFilePaths(physicalPath, playlists);
+  const paths = trackFilePaths(placement, playlists);
   const map = new Map<string, ProbeDurationResult>();
   if (paths.length === 0) return map;
   const cache = fetchProbeCache(paths);
@@ -59,11 +60,11 @@ export async function liveFileProbeMap(
 
 /** probe cache を読むだけ。stat / parse / cache 書込みはしない。 */
 export function cachedFileProbeMap(
-  physicalPath: string,
+  placement: WorkPlacement,
   playlists: Array<{ tracks: Array<{ file: string }> }>,
   fetchProbeCache: (paths: string[]) => Map<string, ProbeCacheEntry>,
 ): Map<string, ProbeDurationResult> {
-  const paths = trackFilePaths(physicalPath, playlists);
+  const paths = trackFilePaths(placement, playlists);
   const map = new Map<string, ProbeDurationResult>();
   if (paths.length === 0) return map;
   const cache = fetchProbeCache(paths);
@@ -81,7 +82,7 @@ export interface ResolvedPlaylistsResult {
 /** 全playlistのトラックについて解決済み durationSec を求める。同一ファイルは1回だけ probe する。 */
 export async function resolvePlaylistDurations(
   db: Db,
-  workDir: string,
+  placement: WorkPlacement,
   playlists: MetaFile["playlists"],
   probeCache: Map<string, ProbeCacheEntry>,
   checkAbort: () => void = () => {},
@@ -97,7 +98,11 @@ export async function resolvePlaylistDurations(
       if (fileProbeCache.has(track.file)) {
         probe = fileProbeCache.get(track.file)!;
       } else {
-        probe = await probeDurationSec(db.catalog, join(workDir, track.file), probeCache);
+        probe = await probeDurationSec(
+          db.catalog,
+          join(placement.mediaRoot, track.file),
+          probeCache,
+        );
         checkAbort();
         fileProbeCache.set(track.file, probe);
       }

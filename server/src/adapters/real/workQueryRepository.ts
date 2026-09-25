@@ -7,6 +7,7 @@ import {
   isCoverUnmeasured,
   projectCoverKind,
   withNormalizeTagBatchCache,
+  workPlacementOf,
 } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
@@ -16,6 +17,7 @@ import type {
   DlsiteNotificationSummary,
   SmartFolderRule,
   Work,
+  WorkPlacement,
   WorksPage,
   WorksQuery,
 } from "@mimimilli/shared";
@@ -35,7 +37,7 @@ import { fetchProbeCache as fetchProbeCacheFromDb } from "./probe.ts";
 import { getScanWorkMap as getScanWorkMapFromDb } from "./scanWorkQueries.ts";
 import {
   getCoverLocation as getCoverLocationFromDb,
-  getMediaRoot as getMediaRootFromDb,
+  getWorkPlacement as getWorkPlacementFromDb,
   hasTrackFile as hasTrackFileFromDb,
 } from "./workMediaQueries.ts";
 import {
@@ -205,7 +207,7 @@ export class WorkQueryRepository {
   listSummaries(workIds?: string[]): ListSummariesResult {
     return withNormalizeTagBatchCache(() => {
       if (workIds !== undefined && workIds.length === 0) {
-        return { summaries: [], skipped: [], unmeasuredCovers: [] };
+        return { summaries: [], skipped: [], unmeasuredCovers: [], placements: new Map() };
       }
 
       const baseSql = `
@@ -217,6 +219,7 @@ export class WorkQueryRepository {
         works.cover_height AS coverHeight,
         works.status,
         works.physical_path AS physicalPath,
+        works.meta_path AS metaPath,
         works.total_duration_sec AS totalDurationSec,
         works.track_count AS trackCount,
         works.error_message AS errorMessage,
@@ -242,6 +245,7 @@ export class WorkQueryRepository {
       const summaries: ListSummariesResult["summaries"] = [];
       const skipped: ListSummariesResult["skipped"] = [];
       const unmeasuredCovers: string[] = [];
+      const placements = new Map<string, WorkPlacement>();
       for (const rawRow of rows) {
         try {
           const row: SummaryRow = { ...rawRow, bookmarked: rawRow.bookmarked !== 0 };
@@ -252,6 +256,7 @@ export class WorkQueryRepository {
               parseDlsiteStateJson(row.id, rawRow.dlsiteStateJson),
             ),
           );
+          placements.set(row.id, workPlacementOf(row.metaPath));
           if (
             isCoverUnmeasured(
               projectCoverKind(rawRow.coverImage, rawRow.coverWidth, rawRow.coverHeight),
@@ -267,7 +272,7 @@ export class WorkQueryRepository {
           throw error;
         }
       }
-      return { summaries, skipped, unmeasuredCovers };
+      return { summaries, skipped, unmeasuredCovers, placements };
     });
   }
 
@@ -377,6 +382,7 @@ export class WorkQueryRepository {
           works.total_duration_sec AS totalDurationSec,
           works.track_count AS trackCount,
           works.physical_path AS physicalPath,
+          works.meta_path AS metaPath,
           work_states.bookmarked,
           work_states.last_played_at AS lastPlayedAt,
           work_dlsite.state_json AS dlsiteStateJson
@@ -587,12 +593,12 @@ export class WorkQueryRepository {
       const idsChunk = uniqueIds.slice(i, i + SQLITE_IN_CHUNK_SIZE);
       const locationRows = this.db.sqlite
         .query(
-          `SELECT id, physical_path AS physicalPath, cover_image AS coverImage
+          `SELECT id, meta_path AS metaPath, cover_image AS coverImage
            FROM main.works WHERE id IN (${inClausePlaceholders(idsChunk.length)})`,
         )
-        .all(...idsChunk) as Array<{ id: string; physicalPath: string; coverImage: string }>;
+        .all(...idsChunk) as Array<{ id: string; metaPath: string; coverImage: string }>;
       for (const row of locationRows) {
-        const source = statCoverSource(row.physicalPath, row.coverImage);
+        const source = statCoverSource(workPlacementOf(row.metaPath), row.coverImage);
         if (source) {
           versions.set(row.id, deriveCoverVersion(row.id, undefined, source));
         }
@@ -605,8 +611,8 @@ export class WorkQueryRepository {
     return getCoverLocationFromDb(this.db, id);
   }
 
-  getMediaRoot(id: string) {
-    return getMediaRootFromDb(this.db, id);
+  getWorkPlacement(id: string) {
+    return getWorkPlacementFromDb(this.db, id);
   }
 
   hasTrackFile(workId: string, file: string): boolean {

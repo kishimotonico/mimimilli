@@ -1,8 +1,10 @@
 import type { Work, WorkSummary } from "@mimimilli/shared";
 import {
+  META_FILE_NAME,
   coverFieldsFromCover,
   emptyDlsiteState,
   toTrackDurationFieldsFromSec,
+  workPlacementOf,
 } from "@mimimilli/shared";
 import type { ResumeBody } from "@mimimilli/shared";
 import type { Db } from "../../src/adapters/real/db.ts";
@@ -10,6 +12,7 @@ import { CatalogWorkRepository } from "../../src/adapters/real/catalogWorkReposi
 import { UserWorkStateRepository } from "../../src/adapters/real/userWorkStateRepository.ts";
 import { WorkQueryRepository } from "../../src/adapters/real/workQueryRepository.ts";
 import { getWorkFromCatalog } from "../../src/adapters/real/workRefresh.ts";
+import type { ListSummariesResult } from "../../src/adapters/real/workRowMapping.ts";
 import { validateResumeRequest } from "../../src/core/resumeValidation.ts";
 
 export function makeWork(overrides: Partial<Work> & Pick<Work, "id">): Work {
@@ -119,4 +122,19 @@ export function upsertTestWork(
 /** フォルダー形式作品のテスト用メタパス（physicalPath 直下の mimimilli.json） */
 export function folderMetaPath(physicalPath: string): string {
   return `${physicalPath}/mimimilli.json`;
+}
+
+/** 一覧結果の組み立て。summaries はすべてフォルダー形式の作品として配置を付ける */
+export function folderSummariesResult(
+  result: Omit<ListSummariesResult, "placements">,
+): ListSummariesResult {
+  return {
+    ...result,
+    placements: new Map(
+      result.summaries.map((summary) => [
+        summary.id,
+        workPlacementOf(`${summary.physicalPath}/${META_FILE_NAME}`),
+      ]),
+    ),
+  };
 }
