@@ -6,6 +6,7 @@ import DlsiteBulkApplyRuntime from "../features/dlsite/ui/DlsiteBulkApplyRuntime
 import ScanRuntime from "../features/scan/ui/ScanRuntime";
 import { PlayerRuntimeProvider } from "../features/player/model/PlayerRuntimeProvider";
 import { queryClient } from "./model/queryClient";
+import { useRootReconfiguringApiErrorHandler } from "./model/useRootReconfiguringApiErrorHandler";
 
 interface ProvidersProps {
   children: ReactNode;
@@ -40,6 +41,7 @@ const ReactQueryDevtools =
  *   Query 結合は当面行わない（issue 参照）。
  */
 export default function Providers({ children }: ProvidersProps) {
+  useRootReconfiguringApiErrorHandler(queryClient);
   return (
     <QueryClientProvider client={queryClient}>
       <JotaiProvider>

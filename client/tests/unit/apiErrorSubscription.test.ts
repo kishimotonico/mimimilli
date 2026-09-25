@@ -1,10 +1,14 @@
-// shared/api/httpのonApiError購読口と、app層（queryClient.ts）でのroot_reconfiguring検知の配線を縛る。
-// TanStack QueryのuseQuery/useMutationを経由しない直接API呼び出し（例:
-// App.handlePlayのprepareWorkPlayback）でも、409 root_reconfiguringを受けたら
-// settingsクエリが再取得される（＝reconfiguring画面へ移れる）ことを確認する。
+// shared/api/httpのonApiError購読口と、app層（useRootReconfiguringApiErrorHandler）
+// でのroot_reconfiguring検知の配線を縛る。TanStack QueryのuseQuery/useMutationを
+// 経由しない直接API呼び出し（例: App.handlePlayのprepareWorkPlayback）でも、
+// 409 root_reconfiguringを受けたらsettingsクエリが再取得される
+// （＝reconfiguring画面へ移れる）ことを確認する。
 import { z } from "zod";
+import { QueryClient } from "@tanstack/react-query";
+import { renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { createQueryClient } from "../../src/app/model/queryClient";
+import { useRootReconfiguringApiErrorHandler } from "../../src/app/model/useRootReconfiguringApiErrorHandler";
 import { getParsed, onApiError } from "../../src/shared/api/http";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 
@@ -35,6 +39,12 @@ describe("onApiError（shared/api/http）", () => {
 });
 
 describe("createQueryClient（app/model/queryClient）", () => {
+  it("副作用を持たず、QueryClientを作るだけ", () => {
+    expect(createQueryClient()).toBeInstanceOf(QueryClient);
+  });
+});
+
+describe("useRootReconfiguringApiErrorHandler（app/model）", () => {
   it("TanStack Queryを経由しない直接API呼び出しの409 root_reconfiguringでもsettingsが再取得される", async () => {
     vi.stubGlobal(
       "fetch",
@@ -62,6 +72,8 @@ describe("createQueryClient（app/model/queryClient）", () => {
     });
     expect(client.getQueryState(SETTINGS_QUERY_KEYS.all())?.isInvalidated).toBe(false);
 
+    renderHook(() => useRootReconfiguringApiErrorHandler(client));
+
     // TanStack Queryを経由しない直接呼び出し（prepareWorkPlaybackのような呼び出し方を模す）。
     await expect(getParsed(z.object({}), "/works/some-work/playback")).rejects.toThrow();
 
@@ -72,7 +84,7 @@ describe("createQueryClient（app/model/queryClient）", () => {
     vi.unstubAllGlobals();
   });
 
-  it("複数回呼んでも古いclientへの購読が残らない", async () => {
+  it("unmountすると購読が外れ、以降のエラーでinvalidateしない", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -80,16 +92,14 @@ describe("createQueryClient（app/model/queryClient）", () => {
       ),
     );
 
-    const first = createQueryClient();
-    const firstInvalidate = vi.spyOn(first, "invalidateQueries");
-
-    const second = createQueryClient();
-    const secondInvalidate = vi.spyOn(second, "invalidateQueries");
+    const client = createQueryClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const { unmount } = renderHook(() => useRootReconfiguringApiErrorHandler(client));
+    unmount();
 
     await expect(getParsed(z.object({}), "/works/some-work/playback")).rejects.toThrow();
 
-    await vi.waitFor(() => expect(secondInvalidate).toHaveBeenCalled());
-    expect(firstInvalidate).not.toHaveBeenCalled();
+    expect(invalidateSpy).not.toHaveBeenCalled();
 
     vi.unstubAllGlobals();
   });
