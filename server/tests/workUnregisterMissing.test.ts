@@ -11,6 +11,7 @@ import { openDb } from "../src/adapters/real/db.ts";
 import { createTestRealAdapter } from "./helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "./helpers/sampleLibrary.ts";
 import { configureRoot } from "./helpers/rootFolder.ts";
+import { folderFixtureWork } from "./helpers/workTestUtils.ts";
 
 function workspace(root: string, absolutePath: string) {
   return workspacePath(absolutePath.slice(root.length + 1));
@@ -73,7 +74,7 @@ test("POST /api/works/unregister-missing: fixtureアダプタでmissingのみを
     { ...baseWork, id: "error-1", status: "error" },
     ...missingIds.map((id) => ({ ...baseWork, id, status: "missing" }) as WorkSummary),
   ];
-  const app = createApp(createFixtureAdapter({ works }));
+  const app = createApp(createFixtureAdapter({ works: works.map(folderFixtureWork) }));
   await assertMissingBulkDeleteContract(app, { missing: missingIds, error: "error-1", ok: "ok-1" });
 });
 

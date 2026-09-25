@@ -1,4 +1,4 @@
-import { isRjCodeMissing, workspacePath } from "@mimimilli/shared";
+import { META_FILE_NAME, isRjCodeMissing, workspacePath } from "@mimimilli/shared";
 import type { ScanCandidate, ScanCandidatesRegisterResponse, ScanResult } from "@mimimilli/shared";
 import type {
   RootReconfigurationAdapter,
@@ -161,12 +161,14 @@ export function createSettingsScanMethods(
         const candidate = candidatesByPath.get(item.path);
         if (!candidate) return [];
         const rjCode = resolveRegisteredRjCode(candidate.rjCode, item.rjCode);
+        const physicalPath = normalizeFsPath(`${rootAbs}/${candidate.path}`);
         const work: FixtureWorkRecord = {
           id: crypto.randomUUID(),
           title: candidate.inferredTitle,
           cover: null,
           status: "ok",
-          physicalPath: normalizeFsPath(`${rootAbs}/${candidate.path}`),
+          physicalPath,
+          metaPath: `${physicalPath}/${META_FILE_NAME}`,
           totalDurationSec: 0,
           trackCount: candidate.audioFileCount,
           addedAt: now,

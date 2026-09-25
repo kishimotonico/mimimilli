@@ -2,7 +2,7 @@ import { createCoverValidators } from "../../adapter/index.ts";
 import type { CoverDescriptor, MediaAdapter } from "../../adapter/media.ts";
 import { buildFullWorkFromState, findTrackByFile } from "./playback.ts";
 import { DEFAULT_TRACK_DURATION_SEC, synthesizeCoverSvg, synthesizeSilentWav } from "./media.ts";
-import { composeWork, type FixtureState } from "./state.ts";
+import type { FixtureState } from "./state.ts";
 
 export function createCoverMediaMethods(
   state: FixtureState,
@@ -14,7 +14,7 @@ export function createCoverMediaMethods(
       if (!relPath) return null;
 
       if (kind === "audio") {
-        const fullWork = buildFullWorkFromState(state, composeWork(state, work));
+        const fullWork = buildFullWorkFromState(state, work);
         const track = findTrackByFile(fullWork, relPath);
         if (!track) return null;
         return synthesizeSilentWav(track.durationSec ?? DEFAULT_TRACK_DURATION_SEC);

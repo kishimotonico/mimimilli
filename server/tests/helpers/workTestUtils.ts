@@ -13,6 +13,7 @@ import { UserWorkStateRepository } from "../../src/adapters/real/userWorkStateRe
 import { WorkQueryRepository } from "../../src/adapters/real/workQueryRepository.ts";
 import { getWorkFromCatalog } from "../../src/adapters/real/workRefresh.ts";
 import type { ListSummariesResult } from "../../src/adapters/real/workRowMapping.ts";
+import type { FixtureSeedWork } from "../../src/adapters/fixture/index.ts";
 import { validateResumeRequest } from "../../src/core/resumeValidation.ts";
 
 export function makeWork(overrides: Partial<Work> & Pick<Work, "id">): Work {
@@ -137,4 +138,9 @@ export function folderSummariesResult(
       ]),
     ),
   };
+}
+
+/** フォルダー形式の作品として fixture に渡す */
+export function folderFixtureWork(work: WorkSummary): FixtureSeedWork {
+  return { ...work, metaPath: `${work.physicalPath}/${META_FILE_NAME}` };
 }

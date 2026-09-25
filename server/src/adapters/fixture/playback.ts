@@ -1,19 +1,21 @@
 import {
   coverFieldsFromColumns,
-  isAudioWorkPath,
   toTrackDurationFieldsFromSec,
+  workPlacementOf,
 } from "@mimimilli/shared";
 import type {
   ResolvedPlaylist,
   ResolvedTrack,
   ResumeBody,
   Work,
+  WorkPlacement,
   WorkSummary,
 } from "@mimimilli/shared";
 import { SEED_PLAYLIST_SPECS, SEED_TRACK_NAMES, type FixtureCoverColumns } from "./data.ts";
 import { fixtureCoverFromColumns } from "./coverDto.ts";
+import type { FixtureWorkRecord } from "./data.ts";
 import type { FixtureState, PlaybackIds } from "./state.ts";
-import { coverColumnsOf } from "./state.ts";
+import { composeWork, coverColumnsOf } from "./state.ts";
 
 /** totalDurationSec を trackCount で等分した決定的な durationSec（端数は最終トラックに寄せる） */
 function splitDurationSec(totalDurationSec: number, trackCount: number, index: number): number {
@@ -46,12 +48,19 @@ function ensurePlaybackIds(
   return ids;
 }
 
-export function buildFullWorkFromState(state: FixtureState, work: WorkSummary): Work {
-  return buildFullWork(work, coverColumnsOf(state, work.id), state.resumes, state.playbackIds);
+export function buildFullWorkFromState(state: FixtureState, record: FixtureWorkRecord): Work {
+  return buildFullWork(
+    composeWork(state, record),
+    workPlacementOf(record.metaPath),
+    coverColumnsOf(state, record.id),
+    state.resumes,
+    state.playbackIds,
+  );
 }
 
 export function buildFullWork(
   summary: WorkSummary,
+  placement: WorkPlacement,
   coverColumns: FixtureCoverColumns,
   resumes: Map<string, ResumeBody>,
   playbackIds: Map<string, PlaybackIds>,
@@ -86,10 +95,10 @@ export function buildFullWork(
               return {
                 id: ids.playlists[0]!.trackIds[i]!,
                 title: namedTracks?.[i] ?? `Track ${i + 1}`,
-                file: isAudioWorkPath(summary.physicalPath)
-                  ? (summary.physicalPath.split("/").pop() ??
-                    `track${String(i + 1).padStart(2, "0")}.mp3`)
-                  : `track${String(i + 1).padStart(2, "0")}.mp3`,
+                file:
+                  placement.kind === "audio-file"
+                    ? summary.physicalPath.slice(placement.mediaRoot.length + 1)
+                    : `track${String(i + 1).padStart(2, "0")}.mp3`,
                 ...toTrackDurationFieldsFromSec(durationSec),
               };
             }),

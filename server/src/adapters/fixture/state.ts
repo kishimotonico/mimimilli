@@ -115,9 +115,10 @@ export function dlsiteFetchFailureFor(
 /** 作品レコードとlinkage・取得キャッシュから、API向けの合成済みWorkSummaryを読み出し時に組み立てる。
  *  合成結果はどこにも保存しない。 */
 export function composeWork(state: FixtureState, record: FixtureWorkRecord): WorkSummary {
+  const { metaPath: _metaPath, ...summary } = record;
   const linkage = dlsiteLinkageOf(state, record.id);
   return {
-    ...record,
+    ...summary,
     dlsite: projectDlsiteState(linkage, dlsiteFetchFailureFor(state, linkage.rjCode)),
   };
 }
@@ -129,6 +130,9 @@ export function composeWorks(state: FixtureState): WorkSummary[] {
 /** dataIntegrityWarning のダミー除外対象workId（実在の works には含めない） */
 const DATA_INTEGRITY_WARNING_SKIPPED_WORK_ID = "RJ501099";
 
+/** 契約テスト用の作品。fixture の作品レコードと同じく metaPath を持つ */
+export type FixtureSeedWork = WorkSummary & { metaPath: string };
+
 export interface FixtureAdapterOptions {
   /** データシナリオ（省略時 "default"）。不明なIDはエラー */
   scenario?: string;
@@ -136,7 +140,7 @@ export interface FixtureAdapterOptions {
   rootRebuildStepMs?: number;
   /** 契約テスト用に差し替える作品一覧。省略時はscenarioのseedを使う。dlsiteはrjCode/status/appliedTags
    *  （linkage相当）だけを取り出して使い、lastAttemptAt/error/errorKindは読まない。 */
-  works?: WorkSummary[];
+  works?: FixtureSeedWork[];
   /** works差し替え時に、rjCodeごとのDLsite取得キャッシュ相当を明示的に与える（省略時は空）。 */
   dlsiteFetchFailures?: ReadonlyArray<{ rjCode: string; resolution: DlsiteCacheResolution }>;
 }

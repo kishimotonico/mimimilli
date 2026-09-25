@@ -61,11 +61,6 @@ export function isAudioFileName(name: string): boolean {
   return AUDIO_WORK_EXTENSIONS.has(fileExtensionOf(name));
 }
 
-function pathBasename(path: string): string {
-  const cut = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-  return cut < 0 ? path : path.slice(cut + 1);
-}
-
 export function isSidecarMetaFileName(name: string): boolean {
   return name.endsWith(META_SIDECAR_SUFFIX) && name !== META_FILE_NAME;
 }
@@ -74,16 +69,4 @@ export function isSidecarMetaFileName(name: string): boolean {
 export function sidecarMetaFileName(audioFileName: string): string {
   const stem = audioFileName.replace(/\.[^.]+$/, "");
   return `${stem}${META_SIDECAR_SUFFIX}`;
-}
-
-/** physicalPath が単一ファイル作品（音声ファイル本体）か */
-export function isAudioWorkPath(physicalPath: string): boolean {
-  return isAudioFileName(pathBasename(physicalPath));
-}
-
-/** トラック・カバーを解決するディレクトリ。単一ファイル作品は親フォルダー */
-export function workMediaRoot(physicalPath: string): string {
-  if (!isAudioWorkPath(physicalPath)) return physicalPath;
-  const cut = Math.max(physicalPath.lastIndexOf("/"), physicalPath.lastIndexOf("\\"));
-  return cut <= 0 ? physicalPath : physicalPath.slice(0, cut);
 }
