@@ -117,7 +117,7 @@ filter='
   | if $d == null or ($d.tracks | length) != 1 then "tracks"
     else $d.tracks[0].file as $f
       | if ($f | test("[/\\\\]"))
-          or ($f | test("\\.(mp3|m4a|aac|wav|ogg|flac|webm|opus)$"; "i") | not)
+          or ($f | test("^.+\\.(mp3|m4a|aac|wav|ogg|flac|webm|opus)$"; "i") | not)
           or ($f | sub("\\.[^.]+$"; "")) != $stem
         then "file"
         elif any($m.playlists[].tracks[]; .file != $f) then "other-playlist"
@@ -140,7 +140,7 @@ rg --files -uu -g '*.mimimilli.json' "$root" | while IFS= read -r meta; do
 done
 ```
 
-Windows（PowerShell 7以降（`pwsh`）。`jq` がPATHにあること。Windows PowerShell 5.1はjqのUTF-8出力を誤読するため対象外）:
+Windows（PowerShell 7.3以降（`pwsh`）。`jq` がPATHにあること。7.2以前はjqへ渡す引数の二重引用符が外れ、Windows PowerShell 5.1はjqのUTF-8出力を誤読するため対象外）:
 
 ```powershell
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -153,7 +153,7 @@ $filter = @'
   | if $d == null or ($d.tracks | length) != 1 then "tracks"
     else $d.tracks[0].file as $f
       | if ($f | test("[/\\\\]"))
-          or ($f | test("\\.(mp3|m4a|aac|wav|ogg|flac|webm|opus)$"; "i") | not)
+          or ($f | test("^.+\\.(mp3|m4a|aac|wav|ogg|flac|webm|opus)$"; "i") | not)
           or ($f | sub("\\.[^.]+$"; "")) != $stem
         then "file"
         elif any($m.playlists[].tracks[]; .file != $f) then "other-playlist"
