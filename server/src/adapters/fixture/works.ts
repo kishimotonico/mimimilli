@@ -30,6 +30,7 @@ import type {
 import { SourceChangedError } from "../../errors.ts";
 import type { WorkAdapter } from "../../adapter/work.ts";
 import { summarizeDlsiteNotifications } from "../../core/dlsiteNotifications.ts";
+import { removeIdentityConflictPath } from "../../core/identityConflicts.ts";
 import { compareJapaneseSortKeys, compareUtf8Bytes } from "../../core/japaneseSortKey.ts";
 import { validateResumeRequest } from "../../core/resumeValidation.ts";
 import { assertRegistrationAllowed } from "../../core/workRegistrationGuard.ts";
@@ -90,6 +91,16 @@ export function fixtureSourceMutation(
 ): WorkSourceMutationResult {
   bumpFixtureRevision(state, work.id);
   return { snapshot: fixtureEditSnapshot(state, work), projection: { status: "published" } };
+}
+
+/** 登録解除対象workのroot相対pathをidentity_conflict診断から外す。対象がroot配下になければ何もしない。 */
+function removeIdentityConflictForWork(state: FixtureState, workId: string): void {
+  const work = state.works.find((candidate) => candidate.id === workId);
+  if (!work) return;
+  const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+  if (!isPathWithin(rootAbs, work.physicalPath, posix)) return;
+  const path = work.physicalPath.slice(rootAbs.length + 1);
+  state.identityConflicts = removeIdentityConflictPath(state.identityConflicts, workId, path);
 }
 
 export function createWorkMethods(state: FixtureState): WorkAdapter {
@@ -233,11 +244,11 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       work.lastPlayedAt = null;
       reassignWorkId(state, oldId, work.id);
       state.resumes.delete(diagnostic.workId);
-      state.identityConflicts = state.identityConflicts.flatMap((candidate) => {
-        if (candidate.workId !== diagnostic.workId) return [candidate];
-        const paths = candidate.paths.filter((path) => path !== _body.path);
-        return paths.length >= 2 ? [{ ...candidate, paths }] : [];
-      });
+      state.identityConflicts = removeIdentityConflictPath(
+        state.identityConflicts,
+        diagnostic.workId,
+        _body.path,
+      );
       return { snapshot: fixtureEditSnapshot(state, work), projection: { status: "published" } };
     },
 
@@ -252,6 +263,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
 
     async deleteWork(id: string): Promise<boolean> {
       if (!state.works.some((w) => w.id === id)) return false;
+      removeIdentityConflictForWork(state, id);
       removeWorks(state, new Set([id]));
       return true;
     },
@@ -264,6 +276,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       const missingIds = new Set(
         state.works.filter((w) => w.status === "missing").map((w) => w.id),
       );
+      for (const id of missingIds) removeIdentityConflictForWork(state, id);
       removeWorks(state, missingIds);
       return { deletedCount: missingIds.size, failedCount: 0 };
     },

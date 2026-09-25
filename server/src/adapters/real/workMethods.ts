@@ -33,6 +33,7 @@ import {
   readMetaSource,
 } from "./meta.ts";
 import { SourceChangedError } from "../../errors.ts";
+import { removeIdentityConflictPath } from "../../core/identityConflicts.ts";
 import { validateResumeRequest } from "../../core/resumeValidation.ts";
 import { resolveWithin, toPortableRelativePath } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
@@ -205,12 +206,9 @@ export function createWorkMethods(deps: {
       });
       const physicalPath = physicalPathForMeta(metaPath, updated.meta);
       const outcome = await scanner.projectMetaFile(metaPath, updated);
-      const remaining = catalog.listIdentityConflicts().flatMap((candidate) => {
-        if (candidate.workId !== diagnostic.workId) return [candidate];
-        const paths = candidate.paths.filter((path) => path !== body.path);
-        return paths.length >= 2 ? [{ ...candidate, paths }] : [];
-      });
-      catalog.replaceIdentityConflicts(remaining);
+      catalog.replaceIdentityConflicts(
+        removeIdentityConflictPath(catalog.listIdentityConflicts(), diagnostic.workId, body.path),
+      );
       return mutationResultFromOutcome(toEditSnapshot(updated, physicalPath), outcome);
     },
 
@@ -256,7 +254,7 @@ export function createWorkMethods(deps: {
     },
 
     async deleteWork(id: string): Promise<boolean> {
-      return unregisterWork(query, catalog, user, id);
+      return unregisterWork(query, catalog, user, requireRoot(), id);
     },
 
     async countMissingWorks(): Promise<number> {
@@ -265,11 +263,12 @@ export function createWorkMethods(deps: {
 
     async unregisterMissingWorks(): Promise<{ deletedCount: number; failedCount: number }> {
       const ids = query.listWorkIdsByStatus("missing");
+      const root = requireRoot();
       let deletedCount = 0;
       let failedCount = 0;
       for (const id of ids) {
         try {
-          if (unregisterWork(query, catalog, user, id)) deletedCount++;
+          if (unregisterWork(query, catalog, user, root, id)) deletedCount++;
           else failedCount++;
         } catch {
           failedCount++;

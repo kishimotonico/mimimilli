@@ -353,7 +353,7 @@ test("unregisterWork: DB削除失敗時に退避したメタ正本を復元す�
   };
 
   assert.throws(
-    () => unregisterWork(query, catalog, user, work.id),
+    () => unregisterWork(query, catalog, user, root, work.id),
     (error: Error) => error.message.includes("simulated db delete failure"),
   );
   db.close();
@@ -402,7 +402,7 @@ test("unregisterWork: catalog削除後のuser削除失敗時はメタを復元�
   };
 
   assert.throws(
-    () => unregisterWork(query, catalog, user, work.id),
+    () => unregisterWork(query, catalog, user, root, work.id),
     (error: Error) => error.message.includes("simulated user delete failure"),
   );
 
@@ -468,7 +468,7 @@ test("unregisterWork: 退避済みメタのまま再実行するとDB削除後�
 
   const db = openDb({ kind: "files", catalogPath, userPath });
   const { query, catalog, user } = createWorkRepos(db);
-  assert.equal(unregisterWork(query, catalog, user, work.id), true);
+  assert.equal(unregisterWork(query, catalog, user, root, work.id), true);
   db.close();
 
   assert.ok(!existsSync(metaPath));
