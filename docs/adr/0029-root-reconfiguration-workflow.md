@@ -64,12 +64,12 @@ user状態（再生履歴・ブックマーク・レジューム等）はWork UU
 
 再設定中と失敗のあいだ、`/api` 配下の要求は次の許可リストだけを通す。
 
-| メソッド | パス                            | 理由                           |
-| -------- | ------------------------------- | ------------------------------ |
-| GET      | `/api/settings`                 | 起動時の状態判定               |
-| GET      | `/api/root-reconfiguration`     | 進捗と失敗理由の取得           |
-| POST     | `/api/root-reconfiguration`     | 再試行                         |
-| POST     | `/api/__test__/reset`           | fixtureのテスト間分離          |
+| メソッド | パス                        | 理由                  |
+| -------- | --------------------------- | --------------------- |
+| GET      | `/api/settings`             | 起動時の状態判定      |
+| GET      | `/api/root-reconfiguration` | 進捗と失敗理由の取得  |
+| POST     | `/api/root-reconfiguration` | 再試行                |
+| POST     | `/api/__test__/reset`       | fixtureのテスト間分離 |
 
 それ以外（Library・Files・メディア配信・scan・候補・DLsite・タグ・スマートフォルダー等）は `RootReconfiguringError` として409で拒否する。ロックは `app.ts` のmiddlewareで一括して掛け、各ルートに判定を散らさない。静的ファイル配信は対象外。
 

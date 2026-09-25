@@ -62,6 +62,7 @@ oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメン
 - `core/`（`server/src/core/`）: 純粋関数によるドメイン処理。`worksQuery`（検索・フィルタ・ソート・ページング）、`axisFacets`（分類軸の値集計）、`smartFolder`（スマートフォルダー条件の評価・ソート・ページング）に加え、`resumeValidation`（resume保存の検証規則）、`workRegistrationGuard`（作品登録の重複・配下登録チェック）がある。後者2つは real/fixture 両アダプタが直接呼び、fixture 固有の判定・real 固有のSQL判定という分岐を作らない。fixture アダプタはインメモリ配列を検索・集計系の純粋関数群（`applyWorksQuery` / `buildAxisFacets` / `evalSmartFolder`）に渡して検索・集計する
 - real アダプタの検索・ファセット集計は SQL で行う。`WorkQueryRepository` の `queryWorks()` が catalog に user を ATTACH した JOIN で件数とページを同じ絞り込み集合から求め（ADR-0008）、`getAxisFacets()` がタグ軸専用 SQL を含むファセット集計を担う。SQL フラグメントは `workQuerySql.ts` に集約する。日本語ソートキー（`japaneseSortKey`）は書き込み時に列へ事前計算する。SQL と core 純粋関数の結果が一致することは `server/tests/real/worksQueryContract.test.ts` の同値性契約テストで担保する。スマートフォルダー評価だけは real でも `listSummaries()` + `evalSmartFolder` を使い、戻り値は `WorksPage`（ページングエンベロープ）である
 - `adapters/`（`server/src/adapters/`）: `DataAdapter` インターフェース（`server/src/adapter/index.ts`）でデータの出どころ（real | fixture）だけを差し替える。ルーターとドメインロジックは1系統のみ
+- プロセス内状態を持つアプリケーションサービス（`ScanJobManager` / `DlsiteJobManager` / `RootReconfigurationWorkflow`）は `server/src/` 直下に置き、`app.ts` が生成してルートと配線する。状態遷移や順序はサービスが持ち、I/Oは `DataAdapter` 経由で real/fixture 共通に行う
 
 新機能は `shared` → fixture アダプタ → real アダプタの順に実装を揃える（fixture が先行してよい）。
 
@@ -81,6 +82,7 @@ oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメン
 - 開発時（fixture）: server（Bun、`MIMIMILLI_ADAPTER=fixture`）と client（Vite）を別々の portless サービスとして起動する。client は Vite proxy で同じ worktree の `api.mimi` へ接続する
 - 開発時（real）: server と client を別々の portless サービスとして起動する。client は Vite proxy で同じ worktree の `api.mimi` へ接続する
 - スキャン: `POST /api/scan` はジョブを開始して 202 とスナップショットを即返す（`Location: /api/scan/:id`）。同時実行は1件のみで、実行中の二重POSTは409。進捗は `GET /api/scan/:id/events` の SSE で配信し、`Last-Event-ID` で欠損イベントをリプレイする（履歴切れ時は `reset` で現スナップショットを送る）。進捗無音区間は15秒間隔の `ping` で接続を維持。`GET /api/scan/active` で実行中ジョブを取得、`GET /api/scan/last` で直近完了結果（メモリ保持）を取得する
+- root再設定: root変更と初回設定は `POST /api/root-reconfiguration` だけで行う。実行中のscan・DLsite一括ジョブを取り消してから `root_folder` と再設定中状態を user DB へ同時に確定し、202 を返したあと、新rootの配下にない作品のcatalog行を削除してフルスキャンでcatalogと候補を作り直す。再設定中と失敗中は `app.ts` のmiddlewareが許可リスト以外の `/api` を409 `root_reconfiguring` で拒否する。状態は `GET /api/root-reconfiguration` と `GET /api/settings` の `rootReconfiguration` で取得する（[ADR-0029](adr/0029-root-reconfiguration-workflow.md)）
 - ファイルDB経路のフルスキャンは `scanWorker.ts` の Worker スレッドで実行し、メインスレッドのイベントループを塞がない。完了時の `ScanExecutionResult`（`ScanResult` + 候補プール）を `ScanCandidateSession` へ丸ごと置き換えて、候補の参照・登録・除外はメインスレッド常駐のセッションが担う
 - メディア配信: client がメディア URL を組み立て（`entities/work/api.ts`）、`/api/media/*` ルートが `DataAdapter.locateMedia()` 経由でアダプタ（実ファイル or fixture の合成メディア）から実体を取得して配信する
 
@@ -102,6 +104,7 @@ oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメン
 - [ADR-0008: 永続化トポロジー・検索所有権・再生IDを分離する](adr/0008-persistence-topology-query-ownership-playback-ids.md)
 - [ADR-0025: 正本の変更・投影・閲覧を責務として分離する](adr/0025-source-mutation-projection-read-separation.md)
 - [ADR-0026: 分類値の一覧を全作品への独立した入口とする](adr/0026-value-list-as-global-entry.md)
+- [ADR-0029: root変更を再設定ワークフローとして扱う](adr/0029-root-reconfiguration-workflow.md)
 - [requirements-v4.md](requirements-v4.md) — 機能・UX 要件
 - [HANDOFF.md](HANDOFF.md) — 開発の現状・引き継ぎ
 - [design-system.md](design-system.md) — フロントエンドのデザイン規約
