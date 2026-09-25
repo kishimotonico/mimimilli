@@ -8,12 +8,51 @@ import { scanRoute } from "../src/routes/scan.ts";
 import { ScanJobManager } from "../src/scanJobManager.ts";
 import { pollUntil } from "./helpers/poll.ts";
 
-function createScanJobManager(
-  adapter: DataAdapter,
-  historyLimit?: number,
-  terminalLimit?: number,
-): ScanJobManager {
-  return new ScanJobManager(adapter, historyLimit, terminalLimit);
+function createScanJobManager(adapter: DataAdapter, terminalLimit?: number): ScanJobManager {
+  return new ScanJobManager(adapter, terminalLimit);
+}
+
+type EmitProgress = (processed: number) => void;
+
+/** scanの進捗発行と完了をテストから操作できるadapter */
+function createGatedScanAdapter(): {
+  adapter: DataAdapter;
+  progressReady: Promise<EmitProgress>;
+  finishScan: () => void;
+} {
+  let resolveEmitProgress!: (emit: EmitProgress) => void;
+  const progressReady = new Promise<EmitProgress>((resolve) => {
+    resolveEmitProgress = resolve;
+  });
+  let finishScan!: () => void;
+  const scanDone = new Promise<typeof emptyResult>((resolve) => {
+    finishScan = () => resolve(emptyResult);
+  });
+  const adapter: DataAdapter = {
+    ...createFixtureAdapter(),
+    scan: (options) => {
+      const onProgress = options?.onProgress;
+      resolveEmitProgress((processed) =>
+        onProgress?.({ type: "progress", phase: "registering", processed, total: 10 }),
+      );
+      return scanDone;
+    },
+  };
+  return { adapter, progressReady, finishScan: () => finishScan() };
+}
+
+async function readSseFrames(response: Response): Promise<Array<{ event: string; data: string }>> {
+  const text = await response.text();
+  return text
+    .split("\n\n")
+    .filter((frame) => frame.trim() !== "")
+    .map((frame) => {
+      const lines = frame.split("\n");
+      assert.ok(!lines.some((line) => line.startsWith("id:")), "SSEフレームにidを付けないこと");
+      const event = lines.find((line) => line.startsWith("event: "))?.slice("event: ".length);
+      const data = lines.find((line) => line.startsWith("data: "))?.slice("data: ".length);
+      return { event: event ?? "", data: data ?? "" };
+    });
 }
 
 const emptyResult = {
@@ -145,24 +184,70 @@ test("GET /scan/last は一度も完了していなければ204、完了後は�
   assert.equal(typeof body.finishedAt, "string");
 });
 
-test("job scoped SSEはprogressとterminalをseq付きで配信し、Last-Event-IDをreplayする", async () => {
-  const app = createApp(createFixtureAdapter({ scenario: "new-work" }));
-  const { id } = await start(app);
-  const stream = await app.request(`/api/scan/${id}/events`);
-  assert.equal(stream.status, 200);
-  const text = await stream.text();
-  assert.match(text, /event: progress/);
-  assert.match(text, /event: completed/);
-  assert.match(text, /id: \d+/);
-  const terminalSeq = [...text.matchAll(/^id: (\d+)$/gm)].at(-1)?.[1];
-  assert.ok(terminalSeq);
-  const afterTerminal = await app.request(`/api/scan/${id}/events`, {
-    headers: { "Last-Event-ID": terminalSeq },
+test("job scoped SSEは接続時に現在snapshotをstateで1件送り、以後のprogressとterminalをid無しで配信する", async () => {
+  const { adapter, progressReady, finishScan } = createGatedScanAdapter();
+  const manager = createScanJobManager(adapter);
+  const app = new Hono();
+  app.route("/", scanRoute(manager));
+  const job = manager.start();
+  const emitProgress = await progressReady;
+  emitProgress(1);
+
+  // Last-Event-IDは読まないため、送っても接続時の現在snapshotから始まる
+  const response = await app.request(`/scan/${job.id}/events`, {
+    headers: { "Last-Event-ID": "0" },
   });
-  assert.equal(await afterTerminal.text(), "");
-  const replay = await app.request(`/api/scan/${id}/events`, { headers: { "Last-Event-ID": "0" } });
-  assert.equal(replay.status, 200);
-  assert.match(await replay.text(), /event: completed/);
+  assert.equal(response.status, 200);
+  emitProgress(2);
+  finishScan();
+  const frames = await readSseFrames(response);
+
+  assert.deepEqual(
+    frames.map((frame) => frame.event),
+    ["state", "progress", "completed"],
+  );
+  const initial = JSON.parse(frames[0]!.data);
+  assert.equal(initial.type, "state");
+  assert.equal(initial.snapshot.id, job.id);
+  assert.equal(initial.snapshot.status, "running");
+  assert.deepEqual(initial.snapshot.progress, { phase: "registering", processed: 1, total: 10 });
+  assert.deepEqual(JSON.parse(frames[1]!.data), {
+    type: "progress",
+    progress: { phase: "registering", processed: 2, total: 10 },
+  });
+  assert.equal(JSON.parse(frames[2]!.data).type, "completed");
+});
+
+test("終了済みjobへの接続は終端snapshotのstateを1件送って閉じる", async () => {
+  const app = createApp(createFixtureAdapter());
+  const { id } = await start(app);
+  const terminal = await waitForTerminal(app, id);
+
+  const frames = await readSseFrames(await app.request(`/api/scan/${id}/events`));
+
+  assert.deepEqual(frames, [
+    { event: "state", data: JSON.stringify({ type: "state", snapshot: terminal }) },
+  ]);
+});
+
+test("subscribeはsnapshot取得と購読を1手で行い、直後の完了を取りこぼさない", async () => {
+  const { adapter, progressReady, finishScan } = createGatedScanAdapter();
+  const manager = createScanJobManager(adapter);
+  const job = manager.start();
+  await progressReady;
+
+  const received: string[] = [];
+  const subscription = manager.subscribe(job.id, (event) => received.push(event.type));
+  assert.equal(subscription?.snapshot.status, "running");
+  finishScan();
+  await pollUntil(() => manager.get(job.id)?.status === "completed");
+  assert.deepEqual(received, ["completed"]);
+  subscription?.unsubscribe();
+
+  const afterTerminal: string[] = [];
+  const late = manager.subscribe(job.id, (event) => afterTerminal.push(event.type));
+  assert.equal(late?.snapshot.status, "completed");
+  assert.deepEqual(afterTerminal, []);
 });
 
 test("SSE subscriberが切断してもjobは継続する", async () => {
@@ -278,20 +363,12 @@ test("同期的に重いadapterでもPOST応答のcall stackではscanを開始�
   assert.equal(scanStarted, false);
 });
 
-test("history切詰時はresetし、terminal上限を超えたjobは404相当のnullになる", async () => {
-  const manager = createScanJobManager(createFixtureAdapter(), 2, 1);
+test("terminal上限を超えたjobは404相当のnullになる", async () => {
+  const manager = createScanJobManager(createFixtureAdapter(), 1);
   const first = manager.start();
   while (!manager.get(first.id)?.finishedAt) {
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
-  const replay = manager.subscribe(first.id, 0, () => {});
-  assert.equal(replay?.initial[0]?.type, "reset");
-  const resetSeq = replay?.initial[0]?.seq;
-  assert.ok(resetSeq !== undefined);
-  replay?.unsubscribe();
-  const afterReset = manager.subscribe(first.id, resetSeq, () => {});
-  assert.deepEqual(afterReset?.initial, []);
-  afterReset?.unsubscribe();
 
   const second = manager.start();
   while (!manager.get(second.id)?.finishedAt) {
@@ -299,60 +376,6 @@ test("history切詰時はresetし、terminal上限を超えたjobは404相当の
   }
   assert.equal(manager.get(first.id), null);
   assert.ok(manager.get(second.id));
-});
-
-test("reset IDで即再接続すると古い履歴を再送せず、以後のlive eventだけを受け取る", async () => {
-  type EmitProgress = (processed: number) => void;
-  let resolveEmitProgress!: (emit: EmitProgress) => void;
-  const emitProgressReady = new Promise<EmitProgress>((resolve) => {
-    resolveEmitProgress = resolve;
-  });
-  let finishScan!: () => void;
-  const scanDone = new Promise<typeof emptyResult>((resolve) => {
-    finishScan = () => resolve(emptyResult);
-  });
-  const fixture = createFixtureAdapter();
-  const adapter: DataAdapter = {
-    ...fixture,
-    scan: (options) => {
-      const onProgress = options?.onProgress;
-      resolveEmitProgress((processed) =>
-        onProgress?.({
-          type: "progress",
-          phase: "registering",
-          processed,
-          total: 10,
-        }),
-      );
-      return scanDone;
-    },
-  };
-  const manager = createScanJobManager(adapter, 2, 2);
-  const job = manager.start();
-  const emitProgress = await emitProgressReady;
-  emitProgress(1);
-  emitProgress(2);
-  emitProgress(3);
-
-  const reset = manager.subscribe(job.id, 0, () => {});
-  assert.equal(reset?.initial.length, 1);
-  assert.equal(reset?.initial[0]?.type, "reset");
-  const resetSeq = reset!.initial[0]!.seq;
-  reset?.unsubscribe();
-
-  const live: Array<{ seq: number }> = [];
-  const reconnected = manager.subscribe(job.id, resetSeq, (event) => live.push(event));
-  assert.deepEqual(reconnected?.initial, []);
-  emitProgress(4);
-  assert.deepEqual(
-    live.map((event) => event.seq),
-    [resetSeq + 1],
-  );
-  reconnected?.unsubscribe();
-  finishScan();
-  while (!manager.get(job.id)?.finishedAt) {
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  }
 });
 
 test("進捗の無い区間でも一定間隔でpingを送り、完了時にハートビートを残さず閉じる", async () => {

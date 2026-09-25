@@ -5,6 +5,7 @@ import {
   bindSseTransportError,
   bindTypedSseEvents,
   connectSse,
+  createSseGeneration,
 } from "../../../shared/api/sseTransport";
 import { cancelScan, getActiveScan, getScanJob, ScanAlreadyActiveError, startScan } from "../api";
 import type { ScanActionResult } from "../../../entities/scan/model/atoms";
@@ -43,7 +44,7 @@ export function useScanJob(options: UseScanJobOptions = {}) {
   const sourceRef = useRef<EventSource | null>(null);
   const attachedJobIdRef = useRef<string | null>(null);
   const snapshotRef = useRef<ScanJobSnapshot | null>(null);
-  const generationRef = useRef(0);
+  const generationRef = useRef(createSseGeneration());
   const terminalHandled = useRef(new Set<string>());
   const onTerminalRef = useRef(options.onTerminal);
   onTerminalRef.current = options.onTerminal;
@@ -52,7 +53,7 @@ export function useScanJob(options: UseScanJobOptions = {}) {
 
   const owns = useCallback(
     (generation: number, jobId: string): boolean =>
-      generationRef.current === generation && attachedJobIdRef.current === jobId,
+      generationRef.current.isCurrent(generation) && attachedJobIdRef.current === jobId,
     [],
   );
 
@@ -95,7 +96,7 @@ export function useScanJob(options: UseScanJobOptions = {}) {
       }
       attachedJobIdRef.current = null;
       snapshotRef.current = null;
-      generationRef.current += 1;
+      generationRef.current.bump();
       setJob(null);
       setError(errorMessage(cause));
     },
@@ -104,7 +105,7 @@ export function useScanJob(options: UseScanJobOptions = {}) {
 
   /** 購読中のジョブをローカルの状態からだけ切り離す（root再設定突入時用）。 */
   const reset = useCallback(() => {
-    generationRef.current += 1;
+    generationRef.current.bump();
     attachedJobIdRef.current = null;
     snapshotRef.current = null;
     sourceRef.current?.close();
@@ -117,8 +118,7 @@ export function useScanJob(options: UseScanJobOptions = {}) {
     (initial: ScanJobSnapshot): void => {
       sourceRef.current?.close();
       sourceRef.current = null;
-      const generation = generationRef.current + 1;
-      generationRef.current = generation;
+      const generation = generationRef.current.bump();
       attachedJobIdRef.current = initial.id;
       snapshotRef.current = null;
       setError(null);
@@ -157,13 +157,13 @@ export function useScanJob(options: UseScanJobOptions = {}) {
 
       bindTypedSseEvents({
         source,
-        eventNames: ["reset", "state", "progress", "completed", "failed", "cancelled"],
+        eventNames: ["state", "progress", "completed", "failed", "cancelled"],
         schema: scanJobEventSchema,
         messages: eventMessages,
         onValidationFailure: fail,
         onValidatedEvent: (event) => {
           if (!owns(generation, initial.id)) return;
-          if (event.type === "reset" || event.type === "state") {
+          if (event.type === "state") {
             applyOwned(generation, initial.id, source, event.snapshot);
           } else if (event.type === "progress") {
             const currentSnapshot = snapshotRef.current;
@@ -200,12 +200,13 @@ export function useScanJob(options: UseScanJobOptions = {}) {
   );
 
   useEffect(() => {
-    const discoveryGeneration = generationRef.current;
+    const generation = generationRef.current;
+    const discoveryGeneration = generation.current();
     void getActiveScan()
       .then((active) => {
         if (
           active &&
-          generationRef.current === discoveryGeneration &&
+          generation.isCurrent(discoveryGeneration) &&
           attachedJobIdRef.current === null
         ) {
           attach(active);
@@ -213,7 +214,7 @@ export function useScanJob(options: UseScanJobOptions = {}) {
       })
       .catch((cause: unknown) => {
         if (
-          generationRef.current === discoveryGeneration &&
+          generation.isCurrent(discoveryGeneration) &&
           attachedJobIdRef.current === null &&
           !isRootReconfiguringError(cause)
         ) {
@@ -221,7 +222,7 @@ export function useScanJob(options: UseScanJobOptions = {}) {
         }
       });
     return () => {
-      generationRef.current += 1;
+      generation.bump();
       attachedJobIdRef.current = null;
       snapshotRef.current = null;
       sourceRef.current?.close();
@@ -252,7 +253,7 @@ export function useScanJob(options: UseScanJobOptions = {}) {
 
   const cancel = useCallback(async (): Promise<ScanActionResult> => {
     if (!job) return { ok: true, job: null };
-    const generation = generationRef.current;
+    const generation = generationRef.current.current();
     const jobId = job.id;
     const localSource = sourceRef.current;
     setError(null);

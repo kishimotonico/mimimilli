@@ -39,7 +39,7 @@ function withStubAdapter(overrides: Partial<DataAdapter> & Pick<DataAdapter, "sc
 async function waitForTerminal(manager: ScanJobManager, id: string): Promise<void> {
   if (manager.get(id)?.finishedAt) return;
   await new Promise<void>((resolve, reject) => {
-    const sub = manager.subscribe(id, null, (event) => {
+    const sub = manager.subscribe(id, (event) => {
       if (event.type === "completed" || event.type === "failed" || event.type === "cancelled") {
         sub?.unsubscribe();
         resolve();
@@ -60,7 +60,7 @@ test("完了時にinsertedWorkIdsが1件以上あれば完了コールバック�
   const result: ScanResult = { ...emptyResult, insertedWorkIds: ["work-1", "work-2"] };
   const adapter = withStubAdapter({ scan: () => Promise.resolve(result) });
   const calls: string[][] = [];
-  const manager = new ScanJobManager(adapter, undefined, undefined, (insertedWorkIds) => {
+  const manager = new ScanJobManager(adapter, undefined, (insertedWorkIds) => {
     calls.push(insertedWorkIds);
   });
 
@@ -74,7 +74,7 @@ test("完了時にinsertedWorkIdsが1件以上あれば完了コールバック�
 test("完了時にinsertedWorkIdsが空なら完了コールバックを呼ばない", async () => {
   const adapter = withStubAdapter({ scan: () => Promise.resolve(emptyResult) });
   const calls: string[][] = [];
-  const manager = new ScanJobManager(adapter, undefined, undefined, (insertedWorkIds) => {
+  const manager = new ScanJobManager(adapter, undefined, (insertedWorkIds) => {
     calls.push(insertedWorkIds);
   });
 
@@ -92,7 +92,7 @@ test("中止時は完了コールバックを呼ばない", async () => {
   });
   const adapter = withStubAdapter({ scan: () => scanDone });
   const calls: string[][] = [];
-  const manager = new ScanJobManager(adapter, undefined, undefined, (insertedWorkIds) => {
+  const manager = new ScanJobManager(adapter, undefined, (insertedWorkIds) => {
     calls.push(insertedWorkIds);
   });
 
@@ -109,7 +109,7 @@ test("中止時は完了コールバックを呼ばない", async () => {
 test("失敗時は完了コールバックを呼ばない", async () => {
   const adapter = withStubAdapter({ scan: () => Promise.reject(new Error("boom")) });
   const calls: string[][] = [];
-  const manager = new ScanJobManager(adapter, undefined, undefined, (insertedWorkIds) => {
+  const manager = new ScanJobManager(adapter, undefined, (insertedWorkIds) => {
     calls.push(insertedWorkIds);
   });
 

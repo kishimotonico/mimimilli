@@ -204,7 +204,6 @@ describe("ScanRuntime EventSource ownership", () => {
     const source = FakeEventSource.instances[0]!;
     const completed = {
       type: "completed" as const,
-      seq: 1,
       result: scanResult,
     };
     dispatchScan(source, completed);
@@ -271,7 +270,7 @@ describe("ScanRuntime EventSource ownership", () => {
 
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
-    const completed = { type: "completed" as const, seq: 1, result: scanResult };
+    const completed = { type: "completed" as const, result: scanResult };
     dispatchScan(source, completed);
 
     // 完了処理が確定する前に、ユーザーが候補を登録して非表示化したと想定する。
@@ -322,7 +321,7 @@ describe("ScanRuntime EventSource ownership", () => {
     const source = FakeEventSource.instances[0]!;
 
     await expectNoUnhandledRejection(async () => {
-      dispatchScan(source, { type: "completed", seq: 1, result: scanResult });
+      dispatchScan(source, { type: "completed", result: scanResult });
       await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
     });
   });
@@ -359,7 +358,7 @@ describe("Runtime間連携: ScanRuntime → DlsiteBulkRuntime", () => {
 
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const scanSource = FakeEventSource.instances[0]!;
-    const completed = { type: "completed" as const, seq: 1, result: scanResultWithNewWorks };
+    const completed = { type: "completed" as const, result: scanResultWithNewWorks };
     dispatchScan(scanSource, completed);
     dispatchScan(scanSource, completed);
 
@@ -386,7 +385,7 @@ describe("ScanRuntime: 完了・中止トースト", () => {
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
 
-    dispatchScan(source, { type: "completed", seq: 1, result: scanResult });
+    dispatchScan(source, { type: "completed", result: scanResult });
     await waitFor(() =>
       expect(latestToastRequest(store)?.message).toBe(
         "スキャン完了: 登録 1件・新規 0件・エラー 0件・行方不明 0件",
@@ -413,7 +412,7 @@ describe("ScanRuntime: 完了・中止トースト", () => {
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
 
-    dispatchScan(source, { type: "completed", seq: 1, result: needsAttentionResult });
+    dispatchScan(source, { type: "completed", result: needsAttentionResult });
     await waitFor(() => expect(latestToastRequest(store)?.actionLabel).toBe("要対応を見る"));
 
     latestToastRequest(store)!.onAction!();
@@ -438,7 +437,7 @@ describe("ScanRuntime: 完了・中止トースト", () => {
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
 
-    dispatchScan(source, { type: "cancelled", seq: 1 });
+    dispatchScan(source, { type: "cancelled" });
     await waitFor(() => expect(latestToastRequest(store)?.message).toBe("スキャンを中止しました"));
   });
 
@@ -458,7 +457,7 @@ describe("ScanRuntime: 完了・中止トースト", () => {
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
 
-    dispatchScan(source, { type: "completed", seq: 1, result: scanResult });
+    dispatchScan(source, { type: "completed", result: scanResult });
     await waitFor(() => expect(store.get(scanJobAtom)?.status).toBe("completed"));
     expect(latestToastRequest(store)).toBeUndefined();
   });

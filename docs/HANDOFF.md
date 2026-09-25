@@ -81,7 +81,7 @@ smokeテストの注意:
 | GET          | `/scan/last`                                 | サーバー起動後に一度でも完了した直近スキャンの結果（`finishedAt` 付き）。なければ204（メモリのみ保持）                    |
 | GET          | `/scan/:id`                                  | ジョブスナップショット。なければ404                                                                                       |
 | DELETE       | `/scan/:id`                                  | キャンセル（`status` → `cancelling`）。なければ404                                                                        |
-| GET          | `/scan/:id/events`                           | ジョブ進捗のSSE（`reset`/`state`/`progress`/`completed`/`failed`/`cancelled`・15秒`ping`）。`Last-Event-ID` 対応          |
+| GET          | `/scan/:id/events`                           | ジョブ進捗のSSE（接続時に現在の`state`、以後`state`/`progress`/`completed`/`failed`/`cancelled`・15秒`ping`）             |
 | GET          | `/scan/diagnostics`                          | スキャン診断（候補プール・identity conflict 等のサマリー）                                                                |
 | GET          | `/scan/candidates`                           | 未登録候補一覧                                                                                                            |
 | POST         | `/scan/candidates/exclude`                   | 候補の除外                                                                                                                |

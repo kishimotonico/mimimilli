@@ -163,29 +163,12 @@ export const scanLastResultResponseSchema = z.object({
 });
 export type ScanLastResultResponse = z.infer<typeof scanLastResultResponseSchema>;
 
-/** `seq` はジョブ内で単調増加する。reset は履歴が切り詰められた再接続時の完全状態である。 */
+/** 接続時は現在snapshotを`state`で1件送り、以後はliveのイベントを送る。 */
 export const scanJobEventSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("reset"),
-    seq: z.number().int().nonnegative(),
-    snapshot: scanJobSnapshotSchema,
-  }),
-  z.object({
-    type: z.literal("state"),
-    seq: z.number().int().nonnegative(),
-    snapshot: scanJobSnapshotSchema,
-  }),
-  z.object({
-    type: z.literal("progress"),
-    seq: z.number().int().nonnegative(),
-    progress: scanProgressSchema,
-  }),
-  z.object({
-    type: z.literal("completed"),
-    seq: z.number().int().nonnegative(),
-    result: scanResultSchema,
-  }),
-  z.object({ type: z.literal("failed"), seq: z.number().int().nonnegative(), error: z.string() }),
-  z.object({ type: z.literal("cancelled"), seq: z.number().int().nonnegative() }),
+  z.object({ type: z.literal("state"), snapshot: scanJobSnapshotSchema }),
+  z.object({ type: z.literal("progress"), progress: scanProgressSchema }),
+  z.object({ type: z.literal("completed"), result: scanResultSchema }),
+  z.object({ type: z.literal("failed"), error: z.string() }),
+  z.object({ type: z.literal("cancelled") }),
 ]);
 export type ScanJobEvent = z.infer<typeof scanJobEventSchema>;

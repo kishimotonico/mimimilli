@@ -241,7 +241,7 @@ describe("ScanRuntime", () => {
 
     // その直後に同じジョブのSSEが完了を届ける。errorToast.dismiss()とonTerminalの完了トーストが
     // 同じバッチで走る経路（cancel()のHTTP失敗＋SSE生存）を再現する。
-    dispatch(source, { type: "completed", seq: 1, result: scanResult });
+    dispatch(source, { type: "completed", result: scanResult });
 
     await waitFor(() => expect(getErrorToastMessage(store)).toBeNull());
     await waitFor(() => expect(screen.getByText(/^スキャン完了/)).toBeTruthy());

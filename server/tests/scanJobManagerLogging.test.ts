@@ -38,7 +38,7 @@ function withStubAdapter(overrides: Partial<DataAdapter> & Pick<DataAdapter, "sc
 async function waitForTerminal(manager: ScanJobManager, id: string): Promise<void> {
   if (manager.get(id)?.finishedAt) return;
   await new Promise<void>((resolve, reject) => {
-    const sub = manager.subscribe(id, null, (event) => {
+    const sub = manager.subscribe(id, (event) => {
       if (event.type === "completed" || event.type === "failed" || event.type === "cancelled") {
         sub?.unsubscribe();
         resolve();

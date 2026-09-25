@@ -67,7 +67,7 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
 
   const api = new Hono();
   const dlsiteJobs = new DlsiteJobManager(adapter);
-  const scanJobs = new ScanJobManager(adapter, undefined, undefined, (insertedWorkIds) =>
+  const scanJobs = new ScanJobManager(adapter, undefined, (insertedWorkIds) =>
     dlsiteJobs.enqueue("new", insertedWorkIds),
   );
   const admittedRequestGate = new InFlightRequestGate();

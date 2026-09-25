@@ -22,8 +22,6 @@ interface Job {
   snapshot: ScanJobSnapshot;
   controller: AbortController;
   listeners: Set<Listener>;
-  history: ScanJobEvent[];
-  nextSeq: number;
   full: boolean;
 }
 
@@ -38,7 +36,6 @@ export class ActiveScanConflictError extends Error {
 
 export class ScanJobManager {
   private readonly adapter: DataAdapter;
-  private readonly historyLimit: number;
   private readonly terminalLimit: number;
   private readonly onCompleted: (insertedWorkIds: string[]) => void;
   private readonly jobs = new Map<string, Job>();
@@ -50,12 +47,10 @@ export class ScanJobManager {
 
   constructor(
     adapter: DataAdapter,
-    historyLimit = 128,
     terminalLimit = 16,
     onCompleted: (insertedWorkIds: string[]) => void = () => {},
   ) {
     this.adapter = adapter;
-    this.historyLimit = historyLimit;
     this.terminalLimit = terminalLimit;
     this.onCompleted = onCompleted;
   }
@@ -79,8 +74,6 @@ export class ScanJobManager {
       snapshot,
       controller: new AbortController(),
       listeners: new Set(),
-      history: [],
-      nextSeq: 1,
       full,
     };
     this.jobs.set(snapshot.id, job);
@@ -156,7 +149,7 @@ export class ScanJobManager {
     if (this.isTerminal(job)) return this.copy(job.snapshot);
     if (job.snapshot.status !== "cancelling") {
       job.snapshot.status = "cancelling";
-      this.emit(job, { type: "state", seq: 0, snapshot: this.copy(job.snapshot) });
+      this.emit(job, { type: "state", snapshot: this.copy(job.snapshot) });
     }
     job.controller.abort();
     return this.copy(job.snapshot);
@@ -177,45 +170,24 @@ export class ScanJobManager {
     await this.runCompletion;
   }
 
+  /** 現在snapshotの取得とlistener登録を同期的に行う。終端済みならlistenerは登録しない。 */
   subscribe(
     id: string,
-    lastEventId: number | null,
     listener: Listener,
-  ): {
-    unsubscribe(): void;
-    initial: ScanJobEvent[];
-    snapshot: ScanJobSnapshot;
-  } | null {
+  ): { snapshot: ScanJobSnapshot; unsubscribe(): void } | null {
     const job = this.jobs.get(id);
     if (!job) return null;
+    const snapshot = this.copy(job.snapshot);
+    if (this.isTerminal(job)) return { snapshot, unsubscribe: () => {} };
     job.listeners.add(listener);
-    const first = job.history[0]?.seq;
-    const initial: ScanJobEvent[] = [];
-    if (lastEventId !== null && first !== undefined && lastEventId < first - 1) {
-      // reset snapshotは現在状態を包含するため、その時点の全event watermarkをIDにする。
-      // first-1ではreset後の再接続時に古いretained historyを再適用してしまう。
-      initial.push({
-        type: "reset",
-        seq: job.nextSeq - 1,
-        snapshot: this.copy(job.snapshot),
-      });
-    } else {
-      for (const event of job.history) {
-        if (lastEventId === null || event.seq > lastEventId) initial.push(event);
-      }
-    }
-    return {
-      initial,
-      snapshot: this.copy(job.snapshot),
-      unsubscribe: () => job.listeners.delete(listener),
-    };
+    return { snapshot, unsubscribe: () => job.listeners.delete(listener) };
   }
 
   private async run(job: Job): Promise<void> {
     if (job.controller.signal.aborted) return this.finishCancelled(job);
     job.snapshot.status = "running";
     job.snapshot.startedAt = new Date().toISOString();
-    this.emit(job, { type: "state", seq: 0, snapshot: this.copy(job.snapshot) });
+    this.emit(job, { type: "state", snapshot: this.copy(job.snapshot) });
     try {
       const settings = await this.adapter.getSettings();
       scanLogger.info("スキャンを開始しました", {
@@ -250,7 +222,7 @@ export class ScanJobManager {
       processed: event.processed,
       total: event.total,
     };
-    this.emit(job, { type: "progress", seq: 0, progress: job.snapshot.progress });
+    this.emit(job, { type: "progress", progress: job.snapshot.progress });
   }
 
   private finishCompleted(job: Job, result: ScanResult): void {
@@ -263,7 +235,7 @@ export class ScanJobManager {
     job.snapshot.finishedAt = new Date().toISOString();
     this.lastCompleted = { result, finishedAt: job.snapshot.finishedAt };
     this.logScanCompleted(job, result);
-    this.emit(job, { type: "completed", seq: 0, result });
+    this.emit(job, { type: "completed", result });
     this.deactivate(job);
     this.pruneTerminal();
     if (result.insertedWorkIds.length > 0) this.onCompleted(result.insertedWorkIds);
@@ -284,7 +256,7 @@ export class ScanJobManager {
       durationMs: this.durationMs(job),
       ...formatError(error),
     });
-    this.emit(job, { type: "failed", seq: 0, error: message });
+    this.emit(job, { type: "failed", error: message });
     this.deactivate(job);
     this.pruneTerminal();
   }
@@ -297,7 +269,7 @@ export class ScanJobManager {
       jobId: job.snapshot.id,
       durationMs: this.durationMs(job),
     });
-    this.emit(job, { type: "cancelled", seq: 0 });
+    this.emit(job, { type: "cancelled" });
     this.deactivate(job);
     this.pruneTerminal();
   }
@@ -328,12 +300,7 @@ export class ScanJobManager {
   }
 
   private emit(job: Job, event: ScanJobEvent): void {
-    const assigned = { ...event, seq: job.nextSeq++ } as ScanJobEvent;
-    job.history.push(assigned);
-    if (job.history.length > this.historyLimit) {
-      job.history.splice(0, job.history.length - this.historyLimit);
-    }
-    for (const listener of job.listeners) listener(assigned);
+    for (const listener of job.listeners) listener(event);
   }
 
   private deactivate(job: Job): void {
