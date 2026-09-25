@@ -40,7 +40,7 @@ import {
 import { SourceChangedError } from "../../errors.ts";
 import { removeIdentityConflictPath } from "../../core/identityConflicts.ts";
 import { validateResumeRequest } from "../../core/resumeValidation.ts";
-import { identityConflictPathOf, resolveWithin } from "./paths.ts";
+import { identityConflictMetaPath, identityConflictPathOf, resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
@@ -115,12 +115,6 @@ export function createWorkMethods(deps: {
     } catch {
       return null;
     }
-  }
-
-  /** identity_conflict のパスはフォルダー形式ならフォルダー、単一ファイル形式ならメタファイルを指す */
-  function metaPathOfIdentityConflictTarget(target: string): string {
-    const isFile = statSync(target, { throwIfNoEntry: false })?.isFile() ?? false;
-    return isFile ? target : join(target, META_FILE_NAME);
   }
 
   async function persistSourceMutation(
@@ -198,7 +192,7 @@ export function createWorkMethods(deps: {
       const root = requireRoot();
       const target = resolveWithin(root, join(root, body.path));
       if (!target) return null;
-      const metaPath = metaPathOfIdentityConflictTarget(target);
+      const metaPath = identityConflictMetaPath(target);
       let source;
       try {
         source = readMetaSource(metaPath);
@@ -233,7 +227,7 @@ export function createWorkMethods(deps: {
       const physicalPath = resolveWorkPlacement(metaPath, source.meta).physicalPath;
       const existing = query.getScanWorkMap().get(source.meta.id);
       const hadCatalogRow = existing !== undefined;
-      if (existing && existing.physicalPath !== physicalPath && existing.status !== "missing") {
+      if (existing && existing.metaPath !== metaPath && existing.status !== "missing") {
         recordIdentityConflict(source.meta.id, existing.metaPath, metaPath);
         return {
           snapshot: toEditSnapshot(source, physicalPath),

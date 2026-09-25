@@ -47,6 +47,15 @@ test("workPlacementOf: メタファイル名で形式を決め、mediaRootはmet
   assert.throws(() => workPlacementOf("/lib/d00001.mp3"));
 });
 
+test("workPlacementOf: ルート直下のmediaRootは末尾の区切りを残す", () => {
+  assert.equal(workPlacementOf("/mimimilli.json").mediaRoot, "/");
+  assert.equal(workPlacementOf("C:\\mimimilli.json").mediaRoot, "C:\\");
+  assert.equal(
+    resolveWorkPlacement("C:\\d00001.mimimilli.json", meta(["d00001.mp3"])).physicalPath,
+    "C:\\d00001.mp3",
+  );
+});
+
 test("resolveWorkPlacement: フォルダー形式はmediaRootがphysicalPath", () => {
   const resolution = resolveWorkPlacement("/lib/work/mimimilli.json", meta(["a.mp3", "b.mp3"]));
   assert.equal(resolution.ok, true);

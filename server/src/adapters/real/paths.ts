@@ -1,10 +1,12 @@
 // パス解決とトラバーサル対策。Rust 版（canonicalize + starts_with）と同水準。
 // /api/fs と /api/media/* のすべての物理パス解決はここを通すこと。
 import { realpathSync } from "node:fs";
-import { dirname, relative, sep } from "node:path";
+import { basename, dirname, join, relative, sep } from "node:path";
 import { isPathWithin } from "../../lib/path.ts";
 import {
   IMAGE_PREVIEW_LIMIT_BYTES,
+  META_FILE_NAME,
+  isSidecarMetaFileName,
   PDF_PREVIEW_LIMIT_BYTES,
   TEXT_PREVIEW_LIMIT_BYTES,
   type MediaKind,
@@ -66,6 +68,11 @@ export function toPortableRelativePath(base: string, target: string): string {
 /** identity_conflict 診断に載せる作品の root 相対パス。フォルダー形式はフォルダー、単一ファイル形式はメタファイル */
 export function identityConflictPathOf(root: string, metaPath: string): string {
   return toPortableRelativePath(root, unresolvedWorkPhysicalPath(workPlacementOf(metaPath)));
+}
+
+/** identityConflictPathOf の逆。パス名だけで対象のメタファイルを決める */
+export function identityConflictMetaPath(target: string): string {
+  return isSidecarMetaFileName(basename(target)) ? target : join(target, META_FILE_NAME);
 }
 
 // ── 祖先パス除外（スキャンの workRoots 統合用。TASK-62） ─────────

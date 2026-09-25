@@ -1,12 +1,13 @@
 // 配置形式の不整合（ADR-0032）: scan の境界で作品が error になり、文言が real/fixture で一致する。
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { emptyMetaDlsiteState, META_FILE_NAME, type MetaFile } from "@mimimilli/shared";
 import type { DataAdapter } from "../src/adapter/index.ts";
 import { createFixtureAdapter, type FixtureSeedWork } from "../src/adapters/fixture/index.ts";
 import { writeMetaFile } from "../src/adapters/real/meta.ts";
+import { identityConflictMetaPath } from "../src/adapters/real/paths.ts";
 import { configureRoot } from "./helpers/rootFolder.ts";
 import { createTestRealAdapter } from "./helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "./helpers/sampleLibrary.ts";
@@ -231,4 +232,123 @@ test("音声拡張子で終わる名前のフォルダーはフォルダー作�
   assert.equal(work?.status, "ok");
   assert.equal(work?.physicalPath, folder);
   assert.equal(work?.playlists[0]?.tracks[0]?.durationKind, "resolved");
+});
+
+async function registerSingleFileWork(
+  name: string,
+  dirs: string[],
+): Promise<{ root: string; meta: MetaFile; adapter: DataAdapter; cleanup: () => void }> {
+  const directory = makeTestDirectory(name);
+  const root = join(directory.path, "library");
+  const meta = metaOf("single", [{ name: "default", files: ["single.wav"] }]);
+  for (const dir of dirs) {
+    mkdirSync(join(root, dir), { recursive: true });
+    writeWav(join(root, dir, "single.wav"), 1);
+  }
+  writeMetaFile(join(root, dirs[0]!, "single.mimimilli.json"), meta);
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  await configureRoot(adapter, root);
+  await adapter.scan();
+  return { root, meta, adapter, cleanup: directory.cleanup };
+}
+
+test("identity_conflictのパスからのメタファイル解決は名前だけで決まる", () => {
+  assert.equal(
+    identityConflictMetaPath("/nowhere/b/single.mimimilli.json"),
+    "/nowhere/b/single.mimimilli.json",
+  );
+  assert.equal(identityConflictMetaPath("/nowhere/b/work"), `/nowhere/b/work/${META_FILE_NAME}`);
+});
+
+test("単一ファイル形式の重複は、メタファイルのパスで再採番できる（real）", async (t) => {
+  const { root, meta, adapter, cleanup } = await registerSingleFileWork("work-placement-reassign", [
+    "a",
+    "b",
+  ]);
+  t.after(cleanup);
+  const copyPath = join(root, "b", "single.mimimilli.json");
+  writeMetaFile(copyPath, meta);
+  await adapter.scan();
+
+  const result = await adapter.reassignIdentityConflict({
+    path: "b/single.mimimilli.json" as never,
+  });
+  assert.ok(result);
+  const reassigned = JSON.parse(readFileSync(copyPath, "utf-8")) as { id: string };
+  assert.notEqual(reassigned.id, meta.id);
+  assert.deepEqual(await adapter.listScanDiagnostics(), []);
+});
+
+test("再採番の前にメタが消えていても、単一ファイル形式はフォルダーとして読まない（real）", async (t) => {
+  const { root, meta, adapter, cleanup } = await registerSingleFileWork(
+    "work-placement-reassign-missing",
+    ["a", "b"],
+  );
+  t.after(cleanup);
+  const copyPath = join(root, "b", "single.mimimilli.json");
+  writeMetaFile(copyPath, meta);
+  await adapter.scan();
+  renameSync(copyPath, join(root, "b", "moved.json"));
+  assert.equal(
+    await adapter.reassignIdentityConflict({ path: "b/single.mimimilli.json" as never }),
+    null,
+  );
+
+  mkdirSync(copyPath);
+  writeMetaFile(join(copyPath, META_FILE_NAME), meta);
+  await assert.rejects(() =>
+    adapter.reassignIdentityConflict({ path: "b/single.mimimilli.json" as never }),
+  );
+  const untouched = JSON.parse(readFileSync(join(copyPath, META_FILE_NAME), "utf-8")) as {
+    id: string;
+  };
+  assert.equal(untouched.id, meta.id);
+});
+
+test("壊れた単一ファイル形式のメタを直して反映すると、競合にならず投影される（real）", async (t) => {
+  const { root, meta, adapter, cleanup } = await registerSingleFileWork(
+    "work-placement-project-repaired",
+    ["a"],
+  );
+  t.after(cleanup);
+  const metaPath = join(root, "a", "single.mimimilli.json");
+  const original = readFileSync(metaPath);
+  writeFileSync(metaPath, "{ broken");
+  await adapter.scan();
+  assert.equal((await adapter.getWork(meta.id))?.physicalPath, metaPath);
+
+  writeFileSync(metaPath, original);
+  const result = await adapter.projectWorkSource("a/single.wav" as never);
+  assert.equal(result?.projection.status, "published");
+  const work = await adapter.getWork(meta.id);
+  assert.equal(work?.status, "ok");
+  assert.equal(work?.physicalPath, join(root, "a", "single.wav"));
+  assert.deepEqual(await adapter.listScanDiagnostics(), []);
+});
+
+test("メタファイルを単一ファイル形式の名前に改名すると、増分scanでも配置を検査し直す（real）", async (t) => {
+  const directory = makeTestDirectory("work-placement-renamed-meta");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "library");
+  const folder = join(root, "album");
+  mkdirSync(folder, { recursive: true });
+  writeWav(join(folder, "track.wav"), 1);
+  const meta = metaOf("album", [{ name: "default", files: ["track.wav"] }]);
+  writeMetaFile(join(folder, META_FILE_NAME), meta);
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  await configureRoot(adapter, root);
+  await adapter.scan();
+  assert.equal((await adapter.getWork(meta.id))?.status, "ok");
+
+  const renamed = join(folder, "single.mimimilli.json");
+  renameSync(join(folder, META_FILE_NAME), renamed);
+  assert.ok(!existsSync(join(folder, META_FILE_NAME)));
+  await adapter.scan();
+  const work = await adapter.getWork(meta.id);
+  assert.equal(work?.status, "error");
+  assert.equal(
+    work?.errorMessage,
+    `${PREFIX}single.mimimilli.json のトラックが参照する track.wav は、このメタファイルに対応する音声ファイルではありません`,
+  );
+  assert.equal(work?.physicalPath, renamed);
 });

@@ -252,9 +252,16 @@ export function prepareMetaEntries(
             }
           : undefined;
       const coverSatisfied = coverSatisfiedForState(meta, state);
+      const placementSettled = placement.ok && state?.metaPath === metaPath;
       if (
-        canSkipIncremental(full, cachedRevisions, revisions, coverSatisfied, state?.status) &&
-        state?.physicalPath === placement.physicalPath
+        canSkipIncremental(
+          full,
+          cachedRevisions,
+          revisions,
+          coverSatisfied,
+          state?.status,
+          placementSettled,
+        )
       ) {
         prepared.push({ kind: "skip", metaPath, id: meta.id });
         continue;
@@ -269,6 +276,7 @@ export function prepareMetaEntries(
         cachedRevisions,
         cachedStatus: state?.status,
         coverSatisfied,
+        placementSettled,
       });
     } catch (e) {
       if (e instanceof MetaParseError) {
@@ -297,6 +305,7 @@ export function prepareSingleMeta(
     cachedRevisions: undefined,
     cachedStatus: undefined,
     coverSatisfied: false,
+    placementSettled: false,
   };
 }
 
@@ -318,6 +327,7 @@ export function buildProbeCache(
         entry.revisions,
         entry.coverSatisfied,
         entry.cachedStatus,
+        entry.placementSettled,
       )
     )
       continue;
@@ -416,8 +426,16 @@ export async function registerMetaFile(
   dlsiteCache?: DlsiteCache | null,
 ): Promise<"skipped" | string> {
   const { full, idsAlreadyRegistered } = options;
-  const { metaPath, meta, placement, revisions, cachedRevisions, cachedStatus, coverSatisfied } =
-    prepared;
+  const {
+    metaPath,
+    meta,
+    placement,
+    revisions,
+    cachedRevisions,
+    cachedStatus,
+    coverSatisfied,
+    placementSettled,
+  } = prepared;
   const { mediaRoot } = placement.placement;
   const id = meta.id;
 
@@ -425,7 +443,16 @@ export async function registerMetaFile(
     assertUniqueMetaIds(metaPath, meta, seenIds);
   }
 
-  if (canSkipIncremental(full, cachedRevisions, revisions, coverSatisfied, cachedStatus)) {
+  if (
+    canSkipIncremental(
+      full,
+      cachedRevisions,
+      revisions,
+      coverSatisfied,
+      cachedStatus,
+      placementSettled,
+    )
+  ) {
     return "skipped";
   }
 

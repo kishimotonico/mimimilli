@@ -34,7 +34,9 @@ function metaFileNameOf(metaPath: string): string {
 export function workPlacementOf(metaPath: string): WorkPlacement {
   const cut = lastSeparatorIndex(metaPath);
   const name = metaPath.slice(cut + 1);
-  const mediaRoot = cut === 0 ? metaPath.slice(0, 1) : metaPath.slice(0, Math.max(cut, 0));
+  const parent = metaPath.slice(0, Math.max(cut, 0));
+  const isRoot = cut === 0 || /^[A-Za-z]:$/.test(parent);
+  const mediaRoot = isRoot ? metaPath.slice(0, cut + 1) : parent;
   if (name === META_FILE_NAME) return { kind: "folder", metaPath, mediaRoot };
   if (isSidecarMetaFileName(name)) return { kind: "audio-file", metaPath, mediaRoot };
   throw new Error(`メタファイル名ではありません: ${metaPath}`);
