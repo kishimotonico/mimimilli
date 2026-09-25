@@ -70,8 +70,8 @@ beforeEach(() => {
   );
 });
 
-describe("SetupScreen 経路", () => {
-  it("rootFolder 未設定時に SetupScreen を表示する", async () => {
+describe("RootConfigurationScreen（初回セットアップ）経路", () => {
+  it("rootFolder 未設定時に初回セットアップ画面を表示する", async () => {
     renderSetupApp();
     await waitFor(() => expect(screen.getByText("ようこそ")).toBeInTheDocument());
     expect(screen.getByRole("button", { name: /スキャン開始/ })).toBeInTheDocument();

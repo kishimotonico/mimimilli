@@ -69,7 +69,7 @@ beforeEach(() => {
 });
 
 describe("root再設定中の画面", () => {
-  it("running中はRootReconfigurationScreenのみが描画され、通常UI（LeftNav等）は出ない", async () => {
+  it("running中はRootConfigurationScreenのみが描画され、通常UI（LeftNav等）は出ない", async () => {
     renderAppWithSettings({
       rootFolder: "/audio/library",
       lastScanTime: "2026-01-01T00:00:00.000Z",
@@ -87,7 +87,7 @@ describe("root再設定中の画面", () => {
     expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
   });
 
-  it("failed中はRootReconfigurationScreenが失敗表示で出て、通常UIは出ない", async () => {
+  it("failed中はRootConfigurationScreenが失敗表示で出て、通常UIは出ない", async () => {
     renderAppWithSettings({
       rootFolder: "/audio/library",
       lastScanTime: null,

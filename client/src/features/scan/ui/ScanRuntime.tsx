@@ -106,8 +106,7 @@ export default function ScanRuntime() {
       errorToast.dismiss();
       return;
     }
-    // scanErrorAtomはSetupScreenがインライン表示にも使う「エラー状態」として残す
-    // （AC参照）。表示自体はここからuseToastへ出す
+    // 表示自体はここからuseToastへ出す
     errorToast.show({
       message: scanJob.error,
       variant: "error",

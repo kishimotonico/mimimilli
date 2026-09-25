@@ -1,5 +1,5 @@
 // root再設定の開始・再試行を単一の手順にまとめる（ADR-0029）。
-// SetupScreen（初回）・SettingsModal（変更）・RootReconfigurationScreen（再試行）はこの手順を共有する。
+// RootConfigurationScreen（初回・再試行）・SettingsModal（変更）はこの手順を共有する。
 import type { RootReconfigurationState } from "@mimimilli/shared";
 
 export interface RunStartRootReconfigurationDeps {

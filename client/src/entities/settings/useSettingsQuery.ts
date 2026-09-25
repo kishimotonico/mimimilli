@@ -31,7 +31,7 @@ export function useRootFolder(): string {
   return requireRootFolder(useSettingsQuery().data?.rootFolder);
 }
 
-/** 起動ゲート（App の startupState 判定・SetupScreen）専用。root がまだ無い状態を扱う */
+/** 起動ゲート（App の startupState 判定・RootConfigurationScreen）専用。root がまだ無い状態を扱う */
 export function useRootFolderOrNull(): string | null {
   return useSettingsQuery().data?.rootFolder ?? null;
 }
