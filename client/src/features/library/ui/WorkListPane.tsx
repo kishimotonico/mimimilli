@@ -1,6 +1,10 @@
 import { useCallback, useState } from "react";
-import type { WorkListItem } from "@mimimilli/shared";
-import type { AxisId } from "../../../entities/library/types";
+import { useAtomValue } from "jotai";
+import {
+  playerIsPlayingOrLoadingAtom,
+  playingWorkIdAtom,
+} from "../../../entities/player/model/atoms";
+import type { WorkResultsProps } from "./workResultsProps";
 import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
 import WorkRow from "./WorkRow";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
@@ -26,57 +30,28 @@ const LIST_PADDING_START = 4;
 const LIST_PADDING_END_BASE = 4;
 const LIST_DOCKED_BAR_EXTRA = 8;
 
-interface WorkListPaneProps {
-  axis: AxisId;
-  works: WorkListItem[];
-  worksQueryKey: string;
-  selectedWorkId: string | null;
-  searchQuery: string;
-  hasSelectedTags: boolean;
-  playingWorkId?: string;
-  isPlaybackActive?: boolean;
-  /** 画面下張り付きの再生バーが表示中か（末尾余白の確保に使う） */
-  dockedBarActive?: boolean;
-  isPending?: boolean;
-  hasNextPage?: boolean;
-  worksTotal?: number;
-  isFetchingNextPage?: boolean;
-  onLoadMore?: () => void;
-  onWorkSelect: (id: string) => void;
-  onWorkPlay: (work: WorkListItem) => void;
-  onClearSearch: () => void;
-  /** Esc・リスト背景クリック時の選択解除 */
-  onDeselect: () => void;
-  /** スマートフォルダー軸か。0件時に専用の空状態（条件を編集・絞り込みをすべてクリア）を
-   *  出す */
-  isSmartFolder?: boolean;
-  onEditSmartFolderRules?: () => void;
-  onClearAllFilters?: () => void;
-}
-
 export default function WorkListPane({
-  axis,
+  nav,
   works,
   worksQueryKey,
-  selectedWorkId,
-  searchQuery,
-  hasSelectedTags,
-  playingWorkId,
-  isPlaybackActive,
-  dockedBarActive = false,
   isPending = false,
-  hasNextPage = false,
-  worksTotal,
-  isFetchingNextPage = false,
-  onLoadMore,
-  onWorkSelect,
+  dockedBarActive = false,
   onWorkPlay,
-  onClearSearch,
-  onDeselect,
-  isSmartFolder = false,
-  onEditSmartFolderRules,
-  onClearAllFilters,
-}: WorkListPaneProps) {
+  pagination: { hasNextPage = false, worksTotal, isFetchingNextPage = false, onLoadMore },
+  emptyState: { searchQuery, isSmartFolder = false, onClearSearch, onEditSmartFolderRules },
+}: WorkResultsProps) {
+  const axis = nav.activeAxis;
+  const selectedWorkId = nav.selectedWorkId;
+  const hasSelectedTags = nav.selectedTags.length > 0;
+  const onWorkSelect = nav.selectWork;
+  const onClearAllFilters = nav.clearTags;
+  const onDeselect = useCallback(
+    () => nav.selectWork(null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nav は毎レンダー新規オブジェクトのため参照する値だけに依存を絞る
+    [nav.selectWork],
+  );
+  const playingWorkId = useAtomValue(playingWorkIdAtom);
+  const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
   const isWorkSelected = selectedWorkId !== null;
   const paddingEnd = dockedBarActive
     ? LIST_PADDING_END_BASE + LIST_DOCKED_BAR_EXTRA

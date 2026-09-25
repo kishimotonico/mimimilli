@@ -4,12 +4,20 @@ import userEvent from "@testing-library/user-event";
 import { Provider, createStore } from "jotai";
 import type { WorkListItem } from "@mimimilli/shared";
 import WorkGrid from "../../src/features/library/ui/WorkGrid";
+import type { WorkResultsProps } from "../../src/features/library/ui/workResultsProps";
 import {
   libraryGridLayoutModeAtom,
   libraryTileSizeAtom,
 } from "../../src/features/library/model/atoms";
 import type { GridLayoutMode } from "../../src/entities/library/types";
+import type {
+  LibraryViewActions,
+  LibraryViewState,
+} from "../../src/features/library/model/useLibraryNavigation";
+import { buildNav } from "./fixtures/libraryNav";
+import { setPlayingWork } from "./fixtures/playerCore";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
+import { nts } from "../helpers/tag";
 
 function createWorks(count: number): WorkListItem[] {
   return Array.from({ length: count }, (_, i) => ({
@@ -25,33 +33,38 @@ function createWorks(count: number): WorkListItem[] {
   }));
 }
 
+interface WorkGridTestOverrides {
+  nav?: Partial<LibraryViewState & LibraryViewActions>;
+  works?: WorkListItem[];
+  worksQueryKey?: string;
+  isPending?: boolean;
+  dockedBarActive?: boolean;
+  onWorkPlay?: WorkResultsProps["onWorkPlay"];
+  pagination?: Partial<WorkResultsProps["pagination"]>;
+  emptyState?: Partial<WorkResultsProps["emptyState"]>;
+}
+
+function buildProps(overrides: WorkGridTestOverrides): WorkResultsProps {
+  return {
+    nav: buildNav(overrides.nav),
+    works: overrides.works ?? createWorks(100),
+    worksQueryKey: overrides.worksQueryKey ?? "key-1",
+    isPending: overrides.isPending,
+    dockedBarActive: overrides.dockedBarActive,
+    onWorkPlay: overrides.onWorkPlay ?? vi.fn(),
+    pagination: { hasNextPage: false, ...overrides.pagination },
+    emptyState: { searchQuery: "", onClearSearch: vi.fn(), ...overrides.emptyState },
+  };
+}
+
 interface RenderWorkGridOptions {
-  props?: Partial<React.ComponentProps<typeof WorkGrid>>;
+  overrides?: WorkGridTestOverrides;
   tileSize?: number;
   gridLayoutMode?: GridLayoutMode;
 }
 
-function workGridElement(props: Partial<React.ComponentProps<typeof WorkGrid>>) {
-  return (
-    <WorkGrid
-      axis="all"
-      works={createWorks(100)}
-      worksQueryKey="key-1"
-      selectedWorkId={null}
-      searchQuery=""
-      hasSelectedTags={false}
-      hasNextPage={false}
-      onWorkSelect={vi.fn()}
-      onWorkPlay={vi.fn()}
-      onClearSearch={vi.fn()}
-      onDeselect={vi.fn()}
-      {...props}
-    />
-  );
-}
-
 function renderWorkGrid({
-  props = {},
+  overrides = {},
   tileSize = 160,
   gridLayoutMode = "square",
 }: RenderWorkGridOptions = {}) {
@@ -59,14 +72,22 @@ function renderWorkGrid({
   store.set(libraryTileSizeAtom, tileSize);
   store.set(libraryGridLayoutModeAtom, gridLayoutMode);
 
-  const result = render(<Provider store={store}>{workGridElement(props)}</Provider>);
+  const result = render(
+    <Provider store={store}>
+      <WorkGrid {...buildProps(overrides)} />
+    </Provider>,
+  );
 
   return {
     ...result,
     store,
     // 同じ store を保ったまま props だけ差し替える（atom の値をリセットしない）
-    rerenderWorkGrid: (nextProps: Partial<React.ComponentProps<typeof WorkGrid>>) =>
-      result.rerender(<Provider store={store}>{workGridElement(nextProps)}</Provider>),
+    rerenderWorkGrid: (nextOverrides: WorkGridTestOverrides) =>
+      result.rerender(
+        <Provider store={store}>
+          <WorkGrid {...buildProps(nextOverrides)} />
+        </Provider>,
+      ),
   };
 }
 
@@ -87,7 +108,7 @@ describe("WorkGrid virtual scrolling", () => {
     // ResizeObserver のコールバックをまだ一度も flush していない状態で列数（columnCount）を検証する。
     // containerWidth が 0 のままだと columnCount=1 に落ちて空白同然のレイアウトになるため、
     // useLayoutEffect による getBoundingClientRect() 同期測定で正しい列数が出ることを確認する。
-    const { container } = renderWorkGrid({ props: { works: createWorks(100) } });
+    const { container } = renderWorkGrid({ overrides: { works: createWorks(100) } });
 
     const row = container.querySelector(".mll-grid-row--square");
     expect(row).not.toBeNull();
@@ -96,7 +117,7 @@ describe("WorkGrid virtual scrolling", () => {
   });
 
   it("renders far fewer tiles than total works for 1,000 items", async () => {
-    renderWorkGrid({ props: { works: createWorks(1_000) } });
+    renderWorkGrid({ overrides: { works: createWorks(1_000) } });
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
     const tiles = screen.queryAllByRole("button", { name: /を選択、Enterで再生/ });
@@ -108,7 +129,7 @@ describe("WorkGrid virtual scrolling", () => {
   });
 
   it("moves focus to the next row with ArrowDown based on calculated column count", async () => {
-    renderWorkGrid({ props: { works: createWorks(100) } });
+    renderWorkGrid({ overrides: { works: createWorks(100) } });
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
     const tiles = screen.queryAllByRole("button", { name: /を選択、Enterで再生/ });
@@ -125,8 +146,8 @@ describe("WorkGrid virtual scrolling", () => {
   });
 
   it("矢印キーでのフォーカス移動は選択も追従させる", async () => {
-    const onWorkSelect = vi.fn();
-    renderWorkGrid({ props: { works: createWorks(100), onWorkSelect } });
+    const selectWork = vi.fn();
+    renderWorkGrid({ overrides: { works: createWorks(100), nav: { selectWork } } });
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
     const tiles = screen.queryAllByRole("button", { name: /を選択、Enterで再生/ });
@@ -135,13 +156,13 @@ describe("WorkGrid virtual scrolling", () => {
     await userEvent.keyboard("{ArrowDown}");
 
     await waitFor(() => {
-      expect(onWorkSelect).toHaveBeenCalledWith("work-5");
+      expect(selectWork).toHaveBeenCalledWith("work-5");
     });
   });
 
   it("Enterでフォーカス項目を再生する", async () => {
     const onWorkPlay = vi.fn();
-    renderWorkGrid({ props: { works: createWorks(10), onWorkPlay } });
+    renderWorkGrid({ overrides: { works: createWorks(10), onWorkPlay } });
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
     const tiles = screen.queryAllByRole("button", { name: /を選択、Enterで再生/ });
@@ -153,26 +174,30 @@ describe("WorkGrid virtual scrolling", () => {
   });
 
   it("再生中の作品タイルに再生インジケーターを表示する", async () => {
-    renderWorkGrid({
-      props: {
-        works: createWorks(10),
-        playingWorkId: "work-3",
-        isPlaybackActive: true,
-      },
-    });
+    const store = createStore();
+    store.set(libraryTileSizeAtom, 160);
+    store.set(libraryGridLayoutModeAtom, "square");
+    setPlayingWork(store, "work-3", { isPlaying: true });
+    render(
+      <Provider store={store}>
+        <WorkGrid {...buildProps({ works: createWorks(10) })} />
+      </Provider>,
+    );
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
     expect(screen.getByLabelText("再生中")).toBeInTheDocument();
   });
 
   it("一時停止中は再生インジケーターのアクセシブル名が切り替わる", async () => {
-    renderWorkGrid({
-      props: {
-        works: createWorks(10),
-        playingWorkId: "work-3",
-        isPlaybackActive: false,
-      },
-    });
+    const store = createStore();
+    store.set(libraryTileSizeAtom, 160);
+    store.set(libraryGridLayoutModeAtom, "square");
+    setPlayingWork(store, "work-3", { isPlaying: false });
+    render(
+      <Provider store={store}>
+        <WorkGrid {...buildProps({ works: createWorks(10) })} />
+      </Provider>,
+    );
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
     expect(screen.getByLabelText("一時停止中")).toBeInTheDocument();
@@ -194,10 +219,9 @@ describe("WorkGrid virtual scrolling", () => {
   it("calls onLoadMore when scrolled near the end", async () => {
     const onLoadMore = vi.fn();
     const { container } = renderWorkGrid({
-      props: {
+      overrides: {
         works: createWorks(1_000),
-        hasNextPage: true,
-        onLoadMore,
+        pagination: { hasNextPage: true, onLoadMore },
       },
     });
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
@@ -215,7 +239,7 @@ describe("WorkGrid virtual scrolling", () => {
   });
 
   it("preserves aria-label, aria-pressed, and button structure on tiles", async () => {
-    renderWorkGrid({ props: { works: createWorks(10) } });
+    renderWorkGrid({ overrides: { works: createWorks(10) } });
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
     const tile = screen.queryAllByRole("button", { name: /を選択、Enterで再生/ })[0];
@@ -226,7 +250,7 @@ describe("WorkGrid virtual scrolling", () => {
 
   it("renders far fewer tiles in justified mode", async () => {
     renderWorkGrid({
-      props: { works: createWorks(1_000) },
+      overrides: { works: createWorks(1_000) },
       gridLayoutMode: "justified",
     });
     await act(async () => {
@@ -248,14 +272,14 @@ describe("WorkGrid empty states", () => {
   });
 
   it("お気に入りビューが0件のとき文脈付きの案内を1行添える", () => {
-    renderWorkGrid({ props: { axis: "fav", works: [] } });
+    renderWorkGrid({ overrides: { nav: { activeAxis: "fav" }, works: [] } });
     expect(screen.getByText("作品詳細の☆ボタンでお気に入りに追加できます")).toBeTruthy();
   });
 
   it("スマートフォルダーが0件のとき専用の見出しと「条件を編集」を出す", () => {
     const onEditSmartFolderRules = vi.fn();
     renderWorkGrid({
-      props: { works: [], isSmartFolder: true, onEditSmartFolderRules },
+      overrides: { works: [], emptyState: { isSmartFolder: true, onEditSmartFolderRules } },
     });
 
     expect(screen.getByText("条件に一致する作品がありません")).toBeTruthy();
@@ -267,17 +291,16 @@ describe("WorkGrid empty states", () => {
   });
 
   it("スマートフォルダーが0件・チップ絞り込み中のとき「絞り込みをすべてクリア」も出す", () => {
-    const onClearAllFilters = vi.fn();
+    const clearTags = vi.fn();
     renderWorkGrid({
-      props: {
+      overrides: {
         works: [],
-        isSmartFolder: true,
-        hasSelectedTags: true,
-        onClearAllFilters,
+        nav: { selectedTags: nts(["タグ"]), clearTags },
+        emptyState: { isSmartFolder: true },
       },
     });
 
     screen.getByRole("button", { name: "絞り込みをすべてクリア" }).click();
-    expect(onClearAllFilters).toHaveBeenCalled();
+    expect(clearTags).toHaveBeenCalled();
   });
 });

@@ -46,6 +46,7 @@ import FilterChipBand from "./FilterChipBand";
 import PreviewPane from "./PreviewPane";
 import WorkGrid from "./WorkGrid";
 import WorkListPane from "./WorkListPane";
+import type { WorkResultsProps } from "./workResultsProps";
 import SmartFolderEditorModal from "./SmartFolderEditorModal";
 import { SmartFolderView } from "./preview/SmartFolderView";
 import { DataIntegrityWarningBanner } from "./DataIntegrityWarningBanner";
@@ -302,6 +303,26 @@ export default function LibraryView({
                   }}
                 />
               ) : undefined;
+              const workResultsProps: WorkResultsProps = {
+                nav,
+                works: result.works,
+                worksQueryKey,
+                isPending,
+                dockedBarActive,
+                onWorkPlay: (work) => onPlay(work, 0),
+                pagination: {
+                  hasNextPage: result.hasNextPage,
+                  worksTotal: result.worksTotal,
+                  isFetchingNextPage: result.isFetchingNextPage,
+                  onLoadMore: () => void result.fetchNextPage(),
+                },
+                emptyState: {
+                  searchQuery,
+                  isSmartFolder: Boolean(activeSmartFolder),
+                  onClearSearch: () => setSearchQuery(""),
+                  onEditSmartFolderRules: handleEditSmartFolder,
+                },
+              };
               return (
                 <>
                   {/* チップ列と同じ理由で .mll-results の外（.mll-resultspane の通常フロー）に置く。
@@ -310,53 +331,9 @@ export default function LibraryView({
                   <div className="mll-results">
                     <div className="mll-results__content">
                       {showGrid ? (
-                        <WorkGrid
-                          axis={nav.activeAxis}
-                          works={result.works}
-                          worksQueryKey={worksQueryKey}
-                          selectedWorkId={nav.selectedWorkId}
-                          searchQuery={searchQuery}
-                          hasSelectedTags={nav.selectedTags.length > 0}
-                          playingWorkId={playingWorkId}
-                          isPlaybackActive={isPlaybackActive}
-                          dockedBarActive={dockedBarActive}
-                          hasNextPage={result.hasNextPage}
-                          worksTotal={result.worksTotal}
-                          isFetchingNextPage={result.isFetchingNextPage}
-                          onLoadMore={() => void result.fetchNextPage()}
-                          isPending={isPending}
-                          onWorkSelect={nav.selectWork}
-                          onWorkPlay={(work) => onPlay(work, 0)}
-                          onClearSearch={() => setSearchQuery("")}
-                          onDeselect={() => nav.selectWork(null)}
-                          isSmartFolder={Boolean(activeSmartFolder)}
-                          onEditSmartFolderRules={handleEditSmartFolder}
-                          onClearAllFilters={nav.clearTags}
-                        />
+                        <WorkGrid {...workResultsProps} />
                       ) : (
-                        <WorkListPane
-                          axis={nav.activeAxis}
-                          works={result.works}
-                          worksQueryKey={worksQueryKey}
-                          selectedWorkId={nav.selectedWorkId}
-                          searchQuery={searchQuery}
-                          hasSelectedTags={nav.selectedTags.length > 0}
-                          playingWorkId={playingWorkId}
-                          isPlaybackActive={isPlaybackActive}
-                          dockedBarActive={dockedBarActive}
-                          isPending={isPending}
-                          hasNextPage={result.hasNextPage}
-                          worksTotal={result.worksTotal}
-                          isFetchingNextPage={result.isFetchingNextPage}
-                          onLoadMore={() => void result.fetchNextPage()}
-                          onWorkSelect={nav.selectWork}
-                          onWorkPlay={(work) => onPlay(work, 0)}
-                          onClearSearch={() => setSearchQuery("")}
-                          onDeselect={() => nav.selectWork(null)}
-                          isSmartFolder={Boolean(activeSmartFolder)}
-                          onEditSmartFolderRules={handleEditSmartFolder}
-                          onClearAllFilters={nav.clearTags}
-                        />
+                        <WorkListPane {...workResultsProps} />
                       )}
                     </div>
 
