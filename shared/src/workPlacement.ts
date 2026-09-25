@@ -26,8 +26,9 @@ function hasSeparator(name: string): boolean {
   return name.includes("/") || name.includes("\\");
 }
 
-function metaFileNameOf(metaPath: string): string {
-  return metaPath.slice(lastSeparatorIndex(metaPath) + 1);
+/** `/` と `\\` のどちらの区切りでも、最後の要素を返す */
+export function pathBaseName(path: string): string {
+  return path.slice(lastSeparatorIndex(path) + 1);
 }
 
 /** 保存済みの metaPath から配置を得る。メタの中身は見ない */
@@ -54,7 +55,7 @@ function joinMediaRoot(placement: WorkPlacement, file: string): string {
 }
 
 export function workPlacementNotAFileMessage(placement: WorkPlacement, audioFile: string): string {
-  return `${WORK_PLACEMENT_MISMATCH_PREFIX}${metaFileNameOf(placement.metaPath)} が指す ${audioFile} はファイルとして存在しません`;
+  return `${WORK_PLACEMENT_MISMATCH_PREFIX}${pathBaseName(placement.metaPath)} が指す ${audioFile} はファイルとして存在しません`;
 }
 
 /** メタの中身と配置の対応を検査して physicalPath を決める。ファイルシステムは見ない */
@@ -66,7 +67,7 @@ export function resolveWorkPlacement(
   if (placement.kind === "folder") {
     return { ok: true, placement, physicalPath: placement.mediaRoot };
   }
-  const metaName = metaFileNameOf(metaPath);
+  const metaName = pathBaseName(metaPath);
   const mismatch = (detail: string): WorkPlacementResolution => ({
     ok: false,
     placement,

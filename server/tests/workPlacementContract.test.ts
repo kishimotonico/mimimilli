@@ -163,6 +163,35 @@ test("配置形式の不整合はscanでerrorになり、文言がreal/fixture�
   assert.equal(broken?.physicalPath, "/library/two-tracks.mimimilli.json");
 });
 
+test("ルート直下の単一ファイル形式の作品は、scanで整合した配置として扱う（fixture）", async () => {
+  const adapter = createFixtureAdapter({
+    works: [
+      {
+        id: workIdOf("single"),
+        title: "single",
+        cover: null,
+        status: "ok",
+        physicalPath: "/single.wav",
+        metaPath: "/single.mimimilli.json",
+        totalDurationSec: 1,
+        addedAt: "2026-01-01T00:00:00.000Z",
+        errorMessage: null,
+        urls: [],
+        tags: [],
+        trackCount: 1,
+        bookmarked: false,
+        lastPlayedAt: null,
+        dlsite: { ...emptyMetaDlsiteState(), lastAttemptAt: null, error: null, errorKind: null },
+      },
+    ],
+  });
+  await adapter.scan();
+  const work = await adapter.getWork(workIdOf("single"));
+  assert.equal(work?.status, "ok");
+  assert.equal(work?.errorMessage, null);
+  assert.equal(work?.playlists[0]?.tracks[0]?.file, "single.wav");
+});
+
 test("単一ファイル形式のメタが壊れると、既存の作品がerrorになる（real）", async (t) => {
   const directory = makeTestDirectory("work-placement-broken-meta");
   t.after(directory.cleanup);

@@ -1,5 +1,6 @@
 import {
   coverFieldsFromColumns,
+  pathBaseName,
   resolveWorkPlacement,
   toTrackDurationFieldsFromSec,
   workPlacementOf,
@@ -99,7 +100,7 @@ export function buildFullWork(
                 title: namedTracks?.[i] ?? `Track ${i + 1}`,
                 file:
                   placement.kind === "audio-file"
-                    ? summary.physicalPath.slice(placement.mediaRoot.length + 1)
+                    ? pathBaseName(summary.physicalPath)
                     : `track${String(i + 1).padStart(2, "0")}.mp3`,
                 ...toTrackDurationFieldsFromSec(durationSec),
               };
