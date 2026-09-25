@@ -1,11 +1,11 @@
 ---
 id: TASK-469
 title: root変更を再設定ワークフローに置き換える
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-24 07:22'
-updated_date: '2026-09-25 03:28'
+updated_date: '2026-09-25 04:45'
 labels:
   - settings
   - scan
@@ -42,7 +42,7 @@ ordinal: 523000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 子タスク(S1.1・S1.2)がすべて完了している
+- [x] #1 子タスク(S1.1・S1.2)がすべて完了している
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -66,3 +66,9 @@ ordinal: 523000
 - 旧rootにのみ存在した作品はcatalogを新rootで作り直す（行削除）。user状態はWork UUIDで保持。missing扱いでは残さない。
 - 実装構造（統括推奨）: 再設定ワークフローはserver/coreのapplication service。job manager終了・adapter・再設定中は通常APIを409で拒否するmiddlewareを app.ts で配線。クライアントは startupState に再設定中を足してSetupScreen同様に通常UIを置き換える。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+子タスク469.1（サーバー側再設定ワークフロー、ADR-0029）と469.2（クライアントUIと画面初期化）で完了。
+<!-- SECTION:FINAL_SUMMARY:END -->
