@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { DlsiteApplyMissingPreviewItem } from "@mimimilli/shared";
 import { previewDlsiteMissing } from "../../../entities/work/api";
 import { useApplyDlsiteMissingMutation } from "../../../entities/work/model/workMutations";
+import { isRootReconfiguringError } from "../../../entities/settings/apiErrorHelpers";
 import {
   dlsiteBulkApplyBusyAtom,
   dlsiteBulkApplyOpenAtom,
@@ -51,7 +52,9 @@ export default function DlsiteBulkApplyRuntime() {
       .catch((cause: unknown) => {
         if (cancelled) return;
         reset();
-        toast.error(apiErrorMessage(cause, "適用対象の差分を取得できませんでした"));
+        if (!isRootReconfiguringError(cause)) {
+          toast.error(apiErrorMessage(cause, "適用対象の差分を取得できませんでした"));
+        }
       })
       .finally(() => {
         if (!cancelled) setBusy(false);
@@ -83,7 +86,9 @@ export default function DlsiteBulkApplyRuntime() {
       });
     } catch (cause) {
       reset();
-      toast.error(sourceMutationErrorMessage(cause, "未設定項目の一括適用に失敗しました"));
+      if (!isRootReconfiguringError(cause)) {
+        toast.error(sourceMutationErrorMessage(cause, "未設定項目の一括適用に失敗しました"));
+      }
     } finally {
       setBusy(false);
     }

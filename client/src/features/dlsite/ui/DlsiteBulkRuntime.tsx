@@ -270,6 +270,11 @@ export default function DlsiteBulkRuntime() {
         })
         .catch((cause: unknown) => {
           if (disposed || terminalHandled || !generation.isCurrent(pollGeneration)) return;
+          if (isRootReconfiguringError(cause)) {
+            terminalHandled = true;
+            detach();
+            return;
+          }
           if (source.readyState === EventSource.CLOSED) {
             fail(
               cause instanceof Error ? cause.message : "DLsite一括取得の状態を取得できませんでした",
