@@ -21,8 +21,7 @@ import { SCAN_QUERY_KEYS } from "../entities/scan/queryKeys";
 import { getLastScanResult } from "../features/scan/api";
 import PlayerDock from "../features/player/ui/PlayerDock";
 import { resolveAppStartupState } from "./model/resolveAppStartupState";
-import SetupScreen from "../features/setup/ui/SetupScreen";
-import RootReconfigurationScreen from "../features/setup/ui/RootReconfigurationScreen";
+import RootConfigurationScreen from "../features/setup/ui/RootConfigurationScreen";
 import StartupErrorScreen from "./ui/StartupErrorScreen";
 import { LibraryNavigationProvider } from "../features/library/ui/LibraryNavigationProvider";
 import GlobalToast from "./ui/GlobalToast";
@@ -273,7 +272,7 @@ export default function App() {
   if (startupState === "setup-required") {
     return (
       <MotionConfig reducedMotion="user">
-        <SetupScreen onComplete={startReconfiguration} />
+        <RootConfigurationScreen state={{ status: "idle" }} onSubmit={startReconfiguration} />
       </MotionConfig>
     );
   }
@@ -285,9 +284,9 @@ export default function App() {
   ) {
     return (
       <MotionConfig reducedMotion="user">
-        <RootReconfigurationScreen
+        <RootConfigurationScreen
           state={settings.rootReconfiguration}
-          onRetry={startReconfiguration}
+          onSubmit={startReconfiguration}
         />
       </MotionConfig>
     );
