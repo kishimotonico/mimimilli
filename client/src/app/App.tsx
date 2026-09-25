@@ -102,16 +102,21 @@ export default function App() {
   // 加え、起動時に既にrunning/failedだった場合・他所からの409検知でsettingsが切り替わった場合も拾う。
   // ここでは通常UIが実際にアンマウント済みなので、removeQueriesで作品系クエリを丸ごと破棄できる
   // （復帰時に古いデータのstale-while-revalidate表示を挟まず必ず新規取得になる）。
+  // player.stop()もここで呼ぶ: PlayerRuntimeProviderは startupState に関わらず常時マウントされて
+  // いるため、自分で開始した経路（runStartRootReconfiguration側で既に停止済み）以外の入り口
+  // （別タブ開始の409検知・起動時に既にrunning/failedだった場合）でも再生を止める必要がある。
+  // 自分で開始した経路と重複して呼ばれても無害（idle時のstopRequestedは何もしない）。
   const wasReconfiguringRef = useRef(false);
   useEffect(() => {
     const isReconfiguring = startupState === "reconfiguring";
     if (isReconfiguring && !wasReconfiguringRef.current) {
+      player.stop();
       resetLibraryNavigation();
       setScanCandidateHiddenPaths(new Set());
       removeReconfigurationAffectedQueries(queryClient);
     }
     wasReconfiguringRef.current = isReconfiguring;
-  }, [startupState, queryClient, resetLibraryNavigation, setScanCandidateHiddenPaths]);
+  }, [startupState, queryClient, player, resetLibraryNavigation, setScanCandidateHiddenPaths]);
 
   // 202応答をsettingsキャッシュへ即時反映する。再取得（invalidateSettings）がそれより先に
   // idleを返す競合（フィクスチャの高速完了等）があっても、これで一度は確実にreconfiguring
