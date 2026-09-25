@@ -14,7 +14,7 @@ import {
 } from "../../../../entities/work/sourceMutation";
 import { SourceProjectionNotice } from "../../../../entities/work/ui/SourceProjectionNotice";
 import { useRootFolderOrNull } from "../../../../entities/settings/useSettingsQuery";
-import type { LibraryTagIntentMutation } from "../../model/useLibraryQueries";
+import type { WorkTagMutation } from "../../../../entities/work/model/workMutations";
 import { useTagPrefixes } from "../../../../entities/tag/useTagPrefixes";
 import { tagPrefixDefinition } from "../../../../entities/tag/tagPrefixDefinition";
 import { useAnchoredPopover } from "../../../../shared/ui/useAnchoredPopover";
@@ -34,8 +34,8 @@ const NARROW_TAG_PANE_PX = 320;
 interface WorkTagEditorProps {
   work: Work;
   tagSuggestions: string[];
-  addTagMutation: LibraryTagIntentMutation;
-  removeTagMutation: LibraryTagIntentMutation;
+  addTagMutation: WorkTagMutation;
+  removeTagMutation: WorkTagMutation;
   /** 編集ダイアログなど、折りたたむ必要がない場所では全タグを表示する。
    *  この場合は編集ダイアログ自体が明示的な編集操作なので削除ボタンは常時表示のまま。 */
   expanded?: boolean;

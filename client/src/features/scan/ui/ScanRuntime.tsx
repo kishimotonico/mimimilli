@@ -6,7 +6,7 @@ import { SETTINGS_QUERY_KEYS } from "../../../entities/settings/queryKeys";
 import { useDlsiteBulkActions } from "../../../entities/dlsite/useDlsiteBulkActions";
 import { SCAN_QUERY_KEYS } from "../api";
 import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
-import { invalidateLibraryQueries } from "../model/libraryInvalidation";
+import { updateCachesAfterLibraryScan } from "../../../entities/work/model/workCacheUpdates";
 import {
   scanActionsAtom,
   scanCandidateHiddenPathsAtom,
@@ -55,7 +55,7 @@ export default function ScanRuntime() {
       const result = job.result;
       queryClient.setQueryData(SCAN_QUERY_KEYS.last(), { result, finishedAt: job.finishedAt });
       void refreshScanCandidates(queryClient).catch(() => {});
-      void invalidateLibraryQueries(queryClient);
+      void updateCachesAfterLibraryScan(queryClient);
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
       if (!scanModalOpen) {
         const hasNeedsAttention =

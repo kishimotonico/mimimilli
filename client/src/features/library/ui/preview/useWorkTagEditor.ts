@@ -2,7 +2,7 @@ import { useState } from "react";
 import { normalizeTag, tagEquals } from "@mimimilli/shared";
 import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
 import { isProtectedTag } from "../../../../entities/tag/isProtectedTag";
-import type { LibraryTagIntentMutation } from "../../model/useLibraryQueries";
+import type { WorkTagMutation } from "../../../../entities/work/model/workMutations";
 
 export interface UseWorkTagEditorOptions {
   workId: string;
@@ -10,15 +10,15 @@ export interface UseWorkTagEditorOptions {
   tagSuggestions: string[];
   /** 保護判定（protected な prefix のタグは削除前に確認を挟む。ADR-0005） */
   tagPrefixes: TagPrefix[];
-  addTagMutation: LibraryTagIntentMutation;
-  removeTagMutation: LibraryTagIntentMutation;
+  addTagMutation: WorkTagMutation;
+  removeTagMutation: WorkTagMutation;
 }
 
 export interface UseWorkTagEditorResult {
   tags: NormalizedTag[];
   suggestions: string[];
   isTagSaving: boolean;
-  patchTagsError: LibraryTagIntentMutation["error"];
+  patchTagsError: WorkTagMutation["error"];
   pendingRemoveTag: NormalizedTag | null;
   failedRemoveTag: NormalizedTag | null;
   /** 保護タグの削除確認待ち。ConfirmDialog の表示トリガー */

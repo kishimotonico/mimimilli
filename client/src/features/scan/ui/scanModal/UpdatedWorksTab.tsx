@@ -8,11 +8,11 @@ export interface UpdatedWorksTabProps {
 }
 
 export default function UpdatedWorksTab({ workIds }: UpdatedWorksTabProps) {
-  const { works, error, truncatedTotal, queryKey } = useScanResultWorks(
+  const { works, error, truncatedTotal } = useScanResultWorks(
     workIds,
     "更新された作品の読み込みに失敗しました",
   );
-  const edit = useInlineTitleEdit(queryKey);
+  const edit = useInlineTitleEdit();
 
   return (
     <div className="flex flex-col gap-2">

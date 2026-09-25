@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useQueryClient } from "@tanstack/react-query";
 import {
   detectRjCode,
   type DlsitePreview,
@@ -8,7 +7,6 @@ import {
   type WorkEditSnapshot,
   type WorkProjection,
 } from "@mimimilli/shared";
-import { applyDlsiteInfo, fetchDlsiteInfo, updateDlsiteState } from "../../../../entities/work/api";
 import {
   dlsiteApplyErrorMessage,
   dlsiteFetchErrorMessage,
@@ -18,14 +16,17 @@ import IconButton from "../../../../shared/ui/IconButton";
 import { I } from "../../../../shared/ui/Icon";
 import TextInput from "../../../../shared/ui/TextInput";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
-import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
 import { SourceProjectionNotice } from "../../../../entities/work/ui/SourceProjectionNotice";
 import {
   projectionWorkspacePath,
   sourceMutationErrorMessage,
 } from "../../../../entities/work/sourceMutation";
 import { useRootFolderOrNull } from "../../../../entities/settings/useSettingsQuery";
-import { useDlsiteInvalidation } from "../../../../entities/dlsite/useDlsiteInvalidation";
+import {
+  useApplyDlsiteInfoMutation,
+  useFetchDlsitePreviewMutation,
+  useUpdateDlsiteLinkageMutation,
+} from "../../../../entities/work/model/workMutations";
 import { useToast } from "../../../../shared/ui/useToast";
 import {
   buildDlsiteApplyBody,
@@ -213,8 +214,9 @@ function DlsiteApplyDialog({
 }
 
 export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: WorkEditSnapshot }) {
-  const queryClient = useQueryClient();
-  const invalidateDlsiteCache = useDlsiteInvalidation();
+  const linkageMutation = useUpdateDlsiteLinkageMutation();
+  const fetchPreviewMutation = useFetchDlsitePreviewMutation();
+  const applyMutation = useApplyDlsiteInfoMutation();
   const toast = useToast();
   const [rjCode, setRjCode] = useState(initialRjCode(snapshot));
   const [preview, setPreview] = useState<DlsitePreview | null>(null);
@@ -239,28 +241,15 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
   // oxlint-disable-next-line react-hooks/exhaustive-deps -- 検出の再計算は作品切替と保存済みコードだけ
   useEffect(() => setRjCode(initialRjCode(snapshot)), [snapshot.id, snapshot.dlsite.rjCode]);
 
-  const rememberSnapshot = (next: WorkEditSnapshot) => {
-    queryClient.setQueryData(WORK_QUERY_KEYS.source(workId), next);
-  };
-
-  const refresh = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(workId), exact: true }),
-      invalidateDlsiteCache(workId),
-    ]);
-  };
-
   const saveCode = async () => {
     setBusy(true);
     setError(null);
     try {
-      const result = await updateDlsiteState(workId, {
-        sourceRevision: snapshot.sourceRevision,
-        rjCode: rjCode.trim() || null,
+      const result = await linkageMutation.mutateAsync({
+        workId,
+        body: { sourceRevision: snapshot.sourceRevision, rjCode: rjCode.trim() || null },
       });
-      rememberSnapshot(result.snapshot);
       setProjection(result.projection);
-      await refresh();
     } catch (cause) {
       setError(sourceMutationErrorMessage(cause, "コードを保存できませんでした"));
     } finally {
@@ -274,14 +263,13 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
     try {
       let current = snapshot;
       if (rjCode.trim().toUpperCase() !== snapshot.dlsite.rjCode) {
-        const updated = await updateDlsiteState(workId, {
-          sourceRevision: snapshot.sourceRevision,
-          rjCode: rjCode.trim() || null,
+        const updated = await linkageMutation.mutateAsync({
+          workId,
+          body: { sourceRevision: snapshot.sourceRevision, rjCode: rjCode.trim() || null },
         });
-        rememberSnapshot(updated.snapshot);
         current = updated.snapshot;
       }
-      const nextPreview = await fetchDlsiteInfo(workId);
+      const nextPreview = await fetchPreviewMutation.mutateAsync(workId);
       const nextDiff = computeDlsiteApplyDiff(
         {
           title: current.title,
@@ -308,7 +296,6 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
       setPreview(nextPreview);
     } catch (cause) {
       setError(dlsiteFetchErrorMessage(cause));
-      await refresh();
     } finally {
       setBusy(false);
     }
@@ -319,20 +306,18 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
     setBusy(true);
     setError(null);
     try {
-      const result = await applyDlsiteInfo(
+      const result = await applyMutation.mutateAsync({
         workId,
-        buildDlsiteApplyBody(preview.info, {
+        body: buildDlsiteApplyBody(preview.info, {
           sourceRevision: preview.sourceRevision,
           applyTitle,
           applyCover,
           applyUrl,
           applyTags: selectedTags,
         }),
-      );
-      rememberSnapshot(result.snapshot);
+      });
       setProjection(result.projection);
       setPreview(null);
-      await refresh();
       toast.show({ message: "DLsite情報を適用しました", variant: "success", priority: "notice" });
     } catch (cause) {
       setError(dlsiteApplyErrorMessage(cause));
@@ -345,13 +330,14 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
     setBusy(true);
     setError(null);
     try {
-      const result = await updateDlsiteState(workId, {
-        sourceRevision: snapshot.sourceRevision,
-        skipped: snapshot.dlsite.status !== "skipped",
+      const result = await linkageMutation.mutateAsync({
+        workId,
+        body: {
+          sourceRevision: snapshot.sourceRevision,
+          skipped: snapshot.dlsite.status !== "skipped",
+        },
       });
-      rememberSnapshot(result.snapshot);
       setProjection(result.projection);
-      await refresh();
     } catch (cause) {
       setError(sourceMutationErrorMessage(cause, "連携設定を変更できませんでした"));
     } finally {
@@ -414,10 +400,7 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
       <SourceProjectionNotice
         projection={projection}
         path={rootFolder ? projectionWorkspacePath(snapshot, rootFolder) : null}
-        onProjected={(result) => {
-          rememberSnapshot(result.snapshot);
-          setProjection(result.projection);
-        }}
+        onProjected={(result) => setProjection(result.projection)}
       />
       {diff && (
         <DlsiteApplyDialog

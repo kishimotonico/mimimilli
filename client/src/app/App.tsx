@@ -15,7 +15,6 @@ import TopBar from "./ui/TopBar";
 import LeftNav from "./ui/LeftNav";
 import AddressBar from "./ui/AddressBar";
 import NotificationBell from "./ui/NotificationBell";
-import { WORK_QUERY_KEYS } from "../entities/work/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../entities/settings/queryKeys";
 import { SCAN_QUERY_KEYS } from "../entities/scan/queryKeys";
 import PlayerDock from "../features/player/ui/PlayerDock";
@@ -31,7 +30,7 @@ import { activeModalAtom } from "../shared/model/activeModalAtom";
 import { buildRootFolderChangedToastRequest } from "./model/rootFolderChangedToast";
 import type { Work, WorkListItem } from "@mimimilli/shared";
 import { prepareWorkPlayback } from "../entities/work/api";
-import { invalidateWorkViewQueries } from "../entities/work/invalidateWorkViewQueries";
+import { updateCachesAfterPlaybackPrepared } from "../entities/work/model/workCacheUpdates";
 import { useDownloadLibraryExport } from "../features/library/useDownloadLibraryExport";
 import { useScanActions } from "../entities/scan/useScanActions";
 import { setRootFolder } from "../entities/settings/api";
@@ -100,8 +99,7 @@ export default function App() {
       try {
         const fullWork = await prepareWorkPlayback(work.id);
         if (requestId !== playRequestIdRef.current) return;
-        queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), fullWork);
-        await invalidateWorkViewQueries(queryClient, work.id);
+        await updateCachesAfterPlaybackPrepared(queryClient, fullWork);
         if (requestId !== playRequestIdRef.current) return;
         const playlist =
           fullWork.playlists.find((p) => p.id === fullWork.defaultPlaylistId) ??
@@ -124,8 +122,7 @@ export default function App() {
       try {
         const fullWork = await prepareWorkPlayback(work.id);
         if (requestId !== playRequestIdRef.current) return;
-        queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), fullWork);
-        await invalidateWorkViewQueries(queryClient, work.id);
+        await updateCachesAfterPlaybackPrepared(queryClient, fullWork);
         if (requestId !== playRequestIdRef.current) return;
         player.playWithResume(fullWork);
       } catch (err) {

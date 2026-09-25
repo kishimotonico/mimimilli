@@ -3,15 +3,10 @@
 
 import {
   dlsiteWorkInfoSchema,
-  workCreateResponseSchema,
-  identityConflictReassignResponseSchema,
   scanDiagnosticsResponseSchema,
   workRegisterPreviewSchema,
   type DlsiteWorkInfo,
-  type WorkCreateBodyInput,
-  type WorkCreateResponse,
   type WorkRegisterPreview,
-  type WorkSourceMutationResult,
   type WorkspacePath,
 } from "@mimimilli/shared";
 import { getParsed, postParsed } from "../../shared/api/http";
@@ -29,21 +24,8 @@ export async function getWorkRegisterPreview(path: WorkspacePath): Promise<WorkR
   return getParsed(workRegisterPreviewSchema, `/works/register-preview${q}`);
 }
 
-/** フォルダーを作品として登録する */
-export async function createWork(body: WorkCreateBodyInput): Promise<WorkCreateResponse> {
-  return postParsed(workCreateResponseSchema, "/works", body);
-}
-
 export async function getScanDiagnostics() {
   return getParsed(scanDiagnosticsResponseSchema, "/scan/diagnostics");
-}
-
-export async function reassignIdentityConflict(
-  path: WorkspacePath,
-): Promise<WorkSourceMutationResult> {
-  return postParsed(identityConflictReassignResponseSchema, "/works/identity-conflicts/reassign", {
-    path,
-  });
 }
 
 /** 作品未登録時の DLsite メタ取得（RJ/VJコード指定） */

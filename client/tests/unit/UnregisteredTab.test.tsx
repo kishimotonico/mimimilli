@@ -4,12 +4,18 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { workspacePath, type ScanCandidate } from "@mimimilli/shared";
+import {
+  workspacePath,
+  type ScanCandidate,
+  type ScanCandidatesRegisterResponse,
+} from "@mimimilli/shared";
 import UnregisteredTab from "../../src/features/scan/ui/scanModal/UnregisteredTab";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import * as scanApi from "../../src/features/scan/api";
+import * as workApi from "../../src/entities/work/api";
 import * as scanEntityApi from "../../src/entities/scan/api";
 import * as scanCandidatesCache from "../../src/entities/scan/scanCandidatesCache";
+import { scanCandidateHiddenPathsAtom } from "../../src/entities/scan/model/atoms";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -103,7 +109,7 @@ describe("UnregisteredTab RJコード編集", () => {
 
   it("1行のRJコードが不正でも、正常な行だけを選んで登録できる（不正な行は自動的に除外される）", async () => {
     const registerSpy = vi
-      .spyOn(scanApi, "registerScanCandidates")
+      .spyOn(workApi, "registerScanCandidates")
       .mockResolvedValue({ registered: [{ path: candidateB.path, workId: "w2" }], failures: [] });
     renderTab([candidateA, candidateB]);
 
@@ -186,7 +192,7 @@ describe("UnregisteredTab 候補から外す", () => {
 
 describe("UnregisteredTab 登録失敗", () => {
   it("サーバーの失敗理由をそのまま表示する", async () => {
-    vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
+    vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
       registered: [],
       failures: [
         {
@@ -205,5 +211,47 @@ describe("UnregisteredTab 登録失敗", () => {
         ),
       ).not.toBeNull(),
     );
+  });
+});
+
+describe("UnregisteredTab 登録中のアンマウント", () => {
+  it("登録リクエスト中にタブがアンマウントされても、非表示集合とonRegisteredへ登録結果が届く", async () => {
+    let resolveRegister!: (response: ScanCandidatesRegisterResponse) => void;
+    vi.spyOn(workApi, "registerScanCandidates").mockReturnValue(
+      new Promise((resolve) => {
+        resolveRegister = resolve;
+      }),
+    );
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const store = createStore();
+    const onRegistered = vi.fn();
+    const view = render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(
+          JotaiProvider,
+          { store },
+          createElement(UnregisteredTab, { candidates: [candidateA, candidateB], onRegistered }),
+        ),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "2件をライブラリに追加" }));
+    await waitFor(() => expect(workApi.registerScanCandidates).toHaveBeenCalled());
+    view.unmount();
+    resolveRegister({
+      registered: [{ path: candidateA.path, workId: "w-a" }],
+      failures: [{ path: candidateB.path, message: "失敗" }],
+    });
+
+    await waitFor(() =>
+      expect(onRegistered).toHaveBeenCalledWith({
+        registeredWorkIds: ["w-a"],
+        failedCount: 1,
+        remainingCount: 1,
+      }),
+    );
+    expect(store.get(scanCandidateHiddenPathsAtom)).toEqual(new Set([candidateA.path]));
   });
 });

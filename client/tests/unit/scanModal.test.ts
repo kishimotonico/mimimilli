@@ -585,7 +585,7 @@ describe("ScanModal", () => {
   });
 
   it("検出済みRJコードは明示送信し、未検出のまま登録すると空文字を送る。全件登録で新規登録済みへ自動遷移する", async () => {
-    const registerSpy = vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
+    const registerSpy = vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
       registered: [
         { path: candidateDetected.path, workId: "w-detected" },
         { path: candidateUndetected.path, workId: "w-undetected" },
@@ -619,7 +619,7 @@ describe("ScanModal", () => {
   });
 
   it("候補登録に成功すると作品一覧・軸件数・DLsite通知・スマートフォルダーのクエリを無効化する", async () => {
-    vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
+    vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
       registered: [{ path: candidateDetected.path, workId: "w-detected" }],
       failures: [],
     });
@@ -639,7 +639,7 @@ describe("ScanModal", () => {
   });
 
   it("候補登録が部分失敗しても、成功分がある限り作品一覧等を無効化する", async () => {
-    vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
+    vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
       registered: [{ path: candidateDetected.path, workId: "w-detected" }],
       failures: [{ path: candidateUndetected.path, message: "失敗" }],
     });
@@ -682,7 +682,7 @@ describe("ScanModal", () => {
   });
 
   it("未検出のRJコードをクリックで編集し、編集した値を登録に送る", async () => {
-    const registerSpy = vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
+    const registerSpy = vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
       registered: [{ path: candidateUndetected.path, workId: "w-undetected" }],
       failures: [],
     });

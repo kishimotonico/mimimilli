@@ -1,14 +1,12 @@
 // 新規登録済み・更新された作品タブ共通: タイトルのインライン編集。
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import type {
   WorkListItem,
   WorkProjection,
   WorkSourceMutationResult,
   WorkspacePath,
 } from "@mimimilli/shared";
-import { getWorkEditSnapshot, patchWorkSource } from "../../../../entities/work/api";
-import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
+import { useRenameWorkMutation } from "../../../../entities/work/model/workMutations";
 import {
   sourceMutationErrorMessage,
   projectionWorkspacePath,
@@ -31,34 +29,15 @@ export interface InlineTitleEdit {
   applyProjected: (result: WorkSourceMutationResult) => void;
 }
 
-/** タイトルのインライン編集state。保存成功時は source キャッシュを更新し、一覧は invalidate する。 */
-export function useInlineTitleEdit(queryKey: QueryKey): InlineTitleEdit {
-  const queryClient = useQueryClient();
+/** タイトルのインライン編集state */
+export function useInlineTitleEdit(): InlineTitleEdit {
   const rootFolder = useRootFolderOrNull();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [pendingResult, setPendingResult] = useState<WorkSourceMutationResult | null>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
-  const saveTitleMutation = useMutation({
-    mutationFn: async ({ workId, title }: { workId: string; title: string }) => {
-      const snapshot = await getWorkEditSnapshot(workId);
-      return patchWorkSource(workId, {
-        title,
-        sourceRevision: snapshot.sourceRevision,
-      });
-    },
-    onSuccess: (result, { workId }) => {
-      queryClient.setQueryData(WORK_QUERY_KEYS.source(workId), result.snapshot);
-      void queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(workId), exact: true });
-      void queryClient.invalidateQueries({ queryKey });
-      setEditingId(null);
-      setPendingResult(result.projection.status === "pending" ? result : null);
-    },
-    onError: (_error, { workId }) => {
-      void queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(workId), exact: true });
-    },
-  });
+  const saveTitleMutation = useRenameWorkMutation();
 
   useEffect(() => {
     if (!editingId) return;
@@ -79,7 +58,15 @@ export function useInlineTitleEdit(queryKey: QueryKey): InlineTitleEdit {
       saveTitleMutation.reset();
       return;
     }
-    saveTitleMutation.mutate({ workId, title: trimmed });
+    saveTitleMutation.mutate(
+      { workId, title: trimmed },
+      {
+        onSuccess: (result) => {
+          setEditingId(null);
+          setPendingResult(result.projection.status === "pending" ? result : null);
+        },
+      },
+    );
   };
 
   const editError = saveTitleMutation.error

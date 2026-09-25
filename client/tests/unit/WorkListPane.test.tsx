@@ -4,6 +4,13 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import userEvent from "@testing-library/user-event";
 import type { WorkListItem } from "@mimimilli/shared";
 import WorkListPane from "../../src/features/library/ui/WorkListPane";
+import type { WorkResultsProps } from "../../src/features/library/ui/workResultsProps";
+import type {
+  LibraryViewActions,
+  LibraryViewState,
+} from "../../src/features/library/model/useLibraryNavigation";
+import { buildNav } from "./fixtures/libraryNav";
+import { nts } from "../helpers/tag";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 
 function createWorks(count: number): WorkListItem[] {
@@ -20,30 +27,36 @@ function createWorks(count: number): WorkListItem[] {
   }));
 }
 
-function renderWorkListPane(
-  props: Partial<React.ComponentProps<typeof WorkListPane>> = {},
-  options?: { dockedBarActive?: boolean },
-) {
+interface WorkListPaneTestOverrides {
+  nav?: Partial<LibraryViewState & LibraryViewActions>;
+  works?: WorkListItem[];
+  worksQueryKey?: string;
+  isPending?: boolean;
+  dockedBarActive?: boolean;
+  onWorkPlay?: WorkResultsProps["onWorkPlay"];
+  pagination?: Partial<WorkResultsProps["pagination"]>;
+  emptyState?: Partial<WorkResultsProps["emptyState"]>;
+}
+
+function buildProps(overrides: WorkListPaneTestOverrides): WorkResultsProps {
+  return {
+    nav: buildNav(overrides.nav),
+    works: overrides.works ?? createWorks(100),
+    worksQueryKey: overrides.worksQueryKey ?? "key-1",
+    isPending: overrides.isPending,
+    dockedBarActive: overrides.dockedBarActive ?? false,
+    onWorkPlay: overrides.onWorkPlay ?? vi.fn(),
+    pagination: { hasNextPage: false, ...overrides.pagination },
+    emptyState: { searchQuery: "", onClearSearch: vi.fn(), ...overrides.emptyState },
+  };
+}
+
+function renderWorkListPane(overrides: WorkListPaneTestOverrides = {}) {
   const store = createStore();
 
   return render(
     <JotaiProvider store={store}>
-      <WorkListPane
-        axis="all"
-        works={createWorks(100)}
-        worksQueryKey="key-1"
-        selectedWorkId={null}
-        searchQuery=""
-        hasSelectedTags={false}
-        playingWorkId={undefined}
-        isPlaybackActive={false}
-        dockedBarActive={options?.dockedBarActive ?? false}
-        hasNextPage={false}
-        onLoadMore={vi.fn()}
-        onWorkSelect={vi.fn()}
-        onClearSearch={vi.fn()}
-        {...props}
-      />
+      <WorkListPane {...buildProps(overrides)} />
     </JotaiProvider>,
   );
 }
@@ -78,8 +91,7 @@ describe("WorkListPane virtual scrolling", () => {
     const onLoadMore = vi.fn();
     const { container } = renderWorkListPane({
       works: createWorks(1_000),
-      hasNextPage: true,
-      onLoadMore,
+      pagination: { hasNextPage: true, onLoadMore },
     });
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
@@ -102,18 +114,7 @@ describe("WorkListPane virtual scrolling", () => {
     const store = createStore();
     const { rerender } = render(
       <JotaiProvider store={store}>
-        <WorkListPane
-          axis="all"
-          works={createWorks(100)}
-          worksQueryKey="key-1"
-          selectedWorkId={null}
-          searchQuery=""
-          hasSelectedTags={false}
-          hasNextPage={false}
-          onLoadMore={vi.fn()}
-          onWorkSelect={vi.fn()}
-          onClearSearch={vi.fn()}
-        />
+        <WorkListPane {...buildProps({ worksQueryKey: "key-1" })} />
       </JotaiProvider>,
     );
     await act(async () => {
@@ -125,18 +126,7 @@ describe("WorkListPane virtual scrolling", () => {
 
     rerender(
       <JotaiProvider store={store}>
-        <WorkListPane
-          axis="all"
-          works={createWorks(100)}
-          worksQueryKey="key-2"
-          selectedWorkId={null}
-          searchQuery=""
-          hasSelectedTags={false}
-          hasNextPage={false}
-          onLoadMore={vi.fn()}
-          onWorkSelect={vi.fn()}
-          onClearSearch={vi.fn()}
-        />
+        <WorkListPane {...buildProps({ worksQueryKey: "key-2" })} />
       </JotaiProvider>,
     );
 
@@ -152,19 +142,19 @@ describe("WorkListPane 空状態", () => {
   });
 
   it("お気に入りビューが0件のとき文脈付きの案内を1行添える", () => {
-    renderWorkListPane({ axis: "fav", works: [] });
+    renderWorkListPane({ nav: { activeAxis: "fav" }, works: [] });
     expect(screen.getByText("作品詳細の☆ボタンでお気に入りに追加できます")).toBeTruthy();
   });
 
   it("選択中フィルタが原因の0件では専用メッセージを出す", () => {
-    renderWorkListPane({ axis: "all", works: [], hasSelectedTags: true });
+    renderWorkListPane({ nav: { activeAxis: "all", selectedTags: nts(["タグ"]) }, works: [] });
     expect(screen.getByText("選択中のフィルタに一致する作品はありません")).toBeTruthy();
   });
 
   it("検索語が原因の0件で検索クリアボタンを出す", async () => {
     const onClearSearch = vi.fn();
     const user = userEvent.setup();
-    renderWorkListPane({ works: [], searchQuery: "ASMR", onClearSearch });
+    renderWorkListPane({ works: [], emptyState: { searchQuery: "ASMR", onClearSearch } });
 
     await user.click(screen.getByRole("button", { name: "検索をクリア" }));
     expect(onClearSearch).toHaveBeenCalledTimes(1);
@@ -173,7 +163,10 @@ describe("WorkListPane 空状態", () => {
   it("スマートフォルダーが0件のとき専用の見出しと「条件を編集」を出す", async () => {
     const onEditSmartFolderRules = vi.fn();
     const user = userEvent.setup();
-    renderWorkListPane({ works: [], isSmartFolder: true, onEditSmartFolderRules });
+    renderWorkListPane({
+      works: [],
+      emptyState: { isSmartFolder: true, onEditSmartFolderRules },
+    });
 
     expect(screen.getByText("条件に一致する作品がありません")).toBeTruthy();
     expect(screen.getByText("条件を見直すか、絞り込みを外してください。")).toBeTruthy();
@@ -184,17 +177,16 @@ describe("WorkListPane 空状態", () => {
   });
 
   it("スマートフォルダーが0件・チップ絞り込み中のとき「絞り込みをすべてクリア」も出す", async () => {
-    const onClearAllFilters = vi.fn();
+    const clearTags = vi.fn();
     const user = userEvent.setup();
     renderWorkListPane({
       works: [],
-      isSmartFolder: true,
-      hasSelectedTags: true,
-      onClearAllFilters,
+      nav: { selectedTags: nts(["タグ"]), clearTags },
+      emptyState: { isSmartFolder: true },
     });
 
     await user.click(screen.getByRole("button", { name: "絞り込みをすべてクリア" }));
-    expect(onClearAllFilters).toHaveBeenCalledTimes(1);
+    expect(clearTags).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -222,7 +214,7 @@ describe("WorkListPane の末尾余白（docked bar）", () => {
     if (!(wrapperWithout instanceof HTMLElement)) throw new Error("wrapper not found");
     const heightWithout = Number.parseFloat(wrapperWithout.style.height);
 
-    const { container: withDocked } = renderWorkListPane({ works }, { dockedBarActive: true });
+    const { container: withDocked } = renderWorkListPane({ works, dockedBarActive: true });
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
       flushAllResizeObservers({ width: 300, height: 600 });

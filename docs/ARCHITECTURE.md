@@ -44,6 +44,7 @@ pnpm workspace のモノレポで、`client/` / `server/` / `shared/` の3パッ
 - `features` 間の sibling import 禁止。複数 feature で共有する state・操作は `shared/model/` か `entities/` へ引き上げる
 - `features` → `app` の import 禁止（`app` → `feature` の composition は許可）
 - `entities`・`shared` への依存は許可。`shared` と `entities` は上位レイヤー（`features` / `app`）へ依存しない
+- 作品を変更する操作は `entities/work/model/workMutations.ts` の hook（React 外は `workCacheUpdates.ts` の関数）を経由し、成功後の必須キャッシュ更新はそこが持つ。画面は選択解除・遷移・表示最適化だけを受け持つ（[ADR-0028](adr/0028-work-management-mutation-ownership.md)）
 
 **server**:
 
@@ -102,6 +103,7 @@ oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメン
 - [ADR-0008: 永続化トポロジー・検索所有権・再生IDを分離する](adr/0008-persistence-topology-query-ownership-playback-ids.md)
 - [ADR-0025: 正本の変更・投影・閲覧を責務として分離する](adr/0025-source-mutation-projection-read-separation.md)
 - [ADR-0026: 分類値の一覧を全作品への独立した入口とする](adr/0026-value-list-as-global-entry.md)
+- [ADR-0028: 作品を変更する操作とキャッシュ更新方針を entities/work/model に集約する](adr/0028-work-management-mutation-ownership.md)
 - [requirements-v4.md](requirements-v4.md) — 機能・UX 要件
 - [HANDOFF.md](HANDOFF.md) — 開発の現状・引き継ぎ
 - [design-system.md](design-system.md) — フロントエンドのデザイン規約

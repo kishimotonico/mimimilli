@@ -11,7 +11,6 @@ import {
   type WorkEditSnapshot,
 } from "@mimimilli/shared";
 import { DlsiteEditor } from "../../src/features/library/ui/preview/DlsiteEditor";
-import { dlsiteInvalidateAtom } from "../../src/entities/dlsite/model/bulkAtoms";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 
 const fetchDlsiteInfo = vi.fn();
@@ -71,7 +70,6 @@ function renderEditor(work: Work) {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const store = createStore();
-  store.set(dlsiteInvalidateAtom, { run: vi.fn(async () => {}) });
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(
       QueryClientProvider,

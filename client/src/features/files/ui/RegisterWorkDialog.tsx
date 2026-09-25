@@ -5,6 +5,7 @@ import { normalizeTag } from "@mimimilli/shared";
 import type {
   DlsiteRegistrationBody,
   DlsiteWorkInfo,
+  WorkCreateResponse,
   WorkRegisterPreview,
   WorkSourceMutationResult,
 } from "@mimimilli/shared";
@@ -26,7 +27,8 @@ import { buildDlsiteRegistrationBody } from "../../../entities/work/dlsitePrevie
 import { dlsiteFetchErrorMessage } from "../../../entities/work/dlsiteFetchError";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { sourceMutationErrorMessage } from "../../../entities/work/sourceMutation";
-import { createWork, fetchDlsiteInfoByCode } from "../api";
+import { fetchDlsiteInfoByCode } from "../api";
+import { useRegisterWorkMutation } from "../../../entities/work/model/workMutations";
 
 interface RegisterWorkDialogProps {
   folderPath: string;
@@ -65,31 +67,33 @@ export default function RegisterWorkDialog({
     },
   });
 
-  const registerMutation = useMutation({
-    mutationFn: async () => {
-      const dlsiteAppliedTags = dlsiteInfo
-        ? dlsiteInfoTags(dlsiteInfo).filter((tag) => tags.includes(tag))
-        : [];
-      const dlsite: DlsiteRegistrationBody | undefined = dlsiteInfo
-        ? buildDlsiteRegistrationBody(dlsiteInfo, {
-            applyTitle: false,
-            applyCover,
-            applyUrl: true,
-            applyTags: dlsiteAppliedTags,
-          })
-        : undefined;
-      return createWork({
+  const registerMutation = useRegisterWorkMutation();
+  const register = async () => {
+    const dlsiteAppliedTags = dlsiteInfo
+      ? dlsiteInfoTags(dlsiteInfo).filter((tag) => tags.includes(tag))
+      : [];
+    const dlsite: DlsiteRegistrationBody | undefined = dlsiteInfo
+      ? buildDlsiteRegistrationBody(dlsiteInfo, {
+          applyTitle: false,
+          applyCover,
+          applyUrl: true,
+          applyTags: dlsiteAppliedTags,
+        })
+      : undefined;
+    let result: WorkCreateResponse;
+    try {
+      result = await registerMutation.mutateAsync({
         path: folderPath,
         title: title.trim(),
         tags,
         dlsite,
       });
-    },
-    onSuccess: (result) => {
-      onRegistered(result);
-      onClose();
-    },
-  });
+    } catch {
+      return;
+    }
+    onRegistered(result);
+    onClose();
+  };
 
   useEffect(() => {
     setTitle(preview.suggestedTitle);
@@ -291,7 +295,7 @@ export default function RegisterWorkDialog({
           <Button
             variant="primary"
             disabled={submitBusy || title.trim().length === 0 || preview.descendantWorkCount > 0}
-            onClick={() => registerMutation.mutate()}
+            onClick={() => void register()}
           >
             登録
           </Button>
