@@ -33,6 +33,7 @@ import { prepareWorkPlayback } from "../entities/work/api";
 import { updateCachesAfterPlaybackPrepared } from "../entities/work/model/workCacheUpdates";
 import { useDownloadLibraryExport } from "../features/library/useDownloadLibraryExport";
 import { useDlsiteBulkActions } from "../entities/dlsite/useDlsiteBulkActions";
+import { useScanActions } from "../entities/scan/useScanActions";
 import { startRootReconfiguration } from "../entities/settings/api";
 import { runStartRootReconfiguration } from "./model/runStartRootReconfiguration";
 import {
@@ -62,6 +63,7 @@ export default function App() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const dlsiteBulk = useDlsiteBulkActions();
+  const scanActions = useScanActions();
   const setAppMode = useSetAtom(setAppModeAtom);
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
   const setLibraryAxis = useSetAtom(setLibraryAxisAtom);
@@ -105,11 +107,18 @@ export default function App() {
   // 備え、reconfiguring状態を実際に観測できなくてもここで選択・検索・候補は必ず初期化される。
   const applyImmediateReconfigurationReset = useCallback(() => {
     setActiveModal(null);
+    scanActions.reset();
     resetLibraryNavigation();
     resetLibraryNavigationUrl();
     setScanCandidateHiddenPaths(new Set());
     markReconfigurationAffectedQueriesStale(queryClient);
-  }, [queryClient, resetLibraryNavigation, setScanCandidateHiddenPaths, setActiveModal]);
+  }, [
+    queryClient,
+    resetLibraryNavigation,
+    setScanCandidateHiddenPaths,
+    setActiveModal,
+    scanActions,
+  ]);
 
   // reconfiguringへの出入りを検知する。startReconfiguration経由（自分で開始した場合）に
   // 加え、起動時に既にrunning/failedだった場合・他所からの409検知でsettingsが切り替わった場合も拾う。
@@ -118,6 +127,9 @@ export default function App() {
   // ここで呼ぶ: PlayerRuntimeProviderはstartupStateに関わらず常時マウントされているため、
   // 自分で開始した経路（runStartRootReconfiguration側で既に停止済み）以外の入り口でも再生を止める
   // 必要がある（重複して呼ばれても無害）。activeModalAtomも常時マウントのstoreに残るので閉じる。
+  // scanActions.reset()も同様: サーバーは再設定開始時に実行中scanを取り消すが、ロック中は
+  // /scan系APIが409を返しSSE再接続も失敗するため、ScanRuntimeが追跡中のジョブ状態
+  // （cancelling等）に固着しうる。終端イベントを待たずここでローカル状態を初期状態へ戻す。
   // 離脱時: サーバーは再構築完了時に新規作品をDLsite取得（new）へ渡す（ADR-0029）。
   // 従来スキャン完了時はScanRuntimeがdlsiteBulk.attach()して進捗・完了通知・クエリ無効化を
   // 拾っていたのと同じ経路を、再構築完了でも通す。
@@ -127,6 +139,7 @@ export default function App() {
     if (isReconfiguring && !wasReconfiguringRef.current) {
       stopPlaybackAndInvalidateGuard();
       setActiveModal(null);
+      scanActions.reset();
       resetLibraryNavigation();
       resetLibraryNavigationUrl();
       setScanCandidateHiddenPaths(new Set());
@@ -146,6 +159,7 @@ export default function App() {
     dlsiteBulk,
     stopPlaybackAndInvalidateGuard,
     setActiveModal,
+    scanActions,
     resetLibraryNavigation,
     setScanCandidateHiddenPaths,
   ]);

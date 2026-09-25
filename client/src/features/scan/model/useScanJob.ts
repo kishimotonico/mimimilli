@@ -22,6 +22,10 @@ function isDefinitiveRefreshError(error: unknown): boolean {
   );
 }
 
+function isReconfiguringLockError(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.code === "root_reconfiguring";
+}
+
 function statusRank(status: ScanJobSnapshot["status"]): number {
   if (status === "queued") return 0;
   if (status === "running") return 1;
@@ -101,6 +105,17 @@ export function useScanJob(options: UseScanJobOptions = {}) {
     [owns],
   );
 
+  /** 購読中のジョブをローカルの状態からだけ切り離す（root再設定突入時用）。 */
+  const reset = useCallback(() => {
+    generationRef.current += 1;
+    attachedJobIdRef.current = null;
+    snapshotRef.current = null;
+    sourceRef.current?.close();
+    sourceRef.current = null;
+    setJob(null);
+    setError(null);
+  }, []);
+
   const attach = useCallback(
     (initial: ScanJobSnapshot): void => {
       sourceRef.current?.close();
@@ -126,6 +141,12 @@ export function useScanJob(options: UseScanJobOptions = {}) {
           .then((next) => applyOwned(generation, initial.id, source, next))
           .catch((cause: unknown) => {
             if (!owns(generation, initial.id)) return;
+            // root再設定中は/scan系APIが409で拒否される。追跡中のジョブは再設定側で
+            // 取り消し済みなので、終端イベントを待たずここで追跡終了とする。
+            if (isReconfiguringLockError(cause)) {
+              reset();
+              return;
+            }
             if (isDefinitiveRefreshError(cause)) {
               detachWithError(generation, initial.id, source, cause);
             }
@@ -178,7 +199,7 @@ export function useScanJob(options: UseScanJobOptions = {}) {
         onConnectionError: refresh,
       });
     },
-    [applyOwned, detachWithError, owns],
+    [applyOwned, detachWithError, owns, reset],
   );
 
   useEffect(() => {
@@ -246,6 +267,7 @@ export function useScanJob(options: UseScanJobOptions = {}) {
   }, [applyOwned, job, owns]);
 
   const clearError = useCallback(() => setError(null), []);
+
   return {
     job,
     error,
@@ -254,5 +276,6 @@ export function useScanJob(options: UseScanJobOptions = {}) {
     cancel,
     attach,
     clearError,
+    reset,
   };
 }

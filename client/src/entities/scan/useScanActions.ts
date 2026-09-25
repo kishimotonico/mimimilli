@@ -19,6 +19,7 @@ export function useScanActions() {
       start: (options?: StartScanRequest) => requireActions(store).start(options),
       cancel: () => requireActions(store).cancel(),
       clearError: () => requireActions(store).clearError(),
+      reset: () => requireActions(store).reset(),
     }),
     [store],
   );

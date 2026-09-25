@@ -32,6 +32,8 @@ export interface ScanActions {
   start: (options?: StartScanRequest) => Promise<ScanActionResult>;
   cancel: () => Promise<ScanActionResult>;
   clearError: () => void;
+  /** 購読中のジョブをローカルの状態からだけ切り離す（root再設定突入時用） */
+  reset: () => void;
 }
 
 /** ScanRuntime がマウント時に登録する操作群。未配線時は null */

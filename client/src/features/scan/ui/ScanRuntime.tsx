@@ -117,6 +117,9 @@ export default function ScanRuntime() {
     clearError: () => {
       scanJobRef.current.clearError();
     },
+    reset: () => {
+      scanJobRef.current.reset();
+    },
   });
 
   useEffect(() => {
