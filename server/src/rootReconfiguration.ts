@@ -29,6 +29,7 @@ type WorkflowAdapter = Pick<
   DataAdapter,
   | "resolveRootFolder"
   | "getRootReconfigurationRecord"
+  | "getRootReconfigurationCompletedAt"
   | "beginRootReconfiguration"
   | "rebuildCatalogForRoot"
   | "failRootReconfiguration"
@@ -60,7 +61,12 @@ export class RootReconfigurationWorkflow {
     const run = this.run;
     if (run) return { status: "running", rootFolder: run.rootFolder, progress: run.progress };
     const record = await this.adapter.getRootReconfigurationRecord();
-    if (record === null) return { status: "idle" };
+    if (record === null) {
+      return {
+        status: "idle",
+        completedAt: await this.adapter.getRootReconfigurationCompletedAt(),
+      };
+    }
     return {
       status: "failed",
       rootFolder: record.rootFolder,

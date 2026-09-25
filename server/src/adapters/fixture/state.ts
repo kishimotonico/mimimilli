@@ -35,6 +35,9 @@ export interface FixtureState {
   lastScanTime: string | null;
   /** 永続化された再設定状態（realのuser DB app_settings.root_reconfiguration相当）。null は通常運用 */
   rootReconfiguration: FixtureRootReconfiguration | null;
+  /** 直近の再設定が完了した時刻（realのapp_settings.root_reconfiguration_completed_at相当）。
+   *  一度も完了していなければnull。 */
+  rootReconfigurationCompletedAt: string | null;
   /** DLsite合成状態（dlsite）を含まない作品レコード。正本は works・dlsiteLinkages・
    *  dlsiteFetchFailures の3つで、合成済みのAPI向け状態はどこにも保存しない。 */
   works: FixtureWorkRecord[];
@@ -184,6 +187,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     rootFolder: scenario.rootFolder,
     lastScanTime: scenario.lastScanTime,
     rootReconfiguration: scenario.rootReconfiguration,
+    rootReconfigurationCompletedAt: null,
     works,
     detachedWorks,
     dlsiteLinkages,

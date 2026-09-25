@@ -7,7 +7,13 @@ import { scanProgressEventSchema } from "./scan.ts";
 const ABSOLUTE_PATH_RE = /^(\/|[A-Za-z]:[\\/])/;
 
 export const rootReconfigurationStateSchema = z.discriminatedUnion("status", [
-  z.object({ status: z.literal("idle") }),
+  z.object({
+    status: z.literal("idle"),
+    /** 直近の再設定が完了した時刻。同一タブがreconfiguring・409のどちらも観測しないまま
+     *  他タブの再設定が完了した場合を検知するのに使う（rootFolderだけでは同じパスへの
+     *  再構築を拾えない）。再設定を一度も行っていなければnull。 */
+    completedAt: z.string().nullable(),
+  }),
   z.object({
     status: z.literal("running"),
     rootFolder: z.string(),

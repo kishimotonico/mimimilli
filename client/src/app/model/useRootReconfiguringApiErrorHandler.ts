@@ -7,12 +7,18 @@ import type { QueryClient } from "@tanstack/react-query";
 import { onApiError } from "../../shared/api/http";
 import { SETTINGS_QUERY_KEYS } from "../../entities/settings/queryKeys";
 
-export function useRootReconfiguringApiErrorHandler(client: QueryClient): void {
+export function useRootReconfiguringApiErrorHandler(
+  client: QueryClient,
+  /** 409を観測した＝他タブ等での再設定が関与した可能性があるため、離脱側後処理が
+   *  必要な旨を呼び出し側（App層）へ伝える */
+  onRootReconfiguring: () => void,
+): void {
   useEffect(() => {
     return onApiError((error) => {
       if (error.code === "root_reconfiguring") {
         void client.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
+        onRootReconfiguring();
       }
     });
-  }, [client]);
+  }, [client, onRootReconfiguring]);
 }

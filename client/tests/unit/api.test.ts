@@ -105,13 +105,13 @@ describe("settings api", () => {
       makeResponse({
         rootFolder: "/test/path",
         lastScanTime: null,
-        rootReconfiguration: { status: "idle" },
+        rootReconfiguration: { status: "idle", completedAt: null },
       }),
     );
     const result = await settingsApi.getSettings();
     expect(mockFetch).toHaveBeenCalledWith("/api/settings");
     expect(result.rootFolder).toBe("/test/path");
-    expect(result.rootReconfiguration).toEqual({ status: "idle" });
+    expect(result.rootReconfiguration).toEqual({ status: "idle", completedAt: null });
   });
 
   it("getRootReconfiguration GETs /api/root-reconfiguration", async () => {

@@ -79,10 +79,12 @@ user状態（再生履歴・ブックマーク・レジューム等）はWork UU
 
 ```ts
 type RootReconfigurationState =
-  | { status: "idle" }
+  | { status: "idle"; completedAt: string | null }
   | { status: "running"; rootFolder: string; progress: ScanProgressEvent | null }
   | { status: "failed"; rootFolder: string; message: string };
 ```
+
+`idle` の `completedAt` は直近の再設定が完了した時刻（一度も完了していなければ`null`）。別クライアントが開始した再設定を、このタブがreconfiguring・409のどちらも観測しないまま完了した場合を検知するのに使う（`rootFolder`だけでは同じパスへの再構築を拾えない）。クライアントはreadyの間、`rootFolder`または`completedAt`が前回観測値から変わったことを離脱側後処理（非破壊リセット・player停止→クエリ破棄→DLsite attach→再取得）のトリガーにする。409観測（`onApiError`）でも同じ後処理を発火させる。初回起動時の観測値は基準として記録するだけで発火しない。
 
 - `GET /api/root-reconfiguration` → 200 `RootReconfigurationState`
 - `POST /api/root-reconfiguration`、body `{ rootFolder: string }`（絶対パス。旧 `settingsUpdateSchema` と同じ検証）

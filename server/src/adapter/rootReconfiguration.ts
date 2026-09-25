@@ -11,6 +11,8 @@ export interface RootReconfigurationAdapter {
   /** 検証して正規化したrootを返す。不正なら InvalidRootFolderError。 */
   resolveRootFolder(requested: string): Promise<string>;
   getRootReconfigurationRecord(): Promise<RootReconfigurationRecord | null>;
+  /** 直近の再設定が完了した時刻。一度も完了していなければnull（ADR-0029、completedAt契約）。 */
+  getRootReconfigurationCompletedAt(): Promise<string | null>;
   /** root_folder の確定と running を同時に永続化する。rootが変わるなら候補除外と候補sessionを破棄する。 */
   beginRootReconfiguration(rootFolder: string): Promise<void>;
   /** rootの配下にない作品をcatalogから削除し、rootをフルスキャンする。 */

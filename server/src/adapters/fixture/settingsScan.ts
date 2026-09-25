@@ -130,6 +130,11 @@ export function createSettingsScanMethods(
 
     async completeRootReconfiguration(): Promise<void> {
       state.rootReconfiguration = null;
+      state.rootReconfigurationCompletedAt = new Date().toISOString();
+    },
+
+    async getRootReconfigurationCompletedAt(): Promise<string | null> {
+      return state.rootReconfigurationCompletedAt;
     },
 
     async scan(scanOptions?: ScanOptions): Promise<ScanResult> {

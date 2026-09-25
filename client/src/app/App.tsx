@@ -11,6 +11,7 @@ import { usePlayerActions } from "../features/player/model/usePlayerActions";
 import PlayerRuntime from "../features/player/ui/PlayerRuntime";
 import ReconfigurationExitEffect from "./ReconfigurationExitEffect";
 import ReconfigurationEntryEffect from "./ReconfigurationEntryEffect";
+import RootReconfigurationDriftEffect from "./RootReconfigurationDriftEffect";
 import AppShell from "./AppShell";
 import AppBody from "./AppBody";
 import TopBar from "./ui/TopBar";
@@ -266,7 +267,10 @@ export default function App() {
   if (startupState === "setup-required") {
     return (
       <MotionConfig reducedMotion="user">
-        <RootConfigurationScreen state={{ status: "idle" }} onSubmit={startReconfiguration} />
+        <RootConfigurationScreen
+          state={{ status: "idle", completedAt: null }}
+          onSubmit={startReconfiguration}
+        />
       </MotionConfig>
     );
   }
@@ -308,6 +312,7 @@ export default function App() {
             <>
               <PlayerRuntime />
               <ReconfigurationExitEffect />
+              <RootReconfigurationDriftEffect onDrift={performReconfigurationEntryReset} />
               <NavigationHistorySync />
               <AppModals
                 lastScanTime={settings?.lastScanTime ?? null}

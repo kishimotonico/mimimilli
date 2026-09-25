@@ -180,20 +180,34 @@ for (const [kind, createHarness] of harnesses) {
     });
     assert.equal(bookmark.status, 200);
 
-    assert.deepEqual(await reconfigure(h.app, h.newRoot), { status: "idle" });
+    assert.equal((await reconfigure(h.app, h.newRoot)).status, "idle");
     const ids = await listWorkIds(h.app);
     assert.ok(ids.includes(h.keptWorkId));
     assert.ok(!ids.includes(h.droppedWorkId));
     assert.equal((await h.app.request(`/api/works/${h.droppedWorkId}`)).status, 404);
     const settings = settingsSchema.parse(await (await h.app.request("/api/settings")).json());
     assert.equal(settings.rootFolder, h.newRoot);
-    assert.deepEqual(settings.rootReconfiguration, { status: "idle" });
+    assert.equal(settings.rootReconfiguration.status, "idle");
     assert.equal((await h.app.request("/api/scan/last")).status, 200);
 
-    assert.deepEqual(await reconfigure(h.app, h.oldRoot), { status: "idle" });
+    assert.equal((await reconfigure(h.app, h.oldRoot)).status, "idle");
     const restored = await h.app.request(`/api/works/${h.droppedWorkId}`);
     assert.equal(restored.status, 200);
     assert.equal(((await restored.json()) as { bookmarked: boolean }).bookmarked, true);
+  });
+
+  test(`${kind}: 完了のたびcompletedAtが更新される（同じrootへの再構築でも変わる）`, async (t) => {
+    const h = await createHarness(t);
+    const afterFirst = await reconfigure(h.app, h.newRoot);
+    assert.ok(afterFirst.status === "idle" && afterFirst.completedAt !== null);
+
+    const afterSecond = await reconfigure(h.app, h.newRoot);
+    assert.ok(afterSecond.status === "idle" && afterSecond.completedAt !== null);
+    assert.ok(
+      afterSecond.status === "idle" &&
+        afterFirst.status === "idle" &&
+        afterSecond.completedAt !== afterFirst.completedAt,
+    );
   });
 
   test(`${kind}: 構築に失敗すると失敗状態を保ち、通常APIを拒否したまま再試行できる`, async (t) => {
@@ -217,7 +231,7 @@ for (const [kind, createHarness] of harnesses) {
       assert.deepEqual(await getState(h.app), failed);
     }
 
-    assert.deepEqual(await reconfigure(h.app, h.newRoot), { status: "idle" });
+    assert.equal((await reconfigure(h.app, h.newRoot)).status, "idle");
     assert.ok((await listWorkIds(h.app)).includes(h.keptWorkId));
   });
 
@@ -277,7 +291,7 @@ for (const [kind, createHarness] of harnesses) {
     assert.equal(scanRes.status, 202);
     const { job } = (await scanRes.json()) as { job: { id: string } };
 
-    assert.deepEqual(await reconfigurePromise, { status: "idle" });
+    assert.equal((await reconfigurePromise).status, "idle");
 
     const scanJob = await h.app.request(`/api/scan/${job.id}`);
     assert.equal(scanJob.status, 200);
@@ -304,7 +318,7 @@ for (const [kind, createHarness] of harnesses) {
     });
     await assertRootReconfiguring(await h.app.request("/api/works"));
 
-    assert.deepEqual(await reconfigure(h.app, h.newRoot), { status: "idle" });
+    assert.equal((await reconfigure(h.app, h.newRoot)).status, "idle");
     assert.equal((await h.app.request("/api/works")).status, 200);
   });
 }
@@ -340,6 +354,6 @@ test("fixture: root-reconfiguration-failed シナリオは失敗状態で起動�
   assert.ok(state.status === "failed" && state.rootFolder === FIXTURE_UNREADABLE_ROOT);
   await assertRootReconfiguring(await app.request("/api/works"));
 
-  assert.deepEqual(await reconfigure(app, "/library"), { status: "idle" });
+  assert.equal((await reconfigure(app, "/library")).status, "idle");
   assert.ok((await listWorkIds(app)).includes("RJ501001"));
 });

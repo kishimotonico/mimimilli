@@ -27,6 +27,7 @@ import type { WorkQueryRepository } from "./workQueryRepository.ts";
 const serverLogger = getCategoryLogger("server");
 const KEY_ROOT_FOLDER = "root_folder";
 const KEY_ROOT_RECONFIGURATION = "root_reconfiguration";
+const KEY_ROOT_RECONFIGURATION_COMPLETED_AT = "root_reconfiguration_completed_at";
 
 const storedRootReconfigurationSchema = z.discriminatedUnion("phase", [
   z.object({ phase: z.literal("running") }),
@@ -197,6 +198,11 @@ export function createSettingsScanMethods(deps: {
 
     async completeRootReconfiguration(): Promise<void> {
       user.deleteUserSetting(KEY_ROOT_RECONFIGURATION);
+      user.setUserSetting(KEY_ROOT_RECONFIGURATION_COMPLETED_AT, new Date().toISOString());
+    },
+
+    async getRootReconfigurationCompletedAt(): Promise<string | null> {
+      return user.getUserSetting(KEY_ROOT_RECONFIGURATION_COMPLETED_AT);
     },
 
     async scan(scanOptions?: ScanOptions): Promise<ScanResult> {
