@@ -28,7 +28,7 @@ import AppModals from "./ui/AppModals";
 import { useToast } from "../shared/ui/useToast";
 import { apiErrorMessage } from "../shared/lib/apiError";
 import { activeModalAtom } from "../shared/model/activeModalAtom";
-import type { Work, WorkListItem } from "@mimimilli/shared";
+import type { RootReconfigurationState, Settings, Work, WorkListItem } from "@mimimilli/shared";
 import { prepareWorkPlayback } from "../entities/work/api";
 import { invalidateWorkViewQueries } from "../entities/work/invalidateWorkViewQueries";
 import { useDownloadLibraryExport } from "../features/library/useDownloadLibraryExport";
@@ -113,16 +113,29 @@ export default function App() {
     wasReconfiguringRef.current = isReconfiguring;
   }, [startupState, queryClient, resetLibraryNavigation, setScanCandidateHiddenPaths]);
 
+  // 202応答をsettingsキャッシュへ即時反映する。再取得（invalidateSettings）がそれより先に
+  // idleを返す競合（フィクスチャの高速完了等）があっても、これで一度は確実にreconfiguring
+  // 画面へ切り替わり、通常UIのアンマウント→作品系クエリの破棄が起きる。
+  const applyRootReconfigurationState = useCallback(
+    (state: RootReconfigurationState) => {
+      queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), (prev: Settings | undefined) =>
+        prev ? { ...prev, rootReconfiguration: state } : prev,
+      );
+    },
+    [queryClient],
+  );
+
   const startReconfiguration = useCallback(
     (path: string) =>
       runStartRootReconfiguration(path, {
         startRootReconfiguration,
         stopPlayback: player.stop,
         resetLibraryForReconfiguration: applyImmediateReconfigurationReset,
+        applyRootReconfigurationState,
         invalidateSettings: () =>
           queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() }),
       }),
-    [applyImmediateReconfigurationReset, player.stop, queryClient],
+    [applyImmediateReconfigurationReset, applyRootReconfigurationState, player.stop, queryClient],
   );
 
   // ── Play handler ──────────────────────────────────────────
