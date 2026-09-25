@@ -10,6 +10,7 @@ import { useSetAtom } from "jotai";
 import { usePlayerActions } from "../features/player/model/usePlayerActions";
 import PlayerRuntime from "../features/player/ui/PlayerRuntime";
 import ReconfigurationExitEffect from "./ReconfigurationExitEffect";
+import ReconfigurationEntryEffect from "./ReconfigurationEntryEffect";
 import AppShell from "./AppShell";
 import AppBody from "./AppBody";
 import TopBar from "./ui/TopBar";
@@ -35,7 +36,7 @@ import { useDownloadLibraryExport } from "../features/library/useDownloadLibrary
 import { useScanActions } from "../entities/scan/useScanActions";
 import { startRootReconfiguration } from "../entities/settings/api";
 import { runStartRootReconfiguration } from "./model/runStartRootReconfiguration";
-import { resetReconfigurationAffectedQueriesForEntry } from "./model/resetLibraryForReconfiguration";
+import { markReconfigurationAffectedQueriesStale } from "./model/resetLibraryForReconfiguration";
 import { resetLibraryNavigationUrl } from "./model/resetLibraryNavigationUrl";
 import { createPlayRequestGuard } from "./model/playRequestGuard";
 import {
@@ -100,18 +101,11 @@ export default function App() {
     playRequestGuard.invalidate();
   }, [player, playRequestGuard]);
 
-  // 突入側の後処理。自分で開始した経路（runStartRootReconfiguration経由）・起動時に
-  // 既にrunning/failedだった場合・他所からの409検知でsettingsが切り替わった場合の
-  // いずれからも呼ぶ共通の関数にすることで、reconfiguring状態を実際に観測できたか
-  // （settings再取得がReactのレンダー前にidleへ戻る競合等）に依存しない。
-  // stopPlaybackAndInvalidateGuard・setActiveModal(null)・scanActions.reset()は
-  // PlayerRuntimeProvider・activeModalAtom・ScanRuntimeが常時マウントのstoreに
-  // 状態を持つため、重複して呼ばれても無害。setDlsiteBulkApplyOpen(false)も同様
-  // （DlsiteBulkApplyRuntimeはactiveModalAtomと独立の自前atomでダイアログを開く）。
-  // クエリの破棄はmarkStale→（レンダー猶予）→removeの2段階（resetLibraryForReconfiguration
-  // 側のコメント参照）。最後にreconfigurationExitPendingAtomをtrueにし、離脱側
-  // （DLsite attach等）はreadyへ到達した後の別effectに任せる。
-  const performReconfigurationEntryReset = useCallback(async () => {
+  // 突入側の非破壊な後処理。自分で開始した経路・起動時に既にrunning/failedだった経路・
+  // 他所からの409検知の経路で共有する。作品系クエリの実際の破棄（removeQueries）は
+  // 通常UIのobserverがまだ生きている可能性があるためここではしない
+  // （stale化のみ。実際の破棄はReconfigurationEntryEffect/ReconfigurationExitEffect）。
+  const performReconfigurationEntryReset = useCallback(() => {
     stopPlaybackAndInvalidateGuard();
     setActiveModal(null);
     setDlsiteBulkApplyOpen(false);
@@ -120,7 +114,7 @@ export default function App() {
     resetLibraryNavigationUrl();
     setScanCandidateHiddenPaths(new Set());
     setReconfigurationExitPending(true);
-    await resetReconfigurationAffectedQueriesForEntry(queryClient);
+    markReconfigurationAffectedQueriesStale(queryClient);
   }, [
     queryClient,
     resetLibraryNavigation,
@@ -132,26 +126,21 @@ export default function App() {
     stopPlaybackAndInvalidateGuard,
   ]);
 
-  // reconfiguringへの突入を検知する。自分で開始した経路はrunStartRootReconfiguration側で
-  // 既にperformReconfigurationEntryResetを呼んでいるので、ここでの再呼び出しは無害な重複
-  // （runningの描画がそもそも起きた場合のみ発火する）。起動時に既にrunning/failedだった
-  // 場合・他所からの409検知でsettingsが切り替わった場合はこの効果だけが突入を検知する。
+  // 自分で開始していない経路（起動時に既にrunning/failed・他所からの409検知）の突入検知。
+  // 自分で開始した経路での再呼び出しは無害な重複（performReconfigurationEntryRestは冪等）。
   const wasReconfiguringRef = useRef(false);
   useEffect(() => {
     const isReconfiguring = startupState === "reconfiguring";
     if (isReconfiguring && !wasReconfiguringRef.current) {
-      void performReconfigurationEntryReset();
+      performReconfigurationEntryReset();
     }
     wasReconfiguringRef.current = isReconfiguring;
   }, [startupState, performReconfigurationEntryReset]);
 
-  // 離脱側の後処理（DLsite一括取得のattach判定）はReconfigurationExitEffectへ分離する
-  // （App.tsxはJotaiのread APIを持たない方針のため）。reconfigurationExitPendingAtomが
-  // trueのままreadyへ到達したら実行してクリアする。
+  // 離脱側の後処理（DLsite attach等）はReconfigurationExitEffectへ分離する
+  // （App.tsxはJotaiのread APIを持たない方針のため）。
 
-  // 202応答をsettingsキャッシュへ即時反映する。再取得（invalidateSettings）がそれより先に
-  // idleを返す競合（フィクスチャの高速完了等）があっても、performEntryResetのクエリ破棄
-  // より先にこれを呼ぶことで、reconfiguring画面へ切り替わるレンダーの猶予を作る。
+  // 202応答をsettingsキャッシュへ即時反映する。
   const applyRootReconfigurationState = useCallback(
     (state: RootReconfigurationState) => {
       queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), (prev: Settings | undefined) =>
@@ -289,6 +278,7 @@ export default function App() {
   ) {
     return (
       <MotionConfig reducedMotion="user">
+        <ReconfigurationEntryEffect />
         <RootConfigurationScreen
           state={settings.rootReconfiguration}
           onSubmit={startReconfiguration}

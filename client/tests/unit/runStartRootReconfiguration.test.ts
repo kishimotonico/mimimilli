@@ -7,7 +7,7 @@ describe("runStartRootReconfiguration", () => {
     const persistFinalResume = vi.fn(async () => {
       calls.push("persistResume");
     });
-    const performEntryReset = vi.fn(async () => {
+    const performEntryReset = vi.fn(() => {
       calls.push("entryReset");
     });
     const applyRootReconfigurationState = vi.fn((state) =>
@@ -70,43 +70,6 @@ describe("runStartRootReconfiguration", () => {
     resolvePersist();
     await donePromise;
     expect(order).toEqual(["start"]);
-  });
-
-  it("202の応答をsettingsへ即時反映してから突入リセットする（再取得がidleを返す競合に対する備え）", async () => {
-    // performEntryResetが解決する前の時点で、既にapplyRootReconfigurationStateが
-    // runningを反映済みであることを確認する。reconfiguring画面への切り替えレンダーの
-    // 猶予を、クエリ破棄より先に作るための順序。
-    let settingsState: string | null = null;
-    const applyRootReconfigurationState = vi.fn((state) => {
-      settingsState = state.status;
-    });
-    let resolveEntryReset!: () => void;
-    const performEntryReset = vi.fn(
-      () =>
-        new Promise<void>((resolve) => {
-          resolveEntryReset = resolve;
-        }),
-    );
-    const startRootReconfiguration = vi.fn(async () => ({
-      status: "running" as const,
-      rootFolder: "/audio/library",
-      progress: null,
-    }));
-
-    const donePromise = runStartRootReconfiguration("/audio/library", {
-      startRootReconfiguration,
-      persistFinalResume: vi.fn(),
-      performEntryReset,
-      applyRootReconfigurationState,
-      invalidateSettings: vi.fn(),
-    });
-
-    // performEntryResetがまだ解決していない時点で、既にsettingsへrunningが反映されている
-    await vi.waitFor(() => expect(performEntryReset).toHaveBeenCalled());
-    expect(settingsState).toBe("running");
-
-    resolveEntryReset();
-    await donePromise;
   });
 
   it("検証失敗（400等）ではresume保存以外（突入リセット・反映・invalidate）は呼ばない", async () => {

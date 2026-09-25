@@ -1,4 +1,6 @@
-import { QueryClient, QueryObserver } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryObserver, useQuery } from "@tanstack/react-query";
+import { renderHook } from "@testing-library/react";
+import { createElement, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import {
   markReconfigurationAffectedQueriesStale,
@@ -47,6 +49,20 @@ describe("removeReconfigurationAffectedQueries", () => {
     removeReconfigurationAffectedQueries(queryClient);
 
     expect(queryClient.getQueryData(["settings"])).toEqual({ rootFolder: "/audio/library" });
+  });
+
+  it("マウント中のuseQuery（＝通常UIのobserver）がいると即座に再フェッチする（＝アンマウント後にしか呼べない理由）", async () => {
+    const queryClient = new QueryClient();
+    const queryFn = vi.fn().mockResolvedValue({ seeded: true });
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client: queryClient }, children);
+
+    renderHook(() => useQuery({ queryKey: WORK_QUERY_KEYS.all(), queryFn }), { wrapper });
+    await vi.waitFor(() => expect(queryFn).toHaveBeenCalledTimes(1));
+
+    removeReconfigurationAffectedQueries(queryClient);
+
+    await vi.waitFor(() => expect(queryFn).toHaveBeenCalledTimes(2));
   });
 });
 
