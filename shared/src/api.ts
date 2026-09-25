@@ -343,7 +343,7 @@ export type ExportResponse = z.infer<typeof exportResponseSchema>;
 
 // ── エラー形式 ───────────────────────────────────────────────
 // 4xx/5xx は常にこの形で返す。ステータスコードと code の対応:
-//   404 not_found / 400 invalid_request / 409 conflict|source_changed
+//   404 not_found / 400 invalid_request / 409 conflict|source_changed|root_reconfiguring
 //   / 502 parse_error|error / 503 offline / 500 internal
 
 export const apiErrorSchema = z.object({
@@ -356,6 +356,7 @@ export const apiErrorSchema = z.object({
       "invalid_request",
       "conflict",
       "source_changed",
+      "root_reconfiguring",
       "internal",
     ]),
     message: z.string(),

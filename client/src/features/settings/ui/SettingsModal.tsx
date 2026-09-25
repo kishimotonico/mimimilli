@@ -28,8 +28,6 @@ const ROW_CLASS = "flex items-center gap-2";
 
 interface SettingsModalProps {
   lastScanTime: string | null;
-  /** 直近の完了スキャンが対象にしたルートフォルダー。rootFolderと不一致なら一覧が未反映 */
-  lastScanRootFolder: string | null;
   onClose: () => void;
   /** TopBarのスキャンボタンと同じくスキャンモーダルを開く（即時実行はしない、TASK-56） */
   onOpenScan: () => void;
@@ -40,7 +38,6 @@ interface SettingsModalProps {
 
 export default function SettingsModal({
   lastScanTime,
-  lastScanRootFolder,
   onClose,
   onOpenScan,
   onChangeFolder,
@@ -61,7 +58,6 @@ export default function SettingsModal({
   const [savingFolder, setSavingFolder] = useState(false);
   const [folderError, setFolderError] = useState<string | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
-  const rootFolderStale = rootFolder !== lastScanRootFolder;
 
   const dismiss = () => {
     if (isEditingFolder) {
@@ -154,7 +150,7 @@ export default function SettingsModal({
                 </Button>
               </form>
               <output className="m-0 block rounded-[6px] bg-paper-2 px-2.5 py-2 font-jp text-secondary text-ink-2">
-                変更すると、候補から外したフォルダーの設定は破棄されます。作品の履歴（ブックマーク・再生位置など）には影響しません。
+                変更すると再設定が始まり、完了までLibrary・Filesが使えなくなります。作品の履歴（ブックマーク・再生位置など）には影響しません。
               </output>
               {folderError && (
                 <p role="alert" className="mll-selectable m-0 text-secondary text-[var(--r-coral)]">
@@ -174,11 +170,6 @@ export default function SettingsModal({
                 変更
               </Button>
             </div>
-          )}
-          {rootFolderStale && (
-            <output className="m-0 block rounded-[6px] bg-paper-2 px-2.5 py-2 font-jp text-secondary text-ink-2">
-              再スキャンすると新しいフォルダーの内容になります。
-            </output>
           )}
         </div>
 

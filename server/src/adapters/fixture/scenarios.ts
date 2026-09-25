@@ -9,6 +9,7 @@ import {
   type ScanDiagnostic,
   type SmartFolder,
 } from "@mimimilli/shared";
+import type { RootReconfigurationRecord } from "../../adapter/index.ts";
 import { createBulkWorks } from "./bulkData.ts";
 import {
   createSeedSmartFolders,
@@ -24,7 +25,8 @@ export type FixtureScenarioId =
   | "new-work"
   | "errors"
   | "large"
-  | "scan-review";
+  | "scan-review"
+  | "root-reconfiguration-failed";
 
 export const SCENARIO_IDS: readonly FixtureScenarioId[] = [
   "default",
@@ -33,10 +35,18 @@ export const SCENARIO_IDS: readonly FixtureScenarioId[] = [
   "errors",
   "large",
   "scan-review",
+  "root-reconfiguration-failed",
 ];
 
 /** "large" シナリオの総作品数（手書きシード + 生成分） */
 export const LARGE_SCENARIO_WORK_COUNT = 1000;
+
+/** 予約パス。このrootへの再設定は構築段階で失敗する */
+export const FIXTURE_UNREADABLE_ROOT = "/fixture/unreadable-library";
+
+export type FixtureRootReconfiguration =
+  | { phase: "running" }
+  | Omit<Extract<RootReconfigurationRecord, { phase: "failed" }>, "rootFolder">;
 
 export interface FixtureScenario {
   id: FixtureScenarioId;
@@ -52,6 +62,9 @@ export interface FixtureScenario {
   scanCandidates: ScanCandidate[];
   scanIdentityConflicts: ScanDiagnostic[];
   scanInvalidMetaFiles: InvalidMetaFile[];
+  /** rootの配下にないためcatalogから外れている作品。rootを戻すと同じIDで一覧へ戻る */
+  detachedWorks: FixtureWorkRecord[];
+  rootReconfiguration: FixtureRootReconfiguration | null;
 }
 
 function cloneWorks(works: FixtureWorkRecord[]): FixtureWorkRecord[] {
@@ -104,6 +117,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanCandidates: [],
       scanIdentityConflicts: [],
       scanInvalidMetaFiles: [],
+      detachedWorks: [],
+      rootReconfiguration: null,
     };
   }
 
@@ -142,6 +157,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanInvalidMetaFiles: [
         { path: workspacePath("壊れた/mimimilli.json"), message: "メタファイルが不正です" },
       ],
+      detachedWorks: [],
+      rootReconfiguration: null,
     };
   }
 
@@ -164,6 +181,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanCandidates: [],
       scanIdentityConflicts: [],
       scanInvalidMetaFiles: [],
+      detachedWorks: [],
+      rootReconfiguration: null,
     };
   }
 
@@ -182,6 +201,30 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanCandidates: [],
       scanIdentityConflicts: [],
       scanInvalidMetaFiles: [],
+      detachedWorks: [],
+      rootReconfiguration: null,
+    };
+  }
+
+  if (id === "root-reconfiguration-failed") {
+    return {
+      id,
+      works: [],
+      dlsiteLinkages: cloneDlsiteLinkages(),
+      dlsiteFetchFailures: cloneDlsiteFailures(nowMs),
+      smartFolders: cloneSmartFolders(smartFolders),
+      rootFolder: FIXTURE_UNREADABLE_ROOT,
+      lastScanTime: now,
+      scanInsertedWorkIds: [],
+      scanUpdatedWorkIds: [],
+      scanCandidates: [],
+      scanIdentityConflicts: [],
+      scanInvalidMetaFiles: [],
+      detachedWorks: cloneWorks(SEED_WORKS),
+      rootReconfiguration: {
+        phase: "failed",
+        message: `ルートフォルダーを読み取れません: ${FIXTURE_UNREADABLE_ROOT}`,
+      },
     };
   }
 
@@ -218,6 +261,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanInvalidMetaFiles: [
         { path: workspacePath("壊れた/mimimilli.json"), message: "メタファイルが不正です" },
       ],
+      detachedWorks: [],
+      rootReconfiguration: null,
     };
   }
 
@@ -234,5 +279,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
     scanCandidates: [],
     scanIdentityConflicts: [],
     scanInvalidMetaFiles: [],
+    detachedWorks: [],
+    rootReconfiguration: null,
   };
 }

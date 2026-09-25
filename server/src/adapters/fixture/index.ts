@@ -14,7 +14,7 @@ export type { FixtureAdapterOptions } from "./state.ts";
 export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataAdapter {
   const state = createInitialState(options);
   return {
-    ...createSettingsScanMethods(state),
+    ...createSettingsScanMethods(state, { rootRebuildStepMs: options.rootRebuildStepMs }),
     ...createWorkMethods(state),
     ...createClassificationMethods(state),
     ...createFsMethods(state),

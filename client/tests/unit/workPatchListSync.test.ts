@@ -177,9 +177,7 @@ function createFetchMock(total = WORKS_DEFAULT_PAGE_SIZE + 50) {
       if (path === "/api/tags") return Promise.resolve(jsonResponse([]));
       if (path === "/api/smart-folders") return Promise.resolve(jsonResponse([]));
       if (path === "/api/settings") {
-        return Promise.resolve(
-          jsonResponse({ rootFolder: "/lib", lastScanTime: null, lastScanRootFolder: null }),
-        );
+        return Promise.resolve(jsonResponse({ rootFolder: "/lib", lastScanTime: null }));
       }
 
       return Promise.reject(new Error(`unexpected fetch: ${url.toString()}`));
@@ -204,7 +202,6 @@ function renderLibraryHooks(nav: LibraryViewState, options?: { queryClient?: Que
   queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
     rootFolder: "/lib",
     lastScanTime: null,
-    lastScanRootFolder: null,
   });
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(

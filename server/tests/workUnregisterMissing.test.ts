@@ -10,6 +10,7 @@ import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { openDb } from "../src/adapters/real/db.ts";
 import { createTestRealAdapter } from "./helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "./helpers/sampleLibrary.ts";
+import { configureRoot } from "./helpers/rootFolder.ts";
 
 function workspace(root: string, absolutePath: string) {
   return workspacePath(absolutePath.slice(root.length + 1));
@@ -88,7 +89,7 @@ test("POST /api/works/unregister-missing: realアダプタでmissingのみを一
   );
   const app = createApp(adapter);
   mkdirSync(root, { recursive: true });
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const ids: string[] = [];
   for (const name of ["ok", "error", "missing1", "missing2"]) {

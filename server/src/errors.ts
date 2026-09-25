@@ -4,6 +4,14 @@ export class InvalidResumeError extends Error {}
 /** 前提条件（ルートフォルダー未設定等）を満たしていない操作。HTTP では 409 conflict */
 export class NotConfiguredError extends Error {}
 
+/** root再設定中・失敗中のため通常操作を受け付けない（ADR-0029）。HTTP では 409 root_reconfiguring */
+export class RootReconfiguringError extends Error {
+  constructor() {
+    super("ルートフォルダーの再設定中のため、この操作はできません");
+    this.name = "RootReconfiguringError";
+  }
+}
+
 /** ルートフォルダーとして指定されたパスが存在しない、またはディレクトリではない。HTTP では 400 invalid_request */
 export class InvalidRootFolderError extends Error {}
 

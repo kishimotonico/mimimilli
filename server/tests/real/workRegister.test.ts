@@ -25,6 +25,7 @@ import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { folderMetaPath } from "../helpers/workTestUtils.ts";
 import { nts } from "../helpers/tag.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 interface FileSnapshot {
   path: string;
@@ -70,7 +71,7 @@ async function setupPlainLibrary(t: TestContext) {
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   return { app, root, parent };
 }
 
@@ -89,7 +90,7 @@ async function setupLibraryWithChild(t: TestContext) {
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const childRes = await app.request("/api/works", {
     method: "POST",
@@ -117,7 +118,7 @@ async function setupLibraryWithTwoChildren(t: TestContext) {
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const childARes = await app.request("/api/works", {
     method: "POST",
@@ -187,7 +188,7 @@ test("POST /works: 絶対パスとパストラバーサルを拒否する", asyn
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   for (const path of [join(directory.path, "outside"), "../outside"]) {
     const res = await app.request("/api/works", {
@@ -249,7 +250,7 @@ test("POST /works: 登録前後で音声等の物理ファイルは変更され�
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const before = snapshotFiles(root, true);
   const res = await app.request("/api/works", {
@@ -784,7 +785,7 @@ async function setupFileLibrary(t: TestContext) {
   writeWav(audio, 2);
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   return { app, adapter, root, fanza, audio };
 }
 

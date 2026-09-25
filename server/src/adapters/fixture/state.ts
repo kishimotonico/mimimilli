@@ -16,7 +16,7 @@ import {
   type FixtureCoverColumns,
   type FixtureWorkRecord,
 } from "./data.ts";
-import { createFixtureScenario } from "./scenarios.ts";
+import { createFixtureScenario, type FixtureRootReconfiguration } from "./scenarios.ts";
 
 /** rjCodeをDLsite取得キャッシュのキーとして正規化する（realのnormalizeDlsiteProductCodeに合わせ大文字化）。 */
 function normalizeDlsiteCacheKey(rjCode: string): string {
@@ -33,11 +33,16 @@ export interface PlaybackIds {
 export interface FixtureState {
   rootFolder: string | null;
   lastScanTime: string | null;
-  /** 直近の完了スキャンが対象にしたルートフォルダー。rootFolderと不一致なら一覧が未反映であることを示す */
-  lastScanRootFolder: string | null;
+  /** 永続化された再設定状態（realのuser DB app_settings.root_reconfiguration相当）。null は通常運用 */
+  rootReconfiguration: FixtureRootReconfiguration | null;
+  /** 直近の再設定が完了した時刻（realのapp_settings.root_reconfiguration_completed_at相当）。
+   *  一度も完了していなければnull。 */
+  rootReconfigurationCompletedAt: string | null;
   /** DLsite合成状態（dlsite）を含まない作品レコード。正本は works・dlsiteLinkages・
    *  dlsiteFetchFailures の3つで、合成済みのAPI向け状態はどこにも保存しない。 */
   works: FixtureWorkRecord[];
+  /** rootの配下にないためcatalog相当の works から外した作品。物理ファイルの代わりで、user状態ごと保持する */
+  detachedWorks: FixtureWorkRecord[];
   /** workIdごとのDLsite連携分類（meta linkage相当）。realのmimimilli.json.dlsiteに対応する。 */
   dlsiteLinkages: Map<string, MetaDlsiteState>;
   /** rjCodeごとのDLsite取得キャッシュ相当。realのDlsiteCacheに対応する。 */
@@ -127,6 +132,8 @@ const DATA_INTEGRITY_WARNING_SKIPPED_WORK_ID = "RJ501099";
 export interface FixtureAdapterOptions {
   /** データシナリオ（省略時 "default"）。不明なIDはエラー */
   scenario?: string;
+  /** 再設定の構築段階1ステップあたりの待ち時間。再設定中の状態と進捗を観測できるよう既定では長めにする */
+  rootRebuildStepMs?: number;
   /** 契約テスト用に差し替える作品一覧。省略時はscenarioのseedを使う。dlsiteはrjCode/status/appliedTags
    *  （linkage相当）だけを取り出して使い、lastAttemptAt/error/errorKindは読まない。 */
   works?: WorkSummary[];
@@ -143,10 +150,12 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
   }, 0);
 
   let works: FixtureWorkRecord[];
+  let detachedWorks: FixtureWorkRecord[];
   let dlsiteLinkages: Map<string, MetaDlsiteState>;
   let dlsiteFetchFailures: Map<string, DlsiteCacheResolution>;
   if (options.works) {
     works = options.works.map(({ dlsite: _dlsite, ...record }) => record);
+    detachedWorks = [];
     dlsiteLinkages = new Map(
       options.works.map((work) => [
         work.id,
@@ -165,19 +174,22 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     );
   } else {
     works = scenario.works;
+    detachedWorks = scenario.detachedWorks;
     dlsiteLinkages = scenario.dlsiteLinkages;
     dlsiteFetchFailures = scenario.dlsiteFetchFailures;
   }
 
   const coverColumns = new Map<string, FixtureCoverColumns>();
-  for (const work of works) {
+  for (const work of [...works, ...detachedWorks]) {
     coverColumns.set(work.id, fixtureCoverColumnsForWork(work));
   }
   return {
     rootFolder: scenario.rootFolder,
     lastScanTime: scenario.lastScanTime,
-    lastScanRootFolder: scenario.rootFolder,
+    rootReconfiguration: scenario.rootReconfiguration,
+    rootReconfigurationCompletedAt: null,
     works,
+    detachedWorks,
     dlsiteLinkages,
     dlsiteFetchFailures,
     coverColumns,
@@ -210,7 +222,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
       scenario.id === "errors"
         ? { skippedCount: 1, skippedWorkIds: [DATA_INTEGRITY_WARNING_SKIPPED_WORK_ID] }
         : undefined,
-    sourceRevisions: new Map(works.map((work) => [work.id, "fixture"])),
+    sourceRevisions: new Map([...works, ...detachedWorks].map((work) => [work.id, "fixture"])),
     sourceRevisionSeq: 0,
   };
 }

@@ -81,8 +81,9 @@ export function usePlayerRuntime() {
     return registerCapabilities({
       loadResume,
       getCurrentPlaybackContext,
+      flushCurrentResume: () => saveCurrentResume(),
     });
-  }, [registerCapabilities, loadResume, getCurrentPlaybackContext]);
+  }, [registerCapabilities, loadResume, getCurrentPlaybackContext, saveCurrentResume]);
 
   useEffect(() => {
     return controller.subscribeCommands((command) => {

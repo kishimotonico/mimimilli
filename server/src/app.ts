@@ -3,15 +3,19 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ApiError } from "@mimimilli/shared";
-import { NotConfiguredError } from "./errors.ts";
+import { NotConfiguredError, RootReconfiguringError } from "./errors.ts";
 import type { DataAdapter } from "./adapter/index.ts";
 import { formatError, getCategoryLogger } from "./lib/logger.ts";
+import { InFlightRequestGate } from "./lib/inFlightRequestGate.ts";
+import { createRootReconfigurationLockMiddleware } from "./lib/rootReconfigurationLockMiddleware.ts";
 import { axesRoute } from "./routes/axes.ts";
 import { dlsiteRoute } from "./routes/dlsite.ts";
 import { fsRoute } from "./routes/fs.ts";
 import { mediaRoute, type MediaRouteOptions } from "./routes/media.ts";
+import { rootReconfigurationRoute } from "./routes/rootReconfiguration.ts";
 import { scanRoute } from "./routes/scan.ts";
 import { DlsiteJobManager } from "./dlsiteJobManager.ts";
+import { RootReconfigurationWorkflow } from "./rootReconfiguration.ts";
 import { ScanJobManager } from "./scanJobManager.ts";
 import { settingsRoute } from "./routes/settings.ts";
 import { smartFoldersRoute } from "./routes/smartFolders.ts";
@@ -24,6 +28,14 @@ export type AppEnv = { Variables: { requestId: string } };
 export type App = Hono<AppEnv> & {
   shutdown(): Promise<void>;
 };
+
+/** 再設定中・失敗中も通す要求。再設定画面とfixtureのテスト間分離に必要なものだけ（ADR-0029）。 */
+const ROOT_RECONFIGURATION_ALLOWED_REQUESTS = new Set([
+  "GET /api/settings",
+  "GET /api/root-reconfiguration",
+  "POST /api/root-reconfiguration",
+  "POST /api/__test__/reset",
+]);
 
 export type CreateAppOptions = { media?: MediaRouteOptions; staticDir?: string };
 
@@ -58,7 +70,20 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
   const scanJobs = new ScanJobManager(adapter, undefined, undefined, (insertedWorkIds) =>
     dlsiteJobs.enqueue("new", insertedWorkIds),
   );
-  api.route("/", settingsRoute(adapter));
+  const admittedRequestGate = new InFlightRequestGate();
+  const rootReconfiguration = new RootReconfigurationWorkflow(adapter, scanJobs, dlsiteJobs, () =>
+    admittedRequestGate.drain(),
+  );
+  api.use(
+    "*",
+    createRootReconfigurationLockMiddleware({
+      isAllowed: (method, path) => ROOT_RECONFIGURATION_ALLOWED_REQUESTS.has(`${method} ${path}`),
+      isLocked: () => rootReconfiguration.isLocked(),
+      gate: admittedRequestGate,
+    }),
+  );
+  api.route("/", settingsRoute(adapter, rootReconfiguration));
+  api.route("/", rootReconfigurationRoute(rootReconfiguration));
   api.route(
     "/",
     scanRoute(scanJobs, undefined, (workId) => dlsiteJobs.enqueue("new", [workId])),
@@ -77,6 +102,7 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
   if (adapter.resetFixtureState) {
     const resetFixtureState = adapter.resetFixtureState;
     api.post("/__test__/reset", async (c) => {
+      await rootReconfiguration.cancelActiveAndAwait();
       await scanJobs.cancelActiveAndAwait();
       await dlsiteJobs.cancelActiveAndAwait();
       resetFixtureState();
@@ -104,6 +130,15 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
       httpLogger.warn("HTTP例外が発生しました", { requestId, path, status: err.status });
       return err.getResponse();
     }
+    if (err instanceof RootReconfiguringError) {
+      httpLogger.warn("ルートフォルダーの再設定中のためリクエストを拒否しました", {
+        requestId,
+        path,
+        status: 409,
+      });
+      const body: ApiError = { error: { code: "root_reconfiguring", message: err.message } };
+      return c.json(body, 409);
+    }
     if (err instanceof NotConfiguredError) {
       httpLogger.warn("未設定のためリクエストを拒否しました", { requestId, path, status: 409 });
       const body: ApiError = { error: { code: "conflict", message: err.message } };
@@ -118,6 +153,7 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
 
   return Object.assign(app, {
     async shutdown(): Promise<void> {
+      await rootReconfiguration.shutdown();
       await scanJobs.shutdown();
       await dlsiteJobs.shutdown();
     },

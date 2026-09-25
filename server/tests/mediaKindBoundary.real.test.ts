@@ -8,6 +8,7 @@ import { createApp, type App } from "../src/app.ts";
 import { createTestRealAdapter } from "./helpers/realAdapter.ts";
 import { scanAndRegisterCandidates } from "./helpers/scanLibrary.ts";
 import { makeSampleLibrary } from "./helpers/sampleLibrary.ts";
+import { configureRoot } from "./helpers/rootFolder.ts";
 
 const REGISTERED_AUDIO = "mp3/01_intro.wav";
 const UNREGISTERED_AUDIO = "cover.jpg";
@@ -23,7 +24,7 @@ async function setup(t: TestContext): Promise<{ app: App; workId: string }> {
   writeFileSync(join(lib.root, "secret.txt"), "library-secret");
   const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: lib.root });
+  await configureRoot(adapter, lib.root);
   await scanAndRegisterCandidates(adapter);
   const works = (await (await app.request("/api/works")).json()) as WorksPage;
   const workId = works.items.find((entry) => entry.title.includes("RJ900001"))!.id;

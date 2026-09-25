@@ -117,6 +117,12 @@ export class ScanJobManager {
     return this.lastCompleted ? structuredClone(this.lastCompleted) : null;
   }
 
+  /** ジョブ外で完了したスキャン（root再設定の構築）を、ジョブの完了と同じく直近完了結果として扱う。 */
+  recordCompleted(result: ScanResult): void {
+    this.lastCompleted = { result, finishedAt: new Date().toISOString() };
+    if (result.insertedWorkIds.length > 0) this.onCompleted(result.insertedWorkIds);
+  }
+
   async listDiagnostics(): Promise<ScanDiagnostic[]> {
     return this.adapter.listScanDiagnostics();
   }

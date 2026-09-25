@@ -9,6 +9,7 @@ import type { WorksQuery } from "@mimimilli/shared";
 import { EMPTY_TAG_FILTERS, workspacePath } from "@mimimilli/shared";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 test("durationSec: end-start / end有start無 / start有end無 / 両無 / 同一ファイル複数区間 / デフォルト外playlist / probe失敗", async (t) => {
   const directory = makeTestDirectory("track-duration-combo");
@@ -72,7 +73,7 @@ test("durationSec: end-start / end有start無 / start有end無 / 両無 / 同一
   );
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan();
 
   const work = await adapter.getWork(id);
@@ -173,7 +174,7 @@ test("startがファイル全体長以上のトラックは作品をerror状態�
   );
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan();
 
   const work = await adapter.getWork(id);
@@ -237,7 +238,7 @@ test("end指定トラックでもstartがファイル全体長を超えていれ
   );
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan();
 
   const work = await adapter.getWork(id);
@@ -291,7 +292,7 @@ test("endがファイル実測長をわずかに超えるだけの正常デー�
   );
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan();
 
   const work = await adapter.getWork(id);
@@ -339,7 +340,7 @@ test("rescan無しのファイル差し替え後、getWorkはcatalogの総時間
   );
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan();
 
   const beforeWork = await adapter.getWork(id);
@@ -402,7 +403,7 @@ test("rescan無しのファイル差し替え後、prepareWorkPlaybackは総時�
   );
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan();
 
   writeWav(join(workDir, "whole.wav"), 8);
@@ -438,7 +439,7 @@ test("createWorkの応答取得は登録時の投影総時間を変えない", a
   writeWav(join(workDir, "whole.wav"), 5);
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const created = await adapter.createWork({
     path: workspacePath("RJ900015_登録総時間"),

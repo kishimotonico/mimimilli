@@ -8,6 +8,7 @@ import { createTestRealAdapter } from "./helpers/realAdapter.ts";
 import { createWorkRepos, makeWorkSummary, upsertTestWork } from "./helpers/workTestUtils.ts";
 import { makeSampleLibrary } from "./helpers/sampleLibrary.ts";
 import { nts } from "./helpers/tag.ts";
+import { configureRoot } from "./helpers/rootFolder.ts";
 
 function notificationWorks(count: number): WorkSummary[] {
   return Array.from({ length: count }, (_, index) =>
@@ -190,7 +191,7 @@ test("real adapter経由のHTTP一覧もWorkListItemの許可キーだけを返�
     dataRoot: library.baseDir,
   });
   try {
-    await adapter.updateSettings({ rootFolder: library.root });
+    await configureRoot(adapter, library.root);
     await adapter.scan();
     const response = await createApp(adapter).request("/api/works?limit=1");
     assert.equal(response.status, 200);

@@ -35,7 +35,6 @@ function renderAddressBar(options?: {
   queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
     rootFolder: options?.rootFolder ?? "/library",
     lastScanTime: null,
-    lastScanRootFolder: null,
   });
 
   render(

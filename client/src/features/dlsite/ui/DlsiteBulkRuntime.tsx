@@ -9,6 +9,7 @@ import {
 } from "@mimimilli/shared";
 import { cancelDlsiteBulk, getDlsiteBulkStatus, startDlsiteBulk } from "../../../entities/work/api";
 import { API_BASE } from "../../../shared/api/http";
+import { isRootReconfiguringError } from "../../../entities/settings/apiErrorHelpers";
 import {
   bindSseTransportError,
   connectSse,
@@ -96,7 +97,9 @@ export default function DlsiteBulkRuntime() {
     } catch (cause) {
       setActive(false);
       setCancelling(false);
-      toast.error(cause instanceof Error ? cause.message : "一括取得を開始できませんでした");
+      if (!isRootReconfiguringError(cause)) {
+        toast.error(cause instanceof Error ? cause.message : "一括取得を開始できませんでした");
+      }
     } finally {
       startingRef.current = false;
       setStarting(false);
@@ -145,7 +148,9 @@ export default function DlsiteBulkRuntime() {
     try {
       await cancelDlsiteBulk();
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "一括取得の中止に失敗しました");
+      if (!isRootReconfiguringError(cause)) {
+        toast.error(cause instanceof Error ? cause.message : "一括取得の中止に失敗しました");
+      }
     }
   }, [active, toast]);
 
@@ -179,7 +184,7 @@ export default function DlsiteBulkRuntime() {
     const detach = (): void => {
       if (disposed) return;
       setActive(false);
-      setCancelling(false);
+      resetTerminalState();
       connection.close();
     };
 
@@ -265,6 +270,11 @@ export default function DlsiteBulkRuntime() {
         })
         .catch((cause: unknown) => {
           if (disposed || terminalHandled || !generation.isCurrent(pollGeneration)) return;
+          if (isRootReconfiguringError(cause)) {
+            terminalHandled = true;
+            detach();
+            return;
+          }
           if (source.readyState === EventSource.CLOSED) {
             fail(
               cause instanceof Error ? cause.message : "DLsite一括取得の状態を取得できませんでした",
@@ -290,6 +300,7 @@ export default function DlsiteBulkRuntime() {
   }, [
     active,
     queryClient,
+    resetTerminalState,
     setActive,
     setCancelling,
     setProgress,

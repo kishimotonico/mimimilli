@@ -1,4 +1,4 @@
-// PUT /settings の検証契約。fixture/real 両アダプタで同じ形式チェックを通ることを確認する。
+// POST /root-reconfiguration の検証契約。fixture/real 両アダプタで同じ形式チェックを通ることを確認する。
 import assert from "node:assert/strict";
 import { mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -9,9 +9,9 @@ import { createTestRealAdapter } from "./helpers/realAdapter.ts";
 import { createApp } from "../src/app.ts";
 import { makeTestScope } from "./helpers/sampleLibrary.ts";
 
-async function putSettings(app: ReturnType<typeof createApp>, rootFolder: string) {
-  return app.request("/api/settings", {
-    method: "PUT",
+async function startReconfiguration(app: ReturnType<typeof createApp>, rootFolder: string) {
+  return app.request("/api/root-reconfiguration", {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ rootFolder }),
   });
@@ -19,7 +19,7 @@ async function putSettings(app: ReturnType<typeof createApp>, rootFolder: string
 
 test("fixtureアダプタ: 相対パスは400 invalid_requestになる", async () => {
   const app = createApp(createFixtureAdapter());
-  const res = await putSettings(app, "not/an/absolute/path");
+  const res = await startReconfiguration(app, "not/an/absolute/path");
   assert.equal(res.status, 400);
   const body = await res.json();
   assert.equal(body.error.code, "invalid_request");
@@ -27,17 +27,18 @@ test("fixtureアダプタ: 相対パスは400 invalid_requestになる", async (
 
 test("fixtureアダプタ: 空文字は400 invalid_requestになる", async () => {
   const app = createApp(createFixtureAdapter());
-  const res = await putSettings(app, "   ");
+  const res = await startReconfiguration(app, "   ");
   assert.equal(res.status, 400);
   const body = await res.json();
   assert.equal(body.error.code, "invalid_request");
 });
 
 test("fixtureアダプタ: 絶対パスは保存できる", async () => {
-  const app = createApp(createFixtureAdapter());
-  const res = await putSettings(app, "/library/new-root");
-  assert.equal(res.status, 200);
+  const app = createApp(createFixtureAdapter({ rootRebuildStepMs: 1 }));
+  const res = await startReconfiguration(app, "/library/new-root");
+  assert.equal(res.status, 202);
   assert.equal((await res.json()).rootFolder, "/library/new-root");
+  await app.shutdown();
 });
 
 test("realアダプタ: 相対パスは fixture と同じく400 invalid_requestになる", async (t) => {
@@ -45,7 +46,7 @@ test("realアダプタ: 相対パスは fixture と同じく400 invalid_request�
   t.after(scope.cleanup);
   const adapter = scope.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  const res = await putSettings(app, "not/an/absolute/path");
+  const res = await startReconfiguration(app, "not/an/absolute/path");
   assert.equal(res.status, 400);
   const body = await res.json();
   assert.equal(body.error.code, "invalid_request");
@@ -56,7 +57,7 @@ test("realアダプタ: 存在しない絶対パスは400 invalid_requestにな�
   t.after(scope.cleanup);
   const adapter = scope.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
-  const res = await putSettings(app, "/path/does/not/exist/for-mimimilli");
+  const res = await startReconfiguration(app, "/path/does/not/exist/for-mimimilli");
   assert.equal(res.status, 400);
   const body = await res.json();
   assert.equal(body.error.code, "invalid_request");
@@ -70,7 +71,7 @@ test("realアダプタ: 存在するがディレクトリでないパスは400 i
   const dir = mkdtempSync(join(tmpdir(), "mimimilli-settings-route-"));
   const filePath = join(dir, "not-a-directory.txt");
   writeFileSync(filePath, "x");
-  const res = await putSettings(app, filePath);
+  const res = await startReconfiguration(app, filePath);
   assert.equal(res.status, 400);
   const body = await res.json();
   assert.equal(body.error.code, "invalid_request");
@@ -82,7 +83,8 @@ test("realアダプタ: 存在するディレクトリは保存できる", async
   const adapter = scope.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
   const dir = mkdtempSync(join(tmpdir(), "mimimilli-settings-route-"));
-  const res = await putSettings(app, dir);
-  assert.equal(res.status, 200);
+  const res = await startReconfiguration(app, dir);
+  assert.equal(res.status, 202);
   assert.equal((await res.json()).rootFolder, realpathSync(dir));
+  await app.shutdown();
 });

@@ -5,7 +5,8 @@ import type { PlaybackTrack } from "./trackTime";
 import type { PlaybackItem } from "./playerController";
 
 export function usePlayerActions() {
-  const { controller, pendingResumeRef, requireCapabilities } = usePlayerRuntimeContext();
+  const { controller, pendingResumeRef, requireCapabilities, getCapabilities } =
+    usePlayerRuntimeContext();
 
   const startPlayback = useCallback(
     (
@@ -172,6 +173,14 @@ export function usePlayerActions() {
     controller.dispatch({ type: "errorDismissed" });
   }, [controller]);
 
+  // <PlayerRuntime>が未マウント（再生UIが出ていない状態）ならcapabilitiesが無く、
+  // 保存すべき再生位置も無いので何もしない。
+  const flushCurrentResume = useCallback(async (): Promise<void> => {
+    const capabilities = getCapabilities();
+    if (!capabilities) return;
+    await capabilities.flushCurrentResume();
+  }, [getCapabilities]);
+
   return useMemo(
     () => ({
       play,
@@ -195,6 +204,7 @@ export function usePlayerActions() {
       pause,
       retryPlayback,
       dismissError,
+      flushCurrentResume,
     }),
     [
       play,
@@ -218,6 +228,7 @@ export function usePlayerActions() {
       pause,
       retryPlayback,
       dismissError,
+      flushCurrentResume,
     ],
   );
 }

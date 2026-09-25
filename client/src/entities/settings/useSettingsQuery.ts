@@ -7,6 +7,15 @@ export function useSettingsQuery() {
     queryKey: SETTINGS_QUERY_KEYS.all(),
     queryFn: getSettings,
     retry: 1,
+    // root再設定中(running)は進捗をこのクエリで追う（GET /api/settingsはロック中も許可される）。
+    refetchInterval: (query) =>
+      query.state.data?.rootReconfiguration?.status === "running" ? 1000 : false,
+    // 全体既定はfalseだが、このクエリだけは"always"にする。タブへ戻った時点で
+    // rootFolder/completedAtの変化（別クライアントでの再設定）を観測できるように
+    // （ADR-0029、RootReconfigurationDriftEffect参照）。trueだとstaleTime（30s）が
+    // 効いて直近30秒以内のフォーカス復帰では再取得されないため、staleTimeに関わらず
+    // 必ず再取得する"always"にする。
+    refetchOnWindowFocus: "always",
   });
 }
 
@@ -28,7 +37,7 @@ export function useRootFolder(): string {
   return requireRootFolder(useSettingsQuery().data?.rootFolder);
 }
 
-/** 起動ゲート（App の startupState 判定・SetupScreen）専用。root がまだ無い状態を扱う */
+/** 起動ゲート（App の startupState 判定・RootConfigurationScreen）専用。root がまだ無い状態を扱う */
 export function useRootFolderOrNull(): string | null {
   return useSettingsQuery().data?.rootFolder ?? null;
 }

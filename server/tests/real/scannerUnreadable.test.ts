@@ -8,6 +8,7 @@ import { openDb } from "../../src/adapters/real/db.ts";
 import { Scanner } from "../../src/adapters/real/scanner.ts";
 import { createWorkRepos, getTestWork } from "../helpers/workTestUtils.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 function metaWithSingleTrack(id: string, title: string): unknown {
   return {
@@ -54,7 +55,7 @@ test("ルート読取失敗: スキャンがエラー終了し missing 更新さ
   );
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan();
 
   const workBefore = await adapter.getWork(workId);

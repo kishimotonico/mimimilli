@@ -15,30 +15,39 @@ import { UserWorkStateRepository } from "../../src/adapters/real/userWorkStateRe
 import type { Scanner } from "../../src/adapters/real/scanner.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
-test("updateSettings は receiver なしで呼び出せる", async () => {
+test("resolveRootFolder / beginRootReconfiguration は receiver なしで呼び出せる", async () => {
   const rootDir = mkdtempSync(join(tmpdir(), "mimimilli-settings-methods-"));
   const settings = new Map<string, string>();
   const user = {
     getUserSetting: (key: string) => settings.get(key) ?? null,
     setUserSetting: (key: string, value: string) => settings.set(key, value),
+    deleteUserSetting: (key: string) => settings.delete(key),
     listScanCandidateExclusions: () => [],
     excludeScanCandidates: () => undefined,
     restoreScanCandidateExclusions: () => undefined,
-    setUserSettingDiscardingScanCandidateExclusions: (key: string, value: string) =>
-      settings.set(key, value),
+    setUserSettings: (values: Record<string, string>) => {
+      for (const [key, value] of Object.entries(values)) settings.set(key, value);
+    },
   };
   const catalog = {
     getScanState: () => null,
     setScanState: () => undefined,
     listIdentityConflicts: () => [],
+    deleteWorksOutsideRoot: () => 0,
   };
   const query = {
     listSummaries: () => ({ summaries: [], skipped: [], unmeasuredCovers: [] }),
   };
 
   try {
-    const { updateSettings } = createSettingsScanMethods({
+    const {
+      resolveRootFolder,
+      beginRootReconfiguration,
+      completeRootReconfiguration,
+      getSettings,
+    } = createSettingsScanMethods({
       database: { kind: "memory" },
       query,
       catalog,
@@ -57,10 +66,11 @@ test("updateSettings は receiver なしで呼び出せる", async () => {
     });
 
     const expectedRoot = realpathSync(rootDir);
-    assert.deepEqual(await updateSettings({ rootFolder: rootDir }), {
+    await beginRootReconfiguration(await resolveRootFolder(rootDir));
+    await completeRootReconfiguration();
+    assert.deepEqual(await getSettings(), {
       rootFolder: expectedRoot,
       lastScanTime: null,
-      lastScanRootFolder: null,
     });
     assert.equal(settings.get("root_folder"), expectedRoot);
   } finally {
@@ -77,13 +87,13 @@ test("同一rootの再保存（正規化後一致）では候補除外を破棄�
   writeWav(join(target, "track.wav"), 1);
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan();
   await adapter.excludeScanCandidates(["候補"]);
   assert.deepEqual(await adapter.listScanCandidateExclusions(), ["候補"]);
 
   // 同じパスを再度そのまま保存する（realpath正規化後は同一root）。
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   assert.deepEqual(await adapter.listScanCandidateExclusions(), ["候補"]);
 });
 
@@ -100,7 +110,7 @@ test("異なるrootへの変更で候補除外とScanCandidateSessionを破棄�
   writeWav(join(targetB, "track.wav"), 1);
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: rootA });
+  await configureRoot(adapter, rootA);
   await adapter.scan();
   await adapter.excludeScanCandidates(["候補A"]);
   assert.deepEqual(await adapter.listScanCandidateExclusions(), ["候補A"]);
@@ -109,7 +119,7 @@ test("異なるrootへの変更で候補除外とScanCandidateSessionを破棄�
     [],
   );
 
-  await adapter.updateSettings({ rootFolder: rootB });
+  await configureRoot(adapter, rootB);
 
   assert.deepEqual(await adapter.listScanCandidateExclusions(), []);
   // rootA走査時のScanCandidateSessionも破棄され、rootBの再スキャン前は候補を返さない。
@@ -125,20 +135,20 @@ test("失敗したroot変更では候補除外を破棄しない", async (t) => 
   writeWav(join(target, "track.wav"), 1);
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   await adapter.scan();
   await adapter.excludeScanCandidates(["候補"]);
   assert.deepEqual(await adapter.listScanCandidateExclusions(), ["候補"]);
 
   await assert.rejects(
-    () => adapter.updateSettings({ rootFolder: join(directory.path, "存在しない") }),
+    () => adapter.resolveRootFolder(join(directory.path, "存在しない")),
     InvalidRootFolderError,
   );
 
   assert.deepEqual(await adapter.listScanCandidateExclusions(), ["候補"]);
 });
 
-test("setUserSettingDiscardingScanCandidateExclusionsは途中で失敗すると除外の削除もroot保存もロールバックする", () => {
+test("setUserSettingsは途中で失敗すると除外の削除もroot保存もロールバックする", () => {
   const db = openDb({ kind: "memory" });
   try {
     const repo = new UserWorkStateRepository(db);
@@ -146,11 +156,11 @@ test("setUserSettingDiscardingScanCandidateExclusionsは途中で失敗すると
     assert.deepEqual(repo.listScanCandidateExclusions(), ["候補"]);
 
     assert.throws(() => {
-      repo.setUserSettingDiscardingScanCandidateExclusions(
-        "root_folder",
+      repo.setUserSettings(
         // objectはtext列にbindできずbun:sqliteが例外を投げる。除外の削除は
         // 同じトランザクション内なのでロールバックされるはず。
-        {} as unknown as string,
+        { root_folder: {} as unknown as string },
+        { discardScanCandidateExclusions: true },
       );
     });
 

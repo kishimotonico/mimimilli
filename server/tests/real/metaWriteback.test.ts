@@ -10,6 +10,7 @@ import { replaceWithRollback } from "../../src/adapters/real/meta.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 import { nts } from "../helpers/tag.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 async function setup(t: TestContext) {
   const lib = makeSampleLibrary();
@@ -21,7 +22,7 @@ async function setup(t: TestContext) {
   writeFileSync(metaPath, JSON.stringify(raw, null, 2));
 
   const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: lib.root });
+  await configureRoot(adapter, lib.root);
   await adapter.scan();
   return { ...lib, adapter, metaPath };
 }
@@ -227,7 +228,7 @@ test("単一ファイル形式作品の patch が同居する mimimilli.json を
   );
 
   const adapter = dir.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: dir.path });
+  await configureRoot(adapter, dir.path);
   await adapter.scan();
 
   const folderMetaBefore = readFileSync(folderMetaPath, "utf-8");

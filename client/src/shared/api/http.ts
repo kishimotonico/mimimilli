@@ -80,6 +80,23 @@ async function readResponseBody(res: Response): Promise<unknown> {
   }
 }
 
+export interface ApiErrorNotification {
+  status: number;
+  code: string;
+}
+
+type ApiErrorListener = (notification: ApiErrorNotification) => void;
+const apiErrorListeners = new Set<ApiErrorListener>();
+
+/** ドメイン非依存のAPIエラー購読口。契約形式（{error:{code,message}}）のエラー応答を
+ *  受けるたびstatus・codeだけを通知する。TanStack Queryのonerrorを経由しない直接
+ *  呼び出し（await getParsed(...)等）でも同じ経路で拾えるよう、throwApiErrorの
+ *  内側から呼ぶ。呼び出し側（app層等）がcode別の意味づけを持つ。 */
+export function onApiError(listener: ApiErrorListener): () => void {
+  apiErrorListeners.add(listener);
+  return () => apiErrorListeners.delete(listener);
+}
+
 export type StatusHandler = (res: Response, body: unknown) => void;
 
 async function throwApiError(
@@ -92,6 +109,8 @@ async function throwApiError(
   onStatus?.[res.status]?.(res, body);
   const parsed = apiErrorSchema.safeParse(body);
   if (parsed.success) {
+    const notification = { status: res.status, code: parsed.data.error.code };
+    for (const listener of apiErrorListeners) listener(notification);
     throw new ApiRequestError(res.status, parsed.data.error.code, parsed.data.error.message);
   }
   const unparsed = unparsedBodyMessage(body);

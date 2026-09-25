@@ -30,6 +30,8 @@ export type LoadResume = (work: Work) => LoadedResumePlayback | null;
 export interface PlayerRuntimeCapabilities {
   loadResume: LoadResume;
   getCurrentPlaybackContext: () => PlaybackContext | null;
+  /** 現在位置のresumeを即時保存し、書き込みが終わるまで待てる */
+  flushCurrentResume: () => Promise<void>;
 }
 
 export const NOT_REGISTERED_ERROR =
@@ -41,6 +43,8 @@ export interface PlayerRuntimeContextValue {
   runtimeRefs: PlayerRuntimeRefs;
   registerCapabilities: (capabilities: PlayerRuntimeCapabilities) => () => void;
   requireCapabilities: () => PlayerRuntimeCapabilities;
+  /** <PlayerRuntime>が未マウントならnull。再生中とは限らない場面（root再設定開始等）向け */
+  getCapabilities: () => PlayerRuntimeCapabilities | null;
 }
 
 const PlayerRuntimeContext = createContext<PlayerRuntimeContextValue | null>(null);
@@ -95,6 +99,10 @@ export function PlayerRuntimeProvider({ children }: { children: ReactNode }) {
     return capabilitiesRef.current;
   }, []);
 
+  const getCapabilities = useCallback((): PlayerRuntimeCapabilities | null => {
+    return capabilitiesRef.current;
+  }, []);
+
   const value = useMemo<PlayerRuntimeContextValue>(
     () => ({
       controller,
@@ -102,8 +110,9 @@ export function PlayerRuntimeProvider({ children }: { children: ReactNode }) {
       runtimeRefs,
       registerCapabilities,
       requireCapabilities,
+      getCapabilities,
     }),
-    [controller, runtimeRefs, registerCapabilities, requireCapabilities],
+    [controller, runtimeRefs, registerCapabilities, requireCapabilities, getCapabilities],
   );
 
   return <PlayerRuntimeContext.Provider value={value}>{children}</PlayerRuntimeContext.Provider>;

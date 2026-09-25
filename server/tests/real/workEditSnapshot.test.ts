@@ -15,12 +15,13 @@ import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 import { nt, nts } from "../helpers/tag.ts";
 import { emptyDlsiteState } from "@mimimilli/shared";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 async function setup(t: TestContext) {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
   const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: lib.root });
+  await configureRoot(adapter, lib.root);
   await adapter.scan();
   const app = createApp(adapter);
   return {
@@ -136,7 +137,7 @@ test("location 不一致は GET source も PATCH も conflict", async (t) => {
     ),
   );
   const adapter = dir.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: dir.path });
+  await configureRoot(adapter, dir.path);
   await adapter.scan();
   const raw = JSON.parse(readFileSync(metaPath, "utf-8"));
   raw.playlists[0].tracks[0].file = "other.wav";

@@ -102,22 +102,33 @@ describe("settings api", () => {
 
   it("getSettings returns rootFolder from /api/settings", async () => {
     mockFetch.mockResolvedValue(
-      makeResponse({ rootFolder: "/test/path", lastScanTime: null, lastScanRootFolder: null }),
+      makeResponse({
+        rootFolder: "/test/path",
+        lastScanTime: null,
+        rootReconfiguration: { status: "idle", completedAt: null },
+      }),
     );
     const result = await settingsApi.getSettings();
     expect(mockFetch).toHaveBeenCalledWith("/api/settings");
     expect(result.rootFolder).toBe("/test/path");
+    expect(result.rootReconfiguration).toEqual({ status: "idle", completedAt: null });
   });
 
-  it("setRootFolder PUTs to /api/settings", async () => {
-    mockFetch.mockResolvedValue(
-      makeResponse({ rootFolder: "/new/path", lastScanTime: null, lastScanRootFolder: null }),
-    );
-    await settingsApi.setRootFolder("/new/path");
+  it("getRootReconfiguration GETs /api/root-reconfiguration", async () => {
+    const failed = { status: "failed", rootFolder: "/new/path", message: "読み取れません" };
+    mockFetch.mockResolvedValue(makeResponse(failed));
+    await expect(settingsApi.getRootReconfiguration()).resolves.toEqual(failed);
+    expect(mockFetch).toHaveBeenCalledWith("/api/root-reconfiguration");
+  });
+
+  it("startRootReconfiguration POSTs to /api/root-reconfiguration", async () => {
+    const running = { status: "running", rootFolder: "/new/path", progress: null };
+    mockFetch.mockResolvedValue(makeResponse(running, 202));
+    await expect(settingsApi.startRootReconfiguration("/new/path")).resolves.toEqual(running);
     expect(mockFetch).toHaveBeenCalledWith(
-      "/api/settings",
+      "/api/root-reconfiguration",
       expect.objectContaining({
-        method: "PUT",
+        method: "POST",
         body: JSON.stringify({ rootFolder: "/new/path" }),
       }),
     );

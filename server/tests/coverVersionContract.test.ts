@@ -10,6 +10,7 @@ import type { WorksPage } from "@mimimilli/shared";
 import { createTestRealAdapter } from "./helpers/realAdapter.ts";
 import { scanAndRegisterCandidates } from "./helpers/scanLibrary.ts";
 import { makeSampleLibrary, writeSampleCover } from "./helpers/sampleLibrary.ts";
+import { configureRoot } from "./helpers/rootFolder.ts";
 
 test("fixture: measured cover DTO に version が付き、同一内容なら安定する", async () => {
   const adapter = createFixtureAdapter();
@@ -68,7 +69,7 @@ test("real: カバーファイル差し替えで version と describeCover ETag 
     }),
   );
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: lib.root });
+  await configureRoot(adapter, lib.root);
   await scanAndRegisterCandidates(adapter);
 
   const works = (await (await app.request("/api/works")).json()) as WorksPage;
@@ -110,7 +111,7 @@ async function setupRealCoverRoute(t: TestContext) {
     }),
   );
   const app = createApp(adapter);
-  await adapter.updateSettings({ rootFolder: lib.root });
+  await configureRoot(adapter, lib.root);
   await scanAndRegisterCandidates(adapter);
   const works = (await (await app.request("/api/works")).json()) as WorksPage;
   const work = works.items.find((item) => item.title.includes("RJ900001"));

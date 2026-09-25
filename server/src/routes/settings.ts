@@ -1,31 +1,21 @@
-// GET/PUT /settings
+// GET /settings
 import { Hono } from "hono";
-import { settingsUpdateSchema } from "@mimimilli/shared";
+import type { Settings } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter/index.ts";
-import { InvalidRootFolderError } from "../errors.ts";
-import { invalidRequest } from "../lib/httpError.ts";
+import type { RootReconfigurationWorkflow } from "../rootReconfiguration.ts";
 
-export function settingsRoute(adapter: DataAdapter): Hono {
+export function settingsRoute(
+  adapter: DataAdapter,
+  rootReconfiguration: RootReconfigurationWorkflow,
+): Hono {
   const app = new Hono();
 
   app.get("/settings", async (c) => {
-    const settings = await adapter.getSettings();
+    const settings: Settings = {
+      ...(await adapter.getSettings()),
+      rootReconfiguration: await rootReconfiguration.getState(),
+    };
     return c.json(settings);
-  });
-
-  app.put("/settings", async (c) => {
-    const body = await c.req.json().catch(() => null);
-    const parsed = settingsUpdateSchema.safeParse(body);
-    if (!parsed.success) {
-      invalidRequest(`ルートフォルダーの指定が不正です: ${parsed.error.issues[0]?.message ?? ""}`);
-    }
-    try {
-      const settings = await adapter.updateSettings(parsed.data);
-      return c.json(settings);
-    } catch (error) {
-      if (error instanceof InvalidRootFolderError) invalidRequest(error.message);
-      throw error;
-    }
   });
 
   return app;

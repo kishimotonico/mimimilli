@@ -28,12 +28,13 @@ import {
   makeTestScope,
   writeWav,
 } from "../helpers/sampleLibrary.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 async function setup(t: TestContext) {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
   const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: lib.root });
+  await configureRoot(adapter, lib.root);
   const initial = await adapter.scan();
   const result = await adapter.registerScanCandidates(
     initial.candidates.map((candidate) => ({ path: candidate.path })),
@@ -191,7 +192,7 @@ test("UUID 重複: 後に検出された方が再採番されメタファイル�
     );
   }
   const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
   const result = await adapter.scan();
 
   assert.equal(result.registered, 0);
@@ -257,7 +258,7 @@ test("大量ディレクトリの走査中、walking フェーズの進捗イベ
     mkdirSync(join(root, `dir-${i}`), { recursive: true });
   }
   const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
+  await configureRoot(adapter, root);
 
   const walkingEvents: { processed: number; total: number }[] = [];
   await adapter.scan({

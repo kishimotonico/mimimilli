@@ -20,7 +20,6 @@ function renderWithMissingRootFolder() {
   queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
     rootFolder: null,
     lastScanTime: null,
-    lastScanRootFolder: null,
   });
   return render(
     <QueryClientProvider client={queryClient}>

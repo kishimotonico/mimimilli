@@ -1,6 +1,7 @@
 // real アダプタの手動スモーク（node tests/helpers/smoke.ts で実行）。
-// 一時ライブラリを生成し、設定 → スキャン → 検索 → fs → メディア（Range）まで一気に確認する。
+// 一時ライブラリを生成し、root再設定 → スキャン → 検索 → fs → メディア（Range）まで一気に確認する。
 import { createApp } from "../../src/app.ts";
+import { pollUntil } from "./poll.ts";
 import { createTestRealAdapter } from "./realAdapter.ts";
 import { makeSampleLibrary } from "./sampleLibrary.ts";
 
@@ -15,13 +16,15 @@ async function json(path: string, init?: RequestInit) {
 }
 
 console.log(
-  "== settings ==",
-  await json("/api/settings", {
-    method: "PUT",
+  "== root-reconfiguration ==",
+  await json("/api/root-reconfiguration", {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ rootFolder: root }),
   }),
 );
+await pollUntil(async () => (await json("/api/root-reconfiguration")).body.status !== "running");
+console.log("== settings ==", await json("/api/settings"));
 console.log("== scan ==", JSON.stringify(await json("/api/scan", { method: "POST" })));
 const works = await json("/api/works?sort=title-asc");
 console.log("== works ==", JSON.stringify(works.body, null, 1).slice(0, 1200));

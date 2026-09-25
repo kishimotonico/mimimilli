@@ -96,3 +96,11 @@ export const goToLibrarySegmentAtom = atom(null, (get, set, index: number) => {
   const activeAxis = get(activeAxisAtom);
   if (index <= 0 && activeAxis !== "all") set(setLibraryAxisAtom, "all");
 });
+
+/** root再設定に入った時点の初期化専用。通常のナビゲーション操作ではないため履歴コミットはしない。 */
+export const resetLibraryNavigationAtom = atom(null, (_get, set) => {
+  set(librarySearchQueryAtom, "");
+  set(selectedTagsAtom, []);
+  set(activeAxisAtom, "all");
+  set(selectedWorkIdAtom, null);
+});

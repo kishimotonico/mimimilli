@@ -3,12 +3,15 @@
 // - 再生開始は usePlayerActions のみ利用（state は leaf で購読）
 // - レイアウトは AppShell に委譲
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { MotionConfig } from "motion/react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
 import { usePlayerActions } from "../features/player/model/usePlayerActions";
 import PlayerRuntime from "../features/player/ui/PlayerRuntime";
+import ReconfigurationExitEffect from "./ReconfigurationExitEffect";
+import ReconfigurationEntryEffect from "./ReconfigurationEntryEffect";
+import RootReconfigurationDriftEffect from "./RootReconfigurationDriftEffect";
 import AppShell from "./AppShell";
 import AppBody from "./AppBody";
 import TopBar from "./ui/TopBar";
@@ -16,50 +19,63 @@ import LeftNav from "./ui/LeftNav";
 import AddressBar from "./ui/AddressBar";
 import NotificationBell from "./ui/NotificationBell";
 import { SETTINGS_QUERY_KEYS } from "../entities/settings/queryKeys";
-import { SCAN_QUERY_KEYS } from "../entities/scan/queryKeys";
 import PlayerDock from "../features/player/ui/PlayerDock";
 import { resolveAppStartupState } from "./model/resolveAppStartupState";
-import SetupScreen from "../features/setup/ui/SetupScreen";
+import RootConfigurationScreen from "../features/setup/ui/RootConfigurationScreen";
 import StartupErrorScreen from "./ui/StartupErrorScreen";
 import { LibraryNavigationProvider } from "../features/library/ui/LibraryNavigationProvider";
 import GlobalToast from "./ui/GlobalToast";
 import AppModals from "./ui/AppModals";
 import { useToast } from "../shared/ui/useToast";
 import { apiErrorMessage } from "../shared/lib/apiError";
+import { isRootReconfiguringError } from "../entities/settings/apiErrorHelpers";
 import { activeModalAtom } from "../shared/model/activeModalAtom";
-import { buildRootFolderChangedToastRequest } from "./model/rootFolderChangedToast";
-import type { Work, WorkListItem } from "@mimimilli/shared";
+import type { RootReconfigurationState, Settings, Work, WorkListItem } from "@mimimilli/shared";
 import { prepareWorkPlayback } from "../entities/work/api";
 import { updateCachesAfterPlaybackPrepared } from "../entities/work/model/workCacheUpdates";
 import { useDownloadLibraryExport } from "../features/library/useDownloadLibraryExport";
 import { useScanActions } from "../entities/scan/useScanActions";
-import { setRootFolder } from "../entities/settings/api";
+import { startRootReconfiguration } from "../entities/settings/api";
+import { runStartRootReconfiguration } from "./model/runStartRootReconfiguration";
+import { markReconfigurationAffectedQueriesStale } from "./model/resetLibraryForReconfiguration";
+import { resetLibraryNavigationUrl } from "./model/resetLibraryNavigationUrl";
+import { resetNavigationToDefaultAtom } from "./model/resetNavigationToDefault";
+import { createPlayRequestGuard } from "./model/playRequestGuard";
 import {
   useSettingsQuery,
   useRootFolderOrNull,
   requireRootFolder,
 } from "../entities/settings/useSettingsQuery";
+import { reconfigurationExitEpochAtom } from "../entities/settings/reconfigurationExitAtom";
 import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
 import { setAppModeAtom } from "../shared/model/appModeAtoms";
 import { openPathInFilesAtom } from "../entities/file-system/model/navigationAtoms";
 import {
   setLibraryAxisAtom,
   selectLibraryWorkAtom,
+  resetLibraryNavigationAtom,
 } from "../entities/library/model/navigationActions";
+import { scanCandidateHiddenPathsAtom } from "../entities/scan/model/atoms";
+import { dlsiteBulkApplyOpenAtom } from "../entities/dlsite/model/bulkAtoms";
 import { openWorkDetailAtom } from "../entities/work/model/navigationActions";
 
 export default function App() {
   const player = usePlayerActions();
-  const scanActions = useScanActions();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const scanActions = useScanActions();
   const setAppMode = useSetAtom(setAppModeAtom);
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
   const setLibraryAxis = useSetAtom(setLibraryAxisAtom);
   const selectLibraryWork = useSetAtom(selectLibraryWorkAtom);
+  const resetLibraryNavigation = useSetAtom(resetLibraryNavigationAtom);
+  const resetNavigationToDefault = useSetAtom(resetNavigationToDefaultAtom);
+  const setScanCandidateHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
   const openWorkDetail = useSetAtom(openWorkDetailAtom);
   const setActiveModal = useSetAtom(activeModalAtom);
-  const playRequestIdRef = useRef(0);
+  const setDlsiteBulkApplyOpen = useSetAtom(dlsiteBulkApplyOpenAtom);
+  const bumpReconfigurationExitEpoch = useSetAtom(reconfigurationExitEpochAtom);
+  const playRequestGuard = useRef(createPlayRequestGuard()).current;
 
   // ── Settings ─────────────────────────────────────────────
   const settingsQuery = useSettingsQuery();
@@ -80,27 +96,92 @@ export default function App() {
     hasErroredBefore: lastStartupError !== undefined,
   });
 
-  // ── Change folder mutation ────────────────────────────────
-  const changeFolderMutation = useMutation({
-    mutationFn: setRootFolder,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
-      queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidates() });
-      toast.show(buildRootFolderChangedToastRequest(handleOpenScanModal));
+  // ── root再設定（ADR-0029） ──────────────────────────────────
+  // 再生停止とplayRequestGuardの無効化を1つの経路にまとめる。別々に呼ぶと
+  // 呼び忘れが起きうるため、「止める」操作は常にこの関数を通す。
+  const stopPlaybackAndInvalidateGuard = useCallback(() => {
+    player.stop();
+    playRequestGuard.invalidate();
+  }, [player, playRequestGuard]);
+
+  // 突入側の非破壊な後処理。自分で開始した経路・起動時に既にrunning/failedだった経路・
+  // DriftEffect（別タブでの完了検知）で共有する。作品系クエリの実際の破棄
+  // （removeQueries）は通常UIのobserverがまだ生きている可能性があるためここではしない
+  // （stale化のみ。実際の破棄はReconfigurationEntryEffect/ReconfigurationExitEffect）。
+  // appMode・Filesのパス・作品詳細IDはURLと同期する状態のため、resetNavigationToDefault
+  // でLibraryモード内部の状態（resetLibraryNavigation）とは別に既定へ戻す。
+  const performReconfigurationEntryReset = useCallback(() => {
+    stopPlaybackAndInvalidateGuard();
+    setActiveModal(null);
+    setDlsiteBulkApplyOpen(false);
+    scanActions.reset();
+    resetNavigationToDefault();
+    resetLibraryNavigation();
+    resetLibraryNavigationUrl();
+    setScanCandidateHiddenPaths(new Set());
+    bumpReconfigurationExitEpoch((epoch) => epoch + 1);
+    markReconfigurationAffectedQueriesStale(queryClient);
+  }, [
+    queryClient,
+    resetLibraryNavigation,
+    resetNavigationToDefault,
+    scanActions,
+    setActiveModal,
+    setDlsiteBulkApplyOpen,
+    bumpReconfigurationExitEpoch,
+    setScanCandidateHiddenPaths,
+    stopPlaybackAndInvalidateGuard,
+  ]);
+
+  // 自分で開始していない経路（起動時に既にrunning/failed・他所からの409検知）の突入検知。
+  // 自分で開始した経路での再呼び出しは無害な重複（performReconfigurationEntryRestは冪等）。
+  const wasReconfiguringRef = useRef(false);
+  useEffect(() => {
+    const isReconfiguring = startupState === "reconfiguring";
+    if (isReconfiguring && !wasReconfiguringRef.current) {
+      performReconfigurationEntryReset();
+    }
+    wasReconfiguringRef.current = isReconfiguring;
+  }, [startupState, performReconfigurationEntryReset]);
+
+  // 離脱側の後処理（DLsite attach等）はReconfigurationExitEffectへ分離する
+  // （App.tsxはJotaiのread APIを持たない方針のため）。
+
+  // 202応答をsettingsキャッシュへ即時反映する。
+  const applyRootReconfigurationState = useCallback(
+    (state: RootReconfigurationState) => {
+      queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), (prev: Settings | undefined) =>
+        prev ? { ...prev, rootReconfiguration: state } : prev,
+      );
     },
-  });
+    [queryClient],
+  );
+
+  const startReconfiguration = useCallback(
+    async (path: string): Promise<void> => {
+      await runStartRootReconfiguration(path, {
+        startRootReconfiguration,
+        persistFinalResume: player.flushCurrentResume,
+        performEntryReset: performReconfigurationEntryReset,
+        applyRootReconfigurationState,
+        invalidateSettings: () =>
+          queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() }),
+      });
+    },
+    [applyRootReconfigurationState, performReconfigurationEntryReset, player, queryClient],
+  );
 
   // ── Play handler ──────────────────────────────────────────
   const handlePlay = useCallback(
     async (work: WorkListItem, trackIndex: number) => {
       // ファイル欠損・メタ読み込みエラーの作品は再生できない（UI側の無効化が第一線、これは防衛線）。
       if (work.status !== "ok") return;
-      const requestId = ++playRequestIdRef.current;
+      const requestId = playRequestGuard.next();
       try {
         const fullWork = await prepareWorkPlayback(work.id);
-        if (requestId !== playRequestIdRef.current) return;
+        if (!playRequestGuard.isCurrent(requestId)) return;
         await updateCachesAfterPlaybackPrepared(queryClient, fullWork);
-        if (requestId !== playRequestIdRef.current) return;
+        if (!playRequestGuard.isCurrent(requestId)) return;
         const playlist =
           fullWork.playlists.find((p) => p.id === fullWork.defaultPlaylistId) ??
           fullWork.playlists[0];
@@ -109,52 +190,36 @@ export default function App() {
           player.play(work, tracks, Math.min(trackIndex, tracks.length - 1), playlist!.id);
         }
       } catch (err) {
-        toast.error(apiErrorMessage(err, "作品の再生に失敗しました"));
+        if (!isRootReconfiguringError(err)) {
+          toast.error(apiErrorMessage(err, "作品の再生に失敗しました"));
+        }
       }
     },
-    [player, queryClient, toast],
+    [player, queryClient, toast, playRequestGuard],
   );
 
   const handleResume = useCallback(
     async (work: Work) => {
       if (work.status !== "ok") return;
-      const requestId = ++playRequestIdRef.current;
+      const requestId = playRequestGuard.next();
       try {
         const fullWork = await prepareWorkPlayback(work.id);
-        if (requestId !== playRequestIdRef.current) return;
+        if (!playRequestGuard.isCurrent(requestId)) return;
         await updateCachesAfterPlaybackPrepared(queryClient, fullWork);
-        if (requestId !== playRequestIdRef.current) return;
+        if (!playRequestGuard.isCurrent(requestId)) return;
         player.playWithResume(fullWork);
       } catch (err) {
-        toast.error(apiErrorMessage(err, "作品の再生に失敗しました"));
+        if (!isRootReconfiguringError(err)) {
+          toast.error(apiErrorMessage(err, "作品の再生に失敗しました"));
+        }
       }
     },
-    [player, queryClient, toast],
-  );
-
-  // ルートフォルダー変更トーストの「今すぐスキャン」から開く。
-  const handleOpenScanModal = useCallback(() => {
-    setActiveModal({ kind: "scan" });
-  }, [setActiveModal]);
-
-  const handleSetupComplete = useCallback(
-    async (path: string) => {
-      await setRootFolder(path);
-      queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
-      const result = await scanActions.start();
-      if (!result.ok) {
-        throw new Error(result.error);
-      }
-      queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), (prev: typeof settings) =>
-        prev ? { ...prev, rootFolder: path } : prev,
-      );
-    },
-    [queryClient, scanActions],
+    [player, queryClient, toast, playRequestGuard],
   );
 
   const handleChangeFolder = useCallback(
-    (path: string) => changeFolderMutation.mutateAsync(path),
-    [changeFolderMutation],
+    (path: string) => startReconfiguration(path),
+    [startReconfiguration],
   );
 
   const handleExport = useDownloadLibraryExport();
@@ -208,7 +273,26 @@ export default function App() {
   if (startupState === "setup-required") {
     return (
       <MotionConfig reducedMotion="user">
-        <SetupScreen onComplete={handleSetupComplete} />
+        <RootConfigurationScreen
+          state={{ status: "idle", completedAt: null }}
+          onSubmit={startReconfiguration}
+        />
+      </MotionConfig>
+    );
+  }
+
+  if (
+    startupState === "reconfiguring" &&
+    settings &&
+    settings.rootReconfiguration.status !== "idle"
+  ) {
+    return (
+      <MotionConfig reducedMotion="user">
+        <ReconfigurationEntryEffect />
+        <RootConfigurationScreen
+          state={settings.rootReconfiguration}
+          onSubmit={startReconfiguration}
+        />
       </MotionConfig>
     );
   }
@@ -233,10 +317,11 @@ export default function App() {
           overlays={
             <>
               <PlayerRuntime />
+              <ReconfigurationExitEffect />
+              <RootReconfigurationDriftEffect onDrift={performReconfigurationEntryReset} />
               <NavigationHistorySync />
               <AppModals
                 lastScanTime={settings?.lastScanTime ?? null}
-                lastScanRootFolder={settings?.lastScanRootFolder ?? null}
                 onChangeFolder={handleChangeFolder}
                 onExport={handleExport}
                 onOpenFiles={handleOpenScanProblemInFiles}

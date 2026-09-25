@@ -22,6 +22,7 @@ import {
 import { createInitialState } from "../src/adapters/fixture/state.ts";
 import { createWorkMethods } from "../src/adapters/fixture/works.ts";
 import type { ScanCandidate } from "@mimimilli/shared";
+import { configureRoot } from "./helpers/rootFolder.ts";
 
 /** createFixtureAdapter同様の合成だが、候補一覧だけを差し替えられる（候補登録の契約テスト用） */
 function buildFixtureAdapterWithCandidates(candidates: ScanCandidate[]): DataAdapter {
@@ -455,17 +456,17 @@ test("fixture: 単一音声ファイルのregister-previewと登録ができる"
 
 test("fixture: 異なるrootへの変更で候補除外を破棄し、同一rootの再保存では破棄しない", async () => {
   const state = createInitialState({ scenario: "empty" });
-  const { updateSettings, excludeScanCandidates, listScanCandidateExclusions } =
-    createSettingsScanMethods(state);
+  const methods = createSettingsScanMethods(state);
+  const { excludeScanCandidates, listScanCandidateExclusions } = methods;
 
-  await updateSettings({ rootFolder: "/library/root-a" });
+  await configureRoot(methods, "/library/root-a");
   await excludeScanCandidates(["候補"]);
   assert.deepEqual(await listScanCandidateExclusions(), ["候補"]);
 
-  await updateSettings({ rootFolder: "/library/root-a" });
+  await configureRoot(methods, "/library/root-a");
   assert.deepEqual(await listScanCandidateExclusions(), ["候補"]);
 
-  await updateSettings({ rootFolder: "/library/root-b" });
+  await configureRoot(methods, "/library/root-b");
   assert.deepEqual(await listScanCandidateExclusions(), []);
 });
 
@@ -474,7 +475,7 @@ test("fixture: 異なるrootへの変更で候補sessionを破棄し、次のsca
   const paths = async () => (await adapter.listScanCandidates()).map((c) => c.path);
   assert.deepEqual(await paths(), ["未登録作品", "朗読/候補"]);
 
-  await adapter.updateSettings({ rootFolder: "/library/root-b" });
+  await configureRoot(adapter, "/library/root-b");
   assert.deepEqual(await paths(), []);
 
   const result = await adapter.scan();

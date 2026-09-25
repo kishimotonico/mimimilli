@@ -5,6 +5,7 @@ import { test } from "node:test";
 import { Database } from "bun:sqlite";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
 test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JOINで作品を読める", async (t) => {
   const library = makeSampleLibrary();
@@ -14,7 +15,7 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
   const database = { kind: "files" as const, catalogPath, userPath };
 
   const adapter = library.own(createTestRealAdapter({ database }));
-  await adapter.updateSettings({ rootFolder: library.root });
+  await configureRoot(adapter, library.root);
   await adapter.scan();
   const before = await adapter.getWork(library.existingWorkId);
   assert.ok(before);
@@ -90,7 +91,6 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
   assert.deepEqual(await rebuilt.getSettings(), {
     rootFolder: library.root,
     lastScanTime: null,
-    lastScanRootFolder: null,
   });
   await rebuilt.scan();
 

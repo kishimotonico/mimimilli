@@ -10,6 +10,7 @@ import { cancelScan, getActiveScan, getScanJob, ScanAlreadyActiveError, startSca
 import type { ScanActionResult } from "../../../entities/scan/model/atoms";
 import { isTerminalScanJob } from "../../../entities/scan/model/scanJob";
 import { formatUserError } from "../../../shared/lib/formatUserError";
+import { isRootReconfiguringError } from "../../../entities/settings/apiErrorHelpers";
 
 function errorMessage(error: unknown): string {
   return formatUserError(error, "スキャン状態の取得に失敗しました").message;
@@ -101,6 +102,17 @@ export function useScanJob(options: UseScanJobOptions = {}) {
     [owns],
   );
 
+  /** 購読中のジョブをローカルの状態からだけ切り離す（root再設定突入時用）。 */
+  const reset = useCallback(() => {
+    generationRef.current += 1;
+    attachedJobIdRef.current = null;
+    snapshotRef.current = null;
+    sourceRef.current?.close();
+    sourceRef.current = null;
+    setJob(null);
+    setError(null);
+  }, []);
+
   const attach = useCallback(
     (initial: ScanJobSnapshot): void => {
       sourceRef.current?.close();
@@ -126,6 +138,12 @@ export function useScanJob(options: UseScanJobOptions = {}) {
           .then((next) => applyOwned(generation, initial.id, source, next))
           .catch((cause: unknown) => {
             if (!owns(generation, initial.id)) return;
+            // root再設定中は/scan系APIが409で拒否される。追跡中のジョブは再設定側で
+            // 取り消し済みなので、終端イベントを待たずここで追跡終了とする。
+            if (isRootReconfiguringError(cause)) {
+              reset();
+              return;
+            }
             if (isDefinitiveRefreshError(cause)) {
               detachWithError(generation, initial.id, source, cause);
             }
@@ -178,7 +196,7 @@ export function useScanJob(options: UseScanJobOptions = {}) {
         onConnectionError: refresh,
       });
     },
-    [applyOwned, detachWithError, owns],
+    [applyOwned, detachWithError, owns, reset],
   );
 
   useEffect(() => {
@@ -194,7 +212,11 @@ export function useScanJob(options: UseScanJobOptions = {}) {
         }
       })
       .catch((cause: unknown) => {
-        if (generationRef.current === discoveryGeneration && attachedJobIdRef.current === null) {
+        if (
+          generationRef.current === discoveryGeneration &&
+          attachedJobIdRef.current === null &&
+          !isRootReconfiguringError(cause)
+        ) {
           setError(errorMessage(cause));
         }
       });
@@ -221,7 +243,7 @@ export function useScanJob(options: UseScanJobOptions = {}) {
           return { ok: true, job: cause.active };
         }
         const message = errorMessage(cause);
-        setError(message);
+        if (!isRootReconfiguringError(cause)) setError(message);
         return { ok: false, error: message };
       }
     },
@@ -240,12 +262,13 @@ export function useScanJob(options: UseScanJobOptions = {}) {
       return { ok: true, job: next };
     } catch (cause) {
       const message = errorMessage(cause);
-      if (owns(generation, jobId)) setError(message);
+      if (owns(generation, jobId) && !isRootReconfiguringError(cause)) setError(message);
       return { ok: false, error: message };
     }
   }, [applyOwned, job, owns]);
 
   const clearError = useCallback(() => setError(null), []);
+
   return {
     job,
     error,
@@ -254,5 +277,6 @@ export function useScanJob(options: UseScanJobOptions = {}) {
     cancel,
     attach,
     clearError,
+    reset,
   };
 }

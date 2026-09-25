@@ -12,6 +12,7 @@ const STATUS_BY_CODE = {
   invalid_request: 400,
   conflict: 409,
   source_changed: 409,
+  root_reconfiguring: 409,
   internal: 500,
 } as const;
 

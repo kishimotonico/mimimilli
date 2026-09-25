@@ -76,8 +76,8 @@ test("HTTPException(4xx) は http カテゴリの WARN で記録する", async (
   await captureLogs(
     async (records) => {
       const app = createApp(createFixtureAdapter());
-      const res = await app.request("/api/settings", {
-        method: "PUT",
+      const res = await app.request("/api/root-reconfiguration", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rootFolder: 123 }),
       });
@@ -94,7 +94,7 @@ test("HTTPException(4xx) は http カテゴリの WARN で記録する", async (
       assert.equal(exceptionLogged.length, 1);
       assert.equal(exceptionLogged[0]!.level, "warning");
       assert.equal(exceptionLogged[0]!.properties.status, 400);
-      assert.equal(exceptionLogged[0]!.properties.path, "/api/settings");
+      assert.equal(exceptionLogged[0]!.properties.path, "/api/root-reconfiguration");
       assert.ok(exceptionLogged[0]!.properties.requestId);
     },
     { categories: ["http"] },
