@@ -6,6 +6,7 @@ export * from "./work.ts";
 export * from "./cover.ts";
 export * from "./duration.ts";
 export * from "./meta.ts";
+export * from "./workPlacement.ts";
 export * from "./library.ts";
 export * from "./pseudoTag.ts";
 export * from "./tagPrefix.ts";
