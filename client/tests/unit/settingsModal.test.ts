@@ -41,7 +41,6 @@ function renderModal(options: RenderModalOptions = {}) {
   queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
     rootFolder: "/audio",
     lastScanTime: null,
-    lastScanRootFolder: null,
   });
   const store = createStore();
   store.set(dlsiteBulkActionsAtom, {

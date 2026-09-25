@@ -31,7 +31,6 @@ function withStubAdapter(overrides: Partial<DataAdapter> & Pick<DataAdapter, "sc
         Promise.resolve({
           rootFolder: "/music/library",
           lastScanTime: null,
-          lastScanRootFolder: null,
         })),
     ...overrides,
   };

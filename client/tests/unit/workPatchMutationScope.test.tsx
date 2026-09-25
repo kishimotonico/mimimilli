@@ -78,7 +78,6 @@ function renderScopedDetail(workId: string) {
   queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
     rootFolder: "/lib",
     lastScanTime: null,
-    lastScanRootFolder: null,
   });
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(QueryClientProvider, { client: queryClient }, children);

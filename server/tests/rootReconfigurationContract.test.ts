@@ -187,7 +187,6 @@ for (const [kind, createHarness] of harnesses) {
     assert.equal((await h.app.request(`/api/works/${h.droppedWorkId}`)).status, 404);
     const settings = settingsSchema.parse(await (await h.app.request("/api/settings")).json());
     assert.equal(settings.rootFolder, h.newRoot);
-    assert.equal(settings.lastScanRootFolder, h.newRoot);
     assert.deepEqual(settings.rootReconfiguration, { status: "idle" });
     assert.equal((await h.app.request("/api/scan/last")).status, 200);
 

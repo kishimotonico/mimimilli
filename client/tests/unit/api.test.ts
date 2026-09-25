@@ -105,7 +105,6 @@ describe("settings api", () => {
       makeResponse({
         rootFolder: "/test/path",
         lastScanTime: null,
-        lastScanRootFolder: null,
         rootReconfiguration: { status: "idle" },
       }),
     );

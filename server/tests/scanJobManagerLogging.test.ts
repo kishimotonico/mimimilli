@@ -30,7 +30,6 @@ function withStubAdapter(overrides: Partial<DataAdapter> & Pick<DataAdapter, "sc
         Promise.resolve({
           rootFolder: "/music/library",
           lastScanTime: null,
-          lastScanRootFolder: null,
         })),
     ...overrides,
   };
@@ -180,7 +179,7 @@ test("getSettings の await 中に取消すると scan を呼ばず cancelled �
   const adapter = withStubAdapter({
     getSettings: async () => {
       await settingsReady;
-      return { rootFolder: "/music/library", lastScanTime: null, lastScanRootFolder: null };
+      return { rootFolder: "/music/library", lastScanTime: null };
     },
     scan: async () => {
       scanCalled = true;

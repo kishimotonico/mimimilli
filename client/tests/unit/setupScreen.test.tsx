@@ -21,7 +21,6 @@ function renderSetupApp() {
   queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
     rootFolder: null,
     lastScanTime: null,
-    lastScanRootFolder: null,
     rootReconfiguration: { status: "idle" },
   });
 

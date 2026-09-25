@@ -57,7 +57,6 @@ describe("root再設定中の画面", () => {
     renderAppWithSettings({
       rootFolder: "/audio/library",
       lastScanTime: "2026-01-01T00:00:00.000Z",
-      lastScanRootFolder: "/audio/old-library",
       rootReconfiguration: {
         status: "running",
         rootFolder: "/audio/library",
@@ -76,7 +75,6 @@ describe("root再設定中の画面", () => {
     renderAppWithSettings({
       rootFolder: "/audio/library",
       lastScanTime: null,
-      lastScanRootFolder: null,
       rootReconfiguration: {
         status: "failed",
         rootFolder: "/audio/library",
@@ -94,7 +92,6 @@ describe("root再設定中の画面", () => {
     renderAppWithSettings({
       rootFolder: "/audio/library",
       lastScanTime: "2026-01-01T00:00:00.000Z",
-      lastScanRootFolder: "/audio/library",
       rootReconfiguration: { status: "idle" },
     });
 

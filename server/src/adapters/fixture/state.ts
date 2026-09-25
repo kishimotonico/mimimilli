@@ -33,8 +33,6 @@ export interface PlaybackIds {
 export interface FixtureState {
   rootFolder: string | null;
   lastScanTime: string | null;
-  /** 直近の完了スキャンが対象にしたルートフォルダー。rootFolderと不一致なら一覧が未反映であることを示す */
-  lastScanRootFolder: string | null;
   /** 永続化された再設定状態（realのuser DB app_settings.root_reconfiguration相当）。null は通常運用 */
   rootReconfiguration: FixtureRootReconfiguration | null;
   /** DLsite合成状態（dlsite）を含まない作品レコード。正本は works・dlsiteLinkages・
@@ -185,7 +183,6 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
   return {
     rootFolder: scenario.rootFolder,
     lastScanTime: scenario.lastScanTime,
-    lastScanRootFolder: scenario.rootFolder,
     rootReconfiguration: scenario.rootReconfiguration,
     works,
     detachedWorks,

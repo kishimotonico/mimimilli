@@ -590,7 +590,6 @@ describe("WorkEditDialog", () => {
     queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
       rootFolder: "/lib",
       lastScanTime: null,
-      lastScanRootFolder: null,
     });
 
     fireEvent.change(screen.getByLabelText("タイトル"), { target: { value: "編集途中" } });

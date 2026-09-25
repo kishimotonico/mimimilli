@@ -12,14 +12,11 @@ import type { WorkQueryRepository } from "./workQueryRepository.ts";
 const scanLogger = getCategoryLogger("scan");
 
 export const LAST_SCAN_TIME_KEY = "last_scan_time";
-/** 直近の完了スキャンが対象にしたルートフォルダー。GET /settings の lastScanRootFolder に対応する */
-export const LAST_SCAN_ROOT_KEY = "last_scan_root_folder";
 
 export async function finalizeScan(deps: {
   query: Pick<WorkQueryRepository, "listSummaries">;
   catalog: Pick<CatalogWorkRepository, "setScanState">;
   thumbnailCacheDir: string;
-  root: string;
   throwIfCancelled?: () => void;
   integrityLogContext?: string;
 }): Promise<void> {
@@ -27,7 +24,6 @@ export async function finalizeScan(deps: {
     query,
     catalog,
     thumbnailCacheDir,
-    root,
     throwIfCancelled,
     integrityLogContext = "scan-finalize",
   } = deps;
@@ -57,5 +53,4 @@ export async function finalizeScan(deps: {
   }
   checkAbort();
   catalog.setScanState(LAST_SCAN_TIME_KEY, new Date().toISOString());
-  catalog.setScanState(LAST_SCAN_ROOT_KEY, root);
 }

@@ -71,7 +71,6 @@ test("resolveRootFolder / beginRootReconfiguration は receiver なしで呼び�
     assert.deepEqual(await getSettings(), {
       rootFolder: expectedRoot,
       lastScanTime: null,
-      lastScanRootFolder: null,
     });
     assert.equal(settings.get("root_folder"), expectedRoot);
   } finally {

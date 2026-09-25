@@ -18,7 +18,7 @@ import { type DbLocation } from "./db.ts";
 import type { DlsiteCacheConfig } from "./dlsiteCache.ts";
 import { Scanner } from "./scanner.ts";
 import { ScanCandidateSession } from "./scanCandidateSession.ts";
-import { finalizeScan, LAST_SCAN_ROOT_KEY, LAST_SCAN_TIME_KEY } from "./scanFinalize.ts";
+import { finalizeScan, LAST_SCAN_TIME_KEY } from "./scanFinalize.ts";
 import type { ScanExecutionResult } from "./scanTypes.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
@@ -84,7 +84,6 @@ export function createSettingsScanMethods(deps: {
   const getSettings = async (): Promise<StoredSettings> => ({
     rootFolder: user.getUserSetting(KEY_ROOT_FOLDER),
     lastScanTime: catalog.getScanState(LAST_SCAN_TIME_KEY),
-    lastScanRootFolder: catalog.getScanState(LAST_SCAN_ROOT_KEY),
   });
   const scanRoot = async (root: string, normalized: ScanOptions): Promise<ScanResult> => {
     if (database.kind === "files") {
@@ -113,7 +112,6 @@ export function createSettingsScanMethods(deps: {
       query,
       catalog,
       thumbnailCacheDir,
-      root,
       throwIfCancelled: checkAbort,
       integrityLogContext: "scan-thumbnail-gc",
     });

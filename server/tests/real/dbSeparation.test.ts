@@ -91,7 +91,6 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
   assert.deepEqual(await rebuilt.getSettings(), {
     rootFolder: library.root,
     lastScanTime: null,
-    lastScanRootFolder: null,
   });
   await rebuilt.scan();
 

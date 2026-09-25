@@ -55,7 +55,6 @@ async function runPseudoScan(
   emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
 
   state.lastScanTime = new Date().toISOString();
-  state.lastScanRootFolder = state.rootFolder;
   state.scanCandidates = [...state.scanCandidatePool];
   const excluded = new Set(state.scanCandidateExclusions);
   return {
@@ -93,7 +92,6 @@ export function createSettingsScanMethods(
       return {
         rootFolder: state.rootFolder,
         lastScanTime: state.lastScanTime,
-        lastScanRootFolder: state.lastScanRootFolder,
       };
     },
 
