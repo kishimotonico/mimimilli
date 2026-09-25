@@ -22,7 +22,7 @@ UIは完全にデスクトップ前提の3ペイン構成（LeftNav・リスト�
 
 ### URL・ルーティング
 
-URLは分けない（`/m` のような別ツリーは作らない）。ルーティングは既存の `navigationUrl.ts` ＋ `useNavigationHistory` をそのまま共有し、分岐はビュー層のみで行う。
+URLは分けない（`/m` のような別ツリーは作らない）。ルーティングは既存の AppRoute と URL 同期（[ADR-0031](0031-app-route-navigation.md)）をそのまま共有し、分岐はビュー層のみで行う。
 
 ### シェル分岐方式
 

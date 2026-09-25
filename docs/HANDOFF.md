@@ -147,9 +147,9 @@ smokeテストの注意:
 
 ## クライアントの状態管理
 
-- **Jotai atom**: API由来でない UI 操作状態。library ナビ（`entities/library/model/navigationAtoms.ts`: activeAxis/selectedTags/selectedWorkId/sort/librarySearchQuery/randomSeed）、library 表示設定（`features/library/model/atoms.ts`: libraryViewMode/libraryTileSize/libraryGridLayoutMode/axisValueSort）、files ナビ（`entities/file-system/model/navigationAtoms.ts`: filesRelPathAtom/filesSelectedPathAtom/filesDirectionAtom）、player（後述）
+- **Jotai atom**: API由来でない UI 操作状態。ナビゲーション（後述の AppRoute）、library 表示設定（`features/library/model/atoms.ts`: libraryViewMode/libraryTileSize/libraryGridLayoutMode/axisValueSort/randomSeed）、player（後述）
 - **TanStack Query**: サーバー状態。キーは `client/src/entities/<ドメイン>/queryKeys.ts` のファクトリで一元管理する（`WORK_QUERY_KEYS` / `TAG_QUERY_KEYS` / `SMART_FOLDER_QUERY_KEYS` / `SETTINGS_QUERY_KEYS` / `FILE_SYSTEM_QUERY_KEYS`）。広域 invalidate 用のプレフィックスキーも各ファクトリが持つ
-- **URL同期**: `features/navigation/`（`navigationUrl.ts` codec + `useNavigationHistory.ts` の history 同期層）。モード・軸・ドリル・タグ・選択作品・ソート・ファイルパスを URL に双方向同期。ナビ操作は `push`、選択/ソート等の軽微変更は `replace`。`requestNavigationHistoryCommitAtom` を各操作（useLibraryNavigation / useFilesNavigation / LeftNav の setMode）が叩いて push/replace を宣言する。AddressBar の戻る/進む・パンくずも本物
+- **ナビゲーションとURL同期**: 画面mode・Libraryの軸/タグ/選択作品/sort/検索語・Filesの場所/選択・作品詳細IDは `entities/navigation/model/appRouteStore.ts` の AppRoute 1つが正本で、各entityの `navigationAtoms.ts` はそこからの読み取り専用の派生。書き込みは各操作の write atom（次のrouteとpush/replaceを計算する純粋関数＋`navigate`）と履歴からの適用だけ。URLとの同期は `Providers` 直下の `NavigationHistorySync`（汎用の `shared/model/useRouteHistorySync.ts` に codec を渡す）が常時マウントで受け持つ（[ADR-0031](adr/0031-app-route-navigation.md)）。AddressBar の戻る/進む・パンくずも本物
 - **共通UIコンポーネント**: `client/src/shared/ui/` の `Button` / `IconButton` / `TagCombobox` を使う（CSSクラス直付けボタンは廃止済み。LeftNav と円形トランスポートだけ固有意匠のため例外）
 - `App.tsx` はランタイム状態も TanStack Query も購読しない。`libraryTotalQuery` / `lastScanQuery` のような画面固有の購読は、それを使う消費者（`ScanModal` / `NotificationBell`）が自分で行う。この境界は `.oxlintrc.json` の `**/App.tsx` override で機械的に強制されており、`features/**/model/**` の import は deny-by-default（`usePlayerActions` 等の action フックだけ否定 glob で許可）
 
