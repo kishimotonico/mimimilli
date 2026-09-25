@@ -5,8 +5,20 @@ import type { DataAdapter } from "../../src/adapter/index.ts";
 import { createFixtureAdapter } from "../../src/adapters/fixture/index.ts";
 import { readResponseText, serveFixtureTransport, waitFor } from "./helpers.ts";
 
-test("scan SSE: 実HTTPでprogressとterminalイベントを受信できる", async (t: TestContext) => {
-  const { server, baseUrl } = serveFixtureTransport(createFixtureAdapter({ scenario: "new-work" }));
+test("scan SSE: 実HTTPで接続時のstateと、以後のprogressとterminalイベントをid無しで受信できる", async (t: TestContext) => {
+  let connected!: () => void;
+  const connectedGate = new Promise<void>((resolve) => {
+    connected = resolve;
+  });
+  const fixture = createFixtureAdapter({ scenario: "new-work" });
+  const adapter: DataAdapter = {
+    ...fixture,
+    scan: async (options) => {
+      await connectedGate;
+      return fixture.scan(options);
+    },
+  };
+  const { server, baseUrl } = serveFixtureTransport(adapter);
   t.after(() => server.stop(true));
 
   const start = await fetch(`${baseUrl}/api/scan`, { method: "POST" });
@@ -16,10 +28,12 @@ test("scan SSE: 実HTTPでprogressとterminalイベントを受信できる", as
   const events = await fetch(`${baseUrl}/api/scan/${job.id}/events`);
   assert.equal(events.status, 200);
   assert.equal(events.headers.get("content-type"), "text/event-stream");
+  connected();
   const text = await readResponseText(events, (body) => /event: completed/.test(body));
+  assert.match(text, /^event: state\n/);
   assert.match(text, /event: progress/);
   assert.match(text, /event: completed/);
-  assert.match(text, /id: \d+/);
+  assert.doesNotMatch(text, /^id:/m);
 });
 
 test("DLsite取得: 実HTTPのAbortSignalで進行中の取得が中断される", async (t: TestContext) => {
