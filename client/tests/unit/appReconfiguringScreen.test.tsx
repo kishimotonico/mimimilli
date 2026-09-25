@@ -143,7 +143,9 @@ describe("root再設定完了後のDLsite自動取得attach", () => {
   // 1000msを超えてflakyになるため、getLastScanResultを直接spyしてチェーンを短くし、
   // 明示的に長めのtimeoutも与えて安定させる。
   it("新規作品があればdlsiteBulk.attach相当（getDlsiteBulkStatus）を呼ぶ", async () => {
-    const getDlsiteBulkStatus = vi.spyOn(workApi, "getDlsiteBulkStatus").mockResolvedValue(null);
+    const getDlsiteBulkStatus = vi
+      .spyOn(workApi, "getDlsiteBulkStatus")
+      .mockResolvedValue({ current: null, lastTerminal: null });
     vi.spyOn(scanApi, "getLastScanResult").mockResolvedValue({
       result: { ...EMPTY_SCAN_RESULT, insertedWorkIds: ["work-1"] },
       finishedAt: "2026-01-01T00:00:00.000Z",
@@ -172,7 +174,9 @@ describe("root再設定完了後のDLsite自動取得attach", () => {
   });
 
   it("新規作品が無ければgetDlsiteBulkStatusを呼ばない", async () => {
-    const getDlsiteBulkStatus = vi.spyOn(workApi, "getDlsiteBulkStatus").mockResolvedValue(null);
+    const getDlsiteBulkStatus = vi
+      .spyOn(workApi, "getDlsiteBulkStatus")
+      .mockResolvedValue({ current: null, lastTerminal: null });
     const getLastScanResult = vi.spyOn(scanApi, "getLastScanResult").mockResolvedValue({
       result: EMPTY_SCAN_RESULT,
       finishedAt: "2026-01-01T00:00:00.000Z",
@@ -298,7 +302,9 @@ describe("root再設定の高速完了（runningが描画されない）競合",
       result: { ...EMPTY_SCAN_RESULT, insertedWorkIds: ["work-2"] },
       finishedAt: "2026-01-01T00:00:00.000Z",
     });
-    const getDlsiteBulkStatus = vi.spyOn(workApi, "getDlsiteBulkStatus").mockResolvedValue(null);
+    const getDlsiteBulkStatus = vi
+      .spyOn(workApi, "getDlsiteBulkStatus")
+      .mockResolvedValue({ current: null, lastTerminal: null });
 
     const { queryClient } = renderAppWithSettings({
       rootFolder: "/audio/library",

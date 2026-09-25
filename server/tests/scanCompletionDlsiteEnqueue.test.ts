@@ -25,7 +25,8 @@ test("スキャン完了でinsertedWorkIdsがあればDLsite一括取得ジョ�
 
   // enqueueは同期的にキュー投入されるため、完了直後にはジョブが存在するはず。
   const bulk = await app.request("/api/dlsite/bulk");
-  assert.notEqual(bulk.status, 204);
+  const snapshot = await bulk.json();
+  assert.ok(snapshot.current !== null || snapshot.lastTerminal !== null);
 });
 
 test("スキャン完了でinsertedWorkIdsが無ければDLsite一括取得ジョブは積まれない", async () => {
@@ -37,5 +38,5 @@ test("スキャン完了でinsertedWorkIdsが無ければDLsite一括取得ジ�
   await waitForScanTerminal(app, job.id);
 
   const bulk = await app.request("/api/dlsite/bulk");
-  assert.equal(bulk.status, 204);
+  assert.deepEqual(await bulk.json(), { current: null, lastTerminal: null });
 });

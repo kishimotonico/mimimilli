@@ -175,7 +175,6 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
         if (options?.signal?.aborted) return result;
         const work = targets[index]!;
         options?.onProgress?.({
-          type: "progress",
           processed: index,
           total: targets.length,
           work: { id: work.id, rjCode: work.rjCode, title: work.title },
@@ -184,7 +183,6 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
         result.fetched += 1;
       }
       options?.onProgress?.({
-        type: "progress",
         processed: targets.length,
         total: targets.length,
         work: null,

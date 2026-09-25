@@ -167,15 +167,7 @@ export async function updateCachesAfterDlsiteBulkApply(
   ]);
 }
 
-/** progressMayBeMissed のときは処理対象を特定できないため全詳細を無効化する */
-export async function updateCachesAfterDlsiteBulkFetch(
-  queryClient: QueryClient,
-  target: { processedWorkIds: readonly string[]; progressMayBeMissed: boolean },
-): Promise<void> {
-  await Promise.all([
-    ...(target.progressMayBeMissed
-      ? [invalidateAllWorkDetails(queryClient)]
-      : target.processedWorkIds.map((workId) => invalidateWorkDetail(queryClient, workId))),
-    invalidateLibraryViews(queryClient),
-  ]);
+/** 一括取得の終端（結果不明を含む）。処理対象を問わず全詳細を無効化する */
+export async function updateCachesAfterDlsiteBulkFetch(queryClient: QueryClient): Promise<void> {
+  await Promise.all([invalidateAllWorkDetails(queryClient), invalidateLibraryViews(queryClient)]);
 }

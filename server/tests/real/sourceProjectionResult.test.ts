@@ -72,6 +72,7 @@ function spyEnqueue(t: TestContext) {
   const spy = spyOn(DlsiteJobManager.prototype, "enqueue").mockImplementation(
     function (mode, workIds) {
       calls.push({ mode, workIds });
+      return "job-spy";
     },
   );
   t.after(() => spy.mockRestore());

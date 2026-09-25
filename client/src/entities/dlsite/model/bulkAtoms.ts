@@ -6,7 +6,10 @@ import { atom } from "jotai";
 import type { DlsiteBulkProgressSnapshot } from "@mimimilli/shared";
 import { formatDlsiteBulkProgressLabel, formatDlsiteBulkWorkLabel } from "./dlsiteProgressLabel";
 
-export const dlsiteBulkActiveAtom = atom(false);
+/** DlsiteBulkRuntime が追跡中の一括取得ジョブのID */
+export const dlsiteBulkJobIdAtom = atom<string | null>(null);
+
+export const dlsiteBulkActiveAtom = atom((get) => get(dlsiteBulkJobIdAtom) !== null);
 
 /** POST /dlsite/bulk の応答待ち。active になる前の多重開始を防ぐ */
 export const dlsiteBulkStartingAtom = atom(false);

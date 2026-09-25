@@ -7,6 +7,8 @@ import {
   dlsiteApplyMissingPreviewSchema,
   dlsiteBulkApplyMissingResultSchema,
   dlsiteBulkCancelResponseSchema,
+  dlsiteBulkSnapshotSchema,
+  dlsiteBulkStartResponseSchema,
   dlsiteFetchByCodeBodySchema,
   dlsiteNotificationKindSchema,
   dlsiteNotificationQuerySchema,
@@ -162,14 +164,14 @@ export function dlsiteRoute(adapter: DataAdapter, dlsiteJobs: DlsiteJobManager):
   });
 
   app.get("/dlsite/bulk", (c) => {
-    const snapshot = dlsiteJobs.getSnapshot();
-    return snapshot ? c.json(snapshot) : c.body(null, 204);
+    return c.json(dlsiteBulkSnapshotSchema.parse(dlsiteJobs.getSnapshot()));
   });
 
   app.post("/dlsite/bulk", async (c) => {
     if (dlsiteJobs.isInProgress()) throw apiError("conflict", "DLsite取得は既に実行中です");
-    dlsiteJobs.enqueue("existing", undefined);
-    return c.json({ started: true }, 202);
+    const jobId = dlsiteJobs.enqueue("existing", undefined);
+    if (!jobId) throw apiError("conflict", "サーバーの終了処理中のためDLsite取得を開始できません");
+    return c.json(dlsiteBulkStartResponseSchema.parse({ jobId }), 202);
   });
 
   app.delete("/dlsite/bulk", (c) => {

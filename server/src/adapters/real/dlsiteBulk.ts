@@ -1,7 +1,7 @@
 import {
   type DataIntegrityWarning,
   type DlsiteBulkMode,
-  type DlsiteBulkProgressEvent,
+  type DlsiteBulkProgressSnapshot,
   type DlsiteBulkResult,
   type DlsiteState,
   hasRjCode,
@@ -150,7 +150,7 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
       workIds: string[] | undefined,
       options?: {
         signal?: AbortSignal;
-        onProgress?: (event: Extract<DlsiteBulkProgressEvent, { type: "progress" }>) => void;
+        onProgress?: (progress: DlsiteBulkProgressSnapshot) => void;
       },
     ): Promise<DlsiteBulkResult> {
       const signal = options?.signal;
@@ -198,7 +198,6 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
           }
           const work = targets[index]!;
           options?.onProgress?.({
-            type: "progress",
             processed: index,
             total: targets.length,
             work: { id: work.id, rjCode: work.dlsite.rjCode, title: work.title },
@@ -246,7 +245,6 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
           }
         }
         options?.onProgress?.({
-          type: "progress",
           processed: targets.length,
           total: targets.length,
           work: null,

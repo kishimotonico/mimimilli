@@ -1,11 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import type { DlsiteBulkResult } from "@mimimilli/shared";
 import {
   dlsiteBulkProgressEventSchema,
-  type DlsiteBulkProgressEvent,
+  type DlsiteBulkResult,
   type DlsiteBulkSnapshot,
+  type DlsiteBulkTerminal,
 } from "@mimimilli/shared";
 import { cancelDlsiteBulk, getDlsiteBulkStatus, startDlsiteBulk } from "../../../entities/work/api";
 import { API_BASE } from "../../../shared/api/http";
@@ -19,29 +19,20 @@ import {
 import { updateCachesAfterDlsiteBulkFetch } from "../../../entities/work/model/workCacheUpdates";
 import {
   dlsiteBulkActionsAtom,
-  dlsiteBulkActiveAtom,
   dlsiteBulkApplyOpenAtom,
   dlsiteBulkStartingAtom,
   dlsiteBulkCancellingAtom,
+  dlsiteBulkJobIdAtom,
   dlsiteBulkProgressAtom,
   type DlsiteBulkActions,
 } from "../../../entities/dlsite/model/bulkAtoms";
 import { formatDlsiteBulkResult } from "../model/formatDlsiteBulkResult";
 import { useToast } from "../../../shared/ui/useToast";
 
-type TerminalEvent = Extract<DlsiteBulkProgressEvent, { type: "complete" | "cancelled" | "error" }>;
-
-function terminalFromSnapshot(snapshot: DlsiteBulkSnapshot): TerminalEvent | null {
-  if (snapshot.status === "complete") return { type: "complete", result: snapshot.result };
-  if (snapshot.status === "cancelled") return { type: "cancelled", result: snapshot.result };
-  if (snapshot.status === "error") return { type: "error", message: snapshot.message };
-  return null;
-}
-
 export default function DlsiteBulkRuntime() {
   const queryClient = useQueryClient();
-  const active = useAtomValue(dlsiteBulkActiveAtom);
-  const setActive = useSetAtom(dlsiteBulkActiveAtom);
+  const jobId = useAtomValue(dlsiteBulkJobIdAtom);
+  const setJobId = useSetAtom(dlsiteBulkJobIdAtom);
   const setStarting = useSetAtom(dlsiteBulkStartingAtom);
   const setCancelling = useSetAtom(dlsiteBulkCancellingAtom);
   const setProgress = useSetAtom(dlsiteBulkProgressAtom);
@@ -73,17 +64,31 @@ export default function DlsiteBulkRuntime() {
     [toast],
   );
 
+  const showTerminal = useCallback(
+    (terminal: DlsiteBulkTerminal) => {
+      if (terminal.status === "complete") showComplete(terminal.result);
+      else if (terminal.status === "cancelled") showCancelled(terminal.result);
+      else toast.error(terminal.message);
+    },
+    [showCancelled, showComplete, toast],
+  );
+
   const resetTerminalState = useCallback(() => {
     setProgress(null);
     setCancelling(false);
   }, [setCancelling, setProgress]);
 
+  const trackCurrent = useCallback(
+    (current: NonNullable<DlsiteBulkSnapshot["current"]>) => {
+      resetTerminalState();
+      if (current.status === "cancelling") setCancelling(true);
+      if (current.progress) setProgress(current.progress);
+      setJobId(current.jobId);
+    },
+    [resetTerminalState, setCancelling, setJobId, setProgress],
+  );
+
   const startingRef = useRef(false);
-  // start()自身がジョブを開始した直後にSSE購読するときだけ、進捗イベントを
-  // 最初から取りこぼさず全て捕捉できると確信できる。attach()は既に走っている
-  // かもしれないジョブへ後から繋ぐため、この確信が持てない
-  // （完了時の詳細キャッシュを処理対象だけに絞れるかどうかに関わる）。
-  const freshStartRef = useRef(false);
 
   const start = useCallback(async () => {
     if (startingRef.current) return;
@@ -91,11 +96,9 @@ export default function DlsiteBulkRuntime() {
     setStarting(true);
     resetTerminalState();
     try {
-      freshStartRef.current = true;
-      await startDlsiteBulk();
-      setActive(true);
+      setJobId(await startDlsiteBulk());
     } catch (cause) {
-      setActive(false);
+      setJobId(null);
       setCancelling(false);
       if (!isRootReconfiguringError(cause)) {
         toast.error(cause instanceof Error ? cause.message : "一括取得を開始できませんでした");
@@ -104,47 +107,31 @@ export default function DlsiteBulkRuntime() {
       startingRef.current = false;
       setStarting(false);
     }
-  }, [resetTerminalState, setActive, setCancelling, setStarting, toast]);
+  }, [resetTerminalState, setCancelling, setJobId, setStarting, toast]);
 
-  // 既に走っているかもしれないジョブへの後乗り専用。ジョブの実在を確認してから
-  // activeにする。running/cancellingのときだけSSEを購読し、
-  // 終端済みならその結果をそのまま反映、ジョブが無ければ何もしない。
+  // 既に走っているかもしれないジョブへの後乗り専用。実行中ならそのジョブを追跡し、
+  // 終端済みならその結果を反映する。ジョブが無ければ何もしない。
   const attach = useCallback(() => {
-    freshStartRef.current = false;
     void (async () => {
-      let snapshot: DlsiteBulkSnapshot | null;
+      let snapshot: DlsiteBulkSnapshot;
       try {
         snapshot = await getDlsiteBulkStatus();
       } catch {
         return;
       }
-      if (!snapshot) return;
-      if (snapshot.status === "running" || snapshot.status === "cancelling") {
-        resetTerminalState();
-        if (snapshot.status === "cancelling") setCancelling(true);
-        if (snapshot.progress) setProgress(snapshot.progress);
-        setActive(true);
+      if (snapshot.current) {
+        trackCurrent(snapshot.current);
         return;
       }
-      const terminal = terminalFromSnapshot(snapshot);
-      if (!terminal) return;
+      if (!snapshot.lastTerminal) return;
       resetTerminalState();
-      if (terminal.type === "complete") showComplete(terminal.result);
-      else if (terminal.type === "cancelled") showCancelled(terminal.result);
-      else toast.error(terminal.message);
+      showTerminal(snapshot.lastTerminal);
+      void updateCachesAfterDlsiteBulkFetch(queryClient).catch(() => {});
     })();
-  }, [
-    resetTerminalState,
-    setActive,
-    setCancelling,
-    setProgress,
-    showCancelled,
-    showComplete,
-    toast,
-  ]);
+  }, [queryClient, resetTerminalState, showTerminal, trackCurrent]);
 
   const cancel = useCallback(async () => {
-    if (!active) return;
+    if (jobId === null) return;
     try {
       await cancelDlsiteBulk();
     } catch (cause) {
@@ -152,7 +139,7 @@ export default function DlsiteBulkRuntime() {
         toast.error(cause instanceof Error ? cause.message : "一括取得の中止に失敗しました");
       }
     }
-  }, [active, toast]);
+  }, [jobId, toast]);
 
   const actions = useMemo<DlsiteBulkActions>(
     () => ({ start, attach, cancel }),
@@ -165,113 +152,69 @@ export default function DlsiteBulkRuntime() {
   }, [actions, setActions]);
 
   useEffect(() => {
-    if (!active) return;
+    if (jobId === null) return;
 
     let disposed = false;
-    let terminalHandled = false;
+    let finished = false;
     const generation = createSseGeneration();
     const connection = connectSse(`${API_BASE}/dlsite/events`);
     const source = connection.source;
-    // progressイベントが伝える処理中作品のIDを集め、完了時にskippedでない（実際に処理対象だった）
-    // 作品の詳細キャッシュだけを選択的に無効化する。
-    // SSE切断→再接続、またはattach()での後乗り（開始直後からの購読と確信できない）
-    // でprogressイベントを取りこぼした可能性がある場合はmissedProgressを立て、
-    // 安全側に倒して全作品を無効化する。
-    const updatedWorkIds = new Set<string>();
-    let missedProgress = !freshStartRef.current;
-    freshStartRef.current = false;
 
     const detach = (): void => {
+      finished = true;
       if (disposed) return;
-      setActive(false);
+      setJobId(null);
       resetTerminalState();
       connection.close();
     };
 
     const fail = (message: string): void => {
-      if (disposed || terminalHandled) return;
-      terminalHandled = true;
+      if (disposed || finished) return;
       toast.error(message);
       detach();
     };
 
-    const applyTerminal = (event: TerminalEvent): void => {
-      if (disposed || terminalHandled) return;
-      terminalHandled = true;
-      if (event.type === "complete") {
-        showComplete(event.result);
-      } else if (event.type === "cancelled") {
-        showCancelled(event.result);
-      } else {
-        toast.error(event.message);
-      }
-      detach();
-      void updateCachesAfterDlsiteBulkFetch(queryClient, {
-        processedWorkIds: [...updatedWorkIds],
-        progressMayBeMissed: missedProgress,
-      }).catch(() => {});
+    const updateCaches = (): void => {
+      void updateCachesAfterDlsiteBulkFetch(queryClient).catch(() => {});
     };
 
     const applySnapshot = (snapshot: DlsiteBulkSnapshot): void => {
-      if (snapshot.status === "running" || snapshot.status === "cancelling") {
-        if (snapshot.status === "cancelling") setCancelling(true);
-        if (snapshot.progress) setProgress(snapshot.progress);
+      const closed = source.readyState === EventSource.CLOSED;
+      if (snapshot.lastTerminal?.jobId === jobId) {
+        showTerminal(snapshot.lastTerminal);
+        detach();
+        updateCaches();
         return;
       }
-      const terminal = terminalFromSnapshot(snapshot);
-      if (terminal) applyTerminal(terminal);
-    };
-
-    const eventMessages = {
-      parse: "DLsite進捗イベントの解析に失敗しました",
-      schema: "DLsite進捗イベントの形式が不正です",
-    } as const;
-
-    const handleRawSseEvent = (raw: Event): void => {
-      if (!(raw instanceof MessageEvent) || typeof raw.data !== "string") return;
-      generation.bump();
-      const parsed = parseTypedSseMessage(raw.data, dlsiteBulkProgressEventSchema, eventMessages);
-      if (!parsed.ok) {
-        fail(parsed.message);
+      if (snapshot.current?.jobId === jobId) {
+        if (closed) {
+          fail("DLsite一括取得の接続が切断されました");
+          return;
+        }
+        if (snapshot.current.status === "cancelling") setCancelling(true);
+        if (snapshot.current.progress) setProgress(snapshot.current.progress);
         return;
       }
-      const event = parsed.event;
-      if (event.type === "progress") {
-        setProgress({ processed: event.processed, total: event.total, work: event.work });
-        if (event.work) updatedWorkIds.add(event.work.id);
-      } else if (event.type === "cancelling") {
-        setCancelling(true);
-      } else {
-        applyTerminal(event);
+      updateCaches();
+      if (closed) {
+        fail("DLsite一括取得の接続が切断されました");
+        return;
       }
+      detach();
+      if (snapshot.current) trackCurrent(snapshot.current);
     };
 
-    const refresh = (): void => {
-      if (disposed || terminalHandled) return;
-      missedProgress = true;
+    const confirm = (): void => {
+      if (disposed || finished) return;
       const pollGeneration = generation.bump();
       void getDlsiteBulkStatus()
         .then((snapshot) => {
-          if (disposed || terminalHandled || !generation.isCurrent(pollGeneration)) return;
-          if (!snapshot) {
-            if (source.readyState === EventSource.CLOSED) {
-              fail("DLsite一括取得の接続が切断されました");
-            }
-            return;
-          }
-          if (
-            source.readyState === EventSource.CLOSED &&
-            (snapshot.status === "running" || snapshot.status === "cancelling")
-          ) {
-            fail("DLsite一括取得の接続が切断されました");
-            return;
-          }
+          if (disposed || finished || !generation.isCurrent(pollGeneration)) return;
           applySnapshot(snapshot);
         })
         .catch((cause: unknown) => {
-          if (disposed || terminalHandled || !generation.isCurrent(pollGeneration)) return;
+          if (disposed || finished || !generation.isCurrent(pollGeneration)) return;
           if (isRootReconfiguringError(cause)) {
-            terminalHandled = true;
             detach();
             return;
           }
@@ -283,13 +226,39 @@ export default function DlsiteBulkRuntime() {
         });
     };
 
+    const eventMessages = {
+      parse: "DLsite進捗イベントの解析に失敗しました",
+      schema: "DLsite進捗イベントの形式が不正です",
+    } as const;
+
+    const handleRawSseEvent = (raw: Event): void => {
+      if (!(raw instanceof MessageEvent) || typeof raw.data !== "string") return;
+      if (disposed || finished) return;
+      generation.bump();
+      const parsed = parseTypedSseMessage(raw.data, dlsiteBulkProgressEventSchema, eventMessages);
+      if (!parsed.ok) {
+        fail(parsed.message);
+        return;
+      }
+      const event = parsed.event;
+      if (event.jobId !== jobId) {
+        confirm();
+      } else if (event.type === "progress") {
+        setProgress({ processed: event.processed, total: event.total, work: event.work });
+      } else if (event.type === "cancelling") {
+        setCancelling(true);
+      } else {
+        confirm();
+      }
+    };
+
     for (const type of ["progress", "cancelling", "complete", "cancelled"] as const) {
       source.addEventListener(type, handleRawSseEvent);
     }
 
     bindSseTransportError({
       source,
-      onConnectionError: refresh,
+      onConnectionError: confirm,
       onNamedErrorEvent: handleRawSseEvent,
     });
 
@@ -298,15 +267,15 @@ export default function DlsiteBulkRuntime() {
       connection.close();
     };
   }, [
-    active,
+    jobId,
     queryClient,
     resetTerminalState,
-    setActive,
     setCancelling,
+    setJobId,
     setProgress,
-    showCancelled,
-    showComplete,
+    showTerminal,
     toast,
+    trackCurrent,
   ]);
 
   return null;

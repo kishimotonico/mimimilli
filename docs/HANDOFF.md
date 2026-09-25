@@ -111,10 +111,10 @@ smokeテストの注意:
 | POST         | `/dlsite/apply-missing`                      | 未取得作品への一括適用（既存値は上書きしない。dry-runとcomputeMissingDiffを共有）                                         |
 | POST         | `/dlsite/apply-missing/preview`              | `/dlsite/apply-missing` のdry-run。作品ごとの追加タグ・cover/url適用有無を書き込みせず返す                                |
 | PATCH        | `/dlsite/:id`                                | RJコード修正・skipped切替                                                                                                 |
-| GET          | `/dlsite/bulk`                               | 実行中または直近の一括取得ジョブスナップショット。なければ204                                                             |
-| POST         | `/dlsite/bulk`                               | none/error作品の一括取得ジョブを開始                                                                                      |
+| GET          | `/dlsite/bulk`                               | 実行中ジョブ（`current`）と直近に終わったジョブ（`lastTerminal`）。どちらもジョブID付き、無ければ`null`                   |
+| POST         | `/dlsite/bulk`                               | none/error作品の一括取得ジョブを開始し、`jobId` を返す                                                                    |
 | DELETE       | `/dlsite/bulk`                               | 実行中の一括取得をキャンセル                                                                                              |
-| GET          | `/dlsite/events`                             | 一括取得ジョブの進捗SSE                                                                                                   |
+| GET          | `/dlsite/events`                             | 一括取得ジョブの進捗SSE（各イベントに`jobId`）                                                                            |
 | GET          | `/dlsite/notifications`                      | RJコード未検出・取得失敗・パース失敗の件数サマリー                                                                        |
 | GET          | `/dlsite/notifications/:kind`                | `rj-missing` / `fetch-failed` / `parse-failed` の該当作品一覧（詳細は docs/dlsite.md）                                    |
 | GET          | `/tags`                                      | フラット/構造化タグの一覧                                                                                                 |
