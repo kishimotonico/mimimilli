@@ -171,6 +171,20 @@ describe.each(scenarios)("useRouteHistorySync（$name）", ({ codec, initial }) 
     expect(pushState).toHaveBeenCalledTimes(1);
   });
 
+  it("同一バッチで元の route へ戻したあとの replace は push にならない", () => {
+    const { routeStore, store } = setup("/home");
+    const original = store.get(routeStore.routeAtom);
+
+    act(() => {
+      store.set(routeStore.navigateAtom, (r) => ({ ...r, page: "other" }));
+      store.set(routeStore.navigateAtom, original);
+    });
+    act(() => store.set(routeStore.navigateAtom, (r) => ({ ...r, q: "x" }), { replace: true }));
+
+    expect(currentUrl()).toBe("/home?q=x");
+    expect(pushState).not.toHaveBeenCalled();
+  });
+
   it("URLが変わらない route の変更は履歴へ書かない", () => {
     const { routeStore, store } = setup("/home");
     replaceState.mockClear();

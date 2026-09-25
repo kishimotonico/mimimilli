@@ -57,6 +57,8 @@ export function navigationHistoryForward(): void {
 export function useRouteHistorySync<R>(routeStore: RouteStore<R>, codec: RouteCodec<R>): void {
   const store = useStore();
   const route = useAtomValue(routeStore.routeAtom);
+  // route が元の値へ戻ったバッチでも、未反映の書き込み要求を必ず消化する
+  const pendingWrite = useAtomValue(routeStore.sync.pendingWriteAtom);
   const indexRef = useRef(0);
   const maxIndexRef = useRef(0);
   const initializedRef = useRef(false);
@@ -104,12 +106,11 @@ export function useRouteHistorySync<R>(routeStore: RouteStore<R>, codec: RouteCo
   }, [codec, routeStore, store]);
 
   useEffect(() => {
-    const write = store.get(routeStore.sync.pendingWriteAtom);
-    store.set(routeStore.sync.consumePendingWriteAtom);
+    if (pendingWrite !== null) store.set(routeStore.sync.consumePendingWriteAtom);
     const nextUrl = codec.serialize(route);
     if (nextUrl === currentUrl()) return;
 
-    if (write === "push") {
+    if (pendingWrite === "push") {
       const nextIndex = indexRef.current + 1;
       indexRef.current = nextIndex;
       maxIndexRef.current = nextIndex;
@@ -120,5 +121,5 @@ export function useRouteHistorySync<R>(routeStore: RouteStore<R>, codec: RouteCo
     }
 
     history.replaceState(stateWithMarker(indexRef.current), "", nextUrl);
-  }, [codec, route, routeStore, store]);
+  }, [codec, pendingWrite, route, routeStore, store]);
 }
