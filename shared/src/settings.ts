@@ -1,25 +1,12 @@
-// 設定（GET/PUT /api/settings）の契約。
+// 設定（GET /api/settings）の契約。
 import { z } from "zod";
+import { rootReconfigurationStateSchema } from "./rootReconfiguration.ts";
 
 export const settingsSchema = z.object({
   rootFolder: z.string().nullable(),
   lastScanTime: z.string().nullable(),
   /** 直近の完了スキャンが対象にしたルートフォルダー。rootFolderと不一致なら一覧が未反映であることを示す */
   lastScanRootFolder: z.string().nullable(),
+  rootReconfiguration: rootReconfigurationStateSchema,
 });
 export type Settings = z.infer<typeof settingsSchema>;
-
-// 先頭が / の絶対パス、または Windows のドライブレター絶対パス（C:\... / C:/...）を受け付ける。
-// Windowsネイティブ動作は恒久要件のため、動作中OSに関わらず両形式を許可する。
-const ABSOLUTE_PATH_RE = /^(\/|[A-Za-z]:[\\/])/;
-
-export const settingsUpdateSchema = z.object({
-  rootFolder: z
-    .string()
-    .trim()
-    .min(1, "ルートフォルダーのパスを入力してください")
-    .refine((path) => ABSOLUTE_PATH_RE.test(path), {
-      message: "絶対パスを入力してください（例: /home/you/asmr、C:\\Users\\you\\ASMR）",
-    }),
-});
-export type SettingsUpdate = z.infer<typeof settingsUpdateSchema>;

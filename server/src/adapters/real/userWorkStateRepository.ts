@@ -224,13 +224,21 @@ export class UserWorkStateRepository {
     }
   }
 
-  /** root再設定の確定に使う。除外はroot相対pathのみを主キーに持ちrootを識別しないため、
-   *  無関係なrootへ意図が漏れないよう全件破棄した上でroot設定を保存する。片方だけが
-   *  失敗して中途半端な状態にならないよう、1トランザクションで行う。 */
-  setUserSettingDiscardingScanCandidateExclusions(key: string, value: string): void {
+  deleteUserSetting(key: string): void {
+    this.db.user.delete(appSettings).where(eq(appSettings.key, key)).run();
+  }
+
+  /** 複数の設定を1トランザクションで保存する。discardScanCandidateExclusions は root の変更に使う。
+   *  除外はroot相対pathのみを主キーに持ちrootを識別しないため、無関係なrootへ意図が漏れないよう全件破棄する。 */
+  setUserSettings(
+    values: Record<string, string>,
+    options: { discardScanCandidateExclusions: boolean },
+  ): void {
     this.db.userTransaction(() => {
-      this.db.user.delete(scanCandidateExclusions).run();
-      this.setUserSetting(key, value);
+      if (options.discardScanCandidateExclusions) {
+        this.db.user.delete(scanCandidateExclusions).run();
+      }
+      for (const [key, value] of Object.entries(values)) this.setUserSetting(key, value);
     });
   }
 

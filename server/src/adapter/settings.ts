@@ -6,7 +6,6 @@ import type {
   ScanProgressEvent,
   ScanResult,
   Settings,
-  SettingsUpdate,
 } from "@mimimilli/shared";
 
 export interface ScanOptions {
@@ -16,9 +15,11 @@ export interface ScanOptions {
   onProgress?: (event: ScanProgressEvent) => void;
 }
 
+/** 再設定状態はワークフローが合成するため、アダプタは永続値だけを返す。 */
+export type StoredSettings = Omit<Settings, "rootReconfiguration">;
+
 export interface SettingsAdapter {
-  getSettings(): Promise<Settings>;
-  updateSettings(patch: SettingsUpdate): Promise<Settings>;
+  getSettings(): Promise<StoredSettings>;
   /** signal はジョブ取消用。 */
   scan(options?: ScanOptions): Promise<ScanResult>;
   listScanDiagnostics(): Promise<ScanDiagnostic[]>;

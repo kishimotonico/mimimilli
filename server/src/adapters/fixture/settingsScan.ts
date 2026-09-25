@@ -1,18 +1,19 @@
 import { isRjCodeMissing, workspacePath } from "@mimimilli/shared";
+import type { ScanCandidate, ScanCandidatesRegisterResponse, ScanResult } from "@mimimilli/shared";
 import type {
-  ScanCandidate,
-  ScanCandidatesRegisterResponse,
-  ScanResult,
-  Settings,
-  SettingsUpdate,
-} from "@mimimilli/shared";
-import type { ScanOptions } from "../../adapter/index.ts";
-import type { SettingsAdapter } from "../../adapter/settings.ts";
+  RootReconfigurationAdapter,
+  RootReconfigurationRecord,
+  ScanOptions,
+  SettingsAdapter,
+  StoredSettings,
+} from "../../adapter/index.ts";
 import type { FixtureWorkRecord } from "./data.ts";
-import { normalizeFsPath } from "./fsResolve.ts";
+import { isFsPathWithin, normalizeFsPath } from "./fsResolve.ts";
+import { FIXTURE_UNREADABLE_ROOT } from "./scenarios.ts";
 import { dlsiteLinkageOf, setDlsiteLinkage, type FixtureState } from "./state.ts";
 
 const FIXTURE_SCAN_STEP_MS = 20;
+const FIXTURE_ROOT_REBUILD_STEP_MS = 250;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -27,9 +28,68 @@ export function resolveRegisteredRjCode(
   return itemRjCode === undefined ? candidateRjCode : itemRjCode;
 }
 
-export function createSettingsScanMethods(state: FixtureState): SettingsAdapter {
+async function runPseudoScan(
+  state: FixtureState,
+  options: ScanOptions,
+  stepMs: number,
+): Promise<ScanResult> {
+  const emit = options.onProgress ?? ((): void => {});
+  const checkAbort = () => {
+    if (options.signal?.aborted)
+      throw new DOMException("スキャンはキャンセルされました", "AbortError");
+  };
+  const pseudoSteps = 4;
+
+  checkAbort();
+  emit({ type: "progress", phase: "walking", processed: 0, total: 0 });
+  await sleep(stepMs);
+  checkAbort();
+  emit({ type: "progress", phase: "registering", processed: 0, total: pseudoSteps });
+  for (let i = 1; i <= pseudoSteps; i++) {
+    await sleep(stepMs);
+    checkAbort();
+    emit({ type: "progress", phase: "registering", processed: i, total: pseudoSteps });
+  }
+  await sleep(stepMs);
+  checkAbort();
+  emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
+
+  state.lastScanTime = new Date().toISOString();
+  state.lastScanRootFolder = state.rootFolder;
+  state.scanCandidates = [...state.scanCandidatePool];
+  const excluded = new Set(state.scanCandidateExclusions);
   return {
-    async getSettings(): Promise<Settings> {
+    registered: state.works.length,
+    insertedWorkIds: state.scanInsertedWorkIds,
+    updatedWorkIds: state.scanUpdatedWorkIds,
+    errors: state.works.filter((w) => w.status === "error").length,
+    missing: state.works.filter((w) => w.status === "missing").length,
+    rjCodeMissingCount: state.works.filter((w) => isRjCodeMissing(dlsiteLinkageOf(state, w.id)))
+      .length,
+    skipped: 0,
+    coverErrors: 0,
+    unreadablePaths: [],
+    identityConflicts: state.scanIdentityConflicts,
+    invalidMetaFiles: state.scanInvalidMetaFiles,
+    candidates: state.scanCandidates.filter((candidate) => !excluded.has(candidate.path)),
+    ...(state.dataIntegrityWarning ? { dataIntegrityWarning: state.dataIntegrityWarning } : {}),
+  };
+}
+
+/** root配下にない作品をworksから外し、root配下に戻った作品をworksへ戻す。 */
+function reattachWorksForRoot(state: FixtureState, rootFolder: string): void {
+  const all = [...state.works, ...state.detachedWorks];
+  state.works = all.filter((work) => isFsPathWithin(rootFolder, work.physicalPath));
+  state.detachedWorks = all.filter((work) => !isFsPathWithin(rootFolder, work.physicalPath));
+}
+
+export function createSettingsScanMethods(
+  state: FixtureState,
+  options: { rootRebuildStepMs?: number } = {},
+): SettingsAdapter & RootReconfigurationAdapter {
+  const rootRebuildStepMs = options.rootRebuildStepMs ?? FIXTURE_ROOT_REBUILD_STEP_MS;
+  return {
+    async getSettings(): Promise<StoredSettings> {
       return {
         rootFolder: state.rootFolder,
         lastScanTime: state.lastScanTime,
@@ -37,61 +97,45 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
       };
     },
 
-    async updateSettings(patch: SettingsUpdate): Promise<Settings> {
-      if (state.rootFolder !== null && state.rootFolder !== patch.rootFolder) {
+    async resolveRootFolder(requested: string): Promise<string> {
+      return normalizeFsPath(requested);
+    },
+
+    async getRootReconfigurationRecord(): Promise<RootReconfigurationRecord | null> {
+      const record = state.rootReconfiguration;
+      if (record === null) return null;
+      if (state.rootFolder === null) throw new Error("再設定中のルートフォルダーがありません");
+      return { ...record, rootFolder: state.rootFolder };
+    },
+
+    async beginRootReconfiguration(rootFolder: string): Promise<void> {
+      if (state.rootFolder !== null && state.rootFolder !== rootFolder) {
         state.scanCandidateExclusions = [];
         state.scanCandidates = [];
       }
-      state.rootFolder = patch.rootFolder;
-      return {
-        rootFolder: state.rootFolder,
-        lastScanTime: state.lastScanTime,
-        lastScanRootFolder: state.lastScanRootFolder,
-      };
+      state.rootFolder = rootFolder;
+      state.rootReconfiguration = { phase: "running" };
     },
 
-    async scan(options?: ScanOptions): Promise<ScanResult> {
-      const emit = options?.onProgress ?? ((): void => {});
-      const checkAbort = () => {
-        if (options?.signal?.aborted)
-          throw new DOMException("スキャンはキャンセルされました", "AbortError");
-      };
-      const pseudoSteps = 4;
-
-      checkAbort();
-      emit({ type: "progress", phase: "walking", processed: 0, total: 0 });
-      await sleep(FIXTURE_SCAN_STEP_MS);
-      checkAbort();
-      emit({ type: "progress", phase: "registering", processed: 0, total: pseudoSteps });
-      for (let i = 1; i <= pseudoSteps; i++) {
-        await sleep(FIXTURE_SCAN_STEP_MS);
-        checkAbort();
-        emit({ type: "progress", phase: "registering", processed: i, total: pseudoSteps });
+    async rebuildCatalogForRoot(rootFolder, rebuildOptions): Promise<ScanResult> {
+      reattachWorksForRoot(state, rootFolder);
+      if (rootFolder === FIXTURE_UNREADABLE_ROOT) {
+        await sleep(rootRebuildStepMs);
+        throw new Error(`ルートフォルダーを読み取れません: ${rootFolder}`);
       }
-      await sleep(FIXTURE_SCAN_STEP_MS);
-      checkAbort();
-      emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
+      return runPseudoScan(state, rebuildOptions, rootRebuildStepMs);
+    },
 
-      state.lastScanTime = new Date().toISOString();
-      state.lastScanRootFolder = state.rootFolder;
-      state.scanCandidates = [...state.scanCandidatePool];
-      const excluded = new Set(state.scanCandidateExclusions);
-      return {
-        registered: state.works.length,
-        insertedWorkIds: state.scanInsertedWorkIds,
-        updatedWorkIds: state.scanUpdatedWorkIds,
-        errors: state.works.filter((w) => w.status === "error").length,
-        missing: state.works.filter((w) => w.status === "missing").length,
-        rjCodeMissingCount: state.works.filter((w) => isRjCodeMissing(dlsiteLinkageOf(state, w.id)))
-          .length,
-        skipped: 0,
-        coverErrors: 0,
-        unreadablePaths: [],
-        identityConflicts: state.scanIdentityConflicts,
-        invalidMetaFiles: state.scanInvalidMetaFiles,
-        candidates: state.scanCandidates.filter((candidate) => !excluded.has(candidate.path)),
-        ...(state.dataIntegrityWarning ? { dataIntegrityWarning: state.dataIntegrityWarning } : {}),
-      };
+    async failRootReconfiguration(message: string): Promise<void> {
+      state.rootReconfiguration = { phase: "failed", message };
+    },
+
+    async completeRootReconfiguration(): Promise<void> {
+      state.rootReconfiguration = null;
+    },
+
+    async scan(scanOptions?: ScanOptions): Promise<ScanResult> {
+      return runPseudoScan(state, scanOptions ?? {}, FIXTURE_SCAN_STEP_MS);
     },
 
     async listScanDiagnostics() {

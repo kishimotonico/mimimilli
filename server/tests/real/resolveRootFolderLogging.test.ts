@@ -6,15 +6,16 @@ import { InvalidRootFolderError } from "../../src/errors.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { captureLogs, categoryRecords, recordMessage } from "../helpers/logCapture.ts";
 import { makeTestDirectory, makeTestScope } from "../helpers/sampleLibrary.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 
-test("存在しないパスを updateSettings に渡すと server カテゴリの WARN を記録する", async (t) => {
+test("存在しないパスを resolveRootFolder に渡すと server カテゴリの WARN を記録する", async (t) => {
   const scope = makeTestScope();
   t.after(scope.cleanup);
   const adapter = scope.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await captureLogs(
     async (records) => {
       await assert.rejects(
-        () => adapter.updateSettings({ rootFolder: "/path/does/not/exist/for-mimimilli" }),
+        () => adapter.resolveRootFolder("/path/does/not/exist/for-mimimilli"),
         (error: unknown) => {
           assert.ok(error instanceof InvalidRootFolderError);
           return true;
@@ -34,7 +35,7 @@ test("存在しないパスを updateSettings に渡すと server カテゴリ�
   );
 });
 
-test("updateSettings 成功時に requestedPath と resolvedPath を INFO で記録する", async (t) => {
+test("resolveRootFolder 成功時に requestedPath と resolvedPath を INFO で記録する", async (t) => {
   const directory = makeTestDirectory("settings-logging-root");
   t.after(directory.cleanup);
   const rootDir = join(directory.path, "root");
@@ -44,7 +45,7 @@ test("updateSettings 成功時に requestedPath と resolvedPath を INFO で記
   const resolvedPath = realpathSync(rootDir);
   await captureLogs(
     async (records) => {
-      await adapter.updateSettings({ rootFolder: requestedPath });
+      await configureRoot(adapter, requestedPath);
 
       const logged = categoryRecords(records, "server").filter(
         (record) => recordMessage(record) === "ルートフォルダーを解決しました",

@@ -8,6 +8,7 @@ import {
 } from "@mimimilli/shared";
 import type { NormalizedTag, DlsiteState, ScanDiagnostic, UrlEntry, Work } from "@mimimilli/shared";
 import { japaneseSortKey } from "../../core/japaneseSortKey.ts";
+import { isPathWithin } from "../../lib/path.ts";
 import type { Db } from "./db.ts";
 import {
   audioProbeCache,
@@ -132,12 +133,29 @@ export class CatalogWorkRepository {
   deleteWorkCatalog(id: string): boolean {
     const row = this.getWorkDeleteTarget(id);
     if (!row) return false;
-    this.db.transaction(() => {
-      this.db.catalog.delete(workTags).where(eq(workTags.workId, id)).run();
-      this.db.catalog.delete(workDlsite).where(eq(workDlsite.workId, id)).run();
-      this.db.catalog.delete(works).where(eq(works.id, id)).run();
-    });
+    this.db.transaction(() => this.deleteWorkRows(id));
     return true;
+  }
+
+  private deleteWorkRows(id: string): void {
+    this.db.catalog.delete(workTags).where(eq(workTags.workId, id)).run();
+    this.db.catalog.delete(workDlsite).where(eq(workDlsite.workId, id)).run();
+    this.db.catalog.delete(works).where(eq(works.id, id)).run();
+  }
+
+  /** root の配下にない作品の行を関連行ごと削除し、削除した件数を返す。 */
+  deleteWorksOutsideRoot(root: string): number {
+    const outside = this.db.catalog
+      .select({ id: works.id, physicalPath: works.physicalPath })
+      .from(works)
+      .all()
+      .filter((row) => !isPathWithin(root, row.physicalPath))
+      .map((row) => row.id);
+    if (outside.length === 0) return 0;
+    this.db.transaction(() => {
+      for (const id of outside) this.deleteWorkRows(id);
+    });
+    return outside.length;
   }
 
   upsertWorkCatalog(

@@ -5,6 +5,12 @@ export function normalizeFsPath(path: string): string {
   return trimmed === "" ? "/" : trimmed;
 }
 
+/** target が rootAbs 自身または配下か。 */
+export function isFsPathWithin(rootAbs: string, target: string): boolean {
+  const root = normalizeFsPath(rootAbs);
+  return target === root || target.startsWith(root === "/" ? "/" : `${root}/`);
+}
+
 /** root 配下の絶対パスからファイルまたはディレクトリを辿る。root 配下でない・存在しなければ null */
 export function resolveFsPath(root: FsNode, rootAbs: string, target: string): FsNode | null {
   if (target === rootAbs) return root;
