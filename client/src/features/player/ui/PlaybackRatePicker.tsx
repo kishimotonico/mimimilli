@@ -1,7 +1,7 @@
 // 再生速度ピル＋メニュー。PopupContent・PlayerTransportControls・
 // NowPlayingImmersiveMiniControlsで共用する。
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useIsPresent } from "motion/react";
 import { I } from "../../../shared/ui/Icon";
@@ -62,6 +62,22 @@ export default function PlaybackRatePicker({
     closeOnFocusOut: true,
   });
 
+  const floatingRef = useRef<HTMLDivElement | null>(null);
+  const setFloatingRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      floatingRef.current = node;
+      return setFloating(node);
+    },
+    [setFloating],
+  );
+
+  // ポータル化したメニューはDOM上でボタンと隣接しないため、開いたら選択中の項目へ
+  // 明示的にフォーカスを移す（Tab/Shift+Tabでメニューへ入れるようにする）
+  useEffect(() => {
+    if (!isOpen) return;
+    floatingRef.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus();
+  }, [isOpen]);
+
   const rateLabel = RATE_LABELS[playbackRate] ?? `${playbackRate.toFixed(2)}×`;
 
   return (
@@ -69,7 +85,7 @@ export default function PlaybackRatePicker({
       {isOpen &&
         createPortal(
           <div
-            ref={setFloating}
+            ref={setFloatingRef}
             style={floatingStyles}
             className="mle-ratepick__pop"
             role="menu"
