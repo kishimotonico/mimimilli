@@ -4,6 +4,7 @@ title: clientのテストを型チェック対象に含める
 status: To Do
 assignee: []
 created_date: '2026-08-09 15:08'
+updated_date: '2026-10-02 11:40'
 labels: []
 dependencies: []
 ordinal: 293000
@@ -26,3 +27,9 @@ tests/ を include に加えると既存の型エラーが多数出ると報告�
 - [ ] #3 client/src/shared/api/http.type-test.ts が tests/ 配下へ移動し、src に未参照ファイルが残っていない
 - [ ] #4 pnpm check と pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-02点検: tsc --listFilesOnlyでclientのtests・vite.config.ts・playwright.config.tsが0件。tsconfig.node.jsonのreferencesもtsc（-bなし）では辿られない。設定ファイルも型チェック対象に含める。
+<!-- SECTION:NOTES:END -->
