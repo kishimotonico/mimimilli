@@ -4,12 +4,13 @@ title: clientのbest-effortな握りつぶしとキャッシュ更新の手書�
 status: To Do
 assignee: []
 created_date: '2026-10-02 11:49'
-updated_date: '2026-10-02 11:50'
+updated_date: '2026-10-04 09:35'
 labels:
   - client
   - refactor
 dependencies:
   - TASK-487
+  - TASK-488
 documentation:
   - backlog/docs/doc-7
   - docs/client-error-handling.md
@@ -31,3 +32,9 @@ docs/client-error-handling.md の「完全に無視する箇所」は5件だが�
 - [ ] #4 Filesから既登録作品を扱ったときのキャッシュ更新がworkCacheUpdatesの関数を通る
 - [ ] #5 pnpm check && pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-04 Codex(Astra)レビュー（tmp/structural-audit-2026-10-02/review-astra.md）を反映: ReconfigurationExitEffectの握りつぶしはTASK-488で移動するので、最終的な整理は488の後に行う。
+<!-- SECTION:NOTES:END -->

@@ -4,6 +4,7 @@ title: fixtureの登録プレビュー規則をrealと共通にし、未設定ro
 status: To Do
 assignee: []
 created_date: '2026-10-02 11:48'
+updated_date: '2026-10-04 09:34'
 labels:
   - server
   - fixture
@@ -28,3 +29,9 @@ fixtureの getWorkRegisterPreview は独自の正規表現 /RJ\d{6,8}/i でRJコ
 - [ ] #4 登録プレビューの規則が両adapterで同じ結果になることがテストで確認されている
 - [ ] #5 pnpm check && pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-04 Codex(Astra)レビュー（tmp/structural-audit-2026-10-02/review-astra.md）を反映: 登録プレビューのうち、このタスクの範囲は入力から決まる純粋な規則（RJ検出・タイトル候補）だけ。メタの読み込みと配置形式による登録の統合はTASK-481が扱う。
+<!-- SECTION:NOTES:END -->

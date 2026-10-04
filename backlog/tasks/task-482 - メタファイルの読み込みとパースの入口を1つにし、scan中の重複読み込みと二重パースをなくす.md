@@ -4,6 +4,7 @@ title: メタファイルの読み込みとパースの入口を1つにし、sca
 status: To Do
 assignee: []
 created_date: '2026-10-02 11:46'
+updated_date: '2026-10-04 09:34'
 labels:
   - server
   - refactor
@@ -25,9 +26,15 @@ TASK-474のメタJSONパース失敗の集約と二重パース解消はこの�
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 メタファイルのJSONパースとスキーマ検証の入口が1つで、formatVersion判定を全経路が通る
-- [ ] #2 候補IDの正規表現による抽出が無くなっている
-- [ ] #3 scanが1つのメタファイルを再検証以外の目的で複数回読まない
-- [ ] #4 パース失敗をMetaParseErrorにする処理が1関数にまとまっている
-- [ ] #5 不正JSON・不正スキーマ・identity衝突のscan結果が既存テストの期待値どおり
-- [ ] #6 pnpm check && pnpm test が通る
+- [ ] #2 scanが1つのメタファイルを再検証以外の目的で複数回読まない
+- [ ] #3 パース失敗をMetaParseErrorにする処理が1関数にまとまっている
+- [ ] #4 不正JSON・不正スキーマ・identity衝突のscan結果が既存テストの期待値どおり
+- [ ] #5 pnpm check && pnpm test が通る
+- [ ] #6 候補IDの抽出（不正JSONからの救済を含む）の実装が1箇所にある
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-04 Codex(Astra)レビュー（tmp/structural-audit-2026-10-02/review-astra.md）を反映: 不正JSONからcandidateIdを拾ってidentity_conflictにする挙動は、壊れたコピーで既存作品の投影を乗っ取らせないための既存仕様（server/tests/real/identityConflict.test.ts の「壊れたコピーのcandidateIdで既存作品の投影を乗っ取らない」、TASK-399）なので維持する。旧AC#2（正規表現抽出の廃止）は取り下げ、抽出実装を1箇所にする条件に変えた。readMetaSourceは現状パース失敗時にcandidateId=nullを投げるため、単一入口はraw・候補ID・診断・検証済みMetaFileを取り出せる形にする。検証済みMetaFileだけを返す関数への置き換えでは足りない。
+<!-- SECTION:NOTES:END -->

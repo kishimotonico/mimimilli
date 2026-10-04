@@ -4,7 +4,7 @@ title: 型の逃げと参照ゼロのexportを解消する
 status: To Do
 assignee: []
 created_date: '2026-10-02 11:40'
-updated_date: '2026-10-02 11:50'
+updated_date: '2026-10-04 09:34'
 labels:
   - client
   - server
@@ -24,13 +24,16 @@ ordinal: 534000
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 列挙した非nullアサーションとas キャストが型設計（型ガード・判別共用体・skipToken等）で置き換わっている
-- [ ] #2 列挙した参照ゼロのexportが削除されている
-- [ ] #3 WorkEditDialogとuseHoverGroupCoordinatorのeffectが依存を偽らずに書かれ、eslint-disableが無い
-- [ ] #4 pnpm check && pnpm test が通る
+- [ ] #2 WorkEditDialogとuseHoverGroupCoordinatorのeffectが依存を偽らずに書かれ、eslint-disableが無い
+- [ ] #3 pnpm check && pnpm test が通る
+- [ ] #4 本番コードとテストのどちらからも参照されないexport（WORK_EDIT_FIELDS など）が削除されている
+- [ ] #5 テストからだけ参照されるexport（getNormalizeTagBatchCacheStateForTests・tagFiltersFromSelected・coverFieldsFromCover など）は、振る舞いのテストへの置き換えかtest helperへの移設かを決めて整理し、代わりに何を保証するかが説明されている
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-02構造点検（doc-6・doc-7）より: server/tests/metaCasRace.test.ts の withCasDelay は環境変数 MIMIMILLI_ATOMIC_WRITE_CAS_DELAY_MS を設定するが server/src に参照が無く、withCasDelay(0, ...) だけが呼ばれる死んだ仕組み。AC#2の範囲で一緒に削除する（doc-7 tool-6）。isStoredTagNormalizedの削除も点検で確認済み（doc-6 shared-8）。
+
+2026-10-04 Codex(Astra)レビュー（tmp/structural-audit-2026-10-02/review-astra.md）を反映: 列挙の一部はテストから参照されている（tagStoredNormalize.test.ts・helpers/tag.ts・helpers/workTestUtils.ts・worksQueryContract.test.ts・coverLabel.test.ts）。「本番から未使用」と「参照ゼロ」を分けてACを直した。WorkEditDialogのeffectはTASK-492で状態管理を抽出するので、492の後に着手するか、抽出後の形を作り直さない範囲にとどめる。
 <!-- SECTION:NOTES:END -->

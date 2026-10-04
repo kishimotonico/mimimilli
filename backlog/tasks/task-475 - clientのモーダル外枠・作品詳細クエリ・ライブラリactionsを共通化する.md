@@ -4,7 +4,7 @@ title: clientのモーダル外枠・作品詳細クエリ・ライブラリacti
 status: To Do
 assignee: []
 created_date: '2026-10-02 11:40'
-updated_date: '2026-10-02 11:50'
+updated_date: '2026-10-04 09:34'
 labels:
   - client
   - refactor
@@ -34,4 +34,6 @@ ordinal: 533000
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-02構造点検（doc-6・doc-7）より: (1) モーダル外枠は10ファイル11箇所（WorkEditDialogは2箇所）。shared/uiにsize variantとHeader/Footerを持つModalを作り、UnsavedChangesPromptの外枠もそれに寄せる。素のdialogをoxlintで禁止する・ConfirmDialogをn択へ拡張するのは必要になってからでよい。暗幕色・角丸・影はModalに吸収されるので別作業にしない（doc-7 cli-ui-1）。(2) 作品詳細だけでなく、getAllTags（3箇所）・getLastScanResult（4箇所）・scan diagnostics（3箇所）もkeyとqueryFnが手書きで重複している。useLibraryQueries.tsのコメントがTASK-188の衝突を理由にqueryOptions共有を掲げているのに3件にしか適用されていない。追加したACで扱う。lintでの直書き禁止までは不要（doc-7 cli-arch-3）。
+
+2026-10-04 Codex(Astra)レビュー（tmp/structural-audit-2026-10-02/review-astra.md）を反映: モーダル外枠・作品詳細などのクエリ・ナビゲーションactionsは独立した責務なので、実装とレビューは単位を分ける。診断・last resultのqueryOptionsはTASK-485がAPI契約を変えるので、着手順を決めてから進める。
 <!-- SECTION:NOTES:END -->

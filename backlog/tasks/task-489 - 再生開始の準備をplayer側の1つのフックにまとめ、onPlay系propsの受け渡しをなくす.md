@@ -4,6 +4,7 @@ title: 再生開始の準備をplayer側の1つのフックにまとめ、onPlay
 status: To Do
 assignee: []
 created_date: '2026-10-02 11:47'
+updated_date: '2026-10-04 09:34'
 labels:
   - client
   - player
@@ -26,6 +27,13 @@ App.tsx の handlePlay と handleResume は、prepareWorkPlayback→updateCaches
 - [ ] #1 再生開始と続きから再生が同じ準備処理を通り、違いは開始位置だけ
 - [ ] #2 再生開始のコールバックがpropsで画面間を受け渡されていない
 - [ ] #3 App.tsxに再生準備と鮮度確認の処理が無い
-- [ ] #4 古い再生要求が後から来た要求を上書きしないことがテストで縛られている
-- [ ] #5 pnpm check && pnpm test && pnpm test:smoke が通る
+- [ ] #4 pnpm check && pnpm test && pnpm test:smoke が通る
+- [ ] #5 再生要求の鮮度管理がplayerと同じ寿命で全画面に共有され、異なる画面から続けて要求しても古い要求が後から再生を始めないことがテストで縛られている
+- [ ] #6 準備やキャッシュ更新を待っている間に停止・root再設定が起きたとき、その要求が後から再生を始めないことがテストで縛られている
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-04 Codex(Astra)レビュー（tmp/structural-audit-2026-10-02/review-astra.md）を反映: 現在は App.tsx の playRequestGuard 1つを全画面が共有し、停止とguardの無効化を stopPlaybackAndInvalidateGuard でセットにしている。usePlayerActions の stop 自体はguardを無効化しない。フックごとにuseRefでguardを持つと画面ごとに世代が分かれるので、guardはplayerの共有controller/runtimeと同じ寿命で持ち、stopが未完了の準備要求も無効化するようにする。TASK-488はこの停止契約を呼ぶ側になる。
+<!-- SECTION:NOTES:END -->

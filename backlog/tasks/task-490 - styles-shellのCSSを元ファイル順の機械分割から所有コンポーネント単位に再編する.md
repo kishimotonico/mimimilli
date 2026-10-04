@@ -4,12 +4,14 @@ title: styles/shellのCSSを元ファイル順の機械分割から所有コン�
 status: To Do
 assignee: []
 created_date: '2026-10-02 11:47'
+updated_date: '2026-10-04 09:35'
 labels:
   - client
   - css
   - refactor
 dependencies:
   - TASK-473
+  - TASK-493
 documentation:
   - backlog/docs/doc-7
   - docs/design-system.md
@@ -31,3 +33,9 @@ client/src/styles/shell は library-a〜e・frame-a〜c・files-a〜c・shared-a
 - [ ] #4 見た目が変わらないことをpnpm test:smokeと主要画面のスクリーンショット比較で確認している
 - [ ] #5 pnpm check && pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-04 Codex(Astra)レビュー（tmp/structural-audit-2026-10-02/review-astra.md）を反映: library-d.css の値一覧の無効行スタイルの重複はTASK-493で整理するので、493の後に再編する。
+<!-- SECTION:NOTES:END -->

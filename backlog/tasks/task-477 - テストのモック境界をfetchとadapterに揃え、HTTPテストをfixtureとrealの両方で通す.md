@@ -4,6 +4,7 @@ title: テストのモック境界をfetchとadapterに揃え、HTTPテストを
 status: To Do
 assignee: []
 created_date: '2026-10-02 11:40'
+updated_date: '2026-10-04 09:34'
 labels:
   - test
   - client
@@ -28,3 +29,9 @@ ordinal: 535000
 - [ ] #5 期待値を緩めた変更が無いことをテスト差分で確認できる
 - [ ] #6 pnpm check && pnpm test が通り、所要時間が大きく増えない
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-04 Codex(Astra)レビュー（tmp/structural-audit-2026-10-02/review-astra.md）を反映: AC#3の「主要route」は着手時に対象routeとケースを列挙して決める。fixtureの意図的な簡略化（DRAFT-56の未決事項）まで全面的に真似させない。AC#6の所要時間は着手前に基準を測り、許容幅を決めておく。
+<!-- SECTION:NOTES:END -->
