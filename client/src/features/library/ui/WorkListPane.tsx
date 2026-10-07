@@ -19,6 +19,7 @@ import { useVirtualList } from "../../../shared/ui/useVirtualList";
 import { useWorkResultsDismiss } from "./useWorkResultsDismiss";
 import { useListKeyboardNav } from "../../../shared/ui/useListKeyboardNav";
 import { useRovingIndex } from "./useRovingIndex";
+import { useRevealSelectedWork } from "./useRevealSelectedWork";
 
 // 作品一覧のリスト表示（list/grid のうち list）。ADR-0012 §3 によりレイアウトを固定し、
 // 常に結果面全幅で表示する（旧 ContentColumn の300px固定・中間カラム役割は廃止）。
@@ -62,7 +63,6 @@ export default function WorkListPane({
   const { scrollRef, virtualizer, virtualItems, wrapperStyle, getItemStyle } = useVirtualList({
     count: works.length,
     estimateSize: WORK_ROW_ESTIMATE_SIZE,
-    resetKey: worksQueryKey,
     gap: 1,
     padding: { start: LIST_PADDING_START, end: paddingEnd },
     overscan: 5,
@@ -95,21 +95,24 @@ export default function WorkListPane({
     virtualizer,
   });
 
-  // roving tabindexの現在位置。選択中の作品があればその位置、無ければ先頭（0）を
-  // 対象にする（一覧全体でTabストップ1個）。対象が仮想化の描画範囲外
-  // （深リンク復元・フィルター変更後の選択維持等）のときは、現在描画されている
-  // 先頭行へフォールバックしつつ対象行までスクロールする
-  // （useRovingIndex、WorkGridと共通のロジック）。
-  const selectedIndex = works.length === 0 ? -1 : works.findIndex((w) => w.id === selectedWorkId);
-  const targetIndex = selectedIndex >= 0 ? selectedIndex : 0;
+  // roving tabindexの現在位置。選択中の作品があればその位置、無ければ描画中の先頭行
+  // （一覧全体でTabストップ1個、WorkGridと共通のロジック）。
+  const selectedIndex = works.findIndex((w) => w.id === selectedWorkId);
   const rovingIndex = useRovingIndex({
     itemCount: works.length,
-    targetIndex,
+    targetIndex: selectedIndex >= 0 ? selectedIndex : null,
     virtualItems,
-    virtualizer,
     // リストは1件=virtualizerの1行なので恒等変換でよい
     toRowIndex: (index) => index,
     firstFlatIndexOfRow: (index) => index,
+  });
+  useRevealSelectedWork({
+    selectedWorkId,
+    resetKey: worksQueryKey,
+    selectedIndex,
+    selectedRowIndex: selectedIndex >= 0 ? selectedIndex : undefined,
+    isLayoutReady: true,
+    virtualizer,
   });
 
   const renderWorkRow = useCallback(
