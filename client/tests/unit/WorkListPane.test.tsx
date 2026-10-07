@@ -135,6 +135,77 @@ describe("WorkListPane virtual scrolling", () => {
   });
 });
 
+describe("WorkListPane スクロールのきっかけ", () => {
+  let sizeMock: { restore: () => void };
+
+  beforeEach(() => {
+    sizeMock = mockElementSize(300, 600) as unknown as { restore: () => void };
+  });
+
+  afterEach(() => {
+    cleanup();
+    sizeMock.restore();
+    clearResizeObservers();
+    vi.restoreAllMocks();
+  });
+
+  async function settle() {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+      flushAllResizeObservers({ width: 300, height: 600 });
+    });
+  }
+
+  function renderWith(overrides: WorkListPaneTestOverrides) {
+    const store = createStore();
+    const result = render(
+      <JotaiProvider store={store}>
+        <WorkListPane {...buildProps(overrides)} />
+      </JotaiProvider>,
+    );
+    return {
+      rerenderWith: (next: WorkListPaneTestOverrides) =>
+        result.rerender(
+          <JotaiProvider store={store}>
+            <WorkListPane {...buildProps(next)} />
+          </JotaiProvider>,
+        ),
+    };
+  }
+
+  it("mount時に選択がある場合、選択作品へスクロールする", async () => {
+    const scrollToSpy = vi.spyOn(Element.prototype, "scrollTo").mockImplementation(() => {});
+    renderWith({ works: createWorks(1_000), nav: { selectedWorkId: "work-500" } });
+    await settle();
+
+    expect(scrollToSpy).toHaveBeenCalled();
+  });
+
+  it("選択を解除してもスクロールしない", async () => {
+    const scrollToSpy = vi.spyOn(Element.prototype, "scrollTo").mockImplementation(() => {});
+    const works = createWorks(1_000);
+    const { rerenderWith } = renderWith({ works, nav: { selectedWorkId: "work-500" } });
+    await settle();
+    scrollToSpy.mockClear();
+
+    rerenderWith({ works, nav: { selectedWorkId: null } });
+    await settle();
+
+    expect(scrollToSpy).not.toHaveBeenCalled();
+  });
+
+  it("worksQueryKeyが変わったとき、選択作品が無ければ先頭へスクロールする", async () => {
+    const scrollToSpy = vi.spyOn(Element.prototype, "scrollTo").mockImplementation(() => {});
+    const { rerenderWith } = renderWith({});
+    await settle();
+    scrollToSpy.mockClear();
+
+    rerenderWith({ worksQueryKey: "key-2" });
+
+    expect(scrollToSpy).toHaveBeenCalledWith(expect.objectContaining({ top: 0 }));
+  });
+});
+
 describe("WorkListPane 空状態", () => {
   afterEach(() => {
     cleanup();

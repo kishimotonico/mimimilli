@@ -16,6 +16,7 @@ export interface VirtualListInfiniteScroll {
 export interface UseVirtualListOptions {
   count: number;
   estimateSize: number | (() => number);
+  /** 変化時に先頭へスクロールする。省略時は呼び出し側がスクロールを管理する */
   resetKey?: string;
   gap?: number;
   padding?: VirtualListPadding;

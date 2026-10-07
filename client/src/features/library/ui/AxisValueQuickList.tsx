@@ -159,13 +159,10 @@ export default function AxisValueQuickList({
     setActiveIndex(-1);
   }, [resetKey]);
 
-  const firstValueIndex = rows.findIndex((row) => row.kind === "value");
-  const targetIndex = activeIndex >= 0 ? activeIndex : firstValueIndex;
   const rawRovingIndex = useRovingIndex({
     itemCount: rows.length,
-    targetIndex,
+    targetIndex: activeIndex >= 0 ? activeIndex : null,
     virtualItems,
-    virtualizer,
     toRowIndex: (index) => index,
     firstFlatIndexOfRow: (index) => index,
   });

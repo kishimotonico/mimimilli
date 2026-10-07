@@ -1,74 +1,76 @@
 import { renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { useRovingIndex } from "../../src/features/library/ui/useRovingIndex";
 
 function virtualItem(index: number) {
   return { index } as never;
 }
 
+const identity = (i: number) => i;
+
 describe("useRovingIndex", () => {
-  it("選択中の作品が現在描画範囲内にあれば、そのままroving対象にする", () => {
-    const scrollToIndex = vi.fn();
+  it("対象が現在描画範囲内にあれば、そのままroving対象にする", () => {
     const { result } = renderHook(() =>
       useRovingIndex({
         itemCount: 20,
         targetIndex: 5,
         virtualItems: [virtualItem(4), virtualItem(5), virtualItem(6)],
-        virtualizer: { scrollToIndex },
-        toRowIndex: (i) => i,
-        firstFlatIndexOfRow: (i) => i,
+        toRowIndex: identity,
+        firstFlatIndexOfRow: identity,
       }),
     );
     expect(result.current).toBe(5);
   });
 
-  // 選択中の作品が仮想化の描画範囲外（URLからの深リンク復元・フィルター変更後に
-  // 選択だけ残る等）だと、roving tabindex(=0)を持つ要素が一覧に一つも無くなり
-  // Tabで一覧へ入れなくなる。
-  it("選択中の作品が描画範囲外なら、描画されている先頭行の先頭項目へフォールバックする", () => {
-    const scrollToIndex = vi.fn();
+  // 対象が仮想化の描画範囲外（URLからの深リンク復元・フィルター変更後に選択だけ残る等）
+  // だと、roving tabindex(=0)を持つ要素が一覧に一つも無くなりTabで一覧へ入れなくなる。
+  it("対象が描画範囲外なら、描画されている先頭行の先頭項目へフォールバックする", () => {
     const { result } = renderHook(() =>
       useRovingIndex({
         itemCount: 500,
-        // 深リンクで選択された作品が末尾付近にあり、初期描画は先頭付近のみ
         targetIndex: 480,
-        virtualItems: [virtualItem(0), virtualItem(1), virtualItem(2)],
-        virtualizer: { scrollToIndex },
-        toRowIndex: (i) => i,
-        firstFlatIndexOfRow: (i) => i,
+        virtualItems: [virtualItem(10), virtualItem(11), virtualItem(12)],
+        toRowIndex: identity,
+        firstFlatIndexOfRow: identity,
       }),
     );
-    // 描画範囲外にフォールできない -1 ではなく、実在する描画済み行を返す
-    expect(result.current).toBe(0);
-    expect(result.current).not.toBe(-1);
+    expect(result.current).toBe(10);
   });
 
-  it("フォールバック中でも対象行までscrollToIndexし、次の描画で範囲内へ入れようとする", () => {
-    const scrollToIndex = vi.fn();
-    renderHook(() =>
+  it("対象なし(null)なら、描画されている先頭行の先頭項目をroving対象にする", () => {
+    const { result } = renderHook(() =>
       useRovingIndex({
         itemCount: 500,
-        targetIndex: 480,
-        virtualItems: [virtualItem(0), virtualItem(1), virtualItem(2)],
-        virtualizer: { scrollToIndex },
-        toRowIndex: (i) => i,
-        firstFlatIndexOfRow: (i) => i,
+        targetIndex: null,
+        virtualItems: [virtualItem(30), virtualItem(31)],
+        toRowIndex: identity,
+        firstFlatIndexOfRow: identity,
       }),
     );
-    expect(scrollToIndex).toHaveBeenCalledWith(480, { align: "auto" });
+    expect(result.current).toBe(30);
+  });
+
+  it("対象の行が未解決(undefined)なら、描画されている先頭行の先頭項目へフォールバックする", () => {
+    const { result } = renderHook(() =>
+      useRovingIndex({
+        itemCount: 10,
+        targetIndex: 3,
+        virtualItems: [virtualItem(0), virtualItem(1)],
+        toRowIndex: () => undefined,
+        firstFlatIndexOfRow: (row) => row * 4,
+      }),
+    );
+    expect(result.current).toBe(0);
   });
 
   it("グリッドのように行が複数タイルを含む場合も、行単位で範囲判定する", () => {
-    const scrollToIndex = vi.fn();
     const columnCount = 4;
-    // targetIndex=9は行2（columnCount=4なので8-11が行2）。行2が描画範囲内なら
-    // フォールバックせずtargetIndexをそのまま返す。
+    // targetIndex=9は行2（8-11が行2）。行2が描画範囲内ならそのまま返す。
     const { result } = renderHook(() =>
       useRovingIndex({
         itemCount: 40,
         targetIndex: 9,
         virtualItems: [virtualItem(1), virtualItem(2)],
-        virtualizer: { scrollToIndex },
         toRowIndex: (i) => Math.floor(i / columnCount),
         firstFlatIndexOfRow: (row) => row * columnCount,
       }),
@@ -76,19 +78,30 @@ describe("useRovingIndex", () => {
     expect(result.current).toBe(9);
   });
 
-  it("itemCount===0のときは-1を返し、スクロールもしない", () => {
-    const scrollToIndex = vi.fn();
+  it("グリッドで先頭行が描画範囲の途中から始まるとき、その行の先頭タイルへフォールバックする", () => {
+    const columnCount = 4;
+    const { result } = renderHook(() =>
+      useRovingIndex({
+        itemCount: 400,
+        targetIndex: null,
+        virtualItems: [virtualItem(20), virtualItem(21)],
+        toRowIndex: (i) => Math.floor(i / columnCount),
+        firstFlatIndexOfRow: (row) => row * columnCount,
+      }),
+    );
+    expect(result.current).toBe(80);
+  });
+
+  it("itemCount===0のときは-1を返す", () => {
     const { result } = renderHook(() =>
       useRovingIndex({
         itemCount: 0,
-        targetIndex: -1,
+        targetIndex: null,
         virtualItems: [],
-        virtualizer: { scrollToIndex },
-        toRowIndex: (i) => i,
-        firstFlatIndexOfRow: (i) => i,
+        toRowIndex: identity,
+        firstFlatIndexOfRow: identity,
       }),
     );
     expect(result.current).toBe(-1);
-    expect(scrollToIndex).not.toHaveBeenCalled();
   });
 });

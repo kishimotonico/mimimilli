@@ -94,19 +94,17 @@ export default function AxisValueGrid({
   );
 
   // roving tabindexの現在位置。値の選択は多重（タグ集合）で「現在の1件」が無いため、
-  // 作品グリッドの選択追従（useRovingIndex+selectedWorkId）とは異なり、フォーカス移動
+  // 作品グリッド（選択作品を対象にする）とは異なり、フォーカス移動
   // だけで独立管理する。
   const [activeIndex, setActiveIndex] = useState(-1);
   useEffect(() => {
     setActiveIndex(-1);
   }, [resetKey]);
-  const targetIndex = activeIndex >= 0 ? activeIndex : 0;
   const rovingIndex = useRovingIndex({
     itemCount: items.length,
-    targetIndex,
+    targetIndex: activeIndex >= 0 ? activeIndex : null,
     virtualItems,
-    virtualizer,
-    toRowIndex: (flatIndex) => rowIndexOfFlatIndex(flatIndex, false, null, columnCount) ?? 0,
+    toRowIndex: (flatIndex) => rowIndexOfFlatIndex(flatIndex, false, null, columnCount),
     firstFlatIndexOfRow: (rowIndex) => firstFlatIndexOfRow(rowIndex, false, null, columnCount),
   });
 

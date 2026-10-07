@@ -30,6 +30,7 @@ import { useWorkGridWheelZoom } from "./workGrid/useWorkGridWheelZoom";
 import { useWorkResultsDismiss } from "./useWorkResultsDismiss";
 import { useListKeyboardNav } from "../../../shared/ui/useListKeyboardNav";
 import { useRovingIndex } from "./useRovingIndex";
+import { useRevealSelectedWork } from "./useRevealSelectedWork";
 import { firstFlatIndexOfRow, rowIndexOfFlatIndex } from "../../../shared/lib/gridNavigation";
 import WorkGridVirtualContent from "./workGrid/WorkGridVirtualContent";
 
@@ -71,6 +72,7 @@ export default function WorkGrid({
   const {
     scrollRef,
     setGridEl: setGridElFromHook,
+    containerWidth,
     columnCount,
     safeTileSize: gridTileSize,
     justifiedLayout: justifiedVirtualLayout,
@@ -81,7 +83,6 @@ export default function WorkGrid({
   } = useVirtualGrid({
     itemCount: works.length,
     tileSize: safeTileSize,
-    resetKey: worksQueryKey,
     gap: { row: GRID_ROW_GAP, column: GRID_COLUMN_GAP },
     padding: { start: GRID_PADDING_START, end: paddingEnd },
     justified: justifiedOptions,
@@ -120,24 +121,28 @@ export default function WorkGrid({
     virtualizer,
   });
 
-  // roving tabindexの現在位置。選択中の作品があればその位置、無ければ先頭（0）を
-  // 対象にする（一覧全体でTabストップ1個）。対象が仮想化の描画範囲外
-  // （深リンク復元・フィルター変更後の選択維持等）のときは、現在描画されている
-  // 先頭行の先頭タイルへフォールバックしつつ対象行までスクロールする
-  // （useRovingIndex、WorkListPaneと共通のロジック）。
-  const selectedIndex = works.length === 0 ? -1 : works.findIndex((w) => w.id === selectedWorkId);
-  const targetIndex = selectedIndex >= 0 ? selectedIndex : 0;
+  // roving tabindexの現在位置。選択中の作品があればその位置、無ければ描画中の先頭行の
+  // 先頭タイル（一覧全体でTabストップ1個、WorkListPaneと共通のロジック）。
+  // ジャスティファイドでタイルが未計算の間は行が解決できず、先頭行へフォールバックする。
+  const justifiedTiles = justifiedLayout?.tiles ?? null;
+  const toRowIndex = (flatIndex: number) =>
+    rowIndexOfFlatIndex(flatIndex, isJustified, justifiedTiles, columnCount);
+  const selectedIndex = works.findIndex((w) => w.id === selectedWorkId);
   const rovingIndex = useRovingIndex({
     itemCount: works.length,
-    targetIndex,
+    targetIndex: selectedIndex >= 0 ? selectedIndex : null,
     virtualItems,
-    virtualizer,
-    // 対象のタイルが（ジャスティファイドで）まだ存在しないときは行0へフォールバック
-    // する。useRovingIndexはこの行が現在の描画範囲内かどうかで対象を判定するため。
-    toRowIndex: (flatIndex) =>
-      rowIndexOfFlatIndex(flatIndex, isJustified, justifiedLayout?.tiles ?? null, columnCount) ?? 0,
+    toRowIndex,
     firstFlatIndexOfRow: (rowIndex) =>
-      firstFlatIndexOfRow(rowIndex, isJustified, justifiedLayout?.tiles ?? null, columnCount),
+      firstFlatIndexOfRow(rowIndex, isJustified, justifiedTiles, columnCount),
+  });
+  useRevealSelectedWork({
+    selectedWorkId,
+    resetKey: worksQueryKey,
+    selectedIndex,
+    selectedRowIndex: selectedIndex >= 0 ? toRowIndex(selectedIndex) : undefined,
+    isLayoutReady: containerWidth > 0,
+    virtualizer,
   });
 
   const rowTileProps = {

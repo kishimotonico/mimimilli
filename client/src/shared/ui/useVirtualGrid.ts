@@ -43,7 +43,8 @@ export interface VirtualGridJustifiedOptions {
 export interface UseVirtualGridOptions {
   itemCount: number;
   tileSize: number;
-  resetKey: string;
+  /** 変化時に先頭へスクロールする。省略時は呼び出し側がスクロールを管理する */
+  resetKey?: string;
   gap?: { row?: number; column?: number };
   padding?: VirtualGridPadding;
   overscan?: number;
@@ -166,6 +167,7 @@ export function useVirtualGrid({
 
   const prevResetKeyRef = useRef(resetKey);
   useEffect(() => {
+    if (resetKey === undefined) return;
     if (prevResetKeyRef.current === resetKey) return;
     prevResetKeyRef.current = resetKey;
     virtualizer.scrollToIndex(0);

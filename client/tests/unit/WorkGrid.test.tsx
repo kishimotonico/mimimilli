@@ -216,6 +216,65 @@ describe("WorkGrid virtual scrolling", () => {
     scrollToSpy.mockRestore();
   });
 
+  describe("スクロールのきっかけ", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it("mount時に選択がある場合、選択作品へスクロールする", async () => {
+      const scrollToSpy = vi.spyOn(Element.prototype, "scrollTo").mockImplementation(() => {});
+      renderWorkGrid({
+        overrides: { works: createWorks(1_000), nav: { selectedWorkId: "work-500" } },
+      });
+      await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
+
+      expect(scrollToSpy).toHaveBeenCalled();
+    });
+
+    it("選択を解除してもスクロールしない", async () => {
+      const scrollToSpy = vi.spyOn(Element.prototype, "scrollTo").mockImplementation(() => {});
+      const works = createWorks(1_000);
+      const { rerenderWorkGrid } = renderWorkGrid({
+        overrides: { works, nav: { selectedWorkId: "work-500" } },
+      });
+      await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
+      scrollToSpy.mockClear();
+
+      rerenderWorkGrid({ works, nav: { selectedWorkId: null } });
+      await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
+
+      expect(scrollToSpy).not.toHaveBeenCalled();
+    });
+
+    it("列数が変わってもスクロールしない", async () => {
+      const scrollToSpy = vi.spyOn(Element.prototype, "scrollTo").mockImplementation(() => {});
+      const { container } = renderWorkGrid({
+        overrides: { works: createWorks(1_000), nav: { selectedWorkId: "work-500" } },
+      });
+      await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
+      const columnsBefore =
+        container.querySelector<HTMLElement>(".mll-grid-row--square")?.style.gridTemplateColumns;
+      scrollToSpy.mockClear();
+
+      await act(() => flushAllResizeObservers({ width: 480, height: 600 }));
+
+      expect(
+        container.querySelector<HTMLElement>(".mll-grid-row--square")?.style.gridTemplateColumns,
+      ).not.toBe(columnsBefore);
+
+      expect(scrollToSpy).not.toHaveBeenCalled();
+    });
+
+    it("worksQueryKeyが変わったとき、選択作品が無ければ先頭へスクロールする", async () => {
+      const scrollToSpy = vi.spyOn(Element.prototype, "scrollTo").mockImplementation(() => {});
+      const { rerenderWorkGrid } = renderWorkGrid();
+      await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
+      scrollToSpy.mockClear();
+
+      rerenderWorkGrid({ worksQueryKey: "key-2" });
+
+      expect(scrollToSpy).toHaveBeenCalledWith(expect.objectContaining({ top: 0 }));
+    });
+  });
+
   it("calls onLoadMore when scrolled near the end", async () => {
     const onLoadMore = vi.fn();
     const { container } = renderWorkGrid({
