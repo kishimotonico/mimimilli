@@ -173,12 +173,17 @@ describe("WorkListPane スクロールのきっかけ", () => {
     };
   }
 
-  it("mount時に選択がある場合、選択作品へスクロールする", async () => {
+  it("mount時に選択がある場合、選択作品の行位置へスクロールする", async () => {
+    // happy-domはscrollHeightを再現せず、virtualizerがスクロール先を0へ丸めてしまうため固定する
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(1_000_000);
     const scrollToSpy = vi.spyOn(Element.prototype, "scrollTo").mockImplementation(() => {});
     renderWith({ works: createWorks(1_000), nav: { selectedWorkId: "work-500" } });
     await settle();
 
-    expect(scrollToSpy).toHaveBeenCalled();
+    const tops = scrollToSpy.mock.calls.map(([arg]) => (arg as ScrollToOptions).top ?? 0);
+    // work-500の行は 4 + 500 * 43 付近。末尾揃えで 600 のビューポート分だけ手前になる
+    expect(Math.max(...tops)).toBeGreaterThan(20_000);
+    expect(Math.max(...tops)).toBeLessThan(22_000);
   });
 
   it("選択を解除してもスクロールしない", async () => {

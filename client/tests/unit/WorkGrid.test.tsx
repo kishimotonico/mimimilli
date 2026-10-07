@@ -219,14 +219,19 @@ describe("WorkGrid virtual scrolling", () => {
   describe("スクロールのきっかけ", () => {
     afterEach(() => vi.restoreAllMocks());
 
-    it("mount時に選択がある場合、選択作品へスクロールする", async () => {
+    it("mount時に選択がある場合、選択作品の行位置へスクロールする", async () => {
+      // happy-domはscrollHeightを再現せず、virtualizerがスクロール先を0へ丸めてしまうため固定する
+      vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(1_000_000);
       const scrollToSpy = vi.spyOn(Element.prototype, "scrollTo").mockImplementation(() => {});
       renderWorkGrid({
         overrides: { works: createWorks(1_000), nav: { selectedWorkId: "work-500" } },
       });
       await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
-      expect(scrollToSpy).toHaveBeenCalled();
+      const tops = scrollToSpy.mock.calls.map(([arg]) => (arg as ScrollToOptions).top ?? 0);
+      // work-500は5列グリッドの行100付近。先頭(0)や手前の行ではなく、その行の位置まで進む
+      expect(Math.max(...tops)).toBeGreaterThan(10_000);
+      expect(Math.max(...tops)).toBeLessThan(25_000);
     });
 
     it("選択を解除してもスクロールしない", async () => {
