@@ -20,7 +20,8 @@ type PendingReveal = "selection" | "reset" | null;
 // 変化や選択解除では動かさない（位置はユーザーのもの）。
 //  - mount時に選択がある / selectedWorkIdが別の非null値へ変わった: 選択作品を画面内へ
 //  - resetKeyが変わった: 選択作品が一覧にあればそこへ、無ければ先頭へ
-// 行位置が解決できていない間は要求を保留し、解決できた時点で一度だけ動かす。
+// 一覧にある選択作品の行位置が解決できていない間は要求を保留し、解決できた時点で一度だけ
+// 動かす。一覧に無い選択作品への要求は、寸法確定後に取り下げる（後から追加ページに入っても動かさない）。
 // 作品一覧ではresetKey時の先頭リセットもここが担う（汎用のresetKeyは渡さない）。
 export function useRevealSelectedWork({
   selectedWorkId,
@@ -51,8 +52,6 @@ export function useRevealSelectedWork({
       virtualizer.scrollToIndex(selectedRowIndex, { align: "auto" });
     } else if (pending === "reset") {
       virtualizer.scrollToOffset(0);
-    } else {
-      return;
     }
     pendingRef.current = null;
   });

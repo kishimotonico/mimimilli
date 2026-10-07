@@ -122,7 +122,11 @@ describe("useRevealSelectedWork", () => {
   });
 
   it("行位置が未解決の間は保留し、解決できた時点で一度だけ寄せる", () => {
-    const { virtualizer, update } = setup({ selectedWorkId: "w7" });
+    const { virtualizer, update } = setup({
+      selectedWorkId: "w7",
+      selectedIndex: 7,
+      selectedRowIndex: undefined,
+    });
     expect(virtualizer.scrollToIndex).not.toHaveBeenCalled();
     update({ selectedWorkId: "w7", selectedIndex: 7, selectedRowIndex: undefined });
     expect(virtualizer.scrollToIndex).not.toHaveBeenCalled();
@@ -131,6 +135,13 @@ describe("useRevealSelectedWork", () => {
     expect(virtualizer.scrollToIndex).toHaveBeenCalledWith(3, { align: "auto" });
     update({ selectedWorkId: "w7", selectedIndex: 7, selectedRowIndex: 4 });
     expect(virtualizer.scrollToIndex).toHaveBeenCalledTimes(1);
+  });
+
+  it("選択作品が一覧に無いまま寸法が確定したら要求を取り下げ、後から一覧に入ってもスクロールしない", () => {
+    const { virtualizer, update } = setup({ selectedWorkId: "w700" });
+    expect(virtualizer.scrollToIndex).not.toHaveBeenCalled();
+    update({ selectedWorkId: "w700", selectedIndex: 700, selectedRowIndex: 350 });
+    expect(virtualizer.scrollToIndex).not.toHaveBeenCalled();
   });
 
   it("寸法が確定するまで保留する", () => {
@@ -146,14 +157,22 @@ describe("useRevealSelectedWork", () => {
   });
 
   it("保留中に選択が解除されたら、要求を取り下げる", () => {
-    const { virtualizer, update } = setup({ selectedWorkId: "w7" });
-    update({ selectedWorkId: null });
+    const { virtualizer, update } = setup({
+      selectedWorkId: "w7",
+      selectedIndex: 7,
+      selectedRowIndex: undefined,
+    });
+    update({ selectedWorkId: null, selectedIndex: -1 });
     update({ selectedWorkId: null, selectedIndex: 7, selectedRowIndex: 3 });
     expect(virtualizer.scrollToIndex).not.toHaveBeenCalled();
   });
 
   it("保留中に次のきっかけが来たら上書きする", () => {
-    const { virtualizer, update } = setup({ selectedWorkId: "w7" });
+    const { virtualizer, update } = setup({
+      selectedWorkId: "w7",
+      selectedIndex: 7,
+      selectedRowIndex: undefined,
+    });
     update({ selectedWorkId: "w9", selectedIndex: 9, selectedRowIndex: 4 });
     expect(virtualizer.scrollToIndex).toHaveBeenCalledTimes(1);
     expect(virtualizer.scrollToIndex).toHaveBeenCalledWith(4, { align: "auto" });
