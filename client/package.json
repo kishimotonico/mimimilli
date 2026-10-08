@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "cross-env PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run vite",
+    "dev": "cross-env PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run node ../scripts/dev-client.mjs",
     "dev:real": "pnpm dev",
     "check": "tsc",
     "build": "tsc && vite build",

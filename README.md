@@ -95,7 +95,7 @@ pnpm dev:real:client
 `pnpm dev:real` はサーバーと client を並行起動するため、サーバーの起動完了前に client が一時的に API 接続に失敗することがある。
 その場合はブラウザをリロードすればよい。
 real サーバーと client は portless から動的ポートを割り当てられる。
-client は `portless get api.mimi` で同じ worktree の API URLを解決するため、複数の worktree でも接続先が混ざらない。
+起動ラッパー（`scripts/dev-client.mjs`）が `portless get api.mimi` で同じ worktree の API URLを解決するため、複数の worktree でも接続先が混ざらない。
 
 real アダプタを使う場合、初回起動後に UI からルートフォルダーを設定する。
 DBはデータルートの `db/catalog.sqlite` と `db/user.sqlite` に作る。既定のデータルートはLinuxが `${XDG_DATA_HOME:-$HOME/.local/share}/mimimilli`、Windowsが `%LOCALAPPDATA%\mimimilli`。`MIMIMILLI_DATA_DIR` には相対パスも指定でき、起動時に絶対パスへ解決する。
@@ -178,6 +178,7 @@ mimimilli/
 │   │   ├── smoke/           # Playwright smoke テスト
 │   │   └── unit/            # vitest 単体テスト
 │   ├── vite.config.ts
+│   ├── vitest.config.ts
 │   └── package.json
 ├── server/                  # HTTP API サーバー (Hono + Bun / TypeScript)
 │   └── src/
