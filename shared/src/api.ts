@@ -1,7 +1,7 @@
 // エンドポイント横断の契約: 作品検索クエリ、ページングエンベロープ、部分更新、エラー形式。
 import { z } from "zod";
 import { dataIntegrityWarningSchema } from "./dataIntegrity.ts";
-import { metaDlsiteStateSchema } from "./dlsite.ts";
+import { dlsiteFetchErrorKindSchema, metaDlsiteStateSchema } from "./dlsite.ts";
 import { smartFolderRuleSchema, sortIdSchema, viewIdSchema } from "./library.ts";
 import { normalizedTagArraySchema } from "./tagNormalize.ts";
 import {
@@ -349,10 +349,7 @@ export type ExportResponse = z.infer<typeof exportResponseSchema>;
 export const apiErrorSchema = z.object({
   error: z.object({
     code: z.enum([
-      "not_found",
-      "parse_error",
-      "offline",
-      "error",
+      ...dlsiteFetchErrorKindSchema.options,
       "invalid_request",
       "conflict",
       "source_changed",

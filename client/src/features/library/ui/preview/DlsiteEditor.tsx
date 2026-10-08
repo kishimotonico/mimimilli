@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   detectRjCode,
+  hasDlsiteUrl,
   type DlsitePreview,
   type Work,
   type WorkEditSnapshot,
@@ -292,7 +293,7 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
       setSelectedTags(nextDiff.newTags);
       setApplyTitle(false);
       setApplyCover(!current.coverImage && Boolean(nextPreview.info.coverUrl));
-      setApplyUrl(!current.urls.some((entry) => entry.url.includes("dlsite.com")));
+      setApplyUrl(!hasDlsiteUrl(current.urls));
       setPreview(nextPreview);
     } catch (cause) {
       setError(dlsiteFetchErrorMessage(cause));
