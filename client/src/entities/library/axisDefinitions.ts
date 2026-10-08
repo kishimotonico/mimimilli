@@ -4,14 +4,18 @@
 // （組み込みの "year" と任意の prefix 軸）。ラベル・軸レールへの表示は
 // サーバーの prefix 定義（GET /tag-prefixes）から引く。
 
-import { resolveTagPrefix, type TagPrefix } from "@mimimilli/shared";
+import {
+  isSmartFolderAxisId,
+  resolveTagPrefix,
+  smartFolderIdFromAxisId,
+  VIEW_IDS,
+  type TagPrefix,
+  type ViewId,
+} from "@mimimilli/shared";
 import type { AxisId } from "./types";
 import type { IconName } from "../../shared/ui/Icon";
 
-// 軸レールの単純ビュー（GET /works の view パラメータに対応）
-const VIEW_AXIS_IDS = ["all", "recent", "added", "fav", "error"] as const;
-
-const VIEW_AXIS_LABELS: Record<string, string> = {
+const VIEW_AXIS_LABELS: Record<ViewId, string> = {
   all: "すべての作品",
   recent: "最近再生",
   added: "最近追加",
@@ -24,14 +28,14 @@ const BUILTIN_AXIS_LABELS: Record<string, string> = {
   year: "追加日",
 };
 
-export const VIEW_AXES = new Set<string>(VIEW_AXIS_IDS);
+export const VIEW_AXES = new Set<string>(VIEW_IDS);
 
-export function isViewAxis(axis: AxisId): boolean {
+export function isViewAxis(axis: AxisId): axis is ViewId {
   return VIEW_AXES.has(axis);
 }
 
 export function isSmartAxis(axis: AxisId): boolean {
-  return axis.startsWith("smart-");
+  return isSmartFolderAxisId(axis);
 }
 
 export function isFacetAxis(axis: AxisId): boolean {
@@ -39,12 +43,13 @@ export function isFacetAxis(axis: AxisId): boolean {
 }
 
 export function getSmartFolderId(axis: AxisId): string {
-  return axis.slice("smart-".length);
+  return smartFolderIdFromAxisId(axis);
 }
 
 export function getAxisLabel(axis: AxisId, tagPrefixes: TagPrefix[] = []): string {
   if (isSmartAxis(axis)) return "スマートフォルダー";
-  const builtin = VIEW_AXIS_LABELS[axis] ?? BUILTIN_AXIS_LABELS[axis];
+  if (isViewAxis(axis)) return VIEW_AXIS_LABELS[axis];
+  const builtin = BUILTIN_AXIS_LABELS[axis];
   if (builtin) return builtin;
   return resolveTagPrefix(axis, tagPrefixes).label;
 }
@@ -86,9 +91,9 @@ export interface ViewAxisRow {
 
 /** ビュー軸の行。軸レール（AxisColumn）のビューグループが使う。 */
 export function buildViewAxisRows(): ViewAxisRow[] {
-  return VIEW_AXIS_IDS.map((id) => ({
+  return VIEW_IDS.map((id) => ({
     id,
-    name: VIEW_AXIS_LABELS[id] ?? id,
+    name: VIEW_AXIS_LABELS[id],
     icon: getAxisIcon(id),
   }));
 }

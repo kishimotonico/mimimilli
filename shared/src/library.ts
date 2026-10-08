@@ -30,9 +30,26 @@ export function createRandomSeed(): number {
 
 // ── ビュー・分類軸 ────────────────────────────────────────────
 
-/** 軸レールのビュー（単純ビュー） */
-export const viewIdSchema = z.enum(["all", "recent", "added", "fav", "error"]);
+/** 軸レールのビュー（単純ビュー）。軸IDの予約語・client のビュー軸一覧はここから導出する */
+export const VIEW_IDS = ["all", "recent", "added", "fav", "error"] as const;
+export const viewIdSchema = z.enum(VIEW_IDS);
 export type ViewId = z.infer<typeof viewIdSchema>;
+
+/** スマートフォルダー軸IDの接頭辞。軸ID = 接頭辞 + スマートフォルダーID */
+export const SMART_FOLDER_AXIS_PREFIX = "smart-";
+
+export function toSmartFolderAxisId(folderId: string): string {
+  return `${SMART_FOLDER_AXIS_PREFIX}${folderId}`;
+}
+
+export function isSmartFolderAxisId(axis: string): boolean {
+  return axis.startsWith(SMART_FOLDER_AXIS_PREFIX);
+}
+
+/** 軸IDからスマートフォルダーIDを取り出す。接頭辞のみ・非スマート軸は空文字 */
+export function smartFolderIdFromAxisId(axis: string): string {
+  return isSmartFolderAxisId(axis) ? axis.slice(SMART_FOLDER_AXIS_PREFIX.length) : "";
+}
 
 /** 分類軸の ID（ADR-0005）。enum ではなく文字列:
  *  - "tag": 全タグ軸（組み込み）。flat・annotated 双方を集計する

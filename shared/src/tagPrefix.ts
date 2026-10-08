@@ -2,9 +2,10 @@
 // ADR-0005: タグの特別扱い（軸表示・保護・ラベル・色）はコードでなく、
 // ユーザーが編集できる設定データとして表現する。システムは初期値の投入のみを行う。
 import { z } from "zod";
+import { isSmartFolderAxisId, SMART_FOLDER_AXIS_PREFIX, VIEW_IDS } from "./library.ts";
 
 /** prefix に使えない予約軸ID。ビュー・組み込み軸（tag / year）と軸IDの名前空間を共有するため */
-export const RESERVED_AXIS_IDS = ["all", "recent", "added", "fav", "error", "tag", "year"] as const;
+export const RESERVED_AXIS_IDS: readonly string[] = [...VIEW_IDS, "tag", "year"];
 
 /** prefix 名。正規形（trim + 小文字）へ変換した上で予約ID・不正文字を拒否する */
 export const tagPrefixNameSchema = z
@@ -14,11 +15,11 @@ export const tagPrefixNameSchema = z
   .max(50)
   .transform((s) => s.toLowerCase())
   .refine((s) => !s.includes("/"), { message: "prefix にスラッシュは使えません" })
-  .refine((s) => !(RESERVED_AXIS_IDS as readonly string[]).includes(s), {
+  .refine((s) => !RESERVED_AXIS_IDS.includes(s), {
     message: "予約された軸IDは prefix に使えません",
   })
-  .refine((s) => !s.startsWith("smart-"), {
-    message: "smart- で始まる prefix は使えません",
+  .refine((s) => !isSmartFolderAxisId(s), {
+    message: `${SMART_FOLDER_AXIS_PREFIX} で始まる prefix は使えません`,
   });
 
 /** タグ prefix の表示色キー。client が tokens.css の CSS 変数へ解決する */
