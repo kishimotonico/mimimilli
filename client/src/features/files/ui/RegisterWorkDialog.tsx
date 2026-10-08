@@ -17,8 +17,7 @@ import TagCombobox from "../../../shared/ui/TagCombobox";
 import TextInput from "../../../shared/ui/TextInput";
 import Modal, { ModalFooter, ModalHeader } from "../../../shared/ui/Modal";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
-import { getAllTags } from "../../../entities/tag/api";
-import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
+import { allTagsQueryOptions } from "../../../entities/tag/allTagsQueryOptions";
 import { buildTagsWithAdded, buildTagsWithRemoved } from "../../../entities/work/editableTags";
 import Tag from "../../../entities/work/ui/Tag";
 import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
@@ -54,7 +53,7 @@ export default function RegisterWorkDialog({
   const [applyCover, setApplyCover] = useState(true);
   const [dlsiteValidationError, setDlsiteValidationError] = useState<string | null>(null);
 
-  const tagsQuery = useQuery({ queryKey: TAG_QUERY_KEYS.all(), queryFn: getAllTags });
+  const tagsQuery = useQuery(allTagsQueryOptions);
   const tagSuggestions = tagsQuery.data ?? [];
   const { tagPrefixes } = useTagPrefixes();
 

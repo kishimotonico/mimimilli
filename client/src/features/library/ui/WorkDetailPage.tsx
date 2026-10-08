@@ -4,10 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ApiRequestError } from "../../../shared/api/http";
 import type { NormalizedTag } from "@mimimilli/shared";
 import { workDetailIdAtom } from "../../../entities/work/model/navigationAtoms";
-import { getWork } from "../../../entities/work/api";
-import { getAllTags } from "../../../entities/tag/api";
-import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
-import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
+import { workDetailQueryOptions } from "../../../entities/work/workDetailQueryOptions";
+import { allTagsQueryOptions } from "../../../entities/tag/allTagsQueryOptions";
 import {
   replaceAppModeAtom,
   setAppModeAtom,
@@ -34,12 +32,8 @@ export default function WorkDetailPage() {
   const replaceAppMode = useSetAtom(replaceAppModeAtom);
   const nav = useLibraryNavigation();
 
-  const workQuery = useQuery({
-    queryKey: WORK_QUERY_KEYS.detail(workId ?? ""),
-    queryFn: () => getWork(workId!),
-    enabled: workId !== null,
-  });
-  const tagsQuery = useQuery({ queryKey: TAG_QUERY_KEYS.all(), queryFn: getAllTags });
+  const workQuery = useQuery(workDetailQueryOptions(workId));
+  const tagsQuery = useQuery(allTagsQueryOptions);
   const workPatchMutations = useLibraryWorkPatchMutations(nav, searchQuery);
   const deleteMutation = useUnregisterWorkMutation();
 

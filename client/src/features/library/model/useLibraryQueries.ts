@@ -19,7 +19,7 @@ import {
   type SmartFolderRule,
   type WorksPage,
 } from "@mimimilli/shared";
-import { getWork, searchWorks } from "../../../entities/work/api";
+import { searchWorks } from "../../../entities/work/api";
 import {
   listSmartFolders,
   createSmartFolder,
@@ -28,10 +28,10 @@ import {
   evalSmartFolder,
   previewSmartFolderRuleCount,
 } from "../../../entities/smart-folder/api";
-import { getAllTags } from "../../../entities/tag/api";
+import { allTagsQueryOptions } from "../../../entities/tag/allTagsQueryOptions";
+import { workDetailQueryOptions } from "../../../entities/work/workDetailQueryOptions";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
-import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 import { invalidateSmartFolderSaveQueries } from "./smartFolderInvalidation";
 import {
   buildSmartFolderFilterParams,
@@ -56,17 +56,6 @@ import type { LibraryViewState } from "./useLibraryNavigation";
 /** 検索クエリのデバウンス時間。1文字ごとの全件検索発行を間引く */
 const SEARCH_DEBOUNCE_MS = 250;
 
-/**
- * limit:1 の全件検索（ライブラリ総件数・統計）。queryKey/queryFn/型を1箇所にまとめ、
- * 呼び出し側（本フック・ScanModal）が個別に useQuery({queryKey, queryFn}) を書かないようにする。
- *
- * 同じ queryKey を持つ useQuery が呼び出し側ごとに違う queryFn（違う戻り値の形）を持つと、
- * React Query は queryKey が同一かどうかしか見ないため、先に解決した方の形が cache を占有し、
- * 後から subscribe した側は自分の queryFn の戻り値ではなく cache の値をそのまま .data として
- * 受け取る（例えば一方が number、他方が WorksPage 全体を期待していると衝突する）。
- * queryOptions() で定義を共有すれば、両者の .data の型が常に一致し、この種の食い違いは
- * 型チェックの時点で検知できる。
- */
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
 import { errorViewCountQueryOptions } from "../../../entities/work/errorViewCountQueryOptions";
 import { missingWorksCountQueryOptions } from "../../../entities/work/missingWorksCountQueryOptions";
@@ -182,12 +171,8 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
     queryKey: SMART_FOLDER_QUERY_KEYS.all(),
     queryFn: listSmartFolders,
   });
-  const selectedWorkId = nav.selectedWorkId;
-  const workDetailQuery = useQuery({
-    queryKey: WORK_QUERY_KEYS.detail(nav.selectedWorkId ?? ""),
-    queryFn: selectedWorkId === null ? skipToken : () => getWork(selectedWorkId),
-  });
-  const tagsQuery = useQuery({ queryKey: TAG_QUERY_KEYS.all(), queryFn: getAllTags });
+  const workDetailQuery = useQuery(workDetailQueryOptions(nav.selectedWorkId));
+  const tagsQuery = useQuery(allTagsQueryOptions);
   const {
     tagPrefixes,
     isError: isTagPrefixesError,
