@@ -1,11 +1,11 @@
 ---
 id: TASK-480
 title: backlogの陳腐化したタスクとドラフトを現状に合わせて整理する
-status: In Progress
+status: Done
 assignee:
   - '@mimi2'
 created_date: '2026-10-02 11:40'
-updated_date: '2026-10-08 03:39'
+updated_date: '2026-10-08 03:53'
 labels:
   - backlog
 dependencies: []
@@ -23,7 +23,7 @@ ordinal: 538000
 <!-- AC:BEGIN -->
 - [x] #1 TASK-442とTASK-441の記述が現在のコードの状態と一致している（不要なら対応なしの根拠付きでクローズ）
 - [x] #2 DRAFT-47・DRAFT-56・DRAFT-71の前提が現状に合わせて更新されるか、陳腐化したものは根拠付きで整理されている
-- [ ] #3 ADR-0012のDRAFT参照が意図したドラフトを一意に指す
+- [x] #3 ADR-0012のDRAFT参照が意図したドラフトを一意に指す
 - [x] #4 task-high.1・task-medium.1の残骸ファイルが無い
 - [x] #5 TASK-340/345/449の残り受け入れ条件について、実機確認の段取りか処置が決まっている
 <!-- AC:END -->
@@ -33,3 +33,9 @@ ordinal: 538000
 <!-- SECTION:NOTES:BEGIN -->
 442は fixture 限定のバグに書き換えて残し、472と同じバッチで扱う。441は参照位置を更新（バグは残存）。DRAFT-47/56/71 はそれぞれ TASK-456/498/470 の Notes に残りの判断を書いて archive。task-high.1 は正式タスク TASK-285 があるので git rm、task-medium.1 は削除済み。340/345/449 は Done 済みで、345 AC#3 は TASK-478 AC#7 が引き継ぐ。AC#3（ADR-0012 の DRAFT-50 参照）は TASK-479 のブランチで直す。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+TASK-441 の参照位置更新、TASK-442 を fixture 限定のバグへ書き換え（472 と同じバッチで扱う）、DRAFT-47/56/71 を残りの判断を関連タスクの Notes に残して archive、ADR-0012 の DRAFT-50 参照をタイトル併記、task-high.1 を git rm（正式タスクは TASK-285）。340/345/449 は Done 済みで 345 AC#3 は TASK-478 AC#7 へ。
+<!-- SECTION:FINAL_SUMMARY:END -->
