@@ -14,7 +14,7 @@ import {
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { basename, dirname, join } from "node:path";
-import { META_FILE_NAME, metaFileSchema, type MetaFile } from "@mimimilli/shared";
+import { errorMessage, META_FILE_NAME, metaFileSchema, type MetaFile } from "@mimimilli/shared";
 import { SourceChangedError } from "../../errors.ts";
 
 export { SourceChangedError } from "../../errors.ts";
@@ -95,7 +95,7 @@ export function readMetaFileRaw(metaPath: string): unknown {
   try {
     return JSON.parse(content);
   } catch (e) {
-    throw new MetaParseError(metaPath, `JSON パースエラー: ${(e as Error).message}`, null, "json");
+    throw new MetaParseError(metaPath, `JSON パースエラー: ${errorMessage(e)}`, null, "json");
   }
 }
 
@@ -114,12 +114,7 @@ export function readMetaSource(metaPath: string): MetaSource {
   try {
     raw = JSON.parse(bytes.toString("utf-8"));
   } catch (error) {
-    throw new MetaParseError(
-      metaPath,
-      `JSON パースエラー: ${(error as Error).message}`,
-      null,
-      "json",
-    );
+    throw new MetaParseError(metaPath, `JSON パースエラー: ${errorMessage(error)}`, null, "json");
   }
   return { bytes, meta: parseMetaRaw(metaPath, raw), sourceRevision: sourceRevision(bytes) };
 }
@@ -273,12 +268,7 @@ export function mutateMetaSource(
     try {
       raw = JSON.parse(bytes.toString("utf-8"));
     } catch (error) {
-      throw new MetaParseError(
-        metaPath,
-        `JSON パースエラー: ${(error as Error).message}`,
-        null,
-        "json",
-      );
+      throw new MetaParseError(metaPath, `JSON パースエラー: ${errorMessage(error)}`, null, "json");
     }
     const meta = parseMetaRaw(metaPath, raw);
     installBytes(metaPath, bytes);

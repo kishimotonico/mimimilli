@@ -24,6 +24,7 @@ import type {
 } from "@mimimilli/shared";
 import type { WorkSourceProjectionResult } from "../../adapter/work.ts";
 import {
+  errorMessage,
   isAudioFileName,
   resolveWorkPlacement,
   sidecarMetaFileName,
@@ -244,7 +245,7 @@ export function createWorkMethods(deps: {
       } catch (error) {
         scanLogger.error("作品の一覧反映に失敗しました", {
           workId: source.meta.id,
-          error: error instanceof Error ? error.message : String(error),
+          error: errorMessage(error),
         });
         return {
           snapshot: toEditSnapshot(source, physicalPath),

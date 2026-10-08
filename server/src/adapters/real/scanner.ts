@@ -10,6 +10,7 @@ import type {
   UrlEntry,
 } from "@mimimilli/shared";
 import {
+  errorMessage,
   detectRjCode,
   emptyMetaDlsiteState,
   isRjCodeMissing,
@@ -502,7 +503,7 @@ export class Scanner {
     } catch (error) {
       scanLogger.error("作品の一覧反映に失敗しました", {
         workId: prepared.meta.id,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage(error),
       });
       return { status: "unpublished", reason: "error", snapshot };
     }

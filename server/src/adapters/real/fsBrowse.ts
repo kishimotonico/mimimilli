@@ -4,7 +4,7 @@
 // 「physical_path が祖先である作品」のうち最も深いものに紐づけ、workRelPath を付与する。
 import { readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { workspacePath, type FsEntry, type FsListing } from "@mimimilli/shared";
+import { fileExtensionOf, workspacePath, type FsEntry, type FsListing } from "@mimimilli/shared";
 import { isMetaFileName } from "./meta.ts";
 import { toPortableRelativePath, workspaceMediaMetadata } from "./paths.ts";
 import { isPathWithin } from "../../lib/path.ts";
@@ -13,11 +13,6 @@ import { isPathWithin } from "../../lib/path.ts";
 export interface FsWorkRef {
   id: string;
   physicalPath: string;
-}
-
-function extOf(name: string): string {
-  const i = name.lastIndexOf(".");
-  return i > 0 ? name.slice(i + 1).toLowerCase() : "";
 }
 
 /** 物理パスで作品を引ける索引。重複時はArray.find と同じく先勝ちにする。 */
@@ -99,7 +94,7 @@ export function browseFs(root: string, works: FsWorkRef[], target: string): FsLi
         path: workspacePath(toPortableRelativePath(root, full)),
         isDir: false,
         size,
-        fileType: extOf(entry.name),
+        fileType: fileExtensionOf(entry.name),
         childCount: 0,
         workId: owner?.id ?? null,
         workRelPath: owner ? toPortableRelativePath(owner.physicalPath, full) : null,

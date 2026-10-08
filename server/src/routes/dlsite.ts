@@ -18,7 +18,7 @@ import {
 import { DlsiteOfflineError } from "../errors.ts";
 import type { DataAdapter } from "../adapter/index.ts";
 import { apiError, invalidRequest, notFound, throwSourceCommandError } from "../lib/httpError.ts";
-import { readOptionalJsonBody } from "../lib/jsonBody.ts";
+import { readJsonBody, readOptionalJsonBody } from "../lib/jsonBody.ts";
 import { getCategoryLogger } from "../lib/logger.ts";
 import type { DlsiteJobManager } from "../dlsiteJobManager.ts";
 
@@ -49,17 +49,17 @@ export function dlsiteRoute(adapter: DataAdapter, dlsiteJobs: DlsiteJobManager):
   });
 
   app.post("/dlsite/fetch-by-code", async (c) => {
-    const body = await c.req.json().catch(() => null);
-    const parsed = dlsiteFetchByCodeBodySchema.safeParse(body);
-    if (!parsed.success) {
-      invalidRequest(parsed.error.issues[0]?.message ?? "RJ/VJコードが不正です");
-    }
+    const data = await readJsonBody(
+      c,
+      dlsiteFetchByCodeBodySchema,
+      (error) => error.issues[0]?.message ?? "RJ/VJコードが不正です",
+    );
     const forceValue = c.req.query("force");
     if (forceValue !== undefined && forceValue !== "true" && forceValue !== "false") {
       invalidRequest("force は true または false で指定してください");
     }
     try {
-      const result = await adapter.dlsiteFetchByCode(parsed.data.rjCode, forceValue === "true", {
+      const result = await adapter.dlsiteFetchByCode(data.rjCode, forceValue === "true", {
         signal: c.req.raw.signal,
       });
       if (!result.ok) throw apiError(result.kind, result.message);
@@ -67,7 +67,7 @@ export function dlsiteRoute(adapter: DataAdapter, dlsiteJobs: DlsiteJobManager):
     } catch (error) {
       if (isClientAbort(error)) {
         dlsiteLogger.info("クライアント切断によりDLsite取得を中断しました", {
-          rjCode: parsed.data.rjCode,
+          rjCode: data.rjCode,
         });
         return;
       }
@@ -103,15 +103,11 @@ export function dlsiteRoute(adapter: DataAdapter, dlsiteJobs: DlsiteJobManager):
   });
 
   app.post("/dlsite/:id/apply", async (c) => {
-    const body = await c.req.json().catch(() => null);
-    const parsed = dlsiteApplyBodySchema.safeParse(body);
-    if (!parsed.success) {
-      invalidRequest("DLsite適用内容が不正です");
-    }
+    const data = await readJsonBody(c, dlsiteApplyBodySchema, "DLsite適用内容が不正です");
     const workId = c.req.param("id");
     let result;
     try {
-      result = await adapter.dlsiteApply(workId, parsed.data, { signal: c.req.raw.signal });
+      result = await adapter.dlsiteApply(workId, data, { signal: c.req.raw.signal });
     } catch (error) {
       if (isClientAbort(error)) {
         dlsiteLogger.info("クライアント切断によりDLsite適用を中断しました", { workId });
@@ -125,37 +121,35 @@ export function dlsiteRoute(adapter: DataAdapter, dlsiteJobs: DlsiteJobManager):
   });
 
   app.post("/dlsite/apply-missing", async (c) => {
-    const body = await readOptionalJsonBody(c, "workIds は文字列配列で指定してください");
-    const parsed = dlsiteApplyMissingBodySchema.safeParse(body);
-    if (!parsed.success) {
-      invalidRequest("workIds は文字列配列で指定してください");
-    }
+    const data = await readOptionalJsonBody(
+      c,
+      dlsiteApplyMissingBodySchema,
+      "workIds は文字列配列で指定してください",
+    );
     return c.json(
-      dlsiteBulkApplyMissingResultSchema.parse(
-        await adapter.dlsiteApplyMissing(parsed.data.workIds),
-      ),
+      dlsiteBulkApplyMissingResultSchema.parse(await adapter.dlsiteApplyMissing(data.workIds)),
     );
   });
 
   app.post("/dlsite/apply-missing/preview", async (c) => {
-    const body = await readOptionalJsonBody(c, "workIds は文字列配列で指定してください");
-    const parsed = dlsiteApplyMissingBodySchema.safeParse(body);
-    if (!parsed.success) {
-      invalidRequest("workIds は文字列配列で指定してください");
-    }
+    const data = await readOptionalJsonBody(
+      c,
+      dlsiteApplyMissingBodySchema,
+      "workIds は文字列配列で指定してください",
+    );
     return c.json(
-      dlsiteApplyMissingPreviewSchema.parse(
-        await adapter.dlsiteApplyMissingPreview(parsed.data.workIds),
-      ),
+      dlsiteApplyMissingPreviewSchema.parse(await adapter.dlsiteApplyMissingPreview(data.workIds)),
     );
   });
 
   app.patch("/dlsite/:id", async (c) => {
-    const body = await c.req.json().catch(() => null);
-    const parsed = dlsiteStateUpdateBodySchema.safeParse(body);
-    if (!parsed.success) invalidRequest(parsed.error.issues[0]?.message ?? "DLsite状態が不正です");
+    const data = await readJsonBody(
+      c,
+      dlsiteStateUpdateBodySchema,
+      (error) => error.issues[0]?.message ?? "DLsite状態が不正です",
+    );
     try {
-      const result = await adapter.updateDlsiteState(c.req.param("id"), parsed.data);
+      const result = await adapter.updateDlsiteState(c.req.param("id"), data);
       if (!result) notFound(`作品が見つかりません: ${c.req.param("id")}`);
       return c.json(workSourceMutationResultSchema.parse(result));
     } catch (error) {

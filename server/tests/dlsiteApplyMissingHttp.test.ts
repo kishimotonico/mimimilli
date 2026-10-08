@@ -58,15 +58,15 @@ test("POST /api/dlsite/apply-missing: workIds 指定時はその配列を渡す"
 });
 
 test("POST /api/dlsite/apply-missing: 不正 JSON・null・型不正 workIds は 400 で適用しない", async () => {
-  const cases: { label: string; body?: string }[] = [
-    { label: "broken json", body: "{" },
+  const cases: { label: string; body?: string; message?: string }[] = [
+    { label: "broken json", body: "{", message: "リクエストの JSON が不正です" },
     { label: "json null", body: "null" },
     { label: "workIds number", body: JSON.stringify({ workIds: 1 }) },
     { label: "workIds string", body: JSON.stringify({ workIds: "RJ501001" }) },
     { label: "workIds mixed array", body: JSON.stringify({ workIds: ["RJ501001", 2] }) },
   ];
 
-  for (const { label, body } of cases) {
+  for (const { label, body, message = INVALID_MESSAGE } of cases) {
     const adapter = createFixtureAdapter();
     let called = false;
     adapter.dlsiteApplyMissing = async () => {
@@ -81,6 +81,6 @@ test("POST /api/dlsite/apply-missing: 不正 JSON・null・型不正 workIds は
     assert.equal(called, false, label);
     const payload = await res.json();
     assert.equal(payload.error.code, "invalid_request", label);
-    assert.equal(payload.error.message, INVALID_MESSAGE, label);
+    assert.equal(payload.error.message, message, label);
   }
 });

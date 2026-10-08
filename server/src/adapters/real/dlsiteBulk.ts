@@ -1,4 +1,5 @@
 import {
+  errorMessage,
   type DataIntegrityWarning,
   type DlsiteBulkMode,
   type DlsiteBulkProgressSnapshot,
@@ -239,7 +240,7 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
             dlsiteLogger.error("DLsite一括取得の結果処理に失敗しました", {
               workId: work.id,
               rjCode: work.dlsite.rjCode,
-              message: error instanceof Error ? error.message : String(error),
+              message: errorMessage(error),
             });
             result.failed += 1;
           }

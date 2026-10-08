@@ -4,7 +4,7 @@
 import { statSync } from "node:fs";
 import { parseFile } from "music-metadata";
 import type { ProbeDurationResult } from "@mimimilli/shared";
-import { probeResultFromCache } from "@mimimilli/shared";
+import { errorMessage, probeResultFromCache } from "@mimimilli/shared";
 import { audioProbeCache } from "./catalogSchema.ts";
 import type { CatalogDb, Db } from "./db.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
@@ -78,7 +78,7 @@ export async function probeDurationSec(
     if (code === "EMFILE" || code === "ENFILE") throw e;
     scanLogger.warn(`再生時間を取得できません: ${filePath}`, {
       path: filePath,
-      error: (e as Error).message,
+      error: errorMessage(e),
     });
   }
 

@@ -15,8 +15,8 @@ import {
 } from "@mimimilli/shared";
 import { CandidatePoolChangedError } from "../errors.ts";
 import { ActiveScanConflictError, ScanJobManager } from "../scanJobManager.ts";
-import { conflict, invalidRequest } from "../lib/httpError.ts";
-import { readOptionalJsonBody } from "../lib/jsonBody.ts";
+import { conflict } from "../lib/httpError.ts";
+import { readJsonBody, readOptionalJsonBody } from "../lib/jsonBody.ts";
 
 /** SSE 接続を生かし続けるための ping 間隔（ms）。walking フェーズ等、進捗が長く無音になり得るため */
 const HEARTBEAT_INTERVAL_MS = 15000;
@@ -47,13 +47,13 @@ export function scanRoute(
   const app = new Hono();
 
   app.post("/scan", async (c) => {
-    const body = await readOptionalJsonBody(c, "スキャンのリクエスト内容が不正です");
-    const parsed = startScanRequestSchema.safeParse(body);
-    if (!parsed.success) {
-      invalidRequest("スキャンのリクエスト内容が不正です");
-    }
+    const data = await readOptionalJsonBody(
+      c,
+      startScanRequestSchema,
+      "スキャンのリクエスト内容が不正です",
+    );
     try {
-      const job = jobs.start({ full: parsed.data.full });
+      const job = jobs.start({ full: data.full });
       return c.json(startScanResponseSchema.parse({ job }), 202, {
         Location: `/api/scan/${job.id}`,
       });
@@ -90,10 +90,9 @@ export function scanRoute(
   });
 
   app.post("/scan/candidates/exclude", async (c) => {
-    const parsed = scanCandidatesMutationSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) invalidRequest("候補の除外内容が不正です");
+    const data = await readJsonBody(c, scanCandidatesMutationSchema, "候補の除外内容が不正です");
     try {
-      await jobs.excludeCandidates(parsed.data.paths);
+      await jobs.excludeCandidates(data.paths);
     } catch (error) {
       if (error instanceof CandidatePoolChangedError) {
         conflict(error.message);
@@ -109,19 +108,23 @@ export function scanRoute(
   });
 
   app.post("/scan/candidates/exclusions/restore", async (c) => {
-    const parsed = scanCandidatesMutationSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) invalidRequest("候補除外の解除内容が不正です");
-    await jobs.restoreCandidateExclusions(parsed.data.paths);
+    const data = await readJsonBody(
+      c,
+      scanCandidatesMutationSchema,
+      "候補除外の解除内容が不正です",
+    );
+    await jobs.restoreCandidateExclusions(data.paths);
     return c.body(null, 204);
   });
 
   app.post("/scan/candidates/register", async (c) => {
-    const parsed = scanCandidatesRegisterRequestSchema.safeParse(
-      await c.req.json().catch(() => null),
+    const data = await readJsonBody(
+      c,
+      scanCandidatesRegisterRequestSchema,
+      "候補の登録内容が不正です",
     );
-    if (!parsed.success) invalidRequest("候補の登録内容が不正です");
     try {
-      const result = await jobs.registerCandidates(parsed.data.items, onCandidateRegistered);
+      const result = await jobs.registerCandidates(data.items, onCandidateRegistered);
       return c.json(scanCandidatesRegisterResponseSchema.parse(result), 201);
     } catch (error) {
       if (error instanceof CandidatePoolChangedError) {
