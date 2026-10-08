@@ -12,7 +12,7 @@ import type {
 import { detectRjCode, emptyMetaDlsiteState, isDlsiteUrl } from "@mimimilli/shared";
 import { inspectMetaFile } from "./meta.ts";
 import { metaStagingPath } from "./metaStaging.ts";
-import { identityConflictPathOf, resolveWithin } from "./paths.ts";
+import { identityConflictPathOf, resolveWithin, toPortableRelativePath } from "./paths.ts";
 import { WorkRegisterError } from "../../errors.ts";
 import { assertRegistrationAllowed } from "../../core/workRegistrationGuard.ts";
 import { fileRegisterNaming, folderRegisterNaming } from "../../core/workRegisterPreview.ts";
@@ -148,6 +148,9 @@ export function unregisterWork(
       return false;
     }
     user.deleteWorkUserState(workId);
+    if (isPathWithin(root, target.metaPath)) {
+      catalog.removeInvalidMetaFile(toPortableRelativePath(root, target.metaPath));
+    }
     if (conflictPath !== null) {
       catalog.replaceIdentityConflicts(
         removeIdentityConflictPath(catalog.listIdentityConflicts(), workId, conflictPath),

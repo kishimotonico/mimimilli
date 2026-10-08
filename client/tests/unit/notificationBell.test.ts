@@ -4,7 +4,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
-import type { ScanDiagnostic, ScanResult } from "@mimimilli/shared";
+import type { ScanDiagnostics, ScanResult } from "@mimimilli/shared";
 import NotificationBell from "../../src/app/ui/NotificationBell";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
@@ -21,12 +21,8 @@ const scanResult: ScanResult = {
   updatedWorkIds: [],
   errors: 1,
   missing: 0,
-  rjCodeMissingCount: 3,
   skipped: 0,
   coverErrors: 0,
-  identityConflicts: [],
-  invalidMetaFiles: [],
-  candidates: [],
 };
 
 const summaryDefaults = {
@@ -44,7 +40,7 @@ function renderBell(
     progress?: import("@mimimilli/shared").DlsiteBulkProgressSnapshot | null;
   },
   scanResultOverride?: ScanResult | null,
-  identityConflicts: ScanDiagnostic[] = [],
+  diagnostics: Partial<ScanDiagnostics> = {},
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -61,7 +57,9 @@ function renderBell(
       : null,
   );
   // 要対応タブと同じ定義を使う: ID重複は常に最新の診断クエリから拾う
-  queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), { diagnostics: identityConflicts });
+  queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), {
+    ...diagnostics,
+  });
 
   const store = createStore();
   const onStartDlsiteBulk = vi.fn();
@@ -195,9 +193,11 @@ describe("NotificationBell", () => {
 
   describe("要対応タブとの件数統一", () => {
     it("ID重複はworkId単位で1件として数え、行クリックで要対応タブを開く", () => {
-      const { store } = renderBell({}, undefined, undefined, [
-        { kind: "identity_conflict", workId: "RJ501001", paths: ["a/1", "a/2"] },
-      ]);
+      const { store } = renderBell({}, undefined, undefined, {
+        identityConflicts: [
+          { kind: "identity_conflict", workId: "RJ501001", paths: ["a/1", "a/2"] },
+        ],
+      });
       expect(screen.getByRole("button", { name: "通知（要対応1件）" })).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole("button", { name: /通知/ }));
@@ -208,16 +208,16 @@ describe("NotificationBell", () => {
     });
 
     it("ID重複とRJコード未検出が両方あるとき、バッジは行の合算になる", () => {
-      renderBell({ rjCodeMissingCount: 2 }, undefined, undefined, [
-        { kind: "identity_conflict", workId: "RJ501001", paths: ["a/1", "a/2"] },
-      ]);
+      renderBell({ rjCodeMissingCount: 2 }, undefined, undefined, {
+        identityConflicts: [
+          { kind: "identity_conflict", workId: "RJ501001", paths: ["a/1", "a/2"] },
+        ],
+      });
       expect(screen.getByRole("button", { name: "通知（要対応3件）" })).toBeInTheDocument();
     });
 
-    it("読み取り失敗はスキャン結果のinvalidMetaFilesから行を作る", () => {
-      const { store } = renderBell({}, undefined, {
-        ...scanResult,
-        rjCodeMissingCount: 0,
+    it("読み取り失敗は現在の診断のinvalidMetaFilesから行を作る", () => {
+      const { store } = renderBell({}, undefined, undefined, {
         invalidMetaFiles: [{ path: "a/1", message: "壊れています" }],
       });
       fireEvent.click(screen.getByRole("button", { name: /通知/ }));

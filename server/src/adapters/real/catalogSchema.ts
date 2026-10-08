@@ -134,6 +134,12 @@ export const identityConflicts = sqliteTable(
   ],
 );
 
+/** 読み取りまたは検証に失敗した mimimilli.json の再構築可能な診断投影。pathはroot相対のportable path。 */
+export const invalidMetaFiles = sqliteTable("invalid_meta_files", {
+  path: text("path").primaryKey(),
+  message: text("message").notNull(),
+});
+
 /** 音声ファイル長のプローブ結果キャッシュ。durationSec は計測失敗時 NULL（未知。0 では埋めない）。 */
 export const audioProbeCache = sqliteTable("audio_probe_cache", {
   path: text("path").primaryKey(),

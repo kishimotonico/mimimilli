@@ -11,7 +11,7 @@ import {
 import type {
   Cover,
   MetaFile,
-  ScanDiagnostic,
+  IdentityConflict,
   ScanResult,
   Work,
   WorkPlacementResolution,
@@ -301,7 +301,7 @@ export function handleMetaParseError(
   existingWorks: Map<string, ScanWorkState>,
   existingByMetaPath: Map<string, { id: string; state: ScanWorkState }>,
   root: string,
-  identityConflicts: ScanDiagnostic[],
+  identityConflicts: IdentityConflict[],
 ): void {
   scanLogger.warn(error.message, { metaPath });
   const existing = existingByMetaPath.get(metaPath) ?? null;
@@ -331,7 +331,7 @@ export function handleMetaParseError(
       const brokenPath = identityConflictPathOf(root, metaPath);
       const ownerPath = identityConflictPathOf(root, existingById.metaPath);
       const existingConflict = identityConflicts.find(
-        (diagnostic): diagnostic is Extract<ScanDiagnostic, { kind: "identity_conflict" }> =>
+        (diagnostic): diagnostic is Extract<IdentityConflict, { kind: "identity_conflict" }> =>
           diagnostic.kind === "identity_conflict" && diagnostic.workId === candidateId,
       );
       if (existingConflict) {

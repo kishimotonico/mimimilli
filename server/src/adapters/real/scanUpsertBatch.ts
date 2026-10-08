@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { ScanDiagnostic, Work } from "@mimimilli/shared";
+import type { IdentityConflict, InvalidMetaFile, Work } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
@@ -94,7 +94,8 @@ export class ScanUpsertBatch {
   publishScanGeneration(input: {
     seenIds: string[];
     unverifiedIds: string[];
-    diagnostics: ScanDiagnostic[];
+    identityConflicts: IdentityConflict[];
+    invalidMetaFiles: InvalidMetaFile[];
   }): void {
     this.checkAbort();
     this.db.userTransaction(() => {
@@ -113,7 +114,8 @@ export class ScanUpsertBatch {
       for (const error of this.errors) {
         this.catalog.markWorkError(error.id, error.physicalPath, error.metaPath, error.message);
       }
-      this.catalog.replaceIdentityConflicts(input.diagnostics);
+      this.catalog.replaceIdentityConflicts(input.identityConflicts);
+      this.catalog.replaceInvalidMetaFiles(input.invalidMetaFiles);
       this.catalog.markMissingExcept(input.seenIds, input.unverifiedIds);
     });
   }

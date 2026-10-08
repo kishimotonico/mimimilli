@@ -13,7 +13,10 @@ import {
 } from "../../entities/dlsite/model/bulkAtoms";
 import { useDlsiteBulkActions } from "../../entities/dlsite/useDlsiteBulkActions";
 import { useDlsiteNotificationSummary } from "../../entities/dlsite/model/useDlsiteNotificationSummary";
-import { getLastScanResult, getScanDiagnostics, SCAN_QUERY_KEYS } from "../../features/scan/api";
+import {
+  scanDiagnosticsQueryOptions,
+  scanLastResultQueryOptions,
+} from "../../entities/scan/queryOptions";
 import {
   buildNeedsAttentionRows,
   countNeedsAttention,
@@ -32,16 +35,10 @@ export default function NotificationBell() {
   const dlsiteBulkProgress = useAtomValue(dlsiteBulkProgressAtom);
   const { start: onStartDlsiteBulk } = useDlsiteBulkActions();
   // 前回スキャン結果（ディスク永続化なし）。購読する。
-  const lastScanQuery = useQuery({
-    queryKey: SCAN_QUERY_KEYS.last(),
-    queryFn: getLastScanResult,
-  });
+  const lastScanQuery = useQuery(scanLastResultQueryOptions);
   const scanResult = lastScanQuery.data?.result ?? null;
-  // ID重複はスキャン時点のスナップショットではなく常に最新を見る（要対応タブと同じクエリキー）。
-  const diagnosticsQuery = useQuery({
-    queryKey: SCAN_QUERY_KEYS.diagnostics(),
-    queryFn: getScanDiagnostics,
-  });
+  // 診断はスキャン時点のスナップショットではなく常に最新を見る（要対応タブと同じクエリ）。
+  const diagnosticsQuery = useQuery(scanDiagnosticsQueryOptions);
   const {
     rjCodeMissingCount,
     fetchFailedCount: dlsiteFetchFailedCount,
@@ -60,8 +57,8 @@ export default function NotificationBell() {
 
   // 要対応タブと同じ定義・同じ件数を使う。
   const needsAttentionRows = buildNeedsAttentionRows({
-    identityConflicts: diagnosticsQuery.data?.diagnostics ?? [],
-    invalidMetaFiles: scanResult?.invalidMetaFiles ?? [],
+    identityConflicts: diagnosticsQuery.data?.identityConflicts ?? [],
+    invalidMetaFiles: diagnosticsQuery.data?.invalidMetaFiles ?? [],
     rjCodeMissingCount,
     dlsiteFetchFailedCount,
     dlsiteParseErrorCount,

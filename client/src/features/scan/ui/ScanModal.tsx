@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useAtomValue } from "jotai";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { cn } from "../../../shared/lib/cn";
@@ -9,8 +9,10 @@ import IconButton from "../../../shared/ui/IconButton";
 import { useToast } from "../../../shared/ui/useToast";
 import { scanningAtom, scanProgressAtom } from "../../../entities/scan/model/atoms";
 import { useScanActions } from "../../../entities/scan/useScanActions";
-import { getLastScanResult, getScanDiagnostics, SCAN_QUERY_KEYS } from "../api";
-import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
+import {
+  scanDiagnosticsQueryOptions,
+  scanLastResultQueryOptions,
+} from "../../../entities/scan/queryOptions";
 import { useScanCandidatesCache } from "../model/useScanCandidatesCache";
 import { useDlsiteNotificationSummary } from "../../../entities/dlsite/model/useDlsiteNotificationSummary";
 import ScanSidebar from "./scanModal/ScanSidebar";
@@ -40,7 +42,6 @@ export default function ScanModal({
   initialTab = "unregistered",
   onOpenFiles,
 }: ScanModalProps) {
-  const queryClient = useQueryClient();
   const scanning = useAtomValue(scanningAtom);
   const progress = useAtomValue(scanProgressAtom);
   const { start, cancel } = useScanActions();
@@ -70,29 +71,18 @@ export default function ScanModal({
     if (remainingCount === 0) setActiveTab("newlyRegistered");
   };
 
-  // 前回スキャン結果（ディスク永続化なし）。サーバー起動後に一度でも完了していれば
+  // 前回スキャンの実行サマリー（ディスク永続化なし）。サーバー起動後に一度でも完了していれば
   // GET /api/scan/last から取得でき、リロードをまたいでスキャンモーダルに表示できる。
-  const lastScanQuery = useQuery({
-    queryKey: SCAN_QUERY_KEYS.last(),
-    queryFn: getLastScanResult,
-  });
+  const lastScanQuery = useQuery(scanLastResultQueryOptions);
   const lastResult = lastScanQuery.data?.result ?? null;
 
   const candidates = useScanCandidatesCache();
 
-  useEffect(() => {
-    if (queryClient.getQueryData(SCAN_QUERY_KEYS.candidates()) !== undefined) return;
-    void refreshScanCandidates(queryClient).catch(() => {});
-  }, [queryClient]);
-
-  // ID重複はFilesでの解決を随時反映する必要があるため、スキャン時点のスナップショットではなく
-  // 常に最新の診断を購読する。FilePreview の解決操作が同じキーを無効化する。
-  const diagnosticsQuery = useQuery({
-    queryKey: SCAN_QUERY_KEYS.diagnostics(),
-    queryFn: getScanDiagnostics,
-  });
-  const identityConflicts = diagnosticsQuery.data?.diagnostics ?? [];
-  const invalidMetaFiles = lastResult?.invalidMetaFiles ?? [];
+  // 診断はFilesでの解決や登録解除を随時反映する必要があるため、スキャン時点のスナップショットではなく
+  // 常に最新を購読する。作品変更後のキャッシュ更新が同じキーを無効化する。
+  const diagnosticsQuery = useQuery(scanDiagnosticsQueryOptions);
+  const identityConflicts = diagnosticsQuery.data?.identityConflicts ?? [];
+  const invalidMetaFiles = diagnosticsQuery.data?.invalidMetaFiles ?? [];
   const dataIntegrityWarning = lastResult?.dataIntegrityWarning;
   // 通知ベルと同じ「要対応」定義を使うため、RJコード未検出・DLsite取得/パース失敗は
   // スキャン結果のスナップショットではなく通知ベルと同じ集計クエリを参照する。

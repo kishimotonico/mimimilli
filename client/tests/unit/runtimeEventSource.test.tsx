@@ -81,13 +81,26 @@ const scanResult = {
   updatedWorkIds: [],
   errors: 0,
   missing: 0,
-  rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
-  identityConflicts: [],
-  invalidMetaFiles: [],
-  candidates: [],
 };
+
+const candidate = {
+  path: "未登録作品",
+  inferredTitle: "未登録作品",
+  audioFileCount: 1,
+  audioBreakdown: [{ extension: "wav", count: 1 }],
+  rjCode: null,
+};
+
+const noNeedsAttentionDiagnostics = { identityConflicts: [], invalidMetaFiles: [] };
+const dlsiteSummary = (rjCodeMissingCount: number) => ({
+  rjCodeMissingCount,
+  fetchFailedCount: 0,
+  parseErrorCount: 0,
+  parseErrorAlert: false,
+  unlinkedCount: 0,
+});
 
 const dlsiteResult = {
   fetched: 2,
@@ -183,6 +196,24 @@ async function expectNoUnhandledRejection(run: () => Promise<void>) {
 }
 
 describe("ScanRuntime EventSource ownership", () => {
+  it("起動時に未登録候補を GET /scan/candidates から1回取得し、取得済みなら取り直さない", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/scan/candidates")) return response({ candidates: [candidate] });
+      return response(null, 204);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { queryClient } = renderRuntime(createElement(ScanRuntime));
+
+    await waitFor(() =>
+      expect(queryClient.getQueryData(SCAN_QUERY_KEYS.candidates())).toEqual([candidate]),
+    );
+    const candidateCalls = () =>
+      fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/scan/candidates"));
+    expect(candidateCalls()).toHaveLength(1);
+  });
+
   it("active job への attach で EventSource を1つだけ生成する", async () => {
     vi.stubGlobal(
       "fetch",
@@ -205,7 +236,7 @@ describe("ScanRuntime EventSource ownership", () => {
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(completedJob);
         if (url.endsWith("/scan/candidates")) {
-          return response({ candidates: scanResult.candidates });
+          return response({ candidates: [candidate] });
         }
         return response(null, 204);
       }),
@@ -232,7 +263,7 @@ describe("ScanRuntime EventSource ownership", () => {
     // 候補の再取得は queryClient.fetchQuery 経由（TASK-387）のため、setQueryData のスパイではなく
     // 反映後のキャッシュ内容そのものを見る。
     await waitFor(() =>
-      expect(queryClient.getQueryData(SCAN_QUERY_KEYS.candidates())).toEqual(scanResult.candidates),
+      expect(queryClient.getQueryData(SCAN_QUERY_KEYS.candidates())).toEqual([candidate]),
     );
     expect(
       setQueryData.mock.calls.filter(
@@ -274,7 +305,7 @@ describe("ScanRuntime EventSource ownership", () => {
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(completedJob);
         if (url.endsWith("/scan/candidates")) {
-          return response({ candidates: scanResult.candidates });
+          return response({ candidates: [] });
         }
         return response(null, 204);
       }),
@@ -356,7 +387,7 @@ describe("Runtime間連携: ScanRuntime → DlsiteBulkRuntime", () => {
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(completedWithNewWorks);
         if (url.endsWith("/scan/candidates")) {
-          return response({ candidates: scanResultWithNewWorks.candidates });
+          return response({ candidates: [] });
         }
         // attach() が実在確認する後乗り先ジョブ。実行中を返す。
         if (url.endsWith("/dlsite/bulk")) {
@@ -393,6 +424,8 @@ describe("ScanRuntime: 完了・中止トースト", () => {
         const url = String(input);
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(completedJob);
+        if (url.endsWith("/scan/diagnostics")) return response(noNeedsAttentionDiagnostics);
+        if (url.endsWith("/dlsite/notifications")) return response(dlsiteSummary(0));
         return response(null, 204);
       }),
     );
@@ -412,7 +445,7 @@ describe("ScanRuntime: 完了・中止トースト", () => {
   });
 
   it("要対応があれば「要対応を見る」アクションを付け、押すとactiveModalAtomを書き換えてトーストを閉じる", async () => {
-    const needsAttentionResult = { ...scanResult, rjCodeMissingCount: 1 };
+    const needsAttentionResult = scanResult;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
@@ -420,6 +453,8 @@ describe("ScanRuntime: 完了・中止トースト", () => {
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1"))
           return response({ ...completedJob, result: needsAttentionResult });
+        if (url.endsWith("/scan/diagnostics")) return response(noNeedsAttentionDiagnostics);
+        if (url.endsWith("/dlsite/notifications")) return response(dlsiteSummary(1));
         return response(null, 204);
       }),
     );
@@ -435,6 +470,75 @@ describe("ScanRuntime: 完了・中止トースト", () => {
 
     expect(store.get(activeModalAtom)).toEqual({ kind: "scan", tab: "needsAttention" });
     expect(latestToastRequest(store)).toBeUndefined();
+  });
+
+  it("完了時点の診断に読み込めない作品情報ファイルがあれば、実行結果に関わらず「要対応を見る」を付ける", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/scan/active")) return response(running);
+        if (url.endsWith("/scan/job-1")) return response(completedJob);
+        if (url.endsWith("/scan/diagnostics")) {
+          return response({
+            identityConflicts: [],
+            invalidMetaFiles: [{ path: "壊れた/mimimilli.json", message: "不正です" }],
+          });
+        }
+        if (url.endsWith("/dlsite/notifications")) return response(dlsiteSummary(0));
+        return response(null, 204);
+      }),
+    );
+
+    const { store } = renderRuntime(createElement(ScanRuntime));
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+
+    dispatchScan(FakeEventSource.instances[0]!, { type: "completed", result: scanResult });
+    await waitFor(() => expect(latestToastRequest(store)?.actionLabel).toBe("要対応を見る"));
+  });
+
+  it("完了直後の診断の取得に失敗したら、要対応リンクは付けずに完了トーストだけ出す", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/scan/active")) return response(running);
+        if (url.endsWith("/scan/job-1")) return response(completedJob);
+        if (url.endsWith("/scan/diagnostics")) return response({ message: "失敗" }, 500);
+        if (url.endsWith("/dlsite/notifications")) return response(dlsiteSummary(1));
+        return response(null, 204);
+      }),
+    );
+
+    const { store } = renderRuntime(createElement(ScanRuntime));
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+
+    dispatchScan(FakeEventSource.instances[0]!, { type: "completed", result: scanResult });
+    await waitFor(() => expect(latestToastRequest(store)?.message).toContain("スキャン完了"));
+    expect(latestToastRequest(store)?.actionLabel).toBeUndefined();
+  });
+
+  it("診断の取得に失敗しても、実行結果のdataIntegrityWarningがあれば要対応リンクを付ける", async () => {
+    const warned = {
+      ...scanResult,
+      dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["bad"] },
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/scan/active")) return response(running);
+        if (url.endsWith("/scan/job-1")) return response({ ...completedJob, result: warned });
+        if (url.endsWith("/scan/diagnostics")) return response({ message: "失敗" }, 500);
+        return response(null, 204);
+      }),
+    );
+
+    const { store } = renderRuntime(createElement(ScanRuntime));
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+
+    dispatchScan(FakeEventSource.instances[0]!, { type: "completed", result: warned });
+    await waitFor(() => expect(latestToastRequest(store)?.actionLabel).toBe("要対応を見る"));
   });
 
   it("中止時は「スキャンを中止しました」トーストを出す", async () => {

@@ -315,7 +315,7 @@ test("投影先のWork IDが別pathのcatalogにあればidentity_conflictで既
   assert.equal(ownerAfter?.title, "before");
 
   const diagnostics = await adapter.listScanDiagnostics();
-  const conflict = diagnostics.find((item) => item.kind === "identity_conflict");
+  const conflict = diagnostics.identityConflicts.find((item) => item.kind === "identity_conflict");
   assert.ok(conflict);
   assert.equal(conflict.workId, OWNER_ID);
   assert.deepEqual(conflict.paths, ["work", "work-copy"]);

@@ -41,7 +41,12 @@ export function createSettingsScanMethods(deps: {
   query: Pick<WorkQueryRepository, "listSummaries">;
   catalog: Pick<
     CatalogWorkRepository,
-    "getScanState" | "setScanState" | "listIdentityConflicts" | "deleteWorksOutsideRoot"
+    | "getScanState"
+    | "setScanState"
+    | "listIdentityConflicts"
+    | "listInvalidMetaFiles"
+    | "clearDiagnostics"
+    | "deleteWorksOutsideRoot"
   >;
   user: Pick<
     UserWorkStateRepository,
@@ -170,7 +175,10 @@ export function createSettingsScanMethods(deps: {
         { [KEY_ROOT_FOLDER]: rootFolder, [KEY_ROOT_RECONFIGURATION]: JSON.stringify(running) },
         { discardScanCandidateExclusions: rootChanged },
       );
-      if (rootChanged) candidateSession = ScanCandidateSession.empty();
+      if (rootChanged) {
+        candidateSession = ScanCandidateSession.empty();
+        catalog.clearDiagnostics();
+      }
     },
 
     async rebuildCatalogForRoot(
@@ -204,7 +212,10 @@ export function createSettingsScanMethods(deps: {
     },
 
     async listScanDiagnostics() {
-      return catalog.listIdentityConflicts();
+      return {
+        identityConflicts: catalog.listIdentityConflicts(),
+        invalidMetaFiles: catalog.listInvalidMetaFiles(),
+      };
     },
     async listScanCandidates(): Promise<ScanCandidate[]> {
       return candidateSession.listCandidates(user);

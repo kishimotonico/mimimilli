@@ -3,20 +3,16 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { getScanDiagnostics } from "../api";
-import { SCAN_QUERY_KEYS } from "../../../entities/scan/queryKeys";
-import type { ScanDiagnostic } from "@mimimilli/shared";
+import { scanDiagnosticsQueryOptions } from "../../../entities/scan/queryOptions";
+import type { IdentityConflict } from "@mimimilli/shared";
 
-/** 物理パス → そのパスが含まれるScanDiagnostic */
-export function useIdentityConflictMap(): Map<string, ScanDiagnostic> {
-  const diagnosticsQuery = useQuery({
-    queryKey: SCAN_QUERY_KEYS.diagnostics(),
-    queryFn: getScanDiagnostics,
-  });
+/** 物理パス → そのパスが含まれるIdentityConflict */
+export function useIdentityConflictMap(): Map<string, IdentityConflict> {
+  const diagnosticsQuery = useQuery(scanDiagnosticsQueryOptions);
   return useMemo(
     () =>
       new Map(
-        (diagnosticsQuery.data?.diagnostics ?? []).flatMap((diagnostic) =>
+        (diagnosticsQuery.data?.identityConflicts ?? []).flatMap((diagnostic) =>
           diagnostic.paths.map((path) => [path, diagnostic] as const),
         ),
       ),
@@ -25,7 +21,7 @@ export function useIdentityConflictMap(): Map<string, ScanDiagnostic> {
 }
 
 /** 単一パスぶんのID重複だけ欲しい呼び出し側向け（diagnosticsQueryはキャッシュ共有されるため追加リクエストは発生しない） */
-export function useIdentityConflictFor(path: string | null): ScanDiagnostic | null {
+export function useIdentityConflictFor(path: string | null): IdentityConflict | null {
   const map = useIdentityConflictMap();
   if (path == null) return null;
   return map.get(path) ?? null;

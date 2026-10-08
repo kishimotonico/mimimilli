@@ -7,7 +7,7 @@ import type {
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
   IdentityConflictReassignBody,
-  ScanDiagnostic,
+  IdentityConflict,
   NormalizedTag,
   ResumeBody,
   Work,
@@ -68,7 +68,7 @@ export function createWorkMethods(deps: {
     const conflictPath = identityConflictPathOf(root, conflictMetaPath);
     const diagnostics = catalog.listIdentityConflicts();
     const existing = diagnostics.find(
-      (diagnostic): diagnostic is Extract<ScanDiagnostic, { kind: "identity_conflict" }> =>
+      (diagnostic): diagnostic is Extract<IdentityConflict, { kind: "identity_conflict" }> =>
         diagnostic.kind === "identity_conflict" && diagnostic.workId === workId,
     );
     if (existing) {

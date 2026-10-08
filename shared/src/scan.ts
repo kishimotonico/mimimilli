@@ -68,36 +68,32 @@ export const scanResultSchema = z.object({
   updatedWorkIds: z.array(z.string()),
   errors: z.number().int().nonnegative(),
   missing: z.number().int().nonnegative(),
-  /** スキャン完了時点でRJコード未検出（かつ未スキップ）のまま残っている作品数。
-   *  新規作品に限らずライブラリ全体を対象に数える（isRjCodeMissing が判定基準） */
-  rjCodeMissingCount: z.number().int().nonnegative(),
   /** 増分スキャンで fingerprint が一致し、プローブ・upsertWork を省略した作品数 */
   skipped: z.number().int().nonnegative(),
   /** カバー画像はあるが寸法を計測できなかった作品数（errors とは別枠。次回スキャンで再試行） */
   coverErrors: z.number().int().nonnegative(),
   /** 走査中に読み取れなかったサブツリーのディレクトリパス。ルート失敗時はスキャン自体がエラーになる */
   unreadablePaths: z.array(z.string()).optional(),
-  /** finalize 時の listSummaries でタグ等の不整合により除外した作品 */
+  /** finalize 時の listSummaries() でタグ等の不整合により除外した作品。その実行の警告で、サーバー再起動後は次のスキャンまで得られない */
   dataIntegrityWarning: dataIntegrityWarningSchema.optional(),
-  /** 同じ Work ID を持つ mimimilli.json が複数見つかった診断。paths はroot相対・separator正規化済みのportable pathで、相互参照用に全件を含む。 */
-  identityConflicts: z.array(
-    z.object({
-      kind: z.literal("identity_conflict"),
-      workId: z.string(),
-      paths: z.array(z.string()).min(2),
-    }),
-  ),
-  /** 読み取りまたは検証に失敗した作品情報ファイル。pathはroot相対のportable path。 */
-  invalidMetaFiles: z.array(invalidMetaFileSchema),
-  /** mimimilli.json を持たない音声フォルダー。scan はこの候補へ書き込まない。 */
-  candidates: z.array(scanCandidateSchema),
 });
 export type ScanResult = z.infer<typeof scanResultSchema>;
 
-export type ScanDiagnostic = ScanResult["identityConflicts"][number];
-export const scanDiagnosticsResponseSchema = z.object({
-  diagnostics: z.array(scanResultSchema.shape.identityConflicts.element),
+/** 同じ Work ID を持つ mimimilli.json が複数見つかった診断。paths はroot相対・separator正規化済みのportable pathで、相互参照用に全件を含む。 */
+export const identityConflictSchema = z.object({
+  kind: z.literal("identity_conflict"),
+  workId: z.string(),
+  paths: z.array(z.string()).min(2),
 });
+export type IdentityConflict = z.infer<typeof identityConflictSchema>;
+
+/** GET /scan/diagnostics の返却値。要対応の現在状態で、スキャンの実行結果ではない。 */
+export const scanDiagnosticsSchema = z.object({
+  identityConflicts: z.array(identityConflictSchema),
+  /** 読み取りまたは検証に失敗した作品情報ファイル。pathはroot相対のportable path。 */
+  invalidMetaFiles: z.array(invalidMetaFileSchema),
+});
+export type ScanDiagnostics = z.infer<typeof scanDiagnosticsSchema>;
 
 /** スキャンの大まかな進行段階（各アダプタの scanner 相当の処理に対応） */
 export const scanPhaseSchema = z.enum(["walking", "registering", "generating", "finalizing"]);

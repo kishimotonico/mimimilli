@@ -652,9 +652,9 @@ test("bulk取得はタイトル・タグを自動適用せず、mimimilli.json�
     }),
   );
   await configureRoot(adapter, lib.root);
-  const scan = await adapter.scan();
+  await adapter.scan();
   const registered = await adapter.registerScanCandidates(
-    scan.candidates.map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
   );
   const candidateId = registered.registered[0]!.workId;
   const beforeExisting = await adapter.getWork(lib.existingWorkId);
@@ -700,9 +700,9 @@ test("bulk取得はcache TTLとskipped状態を利用し、mimimilli.jsonを変�
     }),
   );
   await configureRoot(adapter, lib.root);
-  const scan = await adapter.scan();
+  await adapter.scan();
   const registered = await adapter.registerScanCandidates(
-    scan.candidates.map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
   );
   const candidateId = registered.registered[0]!.workId;
   await adapter.updateDlsiteState(candidateId!, {
@@ -1383,9 +1383,9 @@ test("DLsite HTMLキャッシュ: fresh DBでmimimilli.jsonを削除して同じ
   };
   const second = makeAdapter(secondDb);
   await configureRoot(second, lib.root);
-  const scan = await second.scan();
+  await second.scan();
   const registration = await second.registerScanCandidates(
-    scan.candidates
+    (await second.listScanCandidates())
       .filter((candidate) => candidate.path.endsWith("RJ900002_既存メタ"))
       .map((candidate) => ({ path: candidate.path })),
   );
@@ -1538,10 +1538,10 @@ test("DLsiteカバー: 同じURLを2作品へ同時適用してもHTTPは1回で
     }),
   );
   await configureRoot(adapter, lib.root);
-  const scan = await adapter.scan();
+  await adapter.scan();
   const workAId = lib.existingWorkId;
   const registration = await adapter.registerScanCandidates(
-    scan.candidates.map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
   );
   const registeredWorkBId = registration.registered[0]?.workId;
   assert.ok(registeredWorkBId);
@@ -1800,9 +1800,9 @@ test("bulk取得はカバー失敗に依存せず、mimimilli.jsonを変更し�
     }),
   );
   await configureRoot(adapter, lib.root);
-  const scan = await adapter.scan();
+  await adapter.scan();
   await adapter.registerScanCandidates(
-    scan.candidates.map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
   );
   const metaPath = join(
     (await adapter.getWork(lib.existingWorkId))!.physicalPath,
@@ -1841,9 +1841,9 @@ test("bulk取得はmimimilli.json書込み権限に依存しない", async (t) =
     }),
   );
   await configureRoot(adapter, lib.root);
-  const scan = await adapter.scan();
+  await adapter.scan();
   await adapter.registerScanCandidates(
-    scan.candidates.map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
   );
 
   const failedMetaPath = join(lib.root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");

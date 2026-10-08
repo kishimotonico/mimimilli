@@ -111,7 +111,6 @@ test("スキャン finalize は壊れた作品があっても ScanResult を返�
   const { result } = await scanner.scan(scanRoot.path, { full: true });
   assert.equal(result.dataIntegrityWarning?.skippedCount, 1);
   assert.deepEqual(result.dataIntegrityWarning?.skippedWorkIds, [badId]);
-  assert.equal(typeof result.rjCodeMissingCount, "number");
 });
 
 test("DLsite 一括取得は壊れた作品を除外し dataIntegrityWarning を返す", async (t) => {

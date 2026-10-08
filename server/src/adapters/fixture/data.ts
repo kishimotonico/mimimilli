@@ -13,7 +13,7 @@ import type {
   DlsiteCacheResolution,
   InvalidMetaFile,
   MetaDlsiteState,
-  ScanDiagnostic,
+  IdentityConflict,
   SmartFolder,
   WorkSummary,
 } from "@mimimilli/shared";
@@ -572,7 +572,7 @@ export function buildFsRoot(
   rootAbs: string,
   works: FixtureWorkRecord[],
   coverColumns: ReadonlyMap<string, FixtureCoverColumns>,
-  identityConflicts: ScanDiagnostic[] = [],
+  identityConflicts: IdentityConflict[] = [],
   invalidMetaFiles: InvalidMetaFile[] = [],
 ): FsNode {
   const folderWorks = works.filter((work) => workPlacementOf(work.metaPath).kind === "folder");

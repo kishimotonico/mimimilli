@@ -59,9 +59,9 @@ async function realResumeAdapter(
   writeWav(join(workDir, "track.wav"), 1);
   const adapter = dir.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  const scan = await adapter.scan();
+  await adapter.scan();
   const registration = await adapter.registerScanCandidates(
-    scan.candidates.map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
   );
   const workId = registration.registered[0]!.workId;
   return { adapter, workId };
@@ -287,9 +287,9 @@ test("createWork: 重複登録の拒否メッセージがreal/fixtureで一致�
   writeWav(join(workDir, "track.wav"), 1);
   const adapter = dir.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  const scan = await adapter.scan();
+  await adapter.scan();
   await adapter.registerScanCandidates(
-    scan.candidates.map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
   );
   await assertAlreadyRegisteredContract(
     adapter,

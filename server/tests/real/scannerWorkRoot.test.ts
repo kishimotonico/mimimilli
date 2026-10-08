@@ -19,9 +19,9 @@ test("複数のdiscフォルダーを一つの未登録候補へ統合し、mimi
 
   const db = directory.own(openDb({ kind: "memory" }));
   const scanner = new Scanner(db, createWorkRepos(db));
-  const { result } = await scanner.scan(root);
+  const { result, candidatePool } = await scanner.scan(root);
 
-  assert.deepEqual(result.candidates, [
+  assert.deepEqual(candidatePool, [
     {
       path: "作品",
       inferredTitle: "作品",
@@ -43,9 +43,9 @@ test("ルート直下の音声は親フォルダー候補へ昇格しない", as
 
   const db = directory.own(openDb({ kind: "memory" }));
   const scanner = new Scanner(db, createWorkRepos(db));
-  const { result } = await scanner.scan(root);
+  const { candidatePool } = await scanner.scan(root);
 
-  assert.deepEqual(result.candidates, []);
+  assert.deepEqual(candidatePool, []);
   assert.equal(existsSync(join(root, "mimimilli.json")), false);
 });
 
@@ -67,8 +67,8 @@ test("mimimilli.jsonがある既存作品は未登録候補として再判定し
 
   const db = directory.own(openDb({ kind: "memory" }));
   const scanner = new Scanner(db, createWorkRepos(db));
-  const { result } = await scanner.scan(root);
+  const { candidatePool } = await scanner.scan(root);
 
-  assert.deepEqual(result.candidates, []);
+  assert.deepEqual(candidatePool, []);
   assert.equal(existsSync(join(work, "mimimilli.json")), true);
 });

@@ -109,7 +109,7 @@ function seededClient(): QueryClient {
   queryClient.setQueryData(KEYS.smartPreview, 3);
   queryClient.setQueryData(KEYS.notifications, { rjMissing: 0 });
   queryClient.setQueryData(KEYS.fs, { entries: [] });
-  queryClient.setQueryData(KEYS.diagnostics, { diagnostics: [] });
+  queryClient.setQueryData(KEYS.diagnostics, { identityConflicts: [], invalidMetaFiles: [] });
   queryClient.setQueryData(KEYS.candidates, []);
   return queryClient;
 }

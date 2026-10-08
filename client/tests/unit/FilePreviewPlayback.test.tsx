@@ -13,7 +13,7 @@ import {
   toSelectedRelPath,
 } from "../../src/entities/file-system/model/navigationAtoms";
 import { seedFilesRoute } from "../helpers/route";
-import type { ScanDiagnostic } from "@mimimilli/shared";
+import type { IdentityConflict } from "@mimimilli/shared";
 import type { FsEntry } from "../../src/features/files/model/types";
 
 const browseFs = vi.fn();
@@ -21,6 +21,10 @@ const getScanDiagnostics = vi.fn();
 
 vi.mock("../../src/features/files/api", () => ({
   browseFs: (...args: unknown[]) => browseFs(...args),
+}));
+
+vi.mock("../../src/entities/scan/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/entities/scan/api")>()),
   getScanDiagnostics: (...args: unknown[]) => getScanDiagnostics(...args),
 }));
 
@@ -53,9 +57,9 @@ function audioFile(name: string): FsEntry {
 function renderPreview(
   selectedPath: string | null,
   onPlayFile = vi.fn(),
-  diagnostics: ScanDiagnostic[] = [],
+  diagnostics: IdentityConflict[] = [],
 ) {
-  getScanDiagnostics.mockResolvedValue({ diagnostics });
+  getScanDiagnostics.mockResolvedValue({ identityConflicts: diagnostics, invalidMetaFiles: [] });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const store = createStore();
   seedFilesRoute(store, { selectedRelPath: toSelectedRelPath(selectedPath) });

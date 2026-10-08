@@ -22,7 +22,7 @@ import {
   sourceMutationErrorMessage,
 } from "../../../entities/work/sourceMutation";
 import type {
-  ScanDiagnostic,
+  IdentityConflict,
   WorkRegisterPreview,
   WorkSourceMutationResult,
   WorkspacePath,
@@ -37,7 +37,7 @@ interface FilePreviewWorkActionsProps {
 }
 
 interface IdentityConflictSectionProps {
-  identityConflict: ScanDiagnostic;
+  identityConflict: IdentityConflict;
   currentPath: string;
   isDir: boolean;
   reassignDisabled: boolean;

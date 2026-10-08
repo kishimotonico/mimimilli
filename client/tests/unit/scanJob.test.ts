@@ -36,12 +36,8 @@ const result = {
   updatedWorkIds: [],
   errors: 0,
   missing: 0,
-  rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
-  identityConflicts: [],
-  invalidMetaFiles: [],
-  candidates: [],
 };
 const completed: ScanJobSnapshot = {
   ...running,

@@ -2,14 +2,14 @@ import { I } from "../../../shared/ui/Icon";
 import { formatFileSize } from "../../../shared/lib/format";
 import { classifyFile, FILE_KIND_ICON, FILE_KIND_ROW_CLASS, type FsEntry } from "../model/types";
 import { getWorkFolderDisplay } from "../model/workFolderDisplay";
-import type { ScanDiagnostic } from "@mimimilli/shared";
+import type { IdentityConflict } from "@mimimilli/shared";
 import type { GridArrowKey } from "../../../shared/lib/gridNavigation";
 
 const LIST_ARROW_KEYS = new Set<GridArrowKey>(["ArrowUp", "ArrowDown", "Home", "End"]);
 
 interface FileRowProps {
   entry: FsEntry;
-  identityConflict: ScanDiagnostic | null;
+  identityConflict: IdentityConflict | null;
   flatIndex: number;
   /** roving tabindexの現在位置と一致する場合だけ0（それ以外は-1）。
    *  一覧全体をTabストップ1個にする（作品一覧と同じ規則） */

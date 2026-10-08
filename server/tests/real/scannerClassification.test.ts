@@ -17,8 +17,8 @@ test("スキャン分類: 初回は新規挿入、変更なし再スキャンは
   assert.deepEqual(first.insertedWorkIds, [lib.existingWorkId]);
   assert.deepEqual(first.updatedWorkIds, []);
   assert.equal(first.skipped, 0);
-  assert.ok(first.candidates.length > 0);
-  assert.equal(first.candidates[0]?.rjCode, "RJ900001");
+  assert.ok((await adapter.listScanCandidates()).length > 0);
+  assert.equal((await adapter.listScanCandidates())[0]?.rjCode, "RJ900001");
 
   const second = await adapter.scan();
   assert.deepEqual(second.insertedWorkIds, []);
@@ -87,8 +87,8 @@ test("候補登録: RJコード空文字は自動検出せずRJコードなし�
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  const scanned = await adapter.scan();
-  assert.equal(scanned.candidates[0]?.rjCode, "RJ123456");
+  await adapter.scan();
+  assert.equal((await adapter.listScanCandidates())[0]?.rjCode, "RJ123456");
 
   const registered = await adapter.registerScanCandidates([
     { path: workspacePath("RJ123456_誤検出を消す作品"), rjCode: "" },

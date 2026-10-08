@@ -13,14 +13,11 @@ import { SCAN_QUERY_KEYS } from "../../entities/scan/queryKeys";
 import type { StartScanRequest } from "@mimimilli/shared";
 import {
   scanConflictResponseSchema,
-  scanDiagnosticsResponseSchema,
   scanJobSnapshotSchema,
-  scanLastResultResponseSchema,
   scanCandidatesMutationSchema,
   startScanRequestSchema,
   startScanResponseSchema,
   type ScanJobSnapshot,
-  type ScanLastResultResponse,
 } from "@mimimilli/shared";
 
 export { SCAN_QUERY_KEYS };
@@ -69,16 +66,6 @@ export async function cancelScan(id: string): Promise<ScanJobSnapshot> {
   return deleteParsed(scanJobSnapshotSchema, `/scan/${encodeURIComponent(id)}`);
 }
 
-/** サーバー起動後に一度でも完了したスキャンの結果。一度も完了していなければnull。 */
-export async function getLastScanResult(): Promise<ScanLastResultResponse | null> {
-  return getParsed(scanLastResultResponseSchema, "/scan/last", { noContentAsNull: true });
-}
-
 export async function excludeScanCandidates(paths: string[]): Promise<void> {
   await postVoid("/scan/candidates/exclude", scanCandidatesMutationSchema.parse({ paths }));
-}
-
-/** ID重複の診断。スキャン完了時点のスナップショットではなく常に最新を返す。 */
-export async function getScanDiagnostics() {
-  return getParsed(scanDiagnosticsResponseSchema, "/scan/diagnostics");
 }

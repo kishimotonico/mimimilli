@@ -21,6 +21,10 @@ const getScanDiagnostics = vi.fn();
 
 vi.mock("../../src/features/files/api", () => ({
   browseFs: (...args: unknown[]) => browseFs(...args),
+}));
+
+vi.mock("../../src/entities/scan/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/entities/scan/api")>()),
   getScanDiagnostics: (...args: unknown[]) => getScanDiagnostics(...args),
 }));
 
@@ -31,7 +35,7 @@ vi.mock("../../src/entities/settings/useSettingsQuery", () => ({
 const MISSING_PATH = workspacePath("dlsite/夜想曲スタジオ/nonexistent");
 
 function renderPreview(selectedPath: string | null) {
-  getScanDiagnostics.mockResolvedValue({ diagnostics: [] });
+  getScanDiagnostics.mockResolvedValue({ identityConflicts: [], invalidMetaFiles: [] });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const store = createStore();
   seedFilesRoute(store, { selectedRelPath: toSelectedRelPath(selectedPath) });

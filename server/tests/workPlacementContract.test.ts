@@ -235,9 +235,9 @@ test("単一ファイル形式の壊れたメタのコピーはメタファイ�
   await configureRoot(adapter, root);
   await adapter.scan();
   writeFileSync(join(root, "b", "single.mimimilli.json"), `{ "id": "${meta.id}", broken`);
-  const result = await adapter.scan();
+  await adapter.scan();
 
-  assert.deepEqual(result.identityConflicts, [
+  assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, [
     {
       kind: "identity_conflict",
       workId: meta.id,
@@ -310,7 +310,7 @@ test("単一ファイル形式の重複は、メタファイルのパスで再�
   assert.ok(result);
   const reassigned = JSON.parse(readFileSync(copyPath, "utf-8")) as { id: string };
   assert.notEqual(reassigned.id, meta.id);
-  assert.deepEqual(await adapter.listScanDiagnostics(), []);
+  assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, []);
 });
 
 test("再採番の前にメタが消えていても、単一ファイル形式はフォルダーとして読まない（real）", async (t) => {
@@ -357,7 +357,7 @@ test("壊れた単一ファイル形式のメタを直して反映すると、�
   const work = await adapter.getWork(meta.id);
   assert.equal(work?.status, "ok");
   assert.equal(work?.physicalPath, join(root, "a", "single.wav"));
-  assert.deepEqual(await adapter.listScanDiagnostics(), []);
+  assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, []);
 });
 
 test("メタファイルを単一ファイル形式の名前に改名すると、増分scanでも配置を検査し直す（real）", async (t) => {
@@ -419,7 +419,7 @@ async function realReassignHarness(layout: ReassignLayout): Promise<ReassignHarn
   await adapter.scan();
   place("b");
   await adapter.scan();
-  assert.equal((await adapter.listScanDiagnostics()).length, 1);
+  assert.equal((await adapter.listScanDiagnostics()).identityConflicts.length, 1);
   return {
     adapter,
     ownerId: meta.id,
@@ -491,7 +491,7 @@ for (const layout of ["folder", "file"] as const) {
       assert.ok(result);
       assert.notEqual(result.snapshot.id, harness.ownerId);
       assert.equal(result.snapshot.physicalPath, harness.physicalPathOf("a"));
-      assert.deepEqual(await harness.adapter.listScanDiagnostics(), []);
+      assert.deepEqual((await harness.adapter.listScanDiagnostics()).identityConflicts, []);
       const work = await harness.adapter.getWork(result.snapshot.id);
       assert.equal(work?.physicalPath, harness.physicalPathOf("a"));
       assert.equal(work?.playlists[0]?.tracks.length, 1);
@@ -507,7 +507,7 @@ for (const layout of ["folder", "file"] as const) {
       assert.ok(result);
       assert.notEqual(result.snapshot.id, harness.ownerId);
       assert.equal(result.snapshot.physicalPath, harness.physicalPathOf("b"));
-      assert.deepEqual(await harness.adapter.listScanDiagnostics(), []);
+      assert.deepEqual((await harness.adapter.listScanDiagnostics()).identityConflicts, []);
       const copy = await harness.adapter.getWork(result.snapshot.id);
       assert.equal(copy?.physicalPath, harness.physicalPathOf("b"));
       assert.equal(copy?.playlists[0]?.tracks.length, 1);

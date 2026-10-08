@@ -134,12 +134,8 @@ const scanResult: ScanResult = {
   updatedWorkIds: [],
   errors: 0,
   missing: 0,
-  rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
-  identityConflicts: [],
-  invalidMetaFiles: [],
-  candidates: [],
 };
 
 const candidateDetected: ScanCandidate = {
@@ -179,6 +175,8 @@ function createRunningJob(
 type ModalOverrides = Partial<Parameters<typeof ScanModal>[0]> & {
   /** ScanModal 自身が SCAN_QUERY_KEYS.last() を購読する（TASK-124）ため、query cache 経由で渡す */
   lastResult?: ScanResult | null;
+  /** 候補は GET /scan/candidates 由来の query cache から読まれる */
+  candidates?: ScanCandidate[];
   /** ScanModal 自身が libraryTotalQueryOptions（WORK_QUERY_KEYS.total()）を購読する
    *  （TASK-124）ため、query cache 経由で渡す。実際のクエリは WorksPage 全体を返す
    *  （TASK-188）ため、ここでは total だけを受け取り WorksPage へ組み立てる。 */
@@ -193,14 +191,22 @@ function createTestQueryClient() {
 
 function seedScanQueries(
   queryClient: QueryClient,
-  { lastResult, libraryTotal }: { lastResult?: ScanResult | null; libraryTotal?: number | null },
+  {
+    lastResult,
+    candidates,
+    libraryTotal,
+  }: { lastResult?: ScanResult | null; candidates?: ScanCandidate[]; libraryTotal?: number | null },
 ) {
   if (lastResult !== undefined) {
     queryClient.setQueryData(
       SCAN_QUERY_KEYS.last(),
       lastResult ? { result: lastResult, finishedAt: "2026-01-01T00:00:00.000Z" } : null,
     );
-    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), lastResult?.candidates ?? []);
+  }
+  if (candidates !== undefined) {
+    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), candidates);
+  } else if (queryClient.getQueryData(SCAN_QUERY_KEYS.candidates()) === undefined) {
+    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), []);
   }
   if (libraryTotal !== undefined && libraryTotal !== null) {
     // queryKey は libraryTotalQueryOptions 由来（DataTag付き）を使う。setQueryData の第二引数が
@@ -215,7 +221,10 @@ function seedScanQueries(
   // ID重複の診断（TASK-322で常に最新を購読する）。未シードだとテストごとに実fetchへ
   // 落ちてしまうため、明示的な指定がなければ空で固定する。
   if (queryClient.getQueryData(SCAN_QUERY_KEYS.diagnostics()) === undefined) {
-    queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), { diagnostics: [] });
+    queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), {
+      identityConflicts: [],
+      invalidMetaFiles: [],
+    });
   }
   // 通知ベルと同じ要対応集計。未シードだと実fetchへ落ちるため既定値で固定する。
   if (queryClient.getQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary()) === undefined) {
@@ -249,10 +258,11 @@ function renderModal(
     store.set(scanJobAtom, scanState.job);
   }
 
-  const { lastResult, libraryTotal, ...rest } = overrides;
+  const { lastResult, candidates, libraryTotal, ...rest } = overrides;
   const queryClient = createTestQueryClient();
   seedScanQueries(queryClient, {
     lastResult: lastResult !== undefined ? lastResult : scanResult,
+    candidates,
     libraryTotal: libraryTotal !== undefined ? libraryTotal : 11,
   });
 
@@ -284,8 +294,17 @@ function renderModal(
   );
 
   const rerenderModal = (newOverrides: ModalOverrides = {}) => {
-    const { lastResult: newLastResult, libraryTotal: newLibraryTotal, ...newRest } = newOverrides;
-    seedScanQueries(queryClient, { lastResult: newLastResult, libraryTotal: newLibraryTotal });
+    const {
+      lastResult: newLastResult,
+      candidates: newCandidates,
+      libraryTotal: newLibraryTotal,
+      ...newRest
+    } = newOverrides;
+    seedScanQueries(queryClient, {
+      lastResult: newLastResult,
+      candidates: newCandidates,
+      libraryTotal: newLibraryTotal,
+    });
     view.rerender(
       createElement(
         QueryClientProvider,
@@ -593,10 +612,7 @@ describe("ScanModal", () => {
       failures: [],
     });
     renderModal({
-      lastResult: {
-        ...scanResult,
-        candidates: [candidateDetected, candidateUndetected],
-      },
+      candidates: [candidateDetected, candidateUndetected],
     });
 
     const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
@@ -624,7 +640,7 @@ describe("ScanModal", () => {
       failures: [],
     });
     const { queryClient } = renderModal({
-      lastResult: { ...scanResult, candidates: [candidateDetected] },
+      candidates: [candidateDetected],
     });
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
@@ -644,7 +660,7 @@ describe("ScanModal", () => {
       failures: [{ path: candidateUndetected.path, message: "失敗" }],
     });
     const { queryClient } = renderModal({
-      lastResult: { ...scanResult, candidates: [candidateDetected, candidateUndetected] },
+      candidates: [candidateDetected, candidateUndetected],
     });
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
@@ -659,7 +675,7 @@ describe("ScanModal", () => {
   it("候補の除外では作品一覧・軸件数・スマートフォルダーの再取得を行わない（AC#4）", async () => {
     vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
     const { queryClient } = renderModal({
-      lastResult: { ...scanResult, candidates: [candidateUndetected] },
+      candidates: [candidateUndetected],
     });
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
@@ -687,10 +703,7 @@ describe("ScanModal", () => {
       failures: [],
     });
     renderModal({
-      lastResult: {
-        ...scanResult,
-        candidates: [candidateDetected, candidateUndetected],
-      },
+      candidates: [candidateDetected, candidateUndetected],
     });
 
     const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
@@ -725,10 +738,7 @@ describe("ScanModal", () => {
         return candidates;
       });
     renderModal({
-      lastResult: {
-        ...scanResult,
-        candidates: [candidateDetected, candidateUndetected],
-      },
+      candidates: [candidateDetected, candidateUndetected],
     });
 
     const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
@@ -795,7 +805,7 @@ describe("ScanModalと他画面が同じlibraryTotalQueryOptionsを共有する�
         );
       }
       if (url.pathname === "/api/scan/diagnostics") {
-        return Promise.resolve(jsonResponse({ diagnostics: [] }));
+        return Promise.resolve(jsonResponse({ identityConflicts: [], invalidMetaFiles: [] }));
       }
       if (url.pathname === "/api/scan/candidates") {
         return Promise.resolve(jsonResponse({ candidates: [] }));

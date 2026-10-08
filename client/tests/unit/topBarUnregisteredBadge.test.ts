@@ -97,41 +97,4 @@ describe("TopBar の未登録バッジ", () => {
 
     expect(scanCandidatesFetchCalls(fetchMock)).toHaveLength(0);
   });
-
-  it("前回スキャン結果から件数を導出する", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
-      if (String(input).endsWith("/scan/last")) {
-        return jsonResponse({
-          finishedAt: "2026-01-01T00:00:00.000Z",
-          result: {
-            registered: 0,
-            insertedWorkIds: [],
-            updatedWorkIds: [],
-            errors: 0,
-            missing: 0,
-            rjCodeMissingCount: 0,
-            skipped: 0,
-            coverErrors: 0,
-            identityConflicts: [],
-            invalidMetaFiles: [],
-            candidates: [candidate, { ...candidate, path: "もう1件", inferredTitle: "もう1件" }],
-          },
-        });
-      }
-      if (String(input).includes("/scan/candidates")) {
-        return jsonResponse({ candidates: [candidate] });
-      }
-      return jsonResponse(null, 204);
-    });
-
-    renderTopBar(queryClient);
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "スキャン（未登録2件）" })).toBeInTheDocument();
-    });
-    expect(scanCandidatesFetchCalls(fetchMock)).toHaveLength(0);
-  });
 });

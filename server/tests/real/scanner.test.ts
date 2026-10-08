@@ -35,9 +35,9 @@ async function setup(t: TestContext) {
   t.after(lib.cleanup);
   const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, lib.root);
-  const initial = await adapter.scan();
+  await adapter.scan();
   const result = await adapter.registerScanCandidates(
-    initial.candidates.map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
   );
   const candidateWorkId = result.registered[0]!.workId;
   return { ...lib, adapter, candidateWorkId: candidateWorkId! };
@@ -121,9 +121,12 @@ test("DLsite状態: mimimilli.jsonのdlsite.statusに取得失敗の一時値が
   };
   writeFileSync(metaPath, JSON.stringify(meta, null, 2));
 
-  const result = await adapter.scan();
-  assert.equal(result.invalidMetaFiles.length, 1);
-  assert.equal(result.invalidMetaFiles[0]?.path, "dlsite/RJ900002_既存メタ/mimimilli.json");
+  await adapter.scan();
+  assert.equal((await adapter.listScanDiagnostics()).invalidMetaFiles.length, 1);
+  assert.equal(
+    (await adapter.listScanDiagnostics()).invalidMetaFiles[0]?.path,
+    "dlsite/RJ900002_既存メタ/mimimilli.json",
+  );
 
   // 検証に失敗したmimimilli.jsonは再投影されず、既存のcatalog投影がそのまま残る。
   const restored = await adapter.getWork(existingWorkId);
@@ -221,9 +224,15 @@ test("メタ不正: 壊れた JSON は errors にカウントされスキャン�
   assert.equal(result.registered, 1); // 既存メタ作品は通常どおり登録される
   // メタ不正フォルダーは「メタあり」扱いなので自動生成はされない
   assert.equal(result.insertedWorkIds.length, 0);
-  assert.equal(result.invalidMetaFiles.length, 1);
-  assert.equal(result.invalidMetaFiles[0]?.path, "broken-work/mimimilli.json");
-  assert.match(result.invalidMetaFiles[0]?.message ?? "", /メタファイルが不正です/);
+  assert.equal((await adapter.listScanDiagnostics()).invalidMetaFiles.length, 1);
+  assert.equal(
+    (await adapter.listScanDiagnostics()).invalidMetaFiles[0]?.path,
+    "broken-work/mimimilli.json",
+  );
+  assert.match(
+    (await adapter.listScanDiagnostics()).invalidMetaFiles[0]?.message ?? "",
+    /メタファイルが不正です/,
+  );
 });
 
 test("メタ不正: mimimilli.jsonのdlsite.statusに取得失敗の一時値（not_found/error）が残っていると丸めず invalidMetaFiles として診断する", async (t) => {
@@ -244,9 +253,15 @@ test("メタ不正: mimimilli.jsonのdlsite.statusに取得失敗の一時値（
   const result = await adapter.scan();
   assert.equal(result.registered, 1); // 既存メタ作品は通常どおり登録される
   assert.equal(result.insertedWorkIds.length, 0);
-  assert.equal(result.invalidMetaFiles.length, 1);
-  assert.equal(result.invalidMetaFiles[0]?.path, "stale-dlsite-status/mimimilli.json");
-  assert.match(result.invalidMetaFiles[0]?.message ?? "", /メタファイルが不正です/);
+  assert.equal((await adapter.listScanDiagnostics()).invalidMetaFiles.length, 1);
+  assert.equal(
+    (await adapter.listScanDiagnostics()).invalidMetaFiles[0]?.path,
+    "stale-dlsite-status/mimimilli.json",
+  );
+  assert.match(
+    (await adapter.listScanDiagnostics()).invalidMetaFiles[0]?.message ?? "",
+    /メタファイルが不正です/,
+  );
 });
 
 test("大量ディレクトリの走査中、walking フェーズの進捗イベントが複数回発火する（同期walkの詰まり修正の検証）", async (t) => {
@@ -351,7 +366,7 @@ test("増分スキャン: source revisionが変わった不正mimimilli.jsonはe
   assert.equal(second.skipped, 0);
   assert.equal(second.errors, 1);
   assert.deepEqual(
-    second.invalidMetaFiles.map((metaFile) => metaFile.path),
+    (await adapter.listScanDiagnostics()).invalidMetaFiles.map((metaFile) => metaFile.path),
     ["dlsite/RJ900001_テスト作品/mimimilli.json"],
   );
 });
@@ -1057,10 +1072,16 @@ test("formatVersionが未対応のmimimilli.jsonはinvalidMetaFilesにunsupporte
   meta.formatVersion = 2;
   writeFileSync(metaPath, JSON.stringify(meta, null, 2));
 
-  const result = await adapter.scan({ full: true });
+  await adapter.scan({ full: true });
 
-  assert.equal(result.invalidMetaFiles.length, 1);
-  assert.equal(result.invalidMetaFiles[0]?.path, "dlsite/RJ900002_既存メタ/mimimilli.json");
-  assert.match(result.invalidMetaFiles[0]?.message ?? "", /unsupported formatVersion/);
+  assert.equal((await adapter.listScanDiagnostics()).invalidMetaFiles.length, 1);
+  assert.equal(
+    (await adapter.listScanDiagnostics()).invalidMetaFiles[0]?.path,
+    "dlsite/RJ900002_既存メタ/mimimilli.json",
+  );
+  assert.match(
+    (await adapter.listScanDiagnostics()).invalidMetaFiles[0]?.message ?? "",
+    /unsupported formatVersion/,
+  );
   assert.equal((await adapter.getWork(existingWorkId))?.status, "error");
 });

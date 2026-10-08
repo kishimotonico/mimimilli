@@ -76,14 +76,14 @@ test("new-work: スキャン結果に新規作品IDが含まれる", async () =>
 test("new-work: Files用診断とscan確認用の候補・問題を独立して返す", async () => {
   const adapter = createFixtureAdapter({ scenario: "new-work" });
 
-  const result = await adapter.scan();
+  await adapter.scan();
   assert.deepEqual(
-    result.candidates.map((candidate) => candidate.path),
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
     ["未登録作品", "朗読/候補"],
   );
-  assert.deepEqual(result.identityConflicts[0]?.paths, ["viewer", "dlsite"]);
-  assert.equal(result.invalidMetaFiles[0]?.path, "壊れた/mimimilli.json");
-  assert.deepEqual((await adapter.listScanDiagnostics())[0]?.paths, [
+  const diagnostics = await adapter.listScanDiagnostics();
+  assert.equal(diagnostics.invalidMetaFiles[0]?.path, "壊れた/mimimilli.json");
+  assert.deepEqual(diagnostics.identityConflicts[0]?.paths, [
     "dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読",
     "copies/RJ501001_夜更けの図書室で囁き朗読",
   ]);
@@ -143,7 +143,7 @@ test("new-work: identityConflicts・invalidMetaFilesが指すパスは/fsツリ�
   assert.equal(duplicateBody.workId, "RJ501001");
   assert.ok(duplicateBody.entries.length > 0);
 
-  // scanIdentityConflicts側の"壊れた/mimimilli.json"（invalidMetaFiles）も同種の不整合
+  // invalidMetaFiles側の"壊れた/mimimilli.json"（invalidMetaFiles）も同種の不整合
   const metaFileDir = await app.request("/api/fs?path=壊れた");
   assert.equal(metaFileDir.status, 200);
   const metaEntry = (await metaFileDir.json()).entries.find(
@@ -478,9 +478,9 @@ test("fixture: 異なるrootへの変更で候補sessionを破棄し、次のsca
   await configureRoot(adapter, "/library/root-b");
   assert.deepEqual(await paths(), []);
 
-  const result = await adapter.scan();
+  await adapter.scan();
   assert.deepEqual(
-    result.candidates.map((c) => c.path),
+    (await adapter.listScanCandidates()).map((c) => c.path),
     ["未登録作品", "朗読/候補"],
   );
   assert.deepEqual(await paths(), ["未登録作品", "朗読/候補"]);

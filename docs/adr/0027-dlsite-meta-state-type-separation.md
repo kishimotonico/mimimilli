@@ -37,7 +37,7 @@ meta linkageとDLsite取得キャッシュの解決結果を合成する`project
 
 ### 非対応値は診断対象にする（丸めない）
 
-`mimimilli.json`の`dlsite.status`に`not_found`/`error`のような取得失敗の一時値が残っていた場合、投影時に`none`へ読み替える（ADR-0017の従来方針）のではなく、通常のスキーマ検証エラーとして扱う。新しい汎用機構は作らない。既存の`MetaParseError`（`server/src/adapters/real/meta.ts`）／`InvalidMetaFile`（`shared/src/scan.ts`）の仕組みにそのまま乗せる。`metaFileSchema.safeParse`が`dlsite.status`の非対応値で失敗すると、他のスキーマ違反と同じ経路でscanの`invalidMetaFiles`に集計され、Filesとscan結果に診断として表示される。該当作品のcatalog投影は更新されず、直前の投影が残る。
+`mimimilli.json`の`dlsite.status`に`not_found`/`error`のような取得失敗の一時値が残っていた場合、投影時に`none`へ読み替える（ADR-0017の従来方針）のではなく、通常のスキーマ検証エラーとして扱う。新しい汎用機構は作らない。既存の`MetaParseError`（`server/src/adapters/real/meta.ts`）／`InvalidMetaFile`（`shared/src/scan.ts`）の仕組みにそのまま乗せる。`metaFileSchema.safeParse`が`dlsite.status`の非対応値で失敗すると、他のスキーマ違反と同じ経路で診断（`GET /api/scan/diagnostics`の`invalidMetaFiles`）に集計され、Filesとスキャン画面の要対応に表示される。該当作品のcatalog投影は更新されず、直前の投影が残る。
 
 未知の外部ツール用フィールドを保持する既存方針とは矛盾しない。対象は「型が知っている`status`フィールドに、型が許さない値が入っている」場合であり、型が知らないフィールド（`raw`の他のキー）はこれまでどおり`patchMetaFileCas`の生JSON編集で保持される。
 

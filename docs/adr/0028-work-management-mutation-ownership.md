@@ -114,7 +114,7 @@ mutation hook は `UseMutationResult` をそのまま返す。
 - 詳細(id): `["work", id]` 完全一致。source: `["work", id, "source"]`。作品キャッシュ(id): `["work", id]` 前方一致（詳細と source）。全詳細: `["work"]` 前方一致
 - 一覧系: `["works"]` 前方一致（通常一覧、総件数、エラー件数、missing 件数、scan 結果の一覧）
 - 一覧: 一覧系のうち `WORK_QUERY_KEYS.list(params)` の形のもの、および `["smartFolderWorks"]` 前方一致
-- facet: `["axisFacets"]`。タグ: `["tags"]`。SF: `["smartFolderWorks"]`（件数プレビューを含む）。通知: `["dlsiteNotifications"]`。FS: `["fs"]`。診断: `["scan", "diagnostics"]`
+- facet: `["axisFacets"]`。タグ: `["tags"]`。SF: `["smartFolderWorks"]`（件数プレビューを含む）。通知: `["dlsiteNotifications"]`。FS: `["fs"]`。診断: `["scan", "diagnostics"]`（ID重複と読み込めない作品情報ファイル）
 
 | 操作                                                                   | 必須更新                                                                                                    |
 | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |

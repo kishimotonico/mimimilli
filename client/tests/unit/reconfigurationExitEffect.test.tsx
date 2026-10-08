@@ -8,7 +8,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import ReconfigurationExitEffect from "../../src/app/ReconfigurationExitEffect";
 import { reconfigurationExitEpochAtom } from "../../src/entities/settings/reconfigurationExitAtom";
 import { dlsiteBulkActionsAtom } from "../../src/entities/dlsite/model/bulkAtoms";
-import * as scanApi from "../../src/features/scan/api";
+import * as scanApi from "../../src/entities/scan/api";
+import * as scanCandidatesCache from "../../src/entities/scan/scanCandidatesCache";
 
 const EMPTY_SCAN_RESULT = {
   registered: 0,
@@ -16,12 +17,8 @@ const EMPTY_SCAN_RESULT = {
   updatedWorkIds: [],
   errors: 0,
   missing: 0,
-  rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
-  identityConflicts: [],
-  invalidMetaFiles: [],
-  candidates: [],
 };
 
 function setup() {
@@ -81,5 +78,24 @@ describe("ReconfigurationExitEffect", () => {
     await vi.waitFor(() => expect(attach).toHaveBeenCalledTimes(2));
 
     expect(getLastScanResult).toHaveBeenCalledTimes(2);
+  });
+
+  it("離脱時に旧rootの候補を捨てて取り直す", async () => {
+    const { attach, queryClient, store } = setup();
+    const refresh = vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue([]);
+
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(JotaiProvider, { store }, createElement(ReconfigurationExitEffect)),
+      ),
+    );
+
+    act(() => store.set(reconfigurationExitEpochAtom, 1));
+    await vi.waitFor(() => expect(attach).toHaveBeenCalledTimes(1));
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledWith(queryClient);
   });
 });

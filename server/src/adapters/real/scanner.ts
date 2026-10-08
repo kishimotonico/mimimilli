@@ -1,14 +1,14 @@
 // ライブラリスキャン。
 import { existsSync, readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
-import type { MetaFile, ScanCandidate, ScanDiagnostic, ScanResult } from "@mimimilli/shared";
-import {
-  errorMessage,
-  detectRjCode,
-  emptyMetaDlsiteState,
-  isRjCodeMissing,
-  workspacePath,
+import type {
+  IdentityConflict,
+  MetaFile,
+  ScanCandidate,
+  ScanDiagnostics,
+  ScanResult,
 } from "@mimimilli/shared";
+import { errorMessage, detectRjCode, emptyMetaDlsiteState, workspacePath } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import type { ScanOptions } from "../../adapter/index.ts";
 import { descendantsRegisteredError } from "../../errors.ts";
@@ -102,7 +102,7 @@ function inspectMetaFiles(
 function findIdentityConflicts(
   root: string,
   inspections: ReadonlyMap<string, MetaInspection>,
-): ScanDiagnostic[] {
+): IdentityConflict[] {
   const pathsByWorkId = new Map<string, string[]>();
   for (const [metaPath, { declaredId }] of inspections) {
     if (declaredId === null) continue;
@@ -130,6 +130,8 @@ export interface ScannerOptions {
   upsertBatchSize?: number;
   measureCover?: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>;
   dlsiteCache?: DlsiteCache | null;
+  /** 単体の登録・投影で、診断の相対パスを現在のrootに解決するために使う */
+  resolveRoot?: () => string;
 }
 
 export class Scanner {
@@ -139,6 +141,7 @@ export class Scanner {
   private readonly user: UserWorkStateRepository;
   private readonly measureCover: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>;
   private readonly dlsiteCache: DlsiteCache | null;
+  private readonly resolveRoot: (() => string) | null;
 
   constructor(db: Db, repos: WorkPersistence, options?: ScannerOptions) {
     this.db = db;
@@ -153,6 +156,7 @@ export class Scanner {
     }
     this.measureCover = options?.measureCover ?? measureCoverDimensions;
     this.dlsiteCache = options?.dlsiteCache ?? null;
+    this.resolveRoot = options?.resolveRoot ?? null;
   }
 
   async scan(
@@ -175,13 +179,10 @@ export class Scanner {
       updatedWorkIds: [],
       errors: 0,
       missing: 0,
-      rjCodeMissingCount: 0,
       skipped: 0,
       coverErrors: 0,
-      identityConflicts: [],
-      invalidMetaFiles: [],
-      candidates: [],
     };
+    const diagnostics: ScanDiagnostics = { identityConflicts: [], invalidMetaFiles: [] };
 
     const tree = await this.walkPhase(root, emit, signal, abortToken, checkAbort);
     recoverStagedMetaFiles(root, tree, this.catalog);
@@ -203,14 +204,13 @@ export class Scanner {
       existingByMetaPath,
       batch,
       result,
+      diagnostics,
       emit,
       checkAbort,
     );
 
     const candidatePool = this.collectCandidates(root, tree, { filterExclusions: false });
-    result.candidates = this.collectCandidates(root, tree);
-
-    await this.generatePhase(root, result, emit, checkAbort);
+    await this.generatePhase(root, this.collectCandidates(root, tree), emit, checkAbort);
 
     return {
       result: this.finalizePhase(
@@ -219,6 +219,7 @@ export class Scanner {
         existingWorks,
         batch,
         result,
+        diagnostics,
         emit,
         abortHooks,
         checkAbort,
@@ -253,17 +254,17 @@ export class Scanner {
     tree: WalkResult,
     existingWorks: Map<string, ScanWorkState>,
     full: boolean,
-    result: ScanResult,
+    diagnostics: ScanDiagnostics,
     checkAbort: () => void,
   ): PreparedEntry[] {
     const inspections = inspectMetaFiles(tree.metaPaths, checkAbort);
-    result.identityConflicts = findIdentityConflicts(root, inspections);
+    diagnostics.identityConflicts = findIdentityConflicts(root, inspections);
     return prepareMetaEntries(
       inspections,
       existingWorks,
       full,
       checkAbort,
-      new Set(result.identityConflicts.map((diagnostic) => diagnostic.workId)),
+      new Set(diagnostics.identityConflicts.map((diagnostic) => diagnostic.workId)),
     );
   }
 
@@ -276,12 +277,13 @@ export class Scanner {
     existingByMetaPath: Map<string, { id: string; state: ScanWorkState }>,
     batch: ScanUpsertBatch,
     result: ScanResult,
+    diagnostics: ScanDiagnostics,
     emit: NonNullable<ScanOptions["onProgress"]>,
     checkAbort: () => void,
   ): Promise<void> {
     emit({ type: "progress", phase: "registering", processed: 0, total: tree.metaPaths.length });
 
-    const prepared = this.prepareEntries(root, tree, existingWorks, full, result, checkAbort);
+    const prepared = this.prepareEntries(root, tree, existingWorks, full, diagnostics, checkAbort);
     const probeCache = buildProbeCache(this.query, prepared, full, checkAbort);
 
     const registeringThrottle = createProgressThrottle(PROGRESS_MIN_INTERVAL_MS);
@@ -301,9 +303,9 @@ export class Scanner {
             existingWorks,
             existingByMetaPath,
             root,
-            result.identityConflicts,
+            diagnostics.identityConflicts,
           );
-          result.invalidMetaFiles.push({
+          diagnostics.invalidMetaFiles.push({
             path: workspacePath(toPortableRelativePath(root, entry.metaPath)),
             message: entry.error.message,
           });
@@ -338,9 +340,9 @@ export class Scanner {
             existingWorks,
             existingByMetaPath,
             root,
-            result.identityConflicts,
+            diagnostics.identityConflicts,
           );
-          result.invalidMetaFiles.push({
+          diagnostics.invalidMetaFiles.push({
             path: workspacePath(toPortableRelativePath(root, entry.metaPath)),
             message: e.message,
           });
@@ -358,11 +360,11 @@ export class Scanner {
 
   private async generatePhase(
     root: string,
-    result: ScanResult,
+    candidates: ScanCandidate[],
     emit: NonNullable<ScanOptions["onProgress"]>,
     checkAbort: () => void,
   ): Promise<void> {
-    const roots = result.candidates.map((candidate) => resolve(root, candidate.path));
+    const roots = candidates.map((candidate) => resolve(root, candidate.path));
 
     emit({ type: "progress", phase: "generating", processed: 0, total: roots.length });
     const generatingThrottle = createProgressThrottle(PROGRESS_MIN_INTERVAL_MS);
@@ -419,6 +421,7 @@ export class Scanner {
     existingWorks: Map<string, ScanWorkState>,
     batch: ScanUpsertBatch,
     result: ScanResult,
+    diagnostics: ScanDiagnostics,
     emit: NonNullable<ScanOptions["onProgress"]>,
     abortHooks: ScannerAbortHooks | undefined,
     checkAbort: () => void,
@@ -457,12 +460,12 @@ export class Scanner {
     batch.publishScanGeneration({
       seenIds: [...seenIds.work],
       unverifiedIds: [...unverifiedIds],
-      diagnostics: result.identityConflicts,
+      identityConflicts: diagnostics.identityConflicts,
+      invalidMetaFiles: diagnostics.invalidMetaFiles,
     });
     result.missing = this.catalog.countByStatus("missing");
-    const { summaries, skipped } = this.query.listSummaries();
+    const { skipped } = this.query.listSummaries();
     logDataIntegritySkips(scanLogger, "scan-finalize", skipped);
-    result.rjCodeMissingCount = summaries.filter((work) => isRjCodeMissing(work.dlsite)).length;
     const dataIntegrityWarning = toDataIntegrityWarning(skipped);
     if (dataIntegrityWarning) result.dataIntegrityWarning = dataIntegrityWarning;
     emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
@@ -522,6 +525,11 @@ export class Scanner {
           snapshot,
           currentSourceRevision: currentSourceRevision(prepared.metaPath),
         };
+      }
+      if (this.resolveRoot) {
+        this.catalog.removeInvalidMetaFile(
+          toPortableRelativePath(this.resolveRoot(), prepared.metaPath),
+        );
       }
       return { status: "published", snapshot };
     } catch (error) {

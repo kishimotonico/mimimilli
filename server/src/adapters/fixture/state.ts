@@ -6,7 +6,7 @@ import type {
   MetaDlsiteState,
   ResumeBody,
   ScanCandidate,
-  ScanDiagnostic,
+  IdentityConflict,
   SmartFolder,
   TagPrefix,
   WorkSummary,
@@ -69,13 +69,12 @@ export interface FixtureState {
   scanUpdatedWorkIds: string[];
   /** 永続化された候補除外パス */
   scanCandidateExclusions: string[];
-  identityConflicts: ScanDiagnostic[];
+  identityConflicts: IdentityConflict[];
   /** scan() が見つける候補。rootを変えても変わらない（fixtureには物理FSがない） */
   scanCandidatePool: ScanCandidate[];
   /** 直近のscan以降に有効な候補session。root変更で破棄し、次のscanで作り直す */
   scanCandidates: ScanCandidate[];
-  scanIdentityConflicts: ScanDiagnostic[];
-  scanInvalidMetaFiles: InvalidMetaFile[];
+  invalidMetaFiles: InvalidMetaFile[];
   /** listSummaries でタグ等の不整合により除外した作品の報告（シナリオ errors のみ） */
   dataIntegrityWarning: DataIntegrityWarning | undefined;
   /** 編集 snapshot の CAS トークン（ファイルが無い fixture 用） */
@@ -165,7 +164,7 @@ export interface FixtureAdapterOptions {
   /** 作品IDごとのプレイリスト定義（meta の playlists に相当）。シードの定義に上書きで足す */
   playlistSpecs?: Readonly<Record<string, SeedPlaylistSpec[]>>;
   /** works差し替え時に、ID重複の診断を明示的に与える（省略時はシナリオ既定） */
-  identityConflicts?: ScanDiagnostic[];
+  identityConflicts?: IdentityConflict[];
 }
 
 export function createInitialState(options: FixtureAdapterOptions): FixtureState {
@@ -245,8 +244,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
         : []),
     scanCandidatePool: scenario.scanCandidates,
     scanCandidates: scenario.scanCandidates,
-    scanIdentityConflicts: scenario.scanIdentityConflicts,
-    scanInvalidMetaFiles: scenario.scanInvalidMetaFiles,
+    invalidMetaFiles: scenario.invalidMetaFiles,
     dataIntegrityWarning:
       scenario.id === "errors"
         ? { skippedCount: 1, skippedWorkIds: [DATA_INTEGRITY_WARNING_SKIPPED_WORK_ID] }

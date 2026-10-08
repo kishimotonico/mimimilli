@@ -6,13 +6,21 @@ import {
   resolveTrackDurationSec,
   workPlacementOf,
 } from "@mimimilli/shared";
-import type { NormalizedTag, DlsiteState, ScanDiagnostic, UrlEntry, Work } from "@mimimilli/shared";
+import type {
+  NormalizedTag,
+  DlsiteState,
+  IdentityConflict,
+  InvalidMetaFile,
+  UrlEntry,
+  Work,
+} from "@mimimilli/shared";
 import { japaneseSortKey } from "../../core/japaneseSortKey.ts";
 import { isPathWithin } from "../../lib/path.ts";
 import type { Db } from "./db.ts";
 import {
   audioProbeCache,
   identityConflicts,
+  invalidMetaFiles,
   playlists as catalogPlaylists,
   scanState,
   tags,
@@ -70,7 +78,7 @@ export class CatalogWorkRepository {
       .run();
   }
 
-  replaceIdentityConflicts(diagnostics: ScanDiagnostic[]): void {
+  replaceIdentityConflicts(diagnostics: IdentityConflict[]): void {
     this.db.catalog.delete(identityConflicts).run();
     for (const diagnostic of diagnostics) {
       for (const path of diagnostic.paths) {
@@ -79,7 +87,26 @@ export class CatalogWorkRepository {
     }
   }
 
-  listIdentityConflicts(): ScanDiagnostic[] {
+  replaceInvalidMetaFiles(files: InvalidMetaFile[]): void {
+    this.db.catalog.delete(invalidMetaFiles).run();
+    for (const file of files) {
+      this.db.catalog.insert(invalidMetaFiles).values(file).onConflictDoNothing().run();
+    }
+  }
+
+  listInvalidMetaFiles(): InvalidMetaFile[] {
+    return this.db.catalog
+      .select()
+      .from(invalidMetaFiles)
+      .orderBy(invalidMetaFiles.path)
+      .all() as InvalidMetaFile[];
+  }
+
+  removeInvalidMetaFile(path: string): void {
+    this.db.catalog.delete(invalidMetaFiles).where(eq(invalidMetaFiles.path, path)).run();
+  }
+
+  listIdentityConflicts(): IdentityConflict[] {
     const rows = this.db.catalog
       .select()
       .from(identityConflicts)
@@ -144,6 +171,14 @@ export class CatalogWorkRepository {
   }
 
   /** root の配下にない作品の行を関連行ごと削除し、削除した件数を返す。 */
+  /** 診断のpathはroot相対なので、rootが変わったら旧rootの行は意味を失う。 */
+  clearDiagnostics(): void {
+    this.db.transaction(() => {
+      this.db.catalog.delete(identityConflicts).run();
+      this.db.catalog.delete(invalidMetaFiles).run();
+    });
+  }
+
   deleteWorksOutsideRoot(root: string): number {
     const outside = this.db.catalog
       .select({ id: works.id, physicalPath: works.physicalPath })

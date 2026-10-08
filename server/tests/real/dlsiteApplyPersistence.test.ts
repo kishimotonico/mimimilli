@@ -41,7 +41,7 @@ test("title: 単発適用は applyTitle に従い、一括取得は作品情報�
     }),
   );
   await configureRoot(adapter, lib.root);
-  const scan = await adapter.scan();
+  await adapter.scan();
 
   const customTitle = "ユーザー編集タイトル";
   const snap = await adapter.getWorkEditSnapshot(lib.existingWorkId);
@@ -82,7 +82,7 @@ test("title: 単発適用は applyTitle に従い、一括取得は作品情報�
   assert.equal(existingAfterApply?.title, applyTitle);
 
   const registration = await adapter.registerScanCandidates(
-    scan.candidates.map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
   );
   const generatedId = registration.registered[0]!.workId;
   const generatedBefore = await adapter.getWork(generatedId);
