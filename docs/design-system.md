@@ -105,7 +105,7 @@
 設定モーダル・スキャンモーダル・スマートフォルダーエディタ・作品編集・DLsite適用プレビューは
 ネイティブ `<dialog>` + `showModal()` で実装しており、z-index ではなくブラウザの
 top layer によって最前面に重なる。開閉ライフサイクル・Escapeキャンセル・
-backdropクリックの共通処理は `client/src/shared/ui/useDialogModal.ts` に集約している。
+backdropクリックの共通処理は `client/src/shared/ui/useDialogModal.ts` に、外枠（サイズ・角丸・影・暗幕）と見出し・フッターは `client/src/shared/ui/Modal.tsx` の `Modal`・`ModalHeader`・`ModalFooter` に集約している。
 フォーカストラップと「多重モーダル時は最前面のEscだけが効く」挙動は top layer の
 ブラウザ標準実装に任せる。Escape・×ボタン・backdropクリックの閉じ方は progressive
 dismissal に統一しており、3経路とも `useDialogModal` の `onClose` 1本に集約する。

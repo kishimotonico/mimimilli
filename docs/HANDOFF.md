@@ -140,7 +140,7 @@ smokeテストの注意:
 - `model/useMediaSession.ts`: OS のメディアキー・通知（Media Session API）連携
 - `entities/player/model/trackTime.ts`: トラック区間（start/duration）とファイル絶対時間の相互変換の純関数
 - `entities/player/model/usePlayerActions.ts`: 状態を持たず `PlayerController` へ dispatch するだけの薄いアクション束。`play` / `togglePlay` / `seek` / `seekRelative` / `setVolume` / `setLoop` / `nextTrack` / `prevTrack` / `setTrackIndex` / `playWithResume` / `setPlaybackRate` / `setChannelSwap`（L⇄R入替）/ `setABPoint`・`setABPointAt`・`clearABRepeat`（A-Bリピート。a < b のときだけ成立、B→A の順で設定すると自動で入れ替え）。レジュームの定期保存は `persistTick`（5秒間隔、`status === "playing"` のときだけ実際に保存する）
-- `entities/player/model/usePlayWork.ts` / `workPlaybackRequest.ts`: 作品の再生開始の唯一の入口。`usePlayWork()` の `playWork(work, trackIndex)` / `resumeWork(work)` を各画面が直接呼ぶ。`requestWorkPlayback` が再生準備（`prepareWorkPlayback` → キャッシュ更新）と `PlayerController.playRequests` による鮮度確認（待ち中に後続要求・停止・別の再生開始があれば捨てる）、失敗時のトースト（root 再設定中のエラーは除く）を担い、通常再生と続きから再生の違いは開始処理だけ。root 再設定時は `App.tsx` が `stop()` を呼ぶだけで未完了の要求も無効になる
+- `entities/player/model/usePlayWork.ts` / `workPlaybackRequest.ts`: 作品の再生開始の唯一の入口。`usePlayWork()` の `playWork(work, trackIndex)` / `resumeWork(work)` を各画面が直接呼ぶ。`requestWorkPlayback` が再生準備（`prepareWorkPlayback` → キャッシュ更新）と `PlayerController.playRequests` による鮮度確認（待ち中に後続要求・停止・別の再生開始があれば捨てる）、失敗時のトースト（root 再設定中のエラーは除く）を担い、通常再生と続きから再生の違いは開始処理だけ。root 再設定時は `rootReconfigurationController` が `stop()` を呼び、未完了の要求も無効になる
 - `model/usePlayer.ts`（`usePlayerRuntime`）: controller ⇄ audioEngine ⇄ atoms を橋渡しするランタイム。`<PlayerRuntime />` 内でだけ呼ぶ
 - `model/useNowPlayingImmersiveShell.ts`: 没入モード中、TopBar/AddressBar/LeftNav を inert 化し Escape で解除する
 - `ui/PlayerDock.tsx`: バー⇄ポップアップの外枠・層切替。再生中タブ表示中は描画しない

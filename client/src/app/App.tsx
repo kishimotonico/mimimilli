@@ -1,6 +1,6 @@
 // App: アプリ全体のオーケストレーション。
 // - 設定・スキャン・フォルダー変更を TanStack Query で管理
-// - 再生は root 再設定時の停止と最終 resume 保存のみ（開始は各画面が直接呼ぶ。state は leaf で購読）
+// - 再生は最終 resume 保存のみ（開始は各画面が、root 再設定時の停止は rootReconfigurationController が呼ぶ。state は leaf で購読）
 // - レイアウトは AppShell に委譲
 
 import { useState, useCallback, useEffect } from "react";
