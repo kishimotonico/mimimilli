@@ -13,14 +13,12 @@ import {
 } from "./dbBackup.ts";
 import { applySqliteBusyTimeout } from "./sqliteConnection.ts";
 import {
-  assertDatabaseNotNewerThanApp,
+  assertMigrationHistoryConsistent,
   executeSqliteMigrations,
   hasPendingSqliteMigrations,
 } from "./sqliteMigrationExecutor.ts";
 import * as userSchema from "./userSchema.ts";
 
-export const CATALOG_SCHEMA_VERSION = 9;
-const USER_SCHEMA_VERSION = 8;
 const SQLITE_URI_FLAGS =
   constants.SQLITE_OPEN_READWRITE | constants.SQLITE_OPEN_CREATE | constants.SQLITE_OPEN_URI;
 const CATALOG_MIGRATIONS = fileURLToPath(new URL("../../../drizzle/catalog", import.meta.url));
@@ -82,8 +80,6 @@ function logDbOpenFailure(
 }
 
 function isNewDatabase(sqlite: Database): boolean {
-  const current = sqlite.query("PRAGMA user_version").get() as { user_version: number };
-  if (current.user_version !== 0) return false;
   const tables = sqlite
     .query(
       "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
@@ -94,7 +90,6 @@ function isNewDatabase(sqlite: Database): boolean {
 
 function openVersionedDatabase(
   path: string,
-  version: number,
   migrationsFolder: string,
   kind: DbBackupKind,
   context?: VersionedDatabaseContext,
@@ -112,7 +107,7 @@ function openVersionedDatabase(
   }
 
   try {
-    assertDatabaseNotNewerThanApp(sqlite, migrationsFolder, version);
+    assertMigrationHistoryConsistent(sqlite, migrationsFolder);
   } catch (error) {
     sqlite.close();
     logDbOpenFailure(kind, path, "open", error);
@@ -137,7 +132,7 @@ function openVersionedDatabase(
       verifyDatabaseBackup(backupPath);
       purgeOldBackups(context.backupDir, context.kind);
     }
-    executeSqliteMigrations(sqlite, migrationsFolder, version, onPendingMigration);
+    executeSqliteMigrations(sqlite, migrationsFolder, onPendingMigration);
   } catch (error) {
     sqlite.close();
     logDbOpenFailure(kind, path, "migrate", error);
@@ -173,7 +168,6 @@ export function openDb(location: DbLocation, options?: DbOpenOptions): Db {
   const onPending = options?.onPendingMigration;
   const catalogOpened = openVersionedDatabase(
     catalogPath,
-    CATALOG_SCHEMA_VERSION,
     CATALOG_MIGRATIONS,
     "catalog",
     catalogContext,
@@ -183,7 +177,6 @@ export function openDb(location: DbLocation, options?: DbOpenOptions): Db {
   try {
     userOpened = openVersionedDatabase(
       userPath,
-      USER_SCHEMA_VERSION,
       USER_MIGRATIONS,
       "user",
       userContext,

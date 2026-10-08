@@ -14,24 +14,38 @@ function tableExists(sqlite: Database, name: string): boolean {
   }
 }
 
-function readLatestMigrationTime(sqlite: Database): number | undefined {
-  if (!tableExists(sqlite, "__drizzle_migrations")) return undefined;
-  const statement = sqlite.query(
-    "SELECT created_at FROM __drizzle_migrations ORDER BY created_at DESC LIMIT 1",
-  );
-  try {
-    const row = statement.get() as { created_at: number } | null;
-    return row?.created_at;
-  } finally {
-    statement.finalize();
-  }
+function readLedgerTimes(sqlite: Database): number[] {
+  if (!tableExists(sqlite, "__drizzle_migrations")) return [];
+  const rows = sqlite.query("SELECT created_at FROM __drizzle_migrations").all() as Array<{
+    created_at: number | string;
+  }>;
+  return rows.map((row) => Number(row.created_at));
 }
 
-function isMigrationPending(
-  migration: MigrationMeta,
-  latestMigrationTime: number | undefined,
-): boolean {
-  return latestMigrationTime === undefined || latestMigrationTime < migration.folderMillis;
+/** ledgerとjournalを突き合わせ、未適用のmigrationを返す。履歴がjournalと整合しなければ例外を投げる。 */
+function resolvePendingMigrations(
+  sqlite: Database,
+  migrations: readonly MigrationMeta[],
+): MigrationMeta[] {
+  const journalTimes = new Set(migrations.map((migration) => migration.folderMillis));
+  const appliedTimes = new Set<number>();
+  for (const time of readLedgerTimes(sqlite)) {
+    if (!journalTimes.has(time)) {
+      throw new Error(`DBにアプリ未対応のmigration履歴があります（created_at: ${time}）`);
+    }
+    if (appliedTimes.has(time)) {
+      throw new Error(`DBのmigration履歴が重複しています（created_at: ${time}）`);
+    }
+    appliedTimes.add(time);
+  }
+
+  const pending = migrations.filter((migration) => !appliedTimes.has(migration.folderMillis));
+  const latestApplied = Math.max(...appliedTimes);
+  const gap = pending.find((migration) => migration.folderMillis < latestApplied);
+  if (gap) {
+    throw new Error(`DBのmigration履歴に欠けがあります（未適用: ${gap.folderMillis}）`);
+  }
+  return pending;
 }
 
 function insertMigration(sqlite: Database, migration: MigrationMeta): void {
@@ -81,18 +95,13 @@ function assertForeignKeyCheck(sqlite: Database): void {
   }
 }
 
-function applyMigrationAtomically(
-  sqlite: Database,
-  migration: MigrationMeta,
-  targetUserVersion: number,
-): void {
+function applyMigrationAtomically(sqlite: Database, migration: MigrationMeta): void {
   const { ddl, disablesForeignKeys } = splitMigrationSql(migration.sql);
   if (disablesForeignKeys) sqlite.exec("PRAGMA foreign_keys = OFF");
   sqlite.exec("BEGIN");
   try {
     for (const statement of ddl) sqlite.exec(statement);
     insertMigration(sqlite, migration);
-    sqlite.exec(`PRAGMA user_version = ${targetUserVersion}`);
     if (disablesForeignKeys) assertForeignKeyCheck(sqlite);
     sqlite.exec("COMMIT");
   } catch (error) {
@@ -107,49 +116,25 @@ function applyMigrationAtomically(
   }
 }
 
-/** ledgerとjournalを比較し、未適用のmigrationがあるかを判定する。executeSqliteMigrationsと同一の判定基準を使う。 */
+/** ledgerとjournalを比較し、未適用のmigrationがあるかを判定する。履歴がjournalと整合しなければ例外を投げる。 */
 export function hasPendingSqliteMigrations(sqlite: Database, migrationsFolder: string): boolean {
-  const migrations = readMigrationFiles({ migrationsFolder });
-  const latestMigrationTime = readLatestMigrationTime(sqlite);
-  return migrations.some((migration) => isMigrationPending(migration, latestMigrationTime));
+  return resolvePendingMigrations(sqlite, readMigrationFiles({ migrationsFolder })).length > 0;
 }
 
-/** DBがアプリより新しい場合は起動を失敗させる。 */
-export function assertDatabaseNotNewerThanApp(
-  sqlite: Database,
-  migrationsFolder: string,
-  targetUserVersion: number,
-): void {
-  const current = sqlite.query("PRAGMA user_version").get() as { user_version: number };
-  if (current.user_version > targetUserVersion) {
-    throw new Error(
-      `DBのスキーマバージョンがアプリより新しいです（DB: v${current.user_version}, アプリ: v${targetUserVersion}）`,
-    );
-  }
-
-  const migrations = readMigrationFiles({ migrationsFolder });
-  const journalTimestamps = new Set(migrations.map((migration) => migration.folderMillis));
-  const maxJournalTime = Math.max(...migrations.map((migration) => migration.folderMillis));
-  if (!tableExists(sqlite, "__drizzle_migrations")) return;
-
-  const rows = sqlite.query("SELECT created_at FROM __drizzle_migrations").all() as Array<{
-    created_at: number;
-  }>;
-  for (const row of rows) {
-    if (!journalTimestamps.has(row.created_at) && row.created_at > maxJournalTime) {
-      throw new Error(`DBにアプリ未対応のmigration履歴があります（created_at: ${row.created_at}）`);
-    }
-  }
+/** 履歴がjournalと整合しない（アプリより新しい等）DBは、書込みの前に起動を失敗させる。 */
+export function assertMigrationHistoryConsistent(sqlite: Database, migrationsFolder: string): void {
+  resolvePendingMigrations(sqlite, readMigrationFiles({ migrationsFolder }));
 }
 
 /** Drizzleのprepared statementを残さず、SQLite接続上でmigrationを実行する。 */
 export function executeSqliteMigrations(
   sqlite: Database,
   migrationsFolder: string,
-  targetUserVersion: number,
   onPendingMigration?: () => void,
 ): void {
   const migrations = readMigrationFiles({ migrationsFolder });
+  const pending = resolvePendingMigrations(sqlite, migrations);
+  if (pending.length === 0) return;
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS __drizzle_migrations (
       id SERIAL PRIMARY KEY,
@@ -157,12 +142,8 @@ export function executeSqliteMigrations(
       created_at numeric
     )
   `);
-  const latestMigrationTime = readLatestMigrationTime(sqlite);
-
-  for (const migration of migrations) {
-    if (isMigrationPending(migration, latestMigrationTime)) {
-      onPendingMigration?.();
-      applyMigrationAtomically(sqlite, migration, targetUserVersion);
-    }
+  for (const migration of pending) {
+    onPendingMigration?.();
+    applyMigrationAtomically(sqlite, migration);
   }
 }

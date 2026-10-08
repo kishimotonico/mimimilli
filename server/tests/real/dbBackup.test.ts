@@ -20,7 +20,7 @@ import {
   verifyDatabaseBackup,
 } from "../../src/adapters/real/dbBackup.ts";
 import {
-  assertDatabaseNotNewerThanApp,
+  assertMigrationHistoryConsistent,
   executeSqliteMigrations,
   hasPendingSqliteMigrations,
 } from "../../src/adapters/real/sqliteMigrationExecutor.ts";
@@ -208,7 +208,7 @@ test("AC3: PRAGMA foreign_keysを含むmigrationはトランザクション外�
   sqlite.exec(
     `INSERT INTO audio_probe_cache (path, size, mtime_ms, duration_sec) VALUES ('/lib/ok.wav', 1, 1, 1.0)`,
   );
-  executeSqliteMigrations(sqlite, migrationsDir, 9);
+  executeSqliteMigrations(sqlite, migrationsDir);
   const foreignKeys = sqlite.query("PRAGMA foreign_keys").get() as { foreign_keys: number };
   assert.equal(foreignKeys.foreign_keys, 1);
   sqlite.close();
@@ -247,7 +247,7 @@ test("AC3: FK違反データではforeign_key_checkによりmigrationが失敗�
   );
   const sqlite = new Database(join(directory.path, "db.sqlite"), { create: true });
   assert.throws(
-    () => executeSqliteMigrations(sqlite, migrationsDir, 1),
+    () => executeSqliteMigrations(sqlite, migrationsDir),
     /foreign_key_check が失敗しました/,
   );
   const foreignKeys = sqlite.query("PRAGMA foreign_keys").get() as { foreign_keys: number };
@@ -256,27 +256,40 @@ test("AC3: FK違反データではforeign_key_checkによりmigrationが失敗�
   sqlite.close();
 });
 
-test("AC4: DBがアプリより新しい場合はバックアップもuser_version書換えもせずfail-fastする", (t) => {
+function journalTimes(migrationsDir: string): number[] {
+  const journal = JSON.parse(readFileSync(join(migrationsDir, "meta/_journal.json"), "utf8")) as {
+    entries: Array<{ when: number }>;
+  };
+  return journal.entries.map((entry) => entry.when);
+}
+
+function openFullyMigratedUserDb(path: string): Database {
+  const sqlite = new Database(path, { create: true });
+  executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR);
+  return sqlite;
+}
+
+test("AC4: ledgerにjournalより新しい未知の履歴があるDBはバックアップも書換えもせずfail-fastする", (t) => {
   const directory = makeTestDirectory("db-inplace-newer-db");
   t.after(directory.cleanup);
   const catalogPath = join(directory.path, "db", "catalog.sqlite");
   const userPath = join(directory.path, "db", "user.sqlite");
   const backupDir = join(directory.path, "backup");
   mkdirSync(join(directory.path, "db"), { recursive: true });
-  const sqlite = new Database(userPath, { create: true });
-  sqlite.exec("PRAGMA user_version = 99");
+  const sqlite = openFullyMigratedUserDb(userPath);
+  sqlite.run("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)", [
+    "future",
+    Number.MAX_SAFE_INTEGER,
+  ]);
   sqlite.close();
 
   assert.throws(
     () => openDb({ kind: "files", catalogPath, userPath }, { backupDir }),
-    /DBのスキーマバージョンがアプリより新しいです/,
+    /DBにアプリ未対応のmigration履歴があります/,
   );
   assert.equal(existsSync(backupDir), false);
   const reopened = new Database(userPath, { readonly: true });
-  assert.equal(
-    (reopened.query("PRAGMA user_version").get() as { user_version: number }).user_version,
-    99,
-  );
+  assert.equal(appliedMigrationCount(reopened), journalTimes(USER_MIGRATIONS_DIR).length + 1);
   reopened.close();
 });
 
@@ -296,8 +309,55 @@ test("AC4: journalにない新しいledgerエントリでもfail-fastする", (t
     Number.MAX_SAFE_INTEGER,
   ]);
   assert.throws(
-    () => assertDatabaseNotNewerThanApp(sqlite, USER_MIGRATIONS_DIR, 7),
+    () => assertMigrationHistoryConsistent(sqlite, USER_MIGRATIONS_DIR),
     /アプリ未対応のmigration履歴/,
+  );
+  sqlite.close();
+});
+
+test("AC4: journalにない古いledgerエントリはfail-fastする", (t) => {
+  const directory = makeTestDirectory("db-inplace-unknown-old-ledger");
+  t.after(directory.cleanup);
+  const sqlite = openFullyMigratedUserDb(join(directory.path, "user.sqlite"));
+  sqlite.run("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)", ["old", 1]);
+  assert.throws(
+    () => assertMigrationHistoryConsistent(sqlite, USER_MIGRATIONS_DIR),
+    /アプリ未対応のmigration履歴があります（created_at: 1）/,
+  );
+  sqlite.close();
+});
+
+test("AC4: ledgerのcreated_atが重複しているとfail-fastする", (t) => {
+  const directory = makeTestDirectory("db-inplace-duplicate-ledger");
+  t.after(directory.cleanup);
+  const sqlite = openFullyMigratedUserDb(join(directory.path, "user.sqlite"));
+  const [first] = journalTimes(USER_MIGRATIONS_DIR);
+  sqlite.run("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)", ["dup", first!]);
+  assert.throws(
+    () => assertMigrationHistoryConsistent(sqlite, USER_MIGRATIONS_DIR),
+    /migration履歴が重複しています/,
+  );
+  sqlite.close();
+});
+
+test("AC4: ledgerに履歴の穴があるとfail-fastし、末尾の未適用はpendingとみなす", (t) => {
+  const directory = makeTestDirectory("db-inplace-ledger-gap");
+  t.after(directory.cleanup);
+  const sqlite = openFullyMigratedUserDb(join(directory.path, "user.sqlite"));
+  const times = journalTimes(USER_MIGRATIONS_DIR);
+
+  sqlite.run("DELETE FROM __drizzle_migrations WHERE created_at = ?", [times[times.length - 1]!]);
+  assert.doesNotThrow(() => assertMigrationHistoryConsistent(sqlite, USER_MIGRATIONS_DIR));
+  assert.equal(hasPendingSqliteMigrations(sqlite, USER_MIGRATIONS_DIR), true);
+
+  sqlite.run("DELETE FROM __drizzle_migrations WHERE created_at = ?", [times[2]!]);
+  assert.throws(
+    () => assertMigrationHistoryConsistent(sqlite, USER_MIGRATIONS_DIR),
+    /migration履歴に欠けがあります/,
+  );
+  assert.throws(
+    () => executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR),
+    /migration履歴に欠けがあります/,
   );
   sqlite.close();
 });
@@ -458,7 +518,7 @@ test("migration rollback失敗は元のmigration例外を保持する", () => {
 
   let thrown: unknown;
   try {
-    executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR, 7);
+    executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR);
   } catch (error) {
     thrown = error;
   }
@@ -510,20 +570,19 @@ test("hasPendingSqliteMigrationsは全件適用済みならfalse", (t) => {
   t.after(directory.cleanup);
   const dbPath = join(directory.path, "user.sqlite");
   const sqlite = new Database(dbPath, { create: true });
-  executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR, 7);
+  executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR);
   assert.equal(hasPendingSqliteMigrations(sqlite, USER_MIGRATIONS_DIR), false);
   sqlite.close();
 });
 
-test("hasPendingSqliteMigrationsは適用件数が足りていても最新created_atがjournalより古ければpendingとみなす", (t) => {
-  const directory = makeTestDirectory("db-pending-stale-created-at");
+test("hasPendingSqliteMigrationsは最新エントリが未適用ならpendingとみなす", (t) => {
+  const directory = makeTestDirectory("db-pending-latest-missing");
   t.after(directory.cleanup);
-  const dbPath = join(directory.path, "user.sqlite");
-  const sqlite = new Database(dbPath, { create: true });
-  executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR, 7);
+  const sqlite = openFullyMigratedUserDb(join(directory.path, "user.sqlite"));
   assert.equal(hasPendingSqliteMigrations(sqlite, USER_MIGRATIONS_DIR), false);
 
-  sqlite.exec("UPDATE __drizzle_migrations SET created_at = 0");
+  const times = journalTimes(USER_MIGRATIONS_DIR);
+  sqlite.run("DELETE FROM __drizzle_migrations WHERE created_at = ?", [times[times.length - 1]!]);
 
   assert.equal(hasPendingSqliteMigrations(sqlite, USER_MIGRATIONS_DIR), true);
   sqlite.close();
@@ -574,7 +633,7 @@ test("Windows実ファイルでmigration executorは成功後にDBを解放す�
   const dbPath = join(directory.path, "user.sqlite");
   const sqlite = new Database(dbPath, { create: true });
 
-  executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR, 7);
+  executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR);
   sqlite.close();
 
   assert.doesNotThrow(() => rmSync(dbPath));
@@ -587,7 +646,7 @@ test("Windows実ファイルでmigration executorは失敗後にもDBを解放�
   const sqlite = new Database(dbPath, { create: true });
   sqlite.exec("CREATE TABLE app_settings (key TEXT PRIMARY KEY)");
 
-  assert.throws(() => executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR, 7), /already exists/);
+  assert.throws(() => executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR), /already exists/);
   sqlite.close();
 
   assert.doesNotThrow(() => rmSync(dbPath));
