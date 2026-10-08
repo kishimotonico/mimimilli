@@ -4,6 +4,7 @@ import {
   coverFieldsFromColumns,
   resolveWorkPlacement,
   selectDefaultPlaylist,
+  sumTrackDurations,
   unresolvedWorkPhysicalPath,
   workPlacementNotAFileMessage,
   workPlacementOf,
@@ -98,10 +99,7 @@ function totalDurationFromResolved(
 ): number | null {
   const defaultResolved =
     resolvedPlaylists.find((p) => p.id === defaultPlaylistId) ?? resolvedPlaylists[0];
-  const defaultTracks = defaultResolved?.tracks ?? [];
-  return defaultTracks.some((track) => track.durationSec === null)
-    ? null
-    : defaultTracks.reduce((sum, track) => sum + track.durationSec!, 0);
+  return sumTrackDurations(defaultResolved?.tracks ?? []);
 }
 
 interface AssembledWork {

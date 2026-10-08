@@ -8,6 +8,7 @@ import {
   relativeToRoot,
   resolveTrackDuration,
   selectDefaultPlaylist,
+  sumTrackDurations,
   toTrackDurationFields,
   toWorkListItemDlsite,
   workListItemSchema,
@@ -288,8 +289,7 @@ export function sumDefaultPlaylistDuration(
 ): number | null {
   const defaultPlaylist = defaultPlaylistOf(row, playlists);
   const tracks = defaultPlaylist?.tracks ?? [];
-  if (tracks.some((track) => track.durationSec === null)) return null;
-  return tracks.reduce((sum, track) => sum + track.durationSec!, 0);
+  return sumTrackDurations(tracks);
 }
 
 export function rowToWork(

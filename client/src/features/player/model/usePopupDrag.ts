@@ -112,8 +112,7 @@ export function usePopupDrag(): PopupDragBind {
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (!isPrimaryPointerButton(e)) return;
-      const target = e.target as HTMLElement;
-      if (target.closest(DRAG_IGNORE_SELECTOR)) return;
+      if (e.target instanceof Element && e.target.closest(DRAG_IGNORE_SELECTOR)) return;
       dragControls.start(e);
     },
     [dragControls],
@@ -121,8 +120,7 @@ export function usePopupDrag(): PopupDragBind {
 
   const onDoubleClick = useCallback(
     (e: React.MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest(DRAG_IGNORE_SELECTOR)) return;
+      if (e.target instanceof Element && e.target.closest(DRAG_IGNORE_SELECTOR)) return;
       resetToOrigin();
     },
     [resetToOrigin],
