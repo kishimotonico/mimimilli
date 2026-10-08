@@ -116,7 +116,13 @@ pnpm test:smoke     # Playwright スモークテスト（roleベースの動作�
 
 ### CI（GitHub Actions）
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) が `master` への push と pull_request で Ubuntu 上の `check-and-test`（`pnpm check && pnpm test`）と `smoke`（`pnpm test:smoke`）の2ジョブを実行する（Windows は対象外）。ブランチ保護を使う場合は、GitHub のリポジトリ設定でこれらのジョブを required check に指定する。
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) が `master` への push と pull_request で次の3ジョブを実行する。
+
+- `check-and-test`: Ubuntu 上で `pnpm check && pnpm test` を実行し、client をビルドする
+- `check-and-test-windows`: windows-latest 上で `pnpm check && pnpm test` を実行する
+- `smoke`: Ubuntu 上で `pnpm test:smoke` を実行する。失敗時は Playwright の report と trace を artifact として保存する
+
+同じブランチで新しい実行が始まると、古い実行は取り消される（concurrency）。ブランチ保護を使う場合は、GitHub のリポジトリ設定でこれらのジョブを required check に指定する。
 
 ## 使い方
 
