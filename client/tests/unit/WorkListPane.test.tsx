@@ -13,6 +13,10 @@ import { buildNav } from "./fixtures/libraryNav";
 import { nts } from "../helpers/tag";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 
+vi.mock("../../src/entities/player/model/usePlayWork", () => ({
+  usePlayWork: () => ({ playWork: vi.fn(), resumeWork: vi.fn() }),
+}));
+
 function createWorks(count: number): WorkListItem[] {
   return Array.from({ length: count }, (_, i) => ({
     id: `work-${i}`,
@@ -33,7 +37,6 @@ interface WorkListPaneTestOverrides {
   worksQueryKey?: string;
   isPending?: boolean;
   dockedBarActive?: boolean;
-  onWorkPlay?: WorkResultsProps["onWorkPlay"];
   pagination?: Partial<WorkResultsProps["pagination"]>;
   emptyState?: Partial<WorkResultsProps["emptyState"]>;
 }
@@ -45,7 +48,6 @@ function buildProps(overrides: WorkListPaneTestOverrides): WorkResultsProps {
     worksQueryKey: overrides.worksQueryKey ?? "key-1",
     isPending: overrides.isPending,
     dockedBarActive: overrides.dockedBarActive ?? false,
-    onWorkPlay: overrides.onWorkPlay ?? vi.fn(),
     pagination: { hasNextPage: false, ...overrides.pagination },
     emptyState: { searchQuery: "", onClearSearch: vi.fn(), ...overrides.emptyState },
   };

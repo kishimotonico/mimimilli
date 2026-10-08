@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createPlayRequestGuard } from "../../src/app/model/playRequestGuard";
+import { createPlayRequestGuard } from "../../src/entities/player/model/playRequestGuard";
 
 describe("createPlayRequestGuard", () => {
   it("最新のトークンだけがisCurrentになる", () => {

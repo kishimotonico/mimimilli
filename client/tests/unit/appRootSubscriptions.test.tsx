@@ -7,7 +7,7 @@ import App from "../../src/app/App";
 import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import NavigationHistorySync from "../../src/features/navigation/ui/NavigationHistorySync";
-import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
+import { PlayerRuntimeProvider } from "../../src/entities/player/model/PlayerRuntimeProvider";
 import { dlsiteBulkProgressAtom } from "../../src/entities/dlsite/model/bulkAtoms";
 import { PLAYER_CORE_INITIAL, playerCoreAtom } from "../../src/entities/player/model/atoms";
 import { scanJobAtom } from "../../src/entities/scan/model/atoms";

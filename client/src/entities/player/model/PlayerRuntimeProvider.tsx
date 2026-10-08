@@ -7,7 +7,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import type { Work } from "../../../entities/work/model";
+import type { Work } from "../../work/model";
 import type { PlaybackContext } from "./playerRuntime";
 import { PLAYER_CONTROLLER_INITIAL, PlayerController } from "./playerController";
 import type { MutableRef, PendingResume, PlayerRuntimeRefs } from "./playerRuntime";

@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { type MotionVariant, useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { playerIsActiveAtom } from "../../../entities/player/model/atoms";
 import { appModeAtom, setAppModeAtom } from "../../../entities/navigation/model/appRouteStore";
-import { usePlayerActions } from "../model/usePlayerActions";
+import { usePlayerActions } from "../../../entities/player/model/usePlayerActions";
 import { usePlayerState, type PlayerState } from "../model/usePlayerState";
 import { usePopupDrag } from "../model/usePopupDrag";
 import { playerUiModeAtom } from "../model/playerPresentationAtoms";

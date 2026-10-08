@@ -6,7 +6,7 @@ import {
   reducePlayer,
   type PlaybackItem,
   type PlayerControllerInput,
-} from "../../src/features/player/model/playerController";
+} from "../../src/entities/player/model/playerController";
 
 const work: WorkSummary = {
   id: "work-1",

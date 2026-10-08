@@ -13,7 +13,7 @@ import { buildFolderAudioQueue } from "../model/filePlayback";
 import { EmptyPreview, FileLoadErrorPreview, MissingSelectionPreview } from "./FilePreviewStates";
 import { FilePreviewMediaSlot } from "./FilePreviewMedia";
 import FilePreviewWorkActions from "./FilePreviewWorkActions";
-import type { PlaybackTrack } from "../../../entities/player/model/playbackTrack";
+import { usePlayerActions } from "../../../entities/player/model/usePlayerActions";
 import {
   classifyFile,
   isWorkFolder,
@@ -23,13 +23,8 @@ import {
   type FsEntry,
 } from "../model/types";
 
-interface FilePreviewProps {
-  onPlayFile: (tracks: PlaybackTrack[], trackIndex: number) => void;
-  /** 再生中のエントリの一時停止・再開を切り替える（先頭からの再生し直しをしない） */
-  onTogglePlay: () => void;
-}
-
-export default function FilePreview({ onPlayFile, onTogglePlay }: FilePreviewProps) {
+export default function FilePreview() {
+  const { playFile, togglePlay } = usePlayerActions();
   const root = useRootFolder();
   const browse = useFilesBrowse(root);
   const matchPlaying = useFilesPlayingMatcher();
@@ -72,7 +67,7 @@ export default function FilePreview({ onPlayFile, onTogglePlay }: FilePreviewPro
     if (classifyFile(target) !== "audio") return;
     const { tracks, trackIndex } = buildFolderAudioQueue(entries, target);
     if (tracks.length === 0) return;
-    onPlayFile(tracks, trackIndex);
+    playFile(tracks, trackIndex);
   };
 
   // 再生中エントリを押し直すと先頭から掛け直されてしまうため、
@@ -83,7 +78,7 @@ export default function FilePreview({ onPlayFile, onTogglePlay }: FilePreviewPro
       <Button
         variant="primary"
         icon={isLoadedEntry ? (isPlaybackActive ? I.pause : I.play) : I.play}
-        onClick={() => (isLoadedEntry ? onTogglePlay() : playEntry(entry!, playbackSourceEntries))}
+        onClick={() => (isLoadedEntry ? togglePlay() : playEntry(entry!, playbackSourceEntries))}
       >
         {isLoadedEntry ? (isPlaybackActive ? "一時停止" : "再開") : "このファイルを再生"}
       </Button>

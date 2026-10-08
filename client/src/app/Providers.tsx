@@ -5,7 +5,7 @@ import DlsiteBulkRuntime from "../features/dlsite/ui/DlsiteBulkRuntime";
 import DlsiteBulkApplyRuntime from "../features/dlsite/ui/DlsiteBulkApplyRuntime";
 import ScanRuntime from "../features/scan/ui/ScanRuntime";
 import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
-import { PlayerRuntimeProvider } from "../features/player/model/PlayerRuntimeProvider";
+import { PlayerRuntimeProvider } from "../entities/player/model/PlayerRuntimeProvider";
 import { queryClient } from "./model/queryClient";
 import { useRootReconfiguringApiErrorHandler } from "./model/useRootReconfiguringApiErrorHandler";
 

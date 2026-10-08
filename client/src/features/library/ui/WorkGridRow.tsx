@@ -1,6 +1,7 @@
-import type { CSSProperties } from "react";
+import { useCallback, type CSSProperties } from "react";
 import type { WorkListItem } from "@mimimilli/shared";
 import type { GridArrowKey } from "../../../shared/lib/gridNavigation";
+import { usePlayWork } from "../../../entities/player/model/usePlayWork";
 import WorkTile from "./WorkTile";
 
 export interface JustifiedRowEntry {
@@ -17,7 +18,6 @@ interface WorkGridRowTileProps {
   /** roving tabindexの現在位置（一覧全体でTabストップ1個にする） */
   rovingIndex: number;
   onWorkSelect: (id: string) => void;
-  onWorkPlay: (work: WorkListItem) => void;
   onTileArrowKey: (flatIndex: number, key: GridArrowKey) => void;
 }
 
@@ -44,15 +44,16 @@ export default function WorkGridRow(props: WorkGridRowProps) {
     safeTileSize,
     rovingIndex,
     onWorkSelect,
-    onWorkPlay,
     onTileArrowKey,
   } = props;
+  const { playWork } = usePlayWork();
+  const onPlay = useCallback((work: WorkListItem) => void playWork(work, 0), [playWork]);
 
   const tileProps = {
     isPlaybackActive,
     safeTileSize,
     onSelect: onWorkSelect,
-    onPlay: onWorkPlay,
+    onPlay,
     onArrowKey: onTileArrowKey,
   };
 

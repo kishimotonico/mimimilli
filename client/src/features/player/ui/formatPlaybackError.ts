@@ -1,6 +1,6 @@
 // 再生エラーの表示用フォーマット。PlaybackErrorNotice 経由で Bar / Popup / 再生中タブで共通利用。
 
-import type { AudioEngineError } from "../model/audioEngine";
+import type { AudioEngineError } from "../../../entities/player/model/audioEngine";
 
 interface FormattedPlaybackError {
   label: string;

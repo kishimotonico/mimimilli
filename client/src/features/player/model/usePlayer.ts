@@ -13,13 +13,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { Work } from "../../../entities/work/model";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { useMediaSession } from "./useMediaSession";
-import { toAudioAbsoluteTime, getTrackDurationSec } from "./trackTime";
+import { toAudioAbsoluteTime, getTrackDurationSec } from "../../../entities/player/model/trackTime";
 import {
   playerCoreAtom,
   playerCurrentTimeAtom,
   playerDurationAtom,
 } from "../../../entities/player/model/atoms";
-import { usePlayerRuntimeContext } from "./PlayerRuntimeProvider";
+import { usePlayerRuntimeContext } from "../../../entities/player/model/PlayerRuntimeProvider";
 import { useAudioEngineLifecycle } from "./useAudioEngineLifecycle";
 import { useResumePersistenceController } from "./useResumePersistence";
 import {
@@ -27,8 +27,8 @@ import {
   isPlayerCoreStateEqual,
   toPlayerCoreState,
   type PlayerControllerState,
-} from "./playerController";
-import { usePlayerActions } from "./usePlayerActions";
+} from "../../../entities/player/model/playerController";
+import { usePlayerActions } from "../../../entities/player/model/usePlayerActions";
 import { useToast } from "../../../shared/ui/useToast";
 
 export function usePlayerRuntime() {

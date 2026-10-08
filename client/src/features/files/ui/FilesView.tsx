@@ -14,7 +14,7 @@ import { navigationDirectionAtom } from "../../../entities/navigation/model/appR
 import { buildFolderAudioQueue } from "../model/filePlayback";
 import { classifyFile, rootLabel, type FsEntry } from "../model/types";
 import { filesPreviewOpenAtom } from "../model/previewLayoutAtoms";
-import type { PlaybackTrack } from "../../../entities/player/model/playbackTrack";
+import { usePlayerActions } from "../../../entities/player/model/usePlayerActions";
 import { playerIsPlayingOrLoadingAtom } from "../../../entities/player/model/atoms";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import FileColumn from "./FileColumn";
@@ -46,12 +46,8 @@ function ColstackBackButton({ parentName, depth, onGoUp }: ColstackBackButtonPro
   );
 }
 
-interface FilesViewProps {
-  onPlayFile: (tracks: PlaybackTrack[], trackIndex: number) => void;
-  onTogglePlay: () => void;
-}
-
-export default function FilesView({ onPlayFile, onTogglePlay }: FilesViewProps) {
+export default function FilesView() {
+  const { playFile } = usePlayerActions();
   const rootFolder = useRootFolder();
   const browse = useFilesBrowse(rootFolder);
   const { nav } = browse;
@@ -70,9 +66,9 @@ export default function FilesView({ onPlayFile, onTogglePlay }: FilesViewProps) 
       if (classifyFile(entry) !== "audio") return;
       const { tracks, trackIndex } = buildFolderAudioQueue(folderEntries, entry);
       if (tracks.length === 0) return;
-      onPlayFile(tracks, trackIndex);
+      playFile(tracks, trackIndex);
     },
-    [onPlayFile],
+    [playFile],
   );
 
   // プレビューが閉じている間に別のエントリを選ぶ／フォルダーへ潜ったときは、
@@ -135,7 +131,7 @@ export default function FilesView({ onPlayFile, onTogglePlay }: FilesViewProps) 
           </div>
         </div>
 
-        {previewOpen && <FilePreview onPlayFile={onPlayFile} onTogglePlay={onTogglePlay} />}
+        {previewOpen && <FilePreview />}
       </div>
     </>
   );

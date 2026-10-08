@@ -6,6 +6,7 @@ import {
 } from "../../../entities/player/model/atoms";
 import type { WorkResultsProps } from "./workResultsProps";
 import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
+import { usePlayWork } from "../../../entities/player/model/usePlayWork";
 import WorkRow from "./WorkRow";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import SmartFolderEmptyAction, {
@@ -37,7 +38,6 @@ export default function WorkListPane({
   worksQueryKey,
   isPending = false,
   dockedBarActive = false,
-  onWorkPlay,
   pagination: { hasNextPage = false, worksTotal, isFetchingNextPage = false, onLoadMore },
   emptyState: { searchQuery, isSmartFolder = false, onClearSearch, onEditSmartFolderRules },
 }: WorkResultsProps) {
@@ -51,6 +51,7 @@ export default function WorkListPane({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- nav は毎レンダー新規オブジェクトのため参照する値だけに依存を絞る
     [nav.selectWork],
   );
+  const { playWork } = usePlayWork();
   const playingWorkId = useAtomValue(playingWorkIdAtom);
   const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
   const isWorkSelected = selectedWorkId !== null;
@@ -128,7 +129,7 @@ export default function WorkListPane({
           isPlaying={work.id === playingWorkId}
           isPlaybackActive={isPlaybackActive}
           onSelect={() => onWorkSelect(work.id)}
-          onPlay={() => onWorkPlay(work)}
+          onPlay={() => void playWork(work, 0)}
           onArrowKey={moveRowFocus}
         />
       );
@@ -140,7 +141,7 @@ export default function WorkListPane({
       playingWorkId,
       isPlaybackActive,
       onWorkSelect,
-      onWorkPlay,
+      playWork,
       moveRowFocus,
     ],
   );

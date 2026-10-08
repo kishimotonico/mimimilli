@@ -5,34 +5,22 @@ import LibraryView from "../features/library/ui/LibraryView";
 import WorkDetailPage from "../features/library/ui/WorkDetailPage";
 import NowPlayingView from "../features/player/ui/NowPlayingView";
 import { playerDockBarVisibleAtom } from "../features/player/model/playerPresentationAtoms";
-import type { Work, WorkListItem } from "@mimimilli/shared";
-import type { PlaybackTrack } from "../entities/player/model/playbackTrack";
 
 const FilesView = lazy(() => import("../features/files/ui/FilesView"));
 
 interface AppBodyProps {
-  onPlay: (work: WorkListItem, trackIndex: number) => void;
-  onResume: (work: Work) => void;
-  onTogglePlay: () => void;
-  onPlayFile: (tracks: PlaybackTrack[], trackIndex: number) => void;
   /** 再生中タブから全画面作品詳細（/work/:id）を開く */
   onOpenWorkDetail: (workId: string) => void;
 }
 
-export default function AppBody({
-  onPlay,
-  onResume,
-  onTogglePlay,
-  onPlayFile,
-  onOpenWorkDetail,
-}: AppBodyProps) {
+export default function AppBody({ onOpenWorkDetail }: AppBodyProps) {
   const mode = useAtomValue(appModeAtom);
   const dockedBarActive = useAtomValue(playerDockBarVisibleAtom);
 
   if (mode === "files") {
     return (
       <Suspense fallback={null}>
-        <FilesView onPlayFile={onPlayFile} onTogglePlay={onTogglePlay} />
+        <FilesView />
       </Suspense>
     );
   }
@@ -42,15 +30,8 @@ export default function AppBody({
   }
 
   if (mode === "workDetail") {
-    return <WorkDetailPage onPlay={onPlay} onResume={onResume} onTogglePlay={onTogglePlay} />;
+    return <WorkDetailPage />;
   }
 
-  return (
-    <LibraryView
-      onPlay={onPlay}
-      onResume={onResume}
-      onTogglePlay={onTogglePlay}
-      dockedBarActive={dockedBarActive}
-    />
-  );
+  return <LibraryView dockedBarActive={dockedBarActive} />;
 }

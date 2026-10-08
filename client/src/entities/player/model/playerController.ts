@@ -1,12 +1,13 @@
-import type { Work, WorkListItem } from "../../../entities/work/model";
+import type { Work, WorkListItem } from "../../work/model";
 import type { AudioEngineError } from "./audioEngine";
+import { createPlayRequestGuard } from "./playRequestGuard";
 import { isResolvedTrack, type PlaybackTrack } from "./trackTime";
 import {
   isAbRepeatEstablished,
   type AbRepeatRange,
   type PlaybackStatus,
   type PlayerCoreState,
-} from "../../../entities/player/model/playerCoreState";
+} from "./playerCoreState";
 
 export type PlaybackCompletionScope = "queue" | "work";
 
@@ -437,6 +438,8 @@ export class PlayerController {
   private state: PlayerControllerState;
   private readonly stateListeners = new Set<StateListener>();
   private readonly commandListeners = new Set<CommandListener>();
+  /** 停止・再生開始のたびに無効化され、準備待ちの作品再生要求が後から再生を始めるのを防ぐ */
+  readonly playRequests = createPlayRequestGuard();
 
   constructor(initialState: PlayerControllerState = PLAYER_CONTROLLER_INITIAL) {
     this.state = initialState;
@@ -447,6 +450,9 @@ export class PlayerController {
   }
 
   dispatch(input: PlayerControllerInput) {
+    if (input.type === "stopRequested" || input.type === "startRequested") {
+      this.playRequests.invalidate();
+    }
     const transition = reducePlayer(this.state, input);
     if (transition.state !== this.state) {
       this.state = transition.state;

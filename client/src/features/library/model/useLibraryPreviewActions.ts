@@ -1,11 +1,6 @@
 import { useCallback } from "react";
 import { useAtomValue } from "jotai";
-import {
-  getDefaultPlaylistTrackCount,
-  toWorkListItem,
-  type Work,
-  type WorkListItem,
-} from "@mimimilli/shared";
+import type { Work } from "@mimimilli/shared";
 import {
   playerIsPlayingOrLoadingAtom,
   playingTrackIndexAtom,
@@ -15,19 +10,13 @@ import type { SwitchableAppMode } from "../../../entities/navigation/model/appRo
 
 interface UseLibraryPreviewActionsOptions {
   selectedWork: Work | null;
-  rootFolder: string;
-  onPlay: (work: WorkListItem, trackIndex: number) => void;
-  onResume: (work: Work) => void;
   openWorkDetail: (workId: string) => void;
   setAppMode: (mode: SwitchableAppMode) => void;
 }
 
-/** 選択中作品プレビューの再生系ハンドラーと、その作品が再生中かどうかの判定をまとめる。 */
+/** 選択中作品プレビューの操作ハンドラーと、その作品が再生中かどうかの判定をまとめる。 */
 export function useLibraryPreviewActions({
   selectedWork,
-  rootFolder,
-  onPlay,
-  onResume,
   openWorkDetail,
   setAppMode,
 }: UseLibraryPreviewActionsOptions) {
@@ -35,28 +24,6 @@ export function useLibraryPreviewActions({
   const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
   const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
   const isSelectedWorkPlaying = Boolean(selectedWork) && playingWorkId === selectedWork?.id;
-
-  const handlePlay = useCallback(
-    (trackIndex: number) => {
-      if (selectedWork) {
-        onPlay(
-          toWorkListItem(
-            {
-              ...selectedWork,
-              trackCount: getDefaultPlaylistTrackCount(selectedWork),
-            },
-            rootFolder,
-          ),
-          trackIndex,
-        );
-      }
-    },
-    [selectedWork, rootFolder, onPlay],
-  );
-
-  const handleResume = useCallback(() => {
-    if (selectedWork) onResume(selectedWork);
-  }, [selectedWork, onResume]);
 
   const handleExpand = useCallback(() => {
     if (selectedWork) openWorkDetail(selectedWork.id);
@@ -68,8 +35,6 @@ export function useLibraryPreviewActions({
     isPlaybackActive,
     isSelectedWorkPlaying,
     playingTrackIndexForSelected: isSelectedWorkPlaying ? (playingTrackIndex ?? null) : null,
-    handlePlay,
-    handleResume,
     handleExpand,
     handleGoToPlayingScreen,
   };

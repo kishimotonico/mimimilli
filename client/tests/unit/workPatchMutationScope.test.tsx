@@ -7,6 +7,13 @@ import type { LibraryViewState } from "../../src/features/library/model/useLibra
 import { WorkDetailPatchScope } from "../../src/features/library/ui/preview/WorkDetailPatchScope";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 
+vi.mock("../../src/entities/player/model/usePlayWork", () => ({
+  usePlayWork: () => ({ playWork: vi.fn(), resumeWork: vi.fn() }),
+}));
+vi.mock("../../src/entities/player/model/usePlayerActions", () => ({
+  usePlayerActions: () => ({ playFile: vi.fn(), togglePlay: vi.fn() }),
+}));
+
 vi.mock("../../src/features/library/ui/preview/WorkTagEditor", () => ({
   WorkTagEditor: () => <div data-testid="tag-editor" />,
 }));
@@ -88,9 +95,6 @@ function renderScopedDetail(workId: string) {
       work={makeWork(workId)}
       nav={{ ...baseNav, selectedWorkId: workId }}
       searchQuery=""
-      onPlay={vi.fn()}
-      onResume={vi.fn()}
-      onTogglePlay={vi.fn()}
       playingTrackIndex={null}
       tagSuggestions={[]}
       onTagClick={vi.fn()}
@@ -185,9 +189,6 @@ describe("WorkDetailPatchScope", () => {
         work={makeWork("work-b")}
         nav={{ ...baseNav, selectedWorkId: "work-b" }}
         searchQuery=""
-        onPlay={vi.fn()}
-        onResume={vi.fn()}
-        onTogglePlay={vi.fn()}
         playingTrackIndex={null}
         tagSuggestions={[]}
         onTagClick={vi.fn()}

@@ -1042,7 +1042,6 @@
               {
                 "group": [
                   "**/features/**/model/**",
-                  "!**/features/player/model/usePlayerActions",
                   "!**/features/scan/model/useScanActions",
                   "!**/features/dlsite/model/useDlsiteBulkActions",
                   "!**/features/files/model/types"

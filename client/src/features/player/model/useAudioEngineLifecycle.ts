@@ -2,16 +2,24 @@ import { useCallback, useEffect } from "react";
 import { getAudioUrl } from "../../../entities/work/api";
 import { getWorkspaceMediaUrl } from "../../../entities/file-system/api";
 import { updateLastPlayed } from "../api";
-import { createAudioEngine } from "./audioEngine";
+import { createAudioEngine } from "../../../entities/player/model/audioEngine";
 import {
   getTrackDurationSec,
   getTrackStart,
   hasReachedTrackEnd,
   isResolvedTrack,
   toTrackRelativeTime,
-} from "./trackTime";
-import type { LoadedTrack, PlaybackContext, PlayerRuntimeRefs } from "./playerRuntime";
-import { toPlayerCoreState, type PlaybackItem, type PlayerController } from "./playerController";
+} from "../../../entities/player/model/trackTime";
+import type {
+  LoadedTrack,
+  PlaybackContext,
+  PlayerRuntimeRefs,
+} from "../../../entities/player/model/playerRuntime";
+import {
+  toPlayerCoreState,
+  type PlaybackItem,
+  type PlayerController,
+} from "../../../entities/player/model/playerController";
 
 interface UseAudioEngineLifecycleOptions {
   refs: PlayerRuntimeRefs;

@@ -40,7 +40,6 @@ export default function WorkGrid({
   worksQueryKey,
   isPending = false,
   dockedBarActive = false,
-  onWorkPlay,
   pagination: { hasNextPage = false, worksTotal, isFetchingNextPage = false, onLoadMore },
   emptyState: { searchQuery, isSmartFolder = false, onClearSearch, onEditSmartFolderRules },
 }: WorkResultsProps) {
@@ -152,7 +151,6 @@ export default function WorkGrid({
     safeTileSize: gridTileSize,
     rovingIndex,
     onWorkSelect,
-    onWorkPlay,
     onTileArrowKey: moveTileFocus,
   };
 

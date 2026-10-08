@@ -7,7 +7,7 @@ import App from "../../src/app/App";
 import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import NavigationHistorySync from "../../src/features/navigation/ui/NavigationHistorySync";
-import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
+import { PlayerRuntimeProvider } from "../../src/entities/player/model/PlayerRuntimeProvider";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import * as settingsApi from "../../src/entities/settings/api";
 import { ApiRequestError } from "../../src/shared/api/http";

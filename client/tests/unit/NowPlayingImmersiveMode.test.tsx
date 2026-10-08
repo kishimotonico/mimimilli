@@ -20,7 +20,7 @@ const playerActions = {
   clearABRepeat: vi.fn(),
 };
 
-vi.mock("../../src/features/player/model/usePlayerActions", () => ({
+vi.mock("../../src/entities/player/model/usePlayerActions", () => ({
   usePlayerActions: () => playerActions,
 }));
 

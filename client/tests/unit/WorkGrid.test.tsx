@@ -19,6 +19,12 @@ import { setPlayingWork } from "./fixtures/playerCore";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 import { nts } from "../helpers/tag";
 
+const playWork = vi.hoisted(() => vi.fn());
+
+vi.mock("../../src/entities/player/model/usePlayWork", () => ({
+  usePlayWork: () => ({ playWork, resumeWork: vi.fn() }),
+}));
+
 function createWorks(count: number): WorkListItem[] {
   return Array.from({ length: count }, (_, i) => ({
     id: `work-${i}`,
@@ -39,7 +45,6 @@ interface WorkGridTestOverrides {
   worksQueryKey?: string;
   isPending?: boolean;
   dockedBarActive?: boolean;
-  onWorkPlay?: WorkResultsProps["onWorkPlay"];
   pagination?: Partial<WorkResultsProps["pagination"]>;
   emptyState?: Partial<WorkResultsProps["emptyState"]>;
 }
@@ -51,7 +56,6 @@ function buildProps(overrides: WorkGridTestOverrides): WorkResultsProps {
     worksQueryKey: overrides.worksQueryKey ?? "key-1",
     isPending: overrides.isPending,
     dockedBarActive: overrides.dockedBarActive,
-    onWorkPlay: overrides.onWorkPlay ?? vi.fn(),
     pagination: { hasNextPage: false, ...overrides.pagination },
     emptyState: { searchQuery: "", onClearSearch: vi.fn(), ...overrides.emptyState },
   };
@@ -161,8 +165,8 @@ describe("WorkGrid virtual scrolling", () => {
   });
 
   it("Enterでフォーカス項目を再生する", async () => {
-    const onWorkPlay = vi.fn();
-    renderWorkGrid({ overrides: { works: createWorks(10), onWorkPlay } });
+    playWork.mockClear();
+    renderWorkGrid({ overrides: { works: createWorks(10) } });
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
     const tiles = screen.queryAllByRole("button", { name: /を選択、Enterで再生/ });
@@ -170,7 +174,7 @@ describe("WorkGrid virtual scrolling", () => {
 
     await userEvent.keyboard("{Enter}");
 
-    expect(onWorkPlay).toHaveBeenCalledWith(expect.objectContaining({ id: "work-2" }));
+    expect(playWork).toHaveBeenCalledWith(expect.objectContaining({ id: "work-2" }), 0);
   });
 
   it("再生中の作品タイルに再生インジケーターを表示する", async () => {

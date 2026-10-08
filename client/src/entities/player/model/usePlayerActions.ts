@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import type { WorkListItem, Work } from "../../../entities/work/model";
+import type { WorkListItem, Work } from "../../work/model";
 import { usePlayerRuntimeContext } from "./PlayerRuntimeProvider";
 import type { PlaybackTrack } from "./trackTime";
 import type { PlaybackItem } from "./playerController";

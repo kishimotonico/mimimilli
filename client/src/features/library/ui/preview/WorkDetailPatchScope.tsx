@@ -8,9 +8,6 @@ interface WorkDetailPatchScopeProps {
   work: Work;
   nav: LibraryViewState & Pick<LibraryViewActions, "selectWork">;
   searchQuery: string;
-  onPlay: (trackIndex: number) => void;
-  onResume: () => void;
-  onTogglePlay: () => void;
   playingTrackIndex: number | null;
   isPlaybackActive?: boolean;
   tagSuggestions: string[];

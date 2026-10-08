@@ -5,11 +5,11 @@ import {
   NOT_REGISTERED_ERROR,
   PlayerRuntimeProvider,
   usePlayerRuntimeContext,
-} from "../../src/features/player/model/PlayerRuntimeProvider";
+} from "../../src/entities/player/model/PlayerRuntimeProvider";
 import {
   PLAYER_PLAYBACK_PREFS_KEY,
   loadPlayerPlaybackPrefs,
-} from "../../src/features/player/model/playerPlaybackPrefs";
+} from "../../src/entities/player/model/playerPlaybackPrefs";
 
 function wrapper({ children }: { children: ReactNode }) {
   return createElement(PlayerRuntimeProvider, null, children);

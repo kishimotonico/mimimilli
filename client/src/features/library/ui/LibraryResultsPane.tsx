@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { AnimatePresence } from "motion/react";
 import type { UseQueryResult } from "@tanstack/react-query";
-import type { NormalizedTag, SmartFolder, TagPrefix, Work, WorkListItem } from "@mimimilli/shared";
+import type { NormalizedTag, SmartFolder, TagPrefix, Work } from "@mimimilli/shared";
 import type { LibraryViewActions, LibraryViewState } from "../model/useLibraryNavigation";
 import type { useLibraryPreviewActions } from "../model/useLibraryPreviewActions";
 import WorkGrid from "./WorkGrid";
@@ -33,8 +33,6 @@ interface LibraryResultsPaneProps {
   selectedWork: Work | null;
   workDetailQuery: Pick<UseQueryResult<Work>, "isPending" | "isError" | "refetch">;
   previewActions: ReturnType<typeof useLibraryPreviewActions>;
-  onTogglePlay: () => void;
-  onWorkPlay: (work: WorkListItem) => void;
   onTagClick: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
 }
 
@@ -57,8 +55,6 @@ export default function LibraryResultsPane({
   selectedWork,
   workDetailQuery,
   previewActions,
-  onTogglePlay,
-  onWorkPlay,
   onTagClick,
 }: LibraryResultsPaneProps) {
   const resultsBanner = activeSmartFolder ? (
@@ -89,7 +85,6 @@ export default function LibraryResultsPane({
     worksQueryKey,
     isPending,
     dockedBarActive,
-    onWorkPlay,
     pagination: {
       hasNextPage: result.hasNextPage,
       worksTotal: result.worksTotal,
@@ -129,9 +124,6 @@ export default function LibraryResultsPane({
               onRetrySelectedWork={workDetailQuery.refetch}
               playingTrackIndex={previewActions.playingTrackIndexForSelected}
               isPlaybackActive={previewActions.isPlaybackActive}
-              onPlay={previewActions.handlePlay}
-              onResume={previewActions.handleResume}
-              onTogglePlay={onTogglePlay}
               onTagClick={onTagClick}
               tagSuggestions={tagSuggestions}
               nav={nav}

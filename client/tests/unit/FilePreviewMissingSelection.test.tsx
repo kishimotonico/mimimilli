@@ -28,6 +28,10 @@ vi.mock("../../src/entities/scan/api", async (importOriginal) => ({
   getScanDiagnostics: (...args: unknown[]) => getScanDiagnostics(...args),
 }));
 
+vi.mock("../../src/entities/player/model/usePlayerActions", () => ({
+  usePlayerActions: () => ({ playFile: vi.fn(), togglePlay: vi.fn() }),
+}));
+
 vi.mock("../../src/entities/settings/useSettingsQuery", () => ({
   useRootFolder: () => "dlsite/夜想曲スタジオ",
 }));
@@ -45,7 +49,7 @@ function renderPreview(selectedPath: string | null) {
       { client: queryClient },
       createElement(JotaiProvider, { store }, children),
     );
-  render(createElement(FilePreview, { onPlayFile: vi.fn(), onTogglePlay: vi.fn() }), { wrapper });
+  render(createElement(FilePreview), { wrapper });
   return store;
 }
 

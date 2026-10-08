@@ -6,7 +6,7 @@ import {
   isResolvedTrack,
   toAudioAbsoluteTime,
   toTrackRelativeTime,
-} from "../../src/features/player/model/trackTime";
+} from "../../src/entities/player/model/trackTime";
 
 const segment: Track = {
   title: "区間トラック",

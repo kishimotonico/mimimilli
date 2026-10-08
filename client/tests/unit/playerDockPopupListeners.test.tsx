@@ -17,7 +17,7 @@ vi.mock("../../src/features/player/ui/BarContent", () => ({
   ),
 }));
 
-vi.mock("../../src/features/player/model/usePlayerActions", () => ({
+vi.mock("../../src/entities/player/model/usePlayerActions", () => ({
   usePlayerActions: () => ({
     togglePlay: vi.fn(),
     nextTrack: vi.fn(),

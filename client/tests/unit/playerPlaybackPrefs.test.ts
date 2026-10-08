@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   PLAYER_CONTROLLER_INITIAL,
   PlayerController,
-} from "../../src/features/player/model/playerController";
+} from "../../src/entities/player/model/playerController";
 import {
   PLAYER_PLAYBACK_PREFS_INITIAL,
   PLAYER_PLAYBACK_PREFS_KEY,
@@ -12,7 +12,7 @@ import {
   savePlayerPlaybackPrefs,
   withPlaybackPrefs,
   type PlayerPlaybackStorage,
-} from "../../src/features/player/model/playerPlaybackPrefs";
+} from "../../src/entities/player/model/playerPlaybackPrefs";
 
 function memoryStorage(initial: Record<string, string> = {}): PlayerPlaybackStorage & {
   data: Map<string, string>;

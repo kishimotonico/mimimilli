@@ -8,7 +8,7 @@ import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
 import DlsiteBulkApplyRuntime from "../../src/features/dlsite/ui/DlsiteBulkApplyRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import NavigationHistorySync from "../../src/features/navigation/ui/NavigationHistorySync";
-import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
+import { PlayerRuntimeProvider } from "../../src/entities/player/model/PlayerRuntimeProvider";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { dlsiteBulkApplyOpenAtom } from "../../src/entities/dlsite/model/bulkAtoms";

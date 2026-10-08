@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { saveResumePosition } from "../../src/features/player/api";
 import { useResumePersistenceController } from "../../src/features/player/model/useResumePersistence";
-import type { PendingResume } from "../../src/features/player/model/playerRuntime";
+import type { PendingResume } from "../../src/entities/player/model/playerRuntime";
 import type { Track, Work } from "../../src/entities/work/model";
 
 vi.mock("../../src/features/player/api", () => ({

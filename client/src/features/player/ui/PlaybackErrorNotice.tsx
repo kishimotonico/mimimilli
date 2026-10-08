@@ -1,6 +1,6 @@
 // 再生エラー表示。Bar / Popup / 再生中タブで共通利用する。
 
-import type { AudioEngineError } from "../model/audioEngine";
+import type { AudioEngineError } from "../../../entities/player/model/audioEngine";
 import { formatPlaybackError } from "./formatPlaybackError";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";

@@ -13,7 +13,7 @@ import App from "../../src/app/App";
 import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import NavigationHistorySync from "../../src/features/navigation/ui/NavigationHistorySync";
-import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
+import { PlayerRuntimeProvider } from "../../src/entities/player/model/PlayerRuntimeProvider";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { getParsed } from "../../src/shared/api/http";
 import { useRootReconfiguringApiErrorHandler } from "../../src/app/model/useRootReconfiguringApiErrorHandler";
@@ -44,7 +44,7 @@ const playerActionsStub = {
   dismissError: vi.fn(),
 };
 
-vi.mock("../../src/features/player/model/usePlayerActions", () => ({
+vi.mock("../../src/entities/player/model/usePlayerActions", () => ({
   usePlayerActions: () => playerActionsStub,
 }));
 

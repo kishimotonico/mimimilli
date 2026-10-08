@@ -1,9 +1,9 @@
-import type { ResolvedTrack } from "../../../entities/work/model";
+import type { ResolvedTrack } from "../../work/model";
 import { resolveTrackDurationSec } from "@mimimilli/shared";
 import { clamp } from "../../../shared/lib/clamp";
-import type { PlaybackTrack } from "../../../entities/player/model/playbackTrack";
+import type { PlaybackTrack } from "./playbackTrack";
 
-export type { PlaybackTrack } from "../../../entities/player/model/playbackTrack";
+export type { PlaybackTrack } from "./playbackTrack";
 
 /** durationSec を持つ ResolvedTrack（登録トラック）かどうかを判定する。 */
 export function isResolvedTrack(track: PlaybackTrack): track is ResolvedTrack {

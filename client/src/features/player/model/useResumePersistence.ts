@@ -7,8 +7,13 @@ import {
   isResolvedTrack,
   toTrackRelativeTime,
   type PlaybackTrack,
-} from "./trackTime";
-import type { LoadedTrack, MutableRef, PendingResume, PlayerRuntimeRefs } from "./playerRuntime";
+} from "../../../entities/player/model/trackTime";
+import type {
+  LoadedTrack,
+  MutableRef,
+  PendingResume,
+  PlayerRuntimeRefs,
+} from "../../../entities/player/model/playerRuntime";
 
 interface UseResumePersistenceOptions {
   refs: Pick<PlayerRuntimeRefs, "engine" | "loadedTrack" | "trackEnded">;

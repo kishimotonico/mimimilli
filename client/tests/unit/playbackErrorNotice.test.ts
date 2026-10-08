@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { AudioEngineError } from "../../src/features/player/model/audioEngine";
+import type { AudioEngineError } from "../../src/entities/player/model/audioEngine";
 import PlaybackErrorNotice from "../../src/features/player/ui/PlaybackErrorNotice";
 
 const playbackError: AudioEngineError = {

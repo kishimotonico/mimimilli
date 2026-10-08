@@ -3,10 +3,10 @@ import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-li
 import { Provider as JotaiProvider, createStore, useAtomValue } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
-import { NOT_REGISTERED_ERROR } from "../../src/features/player/model/PlayerRuntimeProvider";
+import { PlayerRuntimeProvider } from "../../src/entities/player/model/PlayerRuntimeProvider";
+import { NOT_REGISTERED_ERROR } from "../../src/entities/player/model/PlayerRuntimeProvider";
 import { usePlayerRuntime } from "../../src/features/player/model/usePlayer";
-import { usePlayerActions } from "../../src/features/player/model/usePlayerActions";
+import { usePlayerActions } from "../../src/entities/player/model/usePlayerActions";
 import { usePlayerState } from "../../src/features/player/model/usePlayerState";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import {
@@ -17,7 +17,7 @@ import {
 import { saveResumePosition } from "../../src/features/player/api";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import type { ResolvedTrack, Track, Work, WorkSummary } from "../../src/entities/work/model";
-import { PLAYER_PLAYBACK_PREFS_KEY } from "../../src/features/player/model/playerPlaybackPrefs";
+import { PLAYER_PLAYBACK_PREFS_KEY } from "../../src/entities/player/model/playerPlaybackPrefs";
 
 vi.mock("../../src/features/player/api", () => ({
   saveResumePosition: vi.fn(() => Promise.resolve()),
