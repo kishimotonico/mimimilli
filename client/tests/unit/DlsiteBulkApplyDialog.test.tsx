@@ -3,30 +3,40 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { DlsiteApplyMissingPreview } from "@mimimilli/shared";
 import DlsiteBulkApplyRuntime from "../../src/features/dlsite/ui/DlsiteBulkApplyRuntime";
 import { dlsiteBulkApplyOpenAtom } from "../../src/entities/dlsite/model/bulkAtoms";
 import { toastRequestsAtom } from "../../src/shared/model/toastRequestsAtom";
+import { mockApi, type ApiMock } from "../helpers/api";
+import {
+  buildDlsiteApplyMissingPreview,
+  buildDlsiteBulkApplyMissingResult,
+} from "../helpers/builders";
 
 /** DlsiteBulkApplyRuntimeは単一のuseToast()しか持たないため、要求は高々1件 */
 function latestToastRequest(store: ReturnType<typeof createStore>) {
   return [...store.get(toastRequestsAtom).values()][0];
 }
 
-const applyDlsiteMissing = vi.fn();
-const previewDlsiteMissing = vi.fn();
+const twoItemPreview = buildDlsiteApplyMissingPreview([
+  { workId: "RJ501001", title: "作品A", newTags: ["cv/新CV"], applyCover: false, applyUrl: true },
+  { workId: "RJ501002", title: "作品B", newTags: [], applyCover: true, applyUrl: false },
+]);
 
-vi.mock("../../src/entities/work/api", () => ({
-  applyDlsiteMissing: (...args: unknown[]) => applyDlsiteMissing(...args),
-  previewDlsiteMissing: (...args: unknown[]) => previewDlsiteMissing(...args),
-}));
+let api: ApiMock;
 
-const twoItemPreview: DlsiteApplyMissingPreview = {
-  items: [
-    { workId: "RJ501001", title: "作品A", newTags: ["cv/新CV"], applyCover: false, applyUrl: true },
-    { workId: "RJ501002", title: "作品B", newTags: [], applyCover: true, applyUrl: false },
-  ],
-};
+function mockDlsiteMissingApi(
+  preview: ReturnType<typeof buildDlsiteApplyMissingPreview>,
+  applied = buildDlsiteBulkApplyMissingResult(),
+) {
+  api = mockApi({
+    "POST /api/dlsite/apply-missing/preview": preview,
+    "POST /api/dlsite/apply-missing": applied,
+  });
+}
+
+function appliedWorkIds(): unknown[] {
+  return api.requestsTo("POST /api/dlsite/apply-missing").map((request) => request.body);
+}
 
 function renderRuntime() {
   const queryClient = new QueryClient({
@@ -48,8 +58,6 @@ function renderRuntime() {
 
 describe("DlsiteBulkApplyDialog", () => {
   beforeEach(() => {
-    applyDlsiteMissing.mockReset();
-    previewDlsiteMissing.mockReset();
     HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
       this.open = true;
     });
@@ -58,9 +66,8 @@ describe("DlsiteBulkApplyDialog", () => {
     });
   });
 
-  it("差分ありの対象を全選択した状態で開き、選択したworkIdだけをapplyDlsiteMissingへ渡す", async () => {
-    previewDlsiteMissing.mockResolvedValue(twoItemPreview);
-    applyDlsiteMissing.mockResolvedValue({ applied: 2, pending: 0, skipped: 0, failed: 0 });
+  it("差分ありの対象を全選択した状態で開き、選択したworkIdだけを適用リクエストに送る", async () => {
+    mockDlsiteMissingApi(twoItemPreview, buildDlsiteBulkApplyMissingResult({ applied: 2 }));
     const store = renderRuntime();
 
     await waitFor(() => expect(screen.getByText("作品A")).toBeInTheDocument());
@@ -68,7 +75,7 @@ describe("DlsiteBulkApplyDialog", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "選択した2件に適用" }));
 
-    await waitFor(() => expect(applyDlsiteMissing).toHaveBeenCalledWith(["RJ501001", "RJ501002"]));
+    await waitFor(() => expect(appliedWorkIds()).toEqual([{ workIds: ["RJ501001", "RJ501002"] }]));
     await waitFor(() =>
       expect(latestToastRequest(store)?.message).toBe(
         "未設定項目を適用: 適用 2件・未反映 0件・スキップ 0件・失敗 0件",
@@ -77,30 +84,29 @@ describe("DlsiteBulkApplyDialog", () => {
     expect(latestToastRequest(store)?.variant).toBe("success");
   });
 
-  it("チェックを外した作品はapplyDlsiteMissingの引数から除かれる", async () => {
-    previewDlsiteMissing.mockResolvedValue(twoItemPreview);
-    applyDlsiteMissing.mockResolvedValue({ applied: 1, pending: 0, skipped: 0, failed: 0 });
+  it("チェックを外した作品は適用リクエストから除かれる", async () => {
+    mockDlsiteMissingApi(twoItemPreview, buildDlsiteBulkApplyMissingResult({ applied: 1 }));
     renderRuntime();
 
     await waitFor(() => expect(screen.getByText("作品B")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("checkbox", { name: "作品B" }));
     fireEvent.click(screen.getByRole("button", { name: "選択した1件に適用" }));
 
-    await waitFor(() => expect(applyDlsiteMissing).toHaveBeenCalledWith(["RJ501001"]));
+    await waitFor(() => expect(appliedWorkIds()).toEqual([{ workIds: ["RJ501001"] }]));
   });
 
-  it("キャンセルでは applyDlsiteMissing を呼ばない", async () => {
-    previewDlsiteMissing.mockResolvedValue(twoItemPreview);
+  it("キャンセルでは適用リクエストを送らない", async () => {
+    mockDlsiteMissingApi(twoItemPreview);
     renderRuntime();
 
     await waitFor(() => expect(screen.getByText("作品A")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "キャンセル", exact: true }));
 
-    expect(applyDlsiteMissing).not.toHaveBeenCalled();
+    expect(appliedWorkIds()).toHaveLength(0);
   });
 
   it("差分0件では確認ダイアログを開かず結果をトーストで通知する", async () => {
-    previewDlsiteMissing.mockResolvedValue({ items: [] } satisfies DlsiteApplyMissingPreview);
+    mockDlsiteMissingApi(buildDlsiteApplyMissingPreview());
     const store = renderRuntime();
 
     await waitFor(() =>

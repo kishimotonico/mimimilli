@@ -5,31 +5,23 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import FilePreview from "../../src/features/files/ui/FilePreview";
-
-const browseFs = vi.fn();
-const getScanDiagnostics = vi.fn();
-
-vi.mock("../../src/features/files/api", () => ({
-  browseFs: (...args: unknown[]) => browseFs(...args),
-}));
-
-vi.mock("../../src/entities/scan/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/entities/scan/api")>()),
-  getScanDiagnostics: (...args: unknown[]) => getScanDiagnostics(...args),
-}));
+import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
+import { mockApi } from "../helpers/api";
+import { buildFsListing, buildScanDiagnostics, buildSettings } from "../helpers/builders";
 
 vi.mock("../../src/entities/player/model/usePlayerActions", () => ({
   usePlayerActions: () => ({ playFile: vi.fn(), togglePlay: vi.fn() }),
 }));
 
-vi.mock("../../src/entities/settings/useSettingsQuery", () => ({
-  useRootFolder: () => "/lib",
-}));
-
 function renderPreview() {
-  browseFs.mockResolvedValue({ entries: [], workId: null });
-  getScanDiagnostics.mockResolvedValue({ identityConflicts: [], invalidMetaFiles: [] });
+  const settings = buildSettings({ rootFolder: "/lib" });
+  mockApi({
+    "GET /api/fs": buildFsListing(),
+    "GET /api/scan/diagnostics": buildScanDiagnostics(),
+    "GET /api/settings": settings,
+  });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), settings);
   const store = createStore();
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(

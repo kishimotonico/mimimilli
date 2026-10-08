@@ -3,51 +3,41 @@
 // 独立したBun+Viteのペアを立て、各テスト開始前にサーバー側の状態をリセットして分離する。
 import { type ChildProcess, spawn } from "node:child_process";
 import { createServer } from "node:net";
+import { fileURLToPath } from "node:url";
 import { chromium, test as base } from "@playwright/test";
-import { derivePort } from "./derivePort.ts";
-
-const VITE_PORT_RANGE_START = 4200;
-const VITE_PORT_RANGE_SIZE = 500;
-const BUN_PORT_RANGE_START = 4700;
-const BUN_PORT_RANGE_SIZE = 500;
 
 // fixture状態リセットのHTTP待ちがADR-0020のWSL blackhole（未使用ポートへの接続が
 // 約2分ハングする既知障害）を踏まないよう、明示的に短いタイムアウトで打ち切る。
 const RESET_FETCH_TIMEOUT_MS = 5_000;
 
-// 直前の実行のサーバーがkillされてからOSがポートを実際に解放するまでにわずかな遅延が
-// あるため、次のサーバーをspawnする前にbindを試して空きを確認する。接続（connect）は
-// ADR-0020のWSL blackhole（未使用ポートへの接続が約2分ハングする既知障害）を踏むため使わず、
-// bindの成否だけで判定する（bindはローカルのカーネル操作でネットワーク接続を伴わない）。
-function waitForPortFree(port: number, timeoutMs: number): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
+const SUPERVISE_SCRIPT = fileURLToPath(new URL("./superviseProcess.mjs", import.meta.url));
+
+// Viteは--port 0を受け付けない（既定ポートへ戻る）ため、OSに空きポートを借りて渡す。
+// 借りたポートは接続せずbindだけで確保する（接続はADR-0020のWSL blackholeを踏みうる）。
+function acquireFreePort(): Promise<number> {
   return new Promise((resolvePromise, reject) => {
-    function attempt() {
-      const probe = createServer();
-      probe.once("error", (err: NodeJS.ErrnoException) => {
+    const probe = createServer();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const address = probe.address();
+      if (address === null || typeof address === "string") {
         probe.close();
-        if (err.code !== "EADDRINUSE") {
-          reject(err);
-          return;
-        }
-        if (Date.now() >= deadline) {
-          reject(new Error(`ポート${port}の解放待ちがタイムアウトしました`));
-          return;
-        }
-        setTimeout(attempt, 100);
-      });
-      probe.once("listening", () => {
-        probe.close(() => resolvePromise());
-      });
-      probe.listen(port, "127.0.0.1");
-    }
-    attempt();
+        reject(new Error("空きポートの取得に失敗しました"));
+        return;
+      }
+      probe.close(() => resolvePromise(address.port));
+    });
   });
 }
 
-function waitForLog(proc: ChildProcess, pattern: RegExp, timeoutMs: number): Promise<void> {
+function waitForLog(
+  proc: ChildProcess,
+  pattern: RegExp,
+  timeoutMs: number,
+): Promise<RegExpMatchArray> {
   return new Promise((resolvePromise, reject) => {
     let stderrOutput = "";
+    let stdoutOutput = "";
     const onStderr = (chunk: Buffer) => {
       stderrOutput += chunk.toString();
     };
@@ -55,12 +45,18 @@ function waitForLog(proc: ChildProcess, pattern: RegExp, timeoutMs: number): Pro
 
     const timer = setTimeout(() => {
       cleanup();
-      reject(new Error(`起動ログ待ちがタイムアウトしました: ${pattern}\n${stderrOutput}`));
+      reject(
+        new Error(
+          `起動ログ ${pattern} が見つからないままタイムアウトしました（ログ文言を変更していないか確認）\n${stderrOutput}`,
+        ),
+      );
     }, timeoutMs);
     const onData = (chunk: Buffer) => {
-      if (pattern.test(chunk.toString())) {
+      stdoutOutput += chunk.toString();
+      const match = pattern.exec(stdoutOutput);
+      if (match) {
         cleanup();
-        resolvePromise();
+        resolvePromise(match);
       }
     };
     const onExit = (code: number | null) => {
@@ -105,6 +101,19 @@ function killGroup(proc: ChildProcess, signal: NodeJS.Signals): void {
   }
 }
 
+// 監督プロセス（superviseProcess.mjs）経由でspawnし、workerが死んだ場合も子が残らないようにする。
+function spawnSupervised(
+  command: string,
+  args: string[],
+  options: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
+): ChildProcess {
+  return spawn(process.execPath, [SUPERVISE_SCRIPT, command, ...args], {
+    ...options,
+    stdio: ["pipe", "pipe", "pipe"],
+    detached: true,
+  });
+}
+
 async function shutdown(proc: ChildProcess, timeoutMs: number): Promise<void> {
   if (proc.exitCode !== null) return;
   killGroup(proc, "SIGTERM");
@@ -123,61 +132,48 @@ interface WorkerServers {
   bunBaseURL: string;
 }
 
-export const test = base.extend<{ resetFixtureState: void }, { workerServers: WorkerServers }>({
-  workerServers: [
-    // Playwrightのfixture解決は第1引数のオブジェクト分割代入構文を静的解析するため、
-    // 依存fixtureがなくても{}が必須。
-    // oxlint-disable-next-line no-empty-pattern
-    async ({}, use, workerInfo) => {
-      const cwd = process.cwd();
-      const bunPort = derivePort(
-        cwd,
-        BUN_PORT_RANGE_START,
-        BUN_PORT_RANGE_SIZE,
-        workerInfo.workerIndex,
-      );
-      const vitePort = derivePort(
-        cwd,
-        VITE_PORT_RANGE_START,
-        VITE_PORT_RANGE_SIZE,
-        workerInfo.workerIndex,
-      );
+export const test = base.extend<
+  { resetFixtureState: void },
+  { workerServers: WorkerServers; fixtureScenario: string }
+>({
+  // spec側で test.use({ fixtureScenario }) するとworkerのサーバーがそのシナリオで起動する
+  fixtureScenario: ["new-work", { scope: "worker", option: true }],
 
+  workerServers: [
+    async ({ fixtureScenario }, use) => {
       let bunProc: ChildProcess | undefined;
       let viteProc: ChildProcess | undefined;
 
       try {
-        await waitForPortFree(bunPort, 10_000);
-        bunProc = spawn("bun", ["src/index.ts"], {
+        bunProc = spawnSupervised("bun", ["src/index.ts"], {
           cwd: "../server",
           env: {
             ...process.env,
             MIMIMILLI_ADAPTER: "fixture",
-            MIMIMILLI_MOCK_SCENARIO: "new-work",
-            PORT: String(bunPort),
+            MIMIMILLI_MOCK_SCENARIO: fixtureScenario,
+            PORT: "0",
           },
-          stdio: ["ignore", "pipe", "pipe"],
-          detached: true,
         });
-        await waitForLog(bunProc, /サーバーを起動しました/, 120_000);
-
-        await waitForPortFree(vitePort, 10_000);
-        viteProc = spawn(
-          "pnpm",
-          [
-            "exec",
-            "cross-env",
-            "VITE_DISABLE_QUERY_DEVTOOLS=1",
-            `MIMIMILLI_BACKEND_URL=http://127.0.0.1:${bunPort}`,
-            "vite",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            String(vitePort),
-            "--strictPort",
-          ],
-          { stdio: ["ignore", "pipe", "pipe"], detached: true },
+        const [, bunPortText] = await waitForLog(
+          bunProc,
+          /サーバーを起動しました: http:\/\/localhost:(\d+)/,
+          120_000,
         );
+        const bunPort = Number(bunPortText);
+
+        const vitePort = await acquireFreePort();
+        viteProc = spawnSupervised("pnpm", [
+          "exec",
+          "cross-env",
+          "VITE_DISABLE_QUERY_DEVTOOLS=1",
+          `MIMIMILLI_BACKEND_URL=http://127.0.0.1:${bunPort}`,
+          "vite",
+          "--host",
+          "127.0.0.1",
+          "--port",
+          String(vitePort),
+          "--strictPort",
+        ]);
         await waitForLog(viteProc, /ready in/, 120_000);
         await warmUp(`http://127.0.0.1:${vitePort}`, 60_000);
 

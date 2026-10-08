@@ -341,7 +341,9 @@ describe("WorkGrid empty states", () => {
 
   it("お気に入りビューが0件のとき文脈付きの案内を1行添える", () => {
     renderWorkGrid({ overrides: { nav: { activeAxis: "fav" }, works: [] } });
-    expect(screen.getByText("作品をブックマークするとお気に入りに表示されます")).toBeTruthy();
+    expect(
+      screen.getByText("作品をブックマークするとお気に入りに表示されます"),
+    ).toBeInTheDocument();
   });
 
   it("スマートフォルダーが0件のとき専用の見出しと「条件を編集」を出す", () => {
@@ -350,8 +352,8 @@ describe("WorkGrid empty states", () => {
       overrides: { works: [], emptyState: { isSmartFolder: true, onEditSmartFolderRules } },
     });
 
-    expect(screen.getByText("条件に一致する作品がありません")).toBeTruthy();
-    expect(screen.getByText("条件を見直すか、絞り込みを外してください。")).toBeTruthy();
+    expect(screen.getByText("条件に一致する作品がありません")).toBeInTheDocument();
+    expect(screen.getByText("条件を見直すか、絞り込みを外してください。")).toBeInTheDocument();
     expect(screen.queryByText("絞り込みをすべてクリア")).toBeNull();
 
     screen.getByRole("button", { name: "条件を編集" }).click();

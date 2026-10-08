@@ -2,17 +2,18 @@ import { createElement, type ReactNode } from "react";
 import { renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Work, WorkListItem } from "@mimimilli/shared";
+import type { Work } from "@mimimilli/shared";
 import { PlayerRuntimeProvider } from "../../src/entities/player/model/PlayerRuntimeProvider";
 import { usePlayWork } from "../../src/entities/player/model/usePlayWork";
 
-const { prepareWorkPlayback, play, playWithResume } = vi.hoisted(() => ({
-  prepareWorkPlayback: vi.fn(),
+import { mockApi } from "../helpers/api";
+import { buildResolvedPlaylist, buildWork, buildWorkListItem } from "../helpers/builders";
+
+const { play, playWithResume } = vi.hoisted(() => ({
   play: vi.fn(),
   playWithResume: vi.fn(),
 }));
 
-vi.mock("../../src/entities/work/api", () => ({ prepareWorkPlayback }));
 vi.mock("../../src/entities/work/model/workCacheUpdates", () => ({
   updateCachesAfterPlaybackPrepared: vi.fn().mockResolvedValue(undefined),
 }));
@@ -20,22 +21,14 @@ vi.mock("../../src/entities/player/model/usePlayerActions", () => ({
   usePlayerActions: () => ({ play, playWithResume }),
 }));
 
-const tracksOf = (...ids: string[]) =>
-  ids.map((id) => ({ id, title: id, file: `${id}.wav`, start: 0, end: 10 }));
-
-const listItem = { id: "w1", status: "ok" } as unknown as WorkListItem;
+const listItem = buildWorkListItem({ id: "w1" });
 
 function preparedWork(): Work {
-  return {
-    id: "w1",
-    status: "ok",
-    defaultPlaylistId: "p2",
-    playlists: [
-      { id: "p1", tracks: tracksOf("a") },
-      { id: "p2", tracks: tracksOf("b", "c") },
-    ],
-  } as unknown as Work;
+  const playlists = [buildResolvedPlaylist(1, ["a"]), buildResolvedPlaylist(2, ["b", "c"])];
+  return buildWork({ id: "w1", defaultPlaylistId: playlists[1]!.id, playlists });
 }
+
+let prepared: Work;
 
 function setup() {
   const queryClient = new QueryClient();
@@ -50,24 +43,31 @@ function setup() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  prepareWorkPlayback.mockResolvedValue(preparedWork());
+  prepared = preparedWork();
+  mockApi({ "POST /api/works/:id/playback-preparation": () => prepared });
 });
 
 describe("usePlayWork", () => {
   it("playWorkは既定プレイリストのトラックでplayを呼ぶ", async () => {
     await setup().playWork(listItem, 1);
-    const prepared = await prepareWorkPlayback.mock.results[0]!.value;
-    expect(play).toHaveBeenCalledWith(listItem, prepared.playlists[1].tracks, 1, "p2");
+    const [defaultPlaylist] = prepared.playlists.filter(
+      (playlist) => playlist.id === prepared.defaultPlaylistId,
+    );
+    expect(play).toHaveBeenCalledWith(
+      listItem,
+      defaultPlaylist!.tracks,
+      1,
+      prepared.defaultPlaylistId,
+    );
   });
 
   it("trackIndexはトラック数の末尾に丸める", async () => {
     await setup().playWork(listItem, 99);
-    expect(play).toHaveBeenCalledWith(listItem, expect.any(Array), 1, "p2");
+    expect(play).toHaveBeenCalledWith(listItem, expect.any(Array), 1, prepared.defaultPlaylistId);
   });
 
   it("resumeWorkは準備済みの作品でplayWithResumeを呼ぶ", async () => {
-    await setup().resumeWork({ id: "w1", status: "ok" } as unknown as Work);
-    const prepared = await prepareWorkPlayback.mock.results[0]!.value;
+    await setup().resumeWork(buildWork({ id: "w1" }));
     expect(playWithResume).toHaveBeenCalledWith(prepared);
     expect(play).not.toHaveBeenCalled();
   });

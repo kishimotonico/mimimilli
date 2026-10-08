@@ -10,7 +10,10 @@ import GlobalToast from "../../src/app/ui/GlobalToast";
 import { scanJobStoreAtom } from "../../src/entities/scan/model/scanJobStore";
 import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
 import { toastRequestsAtom } from "../../src/shared/model/toastRequestsAtom";
-import type { ScanJobEvent, ScanResult } from "@mimimilli/shared";
+import type { ScanJobEvent } from "@mimimilli/shared";
+import { apiError, mockApi } from "../helpers/api";
+import { appShellRoutes } from "../helpers/appShellApi";
+import { buildScanJobEvent, buildScanJobSnapshot, buildScanResult } from "../helpers/builders";
 
 /** 現在表示中のerror variantトーストのメッセージ。無ければnull。 */
 function getErrorToastMessage(store: ReturnType<typeof createStore>): string | null {
@@ -40,16 +43,12 @@ class FakeEventSource extends EventTarget {
 
 function dispatch(source: FakeEventSource, event: ScanJobEvent): void {
   act(() => {
-    source.dispatchEvent(new MessageEvent(event.type, { data: JSON.stringify(event) }));
+    const valid = buildScanJobEvent(event);
+    source.dispatchEvent(new MessageEvent(valid.type, { data: JSON.stringify(valid) }));
   });
 }
 
-function response(body: unknown, status = 200): Response {
-  return new Response(status === 204 ? null : JSON.stringify(body), {
-    status,
-    headers: status === 204 ? undefined : { "Content-Type": "application/json" },
-  });
-}
+const UNSTRUCTURED_FAILURE = () => new Response("開始できませんでした", { status: 500 });
 
 function renderRuntime() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -85,15 +84,10 @@ afterEach(() => {
 
 describe("ScanRuntime", () => {
   it("スキャン開始に失敗するとerrorトーストを出し、閉じると消える", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.endsWith("/scan/active")) return response(null, 204);
-        if (url.endsWith("/scan")) return response({ message: "開始できませんでした" }, 500);
-        return response(null, 204);
-      }),
-    );
+    mockApi({
+      ...appShellRoutes(),
+      "POST /api/scan": UNSTRUCTURED_FAILURE,
+    });
 
     const { store } = renderRuntime();
 
@@ -103,7 +97,7 @@ describe("ScanRuntime", () => {
 
     await waitFor(() => expect(getErrorToastMessage(store)).not.toBeNull());
     const message = getErrorToastMessage(store)!;
-    expect(screen.getByText(message)).toBeTruthy();
+    expect(screen.getByText(message)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
 
@@ -112,40 +106,23 @@ describe("ScanRuntime", () => {
   });
 
   it("モーダルを開いたまま失敗→再試行→成功すると古いエラートーストが残らない", async () => {
-    const scanResult: ScanResult = {
-      registered: 1,
-      insertedWorkIds: [],
-      updatedWorkIds: [],
-      errors: 0,
-      missing: 0,
-      skipped: 0,
-      coverErrors: 0,
-    };
+    const scanResult = buildScanResult({ registered: 1 });
     let scanCallCount = 0;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.endsWith("/scan/active")) return response(null, 204);
-        if (url.endsWith("/scan")) {
-          scanCallCount += 1;
-          if (scanCallCount === 1) return response({ message: "開始できませんでした" }, 500);
-          return response({
-            job: {
-              id: "job-2",
-              status: "completed",
-              createdAt: new Date().toISOString(),
-              startedAt: new Date().toISOString(),
-              finishedAt: new Date().toISOString(),
-              progress: null,
-              result: scanResult,
-              error: null,
-            },
-          });
-        }
-        return response(null, 204);
-      }),
-    );
+    mockApi({
+      ...appShellRoutes(),
+      "POST /api/scan": () => {
+        scanCallCount += 1;
+        if (scanCallCount === 1) return UNSTRUCTURED_FAILURE();
+        return {
+          job: buildScanJobSnapshot({
+            id: "job-2",
+            status: "completed",
+            finishedAt: "2026-01-01T00:00:02.000Z",
+            result: scanResult,
+          }),
+        };
+      },
+    });
 
     const { store } = renderRuntime();
     store.set(activeModalAtom, { kind: "scan" });
@@ -156,7 +133,7 @@ describe("ScanRuntime", () => {
 
     await waitFor(() => expect(getErrorToastMessage(store)).not.toBeNull());
     const message = getErrorToastMessage(store)!;
-    expect(screen.getByText(message)).toBeTruthy();
+    expect(screen.getByText(message)).toBeInTheDocument();
 
     await act(async () => {
       await store.get(scanJobStoreAtom).start();
@@ -167,49 +144,23 @@ describe("ScanRuntime", () => {
   });
 
   it("中止APIの失敗でエラーが出た直後にSSEで完了しても、完了トーストは消えずに残る", async () => {
-    const scanResult: ScanResult = {
-      registered: 1,
-      insertedWorkIds: [],
-      updatedWorkIds: [],
-      errors: 0,
-      missing: 0,
-      skipped: 0,
-      coverErrors: 0,
-    };
-    const running = {
-      id: "job-1",
-      status: "running" as const,
-      createdAt: "2026-01-01T00:00:00.000Z",
-      startedAt: "2026-01-01T00:00:00.001Z",
-      finishedAt: null,
-      progress: null,
-      result: null,
-      error: null,
-    };
-
-    const completed = {
-      ...running,
-      status: "completed" as const,
+    const scanResult = buildScanResult({ registered: 1 });
+    const running = buildScanJobSnapshot();
+    const completed = buildScanJobSnapshot({
+      status: "completed",
       finishedAt: "2026-01-01T00:00:01.000Z",
       result: scanResult,
-    };
+    });
 
     FakeEventSource.instances = [];
     vi.stubGlobal("EventSource", FakeEventSource);
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input);
-        if (url.endsWith("/scan/active")) return response(null, 204);
-        if (url.endsWith("/scan") && init?.method === "POST") return response({ job: running });
-        if (url.endsWith("/scan/job-1") && init?.method === "DELETE") {
-          return response({ error: { code: "internal", message: "中止できませんでした" } }, 500);
-        }
-        // SSEの"completed"はrefresh経由でGETするだけで確定するため、GETは完了済みを返す
-        if (url.endsWith("/scan/job-1")) return response(completed);
-        return response(null, 204);
-      }),
-    );
+    mockApi({
+      ...appShellRoutes(),
+      "POST /api/scan": { job: running },
+      "DELETE /api/scan/:id": () => apiError(500, "internal", "中止できませんでした"),
+      // SSEの"completed"はrefresh経由でGETするだけで確定するため、GETは完了済みを返す
+      "GET /api/scan/:id": completed,
+    });
 
     // scanModalOpenAtomは未設定（閉じている）。完了トーストが出る経路を検証する。
     const { store } = renderRuntime();
@@ -226,37 +177,22 @@ describe("ScanRuntime", () => {
     });
     await waitFor(() => expect(getErrorToastMessage(store)).not.toBeNull());
     const errorMessage = getErrorToastMessage(store)!;
-    expect(screen.getByText(errorMessage)).toBeTruthy();
+    expect(screen.getByText(errorMessage)).toBeInTheDocument();
 
     // その直後に同じジョブのSSEが完了を届ける。errorToast.dismiss()とonTerminalの完了トーストが
     // 同じバッチで走る経路（cancel()のHTTP失敗＋SSE生存）を再現する。
     dispatch(source, { type: "completed", result: scanResult });
 
     await waitFor(() => expect(getErrorToastMessage(store)).toBeNull());
-    await waitFor(() => expect(screen.getByText(/^スキャン完了/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/^スキャン完了/)).toBeInTheDocument());
     expect(screen.queryByText(errorMessage)).toBeNull();
   });
 
   it("reset()（root再設定突入時用）を呼ぶと実行中ジョブの追跡状態が初期化される", async () => {
-    const running = {
-      id: "job-1",
-      status: "running" as const,
-      createdAt: "2026-01-01T00:00:00.000Z",
-      startedAt: "2026-01-01T00:00:00.001Z",
-      finishedAt: null,
-      progress: null,
-      result: null,
-      error: null,
-    };
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input);
-        if (url.endsWith("/scan/active")) return response(null, 204);
-        if (url.endsWith("/scan") && init?.method === "POST") return response({ job: running });
-        return response(null, 204);
-      }),
-    );
+    mockApi({
+      ...appShellRoutes(),
+      "POST /api/scan": { job: buildScanJobSnapshot() },
+    });
 
     const { store } = renderRuntime();
 
@@ -274,36 +210,17 @@ describe("ScanRuntime", () => {
   });
 
   it("root再設定中の409（root_reconfiguring）でSSE再接続が失敗すると、追跡状態が初期化される（リトライしない）", async () => {
-    const running = {
-      id: "job-1",
-      status: "running" as const,
-      createdAt: "2026-01-01T00:00:00.000Z",
-      startedAt: "2026-01-01T00:00:00.001Z",
-      finishedAt: null,
-      progress: null,
-      result: null,
-      error: null,
-    };
-
     FakeEventSource.instances = [];
     vi.stubGlobal("EventSource", FakeEventSource);
     let getJobCallCount = 0;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input);
-        if (url.endsWith("/scan/active")) return response(null, 204);
-        if (url.endsWith("/scan") && init?.method === "POST") return response({ job: running });
-        if (url.endsWith("/scan/job-1")) {
-          getJobCallCount += 1;
-          return new Response(
-            JSON.stringify({ error: { code: "root_reconfiguring", message: "再設定中です" } }),
-            { status: 409, headers: { "Content-Type": "application/json" } },
-          );
-        }
-        return response(null, 204);
-      }),
-    );
+    mockApi({
+      ...appShellRoutes(),
+      "POST /api/scan": { job: buildScanJobSnapshot() },
+      "GET /api/scan/:id": () => {
+        getJobCallCount += 1;
+        return apiError(409, "root_reconfiguring", "再設定中です");
+      },
+    });
 
     const { store } = renderRuntime();
 
@@ -328,20 +245,10 @@ describe("ScanRuntime", () => {
   // catch→isRootReconfiguringErrorで判定→トーストを出さない」パターンをstart()で縛る。
   // 画面がreconfiguringへ切り替わるのが正しい応答であり、「失敗」トーストは不要。
   it("start()が409（root_reconfiguring）で失敗してもトースト要求が積まれない", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input);
-        if (url.endsWith("/scan/active")) return response(null, 204);
-        if (url.endsWith("/scan") && init?.method === "POST") {
-          return new Response(
-            JSON.stringify({ error: { code: "root_reconfiguring", message: "再設定中です" } }),
-            { status: 409, headers: { "Content-Type": "application/json" } },
-          );
-        }
-        return response(null, 204);
-      }),
-    );
+    mockApi({
+      ...appShellRoutes(),
+      "POST /api/scan": () => apiError(409, "root_reconfiguring", "再設定中です"),
+    });
 
     const { store } = renderRuntime();
 

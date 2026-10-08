@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import type { AxisFacetItem } from "@mimimilli/shared";
@@ -346,7 +346,7 @@ describe("AxisValueQuickList のソート（アイコンボタン＋インライ
 
     const toggle = screen.getByRole("button", { name: /^並び替え/ });
     await user.click(toggle);
-    expect(screen.getByRole("group", { name: "並び替え" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "並び替え" })).toBeInTheDocument();
 
     await user.click(toggle);
     // collapse variant の退出アニメーション（150ms）が終わるまでマウントされ続ける
@@ -378,7 +378,7 @@ describe("AxisValueQuickList のソート（アイコンボタン＋インライ
     await user.click(toggle);
     await user.click(screen.getByRole("button", { name: "名前" }));
 
-    expect(screen.getByRole("group", { name: "並び替え" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "並び替え" })).toBeInTheDocument();
 
     await user.click(toggle);
     await waitFor(() => expect(screen.queryByRole("group", { name: "並び替え" })).toBeNull());
@@ -394,10 +394,10 @@ describe("AxisValueQuickList のソート（アイコンボタン＋インライ
     await user.click(screen.getByRole("button", { name: /^並び替え/ }));
     const nameButton = screen.getByRole("button", { name: "名前" });
     await user.click(nameButton);
-    expect(screen.getByRole("button", { name: "名前（昇順）" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "名前（昇順）" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "名前（昇順）" }));
-    expect(screen.getByRole("button", { name: "名前（降順）" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "名前（降順）" })).toBeInTheDocument();
     sizeMock.restore();
   });
 
@@ -424,7 +424,7 @@ describe("AxisValueQuickList の選択", () => {
     await flushVirtualizer();
 
     const first = document.querySelector<HTMLButtonElement>("[data-quicklist-item]");
-    expect(first).toBeTruthy();
+    expect(first).toBeInTheDocument();
     await user.click(first!);
 
     expect(onSelect).toHaveBeenCalledTimes(1);
@@ -443,9 +443,15 @@ describe("AxisValueQuickList の選択", () => {
     expect(rows.length).toBe(3);
     const selectedRow = rows.find((row) => row.textContent?.includes(selectedValue));
     const otherRows = rows.filter((row) => row !== selectedRow);
-    expect(selectedRow?.querySelector(".mll-qlist__add")).toBeNull();
+    expect(
+      within(selectedRow as HTMLElement).queryByRole("button", { name: /AND追加/ }),
+    ).toBeNull();
     expect(otherRows.length).toBe(2);
-    otherRows.forEach((row) => expect(row.querySelector(".mll-qlist__add")).toBeTruthy());
+    otherRows.forEach((row) =>
+      expect(
+        within(row as HTMLElement).getByRole("button", { name: /AND追加/ }),
+      ).toBeInTheDocument(),
+    );
     sizeMock.restore();
   });
 });

@@ -1,151 +1,114 @@
-// GET /api/smart-folders/:id/works のサーバー側ページングを検証。
-// fixture アダプタの evalSmartFolder を多数件データへの純粋関数呼び出しに差し替え、
+// GET /api/smart-folders/:id/works のサーバー側ページングを fixture / real の両方で検証。
 // デフォルト適用・ページ連結・random seed 引継ぎ・total・固有 sort 維持を担保する。
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  WORKS_DEFAULT_PAGE_SIZE,
-  type SmartFolder,
-  type WorksPage,
-  type WorkSummary,
-} from "@mimimilli/shared";
-import { createApp } from "../src/app.ts";
-import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
-import { evalSmartFolder } from "../src/core/smartFolder.ts";
-import { toWorksPage } from "../src/core/worksQuery.ts";
-import { nts } from "./helpers/tag.ts";
-import { makeWorkSummary } from "./helpers/workTestUtils.ts";
+import { WORKS_DEFAULT_PAGE_SIZE, type SmartFolder, type WorksPage } from "@mimimilli/shared";
+import { defineContract, numberedWorks, type ContractHarness } from "./helpers/contractHarness.ts";
 
-const RECENT = new Date(Date.now() - 5 * 86400000).toISOString();
+const TOTAL = WORKS_DEFAULT_PAGE_SIZE + 10;
+const contract = defineContract({ works: numberedWorks(TOTAL, ["ASMR"]) }, { shared: true });
 
-function summary(index: number): WorkSummary {
-  const id = `work-${String(index).padStart(4, "0")}`;
-  return makeWorkSummary({
-    id,
-    title: `作品 ${id}`,
-    physicalPath: `/library/${id}`,
-    totalDurationSec: 600,
-    addedAt: RECENT,
-    tags: nts(["ASMR"]),
-  });
-}
-
-function buildFolder(sort: SmartFolder["sort"]): SmartFolder {
-  return {
-    id: "sf-pagination",
-    name: "ページング検証",
+async function createFolder(harness: ContractHarness, sort: SmartFolder["sort"]): Promise<string> {
+  const { status, body } = await harness.send<SmartFolder>("POST", "/api/smart-folders", {
+    name: `ページング検証 ${sort}`,
     rules: [],
     sort,
-    createdAt: RECENT,
-  };
-}
-
-function buildAppWithManyWorks(count = 210) {
-  const adapter = createFixtureAdapter();
-  const manyWorks = Array.from({ length: count }, (_, index) => summary(index));
-  const folder = buildFolder("added-desc");
-  adapter.evalSmartFolder = async (id, query) => {
-    if (id !== folder.id) return null;
-    const page = evalSmartFolder(folder, manyWorks, query);
-    return toWorksPage(page, "/library");
-  };
-  adapter.listSmartFolders = async () => [folder];
-  return createApp(adapter);
+  });
+  assert.equal(status, 201);
+  return body.id;
 }
 
 async function getSmartFolderWorks(
-  app: ReturnType<typeof createApp>,
+  harness: ContractHarness,
+  folderId: string,
   query = "",
 ): Promise<WorksPage> {
-  const res = await app.request(`/api/smart-folders/sf-pagination/works${query}`);
-  assert.equal(res.status, 200);
-  return (await res.json()) as WorksPage;
+  const { status, body } = await harness.json<WorksPage>(
+    `/api/smart-folders/${folderId}/works${query}`,
+  );
+  assert.equal(status, 200);
+  return body;
 }
 
-test("limit 未指定でも全件返さない（デフォルト page=1 + デフォルト limit）", async () => {
-  const app = buildAppWithManyWorks(210);
-  const body = await getSmartFolderWorks(app);
-  assert.equal(body.items.length, WORKS_DEFAULT_PAGE_SIZE);
-  assert.equal(body.total, 210);
-});
+contract(
+  "limit 未指定でも全件返さない（デフォルト page=1 + デフォルト limit）",
+  async (harness) => {
+    const folderId = await createFolder(harness, "added-desc");
+    const body = await getSmartFolderWorks(harness, folderId);
+    assert.equal(body.items.length, WORKS_DEFAULT_PAGE_SIZE);
+    assert.equal(body.total, TOTAL);
+  },
+);
 
-test("limit のみ指定時は page=1 として動作する", async () => {
-  const app = buildAppWithManyWorks(210);
-  const body = await getSmartFolderWorks(app, "?limit=5");
+contract("limit のみ指定時は page=1 として動作する", async (harness) => {
+  const folderId = await createFolder(harness, "added-desc");
+  const body = await getSmartFolderWorks(harness, folderId, "?limit=5");
   assert.equal(body.items.length, 5);
-  assert.equal(body.total, 210);
+  assert.equal(body.total, TOTAL);
 });
 
-test("全件がページの連結で重複・欠落なく取得できる", async () => {
-  const app = buildAppWithManyWorks(210);
-  const first = await getSmartFolderWorks(app, `?limit=${WORKS_DEFAULT_PAGE_SIZE}&page=1`);
-  const second = await getSmartFolderWorks(app, `?limit=${WORKS_DEFAULT_PAGE_SIZE}&page=2`);
+contract("全件がページの連結で重複・欠落なく取得できる", async (harness) => {
+  const folderId = await createFolder(harness, "added-desc");
+  const first = await getSmartFolderWorks(
+    harness,
+    folderId,
+    `?limit=${WORKS_DEFAULT_PAGE_SIZE}&page=1`,
+  );
+  const second = await getSmartFolderWorks(
+    harness,
+    folderId,
+    `?limit=${WORKS_DEFAULT_PAGE_SIZE}&page=2`,
+  );
   const ids = [...first.items, ...second.items].map((work) => work.id);
-  assert.equal(new Set(ids).size, 210, "ページ間で重複があります");
-  assert.equal(ids.length, 210, "ページ間で欠落があります");
-  assert.equal(second.total, 210);
+  assert.equal(new Set(ids).size, TOTAL, "ページ間で重複があります");
+  assert.equal(ids.length, TOTAL, "ページ間で欠落があります");
+  assert.equal(second.total, TOTAL);
 });
 
-test("randomソートは発行されたseedを次ページへ送ると重複・欠落なく取得できる", async () => {
-  const folder = buildFolder("random");
-  const adapter = createFixtureAdapter();
-  const manyWorks = Array.from({ length: 210 }, (_, index) => summary(index));
-  adapter.evalSmartFolder = async (id, query) => {
-    if (id !== folder.id) return null;
-    const page = evalSmartFolder(folder, manyWorks, query);
-    return toWorksPage(page, "/library");
-  };
-  adapter.listSmartFolders = async () => [folder];
-  const app = createApp(adapter);
+contract(
+  "randomソートは発行されたseedを次ページへ送ると重複・欠落なく取得できる",
+  async (harness) => {
+    const folderId = await createFolder(harness, "random");
+    const first = await getSmartFolderWorks(harness, folderId, "?limit=200&page=1");
+    assert.equal(typeof first.seed, "number");
+    const second = await getSmartFolderWorks(
+      harness,
+      folderId,
+      `?seed=${first.seed}&limit=200&page=2`,
+    );
+    const ids = [...first.items, ...second.items].map((work) => work.id);
+    assert.equal(new Set(ids).size, TOTAL, "random ページ間で重複があります");
+    assert.equal(ids.length, TOTAL, "random ページ間で欠落があります");
+  },
+);
 
-  const first = await getSmartFolderWorks(app, "?limit=200&page=1");
-  assert.equal(typeof first.seed, "number");
-  const second = await getSmartFolderWorks(app, `?seed=${first.seed}&limit=200&page=2`);
-  const ids = [...first.items, ...second.items].map((work) => work.id);
-  assert.equal(new Set(ids).size, 210, "random ページ間で重複があります");
-  assert.equal(ids.length, 210, "random ページ間で欠落があります");
-});
-
-test("total はページング前の評価結果件数を返す", async () => {
-  const app = buildAppWithManyWorks(210);
-  const body = await getSmartFolderWorks(app, "?limit=5&page=3");
+contract("total はページング前の評価結果件数を返す", async (harness) => {
+  const folderId = await createFolder(harness, "added-desc");
+  const body = await getSmartFolderWorks(harness, folderId, "?limit=5&page=3");
   assert.equal(body.items.length, 5);
-  assert.equal(body.total, 210);
+  assert.equal(body.total, TOTAL);
 });
 
-test("スマートフォルダー固有の sort が維持される", async () => {
-  const folder = buildFolder("title-asc");
-  const adapter = createFixtureAdapter();
-  const manyWorks = Array.from({ length: 210 }, (_, index) => summary(index));
-  adapter.evalSmartFolder = async (id, query) => {
-    if (id !== folder.id) return null;
-    const page = evalSmartFolder(folder, manyWorks, query);
-    return toWorksPage(page, "/library");
-  };
-  adapter.listSmartFolders = async () => [folder];
-  const appSorted = createApp(adapter);
-
-  const body = await getSmartFolderWorks(appSorted);
-  const titles = body.items.map((w) => w.title);
-  const expected = [...titles].sort();
-  assert.deepEqual(titles, expected);
-  assert.equal(body.total, 210);
+contract("スマートフォルダー固有の sort が維持される", async (harness) => {
+  const folderId = await createFolder(harness, "title-asc");
+  const body = await getSmartFolderWorks(harness, folderId);
+  const titles = body.items.map((work) => work.title);
+  assert.deepEqual(titles, [...titles].sort());
+  assert.equal(body.total, TOTAL);
 });
 
-test("作品検索qがHTTPクエリからルート・evalSmartFolderまで渡る", async () => {
-  const app = buildAppWithManyWorks(210);
-  const body = await getSmartFolderWorks(app, "?q=work-0005&limit=10");
+contract("作品検索qがHTTPクエリから評価まで渡る", async (harness) => {
+  const folderId = await createFolder(harness, "added-desc");
+  const body = await getSmartFolderWorks(harness, folderId, "?q=work-0005&limit=10");
   assert.deepEqual(
-    body.items.map((w) => w.id),
-    ["work-0005"],
+    body.items.map((work) => work.id),
+    [harness.workId("work-0005")],
   );
   assert.equal(body.total, 1);
 });
 
-test("クエリパラメータ不正は400", async () => {
-  const app = buildAppWithManyWorks(10);
-  const res = await app.request("/api/smart-folders/sf-pagination/works?page=0");
-  assert.equal(res.status, 400);
-  const body = await res.json();
+contract("クエリパラメータ不正は400", async (harness) => {
+  const folderId = await createFolder(harness, "added-desc");
+  const { status, body } = await harness.json(`/api/smart-folders/${folderId}/works?page=0`);
+  assert.equal(status, 400);
   assert.equal(body.error.code, "invalid_request");
 });

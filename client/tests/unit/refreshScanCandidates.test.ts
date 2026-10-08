@@ -1,82 +1,41 @@
 import { QueryClient } from "@tanstack/react-query";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { ScanCandidate } from "@mimimilli/shared";
 import {
   fetchScanCandidates,
   refreshScanCandidates,
   SCAN_CANDIDATES_QUERY_KEY,
 } from "../../src/entities/scan/scanCandidatesCache";
+import { mockApi } from "../helpers/api";
+import { buildScanCandidate } from "../helpers/builders";
 
-const candidateA: ScanCandidate = {
+const candidateA = buildScanCandidate({
   path: "候補A",
   inferredTitle: "候補A",
-  audioFileCount: 1,
   audioBreakdown: [{ extension: "wav", count: 1 }],
-  rjCode: null,
-};
+});
 
-const candidateB: ScanCandidate = {
+const candidateB = buildScanCandidate({
   path: "候補B",
   inferredTitle: "候補B",
-  audioFileCount: 1,
   audioBreakdown: [{ extension: "wav", count: 1 }],
-  rjCode: null,
-};
-
-function jsonResponse(body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
-}
+});
 
 function readCache(queryClient: QueryClient): ScanCandidate[] | undefined {
   return queryClient.getQueryData(SCAN_CANDIDATES_QUERY_KEY);
 }
 
 describe("fetchScanCandidates", () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it("サーバーから候補一覧を取得する", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        if (String(input).endsWith("/scan/candidates")) {
-          return jsonResponse({ candidates: [candidateA, candidateB] });
-        }
-        throw new Error(`unexpected fetch: ${String(input)}`);
-      }),
-    );
+    mockApi({ "GET /api/scan/candidates": { candidates: [candidateA, candidateB] } });
 
     await expect(fetchScanCandidates()).resolves.toEqual([candidateA, candidateB]);
   });
 });
 
 describe("refreshScanCandidates", () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it("取得結果をクエリキャッシュへ反映する", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        if (String(input).endsWith("/scan/candidates")) {
-          return jsonResponse({ candidates: [candidateA, candidateB] });
-        }
-        throw new Error(`unexpected fetch: ${String(input)}`);
-      }),
-    );
+    mockApi({ "GET /api/scan/candidates": { candidates: [candidateA, candidateB] } });
 
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const result = await refreshScanCandidates(queryClient);
@@ -92,20 +51,16 @@ describe("refreshScanCandidates", () => {
     });
 
     let callCount = 0;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        if (String(input).endsWith("/scan/candidates")) {
-          callCount += 1;
-          if (callCount === 1) {
-            await firstGate;
-            return jsonResponse({ candidates: [candidateA] });
-          }
-          return jsonResponse({ candidates: [candidateB] });
+    mockApi({
+      "GET /api/scan/candidates": async () => {
+        callCount += 1;
+        if (callCount === 1) {
+          await firstGate;
+          return { candidates: [candidateA] };
         }
-        throw new Error(`unexpected fetch: ${String(input)}`);
-      }),
-    );
+        return { candidates: [candidateB] };
+      },
+    });
 
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 

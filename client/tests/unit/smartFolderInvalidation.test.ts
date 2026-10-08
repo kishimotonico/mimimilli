@@ -25,7 +25,7 @@ describe("invalidateSmartFolderSaveQueries", () => {
 
     await invalidateSmartFolderSaveQueries(queryClient, "folder-1");
 
-    expect(queryClient.getQueryState(normalFacetKey)?.isInvalidated).toBeFalsy();
+    expect(queryClient.getQueryState(normalFacetKey)?.isInvalidated).toBe(false);
   });
 
   it("対象フォルダー以外のスコープ付きファセットは無効化しない", async () => {
@@ -35,7 +35,7 @@ describe("invalidateSmartFolderSaveQueries", () => {
 
     await invalidateSmartFolderSaveQueries(queryClient, "folder-1");
 
-    expect(queryClient.getQueryState(otherFolderFacetKey)?.isInvalidated).toBeFalsy();
+    expect(queryClient.getQueryState(otherFolderFacetKey)?.isInvalidated).toBe(false);
   });
 });
 

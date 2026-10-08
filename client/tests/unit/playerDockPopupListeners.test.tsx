@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import PlayerDock from "../../src/features/player/ui/PlayerDock";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import { PLAYER_CORE_INITIAL, playerCoreAtom } from "../../src/entities/player/model/atoms";
@@ -62,42 +62,26 @@ function renderPlayerDock() {
   );
 }
 
-describe("PlayerDock popup: 再生速度メニューのリスナー", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("退出開始（useIsPresent()===false）と同時に outside press/keydown/scroll リスナーが解除される", () => {
-    const docAddSpy = vi.spyOn(document, "addEventListener");
-    const docRemoveSpy = vi.spyOn(document, "removeEventListener");
-    const winAddSpy = vi.spyOn(window, "addEventListener");
-    const winRemoveSpy = vi.spyOn(window, "removeEventListener");
-
+describe("PlayerDock popup: 再生速度メニューの閉じ操作", () => {
+  it("表示中はEscapeで再生速度メニューが閉じる", () => {
     renderPlayerDock();
     fireEvent.click(screen.getByTitle("再生速度"));
+    expect(screen.getByRole("menu", { name: "再生速度" })).toBeInTheDocument();
 
-    expect(docAddSpy.mock.calls.some(([type]) => type === "pointerdown")).toBe(true);
-    expect(docAddSpy.mock.calls.some(([type]) => type === "keydown")).toBe(true);
-    expect(winAddSpy.mock.calls.some(([type]) => type === "scroll")).toBe(true);
-    const removedBefore =
-      docRemoveSpy.mock.calls.filter(([type]) => type === "pointerdown" || type === "keydown")
-        .length + winRemoveSpy.mock.calls.filter(([type]) => type === "scroll").length;
+    fireEvent.keyDown(document, { key: "Escape" });
 
-    // バーへ戻る => popup 境界が退出開始。isPresent は退出開始と同時に false になるため、
-    // アニメーション完了を待たずにここでリスナーが外れているはず。
+    expect(screen.queryByRole("menu", { name: "再生速度" })).not.toBeInTheDocument();
+  });
+
+  it("バーへ戻る退出中は、Escapeや外側クリックに再生速度メニューが反応しない", () => {
+    renderPlayerDock();
+    fireEvent.click(screen.getByTitle("再生速度"));
+    expect(screen.getByRole("menu", { name: "再生速度" })).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: "バーへ戻る" }));
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.pointerDown(document.body);
 
-    const removedAfter =
-      docRemoveSpy.mock.calls.filter(([type]) => type === "pointerdown" || type === "keydown")
-        .length + winRemoveSpy.mock.calls.filter(([type]) => type === "scroll").length;
-    expect(removedAfter).toBeGreaterThan(removedBefore);
-
-    // 退出中に外部から pointerdown/keydown/scroll を飛ばしても、もはや古いリスナーには届かない
-    // （そのため rateMenuOpen が再オープンされたりせずクラッシュもしない）ことを確認する。
-    expect(() => {
-      fireEvent.pointerDown(document.body);
-      fireEvent.keyDown(window, { key: "Escape" });
-      fireEvent.scroll(window);
-    }).not.toThrow();
+    expect(screen.getByRole("menu", { name: "再生速度" })).toBeInTheDocument();
   });
 });

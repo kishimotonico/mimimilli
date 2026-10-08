@@ -5,18 +5,14 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Work, WorkEditSnapshot } from "@mimimilli/shared";
-import { emptyDlsiteState, toDlsiteLinkageStatus } from "@mimimilli/shared";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { WorkEditDialog } from "../../src/features/library/ui/preview/WorkEditDialog";
+import { mockApi } from "../helpers/api";
+import { buildSettings, buildWork, buildWorkEditSnapshotOf } from "../helpers/builders";
 
 vi.mock("../../src/features/library/ui/preview/DlsiteEditor", () => ({
   DlsiteEditor: () => null,
 }));
-vi.mock("../../src/entities/tag/useTagPrefixes", () => ({
-  useTagPrefixes: () => ({ tagPrefixes: [] }),
-}));
-
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
     this.open = true;
@@ -26,54 +22,18 @@ beforeEach(() => {
   });
 });
 
-function makeWork(overrides: Partial<Work> = {}): Work {
-  return {
-    id: "w1",
-    title: "作品",
-    cover: null,
-    coverKind: "none",
-    coverImage: null,
-    status: "ok",
-    physicalPath: "/lib/w1",
-    totalDurationSec: 120,
-    addedAt: "2025-01-01T00:00:00.000Z",
-    errorMessage: null,
-    urls: [],
-    tags: [],
-    bookmarked: false,
-    lastPlayedAt: null,
-    dlsite: emptyDlsiteState(),
-    defaultPlaylistId: null,
-    createdAt: null,
-    playlists: [],
-    resume: null,
-    ...overrides,
-  };
-}
-
-function makeSnapshot(work: Work): WorkEditSnapshot {
-  return {
-    sourceRevision: "revision-1",
-    id: work.id,
-    physicalPath: work.physicalPath,
-    title: work.title,
-    tags: work.tags,
-    urls: work.urls,
-    coverImage: work.coverImage,
-    dlsite: {
-      rjCode: work.dlsite.rjCode,
-      status: toDlsiteLinkageStatus(work.dlsite.status),
-      appliedTags: work.dlsite.appliedTags,
-    },
-  };
-}
-
 function renderDialog(onClose: () => void) {
-  const work = makeWork();
+  const work = buildWork({ id: "w1", physicalPath: "/lib/w1" });
+  const snapshot = buildWorkEditSnapshotOf(work, "revision-1");
+  mockApi({
+    "GET /api/works/:id/source": snapshot,
+    "GET /api/settings": buildSettings(),
+    "GET /api/tag-prefixes": [],
+  });
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  queryClient.setQueryData(WORK_QUERY_KEYS.source(work.id), makeSnapshot(work));
+  queryClient.setQueryData(WORK_QUERY_KEYS.source(work.id), snapshot);
   const noop = {
     isPending: false,
     error: null,
@@ -106,12 +66,12 @@ describe("WorkEditDialog × WorkTagEditor: Escapeの契約統合", () => {
     fireEvent.click(screen.getByRole("button", { name: "タグを追加" }));
     const tagInput = screen.getByRole("combobox", { name: "追加するタグ" });
     fireEvent.change(tagInput, { target: { value: "睡" } });
-    expect(screen.getByRole("listbox")).toBeTruthy();
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
 
     fireEvent.keyDown(tagInput, { key: "Escape" });
 
     expect(screen.queryByRole("listbox")).toBeNull(); // 候補だけが閉じる
-    expect(screen.getByRole("combobox", { name: "追加するタグ" })).toBeTruthy(); // タグ追加欄自体は開いたまま
+    expect(screen.getByRole("combobox", { name: "追加するタグ" })).toBeInTheDocument(); // タグ追加欄自体は開いたまま
     expect(screen.queryByRole("alertdialog", { name: "未保存の変更があります" })).toBeNull();
     expect(onClose).not.toHaveBeenCalled();
 
@@ -132,6 +92,6 @@ describe("WorkEditDialog × WorkTagEditor: Escapeの契約統合", () => {
     fireEvent(dialog, new Event("cancel", { cancelable: true, bubbles: true }));
 
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByRole("alertdialog", { name: "未保存の変更があります" })).toBeTruthy();
+    expect(screen.getByRole("alertdialog", { name: "未保存の変更があります" })).toBeInTheDocument();
   });
 });

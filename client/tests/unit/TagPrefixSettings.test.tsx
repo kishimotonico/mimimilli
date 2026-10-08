@@ -5,34 +5,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TagPrefix } from "@mimimilli/shared";
 import TagPrefixSettings from "../../src/features/settings/ui/TagPrefixSettings";
-
-const listTagPrefixes = vi.fn();
-const listTagPrefixCandidates = vi.fn();
-const createTagPrefix = vi.fn();
-const updateTagPrefix = vi.fn();
-const reorderTagPrefixes = vi.fn();
-const deleteTagPrefix = vi.fn();
-
-vi.mock("../../src/entities/tag/api", () => ({
-  listTagPrefixes: (...args: unknown[]) => listTagPrefixes(...args),
-  listTagPrefixCandidates: (...args: unknown[]) => listTagPrefixCandidates(...args),
-  createTagPrefix: (...args: unknown[]) => createTagPrefix(...args),
-  updateTagPrefix: (...args: unknown[]) => updateTagPrefix(...args),
-  reorderTagPrefixes: (...args: unknown[]) => reorderTagPrefixes(...args),
-  deleteTagPrefix: (...args: unknown[]) => deleteTagPrefix(...args),
-}));
+import { apiNoContent, mockApi, type ApiMock } from "../helpers/api";
+import { buildTagPrefix } from "../helpers/builders";
 
 const PREFIXES: TagPrefix[] = [
-  { prefix: "cv", label: "CV", color: "cv", showAsAxis: true, protected: true, order: 0 },
-  {
-    prefix: "気分",
-    label: "気分",
-    color: null,
-    showAsAxis: true,
-    protected: false,
-    order: 1,
-  },
+  buildTagPrefix({ prefix: "cv", label: "CV", color: "cv", protected: true, order: 0 }),
+  buildTagPrefix({ prefix: "気分", label: "気分", color: null, protected: false, order: 1 }),
 ];
+
+let api: ApiMock;
 
 function renderSettings() {
   const queryClient = new QueryClient({
@@ -45,12 +26,17 @@ function renderSettings() {
 
 describe("TagPrefixSettings", () => {
   beforeEach(() => {
-    listTagPrefixes.mockReset().mockResolvedValue(PREFIXES);
-    listTagPrefixCandidates.mockReset().mockResolvedValue([]);
-    createTagPrefix.mockReset();
-    updateTagPrefix.mockReset().mockResolvedValue(undefined);
-    reorderTagPrefixes.mockReset().mockResolvedValue(undefined);
-    deleteTagPrefix.mockReset().mockResolvedValue(undefined);
+    api = mockApi({
+      "GET /api/tag-prefixes": PREFIXES,
+      "GET /api/tag-prefixes/candidates": [],
+      "PATCH /api/tag-prefixes/:prefix": ({ params }) =>
+        PREFIXES.find((prefix) => prefix.prefix === params.prefix),
+      "PUT /api/tag-prefixes/order": ({ body }) => {
+        const { prefixes } = body as { prefixes: string[] };
+        return prefixes.map((name) => PREFIXES.find((prefix) => prefix.prefix === name));
+      },
+      "DELETE /api/tag-prefixes/:prefix": () => apiNoContent(),
+    });
     HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
       this.open = true;
     });
@@ -72,15 +58,17 @@ describe("TagPrefixSettings", () => {
   it("保護されていないprefixは確認ダイアログを経由して削除する", async () => {
     renderSettings();
     const button = await screen.findByRole("button", { name: "prefix「気分」を削除" });
-    expect(deleteTagPrefix).not.toHaveBeenCalled();
+    expect(api.requestsTo("DELETE /api/tag-prefixes/:prefix")).toHaveLength(0);
 
     fireEvent.click(button);
     const dialog = await screen.findByRole("alertdialog");
     expect(within(dialog).getByText(/気分\/ タグ自体は消えません/)).toBeInTheDocument();
-    expect(deleteTagPrefix).not.toHaveBeenCalled();
+    expect(api.requestsTo("DELETE /api/tag-prefixes/:prefix")).toHaveLength(0);
 
     fireEvent.click(within(dialog).getByRole("button", { name: "削除する" }));
-    await waitFor(() => expect(deleteTagPrefix).toHaveBeenCalledWith("気分"));
+    await waitFor(() =>
+      expect(api.requestsTo("DELETE /api/tag-prefixes/:prefix")[0]?.params.prefix).toBe("気分"),
+    );
   });
 
   it("上へ移動すると全prefixの新しい順序を一括で送る", async () => {
@@ -88,8 +76,12 @@ describe("TagPrefixSettings", () => {
     const upButton = await screen.findByRole("button", { name: "「気分」を上へ移動" });
     fireEvent.click(upButton);
 
-    await waitFor(() => expect(reorderTagPrefixes).toHaveBeenCalledWith(["気分", "cv"]));
-    expect(updateTagPrefix).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(api.requestsTo("PUT /api/tag-prefixes/order")[0]?.body).toEqual({
+        prefixes: ["気分", "cv"],
+      }),
+    );
+    expect(api.requestsTo("PATCH /api/tag-prefixes/:prefix")).toHaveLength(0);
   });
 
   it("ラベル編集はIME変換中のEnterで確定せず、変換後のEnterで確定する", async () => {
@@ -100,9 +92,12 @@ describe("TagPrefixSettings", () => {
     fireEvent.change(input, { target: { value: "あたらしい" } });
 
     fireEvent.keyDown(input, { key: "Enter", isComposing: true, keyCode: 229 });
-    expect(updateTagPrefix).not.toHaveBeenCalled();
+    expect(api.requestsTo("PATCH /api/tag-prefixes/:prefix")).toHaveLength(0);
 
     fireEvent.keyDown(input, { key: "Enter" });
-    await waitFor(() => expect(updateTagPrefix).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(api.requestsTo("PATCH /api/tag-prefixes/:prefix")).toHaveLength(1));
+    expect(api.requestsTo("PATCH /api/tag-prefixes/:prefix")[0]?.body).toEqual({
+      label: "あたらしい",
+    });
   });
 });

@@ -1,14 +1,13 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { saveResumePosition } from "../../src/features/player/api";
+import { beforeEach, describe, expect, it } from "vitest";
 import { useResumePersistenceController } from "../../src/features/player/model/useResumePersistence";
 import type { PendingResume } from "../../src/entities/player/model/playerRuntime";
 import { PlayerController } from "../../src/entities/player/model/playerController";
 import type { Track, Work, WorkSummary } from "../../src/entities/work/model";
+import { apiNoContent, mockApi, type ApiMock } from "../helpers/api";
 
-vi.mock("../../src/features/player/api", () => ({
-  saveResumePosition: vi.fn(() => Promise.resolve()),
-}));
+const RESUME_ROUTE = "POST /api/works/:id/resume";
+let api: ApiMock;
 
 const playlistId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const track: Track = {
@@ -39,8 +38,7 @@ function options() {
 }
 
 beforeEach(() => {
-  vi.mocked(saveResumePosition).mockReset();
-  vi.mocked(saveResumePosition).mockResolvedValue(undefined);
+  api = mockApi({ [RESUME_ROUTE]: () => apiNoContent() });
 });
 
 describe("resume persistence port", () => {
@@ -80,14 +78,16 @@ describe("resume persistence port", () => {
 
   it("飛行中の保存後に次の保存を直列化し、先行保存の失敗後も継続する", async () => {
     let rejectFirstSave: ((reason?: unknown) => void) | undefined;
-    vi.mocked(saveResumePosition)
-      .mockImplementationOnce(
-        () =>
-          new Promise<void>((_resolve, reject) => {
-            rejectFirstSave = reject;
-          }),
-      )
-      .mockResolvedValueOnce(undefined);
+    let saveCount = 0;
+    api = mockApi({
+      [RESUME_ROUTE]: () => {
+        saveCount += 1;
+        if (saveCount > 1) return apiNoContent();
+        return new Promise<Response>((_resolve, reject) => {
+          rejectFirstSave = reject;
+        });
+      },
+    });
     const { result } = renderHook(() => useResumePersistenceController(options()));
 
     act(() => {
@@ -98,14 +98,12 @@ describe("resume persistence port", () => {
         offsetSec: 0,
       });
     });
-    expect(saveResumePosition).toHaveBeenCalledTimes(1);
+    expect(api.requestsTo(RESUME_ROUTE)).toHaveLength(1);
 
     act(() => rejectFirstSave?.(new Error("保存失敗")));
-    await waitFor(() => expect(saveResumePosition).toHaveBeenCalledTimes(2));
-    expect(saveResumePosition).toHaveBeenLastCalledWith("work-1", {
-      playlistId,
-      trackId: track.id,
-      offsetSec: 0,
-    });
+    await waitFor(() => expect(api.requestsTo(RESUME_ROUTE)).toHaveLength(2));
+    const lastSave = api.requestsTo(RESUME_ROUTE)[1];
+    expect(lastSave?.params.id).toBe("work-1");
+    expect(lastSave?.body).toEqual({ playlistId, trackId: track.id, offsetSec: 0 });
   });
 });

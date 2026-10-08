@@ -65,7 +65,7 @@ describe("GlobalToast", () => {
     // 破棄された要求のToastContentは退場アニメーション中は残る（motion）ため、
     // 最終的に1件だけになるのを待つ
     await waitFor(() => expect(screen.getAllByText(/^(操作の結果|単発の通知)$/)).toHaveLength(1));
-    expect(screen.getByText("操作の結果")).toBeTruthy();
+    expect(screen.getByText("操作の結果")).toBeInTheDocument();
   });
 
   it("variant=errorは発行元が宣言したpriorityに関わらず最優先で選ばれる", async () => {
@@ -83,7 +83,7 @@ describe("GlobalToast", () => {
     await waitFor(() =>
       expect(screen.getAllByText(/^(操作の結果|致命的なエラー)$/)).toHaveLength(1),
     );
-    expect(screen.getByText("致命的なエラー")).toBeTruthy();
+    expect(screen.getByText("致命的なエラー")).toBeInTheDocument();
   });
 
   it("選ばれなかった要求は即座に破棄され、onDismissが同期的に呼ばれる", () => {

@@ -2,17 +2,15 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { TagPrefix } from "@mimimilli/shared";
 import AxisColumn from "../../src/features/library/ui/AxisColumn";
+import { mockApi } from "../helpers/api";
+import { buildAxisFacetItem, buildTagPrefix } from "../helpers/builders";
 
 afterEach(() => {
   cleanup();
-  vi.unstubAllGlobals();
 });
 
-const PREFIXES: TagPrefix[] = [
-  { prefix: "cv", label: "CV", color: "cv", showAsAxis: true, protected: true },
-];
+const PREFIXES = [buildTagPrefix({ prefix: "cv", label: "CV", color: "cv", protected: true })];
 
 function renderAxisColumn(props: Partial<React.ComponentProps<typeof AxisColumn>>) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -42,13 +40,13 @@ describe("AxisColumn", () => {
       stats: { status: "ready", count: 12, trackCount: 34, durationSec: 3661 },
     });
 
-    expect(screen.getByText(/12作品.*34トラック/)).toBeTruthy();
+    expect(screen.getByText(/12作品.*34トラック/)).toBeInTheDocument();
   });
 
   it("統計取得に失敗した場合はエラー文言を表示する", () => {
     renderAxisColumn({ stats: { status: "error" } });
 
-    expect(screen.getByText("統計の取得に失敗しました")).toBeTruthy();
+    expect(screen.getByText("統計の取得に失敗しました")).toBeInTheDocument();
   });
 
   it("選択中のビュー項目に aria-current を付与する", () => {
@@ -70,9 +68,9 @@ describe("AxisColumn", () => {
       isTagPrefixesError: true,
     });
 
-    expect(screen.getByText("分類軸の取得に失敗しました")).toBeTruthy();
+    expect(screen.getByText("分類軸の取得に失敗しました")).toBeInTheDocument();
     // 組み込みのタグ・追加日は tagPrefixes に依存しないため引き続き表示される
-    expect(screen.getByRole("button", { name: /タグ/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /タグ/ })).toBeInTheDocument();
   });
 
   it("エラー行の再試行ボタンをクリックすると onRetryTagPrefixes を呼ぶ", async () => {
@@ -92,21 +90,11 @@ describe("AxisColumn", () => {
     });
 
     expect(screen.queryByText("分類軸の取得に失敗しました")).toBeNull();
-    expect(screen.getByRole("button", { name: /CV/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /CV/ })).toBeInTheDocument();
   });
 
   it("初回レンダー直後（再レンダーを挟まない）の最初のホバーでもクイックオーバーレイが開く", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() =>
-        Promise.resolve(
-          new Response(JSON.stringify([]), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          }),
-        ),
-      ),
-    );
+    mockApi({ "GET /api/axes/:axis": [] });
     renderAxisColumn({ tagPrefixes: PREFIXES });
 
     // マウント直後、再レンダーを一切挟まずに最初のpointerEnterを発火する。実ブラウザでは
@@ -116,22 +104,12 @@ describe("AxisColumn", () => {
     fireEvent.pointerEnter(screen.getByRole("button", { name: /CV/ }));
 
     await waitFor(() => {
-      expect(document.querySelector(".mll-qoverlay")).toBeTruthy();
+      expect(document.querySelector(".mll-qoverlay")).toBeInTheDocument();
     });
   });
 
   it("オーバーレイ閉鎖（退出）中もfacet一覧が空にならない", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() =>
-        Promise.resolve(
-          new Response(
-            JSON.stringify([{ value: "藤田茜", count: 3, durationSec: 0, covers: [] }]),
-            { status: 200, headers: { "Content-Type": "application/json" } },
-          ),
-        ),
-      ),
-    );
+    mockApi({ "GET /api/axes/:axis": [buildAxisFacetItem({ value: "藤田茜", count: 3 })] });
     renderAxisColumn({ tagPrefixes: PREFIXES });
 
     // ArrowRight で遅延なしに開く（openImmediately）。
@@ -140,7 +118,7 @@ describe("AxisColumn", () => {
     // 読み込み完了で「項目がありません」（空表示）が出ないこと（＝1件のfacetが一覧に載っている）
     // を、一覧本体（role="group"）の出現で確認する。
     await waitFor(() => {
-      expect(document.querySelector('.mll-qlist__body[role="group"]')).toBeTruthy();
+      expect(document.querySelector('.mll-qlist__body[role="group"]')).toBeInTheDocument();
     });
 
     // Escape で閉じる（コーディネーターの close() は遅延なし。閉鎖直後もAnimatePresenceが
@@ -149,27 +127,17 @@ describe("AxisColumn", () => {
 
     // クエリが無効化されて空扱いになっていれば「項目がありません」に切り替わる。
     // 退出中も一覧本体が保持されたままであることを確認する。
-    expect(document.querySelector('.mll-qlist__body[role="group"]')).toBeTruthy();
+    expect(document.querySelector('.mll-qlist__body[role="group"]')).toBeInTheDocument();
     expect(screen.queryByText("項目がありません")).toBeNull();
   });
 
   it("軸A→B高速切替で新パネルが閉じず、検索欄フォーカスが奪われない", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() =>
-        Promise.resolve(
-          new Response(JSON.stringify([]), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          }),
-        ),
-      ),
-    );
+    mockApi({ "GET /api/axes/:axis": [] });
     renderAxisColumn({ tagPrefixes: PREFIXES });
 
     fireEvent.keyDown(screen.getByRole("button", { name: /CV/ }), { key: "ArrowRight" });
     await waitFor(() => {
-      expect(screen.getByLabelText("CVの値を検索")).toBeTruthy();
+      expect(screen.getByLabelText("CVの値を検索")).toBeInTheDocument();
     });
 
     // 退出アニメーション完了を待たず、別軸へ即座に切り替える（openImmediately）。
@@ -179,6 +147,6 @@ describe("AxisColumn", () => {
       expect(document.activeElement).toBe(screen.getByLabelText("追加日の値を検索"));
     });
     // 新パネルが開いたまま維持されている（閉じていない）。
-    expect(screen.getByLabelText("追加日の値を検索")).toBeTruthy();
+    expect(screen.getByLabelText("追加日の値を検索")).toBeInTheDocument();
   });
 });

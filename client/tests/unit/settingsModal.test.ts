@@ -11,6 +11,8 @@ import { dlsiteBulkStoreAtom } from "../../src/entities/dlsite/model/dlsiteBulkS
 import { createFakeDlsiteBulkStore } from "../helpers/fakeJobStores";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { ApiRequestError } from "../../src/shared/api/http";
+import { mockApi } from "../helpers/api";
+import { buildSettings } from "../helpers/builders";
 
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
@@ -19,10 +21,12 @@ beforeEach(() => {
   HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
     this.open = false;
   });
-  vi.mocked(global.fetch).mockResolvedValue({
-    ok: true,
-    json: async () => [],
-  } as Response);
+  mockApi({
+    "GET /api/settings": buildSettings({ rootFolder: "/audio" }),
+    "GET /api/tag-prefixes": [],
+    "GET /api/tag-prefixes/candidates": [],
+    "GET /api/scan/candidates/exclusions": { paths: [] },
+  });
 });
 
 interface RenderModalOptions {
@@ -39,10 +43,7 @@ function renderModal(options: RenderModalOptions = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
-    rootFolder: "/audio",
-    lastScanTime: null,
-  });
+  queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), buildSettings({ rootFolder: "/audio" }));
   const store = createStore();
   store.set(dlsiteBulkStoreAtom, createFakeDlsiteBulkStore());
   render(

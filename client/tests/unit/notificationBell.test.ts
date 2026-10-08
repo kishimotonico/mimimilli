@@ -4,34 +4,29 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
-import type { ScanDiagnostics, ScanResult } from "@mimimilli/shared";
+import type { DlsiteNotificationSummary, ScanDiagnostics, ScanResult } from "@mimimilli/shared";
 import NotificationBell from "../../src/app/ui/NotificationBell";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
 import { dlsiteBulkStoreAtom } from "../../src/entities/dlsite/model/dlsiteBulkStore";
 import { createFakeDlsiteBulkStore } from "../helpers/fakeJobStores";
+import { mockApi, apiNoContent } from "../helpers/api";
+import {
+  buildDlsiteNotificationSummary,
+  buildScanDiagnostics,
+  buildScanLastResult,
+  buildScanResult,
+} from "../helpers/builders";
 
-const scanResult: ScanResult = {
+const scanResult: ScanResult = buildScanResult({
   registered: 12,
   insertedWorkIds: ["a", "b", "c"],
-  updatedWorkIds: [],
   errors: 1,
-  missing: 0,
-  skipped: 0,
-  coverErrors: 0,
-};
-
-const summaryDefaults = {
-  rjCodeMissingCount: 0,
-  fetchFailedCount: 0,
-  parseErrorCount: 0,
-  parseErrorAlert: false,
-  unlinkedCount: 0,
-};
+});
 
 function renderBell(
-  summaryOverrides: Partial<typeof summaryDefaults> = {},
+  summaryOverrides: Partial<DlsiteNotificationSummary> = {},
   atomOverrides?: {
     active?: boolean;
     progress?: import("@mimimilli/shared").DlsiteBulkProgressSnapshot | null;
@@ -42,21 +37,19 @@ function renderBell(
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  queryClient.setQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary(), {
-    ...summaryDefaults,
-    ...summaryOverrides,
+  const summary = buildDlsiteNotificationSummary(summaryOverrides);
+  const lastScan = scanResultOverride ? buildScanLastResult({ result: scanResultOverride }) : null;
+  const scanDiagnostics = buildScanDiagnostics(diagnostics);
+  mockApi({
+    "GET /api/dlsite/notifications": summary,
+    "GET /api/scan/last": () => lastScan ?? apiNoContent(),
+    "GET /api/scan/diagnostics": scanDiagnostics,
   });
+  queryClient.setQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary(), summary);
   // NotificationBell 自身が SCAN_QUERY_KEYS.last() を持つ
-  queryClient.setQueryData(
-    SCAN_QUERY_KEYS.last(),
-    scanResultOverride
-      ? { result: scanResultOverride, finishedAt: "2026-01-01T00:00:00.000Z" }
-      : null,
-  );
+  queryClient.setQueryData(SCAN_QUERY_KEYS.last(), lastScan);
   // 要対応タブと同じ定義を使う: ID重複は常に最新の診断クエリから拾う
-  queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), {
-    ...diagnostics,
-  });
+  queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), scanDiagnostics);
 
   const store = createStore();
   const dlsiteBulk = createFakeDlsiteBulkStore({

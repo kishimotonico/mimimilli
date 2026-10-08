@@ -1,18 +1,19 @@
 import { createElement, type ReactNode } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { WorkRegisterPreview } from "@mimimilli/shared";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { workRegisterPreviewSchema } from "@mimimilli/shared";
+import { mockApi } from "../helpers/api";
 import RegisterWorkDialog from "../../src/features/files/ui/RegisterWorkDialog";
 
-const preview: WorkRegisterPreview = {
+const preview = workRegisterPreviewSchema.parse({
   suggestedTitle: "テスト作品",
   tags: [],
   detectedRjCode: null,
   descendantWorkCount: 0,
   alreadyRegistered: false,
   orphanedMeta: false,
-};
+});
 
 function renderDialog() {
   const queryClient = new QueryClient({
@@ -40,30 +41,7 @@ describe("RegisterWorkDialog", () => {
     HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
       this.open = false;
     });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.includes("/api/tags")) {
-          return new Response(JSON.stringify([]), {
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        if (url.includes("/api/tag-prefixes")) {
-          return new Response(JSON.stringify([]), {
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        return new Response(JSON.stringify({}), {
-          status: 404,
-          headers: { "Content-Type": "application/json" },
-        });
-      }),
-    );
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
+    mockApi({ "GET /api/tags": [], "GET /api/tag-prefixes": [] });
   });
 
   it("targetKind=file のとき見出しをファイル向けにする", () => {
@@ -82,7 +60,9 @@ describe("RegisterWorkDialog", () => {
       />,
       { wrapper },
     );
-    expect(screen.getByRole("heading", { name: "このファイルを作品として登録" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "このファイルを作品として登録" }),
+    ).toBeInTheDocument();
   });
 
   it("RJ/VJコード未入力で取得を押すとバリデーション文言を表示する", () => {
@@ -90,7 +70,7 @@ describe("RegisterWorkDialog", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "取得" }));
 
-    expect(screen.getByText("RJ/VJコードを入力してください")).toBeTruthy();
+    expect(screen.getByText("RJ/VJコードを入力してください")).toBeInTheDocument();
     expect(screen.queryByText("DLsite情報の取得に失敗しました")).toBeNull();
   });
 
@@ -109,8 +89,10 @@ describe("RegisterWorkDialog", () => {
       />,
       { wrapper },
     );
-    expect(screen.getByText(/先に子作品の登録を解除してから親を登録してください/)).toBeTruthy();
-    expect(screen.getByText("2")).toBeTruthy();
+    expect(
+      screen.getByText(/先に子作品の登録を解除してから親を登録してください/),
+    ).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "登録" })).toBeDisabled();
   });
 });

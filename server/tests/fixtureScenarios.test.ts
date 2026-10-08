@@ -152,6 +152,40 @@ test("new-work: identityConflicts・invalidMetaFilesが指すパスは/fsツリ�
   assert.ok(metaEntry, "壊れた/mimimilli.json が/fsツリーに存在しない");
 });
 
+test("identity-conflict: 単一ファイル形式の重複メタファイルと音声ファイルがrealと同じ配置で/fsツリーに載る", async () => {
+  const app = buildApp("identity-conflict");
+  const entries = async (path: string) =>
+    (await (await app.request(`/api/fs?path=${path}`)).json()).entries as Array<{
+      name: string;
+      workId: string | null;
+    }>;
+
+  assert.deepEqual(
+    (await entries("fanza")).map(({ name, workId }) => ({ name, workId })),
+    [
+      { name: "d00001.mp3", workId: null },
+      { name: "d00002.mp3", workId: "d00002" },
+      { name: "d00002.mimimilli.json", workId: null },
+    ],
+  );
+  assert.deepEqual(
+    (await entries("copies")).map(({ name, workId }) => ({ name, workId })),
+    [
+      { name: "d00002.mimimilli.json", workId: null },
+      { name: "d00002.mp3", workId: null },
+    ],
+  );
+
+  const diagnostics = await (await app.request("/api/scan/diagnostics")).json();
+  assert.deepEqual(diagnostics.identityConflicts, [
+    {
+      kind: "identity_conflict",
+      workId: "d00002",
+      paths: ["fanza/d00002.mimimilli.json", "copies/d00002.mimimilli.json"],
+    },
+  ]);
+});
+
 test("errors: dataIntegrityWarningがWorksPage・スキャン結果・エクスポート・スマートフォルダー・DLsite一括のいずれからも取得できる", async () => {
   // real adapterの意味論（DB破損行があればクエリのたびに毎回付く劣化状態の表示）に
   // 合わせ、劣化状態を確認するためのシナリオ errors に置く。new-work・default等の

@@ -7,35 +7,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAxisFacetsQuery } from "../../src/features/library/model/useAxisFacetsQuery";
-
-function jsonResponse(data: unknown): Response {
-  return new Response(JSON.stringify(data), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-function urlOf(input: RequestInfo | URL): string {
-  if (typeof input === "string") return input;
-  if (input instanceof URL) return input.toString();
-  return input.url;
-}
-
-function createFetchMock() {
-  return vi.fn((input: RequestInfo | URL) => {
-    const url = new URL(urlOf(input), "http://localhost");
-    if (url.pathname.startsWith("/api/axes/")) {
-      return Promise.resolve(jsonResponse([]));
-    }
-    return Promise.reject(new Error(`unexpected fetch: ${url.toString()}`));
-  });
-}
-
-function axesCallUrls(fetchMock: ReturnType<typeof createFetchMock>): string[] {
-  return fetchMock.mock.calls
-    .map(([input]) => urlOf(input))
-    .filter((u) => u.includes("/api/axes/"));
-}
+import { mockApi, type ApiMock } from "../helpers/api";
 
 function renderFacets(axis: string | null, selectedTags: string[]) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -49,11 +21,10 @@ function renderFacets(axis: string | null, selectedTags: string[]) {
 }
 
 describe("useAxisFacetsQuery のタグ素通し", () => {
-  let fetchMock: ReturnType<typeof createFetchMock>;
+  let api: ApiMock;
 
   beforeEach(() => {
-    fetchMock = createFetchMock();
-    vi.stubGlobal("fetch", fetchMock);
+    api = mockApi({ "GET /api/axes/:axis": [] });
   });
 
   afterEach(() => {
@@ -65,7 +36,7 @@ describe("useAxisFacetsQuery のタグ素通し", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    const urls = axesCallUrls(fetchMock);
+    const urls = api.urlsTo("GET /api/axes/:axis");
     expect(urls).toHaveLength(1);
     expect(urls[0]).toContain("/api/axes/cv?");
     expect(urls[0]).toContain("cv%2F"); // 自軸(cv)由来の選択タグも渡される
@@ -77,7 +48,7 @@ describe("useAxisFacetsQuery のタグ素通し", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    const urls = axesCallUrls(fetchMock);
+    const urls = api.urlsTo("GET /api/axes/:axis");
     expect(urls[0]).toBe("/api/axes/cv");
   });
 
@@ -93,11 +64,11 @@ describe("useAxisFacetsQuery のタグ素通し", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     await waitFor(() => expect(queryClient.isFetching()).toBe(0));
-    fetchMock.mockClear();
+    api.clear();
 
     rerender({ selectedTags: ["サークル/月白製作所"] });
 
-    await waitFor(() => expect(axesCallUrls(fetchMock)).toHaveLength(1));
-    expect(axesCallUrls(fetchMock)[0]).toContain("tags=");
+    await waitFor(() => expect(api.urlsTo("GET /api/axes/:axis")).toHaveLength(1));
+    expect(api.urlsTo("GET /api/axes/:axis")[0]).toContain("tags=");
   });
 });

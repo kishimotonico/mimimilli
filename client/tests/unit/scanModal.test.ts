@@ -4,11 +4,9 @@ import { createElement, Fragment } from "react";
 import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   WORKS_DEFAULT_PAGE_SIZE,
-  toDlsiteLinkageStatus,
-  workspacePath,
   type ScanCandidate,
   type ScanJobSnapshot,
   type ScanResult,
@@ -19,36 +17,58 @@ import {
 } from "@mimimilli/shared";
 import ScanModal from "../../src/features/scan/ui/ScanModal";
 import GlobalToast from "../../src/app/ui/GlobalToast";
-import * as workApi from "../../src/entities/work/api";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { scanJobStoreAtom } from "../../src/entities/scan/model/scanJobStore";
 import { createFakeScanJobStore } from "../helpers/fakeJobStores";
-import * as scanApi from "../../src/features/scan/api";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
-import * as scanCandidatesCache from "../../src/entities/scan/scanCandidatesCache";
-import * as scanEntityApi from "../../src/entities/scan/api";
 import { libraryTotalQueryOptions } from "../../src/entities/work/libraryTotalQueryOptions";
+import { apiError, apiNoContent, mockApi, type ApiMock, type ApiRequest } from "../helpers/api";
+import {
+  buildDlsiteNotificationSummary,
+  buildScanCandidate,
+  buildScanCandidatesRegisterResponse,
+  buildScanDiagnostics,
+  buildScanLastResult,
+  buildScanResult,
+  buildSettings,
+  buildWork,
+  buildWorkEditSnapshotOf,
+  buildWorkListItem,
+  buildWorkSourceMutationResult,
+  buildWorksPage,
+} from "../helpers/builders";
 
-/** ids指定のworks一覧クエリ結果のスタブ。テストごとに登録した作品だけ返す。
- *  ids指定が無い呼び出し（libraryTotalQueryOptions等）は本来の実装（fetch経由）へ委譲する。 */
+const LIBRARY_TOTAL = 11;
+
+/** ids指定のworks一覧に返す作品。テストごとに登録した作品だけ返す */
 const worksById = new Map<string, WorkListItem>();
-const originalSearchWorks = workApi.searchWorks;
-let searchWorksSpy: ReturnType<typeof vi.spyOn<typeof workApi, "searchWorks">>;
+let api: ApiMock;
+let worksByIdFails = false;
+let patchWorkSourceReply: (request: ApiRequest) => unknown;
+let registerReply: unknown;
+let serverCandidates: ScanCandidate[] = [];
 
 function toListItem(id: string, title: string, trackCount: number): WorkListItem {
-  return {
-    id,
-    title,
-    cover: null,
-    status: "ok",
-    totalDurationSec: null,
-    trackCount,
-    bookmarked: false,
-    lastPlayedAt: null,
-    circleName: null,
-    relativePath: workspacePath(id),
-    dlsite: { rjCode: null, status: "none" },
-  };
+  return buildWorkListItem({ id, title, trackCount });
+}
+
+function idsQueries(): string[][] {
+  return api
+    .requestsTo("GET /api/works")
+    .map((request) => request.url.searchParams.getAll("ids"))
+    .filter((ids) => ids.length > 0);
+}
+
+/** 契約形式（{error:{code,message}}）ではない500。利用者向け文言を持たない失敗として扱われる */
+function unstructuredServerError(): Response {
+  return new Response("Internal Server Error", { status: 500 });
+}
+
+function saveTitleReply(request: ApiRequest) {
+  const { title } = request.body as { title: string };
+  const item = worksById.get(newWork.id);
+  if (item) worksById.set(newWork.id, { ...item, title });
+  return buildWorkSourceMutationResult(scanSnapshot(title));
 }
 
 beforeEach(() => {
@@ -61,98 +81,62 @@ beforeEach(() => {
 
   worksById.clear();
   worksById.set(newWork.id, toListItem(newWork.id, newWork.title, newWork.trackCount));
-  searchWorksSpy = vi.spyOn(workApi, "searchWorks").mockImplementation(async (params, options) => {
-    if (!params.ids) return originalSearchWorks(params, options);
-    const items = params.ids.flatMap((id) => {
-      const item = worksById.get(id);
-      return item ? [item] : [];
-    });
-    return { items, total: items.length, stats: { trackCount: 0, durationSec: 0 } };
+  worksByIdFails = false;
+  patchWorkSourceReply = saveTitleReply;
+  registerReply = buildScanCandidatesRegisterResponse();
+  serverCandidates = [];
+  api = mockApi({
+    "GET /api/works": ({ url }) => {
+      const ids = url.searchParams.getAll("ids");
+      if (ids.length === 0) return buildWorksPage([], { total: LIBRARY_TOTAL });
+      if (worksByIdFails) return unstructuredServerError();
+      return buildWorksPage(ids.flatMap((id) => worksById.get(id) ?? []));
+    },
+    "GET /api/works/:id": ({ params }) =>
+      params.id === work.id ? work : apiError(404, "not_found", `work not found: ${params.id}`),
+    "GET /api/works/:id/source": () => scanSnapshot(work.title),
+    "PATCH /api/works/:id": (request) => patchWorkSourceReply(request),
+    "POST /api/scan/candidates/register": () => registerReply,
+    "POST /api/scan/candidates/exclude": () => apiNoContent(),
+    "POST /api/scan/candidates/exclusions/restore": () => apiNoContent(),
+    "GET /api/scan/candidates": () => ({ candidates: serverCandidates }),
+    "GET /api/scan/candidates/exclusions": { paths: [] },
+    "GET /api/scan/last": () => apiNoContent(),
+    "GET /api/scan/diagnostics": buildScanDiagnostics(),
+    "GET /api/dlsite/notifications": buildDlsiteNotificationSummary(),
+    "GET /api/settings": buildSettings(),
   });
-  vi.spyOn(workApi, "getWork").mockImplementation(async (workId) => {
-    if (workId === work.id) return work;
-    throw new Error(`work not found: ${workId}`);
-  });
-});
-
-afterEach(() => {
-  vi.restoreAllMocks();
 });
 
 const newWork = { id: "work-1", title: "新規作品", trackCount: 1 };
 
-const work: Work = {
+const work: Work = buildWork({
   id: newWork.id,
   title: newWork.title,
-  cover: null,
-  coverKind: "none",
-  coverImage: null,
-  status: "ok",
   physicalPath: "/audio/work-1",
   totalDurationSec: 120,
-  addedAt: "2026-01-01T00:00:00.000Z",
-  errorMessage: null,
-  urls: [],
-  tags: [],
-  bookmarked: false,
-  lastPlayedAt: null,
-  dlsite: { rjCode: null, status: "none", lastAttemptAt: null, error: null, appliedTags: [] },
-  defaultPlaylistId: null,
-  createdAt: null,
-  playlists: [],
-  resume: null,
-};
+});
 
 function scanSnapshot(title: string): WorkEditSnapshot {
-  return {
-    sourceRevision: "revision-1",
-    id: work.id,
-    physicalPath: work.physicalPath,
-    title,
-    tags: work.tags,
-    urls: work.urls,
-    coverImage: work.coverImage,
-    dlsite: {
-      rjCode: work.dlsite.rjCode,
-      status: toDlsiteLinkageStatus(work.dlsite.status),
-      appliedTags: work.dlsite.appliedTags,
-    },
-  };
+  return buildWorkEditSnapshotOf({ ...work, title });
 }
 
-function mockSuccessfulScanTitleSave(title: string) {
-  vi.spyOn(workApi, "getWorkEditSnapshot").mockResolvedValue(scanSnapshot(work.title));
-  vi.spyOn(workApi, "patchWorkSource").mockImplementation(async () => {
-    const item = worksById.get(newWork.id);
-    if (item) worksById.set(newWork.id, { ...item, title });
-    return { snapshot: scanSnapshot(title), projection: { status: "published" as const } };
-  });
-}
-
-const scanResult: ScanResult = {
+const scanResult: ScanResult = buildScanResult({
   registered: 10,
   insertedWorkIds: [newWork.id],
-  updatedWorkIds: [],
-  errors: 0,
-  missing: 0,
-  skipped: 0,
-  coverErrors: 0,
-};
+});
 
-const candidateDetected: ScanCandidate = {
-  path: workspacePath("dlsite/検出済み作品"),
+const candidateDetected: ScanCandidate = buildScanCandidate({
+  path: "dlsite/検出済み作品",
   inferredTitle: "検出済み作品",
   audioFileCount: 2,
   audioBreakdown: [{ extension: "mp3", count: 2 }],
   rjCode: "RJ100001",
-};
-const candidateUndetected: ScanCandidate = {
-  path: workspacePath("dlsite/未検出作品"),
+});
+const candidateUndetected: ScanCandidate = buildScanCandidate({
+  path: "dlsite/未検出作品",
   inferredTitle: "未検出作品",
-  audioFileCount: 1,
-  audioBreakdown: [{ extension: "mp3", count: 1 }],
-  rjCode: null,
-};
+});
 
 function dispatchCancel(dialog: HTMLElement) {
   return fireEvent(dialog, new Event("cancel", { cancelable: true, bubbles: true }));
@@ -202,7 +186,7 @@ function seedScanQueries(
   if (lastResult !== undefined) {
     queryClient.setQueryData(
       SCAN_QUERY_KEYS.last(),
-      lastResult ? { result: lastResult, finishedAt: "2026-01-01T00:00:00.000Z" } : null,
+      lastResult ? buildScanLastResult({ result: lastResult }) : null,
     );
   }
   if (candidates !== undefined) {
@@ -214,29 +198,22 @@ function seedScanQueries(
     // queryKey は libraryTotalQueryOptions 由来（DataTag付き）を使う。setQueryData の第二引数が
     // WorksPage 型で型検査されるため、number など違う形を渡そうとするとコンパイルエラーになる
     // （同じキーに違う形のデータを期待する食い違いを型で検知する）。
-    queryClient.setQueryData(libraryTotalQueryOptions.queryKey, {
-      items: [],
-      total: libraryTotal,
-      stats: { trackCount: 0, durationSec: 0 },
-    });
+    queryClient.setQueryData(
+      libraryTotalQueryOptions.queryKey,
+      buildWorksPage([], { total: libraryTotal }),
+    );
   }
   // ID重複の診断（常に最新を購読する）。未シードだとテストごとに実fetchへ
   // 落ちてしまうため、明示的な指定がなければ空で固定する。
   if (queryClient.getQueryData(SCAN_QUERY_KEYS.diagnostics()) === undefined) {
-    queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), {
-      identityConflicts: [],
-      invalidMetaFiles: [],
-    });
+    queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
   }
   // 通知ベルと同じ要対応集計。未シードだと実fetchへ落ちるため既定値で固定する。
   if (queryClient.getQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary()) === undefined) {
-    queryClient.setQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary(), {
-      rjCodeMissingCount: 0,
-      fetchFailedCount: 0,
-      parseErrorCount: 0,
-      parseErrorAlert: false,
-      unlinkedCount: 0,
-    });
+    queryClient.setQueryData(
+      WORK_QUERY_KEYS.dlsiteNotificationSummary(),
+      buildDlsiteNotificationSummary(),
+    );
   }
 }
 
@@ -255,6 +232,7 @@ function renderModal(
   store.set(scanJobStoreAtom, scanJob);
 
   const { lastResult, candidates, libraryTotal, ...rest } = overrides;
+  serverCandidates = candidates ?? [];
   const queryClient = createTestQueryClient();
   seedScanQueries(queryClient, {
     lastResult: lastResult !== undefined ? lastResult : scanResult,
@@ -460,7 +438,6 @@ describe("ScanModal", () => {
   });
 
   it("scan結果のinsertedWorkIdsが変わると一覧も即座に切り替わる（getWorkを呼ばず、worksをids一括取得する）", async () => {
-    const getWorkSpy = vi.spyOn(workApi, "getWork");
     const workA = { id: "work-a", title: "作品A", trackCount: 2 };
     const workB = { id: "work-b", title: "作品B", trackCount: 3 };
     worksById.set(workA.id, toListItem(workA.id, workA.title, workA.trackCount));
@@ -476,9 +453,9 @@ describe("ScanModal", () => {
     await waitFor(() => expect(screen.getByText(workB.title)).toBeInTheDocument());
     expect(screen.queryByText(workA.title)).toBeNull();
 
-    expect(getWorkSpy).not.toHaveBeenCalled();
-    expect(searchWorksSpy).toHaveBeenCalledWith({ ids: [workA.id] });
-    expect(searchWorksSpy).toHaveBeenCalledWith({ ids: [workB.id] });
+    expect(api.requestsTo("GET /api/works/:id")).toHaveLength(0);
+    expect(idsQueries()).toContainEqual([workA.id]);
+    expect(idsQueries()).toContainEqual([workB.id]);
   });
 
   it("insertedWorkIdsがWORKS_DEFAULT_PAGE_SIZEを超えるとidsを先頭で切り詰め、省略件数を表示する", async () => {
@@ -492,24 +469,15 @@ describe("ScanModal", () => {
     openTab("新規登録済み");
 
     await waitFor(() => expect(screen.getAllByText("work-many-0").length).toBeGreaterThan(0));
-    expect(
-      searchWorksSpy.mock.calls.some(([params]) => params.ids?.length === WORKS_DEFAULT_PAGE_SIZE),
-    ).toBe(true);
-    expect(
-      searchWorksSpy.mock.calls.every(
-        ([params]) => (params.ids?.length ?? 0) <= WORKS_DEFAULT_PAGE_SIZE,
-      ),
-    ).toBe(true);
+    expect(idsQueries().some((ids) => ids.length === WORKS_DEFAULT_PAGE_SIZE)).toBe(true);
+    expect(idsQueries().every((ids) => ids.length <= WORKS_DEFAULT_PAGE_SIZE)).toBe(true);
     expect(
       screen.getByText(`${manyIds.length}件中${WORKS_DEFAULT_PAGE_SIZE}件を表示`),
     ).toBeInTheDocument();
   });
 
   it("新規作品一覧の取得に失敗したときエラーを表示する（統計バッジで件数は出るが一覧が無表示にならない）", async () => {
-    searchWorksSpy.mockImplementation(async (params) => {
-      if (params.ids) throw new Error("network error");
-      return originalSearchWorks(params);
-    });
+    worksByIdFails = true;
 
     renderModal();
     openTab("新規登録済み");
@@ -525,8 +493,7 @@ describe("ScanModal", () => {
   });
 
   it("タイトル保存に失敗したときエラーを表示し、ローカル表示は更新されない", async () => {
-    vi.spyOn(workApi, "getWorkEditSnapshot").mockResolvedValue(scanSnapshot(work.title));
-    vi.spyOn(workApi, "patchWorkSource").mockRejectedValue(new Error("network error"));
+    patchWorkSourceReply = unstructuredServerError;
     renderModal();
     openTab("新規登録済み");
 
@@ -545,7 +512,6 @@ describe("ScanModal", () => {
   });
 
   it("タイトル保存に成功したとき表示名が更新され編集モードが閉じる", async () => {
-    mockSuccessfulScanTitleSave("新しいタイトル");
     renderModal();
     openTab("新規登録済み");
 
@@ -560,12 +526,11 @@ describe("ScanModal", () => {
   });
 
   it("タイトル保存に成功すると正本キャッシュを更新し、一覧クエリを再取得する", async () => {
-    mockSuccessfulScanTitleSave("新しいタイトル");
     const { queryClient } = renderModal();
     openTab("新規登録済み");
 
     await waitFor(() => screen.getByText(newWork.title));
-    const searchCallsBefore = searchWorksSpy.mock.calls.length;
+    const searchCallsBefore = idsQueries().length;
     fireEvent.click(screen.getByText(newWork.title));
     const input = screen.getByDisplayValue(newWork.title);
     fireEvent.change(input, { target: { value: "新しいタイトル" } });
@@ -576,7 +541,7 @@ describe("ScanModal", () => {
     expect(queryClient.getQueryData(WORK_QUERY_KEYS.source(newWork.id))).toMatchObject({
       title: "新しいタイトル",
     });
-    expect(searchWorksSpy.mock.calls.length).toBeGreaterThan(searchCallsBefore);
+    expect(idsQueries().length).toBeGreaterThan(searchCallsBefore);
     const cachedList = queryClient.getQueryData<WorksPage>(
       WORK_QUERY_KEYS.list({ ids: [newWork.id] }),
     );
@@ -584,8 +549,6 @@ describe("ScanModal", () => {
   });
 
   it("空文字・空白のみのタイトルは保存されず編集モードだけ閉じる", async () => {
-    vi.spyOn(workApi, "getWorkEditSnapshot").mockResolvedValue(scanSnapshot(work.title));
-    const patchSpy = vi.spyOn(workApi, "patchWorkSource");
     renderModal();
     openTab("新規登録済み");
 
@@ -595,17 +558,16 @@ describe("ScanModal", () => {
     fireEvent.change(input, { target: { value: "   " } });
     fireEvent.keyDown(input, { key: "Enter" });
 
-    expect(patchSpy).not.toHaveBeenCalled();
+    expect(api.requestsTo("PATCH /api/works/:id")).toHaveLength(0);
     expect(screen.getByText(newWork.title)).toBeInTheDocument();
   });
 
   it("検出済みRJコードは明示送信し、未検出のまま登録すると空文字を送る。全件登録で新規登録済みへ自動遷移する", async () => {
-    const registerSpy = vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
+    registerReply = buildScanCandidatesRegisterResponse({
       registered: [
         { path: candidateDetected.path, workId: "w-detected" },
         { path: candidateUndetected.path, workId: "w-undetected" },
       ],
-      failures: [],
     });
     renderModal({
       candidates: [candidateDetected, candidateUndetected],
@@ -616,11 +578,15 @@ describe("ScanModal", () => {
 
     fireEvent.click(within(unregistered).getByRole("button", { name: "2件をライブラリに追加" }));
 
-    await waitFor(() => expect(registerSpy).toHaveBeenCalled());
-    expect(registerSpy.mock.calls[0]?.[0]).toEqual([
-      { path: candidateDetected.path, rjCode: candidateDetected.rjCode },
-      { path: candidateUndetected.path, rjCode: "" },
-    ]);
+    await waitFor(() =>
+      expect(api.requestsTo("POST /api/scan/candidates/register")).toHaveLength(1),
+    );
+    expect(api.requestsTo("POST /api/scan/candidates/register")[0]?.body).toEqual({
+      items: [
+        { path: candidateDetected.path, rjCode: candidateDetected.rjCode },
+        { path: candidateUndetected.path, rjCode: "" },
+      ],
+    });
 
     await waitFor(() =>
       expect(screen.getByText("2件をライブラリに追加しました")).toBeInTheDocument(),
@@ -631,9 +597,8 @@ describe("ScanModal", () => {
   });
 
   it("候補登録に成功すると作品一覧・軸件数・DLsite通知・スマートフォルダーのクエリを無効化する", async () => {
-    vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
+    registerReply = buildScanCandidatesRegisterResponse({
       registered: [{ path: candidateDetected.path, workId: "w-detected" }],
-      failures: [],
     });
     const { queryClient } = renderModal({
       candidates: [candidateDetected],
@@ -651,7 +616,7 @@ describe("ScanModal", () => {
   });
 
   it("候補登録が部分失敗しても、成功分がある限り作品一覧等を無効化する", async () => {
-    vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
+    registerReply = buildScanCandidatesRegisterResponse({
       registered: [{ path: candidateDetected.path, workId: "w-detected" }],
       failures: [{ path: candidateUndetected.path, message: "失敗" }],
     });
@@ -669,7 +634,6 @@ describe("ScanModal", () => {
   });
 
   it("候補の除外では作品一覧・軸件数・スマートフォルダーの再取得を行わない（AC#4）", async () => {
-    vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
     const { queryClient } = renderModal({
       candidates: [candidateUndetected],
     });
@@ -694,9 +658,8 @@ describe("ScanModal", () => {
   });
 
   it("未検出のRJコードをクリックで編集し、編集した値を登録に送る", async () => {
-    const registerSpy = vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
+    registerReply = buildScanCandidatesRegisterResponse({
       registered: [{ path: candidateUndetected.path, workId: "w-undetected" }],
-      failures: [],
     });
     renderModal({
       candidates: [candidateDetected, candidateUndetected],
@@ -715,24 +678,15 @@ describe("ScanModal", () => {
     );
     fireEvent.click(within(unregistered).getByRole("button", { name: "1件をライブラリに追加" }));
 
-    await waitFor(() => expect(registerSpy).toHaveBeenCalled());
-    expect(registerSpy.mock.calls[0]?.[0]).toEqual([
-      { path: candidateUndetected.path, rjCode: "RJ200002" },
-    ]);
+    await waitFor(() =>
+      expect(api.requestsTo("POST /api/scan/candidates/register")).toHaveLength(1),
+    );
+    expect(api.requestsTo("POST /api/scan/candidates/register")[0]?.body).toEqual({
+      items: [{ path: candidateUndetected.path, rjCode: "RJ200002" }],
+    });
   });
 
   it("候補を1件ずつ除外でき、「元に戻す」で取り消せる", async () => {
-    const excludeSpy = vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
-    const restoreSpy = vi
-      .spyOn(scanEntityApi, "restoreScanCandidateExclusions")
-      .mockResolvedValue(undefined);
-    const refreshSpy = vi
-      .spyOn(scanCandidatesCache, "refreshScanCandidates")
-      .mockImplementation(async (queryClient) => {
-        const candidates = [candidateDetected, candidateUndetected];
-        queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), candidates);
-        return candidates;
-      });
     renderModal({
       candidates: [candidateDetected, candidateUndetected],
     });
@@ -746,7 +700,11 @@ describe("ScanModal", () => {
       }),
     );
 
-    await waitFor(() => expect(excludeSpy).toHaveBeenCalledWith([candidateUndetected.path]));
+    await waitFor(() =>
+      expect(api.requestsTo("POST /api/scan/candidates/exclude")[0]?.body).toEqual({
+        paths: [candidateUndetected.path],
+      }),
+    );
     await waitFor(() =>
       expect(
         screen.getByText(`「${candidateUndetected.inferredTitle}」を候補から外しました`),
@@ -756,8 +714,11 @@ describe("ScanModal", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "元に戻す" }));
 
-    await waitFor(() => expect(restoreSpy).toHaveBeenCalledWith([candidateUndetected.path]));
-    await waitFor(() => expect(refreshSpy).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(api.requestsTo("POST /api/scan/candidates/exclusions/restore")[0]?.body).toEqual({
+        paths: [candidateUndetected.path],
+      }),
+    );
     await waitFor(() =>
       expect(screen.getByText(candidateUndetected.inferredTitle)).toBeInTheDocument(),
     );
@@ -771,54 +732,14 @@ describe("ScanModal", () => {
 // queryFn が食い違うと、先にキャッシュを占有した側（WorksPage 全体）がもう一方の .data になり、
 // {items, total, stats} をそのまま JSX の子として描画してクラッシュする。
 describe("ScanModalと他画面が同じlibraryTotalQueryOptionsを共有する", () => {
-  function jsonResponse(data: unknown, status = 200): Response {
-    return new Response(data === null ? null : JSON.stringify(data), {
-      status,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  function urlOf(input: RequestInfo | URL): string {
-    if (typeof input === "string") return input;
-    if (input instanceof URL) return input.toString();
-    return input.url;
-  }
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it("同時にマウントした別コンポーネントの購読と食い違わず、件数の数値が描画される", async () => {
-    const fetchMock = vi.fn((input: RequestInfo | URL) => {
-      const url = new URL(urlOf(input), "http://localhost");
-      if (url.pathname === "/api/scan/last") {
-        return Promise.resolve(jsonResponse(null, 204));
-      }
-      if (url.pathname === "/api/works") {
-        return Promise.resolve(
-          jsonResponse({ items: [], total: 42, stats: { trackCount: 0, durationSec: 0 } }),
-        );
-      }
-      if (url.pathname === "/api/scan/diagnostics") {
-        return Promise.resolve(jsonResponse({ identityConflicts: [], invalidMetaFiles: [] }));
-      }
-      if (url.pathname === "/api/scan/candidates") {
-        return Promise.resolve(jsonResponse({ candidates: [] }));
-      }
-      if (url.pathname === "/api/dlsite/notifications") {
-        return Promise.resolve(
-          jsonResponse({
-            rjCodeMissingCount: 0,
-            fetchFailedCount: 0,
-            parseErrorCount: 0,
-            parseErrorAlert: false,
-            unlinkedCount: 0,
-          }),
-        );
-      }
-      return Promise.reject(new Error(`unexpected fetch: ${url.toString()}`));
+    mockApi({
+      "GET /api/scan/last": () => apiNoContent(),
+      "GET /api/works": buildWorksPage([], { total: 42 }),
+      "GET /api/scan/diagnostics": buildScanDiagnostics(),
+      "GET /api/scan/candidates": { candidates: [] },
+      "GET /api/dlsite/notifications": buildDlsiteNotificationSummary(),
     });
-    vi.stubGlobal("fetch", fetchMock);
 
     const store = createStore();
     store.set(scanJobStoreAtom, createFakeScanJobStore());

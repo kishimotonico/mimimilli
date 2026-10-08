@@ -1,110 +1,354 @@
+// HTTP route の基本疎通・バリデーション・エラー写像。データに依存するケースは fixture / real の両方で、
+// adapter の戻り値だけに依存するケース（取得分類→HTTPコード、ジョブ状態、fixture専用APIなど）は
+// fixture ベースで adapter メソッドを差し替えて検証する。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { EMPTY_TAG_FILTERS } from "@mimimilli/shared";
-import { tf } from "./helpers/tag.ts";
 import { compareJapaneseSortKeys } from "../src/core/japaneseSortKey.ts";
 import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
-import { SourceChangedError } from "../src/errors.ts";
+import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
 
-function buildApp() {
-  return createApp(createFixtureAdapter());
+const YEAR = new Date().getFullYear();
+
+const contract = defineContract({
+  works: [
+    { key: "a", title: "あ作品", tags: ["ASMR", "cv/声優A", "tag,one"] },
+    { key: "b", title: "い作品", tags: ["ASMR", "cv/声優A", "tag2"] },
+    { key: "c", title: "う作品", tags: ["cv/声優B"] },
+  ],
+});
+
+const ALL_IDS = ["a", "b", "c"].map((key) => ({ key }));
+
+function idsOf(harness: ContractHarness, keys: string[]): string[] {
+  return keys.map((key) => harness.workId(key)).sort();
 }
 
-test("GET /api/works は {items, total} を返す", async () => {
-  const app = buildApp();
-  const res = await app.request("/api/works");
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.ok(Array.isArray(body.items));
-  assert.equal(typeof body.total, "number");
-  assert.ok(body.items.length > 0);
+function sortedIds(items: Array<{ id: string }>): string[] {
+  return items.map((item) => item.id).sort();
+}
+
+async function sourceRevisionOf(harness: ContractHarness, id: string): Promise<string> {
+  const { status, body } = await harness.json(`/api/works/${id}/source`);
+  assert.equal(status, 200);
+  assert.equal(typeof body.sourceRevision, "string");
+  return body.sourceRevision;
+}
+
+contract("GET /api/works は登録済みの全作品を {items, total} で返す", async (harness) => {
+  const { status, body } = await harness.json("/api/works");
+  assert.equal(status, 200);
+  assert.equal(body.total, ALL_IDS.length);
+  assert.deepEqual(sortedIds(body.items), idsOf(harness, ["a", "b", "c"]));
 });
 
-test("GET /api/works は複数の tags を配列で受け、タグ内のカンマを保持する", async () => {
-  const adapter = createFixtureAdapter();
-  let receivedTags: import("@mimimilli/shared").TagFilters | undefined;
-  adapter.queryWorks = async (query) => {
-    receivedTags = query.tags;
-    return { items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } };
-  };
+contract("GET /api/works は複数の tags を配列で受け、タグ内のカンマを保持する", async (harness) => {
+  const matched = await harness.json("/api/works?tags=tag%2Cone&tags=ASMR");
+  assert.equal(matched.status, 200);
+  assert.deepEqual(sortedIds(matched.body.items), idsOf(harness, ["a"]));
 
-  const app = createApp(adapter);
-  const res = await app.request("/api/works?tags=tag%2Cone&tags=tag2");
-
-  assert.equal(res.status, 200);
-  assert.deepEqual(receivedTags, tf("tag,one", "tag2"));
+  const split = await harness.json("/api/works?tags=tag&tags=one");
+  assert.equal(split.status, 200);
+  assert.equal(split.body.total, 0);
 });
 
-test("GET /api/works は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する", async () => {
-  const app = buildApp();
-  for (const badTag of ["@year", "@year/", "@/2024", "@year/banana", "@unknown/2024"]) {
-    const res = await app.request(`/api/works?tags=${encodeURIComponent(badTag)}`);
-    assert.equal(res.status, 400, badTag);
-    const body = await res.json();
-    assert.equal(body.error.code, "invalid_request", badTag);
-  }
+contract(
+  "GET /api/works は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する",
+  async (harness) => {
+    for (const badTag of ["@year", "@year/", "@/2024", "@year/banana", "@unknown/2024"]) {
+      const { status, body } = await harness.json(`/api/works?tags=${encodeURIComponent(badTag)}`);
+      assert.equal(status, 400, badTag);
+      assert.equal(body.error.code, "invalid_request", badTag);
+    }
+  },
+);
+
+contract("GET /api/works は正しい @year/YYYY 擬似タグで追加年に絞り込む", async (harness) => {
+  const thisYear = await harness.json(`/api/works?tags=${encodeURIComponent(`@year/${YEAR}`)}`);
+  assert.equal(thisYear.status, 200);
+  assert.equal(thisYear.body.total, ALL_IDS.length);
+
+  const otherYear = await harness.json(`/api/works?tags=${encodeURIComponent("@year/1999")}`);
+  assert.equal(otherYear.status, 200);
+  assert.equal(otherYear.body.total, 0);
 });
 
-test("GET /api/works は正しい @year/2024 擬似タグを受理する", async () => {
-  const app = buildApp();
-  const res = await app.request("/api/works?tags=%40year%2F2024");
-  assert.equal(res.status, 200);
-});
+contract(
+  "GET /api/works は先頭に空白を挟んだ擬似タグも正規化後の値で判定し受理する",
+  async (harness) => {
+    const { status, body } = await harness.json(
+      `/api/works?tags=${encodeURIComponent(` @year/${YEAR}`)}`,
+    );
+    assert.equal(status, 200);
+    assert.equal(body.total, ALL_IDS.length);
+  },
+);
 
-test("GET /api/works は先頭に空白を挟んだ擬似タグも正規化後の値で判定し受理する", async () => {
-  const app = buildApp();
-  const res = await app.request(`/api/works?tags=${encodeURIComponent(" @year/2024")}`);
-  assert.equal(res.status, 200);
-});
-
-test("GET /api/works は ids を複数指定すると該当作品のみへ絞り込む", async () => {
-  const app = buildApp();
-  const res = await app.request("/api/works?ids=RJ501001&ids=RJ501003");
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.deepEqual(body.items.map((item: { id: string }) => item.id).sort(), [
-    "RJ501001",
-    "RJ501003",
-  ]);
+contract("GET /api/works は ids を複数指定すると該当作品のみへ絞り込む", async (harness) => {
+  const { status, body } = await harness.json(
+    `/api/works?ids=${harness.workId("a")}&ids=${harness.workId("c")}`,
+  );
+  assert.equal(status, 200);
+  assert.deepEqual(sortedIds(body.items), idsOf(harness, ["a", "c"]));
   assert.equal(body.total, 2);
 });
 
-test("GET /api/works は ids に他のフィルタ・ページングを組み合わせられる", async () => {
-  const app = buildApp();
-  const res = await app.request(
-    "/api/works?ids=RJ501001&ids=RJ501002&ids=RJ501003&limit=1&page=1&sort=id-asc",
-  );
-  assert.equal(res.status, 200);
-  const body = await res.json();
+contract("GET /api/works は ids に他のフィルタ・ページングを組み合わせられる", async (harness) => {
+  const ids = ["a", "b", "c"].map((key) => `ids=${harness.workId(key)}`).join("&");
+  const { status, body } = await harness.json(`/api/works?${ids}&limit=1&page=1&sort=id-asc`);
+  assert.equal(status, 200);
   assert.deepEqual(
     body.items.map((item: { id: string }) => item.id),
-    ["RJ501001"],
+    [idsOf(harness, ["a", "b", "c"])[0]],
   );
   assert.equal(body.total, 3);
 });
 
-test("GET /api/works は ids 未指定なら絞り込まない（全件対象）", async () => {
-  const adapter = createFixtureAdapter();
-  let receivedIds: string[] | undefined;
-  adapter.queryWorks = async (query) => {
-    receivedIds = query.ids;
-    return { items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } };
-  };
-  const app = createApp(adapter);
-  const res = await app.request("/api/works");
-  assert.equal(res.status, 200);
-  assert.equal(receivedIds, undefined);
-});
-
-test("GET /api/works/:id 存在しないIDは404 + apiErrorSchema形式", async () => {
-  const app = buildApp();
-  const res = await app.request("/api/works/NOT_EXIST");
-  assert.equal(res.status, 404);
-  const body = await res.json();
+contract("GET /api/works/:id 存在しないIDは404 + apiErrorSchema形式", async (harness) => {
+  const { status, body } = await harness.json("/api/works/NOT_EXIST");
+  assert.equal(status, 404);
   assert.equal(body.error.code, "not_found");
   assert.equal(typeof body.error.message, "string");
 });
+
+contract("PATCH /api/works/:id でタグ更新が反映される", async (harness) => {
+  const id = harness.workId("a");
+  const sourceRevision = await sourceRevisionOf(harness, id);
+  const patched = await harness.send("PATCH", `/api/works/${id}`, {
+    tags: ["テスト用タグ"],
+    sourceRevision,
+  });
+  assert.equal(patched.status, 200);
+  assert.deepEqual(patched.body.snapshot.tags, ["テスト用タグ"]);
+
+  const fetched = await harness.json(`/api/works/${id}`);
+  assert.deepEqual(fetched.body.tags, ["テスト用タグ"]);
+});
+
+contract("PATCH /api/works/:id でurls更新が反映される", async (harness) => {
+  const id = harness.workId("a");
+  const urls = [{ label: "公式", url: "https://example.com/work" }];
+  const patched = await harness.send("PATCH", `/api/works/${id}`, {
+    urls,
+    sourceRevision: await sourceRevisionOf(harness, id),
+  });
+  assert.equal(patched.status, 200);
+  assert.deepEqual(patched.body.snapshot.urls, urls);
+  assert.deepEqual((await harness.json(`/api/works/${id}`)).body.urls, urls);
+});
+
+contract("PATCH /api/works/:id は危険スキームのurlsを400で拒否する", async (harness) => {
+  const id = harness.workId("a");
+  const { status } = await harness.send("PATCH", `/api/works/${id}`, {
+    urls: [{ label: "evil", url: "javascript:alert(1)" }],
+    sourceRevision: await sourceRevisionOf(harness, id),
+  });
+  assert.equal(status, 400);
+});
+
+contract("GET /api/works/:id の JSON に sourceRevision は無く、/source が返す", async (harness) => {
+  const id = harness.workId("a");
+  const detail = await harness.json(`/api/works/${id}`);
+  assert.equal("sourceRevision" in detail.body, false);
+  assert.ok((await sourceRevisionOf(harness, id)).length > 0);
+});
+
+contract("PATCH /api/works/:id/bookmark は sourceRevision なしで通る", async (harness) => {
+  const id = harness.workId("a");
+  const res = await harness.send("PATCH", `/api/works/${id}/bookmark`, {
+    bookmarked: true,
+  });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { bookmarked: true });
+  assert.equal((await harness.json(`/api/works/${id}`)).body.bookmarked, true);
+});
+
+contract("PUT/DELETE /api/works/:id/tags/:tag はパスのタグを正規化する", async (harness) => {
+  const id = harness.workId("a");
+  const slashTag = encodeURIComponent("CV/ foo ");
+  const put = await harness.send("PUT", `/api/works/${id}/tags/${slashTag}`);
+  assert.equal(put.status, 200);
+  assert.ok(put.body.snapshot.tags.includes("cv/foo"));
+  const del = await harness.send("DELETE", `/api/works/${id}/tags/${slashTag}`);
+  assert.equal(del.status, 200);
+  assert.equal(del.body.snapshot.tags.includes("cv/foo"), false);
+});
+
+contract("PATCH /api/works/:id はsourceRevisionなしを400で拒否する", async (harness) => {
+  const { status, body } = await harness.send("PATCH", `/api/works/${harness.workId("a")}`, {
+    title: "更新",
+  });
+  assert.equal(status, 400);
+  assert.equal(body.error.code, "invalid_request");
+});
+
+contract("PATCH /api/works/:id は古いsourceRevisionを409 source_changedで返す", async (harness) => {
+  const { status, body } = await harness.send("PATCH", `/api/works/${harness.workId("a")}`, {
+    title: "更新",
+    sourceRevision: "stale",
+  });
+  assert.equal(status, 409);
+  assert.equal(body.error.code, "source_changed");
+});
+
+contract("GET /api/axes/cv は AxisFacetItem[] を count 降順で返す", async (harness) => {
+  const { status, body } = await harness.json("/api/axes/cv");
+  assert.equal(status, 200);
+  assert.deepEqual(
+    body.map((item: { value: string; count: number }) => [item.value, item.count]),
+    [
+      ["声優A", 2],
+      ["声優B", 1],
+    ],
+  );
+});
+
+contract(
+  "GET /api/axes/:axis は未登録 prefix でも集計する（該当なしは空配列）",
+  async (harness) => {
+    const { status, body } = await harness.json("/api/axes/unknown-prefix");
+    assert.equal(status, 200);
+    assert.deepEqual(body, []);
+  },
+);
+
+contract("GET /api/axes/:axis にスラッシュ入りの軸を渡すと400", async (harness) => {
+  const { status, body } = await harness.json(`/api/axes/${encodeURIComponent("a/b")}`);
+  assert.equal(status, 400);
+  assert.equal(body.error.code, "invalid_request");
+});
+
+contract("GET /api/axes/:axis は tags/tagOp で作品を絞り込んで集計する", async (harness) => {
+  const and = await harness.json("/api/axes/cv?tags=ASMR");
+  assert.deepEqual(
+    and.body.map((item: { value: string; count: number }) => [item.value, item.count]),
+    [["声優A", 2]],
+  );
+
+  const or = await harness.json("/api/axes/cv?tags=tag2&tags=cv%2F%E5%A3%B0%E5%84%AAB&tagOp=OR");
+  assert.deepEqual(or.body.map((item: { value: string; count: number }) => item.value).sort(), [
+    "声優A",
+    "声優B",
+  ]);
+});
+
+contract("GET /api/axes/:axis は tagOp 省略時 AND で絞り込む", async (harness) => {
+  const query = "tags=ASMR&tags=cv%2F%E5%A3%B0%E5%84%AAB";
+  const and = await harness.json(`/api/axes/cv?${query}`);
+  assert.deepEqual(and.body, []);
+
+  const or = await harness.json(`/api/axes/cv?${query}&tagOp=OR`);
+  assert.deepEqual(
+    or.body.map((item: { value: string; count: number }) => [item.value, item.count]).sort(),
+    [
+      ["声優A", 2],
+      ["声優B", 1],
+    ],
+  );
+});
+
+contract("GET /api/axes/:axis は組み込み軸の擬似タグも絞り込みに含める", async (harness) => {
+  const thisYear = await harness.json(
+    `/api/axes/cv?tags=${encodeURIComponent(`@year/${YEAR}`)}&tags=ASMR`,
+  );
+  assert.equal(thisYear.status, 200);
+  assert.deepEqual(
+    thisYear.body.map((item: { value: string; count: number }) => [item.value, item.count]),
+    [["声優A", 2]],
+  );
+  const otherYear = await harness.json(`/api/axes/cv?tags=${encodeURIComponent("@year/1999")}`);
+  assert.deepEqual(otherYear.body, []);
+});
+
+contract(
+  "GET /api/axes/:axis は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する",
+  async (harness) => {
+    const { status, body } = await harness.json("/api/axes/cv?tags=%40year%2Fbanana");
+    assert.equal(status, 400);
+    assert.equal(body.error.code, "invalid_request");
+  },
+);
+
+contract(
+  "GET /api/smart-folders/:id/works は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する",
+  async (harness) => {
+    const created = await harness.send("POST", "/api/smart-folders", {
+      name: "テスト",
+      rules: [],
+      sort: "added-desc",
+    });
+    const { status, body } = await harness.json(
+      `/api/smart-folders/${created.body.id}/works?tags=%40year%2F`,
+    );
+    assert.equal(status, 400);
+    assert.equal(body.error.code, "invalid_request");
+  },
+);
+
+contract("GET /api/fs はルートの listing を返す", async (harness) => {
+  const { status, body } = await harness.json("/api/fs");
+  assert.equal(status, 200);
+  assert.equal(body.path, null);
+  assert.ok(Array.isArray(body.entries));
+});
+
+contract("POST /api/smart-folders は201 + 作成されたSmartFolderを返す", async (harness) => {
+  const { status, body } = await harness.send("POST", "/api/smart-folders", {
+    name: "テストフォルダー",
+    rules: [],
+    sort: "added-desc",
+  });
+  assert.equal(status, 201);
+  assert.equal(body.name, "テストフォルダー");
+  assert.equal(typeof body.id, "string");
+  assert.equal(typeof body.createdAt, "string");
+});
+
+contract("POST /api/smart-folders は未対応ルールを400で拒否する", async (harness) => {
+  const { status, body } = await harness.send("POST", "/api/smart-folders", {
+    name: "不正ルール",
+    rules: [{ conjunction: "WHERE", field: "不明", operator: "=", values: ["x"] }],
+    sort: "added-desc",
+  });
+  assert.equal(status, 400);
+  assert.equal(body.error.code, "invalid_request");
+});
+
+contract("スマートフォルダーの作品一覧は保存済み sort を適用する", async (harness) => {
+  const created = await harness.send("POST", "/api/smart-folders", {
+    name: "タイトル降順",
+    rules: [],
+    sort: "title-desc",
+  });
+  const { status, body } = await harness.json(`/api/smart-folders/${created.body.id}/works`);
+  assert.equal(status, 200);
+  assert.equal(body.total, ALL_IDS.length);
+  const titles = body.items.map((work: { title: string }) => work.title);
+  assert.deepEqual(
+    titles,
+    [...titles].sort((a, b) => compareJapaneseSortKeys(b, a)),
+  );
+});
+
+contract("randomソートのスマートフォルダーも作品一覧を返す", async (harness) => {
+  const created = await harness.send("POST", "/api/smart-folders", {
+    name: "ランダム",
+    rules: [],
+    sort: "random",
+  });
+  const { status, body } = await harness.json(`/api/smart-folders/${created.body.id}/works`);
+  assert.equal(status, 200);
+  assert.equal(body.items.length, ALL_IDS.length);
+  assert.equal(typeof body.seed, "number");
+});
+
+contract("未知ルートは404 + not_found", async (harness) => {
+  const { status, body } = await harness.json("/api/unknown-route");
+  assert.equal(status, 404);
+  assert.equal(body.error.code, "not_found");
+});
+
+// 以降は adapter メソッドの差し替えと fixture 専用 API に依存するケース（fixture のみ）
 
 test("POST /api/dlsite/:id/fetch は取得分類をHTTPエラーコードへ反映する", async () => {
   for (const [kind, status] of [
@@ -123,7 +367,7 @@ test("POST /api/dlsite/:id/fetch は取得分類をHTTPエラーコードへ反�
 });
 
 test("GET /api/dlsite/bulk は実行中・終了後の状態をPOSTのjobId付きで返し、未実行時は両方null", async () => {
-  const app = buildApp();
+  const app = createApp(createFixtureAdapter());
   const idle = await app.request("/api/dlsite/bulk");
   assert.equal(idle.status, 200);
   assert.deepEqual(await idle.json(), { current: null, lastTerminal: null });
@@ -160,7 +404,7 @@ test("GET /api/dlsite/bulk は実行中・終了後の状態をPOSTのjobId付�
 });
 
 test("DLsite一括取得は202で開始し、SSEに進捗と完了件数を配信する", async () => {
-  const app = buildApp();
+  const app = createApp(createFixtureAdapter());
   const start = await app.request("/api/dlsite/bulk", { method: "POST" });
   assert.equal(start.status, 202);
   const events = await app.request("/api/dlsite/events");
@@ -191,297 +435,6 @@ test("DELETE /api/dlsite/bulk は実行中ジョブの取消を要求し、終�
   await new Promise((resolve) => setImmediate(resolve));
   const idle = await app.request("/api/dlsite/bulk", { method: "DELETE" });
   assert.equal(idle.status, 404);
-});
-
-test("PATCH /api/works/:id でタグ更新が反映される", async () => {
-  const app = buildApp();
-
-  // 既存作品のIDを取得
-  const listRes = await app.request("/api/works");
-  const { items } = await listRes.json();
-  const targetId: string = items[0].id;
-  const source = await (await app.request(`/api/works/${targetId}/source`)).json();
-
-  const patchRes = await app.request(`/api/works/${targetId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tags: ["テスト用タグ"], sourceRevision: source.sourceRevision }),
-  });
-  assert.equal(patchRes.status, 200);
-  const patched = await patchRes.json();
-  assert.deepEqual(patched.snapshot.tags, ["テスト用タグ"]);
-
-  // 再取得しても反映されている
-  const getRes = await app.request(`/api/works/${targetId}`);
-  const fetched = await getRes.json();
-  assert.deepEqual(fetched.tags, ["テスト用タグ"]);
-});
-
-test("PATCH /api/works/:id でurls更新が反映される", async () => {
-  const app = buildApp();
-  const listRes = await app.request("/api/works");
-  const { items } = await listRes.json();
-  const targetId = items[0].id;
-  const source = await (await app.request(`/api/works/${targetId}/source`)).json();
-  const urls = [{ label: "公式", url: "https://example.com/work" }];
-  const patchRes = await app.request(`/api/works/${targetId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ urls, sourceRevision: source.sourceRevision }),
-  });
-  assert.equal(patchRes.status, 200);
-  assert.deepEqual((await patchRes.json()).snapshot.urls, urls);
-});
-
-test("PATCH /api/works/:id は危険スキームのurlsを400で拒否する", async () => {
-  const app = buildApp();
-  const listRes = await app.request("/api/works");
-  const { items } = await listRes.json();
-  const source = await (await app.request(`/api/works/${items[0].id}/source`)).json();
-  const patchRes = await app.request(`/api/works/${items[0].id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      urls: [{ label: "evil", url: "javascript:alert(1)" }],
-      sourceRevision: source.sourceRevision,
-    }),
-  });
-  assert.equal(patchRes.status, 400);
-});
-
-test("GET /api/works/:id の JSON に sourceRevision は無い", async () => {
-  const app = buildApp();
-  const list = await app.request("/api/works");
-  const { items } = await list.json();
-  const detail = await (await app.request(`/api/works/${items[0].id}`)).json();
-  assert.equal("sourceRevision" in detail, false);
-  const sourceRes = await app.request(`/api/works/${items[0].id}/source`);
-  assert.equal(sourceRes.status, 200);
-  const source = await sourceRes.json();
-  assert.equal(typeof source.sourceRevision, "string");
-  assert.ok(source.sourceRevision.length > 0);
-});
-
-test("PATCH /api/works/:id/bookmark は sourceRevision なしで通る", async () => {
-  const app = buildApp();
-  const list = await app.request("/api/works");
-  const { items } = await list.json();
-  const res = await app.request(`/api/works/${items[0].id}/bookmark`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ bookmarked: true }),
-  });
-  assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { bookmarked: true });
-});
-
-test("PUT/DELETE /api/works/:id/tags/:tag はパスのタグを正規化する", async () => {
-  const app = buildApp();
-  const list = await app.request("/api/works");
-  const { items } = await list.json();
-  const id = items[0].id;
-  const slashTag = encodeURIComponent("cv/foo");
-  const putRes = await app.request(`/api/works/${id}/tags/${slashTag}`, { method: "PUT" });
-  assert.equal(putRes.status, 200);
-  const putBody = await putRes.json();
-  assert.ok(putBody.snapshot.tags.includes("cv/foo"));
-  const delRes = await app.request(`/api/works/${id}/tags/${slashTag}`, { method: "DELETE" });
-  assert.equal(delRes.status, 200);
-  assert.equal((await delRes.json()).snapshot.tags.includes("cv/foo"), false);
-});
-
-test("PATCH /api/works/:id はsourceRevisionなしを400で拒否する", async () => {
-  const app = buildApp();
-  const list = await app.request("/api/works");
-  const { items } = await list.json();
-  const res = await app.request(`/api/works/${items[0].id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title: "更新" }),
-  });
-  assert.equal(res.status, 400);
-  assert.equal((await res.json()).error.code, "invalid_request");
-});
-
-test("PATCH /api/works/:id はmimimilli.json競合を409 source_changedで返す", async () => {
-  const adapter = createFixtureAdapter();
-  adapter.patchWorkSource = async () => {
-    throw new SourceChangedError();
-  };
-  const app = createApp(adapter);
-  const res = await app.request("/api/works/any", {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title: "更新", sourceRevision: "stale" }),
-  });
-  assert.equal(res.status, 409);
-  assert.equal((await res.json()).error.code, "source_changed");
-});
-
-test("GET /api/axes/cv は AxisFacetItem[] を count 降順で返す", async () => {
-  const app = buildApp();
-  const res = await app.request("/api/axes/cv");
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.ok(Array.isArray(body));
-  assert.ok(body.length > 0);
-  for (const item of body) {
-    assert.equal(typeof item.value, "string");
-    assert.equal(typeof item.count, "number");
-  }
-  for (let i = 1; i < body.length; i++) {
-    assert.ok(body[i - 1].count >= body[i].count);
-  }
-});
-
-test("GET /api/axes/:axis は未登録 prefix でも集計する（該当なしは空配列）", async () => {
-  const app = buildApp();
-  const res = await app.request("/api/axes/unknown-prefix");
-  assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), []);
-});
-
-test("GET /api/axes/:axis にスラッシュ入りの軸を渡すと400", async () => {
-  const app = buildApp();
-  const res = await app.request(`/api/axes/${encodeURIComponent("a/b")}`);
-  assert.equal(res.status, 400);
-  const body = await res.json();
-  assert.equal(body.error.code, "invalid_request");
-});
-
-test("GET /api/axes/:axis は tags/tagOp を絞り込みとしてadapterへ渡す。組み込み軸の擬似タグも tags に含まれる", async () => {
-  const adapter = createFixtureAdapter();
-  let receivedFilter: unknown;
-  adapter.getAxisFacets = async (_axis, filter) => {
-    receivedFilter = filter;
-    return [];
-  };
-  const app = createApp(adapter);
-  const res = await app.request(
-    "/api/axes/cv?tags=ASMR&tags=%E5%82%AC%E7%9C%A0&tags=%40year%2F2024&tagOp=OR",
-  );
-  assert.equal(res.status, 200);
-  assert.deepEqual(receivedFilter, {
-    tags: tf("ASMR", "催眠", "@year/2024"),
-    tagOp: "OR",
-  });
-});
-
-test("GET /api/axes/:axis はクエリ省略時、空配列相当のフィルタをadapterへ渡す", async () => {
-  const adapter = createFixtureAdapter();
-  let receivedFilter: unknown;
-  adapter.getAxisFacets = async (_axis, filter) => {
-    receivedFilter = filter;
-    return [];
-  };
-  const app = createApp(adapter);
-  const res = await app.request("/api/axes/cv");
-  assert.equal(res.status, 200);
-  assert.deepEqual(receivedFilter, { tags: EMPTY_TAG_FILTERS, tagOp: "AND" });
-});
-
-test("GET /api/axes/:axis は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する", async () => {
-  const app = buildApp();
-  const res = await app.request("/api/axes/cv?tags=%40year%2Fbanana");
-  assert.equal(res.status, 400);
-  const body = await res.json();
-  assert.equal(body.error.code, "invalid_request");
-});
-
-test("GET /api/smart-folders/:id/works は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する", async () => {
-  const app = buildApp();
-  const createRes = await app.request("/api/smart-folders", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: "テスト", rules: [], sort: "added-desc" }),
-  });
-  const folder = await createRes.json();
-  const res = await app.request(`/api/smart-folders/${folder.id}/works?tags=%40year%2F`);
-  assert.equal(res.status, 400);
-  const body = await res.json();
-  assert.equal(body.error.code, "invalid_request");
-});
-
-test("GET /api/fs はルートの listing を返す", async () => {
-  const app = buildApp();
-  const res = await app.request("/api/fs");
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.equal(body.path, null);
-  assert.ok(Array.isArray(body.entries));
-});
-
-test("POST /api/smart-folders は201 + 作成されたSmartFolderを返す", async () => {
-  const app = buildApp();
-  const res = await app.request("/api/smart-folders", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: "テストフォルダー", rules: [], sort: "added-desc" }),
-  });
-  assert.equal(res.status, 201);
-  const body = await res.json();
-  assert.equal(body.name, "テストフォルダー");
-  assert.equal(typeof body.id, "string");
-  assert.equal(typeof body.createdAt, "string");
-});
-
-test("POST /api/smart-folders は未対応ルールを400で拒否する", async () => {
-  const app = buildApp();
-  const res = await app.request("/api/smart-folders", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: "不正ルール",
-      rules: [{ conjunction: "WHERE", field: "不明", operator: "=", values: ["x"] }],
-      sort: "added-desc",
-    }),
-  });
-  assert.equal(res.status, 400);
-  const body = await res.json();
-  assert.equal(body.error.code, "invalid_request");
-});
-
-test("スマートフォルダーの作品一覧は保存済み sort を適用する", async () => {
-  const app = buildApp();
-  const createRes = await app.request("/api/smart-folders", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: "タイトル降順", rules: [], sort: "title-desc" }),
-  });
-  const folder = await createRes.json();
-
-  const worksRes = await app.request(`/api/smart-folders/${folder.id}/works`);
-  assert.equal(worksRes.status, 200);
-  const page = await worksRes.json();
-  assert.equal(typeof page.total, "number");
-  const titles = page.items.map((work: { title: string }) => work.title);
-  const expected = [...titles].sort((a, b) => compareJapaneseSortKeys(b, a));
-  assert.deepEqual(titles, expected);
-});
-
-test("randomソートのスマートフォルダーも作品一覧を返す", async () => {
-  const app = buildApp();
-  const createRes = await app.request("/api/smart-folders", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: "ランダム", rules: [], sort: "random" }),
-  });
-  const folder = await createRes.json();
-
-  const worksRes = await app.request(`/api/smart-folders/${folder.id}/works`);
-  assert.equal(worksRes.status, 200);
-  const page = await worksRes.json();
-  assert.equal(typeof page.total, "number");
-  assert.ok(page.items.length > 0);
-  assert.equal(typeof page.seed, "number");
-});
-
-test("未知ルートは404 + not_found", async () => {
-  const app = buildApp();
-  const res = await app.request("/api/unknown-route");
-  assert.equal(res.status, 404);
-  const body = await res.json();
-  assert.equal(body.error.code, "not_found");
 });
 
 test("POST /api/__test__/reset は実行中スキャンを取消して完了待ちしてからfixture状態を戻す", async () => {

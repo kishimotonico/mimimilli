@@ -18,6 +18,16 @@ import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { getParsed } from "../../src/shared/api/http";
 import { useRootReconfiguringApiErrorHandler } from "../../src/app/model/useRootReconfiguringApiErrorHandler";
 import type { Settings } from "@mimimilli/shared";
+import { apiError, mockApi } from "../helpers/api";
+import { appShellRoutes } from "../helpers/appShellApi";
+import { buildSettings } from "../helpers/builders";
+
+function settingsOf(
+  rootReconfiguration: Settings["rootReconfiguration"],
+  lastScanTime: string | null = "2026-01-01T00:00:00.000Z",
+): Settings {
+  return buildSettings({ rootFolder: "/audio/library", lastScanTime, rootReconfiguration });
+}
 
 const stopSpy = vi.fn();
 const playerActionsStub = {
@@ -94,35 +104,22 @@ function renderAppWithSettings(
 
 beforeEach(() => {
   stopSpy.mockClear();
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(
-      async () =>
-        new Response(JSON.stringify([]), { headers: { "Content-Type": "application/json" } }),
-    ),
-  );
+  mockApi(appShellRoutes());
 });
 
 describe("root再設定に入ったときの再生停止（自分で開始していない経路）", () => {
   it("409検知等でsettingsが直接runningへ切り替わったときもstopが呼ばれる", async () => {
-    const { queryClient } = renderAppWithSettings({
-      rootFolder: "/audio/library",
-      lastScanTime: "2026-01-01T00:00:00.000Z",
-      rootReconfiguration: { status: "idle", completedAt: null },
-    });
+    const { queryClient } = renderAppWithSettings(
+      settingsOf({ status: "idle", completedAt: null }),
+    );
 
     await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
     expect(stopSpy).not.toHaveBeenCalled();
 
-    queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
-      rootFolder: "/audio/library",
-      lastScanTime: "2026-01-01T00:00:00.000Z",
-      rootReconfiguration: {
-        status: "running",
-        rootFolder: "/audio/library",
-        progress: null,
-      },
-    });
+    queryClient.setQueryData(
+      SETTINGS_QUERY_KEYS.all(),
+      settingsOf({ status: "running", rootFolder: "/audio/library", progress: null }),
+    );
 
     await waitFor(() =>
       expect(screen.getByText("ライブラリを再構築しています")).toBeInTheDocument(),
@@ -131,39 +128,20 @@ describe("root再設定に入ったときの再生停止（自分で開始して
   });
 
   it("実際の409（root_reconfiguring）を観測後、settings再取得がrunningを返すとstopが呼ばれる", async () => {
-    renderAppWithSettings(
-      {
-        rootFolder: "/audio/library",
-        lastScanTime: "2026-01-01T00:00:00.000Z",
-        rootReconfiguration: { status: "idle", completedAt: null },
-      },
-      { withApiErrorHandler: true },
-    );
+    renderAppWithSettings(settingsOf({ status: "idle", completedAt: null }), {
+      withApiErrorHandler: true,
+    });
     await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
     expect(stopSpy).not.toHaveBeenCalled();
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.endsWith("/settings")) {
-          return new Response(
-            JSON.stringify({
-              rootFolder: "/audio/library",
-              lastScanTime: "2026-01-01T00:00:00.000Z",
-              rootReconfiguration: {
-                status: "running",
-                rootFolder: "/audio/library",
-                progress: null,
-              },
-            }),
-            { headers: { "Content-Type": "application/json" } },
-          );
-        }
-        return new Response(
-          JSON.stringify({ error: { code: "root_reconfiguring", message: "再設定中です" } }),
-          { status: 409, headers: { "Content-Type": "application/json" } },
-        );
+    mockApi(
+      appShellRoutes({
+        "GET /api/settings": settingsOf({
+          status: "running",
+          rootFolder: "/audio/library",
+          progress: null,
+        }),
+        "GET /api/works/:id/playback": () => apiError(409, "root_reconfiguring", "再設定中です"),
       }),
     );
 
@@ -176,15 +154,16 @@ describe("root再設定に入ったときの再生停止（自分で開始して
   });
 
   it("起動時に既にfailedだった場合もstopが呼ばれる", async () => {
-    renderAppWithSettings({
-      rootFolder: "/audio/library",
-      lastScanTime: null,
-      rootReconfiguration: {
-        status: "failed",
-        rootFolder: "/audio/library",
-        message: "ルートフォルダーにアクセスできません",
-      },
-    });
+    renderAppWithSettings(
+      settingsOf(
+        {
+          status: "failed",
+          rootFolder: "/audio/library",
+          message: "ルートフォルダーにアクセスできません",
+        },
+        null,
+      ),
+    );
 
     await waitFor(() =>
       expect(screen.getByText("ライブラリの再構築に失敗しました")).toBeInTheDocument(),

@@ -6,13 +6,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  WORKS_DEFAULT_PAGE_SIZE,
-  emptyDlsiteState,
-  workspacePath,
-  type Work,
-  type WorkListItem,
-} from "@mimimilli/shared";
+import { WORKS_DEFAULT_PAGE_SIZE, type Work, type WorkListItem } from "@mimimilli/shared";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import {
@@ -21,6 +15,16 @@ import {
   useSuspenseNormalLibraryWorks,
 } from "../../src/features/library/model/useLibraryQueries";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
+import { mockApi, type ApiMock } from "../helpers/api";
+import {
+  buildResolvedPlaylist,
+  buildSettings,
+  buildWork,
+  buildWorkEditSnapshotOf,
+  buildWorkListItem,
+  buildWorkSourceMutationResult,
+  buildWorksPage,
+} from "../helpers/builders";
 
 const baseNav: LibraryViewState = {
   activeAxis: "all",
@@ -29,168 +33,83 @@ const baseNav: LibraryViewState = {
   sort: "added-desc",
 };
 
-function jsonResponse(data: unknown): Response {
-  return new Response(JSON.stringify(data), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-function urlOf(input: RequestInfo | URL): string {
-  if (typeof input === "string") return input;
-  if (input instanceof URL) return input.toString();
-  return input.url;
-}
-
 function makeWorkListItem(id: string, title = `作品 ${id}`): WorkListItem {
-  return {
-    id,
-    title,
-    cover: null,
-    status: "ok",
-    totalDurationSec: 60,
-    trackCount: 1,
-    bookmarked: false,
-    lastPlayedAt: null,
-    circleName: null,
-    relativePath: workspacePath(id),
-    dlsite: { rjCode: null, status: "none" },
-  };
+  return buildWorkListItem({ id, title, totalDurationSec: 60 });
 }
 
 function makeWorkDetail(id: string, title = `作品 ${id}`): Work {
-  const playlistId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-  return {
+  const playlist = buildResolvedPlaylist(1, ["track"]);
+  return buildWork({
     id,
     title,
-    cover: null,
-    coverKind: "none",
-    coverImage: null,
-    status: "ok",
     physicalPath: `/lib/${id}`,
     totalDurationSec: 60,
-    addedAt: "2025-01-01T00:00:00.000Z",
-    errorMessage: null,
-    urls: [],
-    tags: [],
-    bookmarked: false,
-    lastPlayedAt: null,
-    dlsite: emptyDlsiteState(),
-    defaultPlaylistId: playlistId,
-    createdAt: null,
-    playlists: [
-      {
-        id: playlistId,
-        name: "default",
-        tracks: [
-          {
-            id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-            title: "track",
-            file: "track.mp3",
-            durationSec: 60,
-            durationKind: "resolved",
-          },
-        ],
-      },
-    ],
-    resume: null,
-  };
+    defaultPlaylistId: playlist.id,
+    playlists: [playlist],
+  });
 }
 
-function createFetchMock(total = WORKS_DEFAULT_PAGE_SIZE + 50) {
+function installApi(total = WORKS_DEFAULT_PAGE_SIZE + 50) {
   const worksById = new Map<string, WorkListItem>();
   const detailsById = new Map<string, Work>();
 
-  return {
-    worksById,
-    detailsById,
-    fetchMock: vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(urlOf(input), "http://localhost");
-      const path = url.pathname;
+  const api = mockApi({
+    "GET /api/works": ({ url }) => {
+      const page = Number(url.searchParams.get("page") ?? 1);
+      const pageSize = WORKS_DEFAULT_PAGE_SIZE;
+      const start = (page - 1) * pageSize;
+      const count = Math.max(0, Math.min(pageSize, total - start));
+      const items: WorkListItem[] = Array.from({ length: count }, (_, i) => {
+        const id = `p${page}-w${i + 1}`;
+        if (!worksById.has(id)) worksById.set(id, makeWorkListItem(id));
+        return worksById.get(id)!;
+      });
+      return buildWorksPage(items, { total });
+    },
+    "PATCH /api/works/:id/bookmark": ({ params, body }) => {
+      const id = params.id!;
+      const { bookmarked } = body as { bookmarked: boolean };
+      const current = detailsById.get(id) ?? makeWorkDetail(id);
+      const updated = { ...current, bookmarked };
+      detailsById.set(id, updated);
+      const listItem = worksById.get(id) ?? makeWorkListItem(id, updated.title);
+      listItem.bookmarked = bookmarked;
+      worksById.set(id, listItem);
+      return { bookmarked };
+    },
+    "PATCH /api/works/:id": ({ params, body }) => {
+      const id = params.id!;
+      const patch = body as Record<string, unknown>;
+      const current = detailsById.get(id) ?? makeWorkDetail(id);
+      const updated: Work = {
+        ...current,
+        ...(patch.title !== undefined ? { title: patch.title as string } : {}),
+        ...(patch.tags !== undefined ? { tags: patch.tags as string[] } : {}),
+        ...(patch.urls !== undefined ? { urls: patch.urls as Work["urls"] } : {}),
+      };
+      detailsById.set(id, updated);
+      const listItem = makeWorkListItem(id, updated.title);
+      listItem.bookmarked = updated.bookmarked;
+      worksById.set(id, listItem);
+      return buildWorkSourceMutationResult(buildWorkEditSnapshotOf(updated, "revision-2"));
+    },
+    "GET /api/works/:id": ({ params }) => {
+      const id = params.id!;
+      const detail = detailsById.get(id) ?? makeWorkDetail(id);
+      if (!detailsById.has(id)) detailsById.set(id, detail);
+      return detail;
+    },
+    "GET /api/tag-prefixes": [],
+    "GET /api/tags": [],
+    "GET /api/smart-folders": [],
+    "GET /api/settings": buildSettings({ rootFolder: "/lib" }),
+  });
 
-      if (path === "/api/works") {
-        const page = Number(url.searchParams.get("page") ?? 1);
-        const pageSize = WORKS_DEFAULT_PAGE_SIZE;
-        const start = (page - 1) * pageSize;
-        const count = Math.max(0, Math.min(pageSize, total - start));
-        const items: WorkListItem[] = Array.from({ length: count }, (_, i) => {
-          const id = `p${page}-w${i + 1}`;
-          if (!worksById.has(id)) worksById.set(id, makeWorkListItem(id));
-          return worksById.get(id)!;
-        });
-        return Promise.resolve(
-          jsonResponse({ items, total, stats: { trackCount: 0, durationSec: 0 } }),
-        );
-      }
-
-      const bookmarkMatch = path.match(/^\/api\/works\/([^/]+)\/bookmark$/);
-      if (bookmarkMatch && init?.method === "PATCH") {
-        const id = bookmarkMatch[1];
-        const body = JSON.parse(init.body as string) as { bookmarked: boolean };
-        const current = detailsById.get(id) ?? makeWorkDetail(id);
-        const updated = { ...current, bookmarked: body.bookmarked };
-        detailsById.set(id, updated);
-        const listItem = worksById.get(id) ?? makeWorkListItem(id, updated.title);
-        listItem.bookmarked = body.bookmarked;
-        worksById.set(id, listItem);
-        return Promise.resolve(jsonResponse({ bookmarked: body.bookmarked }));
-      }
-
-      const workIdMatch = path.match(/^\/api\/works\/([^/]+)$/);
-      if (workIdMatch) {
-        const id = workIdMatch[1];
-        if (init?.method === "PATCH") {
-          const body = JSON.parse(init.body as string) as Record<string, unknown>;
-          const current = detailsById.get(id) ?? makeWorkDetail(id);
-          const updated: Work = {
-            ...current,
-            ...(body.title !== undefined ? { title: body.title as string } : {}),
-            ...(body.tags !== undefined ? { tags: body.tags as string[] } : {}),
-            ...(body.urls !== undefined ? { urls: body.urls as Work["urls"] } : {}),
-          };
-          detailsById.set(id, updated);
-          const listItem = makeWorkListItem(id, updated.title);
-          listItem.bookmarked = updated.bookmarked;
-          worksById.set(id, listItem);
-          return Promise.resolve(
-            jsonResponse({
-              snapshot: {
-                sourceRevision: "revision-2",
-                id: updated.id,
-                physicalPath: updated.physicalPath,
-                title: updated.title,
-                tags: updated.tags,
-                urls: updated.urls,
-                coverImage: updated.coverImage,
-                dlsite: updated.dlsite,
-              },
-              projection: { status: "published" },
-            }),
-          );
-        }
-        const detail = detailsById.get(id) ?? makeWorkDetail(id);
-        if (!detailsById.has(id)) detailsById.set(id, detail);
-        return Promise.resolve(jsonResponse(detail));
-      }
-
-      if (path === "/api/tag-prefixes") return Promise.resolve(jsonResponse([]));
-      if (path === "/api/tags") return Promise.resolve(jsonResponse([]));
-      if (path === "/api/smart-folders") return Promise.resolve(jsonResponse([]));
-      if (path === "/api/settings") {
-        return Promise.resolve(jsonResponse({ rootFolder: "/lib", lastScanTime: null }));
-      }
-
-      return Promise.reject(new Error(`unexpected fetch: ${url.toString()}`));
-    }),
-  };
+  return { api, worksById, detailsById };
 }
 
-function isWorksListUrl(input: string): boolean {
-  return new URL(input, "http://localhost").pathname === "/api/works";
-}
-
-function worksCallUrls(fetchMock: ReturnType<typeof vi.fn>): string[] {
-  return fetchMock.mock.calls.map(([input]) => urlOf(input)).filter((u) => isWorksListUrl(u));
+function worksCallUrls(api: ApiMock): string[] {
+  return api.urlsTo("GET /api/works");
 }
 
 function renderLibraryHooks(nav: LibraryViewState, options?: { queryClient?: QueryClient }) {
@@ -199,10 +118,7 @@ function renderLibraryHooks(nav: LibraryViewState, options?: { queryClient?: Que
     new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Infinity } },
     });
-  queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
-    rootFolder: "/lib",
-    lastScanTime: null,
-  });
+  queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), buildSettings({ rootFolder: "/lib" }));
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(
       QueryClientProvider,
@@ -226,14 +142,13 @@ function renderLibraryHooks(nav: LibraryViewState, options?: { queryClient?: Que
 }
 
 describe("作品 PATCH 後の一覧キャッシュ同期", () => {
-  let fetchMock: ReturnType<typeof vi.fn>;
+  let api: ApiMock;
   let detailsById: Map<string, Work>;
 
   beforeEach(() => {
-    const mock = createFetchMock();
-    fetchMock = mock.fetchMock;
+    const mock = installApi();
+    api = mock.api;
     detailsById = mock.detailsById;
-    vi.stubGlobal("fetch", fetchMock);
   });
 
   afterEach(() => {
@@ -251,7 +166,7 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
 
     await waitFor(() => expect(result.current.works).toHaveLength(WORKS_DEFAULT_PAGE_SIZE + 50));
 
-    const worksCallsBeforePatch = worksCallUrls(fetchMock).length;
+    const worksCallsBeforePatch = worksCallUrls(api).length;
 
     await act(async () => {
       await result.current.workPatchMutations.editMutation.mutateAsync({
@@ -262,7 +177,7 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
     });
 
     await waitFor(() => {
-      expect(worksCallUrls(fetchMock).length).toBeGreaterThan(worksCallsBeforePatch);
+      expect(worksCallUrls(api).length).toBeGreaterThan(worksCallsBeforePatch);
     });
     await waitFor(() => {
       expect(result.current.works.find((w) => w.id === "p1-w1")?.title).toBe("更新後タイトル");
@@ -318,7 +233,7 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
 
     await waitFor(() => expect(result.current.works).toHaveLength(WORKS_DEFAULT_PAGE_SIZE));
 
-    const worksCallsBeforePatch = worksCallUrls(fetchMock).length;
+    const worksCallsBeforePatch = worksCallUrls(api).length;
 
     await act(async () => {
       await result.current.workPatchMutations.bookmarkMutation.mutateAsync({
@@ -327,8 +242,8 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
       });
     });
 
-    expect(worksCallUrls(fetchMock).length).toBe(worksCallsBeforePatch);
-    expect(worksCallUrls(fetchMock).some((u) => u.includes("view=fav"))).toBe(false);
+    expect(worksCallUrls(api).length).toBe(worksCallsBeforePatch);
+    expect(worksCallUrls(api).some((u) => u.includes("view=fav"))).toBe(false);
 
     const favQuery = queryClient.getQueryCache().find({ queryKey: favKey });
     expect(favQuery?.isStale()).toBe(true);
@@ -357,7 +272,7 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
 
     await waitFor(() => expect(result.current.works).toHaveLength(WORKS_DEFAULT_PAGE_SIZE));
 
-    const worksCallsBeforePatch = worksCallUrls(fetchMock).length;
+    const worksCallsBeforePatch = worksCallUrls(api).length;
 
     await act(async () => {
       await result.current.workPatchMutations.bookmarkMutation.mutateAsync({
@@ -366,14 +281,12 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
       });
     });
 
-    await waitFor(() =>
-      expect(worksCallUrls(fetchMock).length).toBeGreaterThan(worksCallsBeforePatch),
+    await waitFor(() => expect(worksCallUrls(api).length).toBeGreaterThan(worksCallsBeforePatch));
+    expect(worksCallUrls(api).some((u) => u.includes("view=fav") && u.includes("page=1"))).toBe(
+      true,
     );
     expect(
-      worksCallUrls(fetchMock).some((u) => u.includes("view=fav") && u.includes("page=1")),
-    ).toBe(true);
-    expect(
-      worksCallUrls(fetchMock).some(
+      worksCallUrls(api).some(
         (u) => !u.includes("view=fav") && !u.includes("limit=1") && u.includes("page=1"),
       ),
     ).toBe(false);

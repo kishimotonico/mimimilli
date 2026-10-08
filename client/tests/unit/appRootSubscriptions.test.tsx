@@ -16,6 +16,13 @@ import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import type { WorkSummary } from "../../src/entities/work/model";
 import { createFakeDlsiteBulkStore, createFakeScanJobStore } from "../helpers/fakeJobStores";
+import { mockApi } from "../helpers/api";
+import {
+  buildDlsiteNotificationSummary,
+  buildScanLastResult,
+  buildScanResult,
+  buildSettings,
+} from "../helpers/builders";
 import { seedLibraryRoute } from "../helpers/route";
 
 let appShellCallCount = 0;
@@ -36,13 +43,7 @@ function JotaiSubscriptionProbe() {
   return null;
 }
 
-const summaryDefaults = {
-  rjCodeMissingCount: 0,
-  fetchFailedCount: 0,
-  parseErrorCount: 0,
-  parseErrorAlert: false,
-  unlinkedCount: 0,
-};
+const summaryDefaults = buildDlsiteNotificationSummary();
 
 const work: WorkSummary = {
   id: "work-1",
@@ -78,23 +79,11 @@ const tracks = [
 ] as const;
 
 function seedQueryCache(queryClient: QueryClient) {
-  queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
-    rootFolder: "/test-library",
-    lastScanTime: null,
-    rootReconfiguration: { status: "idle", completedAt: null },
-  });
-  queryClient.setQueryData(SCAN_QUERY_KEYS.last(), {
-    result: {
-      registered: 0,
-      insertedWorkIds: [],
-      updatedWorkIds: [],
-      errors: 0,
-      missing: 0,
-      skipped: 0,
-      coverErrors: 0,
-    },
-    finishedAt: "2026-01-01T00:00:00.000Z",
-  });
+  queryClient.setQueryData(
+    SETTINGS_QUERY_KEYS.all(),
+    buildSettings({ rootFolder: "/test-library" }),
+  );
+  queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanLastResult());
   queryClient.setQueryData(WORK_QUERY_KEYS.total(), 0);
   queryClient.setQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary(), summaryDefaults);
 }
@@ -113,6 +102,7 @@ function createTestQueryClient() {
 }
 
 function renderApp() {
+  mockApi({ "GET /api/scan/candidates": { candidates: [] } });
   const queryClient = createTestQueryClient();
   const store = createStore();
   const scanJob = createFakeScanJobStore();
@@ -191,11 +181,10 @@ describe("App root subscriptions", () => {
       const baseline = await waitForAppShellBaseline();
 
       await act(async () => {
-        queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
-          rootFolder: "/changed-root",
-          lastScanTime: null,
-          rootReconfiguration: { status: "idle", completedAt: null },
-        });
+        queryClient.setQueryData(
+          SETTINGS_QUERY_KEYS.all(),
+          buildSettings({ rootFolder: "/changed-root" }),
+        );
       });
 
       await waitFor(() =>
@@ -256,10 +245,10 @@ describe("App root subscriptions", () => {
       const baseline = await waitForAppShellBaseline();
 
       await act(async () => {
-        queryClient.setQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary(), {
-          ...summaryDefaults,
-          rjCodeMissingCount: 5,
-        });
+        queryClient.setQueryData(
+          WORK_QUERY_KEYS.dlsiteNotificationSummary(),
+          buildDlsiteNotificationSummary({ rjCodeMissingCount: 5 }),
+        );
       });
 
       await waitFor(() =>
@@ -339,18 +328,10 @@ describe("App root subscriptions", () => {
       const { queryClient } = renderApp();
       const baseline = await waitForAppShellBaseline();
 
-      const nextResult = {
-        result: {
-          registered: 1,
-          insertedWorkIds: ["work-1"],
-          updatedWorkIds: [],
-          errors: 0,
-          missing: 0,
-          skipped: 0,
-          coverErrors: 0,
-        },
+      const nextResult = buildScanLastResult({
+        result: buildScanResult({ registered: 1, insertedWorkIds: ["work-1"] }),
         finishedAt: "2026-01-02T00:00:00.000Z",
-      };
+      });
       await act(async () => {
         queryClient.setQueryData(SCAN_QUERY_KEYS.last(), nextResult);
       });

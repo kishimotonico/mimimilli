@@ -493,7 +493,7 @@ describe("AxisValueQuickList 経路での close()", () => {
     const focusSpy = vi.spyOn(anchor, "focus");
 
     const firstItem = document.querySelector<HTMLButtonElement>("[data-quicklist-item]");
-    expect(firstItem).toBeTruthy();
+    expect(firstItem).toBeInTheDocument();
     firstItem!.focus();
     await userEvent.click(firstItem!);
 

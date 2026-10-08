@@ -13,56 +13,44 @@ import {
   toSelectedRelPath,
 } from "../../src/entities/file-system/model/navigationAtoms";
 import { seedFilesRoute } from "../helpers/route";
-import type { IdentityConflict } from "@mimimilli/shared";
-import type { FsEntry } from "../../src/features/files/model/types";
+import type { FsEntry, IdentityConflict } from "@mimimilli/shared";
+import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
+import { mockApi, type ApiMock } from "../helpers/api";
+import {
+  buildFsEntry,
+  buildFsListing,
+  buildScanDiagnostics,
+  buildSettings,
+  buildWorkSourceMutationResult,
+} from "../helpers/builders";
 
-const browseFs = vi.fn();
-const getScanDiagnostics = vi.fn();
 const playFile = vi.fn();
-
-vi.mock("../../src/features/files/api", () => ({
-  browseFs: (...args: unknown[]) => browseFs(...args),
-}));
-
-vi.mock("../../src/entities/scan/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/entities/scan/api")>()),
-  getScanDiagnostics: (...args: unknown[]) => getScanDiagnostics(...args),
-}));
-
-const reassignIdentityConflict = vi.fn();
-
-vi.mock("../../src/entities/work/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/entities/work/api")>()),
-  reassignIdentityConflict: (...args: unknown[]) => reassignIdentityConflict(...args),
-}));
 
 vi.mock("../../src/entities/player/model/usePlayerActions", () => ({
   usePlayerActions: () => ({ playFile, togglePlay: vi.fn() }),
 }));
 
-vi.mock("../../src/entities/settings/useSettingsQuery", () => ({
-  useRootFolder: () => "/lib",
-}));
-
 function audioFile(name: string): FsEntry {
-  return {
-    name,
-    path: name,
-    isDir: false,
-    size: 100,
-    fileType: "audio",
-    childCount: 0,
-    workId: null,
-    workRelPath: null,
-    mediaKind: "audio",
-    preview: { kind: "available" },
-  };
+  return buildFsEntry({ path: name });
 }
 
-function renderPreview(selectedPath: string | null, diagnostics: IdentityConflict[] = []) {
+let api: ApiMock;
+
+function renderPreview(
+  selectedPath: string | null,
+  entries: FsEntry[],
+  diagnostics: IdentityConflict[] = [],
+) {
   playFile.mockClear();
-  getScanDiagnostics.mockResolvedValue({ identityConflicts: diagnostics, invalidMetaFiles: [] });
+  const settings = buildSettings({ rootFolder: "/lib" });
+  api = mockApi({
+    "GET /api/fs": buildFsListing(entries),
+    "GET /api/scan/diagnostics": buildScanDiagnostics({ identityConflicts: diagnostics }),
+    "GET /api/settings": settings,
+    "POST /api/works/identity-conflicts/reassign": buildWorkSourceMutationResult(),
+  });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), settings);
   const store = createStore();
   seedFilesRoute(store, { selectedRelPath: toSelectedRelPath(selectedPath) });
   const wrapper = ({ children }: { children: ReactNode }) =>
@@ -80,8 +68,7 @@ afterEach(cleanup);
 describe("FilePreview 再生キュー", () => {
   it("音声2件のフォルダーで2件目のファイルを選び「このファイルを再生」→ 2トラック・trackIndex=1で再生される", async () => {
     const entries = [audioFile("audio1.wav"), audioFile("audio2.wav")];
-    browseFs.mockResolvedValue({ entries, workId: null });
-    renderPreview("audio2.wav");
+    renderPreview("audio2.wav", entries);
 
     await userEvent.click(await screen.findByRole("button", { name: "このファイルを再生" }));
 
@@ -93,8 +80,7 @@ describe("FilePreview 再生キュー", () => {
 
   it("フォルダー選択時の「先頭の音声を再生」→ 1件目から再生される", async () => {
     const entries = [audioFile("audio1.wav"), audioFile("audio2.wav")];
-    browseFs.mockResolvedValue({ entries, workId: null });
-    renderPreview(null);
+    renderPreview(null, entries);
 
     await userEvent.click(await screen.findByRole("button", { name: "先頭の音声を再生" }));
 
@@ -107,24 +93,19 @@ describe("FilePreview 再生キュー", () => {
 
 describe("FilePreview ID重複（単一ファイル形式）", () => {
   const metaPath = "b/single.mimimilli.json";
-  const metaEntry: FsEntry = {
-    name: "single.mimimilli.json",
+  const metaEntry = buildFsEntry({
     path: metaPath,
-    isDir: false,
-    size: 100,
     fileType: "json",
-    childCount: 0,
-    workId: null,
-    workRelPath: null,
     mediaKind: "other",
     preview: { kind: "unavailable", reason: "unsupported" },
-  };
+  });
 
   it("重複対象のメタファイルを選ぶと、ID重複の説明と再採番ボタンが出る", async () => {
-    browseFs.mockResolvedValue({ entries: [metaEntry], workId: null });
-    renderPreview(metaPath, [
-      { kind: "identity_conflict", workId: "w1", paths: ["a/single.mimimilli.json", metaPath] },
-    ]);
+    renderPreview(
+      metaPath,
+      [metaEntry],
+      [{ kind: "identity_conflict", workId: "w1", paths: ["a/single.mimimilli.json", metaPath] }],
+    );
 
     expect(
       await screen.findByText("同じWork IDを持つメタファイルがあります。"),
@@ -134,25 +115,23 @@ describe("FilePreview ID重複（単一ファイル形式）", () => {
   });
 
   it("メタファイル行の再採番に成功すると選択が外れ、親フォルダーのプレビューへ戻る", async () => {
-    browseFs.mockResolvedValue({ entries: [metaEntry], workId: null });
-    reassignIdentityConflict.mockResolvedValue({
-      snapshot: { id: "new" },
-      projection: { status: "published" },
-    });
-    const { store } = renderPreview(metaPath, [
-      { kind: "identity_conflict", workId: "w1", paths: ["a/single.mimimilli.json", metaPath] },
-    ]);
+    const { store } = renderPreview(
+      metaPath,
+      [metaEntry],
+      [{ kind: "identity_conflict", workId: "w1", paths: ["a/single.mimimilli.json", metaPath] }],
+    );
 
     await userEvent.click(await screen.findByRole("button", { name: "別作品として取り込む" }));
     await userEvent.click(await screen.findByRole("button", { name: "取り込む" }));
 
     await waitFor(() => expect(store.get(filesSelectedPathAtom)).toBeNull());
-    expect(reassignIdentityConflict).toHaveBeenCalledWith(metaPath);
+    expect(api.requestsTo("POST /api/works/identity-conflicts/reassign")[0]?.body).toEqual({
+      path: metaPath,
+    });
   });
 
   it("重複対象でないファイルにはID重複セクションを出さない", async () => {
-    browseFs.mockResolvedValue({ entries: [metaEntry], workId: null });
-    renderPreview(metaPath);
+    renderPreview(metaPath, [metaEntry]);
 
     await screen.findByText("single.mimimilli.json");
     expect(screen.queryByText("ID重複")).not.toBeInTheDocument();

@@ -2,15 +2,19 @@ import { act, createElement, useMemo } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import App from "../../src/app/App";
 import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import NavigationHistorySync from "../../src/features/navigation/ui/NavigationHistorySync";
 import { PlayerRuntimeProvider } from "../../src/entities/player/model/PlayerRuntimeProvider";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
-import * as settingsApi from "../../src/entities/settings/api";
-import { ApiRequestError } from "../../src/shared/api/http";
+import { apiError, apiNoContent, mockApi, type ApiMock } from "../helpers/api";
+import { buildSettings } from "../helpers/builders";
+
+const SETUP_SETTINGS = buildSettings({ rootFolder: null });
+let api: ApiMock;
+let startReply: unknown;
 
 function renderSetupApp() {
   const queryClient = new QueryClient({
@@ -19,11 +23,7 @@ function renderSetupApp() {
       mutations: { retry: false },
     },
   });
-  queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
-    rootFolder: null,
-    lastScanTime: null,
-    rootReconfiguration: { status: "idle", completedAt: null },
-  });
+  queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), SETUP_SETTINGS);
 
   function Wrapper() {
     const client = useMemo(() => queryClient, []);
@@ -50,26 +50,18 @@ function renderSetupApp() {
 }
 
 beforeEach(() => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith("/scan/active")) {
-        return new Response(null, { status: 204 });
-      }
-      if (url.endsWith("/scan/last")) {
-        return new Response(null, { status: 204 });
-      }
-      if (url.endsWith("/works/search") || url.includes("/works?")) {
-        return new Response(JSON.stringify({ items: [], total: 0 }), {
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify([]), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }),
-  );
+  startReply = {
+    status: "running",
+    rootFolder: "/audio/library",
+    progress: null,
+  };
+  api = mockApi({
+    "GET /api/settings": SETUP_SETTINGS,
+    "GET /api/scan/active": () => apiNoContent(),
+    "GET /api/scan/last": () => apiNoContent(),
+    "GET /api/scan/candidates": { candidates: [] },
+    "POST /api/root-reconfiguration": () => startReply,
+  });
 });
 
 describe("RootConfigurationScreen（初回セットアップ）経路", () => {
@@ -79,15 +71,7 @@ describe("RootConfigurationScreen（初回セットアップ）経路", () => {
     expect(screen.getByRole("button", { name: /スキャン開始/ })).toBeInTheDocument();
   });
 
-  it("パス送信で startRootReconfiguration を呼び、成功後は settings を再取得する", async () => {
-    const startRootReconfiguration = vi
-      .spyOn(settingsApi, "startRootReconfiguration")
-      .mockResolvedValue({
-        status: "running",
-        rootFolder: "/audio/library",
-        progress: null,
-      });
-
+  it("パス送信でroot再設定を開始し、成功後は settings を再取得する", async () => {
     renderSetupApp();
     await waitFor(() => expect(screen.getByText("ようこそ")).toBeInTheDocument());
 
@@ -97,19 +81,17 @@ describe("RootConfigurationScreen（初回セットアップ）経路", () => {
       fireEvent.click(screen.getByRole("button", { name: /スキャン開始/ }));
     });
 
-    await waitFor(() => expect(startRootReconfiguration).toHaveBeenCalledWith("/audio/library"));
-    // 成功後は settings を再取得する（staleTime=Infinityの初期データが無効化され、再フェッチが走る）
     await waitFor(() =>
-      expect(fetch as unknown as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
-        expect.stringContaining("/settings"),
-      ),
+      expect(api.requestsTo("POST /api/root-reconfiguration")[0]?.body).toEqual({
+        rootFolder: "/audio/library",
+      }),
     );
+    // 成功後は settings を再取得する（staleTime=Infinityの初期データが無効化され、再フェッチが走る）
+    await waitFor(() => expect(api.requestsTo("GET /api/settings")).not.toHaveLength(0));
   });
 
   it("送信が失敗したらエラーを表示する", async () => {
-    vi.spyOn(settingsApi, "startRootReconfiguration").mockRejectedValue(
-      new Error("保存に失敗しました"),
-    );
+    startReply = apiError(500, "internal", "保存に失敗しました");
 
     renderSetupApp();
     await waitFor(() => expect(screen.getByText("ようこそ")).toBeInTheDocument());
@@ -126,12 +108,10 @@ describe("RootConfigurationScreen（初回セットアップ）経路", () => {
   });
 
   it("ルートフォルダー検証エラー（InvalidRootFolderError由来のApiRequestError）はサーバーの文言をそのまま表示する", async () => {
-    vi.spyOn(settingsApi, "startRootReconfiguration").mockRejectedValue(
-      new ApiRequestError(
-        400,
-        "invalid_request",
-        "指定されたルートフォルダーが存在しません: /no/such/path",
-      ),
+    startReply = apiError(
+      400,
+      "invalid_request",
+      "指定されたルートフォルダーが存在しません: /no/such/path",
     );
 
     renderSetupApp();

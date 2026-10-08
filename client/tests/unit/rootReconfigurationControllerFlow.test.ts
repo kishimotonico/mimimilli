@@ -1,6 +1,5 @@
 // root再設定（ADR-0029）の突入・離脱・drift検知のリセットを、Reactを使わずに縛る。
 import { QueryClient, QueryObserver } from "@tanstack/react-query";
-import type { Settings } from "@mimimilli/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createRootReconfigurationController,
@@ -8,25 +7,25 @@ import {
 } from "../../src/app/model/rootReconfigurationController";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
-import * as scanApi from "../../src/entities/scan/api";
-import * as scanCandidatesCache from "../../src/entities/scan/scanCandidatesCache";
+import { SCAN_CANDIDATES_QUERY_KEY } from "../../src/entities/scan/scanCandidatesCache";
+import { mockApi, type ApiMock } from "../helpers/api";
+import { buildScanLastResult, buildScanResult, buildSettings } from "../helpers/builders";
 
-const SCAN_RESULT = {
-  registered: 0,
-  insertedWorkIds: ["work-1"] as string[],
-  updatedWorkIds: [],
-  errors: 0,
-  missing: 0,
-  skipped: 0,
-  coverErrors: 0,
-};
+const LAST_SCAN_ROUTE = "GET /api/scan/last";
+const CANDIDATES_ROUTE = "GET /api/scan/candidates";
 
-function idleSettings(rootFolder: string, completedAt: string | null): Settings {
-  return {
+let api: ApiMock;
+let insertedWorkIds: string[];
+
+function idleSettings(rootFolder: string, completedAt: string | null) {
+  return buildSettings({ rootFolder, rootReconfiguration: { status: "idle", completedAt } });
+}
+
+function runningSettings(rootFolder: string, target: string) {
+  return buildSettings({
     rootFolder,
-    lastScanTime: null,
-    rootReconfiguration: { status: "idle", completedAt },
-  } as Settings;
+    rootReconfiguration: { status: "running", rootFolder: target, progress: null },
+  });
 }
 
 function setup() {
@@ -51,12 +50,12 @@ function setup() {
 
 describe("rootReconfigurationController", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
-    vi.spyOn(scanApi, "getLastScanResult").mockResolvedValue({
-      result: SCAN_RESULT,
-      finishedAt: "2026-01-01T00:00:00.000Z",
+    insertedWorkIds = ["work-1"];
+    api = mockApi({
+      [LAST_SCAN_ROUTE]: () =>
+        buildScanLastResult({ result: buildScanResult({ insertedWorkIds }) }),
+      [CANDIDATES_ROUTE]: { candidates: [] },
     });
-    vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue([]);
   });
 
   it("突入で再生停止・モーダル閉・DLsite適用ダイアログ閉・scan/DLsiteのreset・既定画面へ遷移・hiddenPaths破棄を行う", () => {
@@ -105,7 +104,7 @@ describe("rootReconfigurationController", () => {
     controller.readyUiMounted();
 
     expect(deps.stopPlayback).not.toHaveBeenCalled();
-    expect(scanCandidatesCache.refreshScanCandidates).not.toHaveBeenCalled();
+    expect(api.requestsTo(CANDIDATES_ROUTE)).toHaveLength(0);
     expect(deps.dlsiteBulk.attach).not.toHaveBeenCalled();
     expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("work-1"))?.isInvalidated).toBe(false);
   });
@@ -126,21 +125,18 @@ describe("rootReconfigurationController", () => {
 
     await vi.waitFor(() => expect(queryFn).toHaveBeenCalledTimes(2));
     await vi.waitFor(() => expect(deps.dlsiteBulk.attach).toHaveBeenCalledTimes(1));
-    expect(scanCandidatesCache.refreshScanCandidates).toHaveBeenCalledWith(queryClient);
+    await vi.waitFor(() => expect(queryClient.getQueryData(SCAN_CANDIDATES_QUERY_KEY)).toEqual([]));
+    expect(api.requestsTo(CANDIDATES_ROUTE)).toHaveLength(1);
     unsubscribe();
   });
 
   it("ロック中は通常UIが残っていても離脱させず、解除後に1回だけ行う", async () => {
     const { controller, deps, queryClient } = setup();
-    queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
-      rootFolder: "/audio/library",
-      lastScanTime: null,
-      rootReconfiguration: { status: "running", rootFolder: "/b", progress: null },
-    });
+    queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), runningSettings("/audio/library", "/b"));
     controller.enter();
 
     controller.readyUiMounted();
-    expect(scanApi.getLastScanResult).not.toHaveBeenCalled();
+    expect(api.requestsTo(LAST_SCAN_ROUTE)).toHaveLength(0);
 
     queryClient.setQueryData(
       SETTINGS_QUERY_KEYS.all(),
@@ -159,7 +155,7 @@ describe("rootReconfigurationController", () => {
     controller.readyUiMounted();
 
     await vi.waitFor(() => expect(deps.dlsiteBulk.attach).toHaveBeenCalledTimes(1));
-    expect(scanApi.getLastScanResult).toHaveBeenCalledTimes(1);
+    expect(api.requestsTo(LAST_SCAN_ROUTE)).toHaveLength(1);
   });
 
   it("次の突入ではまた離脱後処理が走る（取りこぼさない）", async () => {
@@ -172,20 +168,17 @@ describe("rootReconfigurationController", () => {
     controller.readyUiMounted();
 
     await vi.waitFor(() => expect(deps.dlsiteBulk.attach).toHaveBeenCalledTimes(2));
-    expect(scanApi.getLastScanResult).toHaveBeenCalledTimes(2);
+    expect(api.requestsTo(LAST_SCAN_ROUTE)).toHaveLength(2);
   });
 
   it("insertedWorkIdsが空ならDLsite一括取得にattachしない", async () => {
-    vi.spyOn(scanApi, "getLastScanResult").mockResolvedValue({
-      result: { ...SCAN_RESULT, insertedWorkIds: [] },
-      finishedAt: "2026-01-01T00:00:00.000Z",
-    });
+    insertedWorkIds = [];
     const { controller, deps } = setup();
 
     controller.enter();
     controller.readyUiMounted();
 
-    await vi.waitFor(() => expect(scanApi.getLastScanResult).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(api.requestsTo(LAST_SCAN_ROUTE)).toHaveLength(1));
     await Promise.resolve();
     expect(deps.dlsiteBulk.attach).not.toHaveBeenCalled();
   });
@@ -249,11 +242,7 @@ describe("rootReconfigurationController", () => {
       controller.observeSettings(idleSettings("/a", "2026-01-01T00:00:00.000Z"));
 
       controller.enter();
-      controller.observeSettings({
-        rootFolder: "/a",
-        lastScanTime: null,
-        rootReconfiguration: { status: "running", rootFolder: "/b", progress: null },
-      } as Settings);
+      controller.observeSettings(runningSettings("/a", "/b"));
       controller.readyUiMounted();
       controller.observeSettings(idleSettings("/b", "2026-01-01T00:05:00.000Z"));
       controller.readyUiMounted();
@@ -262,7 +251,7 @@ describe("rootReconfigurationController", () => {
       expect(deps.stopPlayback).toHaveBeenCalledTimes(1);
       expect(deps.navigateToDefaultRoute).toHaveBeenCalledTimes(1);
       await vi.waitFor(() => expect(deps.dlsiteBulk.attach).toHaveBeenCalledTimes(1));
-      expect(scanApi.getLastScanResult).toHaveBeenCalledTimes(1);
+      expect(api.requestsTo(LAST_SCAN_ROUTE)).toHaveLength(1);
     });
 
     it("rootFolderが変わっても発火する", () => {
@@ -287,11 +276,7 @@ describe("rootReconfigurationController", () => {
       const { controller, deps } = setup();
       controller.observeSettings(idleSettings("/a", "2026-01-01T00:00:00.000Z"));
 
-      controller.observeSettings({
-        rootFolder: "/a",
-        lastScanTime: null,
-        rootReconfiguration: { status: "running", rootFolder: "/a", progress: null },
-      } as Settings);
+      controller.observeSettings(runningSettings("/a", "/a"));
       expect(deps.stopPlayback).not.toHaveBeenCalled();
 
       controller.observeSettings(idleSettings("/a", "2026-01-01T00:10:00.000Z"));

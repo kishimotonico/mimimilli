@@ -228,20 +228,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     scanInsertedWorkIds: scenario.scanInsertedWorkIds,
     scanUpdatedWorkIds: scenario.scanUpdatedWorkIds,
     scanCandidateExclusions: [],
-    identityConflicts:
-      options.identityConflicts ??
-      (scenario.id === "new-work"
-        ? [
-            {
-              kind: "identity_conflict",
-              workId: "RJ501001",
-              paths: [
-                "dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読",
-                "copies/RJ501001_夜更けの図書室で囁き朗読",
-              ],
-            },
-          ]
-        : []),
+    identityConflicts: options.identityConflicts ?? scenario.identityConflicts,
     scanCandidatePool: scenario.scanCandidates,
     scanCandidates: scenario.scanCandidates,
     invalidMetaFiles: scenario.invalidMetaFiles,

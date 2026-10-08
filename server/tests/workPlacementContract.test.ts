@@ -521,7 +521,7 @@ test("単一ファイル形式のID重複は、対象のメタファイルがFil
   const { adapter, conflictPathOf } = fixtureReassignHarness("file");
   const listed = await adapter.browseFs(workspacePath("b"));
   assert.deepEqual(
-    listed?.entries.map((entry) => entry.path),
-    [conflictPathOf("b")],
+    listed?.entries.map((entry) => entry.path).sort(),
+    [conflictPathOf("b"), "b/single.wav"].sort(),
   );
 });

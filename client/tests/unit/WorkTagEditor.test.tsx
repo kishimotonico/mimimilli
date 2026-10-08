@@ -1,13 +1,14 @@
 import type { ReactElement } from "react";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Work } from "@mimimilli/shared";
-import { emptyDlsiteState } from "@mimimilli/shared";
 import type { WorkTagMutation } from "../../src/entities/work/model/workMutations";
 import { WorkTagEditor } from "../../src/features/library/ui/preview/WorkTagEditor";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import { ApiRequestError } from "../../src/shared/api/http";
+import { mockApi } from "../helpers/api";
+import { buildSettings, buildWork } from "../helpers/builders";
 
 function renderWithToast(ui: ReactElement) {
   const queryClient = new QueryClient({
@@ -31,28 +32,13 @@ function renderWithToast(ui: ReactElement) {
 }
 
 function makeWork(overrides: Partial<Work> = {}): Work {
-  return {
+  return buildWork({
     id: "w1",
-    title: "作品",
-    cover: null,
-    coverKind: "none",
-    coverImage: null,
-    status: "ok",
     physicalPath: "/lib/w1",
     totalDurationSec: 120,
-    addedAt: "2025-01-01T00:00:00.000Z",
-    errorMessage: null,
-    urls: [],
     tags: ["ASMR"],
-    bookmarked: false,
-    lastPlayedAt: null,
-    dlsite: emptyDlsiteState(),
-    defaultPlaylistId: null,
-    createdAt: null,
-    playlists: [],
-    resume: null,
     ...overrides,
-  };
+  });
 }
 
 function makeTagMutation(overrides: Partial<WorkTagMutation> = {}): WorkTagMutation {
@@ -66,9 +52,9 @@ function makeTagMutation(overrides: Partial<WorkTagMutation> = {}): WorkTagMutat
   } as WorkTagMutation;
 }
 
-vi.mock("../../src/entities/tag/useTagPrefixes", () => ({
-  useTagPrefixes: () => ({ tagPrefixes: [] }),
-}));
+beforeEach(() => {
+  mockApi({ "GET /api/settings": buildSettings(), "GET /api/tag-prefixes": [] });
+});
 
 const BROKEN_SOURCE_MESSAGE =
   "作品情報ファイルが壊れているため編集できません。表示は前回スキャン時点の内容です。";
@@ -85,7 +71,7 @@ describe("WorkTagEditor", () => {
       />,
     );
 
-    expect(screen.getByText("タグを保存できませんでした。")).toBeTruthy();
+    expect(screen.getByText("タグを保存できませんでした。")).toBeInTheDocument();
   });
 
   it("parse_error のあと role=alert を出し追加入力を disabled にする", () => {
