@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { useMotionVariants } from "../../../../shared/ui/useMotionVariants";
 import { buttonClass } from "../../../../shared/ui/Button";
 import { I } from "../../../../shared/ui/Icon";
+import { ModalFooter } from "../../../../shared/ui/Modal";
 
 export interface ScanFooterProps {
   scanning: boolean;
@@ -20,7 +21,7 @@ export default function ScanFooter({
   onStart,
 }: ScanFooterProps) {
   return (
-    <footer className="relative flex shrink-0 items-center justify-between gap-3 border-t border-line-soft px-[18px] py-3">
+    <ModalFooter className="relative justify-between gap-3">
       <AnimatePresence initial={false}>
         {scanning ? <ScanFooterHint key="hint" /> : <ScanDiffHint key="diff" />}
       </AnimatePresence>
@@ -35,7 +36,7 @@ export default function ScanFooter({
           {!scanning && <ScanStartButton key="start" hasResult={hasResult} onClick={onStart} />}
         </AnimatePresence>
       </div>
-    </footer>
+    </ModalFooter>
   );
 }
 

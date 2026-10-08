@@ -16,10 +16,10 @@ import { SORT_OPTIONS } from "../../../entities/library/types";
 import { cn } from "../../../shared/lib/cn";
 import Button from "../../../shared/ui/Button";
 import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
-import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
 import { type TagComboboxHandle } from "../../../shared/ui/TagCombobox";
 import TextInput from "../../../shared/ui/TextInput";
+import Modal, { ModalFooter, ModalHeader } from "../../../shared/ui/Modal";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import SmartFolderRuleCard from "./SmartFolderRuleCard";
 
@@ -69,7 +69,7 @@ export default function SmartFolderEditorModal({
   const errorCount = Object.keys(errors.ruleValues).length + (errors.name ? 1 : 0);
 
   // 保存中・削除中はEscapeでもbackdropクリックでも閉じない（既存挙動を維持）
-  const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({
+  const dialog = useDialogModal({
     onClose: () => {
       if (!isBusy) onClose();
     },
@@ -147,186 +147,177 @@ export default function SmartFolderEditorModal({
 
   return (
     <>
-      {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックで閉じる。EscapeはonCancel（useDialogModal）で処理する。 */}
-      <dialog
-        ref={dialogRef}
-        aria-labelledby="smart-folder-editor-title"
-        onCancel={handleCancel}
-        onClick={(e) => handleBackdropClick(e)}
-        className="m-auto w-[min(720px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp shadow-pop backdrop:bg-[var(--scrim)]"
+      <Modal
+        dialog={dialog}
+        size={720}
+        height="editor"
+        labelledBy="smart-folder-editor-title"
+        onSubmit={handleSubmit}
       >
-        <form
-          onSubmit={handleSubmit}
-          className="flex max-h-[min(760px,calc(100vh-32px))] min-h-0 flex-col overflow-hidden"
-        >
-          <div className="flex shrink-0 items-center border-b border-line-soft px-[18px] py-[14px]">
-            <div className="min-w-0 flex-1">
-              <span className="font-mono text-label font-semibold tracking-[0.08em] text-acc-ink">
-                SMART
+        <ModalHeader
+          title={folder ? "スマートフォルダーを編集" : "スマートフォルダーを作成"}
+          titleId="smart-folder-editor-title"
+          eyebrow={
+            <span className="font-mono text-label font-semibold tracking-[0.08em] text-acc-ink">
+              SMART
+            </span>
+          }
+          onClose={onClose}
+          closeDisabled={isBusy}
+        />
+
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-[18px] py-4">
+          <label className="flex flex-col gap-1.5 font-sans text-label font-medium text-ink-1">
+            名前
+            <TextInput
+              ref={nameInputRef}
+              value={draft.name}
+              font="jp"
+              surface={1}
+              aria-invalid={Boolean(errors.name)}
+              className={cn(errors.name && "border-[var(--r-coral)]")}
+              placeholder="例: 長時間 ASMR"
+              onChange={(event) => {
+                setDraft((current) => ({ ...current, name: event.target.value }));
+                setErrors((current) => ({ ...current, name: undefined }));
+              }}
+            />
+            {errors.name && (
+              <span className="text-secondary text-[var(--r-coral)]">{errors.name}</span>
+            )}
+          </label>
+
+          <label className="flex flex-col gap-1.5 font-sans text-label font-medium text-ink-1">
+            並び順
+            <select
+              value={draft.sort}
+              className={`${selectClass} w-[200px]`}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, sort: event.target.value as SortId }))
+              }
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <section aria-labelledby="smart-folder-rules-title" className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <h3
+                id="smart-folder-rules-title"
+                className="font-sans text-label font-medium text-ink-1"
+              >
+                条件
+              </h3>
+              <span className="font-jp text-caption text-ink-2">上から順に評価します</span>
+              <span className="ml-auto font-mono text-mono text-ink-2">
+                {matchCount.isCounting ? (
+                  "集計中…"
+                ) : matchCount.total !== undefined ? (
+                  <>
+                    条件一致 <b className="text-acc-ink">{matchCount.total}</b>件
+                  </>
+                ) : null}
               </span>
-              <h2
-                id="smart-folder-editor-title"
-                className="mt-0.5 font-sans text-[14px] font-semibold text-ink-0"
-              >
-                {folder ? "スマートフォルダーを編集" : "スマートフォルダーを作成"}
-              </h2>
             </div>
-            <IconButton icon={I.x} label="閉じる" size="sm" disabled={isBusy} onClick={onClose} />
-          </div>
 
-          <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-[18px] py-4">
-            <label className="flex flex-col gap-1.5 font-sans text-label font-medium text-ink-1">
-              名前
-              <TextInput
-                ref={nameInputRef}
-                value={draft.name}
-                font="jp"
-                surface={1}
-                aria-invalid={Boolean(errors.name)}
-                className={cn(errors.name && "border-[var(--r-coral)]")}
-                placeholder="例: 長時間 ASMR"
-                onChange={(event) => {
-                  setDraft((current) => ({ ...current, name: event.target.value }));
-                  setErrors((current) => ({ ...current, name: undefined }));
-                }}
-              />
-              {errors.name && (
-                <span className="text-secondary text-[var(--r-coral)]">{errors.name}</span>
-              )}
-            </label>
-
-            <label className="flex flex-col gap-1.5 font-sans text-label font-medium text-ink-1">
-              並び順
-              <select
-                value={draft.sort}
-                className={`${selectClass} w-[200px]`}
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, sort: event.target.value as SortId }))
-                }
-              >
-                {SORT_OPTIONS.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <section aria-labelledby="smart-folder-rules-title" className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <h3
-                  id="smart-folder-rules-title"
-                  className="font-sans text-label font-medium text-ink-1"
-                >
-                  条件
-                </h3>
-                <span className="font-jp text-caption text-ink-2">上から順に評価します</span>
-                <span className="ml-auto font-mono text-mono text-ink-2">
-                  {matchCount.isCounting ? (
-                    "集計中…"
-                  ) : matchCount.total !== undefined ? (
-                    <>
-                      条件一致 <b className="text-acc-ink">{matchCount.total}</b>件
-                    </>
-                  ) : null}
-                </span>
-              </div>
-
-              <div className="mll-smart__rules gap-2 p-2.5">
-                {draft.rules.map((rule, index) => (
-                  <SmartFolderRuleCard
-                    key={rule.id}
-                    rule={rule}
-                    index={index}
-                    error={errors.ruleValues[rule.id]}
-                    tagSuggestions={tagSuggestions}
-                    tagPrefixes={tagPrefixes}
-                    cardRef={(el) => {
-                      ruleCardRefs.current[rule.id] = el;
-                    }}
-                    tagComboboxRef={(el) => {
-                      tagComboboxRefs.current[rule.id] = el;
-                    }}
-                    onFieldChange={(field) => {
-                      setDraft((current) => changeSmartFolderRuleField(current, rule.id, field));
-                      setErrors((current) => {
-                        const { [rule.id]: _removed, ...ruleValues } = current.ruleValues;
-                        return { ...current, ruleValues };
-                      });
-                    }}
-                    onRemove={() => {
-                      setDraft((current) => removeSmartFolderRule(current, rule.id));
-                      setErrors((current) => {
-                        const { [rule.id]: _removed, ...ruleValues } = current.ruleValues;
-                        return { ...current, ruleValues };
-                      });
-                    }}
-                    onUpdate={(update) => updateRule(rule.id, update)}
-                  />
-                ))}
-              </div>
-
-              <Button
-                variant="ghost"
-                icon={I.add}
-                className="self-start border border-dashed border-line-strong bg-transparent"
-                onClick={() => {
-                  const id = `rule-${nextRuleId.current++}`;
-                  setDraft((current) => addSmartFolderRule(current, id));
-                }}
-              >
-                条件を追加
-              </Button>
-              {draft.rules.length === 0 && (
-                <span className="font-jp text-secondary text-ink-2">
-                  条件なし: すべての作品に一致します
-                </span>
-              )}
-            </section>
-
-            {errorCount > 0 && (
-              <div
-                role="alert"
-                className="mll-selectable rounded-[6px] border border-[var(--r-coral)] bg-paper-0 px-3 py-2 text-secondary text-[var(--r-coral)]"
-              >
-                入力に不備があります（{errorCount}件）
-              </div>
-            )}
-            {saveError && (
-              <div
-                role="alert"
-                className="mll-selectable rounded-[6px] border border-[var(--r-coral)] bg-paper-0 px-3 py-2 text-secondary text-[var(--r-coral)]"
-              >
-                {saveError}
-              </div>
-            )}
-            {deleteError && (
-              <div
-                role="alert"
-                className="mll-selectable rounded-[6px] border border-[var(--r-coral)] bg-paper-0 px-3 py-2 text-secondary text-[var(--r-coral)]"
-              >
-                {deleteError}
-              </div>
-            )}
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2 border-t border-line-soft px-[18px] py-3">
-            {onDelete && (
-              <Button variant="ghost" disabled={isBusy} onClick={() => setIsConfirmingDelete(true)}>
-                {isDeleting ? "削除中…" : "このスマートフォルダーを削除"}
-              </Button>
-            )}
-            <div className="ml-auto flex gap-2">
-              <Button variant="quiet" disabled={isBusy} onClick={onClose}>
-                キャンセル
-              </Button>
-              <Button variant="primary" type="submit" disabled={isBusy}>
-                {isSaving ? "保存中…" : folder ? "変更を保存" : "作成"}
-              </Button>
+            <div className="mll-smart__rules gap-2 p-2.5">
+              {draft.rules.map((rule, index) => (
+                <SmartFolderRuleCard
+                  key={rule.id}
+                  rule={rule}
+                  index={index}
+                  error={errors.ruleValues[rule.id]}
+                  tagSuggestions={tagSuggestions}
+                  tagPrefixes={tagPrefixes}
+                  cardRef={(el) => {
+                    ruleCardRefs.current[rule.id] = el;
+                  }}
+                  tagComboboxRef={(el) => {
+                    tagComboboxRefs.current[rule.id] = el;
+                  }}
+                  onFieldChange={(field) => {
+                    setDraft((current) => changeSmartFolderRuleField(current, rule.id, field));
+                    setErrors((current) => {
+                      const { [rule.id]: _removed, ...ruleValues } = current.ruleValues;
+                      return { ...current, ruleValues };
+                    });
+                  }}
+                  onRemove={() => {
+                    setDraft((current) => removeSmartFolderRule(current, rule.id));
+                    setErrors((current) => {
+                      const { [rule.id]: _removed, ...ruleValues } = current.ruleValues;
+                      return { ...current, ruleValues };
+                    });
+                  }}
+                  onUpdate={(update) => updateRule(rule.id, update)}
+                />
+              ))}
             </div>
+
+            <Button
+              variant="ghost"
+              icon={I.add}
+              className="self-start border border-dashed border-line-strong bg-transparent"
+              onClick={() => {
+                const id = `rule-${nextRuleId.current++}`;
+                setDraft((current) => addSmartFolderRule(current, id));
+              }}
+            >
+              条件を追加
+            </Button>
+            {draft.rules.length === 0 && (
+              <span className="font-jp text-secondary text-ink-2">
+                条件なし: すべての作品に一致します
+              </span>
+            )}
+          </section>
+
+          {errorCount > 0 && (
+            <div
+              role="alert"
+              className="mll-selectable rounded-[6px] border border-[var(--r-coral)] bg-paper-0 px-3 py-2 text-secondary text-[var(--r-coral)]"
+            >
+              入力に不備があります（{errorCount}件）
+            </div>
+          )}
+          {saveError && (
+            <div
+              role="alert"
+              className="mll-selectable rounded-[6px] border border-[var(--r-coral)] bg-paper-0 px-3 py-2 text-secondary text-[var(--r-coral)]"
+            >
+              {saveError}
+            </div>
+          )}
+          {deleteError && (
+            <div
+              role="alert"
+              className="mll-selectable rounded-[6px] border border-[var(--r-coral)] bg-paper-0 px-3 py-2 text-secondary text-[var(--r-coral)]"
+            >
+              {deleteError}
+            </div>
+          )}
+        </div>
+
+        <ModalFooter>
+          {onDelete && (
+            <Button variant="ghost" disabled={isBusy} onClick={() => setIsConfirmingDelete(true)}>
+              {isDeleting ? "削除中…" : "このスマートフォルダーを削除"}
+            </Button>
+          )}
+          <div className="ml-auto flex gap-2">
+            <Button variant="quiet" disabled={isBusy} onClick={onClose}>
+              キャンセル
+            </Button>
+            <Button variant="primary" type="submit" disabled={isBusy}>
+              {isSaving ? "保存中…" : folder ? "変更を保存" : "作成"}
+            </Button>
           </div>
-        </form>
-      </dialog>
+        </ModalFooter>
+      </Modal>
       {isConfirmingDelete && onDelete && (
         <ConfirmDialog
           title="スマートフォルダーを削除しますか？"

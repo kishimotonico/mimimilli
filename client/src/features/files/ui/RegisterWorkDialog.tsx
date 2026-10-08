@@ -15,6 +15,7 @@ import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
 import TagCombobox from "../../../shared/ui/TagCombobox";
 import TextInput from "../../../shared/ui/TextInput";
+import Modal, { ModalFooter, ModalHeader } from "../../../shared/ui/Modal";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { getAllTags } from "../../../entities/tag/api";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
@@ -118,7 +119,7 @@ export default function RegisterWorkDialog({
   const close = () => {
     if (!submitBusy) onClose();
   };
-  const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({ onClose: close });
+  const dialog = useDialogModal({ onClose: close });
 
   const definitionOf = (tag: string) => tagPrefixDefinition(tag, tagPrefixes);
 
@@ -151,157 +152,141 @@ export default function RegisterWorkDialog({
     : null;
 
   return createPortal(
-    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックはuseDialogModalで判定する。
-    <dialog
-      ref={dialogRef}
-      aria-labelledby="register-work-title"
-      onCancel={handleCancel}
-      onClick={(event) => handleBackdropClick(event)}
-      className="m-auto w-[min(520px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[var(--scrim)]"
-    >
-      <div className="flex max-h-[calc(100vh-48px)] min-h-0 flex-col overflow-hidden">
-        <header className="flex shrink-0 items-center border-b border-line-soft px-[18px] py-[14px]">
-          <h2
-            id="register-work-title"
-            className="min-w-0 flex-1 font-sans text-[14px] font-semibold"
-          >
+    <Modal dialog={dialog} size={520} labelledBy="register-work-title">
+      <ModalHeader
+        title={
+          targetKind === "file" ? "このファイルを作品として登録" : "このフォルダーを作品として登録"
+        }
+        titleId="register-work-title"
+        onClose={close}
+        closeDisabled={submitBusy}
+      />
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-[18px] py-3 text-body">
+        {preview.orphanedMeta && (
+          <p className="mb-3 rounded-[6px] border border-line-soft bg-paper-0 px-3 py-2 text-secondary leading-[1.6] text-ink-1">
             {targetKind === "file"
-              ? "このファイルを作品として登録"
-              : "このフォルダーを作品として登録"}
-          </h2>
-          <IconButton icon={I.x} label="閉じる" size="sm" disabled={submitBusy} onClick={close} />
-        </header>
+              ? "このファイルには以前の登録情報が残っています。内容を引き継いで復元します。"
+              : "このフォルダーには以前の登録情報が残っています。内容を引き継いで復元します。"}
+          </p>
+        )}
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-[18px] py-3 text-body">
-          {preview.orphanedMeta && (
-            <p className="mb-3 rounded-[6px] border border-line-soft bg-paper-0 px-3 py-2 text-secondary leading-[1.6] text-ink-1">
-              {targetKind === "file"
-                ? "このファイルには以前の登録情報が残っています。内容を引き継いで復元します。"
-                : "このフォルダーには以前の登録情報が残っています。内容を引き継いで復元します。"}
-            </p>
-          )}
+        {preview.descendantWorkCount > 0 && (
+          <p className="mb-3 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_35%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_8%,transparent)] px-3 py-2 text-secondary leading-[1.6] text-ink-1">
+            配下に登録済み作品が <b>{preview.descendantWorkCount}</b>{" "}
+            件あります。先に子作品の登録を解除してから親を登録してください。
+          </p>
+        )}
 
-          {preview.descendantWorkCount > 0 && (
-            <p className="mb-3 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_35%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_8%,transparent)] px-3 py-2 text-secondary leading-[1.6] text-ink-1">
-              配下に登録済み作品が <b>{preview.descendantWorkCount}</b>{" "}
-              件あります。先に子作品の登録を解除してから親を登録してください。
-            </p>
-          )}
-
-          <div className="mb-3 flex flex-col gap-2 rounded-[8px] border border-line-soft p-3">
-            <span className="font-sans text-label font-medium text-ink-2">DLsite連携（任意）</span>
-            <div className="flex gap-2">
-              <TextInput
-                font="mono"
-                value={rjCode}
-                disabled={submitBusy || dlsiteBusy}
-                placeholder="RJ123456"
-                onChange={(event) => {
-                  setRjCode(event.target.value);
-                  if (dlsiteValidationError) setDlsiteValidationError(null);
-                }}
-              />
-              <Button variant="ghost" disabled={submitBusy || dlsiteBusy} onClick={fetchDlsite}>
-                {dlsiteBusy ? <I.refresh size={12} className="motion-safe:animate-spin" /> : "取得"}
-              </Button>
-            </div>
-            {dlsiteError && (
-              <p className="m-0 text-secondary text-[var(--r-coral)]">{dlsiteError}</p>
-            )}
-
-            <div className="flex items-center gap-2.5">
-              {dlsiteInfo?.coverUrl ? (
-                <img
-                  src={dlsiteInfo.coverUrl}
-                  alt=""
-                  className="h-[104px] w-[104px] shrink-0 rounded-[6px] border border-line-soft object-cover"
-                />
-              ) : (
-                <div className="flex h-[104px] w-[104px] shrink-0 flex-col items-center justify-center gap-1 rounded-[6px] border border-line-soft bg-paper-0 text-ink-4">
-                  <I.image size={20} />
-                  <span className="font-sans text-caption">なし</span>
-                </div>
-              )}
-              <label
-                className={`flex items-center gap-1.5 text-secondary ${dlsiteInfo?.coverUrl ? "text-ink-1" : "text-ink-4"}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={Boolean(dlsiteInfo?.coverUrl) && applyCover}
-                  disabled={!dlsiteInfo?.coverUrl}
-                  onChange={(event) => setApplyCover(event.target.checked)}
-                />
-                カバー画像を適用
-              </label>
-            </div>
-          </div>
-
-          <label className="mb-3 flex flex-col gap-1">
-            <span className="flex items-center gap-1.5 font-sans text-label font-medium text-ink-2">
-              タイトル
-              {dlsiteBusy && (
-                <I.refresh size={11} className="text-ink-3 motion-safe:animate-spin" />
-              )}
-            </span>
+        <div className="mb-3 flex flex-col gap-2 rounded-[8px] border border-line-soft p-3">
+          <span className="font-sans text-label font-medium text-ink-2">DLsite連携（任意）</span>
+          <div className="flex gap-2">
             <TextInput
-              value={title}
-              disabled={submitBusy}
-              onChange={(event) => setTitle(event.target.value)}
+              font="mono"
+              value={rjCode}
+              disabled={submitBusy || dlsiteBusy}
+              placeholder="RJ123456"
+              onChange={(event) => {
+                setRjCode(event.target.value);
+                if (dlsiteValidationError) setDlsiteValidationError(null);
+              }}
             />
-          </label>
-
-          <div className="mb-3 flex flex-col gap-1">
-            <span className="font-sans text-label font-medium text-ink-2">タグ</span>
-            <div className="flex flex-wrap items-start gap-1.5">
-              {tags.map((tag) => (
-                <Tag
-                  key={tag}
-                  tag={tag}
-                  definition={definitionOf(tag)}
-                  onRemove={submitBusy ? undefined : () => removeTag(tag)}
-                />
-              ))}
-              {isTagInputOpen ? (
-                <TagCombobox
-                  focusOnMount
-                  suggestions={tagSuggestions}
-                  excludeTags={tags}
-                  disabled={submitBusy}
-                  canCreate={(tag) => normalizeTag(tag) !== null}
-                  width={180}
-                  onSelect={addTag}
-                  onCancel={() => setIsTagInputOpen(false)}
-                />
-              ) : (
-                <IconButton
-                  icon={I.add}
-                  label="タグを追加"
-                  size="xs"
-                  className="bg-paper-2 text-ink-2 hover:bg-paper-3 hover:text-ink-0"
-                  disabled={submitBusy}
-                  onClick={() => setIsTagInputOpen(true)}
-                />
-              )}
-            </div>
+            <Button variant="ghost" disabled={submitBusy || dlsiteBusy} onClick={fetchDlsite}>
+              {dlsiteBusy ? <I.refresh size={12} className="motion-safe:animate-spin" /> : "取得"}
+            </Button>
           </div>
+          {dlsiteError && <p className="m-0 text-secondary text-[var(--r-coral)]">{dlsiteError}</p>}
 
-          {submitError && <p className="m-0 text-secondary text-[var(--r-coral)]">{submitError}</p>}
+          <div className="flex items-center gap-2.5">
+            {dlsiteInfo?.coverUrl ? (
+              <img
+                src={dlsiteInfo.coverUrl}
+                alt=""
+                className="h-[104px] w-[104px] shrink-0 rounded-[6px] border border-line-soft object-cover"
+              />
+            ) : (
+              <div className="flex h-[104px] w-[104px] shrink-0 flex-col items-center justify-center gap-1 rounded-[6px] border border-line-soft bg-paper-0 text-ink-4">
+                <I.image size={20} />
+                <span className="font-sans text-caption">なし</span>
+              </div>
+            )}
+            <label
+              className={`flex items-center gap-1.5 text-secondary ${dlsiteInfo?.coverUrl ? "text-ink-1" : "text-ink-4"}`}
+            >
+              <input
+                type="checkbox"
+                checked={Boolean(dlsiteInfo?.coverUrl) && applyCover}
+                disabled={!dlsiteInfo?.coverUrl}
+                onChange={(event) => setApplyCover(event.target.checked)}
+              />
+              カバー画像を適用
+            </label>
+          </div>
         </div>
 
-        <footer className="flex shrink-0 justify-end gap-2 border-t border-line-soft px-[18px] py-3">
-          <Button variant="quiet" disabled={submitBusy} onClick={close}>
-            キャンセル
-          </Button>
-          <Button
-            variant="primary"
-            disabled={submitBusy || title.trim().length === 0 || preview.descendantWorkCount > 0}
-            onClick={() => void register()}
-          >
-            登録
-          </Button>
-        </footer>
+        <label className="mb-3 flex flex-col gap-1">
+          <span className="flex items-center gap-1.5 font-sans text-label font-medium text-ink-2">
+            タイトル
+            {dlsiteBusy && <I.refresh size={11} className="text-ink-3 motion-safe:animate-spin" />}
+          </span>
+          <TextInput
+            value={title}
+            disabled={submitBusy}
+            onChange={(event) => setTitle(event.target.value)}
+          />
+        </label>
+
+        <div className="mb-3 flex flex-col gap-1">
+          <span className="font-sans text-label font-medium text-ink-2">タグ</span>
+          <div className="flex flex-wrap items-start gap-1.5">
+            {tags.map((tag) => (
+              <Tag
+                key={tag}
+                tag={tag}
+                definition={definitionOf(tag)}
+                onRemove={submitBusy ? undefined : () => removeTag(tag)}
+              />
+            ))}
+            {isTagInputOpen ? (
+              <TagCombobox
+                focusOnMount
+                suggestions={tagSuggestions}
+                excludeTags={tags}
+                disabled={submitBusy}
+                canCreate={(tag) => normalizeTag(tag) !== null}
+                width={180}
+                onSelect={addTag}
+                onCancel={() => setIsTagInputOpen(false)}
+              />
+            ) : (
+              <IconButton
+                icon={I.add}
+                label="タグを追加"
+                size="xs"
+                className="bg-paper-2 text-ink-2 hover:bg-paper-3 hover:text-ink-0"
+                disabled={submitBusy}
+                onClick={() => setIsTagInputOpen(true)}
+              />
+            )}
+          </div>
+        </div>
+
+        {submitError && <p className="m-0 text-secondary text-[var(--r-coral)]">{submitError}</p>}
       </div>
-    </dialog>,
+
+      <ModalFooter>
+        <Button variant="quiet" disabled={submitBusy} onClick={close}>
+          キャンセル
+        </Button>
+        <Button
+          variant="primary"
+          disabled={submitBusy || title.trim().length === 0 || preview.descendantWorkCount > 0}
+          onClick={() => void register()}
+        >
+          登録
+        </Button>
+      </ModalFooter>
+    </Modal>,
     document.body,
   );
 }

@@ -2,10 +2,10 @@ import { useMemo, useState } from "react";
 import { useAtomValue } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
+import Modal, { ModalHeader } from "../../../shared/ui/Modal";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
-import IconButton from "../../../shared/ui/IconButton";
 import { useToast } from "../../../shared/ui/useToast";
 import { scanningAtom, scanProgressAtom } from "../../../entities/scan/model/atoms";
 import { useScanActions } from "../../../entities/scan/useScanActions";
@@ -125,77 +125,64 @@ export default function ScanModal({
   };
 
   // スキャン実行中でも閉じられる。スキャン自体はバックグラウンドで継続する。
-  const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({ onClose });
+  const dialog = useDialogModal({ onClose });
 
   return (
-    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックで閉じる。EscapeはonCancel（useDialogModal）で処理する。
-    <dialog
-      ref={dialogRef}
-      aria-labelledby="scan-modal-title"
-      onCancel={handleCancel}
-      onClick={handleBackdropClick}
-      className="m-auto w-[min(740px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[var(--scrim)]"
-    >
-      <div className="flex max-h-[min(80vh,calc(100vh-32px))] min-h-0 flex-col overflow-hidden">
-        <header className="flex shrink-0 items-center gap-2 border-b border-line-soft px-[18px] py-[14px]">
-          <I.refresh size={14} className={cn("text-ink-3", scanning && "animate-spin")} />
-          <h2 id="scan-modal-title" className="flex-1 font-sans text-[14px] font-semibold">
-            スキャン
-          </h2>
-          <IconButton icon={I.x} label="閉じる" size="sm" onClick={onClose} />
-        </header>
+    <Modal dialog={dialog} size={740} height="short" labelledBy="scan-modal-title">
+      <ModalHeader
+        title="スキャン"
+        titleId="scan-modal-title"
+        icon={<I.refresh size={14} className={cn("text-ink-3", scanning && "animate-spin")} />}
+        onClose={onClose}
+      />
 
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          <ScanSidebar
-            active={activeTab}
-            onSelect={setActiveTab}
-            counts={counts}
-            skippedCount={lastResult?.skipped ?? null}
-            libraryTotal={libraryTotal}
-            scanning={scanning}
-            progress={progress}
-            lastScanTime={lastScanTime}
-            showCompletedHint={showCompletedHint}
-          />
-          <div
-            role="tabpanel"
-            id={`scan-tabpanel-${activeTab}`}
-            aria-labelledby={`scan-tab-${activeTab}`}
-            className="min-h-0 flex-1 overflow-y-auto px-[18px] py-4"
-          >
-            {activeTab === "unregistered" && (
-              <UnregisteredTab
-                candidates={candidates}
-                onRegistered={handleUnregisteredRegistered}
-              />
-            )}
-            {activeTab === "needsAttention" && (
-              <NeedsAttentionTab
-                identityConflicts={identityConflicts}
-                invalidMetaFiles={invalidMetaFiles}
-                rjCodeMissingCount={rjCodeMissingCount}
-                dlsiteFetchFailedCount={dlsiteFetchFailedCount}
-                dlsiteParseErrorCount={dlsiteParseErrorCount}
-                dlsiteParseErrorAlert={dlsiteParseErrorAlert}
-                dataIntegrityWarning={dataIntegrityWarning}
-                onOpenFiles={onOpenFiles}
-              />
-            )}
-            {activeTab === "newlyRegistered" && (
-              <NewlyRegisteredTab workIds={newlyRegisteredWorkIds} />
-            )}
-            {activeTab === "updated" && <UpdatedWorksTab workIds={updatedWorkIds} />}
-          </div>
-        </div>
-
-        <ScanFooter
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <ScanSidebar
+          active={activeTab}
+          onSelect={setActiveTab}
+          counts={counts}
+          skippedCount={lastResult?.skipped ?? null}
+          libraryTotal={libraryTotal}
           scanning={scanning}
-          hasResult={lastResult !== null}
-          onCancel={() => void cancel()}
-          onFullScan={() => void start({ full: true })}
-          onStart={() => void start()}
+          progress={progress}
+          lastScanTime={lastScanTime}
+          showCompletedHint={showCompletedHint}
         />
+        <div
+          role="tabpanel"
+          id={`scan-tabpanel-${activeTab}`}
+          aria-labelledby={`scan-tab-${activeTab}`}
+          className="min-h-0 flex-1 overflow-y-auto px-[18px] py-4"
+        >
+          {activeTab === "unregistered" && (
+            <UnregisteredTab candidates={candidates} onRegistered={handleUnregisteredRegistered} />
+          )}
+          {activeTab === "needsAttention" && (
+            <NeedsAttentionTab
+              identityConflicts={identityConflicts}
+              invalidMetaFiles={invalidMetaFiles}
+              rjCodeMissingCount={rjCodeMissingCount}
+              dlsiteFetchFailedCount={dlsiteFetchFailedCount}
+              dlsiteParseErrorCount={dlsiteParseErrorCount}
+              dlsiteParseErrorAlert={dlsiteParseErrorAlert}
+              dataIntegrityWarning={dataIntegrityWarning}
+              onOpenFiles={onOpenFiles}
+            />
+          )}
+          {activeTab === "newlyRegistered" && (
+            <NewlyRegisteredTab workIds={newlyRegisteredWorkIds} />
+          )}
+          {activeTab === "updated" && <UpdatedWorksTab workIds={updatedWorkIds} />}
+        </div>
       </div>
-    </dialog>
+
+      <ScanFooter
+        scanning={scanning}
+        hasResult={lastResult !== null}
+        onCancel={() => void cancel()}
+        onFullScan={() => void start({ full: true })}
+        onStart={() => void start()}
+      />
+    </Modal>
   );
 }
