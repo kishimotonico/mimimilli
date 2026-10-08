@@ -103,6 +103,9 @@ describe("UnregisteredTab RJコード編集", () => {
     fireEvent.keyDown(input, { key: "Enter", isComposing: true });
     expect(screen.getByPlaceholderText("RJコード")).not.toBeNull(); // 編集中のまま
 
+    fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
+    expect(screen.getByPlaceholderText("RJコード")).not.toBeNull(); // 編集中のまま
+
     fireEvent.keyDown(input, { key: "Escape", isComposing: true });
     expect(screen.getByPlaceholderText("RJコード")).not.toBeNull(); // 編集中のまま
   });
