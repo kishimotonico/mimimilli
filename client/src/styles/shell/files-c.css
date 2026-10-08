@@ -189,9 +189,9 @@
   gap: 8px;
   margin-top: 14px;
   padding: 12px;
-  border: 1px solid oklch(72% 0.165 25 / 0.28);
+  border: 1px solid color-mix(in oklch, var(--r-coral) 28%, transparent);
   border-radius: var(--r-2);
-  background: oklch(72% 0.165 25 / 0.08);
+  background: color-mix(in oklch, var(--r-coral) 8%, transparent);
 }
 .mle-identity-conflict p {
   margin: 0;
@@ -215,9 +215,9 @@
   display: inline-flex;
   align-self: flex-start;
   padding: 1px 5px;
-  border: 1px solid oklch(72% 0.165 25 / 0.36);
+  border: 1px solid color-mix(in oklch, var(--r-coral) 36%, transparent);
   border-radius: var(--r-1);
-  background: oklch(72% 0.165 25 / 0.12);
+  background: color-mix(in oklch, var(--r-coral) 12%, transparent);
   color: var(--r-coral);
   font-family: var(--font-mono);
   font-size: var(--fs-mono);

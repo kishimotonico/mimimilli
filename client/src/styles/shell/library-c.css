@@ -39,15 +39,14 @@
 }
 .mll-grid {
   display: grid;
-  /* 初回マウント（コンテナ幅未計測）時のみのフォールバック。
-       計測後は WorkGrid が実測列数を gridTemplateColumns としてインライン指定する
-       （auto-fill+minmax は列数境界でタイル実寸が飛ぶため、通常時はJS側の
-       computeGridColumnCount に置き換える。TASK-45） */
+  /* 初回マウント（コンテナ幅未計測）時のみ使う。計測後は WorkGrid が computeGridColumnCount の
+       実測列数を gridTemplateColumns としてインライン指定する（auto-fill+minmax は
+       列数境界でタイル実寸が飛ぶため） */
   grid-template-columns: repeat(auto-fill, minmax(var(--tile-size), 1fr));
   align-items: start;
   gap: var(--grid-row-gap) var(--grid-col-gap);
 }
-/* 原寸ジャスティファイド（TASK-45）。行ごとに display:flex な .mll-grid-row を
+/* 原寸ジャスティファイド。行ごとに display:flex な .mll-grid-row を
      縦積みし、各タイルの幅・行高さは WorkGrid が justifiedLayout の計算結果を
      インラインstyleで与える。行内のジャスティファイ（幅ぴったり詰め）は
      アイテム側の明示幅の合計で実現しており、CSS側で追加のjustify調整は不要 */
@@ -63,7 +62,7 @@
   gap: var(--grid-col-gap);
   content-visibility: auto;
 }
-/* 1:1タイルの仮想化行（TASK-59）。行内は grid で列数を固定し、gap は列間のみ。 */
+/* 1:1タイルの仮想化行。行内は grid で列数を固定し、gap は列間のみ。 */
 .mll-grid-row--square {
   display: grid;
   align-items: start;
@@ -158,7 +157,7 @@
 }
 /* content-visibilityは1:1タイルのみタイル単位で効かせる（--tile-sizeを幅にも
      使えるため）。ジャスティファイドは幅がタイルごとに違うため .mll-grid-row 側で
-     行単位にかけている（TASK-45） */
+     行単位にかけている */
 .mll-grid:not(.mll-grid--justified) .mll-grid-tile {
   content-visibility: auto;
   contain-intrinsic-size: var(--tile-size) calc(var(--tile-size) + var(--tile-chrome-h));

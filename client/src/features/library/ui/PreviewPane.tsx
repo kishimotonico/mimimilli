@@ -23,7 +23,7 @@ interface PreviewPaneProps {
   tagSuggestions: string[];
   nav: LibraryViewState & Pick<LibraryViewActions, "selectWork">;
   searchQuery: string;
-  /** grid/listスライドインどちらの経路でも同じ閉じ方にする（TASK-295）。 */
+  /** grid/listスライドインどちらの経路でも同じ閉じ方にする。 */
   onClose: () => void;
   /** 全画面詳細（/work/:id）へ遷移する */
   onExpand: () => void;

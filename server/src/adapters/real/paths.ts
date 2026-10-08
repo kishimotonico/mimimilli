@@ -75,7 +75,7 @@ export function identityConflictMetaPath(target: string): string {
   return isSidecarMetaFileName(basename(target)) ? target : join(target, META_FILE_NAME);
 }
 
-// ── 祖先パス除外（スキャンの workRoots 統合用。TASK-62） ─────────
+// ── 祖先パス除外（スキャンの workRoots 統合用） ─────────
 
 export interface AncestorExclusionOps {
   dirname(path: string): string;

@@ -83,10 +83,24 @@
   --r-pill: 999px;
 
   /* Shadows */
-  --shadow-1: 0 1px 0 0 oklch(20% 0.02 70 / 0.02), 0 1px 2px oklch(20% 0.02 70 / 0.04);
-  --shadow-2: 0 4px 14px -6px oklch(20% 0.02 70 / 0.12), 0 1px 2px oklch(20% 0.02 70 / 0.05);
-  --shadow-pop: 0 18px 40px -12px oklch(20% 0.02 70 / 0.22), 0 2px 6px oklch(20% 0.02 70 / 0.08);
-  --shadow-cover: 0 1px 0 0 oklch(100% 0 0 / 0.5) inset, 0 6px 16px -8px oklch(20% 0.02 70 / 0.18);
+  --shadow-ink: oklch(20% 0.02 70); /* 影・暗幕の元色 */
+  --scrim: color-mix(in oklch, var(--shadow-ink) 30%, transparent); /* モーダル暗幕 */
+  --shadow-1:
+    0 1px 0 0 color-mix(in oklch, var(--shadow-ink) 2%, transparent),
+    0 1px 2px color-mix(in oklch, var(--shadow-ink) 4%, transparent);
+  --shadow-2:
+    0 4px 14px -6px color-mix(in oklch, var(--shadow-ink) 12%, transparent),
+    0 1px 2px color-mix(in oklch, var(--shadow-ink) 5%, transparent);
+  --shadow-pop:
+    0 18px 40px -12px color-mix(in oklch, var(--shadow-ink) 22%, transparent),
+    0 2px 6px color-mix(in oklch, var(--shadow-ink) 8%, transparent);
+  --shadow-cover:
+    0 1px 0 0 oklch(100% 0 0 / 0.5) inset,
+    0 6px 16px -8px color-mix(in oklch, var(--shadow-ink) 18%, transparent);
+  --shadow-dock: 0 -8px 24px -16px color-mix(in oklch, var(--shadow-ink) 18%, transparent);
+  --shadow-thumb:
+    0 1px 0 0 oklch(100% 0 0 / 0.5) inset,
+    0 2px 6px -3px color-mix(in oklch, var(--shadow-ink) 20%, transparent);
 
   /* Spacing */
   --sp-1: 4px;

@@ -9,7 +9,7 @@ interface LoadMoreProps {
   onLoadMore: () => void;
 }
 
-/** 作品一覧の末尾に置く追加読み込みボタン（TASK-73） */
+/** 作品一覧の末尾に置く追加読み込みボタン */
 export default function LoadMore({
   loadedCount,
   totalCount,

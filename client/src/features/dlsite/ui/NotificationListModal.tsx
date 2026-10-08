@@ -44,7 +44,7 @@ export default function NotificationListModal<T>({
       aria-labelledby={titleId}
       onCancel={handleCancel}
       onClick={(event) => handleBackdropClick(event)}
-      className="m-auto w-[min(480px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
+      className="m-auto w-[min(480px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[var(--scrim)]"
     >
       <div className="flex max-h-[min(80vh,calc(100vh-32px))] min-h-0 flex-col overflow-hidden">
         <header className="shrink-0 border-b border-line-soft px-[18px] py-[14px]">

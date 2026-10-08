@@ -10,7 +10,7 @@ const SHORTCUT_EXEMPT_SELECTOR =
 const PLAYER_CONTROL_SELECTOR = "[data-player-control]";
 
 /** カスタムスライダー（シーク行・ABハンドル）が自前で処理するキー。Spaceにはスライダー
- *  側のネイティブ動作がないため対象外にせず、従来どおりグローバル側で処理する。 */
+ *  側のネイティブ動作がないため対象外にせず、グローバル側で処理する。 */
 const SLIDER_SELECTOR = '[role="slider"]';
 const SLIDER_OWNED_KEYS = new Set([
   "ArrowLeft",

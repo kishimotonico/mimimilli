@@ -1,7 +1,7 @@
 /* mimimilli shell — files-b
    所有範囲: カラムスタック(.mle-colstack*、祖先カラムを束ねて表示し、クリックで1階層
    戻るナビゲーション)。パルス演出の transition/[data-pulse] 修飾は files-c.css 側にある
-   （元ファイルでファイルモード区画の末尾に離れて存在するため）。
+   （ファイルモード区画の末尾に離れて存在するため）。
    files-a〜cの分割理由はfiles-a.css冒頭コメント参照。
    import順: library-d.cssの次、preview-a.cssより前。 */
 
@@ -36,7 +36,7 @@
   border-left: 1px solid var(--line);
   border-right: 1px solid var(--line-soft);
   border-radius: 4px 0 0 4px;
-  box-shadow: -3px 0 7px -4px oklch(20% 0.02 70 / 0.22);
+  box-shadow: -3px 0 7px -4px color-mix(in oklch, var(--shadow-ink) 22%, transparent);
 }
 .mle-colstack__edges span:nth-child(1) {
   transform: translateX(-15px);

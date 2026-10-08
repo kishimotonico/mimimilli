@@ -78,7 +78,7 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: oklch(20% 0.02 70 / 0.5);
+  background: color-mix(in oklch, var(--shadow-ink) 50%, transparent);
   color: var(--paper-1);
   font-family: var(--font-mono);
   font-size: var(--fs-mono);
@@ -93,7 +93,7 @@
   opacity: 1;
 }
 .mle-popup__cover .mle-popup__skip:hover {
-  background: oklch(20% 0.02 70 / 0.7);
+  background: color-mix(in oklch, var(--shadow-ink) 70%, transparent);
 }
 .mle-popup__skip--back {
   left: 14px;
@@ -170,12 +170,12 @@
 }
 .mle-ratepill.is-overlay {
   position: relative;
-  background: oklch(20% 0.02 70 / 0.55);
+  background: color-mix(in oklch, var(--shadow-ink) 55%, transparent);
   color: var(--paper-1);
   opacity: 0.6;
 }
 .mle-ratepill.is-overlay:hover {
-  background: oklch(20% 0.02 70 / 0.75);
+  background: color-mix(in oklch, var(--shadow-ink) 75%, transparent);
   color: var(--paper-1);
   opacity: 1;
 }

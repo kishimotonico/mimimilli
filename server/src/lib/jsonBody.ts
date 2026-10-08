@@ -1,4 +1,4 @@
-// POST/PATCH 等で body 省略を許すエンドポイント向けの JSON 読み取り（TASK-136 / TASK-95）。
+// POST/PATCH 等で body 省略を許すエンドポイント向けの JSON 読み取り。
 import type { Context } from "hono";
 import { invalidRequest } from "./httpError.ts";
 

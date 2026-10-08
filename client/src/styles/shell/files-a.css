@@ -1,7 +1,7 @@
 /* mimimilli shell — files-a
    所有範囲: ファイル行(.mle-row、mle- prefixだが File Explorer mode 専用)。
    files系はfiles-a〜files-cの3ファイルに分かれている（library・preview等の区画が
-   元ファイル内でfilesの区画を挟んでいるため）。
+   カスケード順でfilesの区画を挟むため）。
    import順: library-c.cssの次、library-d.cssより前。 */
 
 /* ── File rows (mle-row — File Explorer mode) ─────────────── */

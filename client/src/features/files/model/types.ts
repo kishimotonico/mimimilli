@@ -53,7 +53,7 @@ export const FILE_KIND_ICON: Record<FileKind, IconName> = {
   other: "file",
 };
 
-/** 種別 → mle-row の修飾クラス（shell.css に定義済み） */
+/** 種別 → mle-row の修飾クラス（styles/shell/ 配下に定義済み） */
 export const FILE_KIND_ROW_CLASS: Record<FileKind, string> = {
   dir: "is-folder",
   audio: "is-audio",

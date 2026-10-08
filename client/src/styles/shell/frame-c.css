@@ -1,9 +1,8 @@
 /* mimimilli shell — frame-c
    所有範囲: 左サイドバー(.mle-side) + 本文カラム領域(.mle-body / .mle-col、is-axis・
    is-results等のモード修飾込み、.mll-resultspane / .mll-results* を含む)。
-   カラム内部の中身の多く（library の結果ペイン等）はここに同居しているが、元ファイルで
-   .mle-body 区画と分離できない形で隣接しており、単独セレクタ単位に割ると多重定義の
-   selector list（コンマ区切り）を分断してビルド出力が変わるおそれがあるため、
+   カラム内部の中身の多く（library の結果ペイン等）は .mle-body 区画と分離できない形で
+   隣接しており、単独セレクタ単位に割ると selector list（コンマ区切り）を分断するため、
    frame-c としてこの区画をまとめて所有する。
    frame-a・frame-bと合わせて frame 全体を構成する（分割理由はframe-a.css冒頭コメント参照）。
    import順: library-b.cssの次、library-c.cssより前。 */

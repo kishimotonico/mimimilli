@@ -20,7 +20,7 @@ function extOf(name: string): string {
   return i > 0 ? name.slice(i + 1).toLowerCase() : "";
 }
 
-/** 物理パスで作品を引ける索引。重複時は従来の Array.find と同じく先勝ちにする。 */
+/** 物理パスで作品を引ける索引。重複時はArray.find と同じく先勝ちにする。 */
 export function buildWorkPathIndex(works: readonly FsWorkRef[]): Map<string, FsWorkRef> {
   const byPhysicalPath = new Map<string, FsWorkRef>();
   for (const work of works) {

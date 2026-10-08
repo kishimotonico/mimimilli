@@ -29,7 +29,7 @@
   height: calc(var(--now-playing-seek-h) + var(--now-playing-controls-h));
   background: var(--paper-1);
   border-top: 1px solid var(--line);
-  box-shadow: 0 -8px 24px -16px oklch(20% 0.02 70 / 0.18);
+  box-shadow: var(--shadow-dock);
 }
 
 /* z-index 41: 没入面（40）より常に手前に置く。没入モードでもシーク行の
@@ -137,7 +137,7 @@
   overflow: hidden;
   box-shadow:
     var(--shadow-cover),
-    0 30px 60px -16px oklch(20% 0.02 70 / 0.25);
+    0 30px 60px -16px color-mix(in oklch, var(--shadow-ink) 25%, transparent);
 }
 
 .mle-nowplaying__right {

@@ -21,7 +21,7 @@
   height: 72px;
   background: var(--paper-1);
   border-top: 1px solid var(--line);
-  box-shadow: 0 -8px 24px -16px oklch(20% 0.02 70 / 0.18);
+  box-shadow: var(--shadow-dock);
 }
 .mle-bar1__body {
   position: relative;

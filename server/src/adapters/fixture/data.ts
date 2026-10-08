@@ -392,8 +392,8 @@ export const SEED_TRACK_NAMES: Record<string, string[]> = {
   RJ501011: ["ツンな日常", "デレの瞬間", "お世話の時間", "おやすみの言葉（照れ気味）"],
 };
 
-/** シードのトラック仕様（TASK-92）。指定された作品だけ明示的なplaylists/start/end/durationSecを持ち、
- *  未指定の作品は buildFullWork が trackCount からファイル全体トラックを自動生成する（従来通り）。 */
+/** シードのトラック仕様。指定された作品だけ明示的なplaylists/start/end/durationSecを持ち、
+ *  未指定の作品は buildFullWork が trackCount からファイル全体トラックを自動生成する。 */
 export interface SeedTrackSpec {
   title: string;
   file: string;

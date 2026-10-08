@@ -1,7 +1,7 @@
 // カバー画像のサムネイル生成とディスクキャッシュ（real アダプタ専用）。
 // キャッシュキーは 作品ID・幅・元ファイルの mtime から作る。元カバーが更新されて
 // mtime が変わればキーは変わるが、旧ファイルは自然には消えないため、
-// gcThumbnailCache による明示的な削除（GC）で掃除する（TASK-26）。
+// gcThumbnailCache による明示的な削除（GC）で掃除する。
 import { createHash } from "node:crypto";
 import { availableParallelism } from "node:os";
 import { mkdir, readdir, rename, rm, stat } from "node:fs/promises";

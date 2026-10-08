@@ -18,7 +18,7 @@ import { workspacePathSchema } from "./media.ts";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
 
-/** GET /works のページサイズ。limit 未指定時にサーバー側で適用するデフォルト（TASK-73）。
+/** GET /works のページサイズ。limit 未指定時にサーバー側で適用するデフォルト。
  *  client の追加読み込みも同じサイズでページを要求する */
 export const WORKS_DEFAULT_PAGE_SIZE = 200;
 
@@ -82,7 +82,7 @@ export type WorksPage = z.infer<typeof worksPageSchema>;
 /** GET /api/smart-folders/:id/works のクエリパラメータ。
  *  ソートはフォルダー自身が保持するため含まない。tags はフォルダーのルールに対する
  *  追加の AND 条件として、q はフォルダーのルール（OR・除外を含む）全体に対する
- *  追加の AND 条件として適用する（ADR-0012、TASK-185） */
+ *  追加の AND 条件として適用する（ADR-0012） */
 export const smartFolderWorksQuerySchema = worksQueryBaseSchema.pick({
   q: true,
   tags: true,
@@ -110,7 +110,7 @@ export const smartFolderPreviewResponseSchema = z.object({
 export type SmartFolderPreviewResponse = z.infer<typeof smartFolderPreviewResponseSchema>;
 
 /** GET /api/axes/:axis のクエリパラメータ。値一覧の件数・総時間・代表カバーは、渡された
- *  tags による絞り込み後の集合から集計する（自軸除外カウント、TASK-187）。
+ *  tags による絞り込み後の集合から集計する（自軸除外カウント）。
  *  自軸由来のフィルタを除外した集合を渡すのは呼び出し側（client）の責務。
  *  smartFolder はスマートフォルダー表示中の集計元をフォルダー条件適用後の集合に絞る
  *  （生のルールではなくIDを渡し、サーバー側で解決する） */

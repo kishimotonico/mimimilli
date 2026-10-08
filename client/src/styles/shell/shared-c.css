@@ -1,6 +1,5 @@
 /* mimimilli shell — shared-c
    所有範囲: 汎用アイコンボタン(.mle-icbtn*)、再生中インジケーター(.barwave*)。
-   元ファイルで連続した区画のため1ファイルにまとめている。
    shared-a〜dの分割理由はshared-a.css冒頭コメント参照。
    import順: library-e.cssの次、player-dock.cssより前。 */
 

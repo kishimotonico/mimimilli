@@ -246,7 +246,7 @@ export default function AxisValueQuickList({
         </button>
       </div>
       {
-        // 統括判断: 入れ子の浮遊レイヤーは作らず、パネル内にインライン展開する
+        // 入れ子の浮遊レイヤーは作らず、パネル内にインライン展開する
         // （フォーカス管理・Escapeの二重化を避けるため）。
       }
       <AnimatePresence>

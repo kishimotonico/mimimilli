@@ -1,7 +1,7 @@
 // エラーをユーザー向け表示に変換する。ローカル常駐サーバー前提のアプリなので、
 // サーバー未起動・通信不能を最も頻度の高い失敗として個別に案内する。
 // 通信不能・契約不一致は生のメッセージを通常表示に出さず、detailへ分離して必要時だけ展開させる。
-// それ以外（ApiRequestErrorやドメイン固有のErrorが持つ、既に人間可読なmessage）は従来どおりそのまま表示する。
+// それ以外（ApiRequestErrorやドメイン固有のErrorが持つ、既に人間可読なmessage）はそのまま表示する。
 
 import { ApiResponseSchemaError } from "../api/http";
 

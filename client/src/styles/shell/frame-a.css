@@ -1,7 +1,7 @@
 /* mimimilli shell — frame-a
    所有範囲: フレームグリッド(.mle-frame)。frame系はframe-a〜frame-cの3ファイルに分かれている
-   （library の .mll-bar / .mle-sortmenu 等が元ファイル内でframeの区画を挟んでいるため、
-   所有境界を保ちつつ元の記述順も保つには分割が必要）。
+   （library の .mll-bar / .mle-sortmenu 等がカスケード順でframeの区画を挟むため、
+   所有境界を保ちつつ順序を保つには分割が必要）。
    import順: shared-a.cssの次、library-a.cssより前。 */
 
 /* ── Frame grid ───────────────────────────────────────────── */

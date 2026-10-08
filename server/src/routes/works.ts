@@ -55,7 +55,7 @@ export function worksRoute(
     if (!parsed.success) {
       invalidRequest("works のクエリパラメータが不正です");
     }
-    // page/limit 未指定でもサーバー側デフォルトでページングする（TASK-73）。
+    // page/limit 未指定でもサーバー側デフォルトでページングする。
     // limit だけの指定は page=1 として扱う
     const page = await adapter.queryWorks({
       ...parsed.data,
