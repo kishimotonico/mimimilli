@@ -124,8 +124,9 @@ smokeテストの注意:
 
 状態遷移は `PlayerController` 状態機械に集約している。model 層の分担（特記のないものは `features/player/model/`）:
 
-- `entities/player/model/playerController.ts`: 再生状態の正。`PlayerControllerState`（`status`: idle/loading/playing/paused/ended/error、`PlaybackItem`、position/duration、volume/loop/playbackRate/channelSwap/abRepeat 等）と、入力→遷移+コマンドの純粋な `reducePlayer`、それを駆動する `PlayerController` クラス。聴了（トラック終端到達）もここのドメインイベントとして扱う。トラック切替は `withTrackIndex` が再生意図を決める: `intent: "preserve"`（次へ・前へ・自動送り）は現在の再生状態を維持し、`intent: "explicit"`（明示選択）は常に再生を開始する。実ロードへは `loadTrack` コマンド（autoplayフラグ付き）で配線する。`playRequests`（`PlayRequestGuard`）も持ち、`stopRequested` / `startRequested` の dispatch で未完了の作品再生要求を無効化する
-- `entities/player/model/playerRuntime.ts`: controller と React の間で共有する参照型（`PlayerRuntimeRefs` / `LoadedTrack` / `PendingResume` 等）
+- `entities/player/model/playerController.ts`: 再生状態の正。`PlayerControllerState`（`status`: idle/loading/playing/paused/ended/error、`PlaybackItem`、position/duration、volume/loop/playbackRate/channelSwap/abRepeat 等）と、入力→遷移+コマンドの純粋な `reducePlayer`、それを駆動する `PlayerController` クラス。聴了（トラック終端到達）もここのドメインイベントとして扱う。トラック切替は `withTrackIndex` が再生意図を決める: `intent: "preserve"`（次へ・前へ・自動送り）は現在の再生状態を維持し、`intent: "explicit"`（明示選択）は常に再生を開始する。実ロードへは `loadTrack` コマンド（autoplay・`reusesAsset` フラグ付き）で配線する。engine ロード済みトラック（`loaded`）・トラック終端待ち（`trackEnded`）・Files 即席トラックのファイル全体長（`fileDurationSec`）も state で持ち、区間トラックの仮想終端・同一音源の継続判定・再生し直し時の先頭復帰はすべて reducer の遷移（`audioTimeChanged` / `audioEnded` / `audioPlaying`）として扱う。`playRequests`（`PlayRequestGuard`）も持ち、`stopRequested` / `startRequested` の dispatch で未完了の作品再生要求を無効化する
+- `entities/player/model/loadedTrack.ts`: engine ロード済みトラックの判別共用体（作品のトラック / Files のファイル）と、同一音源判定の純関数
+- `entities/player/model/playerRuntime.ts`: controller と React の間で共有する参照型（`PlayerRuntimeRefs` / `PendingResume` 等。engine ハンドルとロードのクリーンアップだけを ref で持つ）
 - `entities/player/model/atoms.ts`（他 feature からも読むため entity 層に置く）:
   - `playerCoreAtom`（低頻度 state。`toPlayerCoreState` で controller state から導出）
   - `playerCurrentTimeAtom` / `playerDurationAtom`（**高頻度**。timeupdate 毎に更新。`usePlaybackProgress` を介して **BarSeekStrip / PopupSeek / NowPlayingScrub の3 leaf だけが subscribe**する。親コンポーネント（BarContent / PopupContent / NowPlayingView）や App.tsx は subscribe しないので再生中に上位が再レンダリングされない — この分離は**維持必須**）
@@ -133,7 +134,7 @@ smokeテストの注意:
   - `playerUiModeAtom`（bar⇄popup）
   - `nowPlayingViewModeAtom`（再生中タブの通常⇄没入）
 - `entities/player/model/audioEngine.ts`: 低レベル。`new Audio()`（DOM外）。load/play/pause/seek/setVolume/setPlaybackRate/setChannelSwap、timeupdate/durationchange/ended コールバック
-- `model/useAudioEngineLifecycle.ts`: エンジンの生成・イベント購読・last-played 送信。同一アセットを再利用する経路（再生中のトラックへ戻る等）では `<audio>` の `play()` がすでに再生中だとイベントを発火しないため、`audioPlaying` を代理で dispatch して状態機械を同期させる
+- `model/useAudioEngineLifecycle.ts`: エンジンの生成と、engine イベント→controller 入力・`loadTrack` コマンド→実ロード/シークの変換、last-played 送信。遷移判定は持たない。同一アセットを再利用する経路は `<audio>` の `play()` がすでに再生中だとイベントを発火しないため、reducer が再生中の status を loading に戻さない
 - `model/useResumePersistence.ts`: レジューム（playlistId/trackId/offsetSec）の保存・復元ポート
 - `model/useMediaSession.ts`: OS のメディアキー・通知（Media Session API）連携
 - `entities/player/model/trackTime.ts`: トラック区間（start/duration）とファイル絶対時間の相互変換の純関数

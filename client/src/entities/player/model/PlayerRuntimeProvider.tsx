@@ -61,10 +61,7 @@ export function PlayerRuntimeProvider({ children }: { children: ReactNode }) {
   useEffect(() => persistPlaybackPrefsOnChange(controller), [controller]);
 
   const engineRef = useRef<PlayerRuntimeRefs["engine"]["current"]>(null);
-  const loadedTrackRef = useRef<PlayerRuntimeRefs["loadedTrack"]["current"]>(null);
-  const trackEndedRef = useRef(false);
   const updateMediaSessionPositionRef = useRef<(position?: number) => void>(() => {});
-  const filesModeFileDurationSecRef = useRef<number | null>(null);
   const loadCleanupRef = useRef<(() => void) | null>(null);
   const pendingResumeRef = useRef<PendingResume | null>(null);
   const capabilitiesRef = useRef<PlayerRuntimeCapabilities | null>(null);
@@ -73,10 +70,7 @@ export function PlayerRuntimeProvider({ children }: { children: ReactNode }) {
   const runtimeRefs = useMemo<PlayerRuntimeRefs>(
     () => ({
       engine: engineRef,
-      loadedTrack: loadedTrackRef,
-      trackEnded: trackEndedRef,
       updateMediaSessionPosition: updateMediaSessionPositionRef,
-      filesModeFileDurationSec: filesModeFileDurationSecRef,
       loadCleanup: loadCleanupRef,
     }),
     [],

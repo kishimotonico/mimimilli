@@ -58,7 +58,8 @@ export function usePlayerRuntime() {
 
   const { consumePendingResume, enqueueResumeSave, saveCurrentResume, loadResume } =
     useResumePersistenceController({
-      refs: runtimeRefs,
+      engineRef: runtimeRefs.engine,
+      controller,
       pendingResumeRef,
     });
 
@@ -86,7 +87,7 @@ export function usePlayerRuntime() {
   }, [registerCapabilities, loadResume, getCurrentPlaybackContext, saveCurrentResume]);
 
   useEffect(() => {
-    return controller.subscribeCommands((command) => {
+    return controller.subscribeCommands((command, state, previous) => {
       const engine = runtimeRefs.engine.current;
       switch (command.type) {
         case "playAudio":
@@ -96,12 +97,9 @@ export function usePlayerRuntime() {
           engine?.pause();
           break;
         case "seekAudio": {
-          const loaded = runtimeRefs.loadedTrack.current;
+          const { loaded, fileDurationSec } = state;
           if (!engine || !loaded) break;
-          const duration = getTrackDurationSec(
-            loaded.track,
-            runtimeRefs.filesModeFileDurationSec.current,
-          );
+          const duration = getTrackDurationSec(loaded.track, fileDurationSec);
           engine.seek(toAudioAbsoluteTime(command.positionSec, loaded.track, duration));
           setCurrentTime(command.positionSec);
           runtimeRefs.updateMediaSessionPosition.current(command.positionSec);
@@ -117,10 +115,7 @@ export function usePlayerRuntime() {
           engine?.setChannelSwap(command.enabled);
           break;
         case "persistResume":
-          saveCurrentResume();
-          break;
-        case "releaseLoadedTrack":
-          runtimeRefs.loadedTrack.current = null;
+          saveCurrentResume(undefined, previous.loaded);
           break;
         case "workCompleted": {
           if (command.item.source.kind !== "work") break;
@@ -135,7 +130,7 @@ export function usePlayerRuntime() {
           break;
         }
         case "loadTrack":
-          loadTrack(command.item, command.autoplay);
+          loadTrack(command.item, command.autoplay, command.reusesAsset);
           break;
         case "notifyTrackSkipped":
           toast.show({

@@ -8,20 +8,23 @@ import {
   toTrackRelativeTime,
   type PlaybackTrack,
 } from "../../../entities/player/model/trackTime";
+import type { LoadedTrack } from "../../../entities/player/model/loadedTrack";
+import type { PlayerController } from "../../../entities/player/model/playerController";
 import type {
-  LoadedTrack,
   MutableRef,
   PendingResume,
   PlayerRuntimeRefs,
 } from "../../../entities/player/model/playerRuntime";
 
 interface UseResumePersistenceOptions {
-  refs: Pick<PlayerRuntimeRefs, "engine" | "loadedTrack" | "trackEnded">;
+  engineRef: PlayerRuntimeRefs["engine"];
+  controller: PlayerController;
   pendingResumeRef: MutableRef<PendingResume | null>;
 }
 
 export function useResumePersistenceController({
-  refs,
+  engineRef,
+  controller,
   pendingResumeRef,
 }: UseResumePersistenceOptions) {
   const savePromiseRef = useRef<Promise<void> | null>(null);
@@ -43,14 +46,16 @@ export function useResumePersistenceController({
   const saveCurrentResume = useCallback(
     (
       absolutePosition?: number,
-      loadedTrack: LoadedTrack | null = refs.loadedTrack.current,
+      loadedTrack: LoadedTrack | null = controller.getState().loaded,
     ): Promise<void> => {
       if (!loadedTrack) return Promise.resolve();
 
-      const position = absolutePosition ?? refs.engine.current?.getCurrentTime();
+      const position = absolutePosition ?? engineRef.current?.getCurrentTime();
       if (position === undefined) return Promise.resolve();
 
-      if (loadedTrack.playlistId === null || !loadedTrack.workId) return Promise.resolve();
+      if (loadedTrack.kind !== "work" || loadedTrack.playlistId === null) {
+        return Promise.resolve();
+      }
       const trackDuration = isResolvedTrack(loadedTrack.track)
         ? loadedTrack.track.durationSec
         : Number.POSITIVE_INFINITY;
@@ -61,7 +66,7 @@ export function useResumePersistenceController({
         offsetSec,
       });
     },
-    [enqueueResumeSave, refs.engine, refs.loadedTrack],
+    [enqueueResumeSave, engineRef, controller],
   );
 
   const consumePendingResume = useCallback(

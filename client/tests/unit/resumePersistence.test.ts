@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { saveResumePosition } from "../../src/features/player/api";
 import { useResumePersistenceController } from "../../src/features/player/model/useResumePersistence";
 import type { PendingResume } from "../../src/entities/player/model/playerRuntime";
-import type { Track, Work } from "../../src/entities/work/model";
+import { PlayerController } from "../../src/entities/player/model/playerController";
+import type { Track, Work, WorkSummary } from "../../src/entities/work/model";
 
 vi.mock("../../src/features/player/api", () => ({
   saveResumePosition: vi.fn(() => Promise.resolve()),
@@ -18,20 +19,23 @@ const track: Track = {
 
 const pendingResumeRef = { current: null as PendingResume | null };
 
-function refs() {
-  return {
-    engine: { current: null },
-    loadedTrack: {
-      current: {
-        workId: "work-1",
-        playlistId,
-        trackIndex: 0,
-        track,
-        assetUrl: "/audio/work-1/track.wav",
-      },
+function loadedController() {
+  const controller = new PlayerController();
+  controller.dispatch({
+    type: "startRequested",
+    item: {
+      source: { kind: "work", work: { id: "work-1" } as WorkSummary },
+      playlistId,
+      tracks: [track],
+      trackIndex: 0,
+      completionScope: "work",
     },
-    trackEnded: { current: false },
-  };
+  });
+  return controller;
+}
+
+function options() {
+  return { engineRef: { current: null }, controller: loadedController(), pendingResumeRef };
 }
 
 beforeEach(() => {
@@ -47,9 +51,7 @@ describe("resume persistence port", () => {
       playlists: [{ id: playlistId, name: "default", tracks: [track] }],
       resume: { playlistId, trackId: track.id, offsetSec: 15 },
     } as Work;
-    const { result } = renderHook(() =>
-      useResumePersistenceController({ refs: refs(), pendingResumeRef }),
-    );
+    const { result } = renderHook(() => useResumePersistenceController(options()));
 
     expect(result.current.loadResume(work)).toEqual({
       playlistId,
@@ -66,9 +68,7 @@ describe("resume persistence port", () => {
       playlists: [{ id: playlistId, name: "default", tracks: [track] }],
       resume: { playlistId, trackId: "missing-track", offsetSec: 15 },
     } as Work;
-    const { result } = renderHook(() =>
-      useResumePersistenceController({ refs: refs(), pendingResumeRef }),
-    );
+    const { result } = renderHook(() => useResumePersistenceController(options()));
 
     expect(result.current.loadResume(work)).toEqual({
       playlistId,
@@ -88,9 +88,7 @@ describe("resume persistence port", () => {
           }),
       )
       .mockResolvedValueOnce(undefined);
-    const { result } = renderHook(() =>
-      useResumePersistenceController({ refs: refs(), pendingResumeRef }),
-    );
+    const { result } = renderHook(() => useResumePersistenceController(options()));
 
     act(() => {
       result.current.saveCurrentResume(75);
