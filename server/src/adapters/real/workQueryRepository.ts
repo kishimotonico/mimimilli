@@ -314,13 +314,14 @@ export class WorkQueryRepository {
     }>;
   }
 
-  resolveSmartFolderCandidateIds(rules: SmartFolderRule[]): Set<string> | null {
-    if (rules.length === 0) return null;
+  /** ルールに一致しうる作品のサマリー。ルールなしは全作品（SQLで候補を絞るだけで最終評価は呼び出し側） */
+  listSmartFolderCandidateSummaries(rules: SmartFolderRule[]): ListSummariesResult {
+    if (rules.length === 0) return this.listSummaries();
     const { predicates, bindings } = smartFolderRulePredicates(rules);
     const rows = this.db.sqlite
       .query(`SELECT works.id AS id FROM main.works WHERE ${predicates.join(" OR ")}`)
       .all(...bindings) as Array<{ id: string }>;
-    return new Set(rows.map((row) => row.id));
+    return this.listSummaries(rows.map((row) => row.id));
   }
 
   queryWorks(params: WorksQuery, root: string): WorksPage {

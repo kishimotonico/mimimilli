@@ -46,19 +46,10 @@ export function coverFieldsFromColumns(
   const coverKind = projectCoverKind(image, width, height);
   const coverImage = image;
   const cover: CoverValueBase | null =
-    coverKind === "measured"
-      ? { image: image!, dimensions: { width: width!, height: height! } }
+    image !== null && width !== null && height !== null
+      ? { image, dimensions: { width, height } }
       : null;
   return { cover, coverKind, coverImage };
-}
-
-/** 表示用 cover から編集用フィールドを組み立てる（テスト・fixture 向け） */
-export function coverFieldsFromCover(cover: Cover): {
-  coverKind: CoverKind;
-  coverImage: string | null;
-} {
-  if (cover === null) return { coverKind: "none", coverImage: null };
-  return { coverKind: "measured", coverImage: cover.image };
 }
 
 /** 計測失敗（画像はあるが寸法未解決）かどうか */

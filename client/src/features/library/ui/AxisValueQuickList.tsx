@@ -9,17 +9,12 @@ import {
 } from "../model/axisValueSort";
 import { axisValueSortAtom } from "../model/atoms";
 import { buildAxisValueDisplayRows } from "../model/axisValueDisplayRows";
-import {
-  getNextAxisValueRowIndex,
-  nearestValueRowIndex,
-  type AxisValueRowArrowKey,
-} from "../model/axisValueRowNav";
+import { isAxisValueRowArrowKey } from "../model/axisValueRowNav";
 import type { AxisId } from "../../../entities/library/types";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
-import { useVirtualList } from "../../../shared/ui/useVirtualList";
-import { useRovingIndex } from "./useRovingIndex";
+import { useAxisValueListNav } from "./useAxisValueListNav";
 
 // 軸レールのクイックオーバーレイ・「＋絞り込み」・チップの兄弟値ドロップダウン
 // が共有する簡易値リスト。データ取得・フィルタ・ソートは値一覧本体
@@ -133,55 +128,28 @@ export default function AxisValueQuickList({
   const rows = buildAxisValueDisplayRows(items, query, sort);
   const resetKey = `${axis}:${sort.key}:${sort.direction}:${query}`;
 
-  const { scrollRef, virtualizer, virtualItems, wrapperStyle, getItemStyle } = useVirtualList({
-    count: rows.length,
-    estimateSize: ROW_ESTIMATE_SIZE,
-    resetKey,
-    resetScrollTop: true,
-    gap: 1,
-    padding: { start: LIST_PADDING, end: LIST_PADDING },
-    overscan: 8,
-  });
-
-  // キーボード移動中の「現在位置」を自前で追跡する（rows のインデックス、未選択は-1）。
-  // document.activeElement から逆算すると、フォーカス確定（下記のダブルrAF）より速く
-  // 次のキー入力が来た場合に取りこぼす（キーリピート等）。scrollToIndex/focus の実際の
-  // 完了を待たず、常にこの ref を正として次の移動先を決める。ref とは別に activeIndex
-  // state も並行して持ち、roving tabindex（各行の tabIndex）の再描画に使う。
-  const activeIndexRef = useRef(-1);
-  const [activeIndex, setActiveIndex] = useState(-1);
-  useEffect(() => {
-    // resetKey（軸・ソート・検索語）が変わらない限りリセットしない。AND追加ボタンで
-    // selectedTags が変わると facet データが再取得され items の参照だけ変わるが、
-    // 見ている対象は変わっていないためスクロール位置・キーボード位置は維持する
-    // （ADR-0013: AND追加はオーバーレイを開いたまま連続で行える）。
-    activeIndexRef.current = -1;
-    setActiveIndex(-1);
-  }, [resetKey]);
-
-  const rawRovingIndex = useRovingIndex({
-    itemCount: rows.length,
-    targetIndex: activeIndex >= 0 ? activeIndex : null,
+  const {
+    scrollRef,
     virtualItems,
-    toRowIndex: (index) => index,
-    firstFlatIndexOfRow: (index) => index,
+    wrapperStyle,
+    getItemStyle,
+    rovingIndex,
+    moveFocus,
+    handleListFocus,
+  } = useAxisValueListNav({
+    rows,
+    virtualList: {
+      estimateSize: ROW_ESTIMATE_SIZE,
+      // resetKey（軸・ソート・検索語）が変わらない限り位置をリセットしない。AND追加ボタンで
+      // items の参照だけが変わっても、スクロール位置・キーボード位置は維持する
+      // （ADR-0013: AND追加はオーバーレイを開いたまま連続で行える）。
+      resetKey,
+      gap: 1,
+      padding: { start: LIST_PADDING, end: LIST_PADDING },
+      overscan: 8,
+    },
+    itemSelector: (index) => `[data-index="${index}"] [data-quicklist-item]`,
   });
-  const rovingIndex = nearestValueRowIndex(rows, rawRovingIndex);
-
-  // 仮想化中は範囲外の行がDOMに無いため、scrollToIndexで画面内へ入れてから
-  // レイアウト確定後（ダブルrAF）にフォーカスする。
-  const focusRowAfterRender = (index: number) => {
-    activeIndexRef.current = index;
-    setActiveIndex(index);
-    virtualizer.scrollToIndex(index, { align: "auto" });
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        scrollRef.current
-          ?.querySelector<HTMLElement>(`[data-index="${index}"] [data-quicklist-item]`)
-          ?.focus({ preventScroll: true });
-      });
-    });
-  };
 
   const handleListKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
@@ -189,15 +157,13 @@ export default function AxisValueQuickList({
       close();
       return;
     }
-    const key = event.key as AxisValueRowArrowKey;
-    if (key !== "ArrowDown" && key !== "ArrowUp" && key !== "Home" && key !== "End") return;
+    const key = event.key;
+    if (!isAxisValueRowArrowKey(key)) return;
     // Home/Endは検索入力欄のカーソル移動（ネイティブ動作）を横取りしない。矢印キーは
     // 検索欄側が個別処理する（handleSearchKeyDown）ため、ここへは既に処理済みで届かない。
     if ((key === "Home" || key === "End") && event.target instanceof HTMLInputElement) return;
     event.preventDefault();
-    const nextIndex = getNextAxisValueRowIndex(rows, activeIndexRef.current, key);
-    if (nextIndex === -1 || nextIndex === activeIndexRef.current) return;
-    focusRowAfterRender(nextIndex);
+    moveFocus(key);
   };
 
   const handleSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
@@ -209,12 +175,7 @@ export default function AxisValueQuickList({
     if (event.key === "ArrowDown") {
       event.preventDefault();
       event.stopPropagation();
-      // activeIndexRef を使う（ハードコードで-1から始めない）。フォーカス移動が非同期
-      // （ダブルrAF）のため、キーリピート等でこのハンドラが連続して呼ばれても
-      // 常に「実際の現在位置」から次へ進む。
-      const nextIndex = getNextAxisValueRowIndex(rows, activeIndexRef.current, "ArrowDown");
-      if (nextIndex === -1) return;
-      focusRowAfterRender(nextIndex);
+      moveFocus("ArrowDown");
     }
   };
 
@@ -272,15 +233,7 @@ export default function AxisValueQuickList({
           // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 値ボタン集合を名前付き集合として表す。fieldset等の代替タグは適合しない
           role="group"
           aria-label={`${axisLabel}の値一覧`}
-          onFocus={(e) => {
-            // マウスクリック・Tab等、キーボード移動以外でフォーカスが動いた場合も
-            // activeIndexRef を追従させる（次のキーボード移動が正しい位置から始まるように）。
-            const indexAttr = e.target.closest("[data-index]")?.getAttribute("data-index");
-            if (indexAttr !== null && indexAttr !== undefined) {
-              activeIndexRef.current = Number(indexAttr);
-              setActiveIndex(Number(indexAttr));
-            }
-          }}
+          onFocus={handleListFocus}
         >
           <div style={wrapperStyle}>
             {virtualItems.map((virtualRow) => {

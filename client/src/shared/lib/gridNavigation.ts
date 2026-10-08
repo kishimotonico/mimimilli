@@ -1,5 +1,29 @@
 export type GridArrowKey = "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown" | "Home" | "End";
 
+export const GRID_ARROW_KEYS: ReadonlySet<GridArrowKey> = new Set<GridArrowKey>([
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+  "ArrowDown",
+  "Home",
+  "End",
+]);
+
+export const LIST_ARROW_KEYS: ReadonlySet<GridArrowKey> = new Set<GridArrowKey>([
+  "ArrowUp",
+  "ArrowDown",
+  "Home",
+  "End",
+]);
+
+export function isGridArrowKey(
+  key: string,
+  allowed: ReadonlySet<GridArrowKey>,
+): key is GridArrowKey {
+  const keys: ReadonlySet<string> = allowed;
+  return keys.has(key);
+}
+
 export function getNextGridIndex(
   currentIndex: number,
   key: GridArrowKey,

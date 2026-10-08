@@ -1,30 +1,47 @@
-/* mimimilli shell — 分割ファイルの束ね役。
-   各ファイルの所有範囲は各ファイル冒頭のコメントを参照。
-   ここでの @import 順がカスケード順になる（同一レイヤー内は同じ詳細度ならソース順で優劣が決まる）。
-   ある「面」の規則が離れた複数箇所に分散している場合は、<owner>-a / <owner>-b ... の
-   複数ファイルへ分ける（例: library は library-a〜library-e の5ファイル）。
+/* mimimilli shell — 所有コンポーネント単位に分けた CSS の束ね役。
    layer(base) は Tailwind の @layer utilities より弱く、layer(components) は
    @layer utilities より強い（レイヤー順は theme, base, components, utilities）。
-   shared-d.css は reduced-motion の一括打ち消しを含むため、components layer の末尾で必ず最後に読み込む。 */
+   同じ要素に同じ詳細度で当たるルールを複数ファイルに置かない。同じ要素に複数コンポーネントの
+   クラスを付ける箇所は、後から効かせる側のセレクタを詳細度で強くしてあり、@import 順に依存しない。 */
 
 @import "./base.css" layer(base);
-@import "./shared-a.css" layer(components);
-@import "./frame-a.css" layer(components);
-@import "./library-a.css" layer(components);
-@import "./frame-b.css" layer(components);
-@import "./library-b.css" layer(components);
-@import "./frame-c.css" layer(components);
-@import "./library-c.css" layer(components);
-@import "./files-a.css" layer(components);
-@import "./library-d.css" layer(components);
-@import "./files-b.css" layer(components);
-@import "./preview-a.css" layer(components);
-@import "./shared-b.css" layer(components);
-@import "./library-e.css" layer(components);
-@import "./shared-c.css" layer(components);
+@import "./app-shell.css" layer(components);
+@import "./left-nav.css" layer(components);
+@import "./top-bar.css" layer(components);
+@import "./address-bar.css" layer(components);
+@import "./grid-controls.css" layer(components);
+@import "./sort-menu.css" layer(components);
+@import "./column.css" layer(components);
+@import "./library-results.css" layer(components);
+@import "./work-grid.css" layer(components);
+@import "./collection-status.css" layer(components);
+@import "./load-more.css" layer(components);
+@import "./work-tile.css" layer(components);
+@import "./axis-rail.css" layer(components);
+@import "./work-row.css" layer(components);
+@import "./tag-band.css" layer(components);
+@import "./collage.css" layer(components);
+@import "./value-list.css" layer(components);
+@import "./value-grid.css" layer(components);
+@import "./quick-overlay.css" layer(components);
+@import "./smart-folder-rules.css" layer(components);
+@import "./file-row.css" layer(components);
+@import "./file-work-badge.css" layer(components);
+@import "./column-stack.css" layer(components);
+@import "./file-stage.css" layer(components);
+@import "./file-preview.css" layer(components);
+@import "./work-preview.css" layer(components);
+@import "./work-play-button.css" layer(components);
+@import "./work-status-warnings.css" layer(components);
+@import "./work-edit-notice.css" layer(components);
+@import "./work-track-list.css" layer(components);
+@import "./section-label.css" layer(components);
+@import "./icon-button.css" layer(components);
+@import "./barwave.css" layer(components);
+@import "./selectable.css" layer(components);
+@import "./seek-tooltip.css" layer(components);
 @import "./player-dock.css" layer(components);
 @import "./player-popup.css" layer(components);
+@import "./playback-rate.css" layer(components);
 @import "./now-playing.css" layer(components);
 @import "./now-playing-immersive.css" layer(components);
-@import "./files-c.css" layer(components);
-@import "./shared-d.css" layer(components);

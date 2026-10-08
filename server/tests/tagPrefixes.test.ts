@@ -9,7 +9,6 @@ import {
   emptyDlsiteState,
   normalizeTag,
   normalizeTags,
-  isTagNormalized,
   parseStoredNormalizedTags,
   resolveTagPrefix,
   TagNormalizationError,
@@ -68,14 +67,6 @@ test("normalizeTag: 値の大文字小文字は保持する", () => {
 
 test("normalizeTag: 値にスラッシュを含む場合は最初のスラッシュでのみ分割する", () => {
   assert.equal(normalizeTag("シリーズ/A/B"), "シリーズ/A/B");
-});
-
-test("isTagNormalized: 正規形は true、非正規形は false", () => {
-  assert.equal(isTagNormalized("cv/水瀬なずな"), true);
-  assert.equal(isTagNormalized("ASMR"), true);
-  assert.equal(isTagNormalized(" CV/壊れ "), false);
-  assert.equal(isTagNormalized("CV/壊れ"), false);
-  assert.equal(isTagNormalized("  ASMR  "), false);
 });
 
 test("parseStoredNormalizedTags: 正規形配列は参照を保ったまま通す", () => {

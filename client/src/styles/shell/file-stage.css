@@ -1,0 +1,83 @@
+/* Filesの舞台（.mle-files-layout / .mle-filestage* / .ml-file-col-enter*）。 */
+
+/* 一覧(.mle-filestage)とプレビュー(.mle-prv-anchor)を束ねる舞台。
+   前者は残り幅いっぱい・後者はドラッグで確定した固定幅、という主従を持つ
+   （一覧幅を固定すると作品名が切れる一方プレビューに空白が残るため、この配分にする）。
+   container queryで幅を検知し、狭幅ではプレビューを全幅へ切り替える。 */
+.mle-files-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  container: files-layout / inline-size;
+}
+/* 現在フォルダー1カラムを載せる舞台。出入りするカラムをクリップする。
+   min-widthはpreviewLayoutAtoms.tsのFILES_LIST_MIN_WIDTHと値を揃える
+   （プレビュー幅の実効上限の算出元）。 */
+.mle-filestage {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 260px;
+  overflow: hidden;
+  border-right: 1px solid var(--line);
+  background: var(--paper-0);
+}
+.mle-col.mle-filestage__col {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border-right: none;
+  will-change: transform, opacity;
+}
+/* 狭幅ではプレビューを全幅へ切り替え、一覧は隠す。
+   一覧は選択操作で自動的にプレビューを開き直す（FilesView側）ため、閉じている間だけ
+   一覧が全幅になる通常挙動と両立する。 */
+@container files-layout (max-width: 720px) {
+  .mle-files-layout[data-preview-open="true"] .mle-filestage {
+    display: none;
+  }
+  .mle-files-layout[data-preview-open="true"] .mle-prv-anchor {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+  .mle-prv__resize {
+    display: none;
+  }
+}
+.ml-file-col-enter {
+  transform-origin: left center;
+  opacity: 1;
+  transform: translateX(0) scaleX(1) scaleY(1);
+}
+.ml-file-col-enter[data-dir="forward"] {
+  animation: ml-file-col-enter-forward 350ms cubic-bezier(0.34, 1.1, 0.64, 1);
+}
+.ml-file-col-enter[data-dir="back"] {
+  animation: ml-file-col-enter-back 350ms cubic-bezier(0.34, 1.1, 0.64, 1);
+}
+@keyframes ml-file-col-enter-forward {
+  from {
+    opacity: 0;
+    transform: translateX(60%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes ml-file-col-enter-back {
+  from {
+    opacity: 0;
+    transform: translateX(-8%) scaleX(0.28) scaleY(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scaleX(1) scaleY(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ml-file-col-enter[data-dir] {
+    animation: none;
+  }
+}

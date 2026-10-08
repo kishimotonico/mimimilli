@@ -1,0 +1,45 @@
+/* 再生中インジケーター（.barwave*）。 */
+
+.barwave {
+  display: none;
+  gap: 2px;
+  height: 10px;
+  align-items: end;
+  justify-content: center;
+}
+.barwave span {
+  display: block;
+  width: 2px;
+  background: var(--acc);
+  border-radius: 1px;
+  animation: barwave-anim 1s ease-in-out infinite;
+}
+.barwave span:nth-child(1) {
+  height: 50%;
+  animation-delay: -0.1s;
+}
+.barwave span:nth-child(2) {
+  height: 100%;
+  animation-delay: -0.4s;
+}
+.barwave span:nth-child(3) {
+  height: 60%;
+  animation-delay: -0.7s;
+}
+@keyframes barwave-anim {
+  0%,
+  100% {
+    transform: scaleY(0.6);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+.barwave.is-paused span {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .barwave span {
+    animation: none;
+  }
+}

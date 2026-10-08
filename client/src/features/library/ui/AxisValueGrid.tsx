@@ -4,8 +4,9 @@ import type { AxisValueHierarchyRow, AxisValueValueRow } from "../model/axisValu
 import { GRID_COLUMN_GAP } from "../../../shared/lib/gridSizing";
 import {
   firstFlatIndexOfRow,
+  GRID_ARROW_KEYS,
+  isGridArrowKey,
   rowIndexOfFlatIndex,
-  type GridArrowKey,
 } from "../../../shared/lib/gridNavigation";
 import type { IconName } from "../../../shared/ui/Icon";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
@@ -23,15 +24,6 @@ import { useRovingIndex } from "./useRovingIndex";
 
 const GRID_PADDING_START = 16;
 const GRID_PADDING_END = 16;
-
-const GRID_ARROW_KEYS = new Set<GridArrowKey>([
-  "ArrowLeft",
-  "ArrowRight",
-  "ArrowUp",
-  "ArrowDown",
-  "Home",
-  "End",
-]);
 
 /** 親パス（葉の1つ上の階層まで）。depth===0 なら親は無い。 */
 function parentPathOf(row: AxisValueValueRow): string | null {
@@ -160,9 +152,9 @@ export default function AxisValueGrid({
                           onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
                         }
                         onKeyDown={(e) => {
-                          if (!GRID_ARROW_KEYS.has(e.key as GridArrowKey)) return;
+                          if (!isGridArrowKey(e.key, GRID_ARROW_KEYS)) return;
                           e.preventDefault();
-                          moveTileFocus(flatIndex, e.key as GridArrowKey);
+                          moveTileFocus(flatIndex, e.key);
                         }}
                       >
                         <CoverCollage

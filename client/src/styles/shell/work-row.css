@@ -1,0 +1,118 @@
+/* 作品行（.mll-wrow*）。 */
+
+.mll-wrow {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  /* 行高を固定する（仮想スクロールの estimateSize と一致させ、行ごとの高さずれを防ぐ） */
+  block-size: 42px;
+  box-sizing: border-box;
+  padding: 5px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--ink-1);
+}
+.mll-wrow:hover {
+  background: var(--paper-2);
+}
+/* overflow: hidden な一覧スクロール域内なので、共通リングのoffsetを負値にして欠けを防ぐ */
+.mll-wrow:focus-visible {
+  outline-offset: var(--focus-ring-offset-clipped);
+}
+.mll-wrow.is-on {
+  background: var(--paper-4);
+  color: var(--ink-0);
+}
+.mll-wrow.is-on.is-focused {
+  background: var(--ink-0);
+  color: var(--paper-1);
+}
+.mll-wrow.is-on.is-focused .mll-wrow__sub {
+  color: oklch(72% 0.008 70);
+}
+.mll-wrow.is-on.is-focused .mll-wrow__meta {
+  color: oklch(80% 0.008 70);
+}
+.mll-wrow__cv {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--paper-2);
+  flex-shrink: 0;
+  box-shadow: var(--shadow-thumb);
+}
+.mll-wrow__cv img,
+.mll-wrow__cv svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.mll-wrow__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.mll-wrow__title {
+  font-family: var(--font-jp);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: 500;
+  color: var(--ink-0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.005em;
+}
+.mll-wrow.is-on.is-focused .mll-wrow__title {
+  color: var(--paper-1);
+}
+.mll-wrow__status {
+  display: inline-flex;
+  color: var(--r-coral);
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+.mll-wrow.is-on.is-focused .mll-wrow__status {
+  color: oklch(80% 0.12 25);
+}
+.mll-wrow__sub {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mll-wrow__meta {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+.mll-wrow__meta .now {
+  background: var(--acc);
+  color: var(--paper-1);
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+}
+.mll-wrow__meta .fav {
+  color: var(--r-mustard);
+}

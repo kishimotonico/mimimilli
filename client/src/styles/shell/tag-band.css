@@ -1,0 +1,109 @@
+/* 絞り込みチップ列（.mll-tagband*）。 */
+
+.mll-tagband {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 6px 8px 8px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--paper-1);
+}
+.mll-tagband__lbl {
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+  letter-spacing: 0.06em;
+  color: var(--ink-2);
+  text-transform: uppercase;
+  font-weight: 600;
+  padding-right: 4px;
+}
+.mll-tagband__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 4px 0 8px;
+  border-radius: var(--r-pill);
+  background: var(--acc-soft);
+  border: 1px solid var(--acc-line);
+  color: var(--acc-ink);
+  font-family: var(--font-jp);
+  font-size: var(--fs-control);
+  line-height: var(--lh-control);
+  font-weight: 500;
+}
+.mll-tagband__chip .lbl {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mll-tagband__chip .lbl:hover {
+  text-decoration: underline;
+}
+.mll-tagband__chip .x {
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink-2);
+}
+.mll-tagband__chip .x:hover {
+  background: var(--paper-1);
+  color: var(--ink-0);
+}
+.mll-tagband__addbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  border: 1px dashed var(--line-strong);
+  color: var(--ink-2);
+  font-family: var(--font-jp);
+  font-size: var(--fs-control);
+  line-height: var(--lh-control);
+  font-weight: 500;
+}
+.mll-tagband__addbtn:hover {
+  color: var(--ink-0);
+  background: var(--paper-2);
+}
+.mll-tagband__and {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+  padding: 0 2px;
+}
+.mll-tagband__tail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.mll-tagband__count {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
+}
+.mll-tagband__clear {
+  font-family: var(--font-sans);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+  font-weight: 600;
+  color: var(--ink-2);
+  padding: 3px 6px;
+  border-radius: var(--r-1);
+}
+.mll-tagband__clear:hover {
+  color: var(--ink-0);
+  background: var(--paper-2);
+}

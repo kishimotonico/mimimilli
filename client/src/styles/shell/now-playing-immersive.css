@@ -1,9 +1,5 @@
-/* mimimilli shell — now-playing-immersive
-   所有範囲: 再生中タブの没入モード（.mle-nowplaying__immersive*）。
-   ビューポート全面（アプリシェルの上）を覆う fixed 面。z-index 40（没入面）。
-   シーク行（now-playing.css の .mle-nowplaying__seek、z-index 41）だけが
-   常にこの上に乗る。
-   import順: now-playing.cssの次、files-c.cssより前。
+/* 再生中タブの没入モード（.mle-nowplaying__immersive*）。ビューポート全面を覆う fixed 面で z-index 40。
+   シーク行（now-playing.css の .mle-nowplaying__seek、z-index 41）だけが常にこの上に乗る。
    z-index の割り当ては docs/design-system.md の Overlay/z-index 一覧を参照。 */
 
 .mle-nowplaying__immersive {
@@ -13,7 +9,6 @@
   overflow: hidden;
   cursor: pointer;
 }
-
 .mle-nowplaying__immersive-ambient {
   position: absolute;
   inset: -5%;
@@ -24,14 +19,12 @@
   filter: blur(24px) saturate(1.3);
   transform: scale(1.15);
 }
-
 .mle-nowplaying__immersive-scrim {
   position: absolute;
   inset: 0;
   z-index: 1;
   background: color-mix(in oklch, var(--immersive-ink) 20%, transparent);
 }
-
 /* カバーの実画像は object-fit: contain で表示するため、この箱自体は
    縦横比を固定しない大きな矩形にする（縦横比は作品ごとに可変）。
    ファイル再生・カバー欠損時のプレースホルダーは正方形のまま中央に収まる。 */
@@ -50,7 +43,6 @@
   max-height: 100%;
   transform: scale(1.35);
 }
-
 .mle-nowplaying__immersive-toggle {
   position: absolute;
   top: 24px;
@@ -76,7 +68,6 @@
   opacity: 0;
   pointer-events: none;
 }
-
 /* 暗幕は敷かず、小さめの文字＋text-shadowだけでカバー柄の上でも読めるようにする。
    切替アイコン（右上）と対角の左上に置き、シークバー付近は避ける。 */
 .mle-nowplaying__immersive-title {
@@ -96,7 +87,6 @@
 .mle-nowplaying__immersive-title.is-idle {
   opacity: 0;
 }
-
 .mle-nowplaying__immersive-eyebrow {
   font-family: var(--font-sans);
   font-size: var(--fs-label);
@@ -106,7 +96,6 @@
   letter-spacing: 0.16em;
   opacity: 0.8;
 }
-
 .mle-nowplaying__immersive-h1 {
   margin: 0;
   max-width: 100%;
@@ -117,8 +106,7 @@
   letter-spacing: -0.01em;
   text-wrap: balance;
 }
-
-/* 再生⇄一時停止のバーストフィードバック（AC2）。画面中央に短時間ポップして消える。 */
+/* 再生⇄一時停止のバーストフィードバック。画面中央に短時間ポップして消える。 */
 .mle-nowplaying__immersive-burst-layer {
   position: absolute;
   inset: 0;
@@ -136,7 +124,6 @@
   background: color-mix(in oklch, var(--immersive-ink) 45%, transparent);
   color: var(--paper-0);
 }
-
 /* マウスアクティブ時のみ現れる最小トランスポート（NowPlayingImmersiveMiniControls）。
    通常モードの .mle-nowplaying__controls と同じ帯（シーク行の直下）に重ねるが、
    背景パネルは持たない。シーク行の DOM・寸法には触れない。

@@ -171,9 +171,9 @@ export default function App() {
         const playlist =
           fullWork.playlists.find((p) => p.id === fullWork.defaultPlaylistId) ??
           fullWork.playlists[0];
-        const tracks = playlist?.tracks ?? [];
-        if (tracks.length > 0) {
-          player.play(work, tracks, Math.min(trackIndex, tracks.length - 1), playlist!.id);
+        if (playlist && playlist.tracks.length > 0) {
+          const { tracks } = playlist;
+          player.play(work, tracks, Math.min(trackIndex, tracks.length - 1), playlist.id);
         }
       } catch (err) {
         if (!isRootReconfiguringError(err)) {

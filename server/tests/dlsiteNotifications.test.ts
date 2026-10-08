@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { coverFieldsFromCover, type Work, type WorkSummary } from "@mimimilli/shared";
+import type { Work, WorkSummary } from "@mimimilli/shared";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { createApp } from "../src/app.ts";
 import { openDb } from "../src/adapters/real/db.ts";
@@ -10,6 +10,7 @@ import {
   folderFixtureWork,
   makeWorkSummary,
   upsertTestWork,
+  coverFieldsFromCover,
 } from "./helpers/workTestUtils.ts";
 import { makeSampleLibrary } from "./helpers/sampleLibrary.ts";
 import { nts } from "./helpers/tag.ts";

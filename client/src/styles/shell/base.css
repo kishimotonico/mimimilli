@@ -1,9 +1,6 @@
 /* mimimilli shell — base
-   所有範囲: body/#root/ポータル要素に対するグローバルUAリセット（フォント・input/button/a等）。
-   frame・library・files・player・preview のどの面にも属さない土台。
-   layer は shell/index.css の @import base.css layer(base) で割り当てる
-   （Tailwind の @layer utilities より弱く保つため）。
-   import順: shell/index.css 内で最初に読み込む。 */
+   body/#root/ポータル要素に対するグローバルUAリセット（フォント・input/button/a等）。
+   index.css で layer(base) に割り当てる（Tailwind の @layer utilities より弱く保つため）。 */
 
 /* ── Base app ─────────────────────────────────────────────── */
 

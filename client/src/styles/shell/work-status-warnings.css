@@ -1,0 +1,43 @@
+/* 作品詳細の状態警告（.mle-prv__warn*）。 */
+
+.mle-prv__warn {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border-radius: var(--r-2);
+  background: color-mix(in oklch, var(--r-coral) 8%, transparent);
+  border: 1px solid color-mix(in oklch, var(--r-coral) 28%, transparent);
+  color: var(--r-coral);
+}
+.mle-prv__warn-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.mle-prv__warn-title {
+  font-family: var(--font-jp);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: 600;
+  color: var(--ink-0);
+  margin: 0;
+}
+.mle-prv__warn-text {
+  user-select: text;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--ink-1);
+  margin: 0;
+}
+.mle-prv__warn-path {
+  user-select: text;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
+  margin: 2px 0 0;
+  word-break: break-all;
+}

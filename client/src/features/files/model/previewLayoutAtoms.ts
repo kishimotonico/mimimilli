@@ -5,7 +5,7 @@ export const FILES_PREVIEW_WIDTH_MIN = 320;
 export const FILES_PREVIEW_WIDTH_MAX = 720;
 export const FILES_PREVIEW_WIDTH_DEFAULT = 420;
 
-/** 一覧（.mle-filestage、files-c.cssの min-width）が確保する最小幅。
+/** 一覧（.mle-filestage、file-stage.cssの min-width）が確保する最小幅。
  *  プレビューの実効上限はコンテナ幅からこの分を引いた値にする（useFilePreviewResize.ts）。 */
 export const FILES_LIST_MIN_WIDTH = 260;
 

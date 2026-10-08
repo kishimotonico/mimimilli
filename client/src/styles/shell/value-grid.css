@@ -1,0 +1,62 @@
+/* 軸値グリッド（.mll-vtile*）。 */
+
+.mll-vtile {
+  position: relative;
+  min-width: 0;
+  border-radius: var(--r-2);
+  color: var(--ink-1);
+}
+.mll-vtile:hover {
+  background: var(--paper-2);
+}
+.mll-vtile.is-on {
+  background: var(--paper-4);
+  color: var(--ink-0);
+}
+.mll-vtile__main {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 5px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+.mll-vtile .mll-collage {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 6px;
+}
+/* 入れ子タグの親パス（名前順ソート時、depth>0 のタイルにのみ表示）。 */
+.mll-vtile__breadcrumb {
+  margin: 8px 2px 0;
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mll-vtile__nm {
+  display: -webkit-box;
+  min-height: 2.1em;
+  margin: 8px 2px 0;
+  overflow: hidden;
+  color: var(--ink-0);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.mll-vtile__breadcrumb + .mll-vtile__nm {
+  margin-top: 2px;
+}
+.mll-vtile__badge {
+  margin: 3px 2px 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
+}

@@ -1,0 +1,71 @@
+/* 一覧の空状態・ステータス行・スケルトン（.mll-grid-empty / .mll-status-*）。 */
+
+/* ドッキングバー下余白は JS 側 GRID_DOCKED_BAR_EXTRA（paddingEnd）に一本化 */
+.mll-grid-empty {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px 16px;
+  color: var(--ink-2);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  text-align: center;
+}
+/* CollectionStatus の補足行・スクリーンリーダー専用テキスト */
+.mll-status-hint {
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+  color: var(--ink-2);
+}
+.mll-status-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+/* CollectionStatus のローディングスケルトン。行/タイルの概形をパルスで示す。 */
+.mll-status-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 320px;
+  padding: 4px 0;
+}
+.mll-status-skeleton.is-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  max-width: 480px;
+}
+.mll-status-skeleton__row {
+  height: 34px;
+  border-radius: var(--r-2);
+  background: var(--paper-3);
+  animation: mll-status-skeleton-pulse 1.4s ease-in-out infinite;
+}
+.mll-status-skeleton.is-grid .mll-status-skeleton__row {
+  height: 96px;
+}
+@keyframes mll-status-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mll-status-skeleton__row {
+    animation: none;
+    opacity: 0.75;
+  }
+}

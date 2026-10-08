@@ -1,0 +1,83 @@
+/* 作品詳細のトラック一覧（.mle-prv__tracks / .mle-prv__trk*）。 */
+
+.mle-prv__tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.mle-prv__trk {
+  display: grid;
+  grid-template-columns: 22px 1fr 56px auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 7px 8px;
+  border-radius: 4px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--ink-1);
+}
+.mle-prv__trk:hover {
+  background: var(--paper-2);
+}
+.mle-prv__trk .num {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
+  text-align: center;
+}
+.mle-prv__trk .name {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-0);
+  font-weight: 500;
+}
+.mle-prv__trk .name .title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mle-prv__trk .resume {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--acc-ink);
+}
+.mle-prv__trk .dur {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
+  text-align: right;
+}
+.mle-prv__trk.is-resume .num {
+  color: var(--acc);
+}
+.mle-prv__trk.is-now {
+  background: var(--acc-soft);
+}
+.mle-prv__trk.is-now .name {
+  color: var(--acc-ink);
+  font-weight: 600;
+}
+.mle-prv__trk.is-now .num {
+  color: var(--acc);
+}
+.mle-prv__trk.is-disabled {
+  cursor: not-allowed;
+  color: var(--ink-3);
+}
+.mle-prv__trk.is-disabled:hover {
+  background: transparent;
+}
+.mle-prv__trk.is-disabled .name {
+  color: var(--ink-3);
+}
+.mle-prv__trk.is-disabled .dur {
+  color: var(--ink-4);
+}

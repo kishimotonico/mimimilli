@@ -10,7 +10,6 @@ import type { NormalizedTag, UrlEntry, WorkEditSnapshot } from "@mimimilli/share
 // dirtyでも衝突にしない。
 
 export type WorkEditField = "title" | "tags" | "urls";
-export const WORK_EDIT_FIELDS: readonly WorkEditField[] = ["title", "tags", "urls"];
 
 export interface WorkEditDirtyFlags {
   title: boolean;

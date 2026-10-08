@@ -1,17 +1,10 @@
 import type { CoverKind, Work } from "@mimimilli/shared";
 
 /** 編集UI向けのカバー状態ラベル */
-export function formatCoverEditLabel(
-  work: Pick<Work, "coverKind" | "coverImage" | "cover">,
-): string {
-  switch (work.coverKind) {
-    case "none":
-      return "なし";
-    case "unmeasured":
-      return `${work.coverImage}（計測できません）`;
-    case "measured":
-      return work.coverImage ?? work.cover!.image;
-  }
+export function formatCoverEditLabel(work: Pick<Work, "coverKind" | "coverImage">): string {
+  const image = work.coverImage;
+  if (work.coverKind === "none" || image === null) return "なし";
+  return work.coverKind === "unmeasured" ? `${image}（計測できません）` : image;
 }
 
 /** 情報表示向けのカバー状態ラベル */

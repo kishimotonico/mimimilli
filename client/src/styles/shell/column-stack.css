@@ -1,11 +1,4 @@
-/* mimimilli shell — files-b
-   所有範囲: カラムスタック(.mle-colstack*、祖先カラムを束ねて表示し、クリックで1階層
-   戻るナビゲーション)。パルス演出の transition/[data-pulse] 修飾は files-c.css 側にある
-   （ファイルモード区画の末尾に離れて存在するため）。
-   files-a〜cの分割理由はfiles-a.css冒頭コメント参照。
-   import順: library-d.cssの次、preview-a.cssより前。 */
-
-/* ── Column stack (ancestor spine — click to go up one level) ─ */
+/* Filesのカラムスタック（.mle-colstack*）。祖先カラムを束ね、クリックで1階層戻る。 */
 
 .mle-colstack {
   flex: 0 0 auto;
@@ -25,6 +18,10 @@
 .mle-colstack__edges {
   position: absolute;
   inset: 0;
+  transition: transform 280ms cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+.mle-colstack__edges[data-pulse="enter"] {
+  transform: scale(1.14) translateX(7px);
 }
 .mle-colstack__edges span {
   position: absolute;
@@ -91,4 +88,9 @@
   max-height: calc(100% - 26px);
   overflow: hidden;
   white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mle-colstack__edges {
+    transition: none;
+  }
 }

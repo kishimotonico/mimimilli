@@ -115,6 +115,13 @@ export function clearResizeObservers() {
   observers.length = 0;
 }
 
+// レイアウトが無い環境では仮想グリッドの行が高さ0と計測され、全行が描画されてしまう。
+const GRID_ROW_HEIGHT = 207;
+
+function isGridRow(el: HTMLElement) {
+  return el.hasAttribute("data-index") && !!el.parentElement?.classList.contains("mll-grid");
+}
+
 // コンポーネントテスト用に HTMLElement のレイアウトサイズを偽装する。
 // @tanstack/react-virtual の observeElementRect は scrollElement の offsetWidth/Height を読む。
 export function mockElementSize(width = 800, height = 600): { restore: () => void } {
@@ -147,6 +154,7 @@ export function mockElementSize(width = 800, height = 600): { restore: () => voi
     configurable: true,
     get: function () {
       if (isScrollTarget(this)) return height;
+      if (isGridRow(this)) return GRID_ROW_HEIGHT;
       return originalOffsetHeight?.get?.call(this) ?? 0;
     },
   });

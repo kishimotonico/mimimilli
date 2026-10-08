@@ -1,40 +1,21 @@
-import { useEffect, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type {
-  NormalizedTag,
-  UrlEntry,
-  Work,
-  WorkEditSnapshot,
-  WorkProjection,
-} from "@mimimilli/shared";
-import { isHttpAbsoluteUrl } from "@mimimilli/shared";
+import { useRef } from "react";
+import type { Work } from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
 import { I } from "../../../../shared/ui/Icon";
 import TextInput from "../../../../shared/ui/TextInput";
-import { ApiRequestError } from "../../../../shared/api/http";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import type { useLibraryWorkPatchMutations } from "../../model/useLibraryQueries";
-import { getWorkEditSnapshot } from "../../../../entities/work/api";
-import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
-import {
-  projectionWorkspacePath,
-  sourceMutationErrorMessage,
-} from "../../../../entities/work/sourceMutation";
+import { projectionWorkspacePath } from "../../../../entities/work/sourceMutation";
 import { SourceProjectionNotice } from "../../../../entities/work/ui/SourceProjectionNotice";
 import { useRootFolderOrNull } from "../../../../entities/settings/useSettingsQuery";
 import { useTagPrefixes } from "../../../../entities/tag/useTagPrefixes";
-import {
-  reconcileWorkEditSnapshot,
-  tagsEqual,
-  urlsEqual,
-  type WorkEditField,
-} from "../../model/workEditReconcile";
-import { interpretWorkEditSaveResult } from "../../model/workEditSaveResult";
+import type { WorkEditField } from "../../model/workEditReconcile";
 import { WorkSourcePatchBlockedNotice } from "./WorkSourcePatchBlockedNotice";
 import { DlsiteEditor } from "./DlsiteEditor";
 import { WorkEditTagsField } from "./WorkEditTagsField";
-import { useWorkEditTagsDraft } from "./useWorkEditTagsDraft";
+import { WorkEditUrlsField } from "./WorkEditUrlsField";
+import { useWorkEditDraft } from "./useWorkEditDraft";
 
 interface WorkEditDialogProps {
   work: Work;
@@ -43,42 +24,11 @@ interface WorkEditDialogProps {
   onClose: () => void;
 }
 
-const SOURCE_CHANGED_MESSAGE = "作品データが他で更新されました。最新の内容を確認しています…";
-
 const FIELD_LABEL: Record<WorkEditField, string> = {
   title: "タイトル",
   tags: "タグ",
   urls: "関連URL",
 };
-
-function cloneUrls(urls: UrlEntry[]): UrlEntry[] {
-  return urls.map((entry) => ({ label: entry.label, url: entry.url }));
-}
-
-/** ラベル・URLの入力欄群を検証済みのUrlEntry[]へ正規化する。不正な入力があれば
- *  setValidationError でエラー文言を出し、nullを返す（保存を続行しない合図）。 */
-function buildFilledUrls(
-  drafts: UrlEntry[],
-  setValidationError: (message: string | null) => void,
-): UrlEntry[] | null {
-  const filled: UrlEntry[] = [];
-  for (const entry of drafts) {
-    const label = entry.label.trim();
-    const url = entry.url.trim();
-    if (!label && !url) continue;
-    if (!label || !url) {
-      setValidationError("ラベルとURLの両方を入力してください");
-      return null;
-    }
-    if (!isHttpAbsoluteUrl(url)) {
-      setValidationError("httpまたはhttpsのURLだけを登録できます");
-      return null;
-    }
-    filled.push({ label, url });
-  }
-  setValidationError(null);
-  return filled;
-}
 
 interface UnsavedChangesPromptProps {
   canSave: boolean;
@@ -170,218 +120,14 @@ export function WorkEditDialog({
   workPatchMutations: { editMutation },
   onClose,
 }: WorkEditDialogProps) {
-  const queryClient = useQueryClient();
-  const sourceQuery = useQuery({
-    queryKey: WORK_QUERY_KEYS.source(work.id),
-    queryFn: () => getWorkEditSnapshot(work.id),
-  });
   const { tagPrefixes } = useTagPrefixes();
-
-  const [acceptedSnapshot, setAcceptedSnapshot] = useState<WorkEditSnapshot | null>(null);
-  const [processedRevision, setProcessedRevision] = useState<string | null>(null);
-  const [titleDraft, setTitleDraft] = useState(work.title);
-  const [tagsDraft, setTagsDraft] = useState<NormalizedTag[]>(work.tags);
-  const [urlDrafts, setUrlDrafts] = useState<UrlEntry[]>(() => cloneUrls(work.urls));
-  const [urlValidationError, setUrlValidationError] = useState<string | null>(null);
-  const [isUnsavedPromptOpen, setIsUnsavedPromptOpen] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  // source確定（保存成功）とcatalog反映は別の事実（ADR-0025）。
-  // projectionがpendingでも保存自体は成功として扱い、反映状況だけをここに残す。
-  const [projection, setProjection] = useState<WorkProjection | null>(null);
   const rootFolder = useRootFolderOrNull();
-
-  // 保存後・DlsiteEditorの独立適用・409後の再取得などで届いた新しいsnapshotを
-  // 基準へ取り込むかどうかの状態。
-  const [pendingSnapshot, setPendingSnapshot] = useState<WorkEditSnapshot | null>(null);
-  const [pendingChangedFields, setPendingChangedFields] = useState<WorkEditField[]>([]);
-  const [conflictFields, setConflictFields] = useState<WorkEditField[]>([]);
-  const [keepMineFields, setKeepMineFields] = useState<ReadonlySet<WorkEditField>>(new Set());
-
-  const titleInputRef = useRef<HTMLInputElement>(null);
-  const firstUrlInputRef = useRef<HTMLInputElement>(null);
-
-  const trimmedTitle = titleDraft.trim();
-  const currentTitle = acceptedSnapshot?.title ?? work.title;
-  const currentTags = acceptedSnapshot?.tags ?? work.tags;
-  const currentUrls = acceptedSnapshot?.urls ?? work.urls;
-  const isTitleDirty = trimmedTitle !== currentTitle;
-  const isTagsDirty = !tagsEqual(tagsDraft, currentTags);
-  const normalizedUrlDrafts = urlDrafts
-    .map((entry) => ({ label: entry.label.trim(), url: entry.url.trim() }))
-    .filter((entry) => entry.label || entry.url);
-  const isUrlsDirty = !urlsEqual(normalizedUrlDrafts, currentUrls);
-  const isDirty = isTitleDirty || isTagsDirty || isUrlsDirty;
-
-  // タグのdraft操作（追加・削除・保護タグ確認・undo）。undoableTag/confirmingRemoveTagは
-  // ここ（ダイアログ側）で保持し、保存開始時にundo導線を無効化できるようにする
-  // （keyでの再マウントはdraft自体まで捨ててしまうため避ける）。
-  const {
-    addTag,
-    requestRemoveTag,
-    confirmingRemoveTag,
-    confirmRemoveTag,
-    cancelRemoveTag,
-    undoableTag,
-    undoRemoveTag,
-    dismissUndo,
-  } = useWorkEditTagsDraft({ tags: tagsDraft, onChange: setTagsDraft, tagPrefixes });
-
-  // 新しいsnapshotが届いたときの取り込み判定。React本体が推奨する「レンダー中に
-  // 前回値と比較してstateを調整する」パターン（useEffectの1tick遅延を避ける。
-  // WorkTagEditor.tsxのblockEpochと同型）。
-  const incoming = sourceQuery.data;
-  if (incoming && incoming.sourceRevision !== processedRevision) {
-    setProcessedRevision(incoming.sourceRevision);
-    if (!acceptedSnapshot) {
-      setAcceptedSnapshot(incoming);
-      setTitleDraft(incoming.title);
-      setTagsDraft(incoming.tags);
-      setUrlDrafts(cloneUrls(incoming.urls));
-    } else {
-      const { changedFields, conflictFields: nextConflicts } = reconcileWorkEditSnapshot(
-        acceptedSnapshot,
-        incoming,
-        { title: isTitleDirty, tags: isTagsDirty, urls: isUrlsDirty },
-        { title: trimmedTitle, tags: tagsDraft, urls: normalizedUrlDrafts },
-      );
-      if (nextConflicts.length === 0) {
-        setAcceptedSnapshot(incoming);
-        if (changedFields.includes("title")) setTitleDraft(incoming.title);
-        if (changedFields.includes("tags")) setTagsDraft(incoming.tags);
-        if (changedFields.includes("urls")) setUrlDrafts(cloneUrls(incoming.urls));
-      } else {
-        setPendingSnapshot(incoming);
-        setPendingChangedFields(changedFields);
-        setConflictFields(nextConflicts);
-        setKeepMineFields(new Set());
-      }
-    }
-  }
-
-  const sourceErrorMessage = sourceQuery.error
-    ? sourceMutationErrorMessage(sourceQuery.error, "作品情報を読み込めないため編集できません。")
-    : null;
-  const canEditSource = Boolean(acceptedSnapshot) && !sourceQuery.isError;
-  const hasUnresolvedConflicts = conflictFields.length > 0;
-
-  function applyFieldToDraft(field: WorkEditField, snapshot: WorkEditSnapshot) {
-    if (field === "title") setTitleDraft(snapshot.title);
-    else if (field === "tags") setTagsDraft(snapshot.tags);
-    else setUrlDrafts(cloneUrls(snapshot.urls));
-  }
-
-  function resolveConflictField(field: WorkEditField, useLatest: boolean) {
-    if (!pendingSnapshot) return;
-    if (useLatest) applyFieldToDraft(field, pendingSnapshot);
-    const nextKeepMine = useLatest ? keepMineFields : new Set(keepMineFields).add(field);
-    const remaining = conflictFields.filter((f) => f !== field);
-    if (remaining.length === 0) {
-      for (const changedField of pendingChangedFields) {
-        if (!nextKeepMine.has(changedField)) applyFieldToDraft(changedField, pendingSnapshot);
-      }
-      setAcceptedSnapshot(pendingSnapshot);
-      setPendingSnapshot(null);
-      setPendingChangedFields([]);
-      setConflictFields([]);
-      setKeepMineFields(new Set());
-    } else {
-      setConflictFields(remaining);
-      setKeepMineFields(nextKeepMine);
-    }
-  }
-
-  function commitSavedSnapshot(snapshot: WorkEditSnapshot) {
-    setAcceptedSnapshot(snapshot);
-    setProcessedRevision(snapshot.sourceRevision);
-    setTitleDraft(snapshot.title);
-    setTagsDraft(snapshot.tags);
-    setUrlDrafts(cloneUrls(snapshot.urls));
-    setUrlValidationError(null);
-  }
-
-  function handleSaveError(cause: unknown) {
-    if (cause instanceof ApiRequestError && cause.code === "source_changed") {
-      setSaveError(SOURCE_CHANGED_MESSAGE);
-      void sourceQuery.refetch().finally(() => {
-        setSaveError((current) => (current === SOURCE_CHANGED_MESSAGE ? null : current));
-      });
-      return;
-    }
-    // ApiTransportError（通信断・中断）は他の失敗と区別し、成功とも失敗とも推測しない
-    // 「結果を確認できませんでした」文言を出す（sourceMutationErrorMessage）。
-    // draftはどちらの場合も保持する（この関数はdraftを一切書き換えない）。
-    setSaveError(sourceMutationErrorMessage(cause, "保存できませんでした。"));
-  }
-
-  /** dirtyなフィールドだけを1回のPATCHへ含める（ADR-0025）。成功後は保存した値を
-   *  基準へ反映し、closeAfterSaveならダイアログを閉じる。 */
-  const save = async (options: { closeAfterSave: boolean }): Promise<boolean> => {
-    // 送信開始時点でタグのundo導線を無効化する（保存後に別コマンドで戻す形は採らないため、
-    // 保存を試みた時点で「取り消せる」という前提自体が崩れる）。
-    dismissUndo();
-    if (!acceptedSnapshot || hasUnresolvedConflicts) return false;
-    if (isTitleDirty && !trimmedTitle) return false;
-    const filledUrls = isUrlsDirty ? buildFilledUrls(urlDrafts, setUrlValidationError) : null;
-    if (isUrlsDirty && filledUrls === null) return false;
-    if (!isDirty) return false;
-
-    try {
-      const result = await editMutation.mutateAsync({
-        workId: work.id,
-        sourceRevision: acceptedSnapshot.sourceRevision,
-        title: isTitleDirty ? trimmedTitle : undefined,
-        tags: isTagsDirty ? tagsDraft : undefined,
-        urls: isUrlsDirty && filledUrls ? filledUrls : undefined,
-      });
-      const outcome = interpretWorkEditSaveResult(result);
-      // source確定はここで完了。catalog反映（projection）がpendingでも保存成功として扱い、
-      // draftを解除する。反映状況はSourceProjectionNoticeへ委ねる。
-      commitSavedSnapshot(outcome.snapshot);
-      setProjection(outcome.projection);
-      setSaveError(null);
-      if (options.closeAfterSave) onClose();
-      return true;
-    } catch (cause) {
-      handleSaveError(cause);
-      return false;
-    }
-  };
-
-  // 保存中はdisabledでフォーカスがbodyへ落ちるため、失敗確定時にフォーカスを戻す
-  // （dirtyなフィールドのうち先に見つかったもの優先。titleが最優先）。
-  useEffect(() => {
-    if (!saveError) return;
-    if (isTitleDirty) titleInputRef.current?.focus();
-    else if (isUrlsDirty) firstUrlInputRef.current?.focus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- saveErrorが立った瞬間だけ発火させる
-  }, [saveError]);
-
-  const requestClose = () => {
-    if (isDirty) {
-      setIsUnsavedPromptOpen(true);
-      return;
-    }
-    onClose();
-  };
+  const edit = useWorkEditDraft({ work, editMutation, tagPrefixes, onClose });
 
   const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({
-    onClose: requestClose,
-    initialFocusRef: titleInputRef,
+    onClose: edit.requestClose,
+    initialFocusRef: edit.titleInputRef,
   });
-
-  const discardAndClose = () => {
-    setIsUnsavedPromptOpen(false);
-    onClose();
-  };
-
-  const saveAndClose = async () => {
-    const ok = await save({ closeAfterSave: true });
-    if (!ok) setIsUnsavedPromptOpen(false);
-  };
-
-  const handleSaveClick = () => {
-    void save({ closeAfterSave: false });
-  };
 
   return (
     <>
@@ -398,26 +144,23 @@ export function WorkEditDialog({
             <h2 id="work-edit-title" className="min-w-0 flex-1 font-sans text-[14px] font-semibold">
               作品を編集
             </h2>
-            <IconButton icon={I.x} label="閉じる" size="sm" onClick={requestClose} />
+            <IconButton icon={I.x} label="閉じる" size="sm" onClick={edit.requestClose} />
           </header>
           <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-[18px] py-4">
-            <WorkSourcePatchBlockedNotice message={sourceErrorMessage} />
-            {saveError && (
+            <WorkSourcePatchBlockedNotice message={edit.sourceErrorMessage} />
+            {edit.saveError && (
               <p className="mle-prv__edit-error" role="alert">
-                {saveError}
+                {edit.saveError}
               </p>
             )}
             <SourceProjectionNotice
-              projection={projection}
+              projection={edit.projection}
               path={
-                acceptedSnapshot && rootFolder
-                  ? projectionWorkspacePath(acceptedSnapshot, rootFolder)
+                edit.acceptedSnapshot && rootFolder
+                  ? projectionWorkspacePath(edit.acceptedSnapshot, rootFolder)
                   : null
               }
-              onProjected={(result) => {
-                queryClient.setQueryData(WORK_QUERY_KEYS.source(work.id), result.snapshot);
-                setProjection(result.projection);
-              }}
+              onProjected={edit.applyProjectedResult}
             />
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-2">
@@ -428,19 +171,19 @@ export function WorkEditDialog({
                   タイトル
                 </label>
                 <TextInput
-                  ref={titleInputRef}
+                  ref={edit.titleInputRef}
                   id="work-title-input"
                   font="jp"
-                  value={titleDraft}
-                  aria-invalid={titleDraft.trim().length === 0}
-                  disabled={editMutation.isPending || !canEditSource}
-                  onChange={(event) => setTitleDraft(event.target.value)}
+                  value={edit.title}
+                  aria-invalid={edit.title.trim().length === 0}
+                  disabled={edit.isBusy}
+                  onChange={(event) => edit.setTitle(event.target.value)}
                 />
-                {conflictFields.includes("title") && (
+                {edit.conflictFields.includes("title") && (
                   <FieldConflictNotice
                     field="title"
-                    onUseLatest={() => resolveConflictField("title", true)}
-                    onKeepMine={() => resolveConflictField("title", false)}
+                    onUseLatest={() => edit.resolveConflict("title", true)}
+                    onKeepMine={() => edit.resolveConflict("title", false)}
                   />
                 )}
               </div>
@@ -453,24 +196,24 @@ export function WorkEditDialog({
                   タグ
                 </h3>
                 <WorkEditTagsField
-                  tags={tagsDraft}
+                  tags={edit.tags}
                   tagSuggestions={tagSuggestions}
                   tagPrefixes={tagPrefixes}
-                  disabled={editMutation.isPending || !canEditSource}
-                  onAddTag={addTag}
-                  onRequestRemoveTag={requestRemoveTag}
-                  confirmingRemoveTag={confirmingRemoveTag}
-                  onConfirmRemoveTag={confirmRemoveTag}
-                  onCancelRemoveTag={cancelRemoveTag}
-                  undoableTag={undoableTag}
-                  onUndoRemoveTag={undoRemoveTag}
-                  onDismissUndo={dismissUndo}
+                  disabled={edit.isBusy}
+                  onAddTag={edit.tagsDraft.addTag}
+                  onRequestRemoveTag={edit.tagsDraft.requestRemoveTag}
+                  confirmingRemoveTag={edit.tagsDraft.confirmingRemoveTag}
+                  onConfirmRemoveTag={edit.tagsDraft.confirmRemoveTag}
+                  onCancelRemoveTag={edit.tagsDraft.cancelRemoveTag}
+                  undoableTag={edit.tagsDraft.undoableTag}
+                  onUndoRemoveTag={edit.tagsDraft.undoRemoveTag}
+                  onDismissUndo={edit.tagsDraft.dismissUndo}
                 />
-                {conflictFields.includes("tags") && (
+                {edit.conflictFields.includes("tags") && (
                   <FieldConflictNotice
                     field="tags"
-                    onUseLatest={() => resolveConflictField("tags", true)}
-                    onKeepMine={() => resolveConflictField("tags", false)}
+                    onUseLatest={() => edit.resolveConflict("tags", true)}
+                    onKeepMine={() => edit.resolveConflict("tags", false)}
                   />
                 )}
               </section>
@@ -482,104 +225,55 @@ export function WorkEditDialog({
                 >
                   関連URL
                 </h3>
-                {urlDrafts.map((entry, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <TextInput
-                      ref={index === 0 ? firstUrlInputRef : undefined}
-                      font="jp"
-                      value={entry.label}
-                      aria-label={`URLラベル ${index + 1}`}
-                      placeholder="ラベル"
-                      disabled={editMutation.isPending || !canEditSource}
-                      onChange={(event) => {
-                        const label = event.target.value;
-                        setUrlDrafts((prev) =>
-                          prev.map((item, i) => (i === index ? { ...item, label } : item)),
-                        );
-                        if (urlValidationError) setUrlValidationError(null);
-                      }}
-                    />
-                    <TextInput
-                      font="mono"
-                      value={entry.url}
-                      aria-label={`URL ${index + 1}`}
-                      placeholder="https://"
-                      disabled={editMutation.isPending || !canEditSource}
-                      onChange={(event) => {
-                        const url = event.target.value;
-                        setUrlDrafts((prev) =>
-                          prev.map((item, i) => (i === index ? { ...item, url } : item)),
-                        );
-                        if (urlValidationError) setUrlValidationError(null);
-                      }}
-                    />
-                    <IconButton
-                      icon={I.x}
-                      label={`URL ${index + 1} を削除`}
-                      size="xs"
-                      disabled={editMutation.isPending || !canEditSource}
-                      onClick={() => {
-                        setUrlDrafts((prev) => prev.filter((_, i) => i !== index));
-                        if (urlValidationError) setUrlValidationError(null);
-                      }}
-                    />
-                  </div>
-                ))}
-                <div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    disabled={editMutation.isPending || !canEditSource}
-                    onClick={() => setUrlDrafts((prev) => [...prev, { label: "", url: "" }])}
-                  >
-                    URLを追加
-                  </Button>
-                </div>
-                {urlValidationError && (
+                <WorkEditUrlsField
+                  urls={edit.urls}
+                  disabled={edit.isBusy}
+                  firstInputRef={edit.firstUrlInputRef}
+                  onChange={edit.setUrls}
+                />
+                {edit.urlValidationError && (
                   <p className="mle-prv__edit-error" role="alert">
-                    {urlValidationError}
+                    {edit.urlValidationError}
                   </p>
                 )}
-                {conflictFields.includes("urls") && (
+                {edit.conflictFields.includes("urls") && (
                   <FieldConflictNotice
                     field="urls"
-                    onUseLatest={() => resolveConflictField("urls", true)}
-                    onKeepMine={() => resolveConflictField("urls", false)}
+                    onUseLatest={() => edit.resolveConflict("urls", true)}
+                    onKeepMine={() => edit.resolveConflict("urls", false)}
                   />
                 )}
               </div>
             </div>
 
             <div className="border-t border-line-soft pt-4">
-              {acceptedSnapshot ? (
-                <DlsiteEditor workId={work.id} snapshot={acceptedSnapshot} />
+              {edit.acceptedSnapshot ? (
+                <DlsiteEditor workId={work.id} snapshot={edit.acceptedSnapshot} />
               ) : null}
             </div>
           </div>
           <footer className="flex shrink-0 justify-end gap-2 border-t border-line-soft px-[18px] py-3">
-            <Button variant="quiet" onClick={requestClose}>
+            <Button variant="quiet" onClick={edit.requestClose}>
               閉じる
             </Button>
             <Button
               type="button"
               variant="primary"
-              disabled={
-                !canEditSource || !isDirty || hasUnresolvedConflicts || editMutation.isPending
-              }
-              onClick={handleSaveClick}
+              disabled={!edit.canSubmit}
+              onClick={() => void edit.save({ closeAfterSave: false })}
             >
               保存
             </Button>
           </footer>
         </div>
       </dialog>
-      {isUnsavedPromptOpen && (
+      {edit.isUnsavedPromptOpen && (
         <UnsavedChangesPrompt
-          canSave={canEditSource && !hasUnresolvedConflicts && !(isTitleDirty && !trimmedTitle)}
-          isSaving={editMutation.isPending}
-          onSave={() => void saveAndClose()}
-          onDiscard={discardAndClose}
-          onCancel={() => setIsUnsavedPromptOpen(false)}
+          canSave={edit.canSave}
+          isSaving={edit.isSaving}
+          onSave={() => void edit.saveAndClose()}
+          onDiscard={edit.discardAndClose}
+          onCancel={edit.cancelUnsavedPrompt}
         />
       )}
     </>

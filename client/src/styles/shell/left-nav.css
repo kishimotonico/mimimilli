@@ -1,0 +1,82 @@
+/* 左サイドバー（.mle-side*）。 */
+
+.mle-side {
+  grid-column: 1;
+  grid-row: 3;
+  background: var(--paper-1);
+  border-right: 1px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0;
+  gap: 2px;
+  align-items: center;
+}
+.mle-side__group {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+  gap: 4px;
+  align-items: center;
+  width: 100%;
+}
+.mle-side__group + .mle-side__group {
+  border-top: 1px solid var(--line-soft);
+}
+.mle-side__group.is-foot {
+  border-top: none;
+  padding-bottom: 0;
+}
+.mle-side__btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--ink-2);
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+.mle-side__btn:hover {
+  background: var(--paper-2);
+  color: var(--ink-0);
+}
+.mle-side__btn:active {
+  background: var(--paper-3);
+}
+.mle-side__btn.is-on {
+  color: var(--acc);
+  background: var(--acc-soft);
+}
+/* 選択中: 左端に細い柿バー */
+.mle-side__btn.is-on::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  border-radius: 0 2px 2px 0;
+  background: var(--acc);
+}
+.mle-side__badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  font-weight: 600;
+  background: var(--acc);
+  color: var(--paper-1);
+  border-radius: 9px;
+  min-width: 14px;
+  padding: 0 4px;
+  text-align: center;
+  border: 1.5px solid var(--paper-1);
+}
+.mle-side__sp {
+  flex: 1;
+}

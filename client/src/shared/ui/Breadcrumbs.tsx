@@ -64,7 +64,7 @@ export default function Breadcrumbs({ path, onNavigate }: BreadcrumbsProps) {
           )}
         </span>
       ))}
-      {/* ラベルは data-label + ::before(content: attr()) で描画する（frame-b.css）。
+      {/* ラベルは data-label + ::before(content: attr()) で描画する（address-bar.css）。
           テキストノードとして持たせると getByText 等のテスト用クエリが実体側の
           ボタンとこのクローンの両方にヒットしてしまう。
           擬似要素の内容はDOMのテキストノードではないため二重ヒットしない。

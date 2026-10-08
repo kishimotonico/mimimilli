@@ -1,0 +1,92 @@
+/* 作品詳細の再生スプリットボタン（.mle-prv__playsplit / playbtn / playcaret / playmenu*）。 */
+
+/* 再生スプリットボタン（WorkPlayButton）。カバー幅いっぱいに広げ、主セグメントが
+     伸びて▾は右端の固定幅に収まる。主ボタン+▾は隙間なく並べて1つのピルに見せる
+     （▾も主ボタンと同じ塗り。ホバー時だけセグメント単位で明度を上げる）。
+     時間テキストは載せない（進捗はカバー画像側の帯で示す。WorkDetail.tsx 参照）。 */
+.mle-prv__playsplit {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+.mle-prv__playbtn {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  background: var(--ink-0);
+  color: var(--paper-1);
+  font-family: var(--font-sans);
+  font-size: var(--fs-control);
+  line-height: var(--lh-control);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color 0.12s ease;
+}
+/* ▾が隣に並ぶときだけ右側を角ばらせ、1つのピルに繋がって見えるようにする */
+.mle-prv__playbtn.has-caret {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.mle-prv__playbtn:hover:not(:disabled) {
+  background: var(--acc);
+}
+.mle-prv__playbtn:disabled {
+  background: var(--paper-2);
+  color: var(--ink-4);
+  cursor: not-allowed;
+}
+/* ▾は主ボタンと同じダーク塗り（主従が逆転して見えないよう新しい色は使わない）。
+     間は控えめな半透過白の1pxセパレータで区切り、ホバー時だけこのセグメント単独で
+     明度を上げる。 */
+.mle-prv__playcaret {
+  display: flex;
+  flex: 0 0 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  background: var(--ink-0);
+  color: var(--paper-1);
+  border-left: 1px solid oklch(100% 0 0 / 0.16);
+  transition: background-color 0.12s ease;
+}
+.mle-prv__playcaret:hover {
+  background: var(--acc);
+}
+.mle-prv__playmenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 10;
+  min-width: 160px;
+  padding: 4px;
+  background: var(--paper-1);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-2);
+  box-shadow: var(--shadow-pop);
+}
+.mle-prv__playmenu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: var(--r-1);
+  font-family: var(--font-jp);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--ink-1);
+  text-align: left;
+  white-space: nowrap;
+}
+.mle-prv__playmenu-item:hover,
+.mle-prv__playmenu-item:focus-visible {
+  background: var(--paper-2);
+  color: var(--ink-0);
+}

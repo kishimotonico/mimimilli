@@ -1,0 +1,116 @@
+/* 軸レール（.mll-axisgroup / .mll-axis* / .mll-axisfoot）。 */
+
+.mll-axisgroup {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 4px 8px;
+  gap: 1px;
+}
+.mll-axisgroup + .mll-axisgroup {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 6px;
+}
+.mll-axisgroup__hd {
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+  text-transform: uppercase;
+  padding: 6px 10px 4px;
+}
+.mll-axis {
+  display: grid;
+  grid-template-columns: 22px 1fr auto auto;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--ink-1);
+  cursor: pointer;
+  font-family: var(--font-jp);
+}
+.mll-axis:hover {
+  background: var(--paper-2);
+}
+.mll-axis.is-on {
+  background: var(--paper-4);
+  color: var(--ink-0);
+  font-weight: 600;
+}
+.mll-axis.is-on.is-focused {
+  background: var(--ink-0);
+  color: var(--paper-1);
+}
+.mll-axis .ic {
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+}
+.mll-axis.is-on .ic {
+  color: var(--acc);
+}
+.mll-axis.is-on.is-focused .ic {
+  color: var(--paper-1);
+}
+.mll-axis .nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mll-axis .count {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
+}
+.mll-axis.is-on .count {
+  color: var(--ink-2);
+}
+.mll-axis.is-on.is-focused .count {
+  color: oklch(82% 0.008 70);
+}
+.mll-axis .chev {
+  color: var(--ink-3);
+  display: grid;
+  place-items: center;
+}
+.mll-axis.is-on .chev {
+  color: var(--ink-0);
+}
+.mll-axis.is-on.is-focused .chev {
+  color: var(--paper-1);
+}
+.mll-axis .badge {
+  background: var(--acc);
+  color: var(--paper-1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 8px;
+  min-width: 16px;
+  text-align: center;
+}
+.mll-axis.is-action {
+  color: var(--ink-2);
+  font-style: italic;
+  font-weight: 400;
+}
+.mll-axis.is-action:hover {
+  color: var(--ink-1);
+}
+/* ライブラリ統計フッター。軸レール最下部（.mle-col__listの外）に常時表示する */
+.mll-axisfoot {
+  flex-shrink: 0;
+  padding: 8px 10px;
+  border-top: 1px solid var(--line-soft);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
+}

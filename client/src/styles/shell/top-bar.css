@@ -1,11 +1,4 @@
-/* mimimilli shell — library-a
-   所有範囲: トップバー(.mll-bar、Library mode replaces tbar)。
-   library系はlibrary-a〜library-eの5ファイルに分かれている（frame・preview・shared・files
-   の区画がカスケード順でlibraryの区画を何度も挟むため、所有境界を保ちつつ
-   順序を保つには分割が必要。理由は各ファイル内のコメントに記す）。
-   import順: frame-a.cssの次、frame-b.cssより前。 */
-
-/* ── App top bar / mll-bar (Library mode replaces tbar) ──── */
+/* トップバー（.mll-bar*）。 */
 
 .mll-bar {
   position: relative;
@@ -75,6 +68,11 @@
 }
 .mll-bar__pulse .dot.is-error {
   background: var(--r-coral);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mll-bar__pulse .dot.is-playing {
+    animation: none;
+  }
 }
 @keyframes mll-pulse {
   0% {
