@@ -9,6 +9,12 @@ const scanLogger = getCategoryLogger("scan");
 
 export type FileScanWorkerResult = ScanExecutionResult;
 
+const activeWorkers = new Map<Worker, () => void>();
+
+export function terminateScanWorkers(): void {
+  for (const stop of activeWorkers.values()) stop();
+}
+
 function reconstructWorkerError(
   message: Extract<ScanWorkerOutboundMessage, { type: "error" }>,
 ): Error {
@@ -107,6 +113,7 @@ export async function runFileScanInWorker(
       worker.removeEventListener("error", onError);
       worker.removeEventListener("messageerror", onMessageError);
       worker.removeEventListener("close", onClose);
+      activeWorkers.delete(worker);
       worker.terminate();
     };
     const settle = (fn: () => void) => {
@@ -115,6 +122,9 @@ export async function runFileScanInWorker(
       cleanup();
       fn();
     };
+    activeWorkers.set(worker, () =>
+      settle(() => rejectResult(new DOMException("スキャンはキャンセルされました", "AbortError"))),
+    );
     if (options.signal?.aborted) abort();
     options.signal?.addEventListener("abort", abort, { once: true });
     worker.addEventListener("message", onMessage);

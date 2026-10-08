@@ -7,7 +7,11 @@ import { test, type TestContext } from "node:test";
 import type { DataAdapter } from "../../src/adapter/index.ts";
 import { createFixtureAdapter } from "../../src/adapters/fixture/index.ts";
 import { getCategoryLogger, initLogger } from "../../src/lib/logger.ts";
-import { performGracefulShutdown, runCleanupAndExit } from "../../src/serverLifecycle.ts";
+import {
+  createShutdownHandler,
+  performGracefulShutdown,
+  runCleanupAndExit,
+} from "../../src/serverLifecycle.ts";
 import { serveFixtureTransport } from "./helpers.ts";
 
 const emptyScanResult = {
@@ -205,6 +209,82 @@ test("runCleanupAndExit: 起動完了後の通常シャットダウンでexitに
     );
     assert.equal(exitCode, 0);
   });
+});
+
+test("graceful shutdown: app.shutdownが戻らなくても期限でワーカーをterminateしadapterをcloseして返る", async () => {
+  await withLogDir(async (logDir) => {
+    await initLogger({ logDir });
+
+    const { adapter, wasClosed } = withCloseTrack(createFixtureAdapter());
+    let terminated = false;
+    const hangingApp = { shutdown: () => new Promise<void>(() => {}) };
+
+    const result = await performGracefulShutdown({
+      server: { stop() {} },
+      app: hangingApp,
+      adapter,
+      terminateWorkers: () => {
+        terminated = true;
+      },
+      timeoutMs: 20,
+    });
+
+    assert.deepEqual(result, { timedOut: true });
+    assert.equal(terminated, true);
+    assert.equal(wasClosed(), true);
+  });
+});
+
+test("graceful shutdown: 期限内に完了すればtimedOutはfalse", async () => {
+  await withLogDir(async (logDir) => {
+    await initLogger({ logDir });
+
+    const result = await performGracefulShutdown({ server: { stop() {} }, timeoutMs: 5_000 });
+    assert.deepEqual(result, { timedOut: false });
+  });
+});
+
+test("runCleanupAndExit: 期限超過時はexit code 1で終了する", async () => {
+  let exitCode: number | undefined;
+  await assert.rejects(
+    () =>
+      runCleanupAndExit(
+        async () => ({ timedOut: true }),
+        0,
+        (code) => {
+          exitCode = code;
+          throw new Error("exit called");
+        },
+      ),
+    /exit called/,
+  );
+  assert.equal(exitCode, 1);
+});
+
+test("shutdownHandler: 終了処理中の2回目の要求は待たずに即時終了コードで終了する", async () => {
+  const exits: number[] = [];
+  const exit = (code: number): never => {
+    exits.push(code);
+    throw new Error("exit called");
+  };
+  let cleanupCalls = 0;
+  const handler = createShutdownHandler({
+    cleanup: () => {
+      cleanupCalls += 1;
+      return new Promise<void>(() => {});
+    },
+    exit,
+    log: () => {},
+  });
+
+  void handler({ exitCode: 0, immediateExitCode: 130, reason: "SIGINT" });
+  await assert.rejects(
+    () => handler({ exitCode: 0, immediateExitCode: 130, reason: "SIGINT" }),
+    /exit called/,
+  );
+
+  assert.deepEqual(exits, [130]);
+  assert.equal(cleanupCalls, 1);
 });
 
 const STARTUP_FAILURE_TIMEOUT_MS = 10_000;

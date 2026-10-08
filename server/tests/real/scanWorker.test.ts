@@ -8,6 +8,7 @@ import { createApp } from "../../src/app.ts";
 import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
 import { pollUntil } from "../helpers/poll.ts";
+import { runFileScanInWorker, terminateScanWorkers } from "../../src/adapters/real/scanRunner.ts";
 import { DlsiteCache, resolveDlsiteCacheConfig } from "../../src/adapters/real/dlsiteCache.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
 
@@ -156,6 +157,42 @@ test("app shutdown は同期停止中のfile scan Workerを終了まで待機す
   await app.shutdown();
 
   assert.equal((await waitForTerminal(app, started.job.id)).status, "cancelled");
+});
+
+test("terminateScanWorkersはエラーログなしでAbortErrorとしてscanを終える", async (t) => {
+  const library = makeSampleLibrary();
+  t.after(library.cleanup);
+  const dataRoot = join(library.baseDir, "data");
+  const database = {
+    kind: "files" as const,
+    catalogPath: join(dataRoot, "db", "catalog.sqlite"),
+    userPath: join(dataRoot, "db", "user.sqlite"),
+  };
+  const thumbnailCacheDir = join(dataRoot, "thumbnails");
+  const seed = createTestRealAdapter({ database, dataRoot, thumbnailCacheDir });
+  await configureRoot(seed, library.root);
+  seed.close();
+
+  const gateBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
+  let ready!: () => void;
+  const workerReady = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  const scan = runFileScanInWorker(
+    database,
+    library.root,
+    thumbnailCacheDir,
+    resolveDlsiteCacheConfig(join(dataRoot, "dlsite-cache.sqlite")),
+    {},
+    gateBuffer,
+    "before-scan",
+    ready,
+  );
+  await workerReady;
+
+  terminateScanWorkers();
+
+  await assert.rejects(scan, { name: "AbortError" });
 });
 
 test("file scan Workerはfull:trueをscannerへ伝播し全件再処理する", async (t) => {
