@@ -2,7 +2,7 @@ import { createElement, useMemo } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../../src/app/App";
 import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
 import DlsiteBulkApplyRuntime from "../../src/features/dlsite/ui/DlsiteBulkApplyRuntime";
@@ -80,6 +80,12 @@ function renderAppWithSettings(settings: Settings) {
 function currentUrl(): string {
   return `${window.location.pathname}${window.location.search}`;
 }
+
+// SettingsModalはlazy importのため、初回のモジュール変換を各テストの待機に含めないよう先に読み込む。
+// 設定モーダルを開く待機は無負荷でも約300msかかるため、waitFor既定の1000msでなく5000msを与える。
+beforeAll(async () => {
+  await import("../../src/features/settings/ui/SettingsModal");
+});
 
 beforeEach(() => {
   vi.restoreAllMocks();
@@ -236,7 +242,9 @@ describe("root再設定突入時のモーダル初期化", () => {
     await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: "設定" }));
-    await waitFor(() => expect(screen.getByRole("dialog", { name: "設定" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("dialog", { name: "設定" })).toBeInTheDocument(), {
+      timeout: 5000,
+    });
 
     queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
       rootFolder: "/audio/library",
@@ -329,7 +337,9 @@ describe("root再設定の高速完了（runningが描画されない）競合",
     queryClient.setQueryData(WORK_QUERY_KEYS.detail("work-1"), { id: "work-1" });
 
     fireEvent.click(screen.getByRole("button", { name: "設定" }));
-    await waitFor(() => expect(screen.getByRole("dialog", { name: "設定" })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("dialog", { name: "設定" })).toBeInTheDocument(), {
+      timeout: 5000,
+    });
     fireEvent.click(screen.getByRole("button", { name: "変更" }));
     fireEvent.change(screen.getByLabelText("ルートフォルダーのパス"), {
       target: { value: "/new/root" },
