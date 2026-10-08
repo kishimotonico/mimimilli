@@ -38,7 +38,7 @@ pnpm test:server
 pnpm test:client
 pnpm test:smoke          # Playwright スモークテスト（roleベースの動作確認）
 # smokeテストは worker ごとに MIMIMILLI_MOCK_SCENARIO=new-work（spec で test.use({ fixtureScenario }) すると変更可）の Bun + Vite サーバーペアを自前で立てる。
-# ポートは worktree の絶対パスを sha256 ハッシュ化して 4200 番台から決定的に導出する（`derivePort.ts`）ため、worktree ごとに一意になる
+# ポートは起動時にOSから空きを確保する（Bunは PORT=0 で bind して起動ログから読み、Vite は借りた空きポートを渡す）。常駐 dev server や他 worktree の smoke と衝突しない
 
 # fixture シナリオ
 pnpm dev:fixture           # 手書きシードの11件のみ
