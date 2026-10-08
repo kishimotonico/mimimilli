@@ -2,19 +2,20 @@ import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
-import IconButton from "../../../shared/ui/IconButton";
+import TextInput from "../../../shared/ui/TextInput";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
+import { dlsiteBulkApplyBusyAtom } from "../../../entities/dlsite/model/bulkAtoms";
 import {
-  dlsiteBulkActiveAtom,
-  dlsiteBulkApplyBusyAtom,
-  dlsiteBulkProgressAtom,
-  dlsiteBulkStartingAtom,
-} from "../../../entities/dlsite/model/bulkAtoms";
-import { useDlsiteBulkActions } from "../../../entities/dlsite/useDlsiteBulkActions";
+  useDlsiteBulkActive,
+  useDlsiteBulkProgress,
+  useDlsiteBulkStarting,
+  useDlsiteBulkStore,
+} from "../../../entities/dlsite/useDlsiteBulk";
 import { useDlsiteBulkApplyActions } from "../../../entities/dlsite/useDlsiteBulkApplyActions";
-import { scanningAtom, scanProgressLabelAtom } from "../../../entities/scan/model/atoms";
+import { useScanning, useScanProgressLabel } from "../../../entities/scan/useScanJob";
 import TagPrefixSettings from "./TagPrefixSettings";
 import ExcludedFoldersSettings from "./ExcludedFoldersSettings";
+import Modal, { ModalHeader } from "../../../shared/ui/Modal";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { formatLastScanTime } from "../../../shared/lib/format";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
@@ -44,14 +45,14 @@ export default function SettingsModal({
   onExport,
 }: SettingsModalProps) {
   const rootFolder = useRootFolder();
-  const scanning = useAtomValue(scanningAtom);
-  const scanProgressLabel = useAtomValue(scanProgressLabelAtom);
-  const dlsiteBulkActive = useAtomValue(dlsiteBulkActiveAtom);
-  const dlsiteBulkStarting = useAtomValue(dlsiteBulkStartingAtom);
-  const dlsiteBulkProgress = useAtomValue(dlsiteBulkProgressAtom);
+  const scanning = useScanning();
+  const scanProgressLabel = useScanProgressLabel();
+  const dlsiteBulkActive = useDlsiteBulkActive();
+  const dlsiteBulkStarting = useDlsiteBulkStarting();
+  const dlsiteBulkProgress = useDlsiteBulkProgress();
   const dlsiteBulkApplyBusy = useAtomValue(dlsiteBulkApplyBusyAtom);
   const dlsiteBulkBusy = dlsiteBulkActive || dlsiteBulkStarting;
-  const { start: onStartDlsiteBulk } = useDlsiteBulkActions();
+  const { start: onStartDlsiteBulk } = useDlsiteBulkStore();
   const { openDialog: onOpenDlsiteBulkApply } = useDlsiteBulkApplyActions();
   const [isEditingFolder, setIsEditingFolder] = useState(false);
   const [folderDraft, setFolderDraft] = useState(rootFolder);
@@ -67,7 +68,7 @@ export default function SettingsModal({
     }
     onClose();
   };
-  const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({ onClose: dismiss });
+  const dialog = useDialogModal({ onClose: dismiss });
 
   useEffect(() => {
     if (isEditingFolder) folderInputRef.current?.focus({ preventScroll: true });
@@ -95,19 +96,8 @@ export default function SettingsModal({
   };
 
   return (
-    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックで閉じる。EscapeはonCancel（useDialogModal）で処理する。
-    <dialog
-      ref={dialogRef}
-      aria-label="設定"
-      onCancel={handleCancel}
-      onClick={handleBackdropClick}
-      className="m-auto flex w-[440px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] flex-col overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[var(--scrim)]"
-    >
-      {/* Header */}
-      <div className="flex shrink-0 items-center border-b border-line-soft px-[18px] py-[14px]">
-        <span className="flex-1 font-sans text-[14px] font-semibold text-ink-0">設定</span>
-        <IconButton icon={I.x} label="閉じる" size="sm" onClick={dismiss} />
-      </div>
+    <Modal dialog={dialog} size={440} labelledBy="settings-title">
+      <ModalHeader title="設定" titleId="settings-title" onClose={dismiss} />
 
       {/* Body */}
       <div className="flex min-h-0 flex-1 flex-col gap-[18px] overflow-y-auto px-[18px] pt-[18px] pb-2">
@@ -123,14 +113,15 @@ export default function SettingsModal({
                   void saveFolder();
                 }}
               >
-                <input
+                <TextInput
+                  font="mono"
                   ref={folderInputRef}
                   value={folderDraft}
                   onChange={(e) => setFolderDraft(e.target.value)}
                   aria-label="ルートフォルダーのパス"
                   placeholder="ルートフォルダーのパスを入力"
                   disabled={savingFolder}
-                  className="h-[34px] flex-1 rounded-[6px] border border-acc bg-paper-0 px-3 font-mono text-mono text-ink-1 disabled:opacity-60"
+                  className="h-[34px] flex-1 border-acc px-3 text-ink-1 focus-visible:border-acc disabled:opacity-60"
                 />
                 <Button
                   variant="quiet"
@@ -239,6 +230,6 @@ export default function SettingsModal({
           閉じる
         </Button>
       </div>
-    </dialog>
+    </Modal>
   );
 }

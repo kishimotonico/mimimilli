@@ -5,7 +5,7 @@ export const WORK_QUERY_KEYS = {
   errorViewCount: () => ["works", "errorViewCount"] as const,
   missingCount: () => ["works", "missingCount"] as const,
   allDetails: () => ["work"] as const,
-  detail: (id: string) => ["work", id] as const,
+  detail: (id: string | null) => ["work", id] as const,
   source: (id: string) => ["work", id, "source"] as const,
   allFacets: () => ["axisFacets"] as const,
   // filterParams: 自軸除外後の絞り込み。フィルタが変われば別クエリとして

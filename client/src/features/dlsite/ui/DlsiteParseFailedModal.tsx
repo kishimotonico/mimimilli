@@ -1,4 +1,5 @@
 import Button from "../../../shared/ui/Button";
+import { ModalFooter } from "../../../shared/ui/Modal";
 import { useDlsiteParseFailedWorks } from "../model/dlsiteParseFailed";
 import NotificationListModal from "./NotificationListModal";
 
@@ -44,7 +45,7 @@ export default function DlsiteParseFailedModal({
         </button>
       )}
       footer={
-        <footer className="flex shrink-0 flex-col gap-2 border-t border-line-soft px-[18px] py-3">
+        <ModalFooter className="flex-col items-stretch justify-start">
           <p className="mll-selectable font-mono text-caption leading-relaxed text-ink-2">
             pnpm --filter @mimimilli/server dlsite-cache -- export --product-code RJ000000 --file
             ./work.html
@@ -54,7 +55,7 @@ export default function DlsiteParseFailedModal({
               閉じる
             </Button>
           </div>
-        </footer>
+        </ModalFooter>
       }
     />
   );

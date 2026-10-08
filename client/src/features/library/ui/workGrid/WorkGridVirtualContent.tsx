@@ -13,7 +13,6 @@ interface RowTileProps {
   safeTileSize: number;
   rovingIndex: number;
   onWorkSelect: (id: string) => void;
-  onWorkPlay: (work: WorkListItem) => void;
   onTileArrowKey: (flatIndex: number, key: GridArrowKey) => void;
 }
 

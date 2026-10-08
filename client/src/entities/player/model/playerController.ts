@@ -1,12 +1,20 @@
-import type { Work, WorkListItem } from "../../../entities/work/model";
+import type { Work, WorkListItem } from "../../work/model";
 import type { AudioEngineError } from "./audioEngine";
-import { isResolvedTrack, type PlaybackTrack } from "./trackTime";
+import { createPlayRequestGuard } from "./playRequestGuard";
+import {
+  getTrackDurationSec,
+  hasReachedTrackEnd,
+  isResolvedTrack,
+  toTrackRelativeTime,
+  type PlaybackTrack,
+} from "./trackTime";
+import { reusesLoadedAsset, sharesAsset, toLoadedTrack, type LoadedTrack } from "./loadedTrack";
 import {
   isAbRepeatEstablished,
   type AbRepeatRange,
   type PlaybackStatus,
   type PlayerCoreState,
-} from "../../../entities/player/model/playerCoreState";
+} from "./playerCoreState";
 
 export type PlaybackCompletionScope = "queue" | "work";
 
@@ -32,6 +40,12 @@ export interface PlayerControllerState {
   abRepeat: AbRepeatRange;
   playbackError: AudioEngineError | null;
   consecutiveTrackFailures: number;
+  /** engine にロード済みのトラック。item の選択に追従し、engine 破棄で null に戻る。 */
+  loaded: LoadedTrack | null;
+  /** トラック終端に達して次の再生開始待ちか。 */
+  trackEnded: boolean;
+  /** Files モード即席トラックの durationchange 由来ファイル全体長。登録トラックでは未使用。 */
+  fileDurationSec: number | null;
 }
 
 export const PLAYER_CONTROLLER_INITIAL: PlayerControllerState = {
@@ -46,6 +60,9 @@ export const PLAYER_CONTROLLER_INITIAL: PlayerControllerState = {
   abRepeat: { a: null, b: null },
   playbackError: null,
   consecutiveTrackFailures: 0,
+  loaded: null,
+  trackEnded: false,
+  fileDurationSec: null,
 };
 
 /** 連続デコード失敗で停止する件数。全滅時の無限スキップを防ぐ。 */
@@ -120,7 +137,10 @@ export type PlayerControllerInput =
   | { type: "audioPlaying" }
   | { type: "audioPaused" }
   | { type: "audioTimeUpdated"; positionSec: number }
-  | { type: "audioDurationChanged"; durationSec: number | null }
+  | { type: "audioTimeChanged"; audioSec: number }
+  /** durationSec はトラックではなく音源ファイル全体の長さ。 */
+  | { type: "audioDurationChanged"; durationSec: number }
+  | { type: "engineReleased" }
   | { type: "audioEnded" }
   | { type: "audioFailed"; error: AudioEngineError }
   | { type: "persistTick" }
@@ -131,13 +151,19 @@ export type PlayerControllerCommand =
   | { type: "playAudio" }
   | { type: "pauseAudio" }
   | { type: "seekAudio"; positionSec: number }
-  | { type: "loadTrack"; item: PlaybackItem; positionSec?: number; autoplay: boolean }
+  | {
+      type: "loadTrack";
+      item: PlaybackItem;
+      positionSec?: number;
+      autoplay: boolean;
+      /** ロード済みの音源をそのまま使い、シークだけで移る。 */
+      reusesAsset: boolean;
+    }
   | { type: "setAudioVolume"; volume: number }
   | { type: "setAudioPlaybackRate"; playbackRate: number }
   | { type: "setAudioChannelSwap"; enabled: boolean }
   | { type: "persistResume"; reason: "track-change" | "pause" | "stop" | "interval" | "error" }
   | { type: "workCompleted"; item: PlaybackItem }
-  | { type: "releaseLoadedTrack" }
   | { type: "notifyTrackSkipped"; trackTitle: string; trackIndex: number };
 
 export interface PlayerTransition {
@@ -149,6 +175,25 @@ export interface PlayerTransition {
 function selectedTrackDurationSec(item: PlaybackItem, trackIndex: number): number | null {
   const track = item.tracks[trackIndex];
   return track && isResolvedTrack(track) ? track.durationSec : null;
+}
+
+/** 新しい項目をロードする遷移で更新する、engine ロード済みトラック周りの状態。 */
+function enterLoad(state: PlayerControllerState, item: PlaybackItem) {
+  const loaded = toLoadedTrack(item);
+  const reusesAsset = reusesLoadedAsset(state.loaded, loaded);
+  return {
+    reusesAsset,
+    fields: {
+      loaded,
+      trackEnded: false,
+      fileDurationSec: reusesAsset ? state.fileDurationSec : null,
+    },
+  };
+}
+
+// 再生中のまま同一音源のトラックへ移るとき、engine は play イベントを再発火しないため status を loading に戻さない。
+function loadingStatus(state: PlayerControllerState, reusesAsset: boolean): PlaybackStatus {
+  return reusesAsset && state.status === "playing" ? "playing" : "loading";
 }
 
 /**
@@ -175,10 +220,12 @@ function withTrackIndex(
   const nextItem = { ...item, trackIndex };
   const wasPlaying = state.status === "playing" || state.status === "loading";
   const autoplay = intent === "explicit" || wasPlaying;
-  const nextStatus = intent === "explicit" ? "loading" : state.status;
+  const load = enterLoad(state, nextItem);
+  const nextStatus = intent === "explicit" ? loadingStatus(state, load.reusesAsset) : state.status;
   return {
     state: {
       ...state,
+      ...load.fields,
       status: nextStatus,
       item: nextItem,
       positionSec: 0,
@@ -189,9 +236,67 @@ function withTrackIndex(
     },
     commands: [
       { type: "persistResume", reason: "track-change" },
-      { type: "loadTrack", item: nextItem, autoplay },
+      { type: "loadTrack", item: nextItem, autoplay, reusesAsset: load.reusesAsset },
     ],
   };
+}
+
+function reduceTimeUpdate(state: PlayerControllerState, positionSec: number): PlayerTransition {
+  const commands: PlayerControllerCommand[] = [];
+  const { abRepeat } = state;
+  if (isAbRepeatEstablished(abRepeat) && positionSec >= abRepeat.b) {
+    commands.push({ type: "seekAudio", positionSec: abRepeat.a });
+    return { state: { ...state, positionSec: abRepeat.a }, commands };
+  }
+  return { state: { ...state, positionSec }, commands };
+}
+
+function reduceTrackEnded(state: PlayerControllerState): PlayerTransition {
+  const item = state.item;
+  if (!item) return { state, commands: [] };
+  if (state.loop) {
+    return {
+      state: { ...state, status: "playing", positionSec: 0 },
+      commands: [{ type: "seekAudio", positionSec: 0 }, { type: "playAudio" }],
+    };
+  }
+  if (item.trackIndex < item.tracks.length - 1) {
+    return withTrackIndex(state, item.trackIndex + 1, "preserve");
+  }
+  const commands: PlayerControllerCommand[] = [];
+  if (item.completionScope === "work") commands.push({ type: "workCompleted", item });
+  return { state: { ...state, status: "ended", trackEnded: true }, commands };
+}
+
+/**
+ * トラックの終端処理。区間トラックの仮想終端ではファイル自体の再生が続くため、
+ * 同じ音源で継続できない境界では明示的に止める。
+ */
+function finishTrack(state: PlayerControllerState, virtualEnd: boolean): PlayerTransition {
+  const item = state.item;
+  if (!item || state.trackEnded) return { state, commands: [] };
+  const nextLoaded = toLoadedTrack(item, item.trackIndex + 1);
+  const continuesAsset =
+    state.loaded !== null && nextLoaded !== null && sharesAsset(state.loaded, nextLoaded);
+  const ended = reduceTrackEnded(state);
+  const pause: PlayerControllerCommand[] =
+    virtualEnd && !continuesAsset ? [{ type: "pauseAudio" }] : [];
+  return { state: ended.state, commands: [...pause, ...ended.commands] };
+}
+
+function reduceAudioTimeChanged(state: PlayerControllerState, audioSec: number): PlayerTransition {
+  const loaded = state.loaded;
+  if (!loaded) return { state, commands: [] };
+  const durationSec = getTrackDurationSec(loaded.track, state.fileDurationSec);
+  const reachedEnd = hasReachedTrackEnd(audioSec, loaded.track);
+  const base = reduceTimeUpdate(
+    reachedEnd ? state : { ...state, trackEnded: false },
+    toTrackRelativeTime(audioSec, loaded.track, durationSec),
+  );
+  // B点が区間終端と一致する場合も、Aへのシークをトラック終了より優先する。
+  if (!reachedEnd || base.commands.length > 0) return base;
+  const finished = finishTrack(base.state, true);
+  return { state: finished.state, commands: [...base.commands, ...finished.commands] };
 }
 
 export function reducePlayer(
@@ -199,11 +304,13 @@ export function reducePlayer(
   input: PlayerControllerInput,
 ): PlayerTransition {
   switch (input.type) {
-    case "startRequested":
+    case "startRequested": {
+      const load = enterLoad(state, input.item);
       return {
         state: {
           ...state,
-          status: "loading",
+          ...load.fields,
+          status: loadingStatus(state, load.reusesAsset),
           item: input.item,
           positionSec: input.positionSec ?? 0,
           durationSec: selectedTrackDurationSec(input.item, input.item.trackIndex),
@@ -213,9 +320,16 @@ export function reducePlayer(
         },
         commands: [
           ...(state.item ? ([{ type: "persistResume", reason: "track-change" }] as const) : []),
-          { type: "loadTrack", item: input.item, positionSec: input.positionSec, autoplay: true },
+          {
+            type: "loadTrack",
+            item: input.item,
+            positionSec: input.positionSec,
+            autoplay: true,
+            reusesAsset: load.reusesAsset,
+          },
         ],
       };
+    }
     case "playRequested":
       return state.item ? { state, commands: [{ type: "playAudio" }] } : { state, commands: [] };
     case "pauseRequested":
@@ -238,14 +352,12 @@ export function reducePlayer(
           playbackError: null,
           consecutiveTrackFailures: 0,
           abRepeat: { a: null, b: null },
+          loaded: null,
+          trackEnded: false,
+          fileDurationSec: null,
         },
         commands: state.item
-          ? [
-              { type: "persistResume", reason: "stop" },
-              { type: "pauseAudio" },
-              { type: "seekAudio", positionSec: 0 },
-              { type: "releaseLoadedTrack" },
-            ]
+          ? [{ type: "persistResume", reason: "stop" }, { type: "pauseAudio" }]
           : [],
       };
     case "seekRequested": {
@@ -291,51 +403,51 @@ export function reducePlayer(
     }
     case "abCleared":
       return { state: { ...state, abRepeat: { a: null, b: null } }, commands: [] };
-    case "audioPlaying":
-      return {
-        state: {
-          ...state,
-          status: "playing",
-          playbackError: null,
-          consecutiveTrackFailures: 0,
-        },
-        commands: [],
+    case "audioPlaying": {
+      const playing = {
+        ...state,
+        status: "playing" as const,
+        playbackError: null,
+        consecutiveTrackFailures: 0,
       };
+      if (!state.trackEnded) return { state: playing, commands: [] };
+      // 終端で止まったトラックを再生し直すときは先頭へ戻す。
+      return {
+        state: { ...playing, trackEnded: false, positionSec: 0 },
+        commands: state.loaded ? [{ type: "seekAudio", positionSec: 0 }] : [],
+      };
+    }
     case "audioPaused":
-      if (!state.item || state.status === "ended" || state.status === "error") {
+      if (!state.item || state.trackEnded || state.status === "ended" || state.status === "error") {
         return { state, commands: [] };
       }
       return {
         state: { ...state, status: "paused" },
         commands: [{ type: "persistResume", reason: "pause" }],
       };
-    case "audioTimeUpdated": {
-      const commands: PlayerControllerCommand[] = [];
-      const { abRepeat } = state;
-      if (isAbRepeatEstablished(abRepeat) && input.positionSec >= abRepeat.b) {
-        commands.push({ type: "seekAudio", positionSec: abRepeat.a });
-        return { state: { ...state, positionSec: abRepeat.a }, commands };
-      }
-      return { state: { ...state, positionSec: input.positionSec }, commands };
+    case "audioTimeUpdated":
+      return reduceTimeUpdate(state, input.positionSec);
+    case "audioTimeChanged":
+      return reduceAudioTimeChanged(state, input.audioSec);
+    case "audioDurationChanged": {
+      const loaded = state.loaded;
+      if (!loaded || isResolvedTrack(loaded.track)) return { state, commands: [] };
+      return {
+        state: {
+          ...state,
+          fileDurationSec: input.durationSec,
+          durationSec: getTrackDurationSec(loaded.track, input.durationSec),
+        },
+        commands: [],
+      };
     }
-    case "audioDurationChanged":
-      return { state: { ...state, durationSec: input.durationSec }, commands: [] };
-    case "audioEnded": {
-      const item = state.item;
-      if (!item) return { state, commands: [] };
-      if (state.loop) {
-        return {
-          state: { ...state, status: "playing", positionSec: 0 },
-          commands: [{ type: "seekAudio", positionSec: 0 }, { type: "playAudio" }],
-        };
-      }
-      if (item.trackIndex < item.tracks.length - 1) {
-        return withTrackIndex(state, item.trackIndex + 1, "preserve");
-      }
-      const commands: PlayerControllerCommand[] = [];
-      if (item.completionScope === "work") commands.push({ type: "workCompleted", item });
-      return { state: { ...state, status: "ended" }, commands };
-    }
+    case "engineReleased":
+      return {
+        state: { ...state, loaded: null, trackEnded: false, fileDurationSec: null },
+        commands: [],
+      };
+    case "audioEnded":
+      return finishTrack(state, false);
     case "audioFailed": {
       // engine 世代防御のセーフティネット: 再生対象がない／既に終了した項目への遅延失敗は無視する。
       if (!state.item || state.status === "idle" || state.status === "ended") {
@@ -386,15 +498,23 @@ export function reducePlayer(
         : { state, commands: [] };
     case "retryRequested": {
       if (!state.item || state.status !== "error") return { state, commands: [] };
+      const load = enterLoad(state, state.item);
       return {
         state: {
           ...state,
+          ...load.fields,
           status: "loading",
           playbackError: null,
           consecutiveTrackFailures: 0,
         },
         commands: [
-          { type: "loadTrack", item: state.item, positionSec: state.positionSec, autoplay: true },
+          {
+            type: "loadTrack",
+            item: state.item,
+            positionSec: state.positionSec,
+            autoplay: true,
+            reusesAsset: load.reusesAsset,
+          },
         ],
       };
     }
@@ -431,12 +551,19 @@ export function toPlayerCoreState(state: PlayerControllerState): PlayerCoreState
 }
 
 type StateListener = (state: PlayerControllerState) => void;
-type CommandListener = (command: PlayerControllerCommand, state: PlayerControllerState) => void;
+/** previous は遷移前の状態。コマンドは遷移後の状態に対して発行されるが、保存系は遷移前のトラックを対象にする。 */
+type CommandListener = (
+  command: PlayerControllerCommand,
+  state: PlayerControllerState,
+  previous: PlayerControllerState,
+) => void;
 
 export class PlayerController {
   private state: PlayerControllerState;
   private readonly stateListeners = new Set<StateListener>();
   private readonly commandListeners = new Set<CommandListener>();
+  /** 停止・再生開始のたびに無効化され、準備待ちの作品再生要求が後から再生を始めるのを防ぐ */
+  readonly playRequests = createPlayRequestGuard();
 
   constructor(initialState: PlayerControllerState = PLAYER_CONTROLLER_INITIAL) {
     this.state = initialState;
@@ -447,13 +574,17 @@ export class PlayerController {
   }
 
   dispatch(input: PlayerControllerInput) {
-    const transition = reducePlayer(this.state, input);
+    if (input.type === "stopRequested" || input.type === "startRequested") {
+      this.playRequests.invalidate();
+    }
+    const previous = this.state;
+    const transition = reducePlayer(previous, input);
     if (transition.state !== this.state) {
       this.state = transition.state;
       for (const listener of this.stateListeners) listener(this.state);
     }
     for (const command of transition.commands) {
-      for (const listener of this.commandListeners) listener(command, this.state);
+      for (const listener of this.commandListeners) listener(command, this.state, previous);
     }
     return transition.commands;
   }

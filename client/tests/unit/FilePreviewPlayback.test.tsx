@@ -18,6 +18,7 @@ import type { FsEntry } from "../../src/features/files/model/types";
 
 const browseFs = vi.fn();
 const getScanDiagnostics = vi.fn();
+const playFile = vi.fn();
 
 vi.mock("../../src/features/files/api", () => ({
   browseFs: (...args: unknown[]) => browseFs(...args),
@@ -33,6 +34,10 @@ const reassignIdentityConflict = vi.fn();
 vi.mock("../../src/entities/work/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/entities/work/api")>()),
   reassignIdentityConflict: (...args: unknown[]) => reassignIdentityConflict(...args),
+}));
+
+vi.mock("../../src/entities/player/model/usePlayerActions", () => ({
+  usePlayerActions: () => ({ playFile, togglePlay: vi.fn() }),
 }));
 
 vi.mock("../../src/entities/settings/useSettingsQuery", () => ({
@@ -54,11 +59,8 @@ function audioFile(name: string): FsEntry {
   };
 }
 
-function renderPreview(
-  selectedPath: string | null,
-  onPlayFile = vi.fn(),
-  diagnostics: IdentityConflict[] = [],
-) {
+function renderPreview(selectedPath: string | null, diagnostics: IdentityConflict[] = []) {
+  playFile.mockClear();
   getScanDiagnostics.mockResolvedValue({ identityConflicts: diagnostics, invalidMetaFiles: [] });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const store = createStore();
@@ -69,8 +71,8 @@ function renderPreview(
       { client: queryClient },
       createElement(JotaiProvider, { store }, children),
     );
-  render(createElement(FilePreview, { onPlayFile, onTogglePlay: vi.fn() }), { wrapper });
-  return { onPlayFile, store };
+  render(createElement(FilePreview), { wrapper });
+  return { store };
 }
 
 afterEach(cleanup);
@@ -79,12 +81,12 @@ describe("FilePreview 再生キュー", () => {
   it("音声2件のフォルダーで2件目のファイルを選び「このファイルを再生」→ 2トラック・trackIndex=1で再生される", async () => {
     const entries = [audioFile("audio1.wav"), audioFile("audio2.wav")];
     browseFs.mockResolvedValue({ entries, workId: null });
-    const { onPlayFile } = renderPreview("audio2.wav");
+    renderPreview("audio2.wav");
 
     await userEvent.click(await screen.findByRole("button", { name: "このファイルを再生" }));
 
-    expect(onPlayFile).toHaveBeenCalledTimes(1);
-    const [tracks, trackIndex] = onPlayFile.mock.calls[0];
+    expect(playFile).toHaveBeenCalledTimes(1);
+    const [tracks, trackIndex] = playFile.mock.calls[0];
     expect(tracks).toHaveLength(2);
     expect(trackIndex).toBe(1);
   });
@@ -92,12 +94,12 @@ describe("FilePreview 再生キュー", () => {
   it("フォルダー選択時の「先頭の音声を再生」→ 1件目から再生される", async () => {
     const entries = [audioFile("audio1.wav"), audioFile("audio2.wav")];
     browseFs.mockResolvedValue({ entries, workId: null });
-    const { onPlayFile } = renderPreview(null);
+    renderPreview(null);
 
     await userEvent.click(await screen.findByRole("button", { name: "先頭の音声を再生" }));
 
-    expect(onPlayFile).toHaveBeenCalledTimes(1);
-    const [tracks, trackIndex] = onPlayFile.mock.calls[0];
+    expect(playFile).toHaveBeenCalledTimes(1);
+    const [tracks, trackIndex] = playFile.mock.calls[0];
     expect(tracks).toHaveLength(2);
     expect(trackIndex).toBe(0);
   });
@@ -120,7 +122,7 @@ describe("FilePreview ID重複（単一ファイル形式）", () => {
 
   it("重複対象のメタファイルを選ぶと、ID重複の説明と再採番ボタンが出る", async () => {
     browseFs.mockResolvedValue({ entries: [metaEntry], workId: null });
-    renderPreview(metaPath, vi.fn(), [
+    renderPreview(metaPath, [
       { kind: "identity_conflict", workId: "w1", paths: ["a/single.mimimilli.json", metaPath] },
     ]);
 
@@ -137,7 +139,7 @@ describe("FilePreview ID重複（単一ファイル形式）", () => {
       snapshot: { id: "new" },
       projection: { status: "published" },
     });
-    const { store } = renderPreview(metaPath, vi.fn(), [
+    const { store } = renderPreview(metaPath, [
       { kind: "identity_conflict", workId: "w1", paths: ["a/single.mimimilli.json", metaPath] },
     ]);
 

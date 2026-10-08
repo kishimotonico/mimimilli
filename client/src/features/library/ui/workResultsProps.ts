@@ -28,7 +28,6 @@ export interface WorkResultsProps {
   isPending?: boolean;
   /** 画面下張り付きの再生バーが表示中か（末尾余白の確保に使う） */
   dockedBarActive?: boolean;
-  onWorkPlay: (work: WorkListItem) => void;
   pagination: WorkResultsPagination;
   emptyState: WorkResultsEmptyState;
 }

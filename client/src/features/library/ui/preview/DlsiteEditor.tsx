@@ -13,9 +13,8 @@ import {
   dlsiteFetchErrorMessage,
 } from "../../../../entities/work/dlsiteFetchError";
 import Button from "../../../../shared/ui/Button";
-import IconButton from "../../../../shared/ui/IconButton";
-import { I } from "../../../../shared/ui/Icon";
 import TextInput from "../../../../shared/ui/TextInput";
+import Modal, { ModalFooter, ModalHeader } from "../../../../shared/ui/Modal";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import { DLSITE_LINKAGE_STATUS_LABEL } from "../../../../entities/work/workStatusLabel";
 import { SourceProjectionNotice } from "../../../../entities/work/ui/SourceProjectionNotice";
@@ -119,90 +118,78 @@ function DlsiteApplyDialog({
   const close = () => {
     if (!busy) onClose();
   };
-  const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({ onClose: close });
+  const dialog = useDialogModal({ onClose: close });
 
   return createPortal(
-    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックはuseDialogModalで判定する。
-    <dialog
-      ref={dialogRef}
-      aria-labelledby="dlsite-apply-title"
-      onCancel={handleCancel}
-      onClick={(event) => handleBackdropClick(event)}
-      className="m-auto w-[min(680px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[var(--scrim)]"
-    >
-      <div className="flex max-h-[calc(100vh-48px)] min-h-0 flex-col overflow-hidden">
-        <header className="flex shrink-0 items-center border-b border-line-soft px-[18px] py-[14px]">
-          <h2
-            id="dlsite-apply-title"
-            className="min-w-0 flex-1 font-sans text-[14px] font-semibold"
-          >
-            DLsite情報の適用
-          </h2>
-          <IconButton icon={I.x} label="閉じる" size="sm" disabled={busy} onClick={close} />
-        </header>
-        <div className="mll-selectable min-h-0 flex-1 overflow-y-auto px-[18px] py-3 text-secondary">
-          <DlsiteDiffRow
-            label="タイトル"
-            diff={diff.title}
-            checked={applyTitle}
-            onCheckedChange={onApplyTitleChange}
-          />
-          <DlsiteDiffRow
-            label="URL"
-            diff={diff.url}
-            checked={applyUrl}
-            onCheckedChange={onApplyUrlChange}
-          />
-          <DlsiteDiffRow
-            label="カバー"
-            diff={diff.cover}
-            checked={applyCover}
-            onCheckedChange={onApplyCoverChange}
-          />
-          {diff.newTags.length > 0 && (
-            <fieldset className="grid gap-1.5 py-2.5">
-              <legend className="mb-1 font-sans font-medium">追加されるタグ</legend>
-              {diff.newTags.map((tag) => (
-                <label key={tag} className="flex items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    checked={selectedTags.includes(tag)}
-                    onChange={(event) =>
-                      onSelectedTagsChange(
-                        event.target.checked
-                          ? [...selectedTags, tag]
-                          : selectedTags.filter((item) => item !== tag),
-                      )
-                    }
-                  />
-                  <span>{tag}</span>
-                </label>
+    <Modal dialog={dialog} size={680} labelledBy="dlsite-apply-title">
+      <ModalHeader
+        title="DLsite情報の適用"
+        titleId="dlsite-apply-title"
+        onClose={close}
+        closeDisabled={busy}
+      />
+      <div className="mll-selectable min-h-0 flex-1 overflow-y-auto px-[18px] py-3 text-secondary">
+        <DlsiteDiffRow
+          label="タイトル"
+          diff={diff.title}
+          checked={applyTitle}
+          onCheckedChange={onApplyTitleChange}
+        />
+        <DlsiteDiffRow
+          label="URL"
+          diff={diff.url}
+          checked={applyUrl}
+          onCheckedChange={onApplyUrlChange}
+        />
+        <DlsiteDiffRow
+          label="カバー"
+          diff={diff.cover}
+          checked={applyCover}
+          onCheckedChange={onApplyCoverChange}
+        />
+        {diff.newTags.length > 0 && (
+          <fieldset className="grid gap-1.5 py-2.5">
+            <legend className="mb-1 font-sans font-medium">追加されるタグ</legend>
+            {diff.newTags.map((tag) => (
+              <label key={tag} className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={selectedTags.includes(tag)}
+                  onChange={(event) =>
+                    onSelectedTagsChange(
+                      event.target.checked
+                        ? [...selectedTags, tag]
+                        : selectedTags.filter((item) => item !== tag),
+                    )
+                  }
+                />
+                <span>{tag}</span>
+              </label>
+            ))}
+          </fieldset>
+        )}
+        {diff.appliedTags.length > 0 && (
+          <details className="py-2 text-ink-2">
+            <summary className="cursor-pointer font-sans">
+              適用済みのタグ（{diff.appliedTags.length}）
+            </summary>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {diff.appliedTags.map((tag) => (
+                <span key={tag}>{tag}</span>
               ))}
-            </fieldset>
-          )}
-          {diff.appliedTags.length > 0 && (
-            <details className="py-2 text-ink-2">
-              <summary className="cursor-pointer font-sans">
-                適用済みのタグ（{diff.appliedTags.length}）
-              </summary>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {diff.appliedTags.map((tag) => (
-                  <span key={tag}>{tag}</span>
-                ))}
-              </div>
-            </details>
-          )}
-        </div>
-        <footer className="flex shrink-0 justify-end gap-2 border-t border-line-soft px-[18px] py-3">
-          <Button variant="quiet" disabled={busy} onClick={close}>
-            キャンセル
-          </Button>
-          <Button variant="primary" disabled={busy} onClick={onApply}>
-            選択内容を適用
-          </Button>
-        </footer>
+            </div>
+          </details>
+        )}
       </div>
-    </dialog>,
+      <ModalFooter>
+        <Button variant="quiet" disabled={busy} onClick={close}>
+          キャンセル
+        </Button>
+        <Button variant="primary" disabled={busy} onClick={onApply}>
+          選択内容を適用
+        </Button>
+      </ModalFooter>
+    </Modal>,
     document.body,
   );
 }

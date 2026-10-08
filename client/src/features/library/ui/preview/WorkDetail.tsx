@@ -1,10 +1,17 @@
 import { useState } from "react";
 import { useSetAtom } from "jotai";
-import type { NormalizedTag, Work } from "@mimimilli/shared";
+import {
+  getDefaultPlaylistTrackCount,
+  toWorkListItem,
+  type NormalizedTag,
+  type Work,
+} from "@mimimilli/shared";
 import { useToast } from "../../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import { openPathInFilesAtom } from "../../../../entities/file-system/model/navigationAtoms";
+import { usePlayerActions } from "../../../../entities/player/model/usePlayerActions";
+import { usePlayWork } from "../../../../entities/player/model/usePlayWork";
 import { useRootFolder } from "../../../../entities/settings/useSettingsQuery";
 import CoverImg from "../../../../entities/work/ui/CoverImg";
 import { getCoverImageUrl } from "../../../../entities/work/api";
@@ -30,9 +37,6 @@ import { WorkInfoDialog } from "./WorkInfoDialog";
 
 interface WorkDetailProps {
   work: Work;
-  onPlay: (trackIndex: number) => void;
-  onResume: () => void;
-  onTogglePlay: () => void;
   playingTrackIndex: number | null;
   isPlaybackActive?: boolean;
   tagSuggestions: string[];
@@ -52,9 +56,6 @@ interface WorkDetailProps {
 
 export function WorkDetail({
   work,
-  onPlay,
-  onResume,
-  onTogglePlay,
   playingTrackIndex,
   isPlaybackActive,
   tagSuggestions,
@@ -93,6 +94,14 @@ export function WorkDetail({
   const toast = useToast();
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
   const rootFolder = useRootFolder();
+  const { togglePlay } = usePlayerActions();
+  const { playWork, resumeWork } = usePlayWork();
+
+  const onPlay = (trackIndex: number) =>
+    playWork(
+      toWorkListItem({ ...work, trackCount: getDefaultPlaylistTrackCount(work) }, rootFolder),
+      trackIndex,
+    );
 
   const handleDeleteConfirm = async () => {
     const title = work.title;
@@ -169,8 +178,8 @@ export function WorkDetail({
             resumeTrack={resumeTrack}
             resumeTime={resumeTime}
             onPlayFromStart={() => onPlay(0)}
-            onResume={onResume}
-            onTogglePlay={onTogglePlay}
+            onResume={() => resumeWork(work)}
+            onTogglePlay={togglePlay}
           />
         </div>
         <div className="mle-prv__meta">

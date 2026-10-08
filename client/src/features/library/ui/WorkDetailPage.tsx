@@ -2,19 +2,10 @@ import { useCallback, useEffect } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import { ApiRequestError } from "../../../shared/api/http";
-import {
-  getDefaultPlaylistTrackCount,
-  toWorkListItem,
-  type NormalizedTag,
-  type Work,
-  type WorkListItem,
-} from "@mimimilli/shared";
+import type { NormalizedTag } from "@mimimilli/shared";
 import { workDetailIdAtom } from "../../../entities/work/model/navigationAtoms";
-import { getWork } from "../../../entities/work/api";
-import { getAllTags } from "../../../entities/tag/api";
-import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
-import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
-import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
+import { workDetailQueryOptions } from "../../../entities/work/workDetailQueryOptions";
+import { allTagsQueryOptions } from "../../../entities/tag/allTagsQueryOptions";
 import {
   replaceAppModeAtom,
   setAppModeAtom,
@@ -31,15 +22,8 @@ import { librarySearchQueryAtom } from "../../../entities/library/model/navigati
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import { WorkDetail } from "./preview/WorkDetail";
 
-interface WorkDetailPageProps {
-  onPlay: (work: WorkListItem, trackIndex: number) => void;
-  onResume: (work: Work) => void;
-  onTogglePlay: () => void;
-}
-
-export default function WorkDetailPage({ onPlay, onResume, onTogglePlay }: WorkDetailPageProps) {
+export default function WorkDetailPage() {
   const workId = useAtomValue(workDetailIdAtom);
-  const rootFolder = useRootFolder();
   const searchQuery = useAtomValue(librarySearchQueryAtom);
   const playingWorkId = useAtomValue(playingWorkIdAtom);
   const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
@@ -47,13 +31,10 @@ export default function WorkDetailPage({ onPlay, onResume, onTogglePlay }: WorkD
   const setAppMode = useSetAtom(setAppModeAtom);
   const replaceAppMode = useSetAtom(replaceAppModeAtom);
   const nav = useLibraryNavigation();
+  const { clickTag } = nav;
 
-  const workQuery = useQuery({
-    queryKey: WORK_QUERY_KEYS.detail(workId ?? ""),
-    queryFn: () => getWork(workId!),
-    enabled: workId !== null,
-  });
-  const tagsQuery = useQuery({ queryKey: TAG_QUERY_KEYS.all(), queryFn: getAllTags });
+  const workQuery = useQuery(workDetailQueryOptions(workId));
+  const tagsQuery = useQuery(allTagsQueryOptions);
   const workPatchMutations = useLibraryWorkPatchMutations(nav, searchQuery);
   const deleteMutation = useUnregisterWorkMutation();
 
@@ -70,30 +51,12 @@ export default function WorkDetailPage({ onPlay, onResume, onTogglePlay }: WorkD
   const work = workQuery.data ?? null;
   const isCurrentWorkPlaying = work !== null && playingWorkId === work.id;
 
-  const handlePlay = useCallback(
-    (trackIndex: number) => {
-      if (work) {
-        onPlay(
-          toWorkListItem({ ...work, trackCount: getDefaultPlaylistTrackCount(work) }, rootFolder),
-          trackIndex,
-        );
-      }
-    },
-    [work, rootFolder, onPlay],
-  );
-
-  const handleResume = useCallback(() => {
-    if (work) onResume(work);
-  }, [work, onResume]);
-
   const handleTagClick = useCallback(
     (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => {
-      if (opts.ctrlKey || opts.metaKey) nav.addTag(tag);
-      else nav.replaceTag(tag);
+      clickTag(tag, opts);
       setAppMode("library");
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- nav は毎レンダー新規オブジェクトのため参照する値だけに依存を絞る
-    [nav.addTag, nav.replaceTag, setAppMode],
+    [clickTag, setAppMode],
   );
 
   const handleGoToPlayingScreen = useCallback(() => setAppMode("nowPlaying"), [setAppMode]);
@@ -115,9 +78,6 @@ export default function WorkDetailPage({ onPlay, onResume, onTogglePlay }: WorkD
       <WorkDetail
         work={work}
         layout="full"
-        onPlay={handlePlay}
-        onResume={handleResume}
-        onTogglePlay={onTogglePlay}
         playingTrackIndex={isCurrentWorkPlaying ? (playingTrackIndex ?? null) : null}
         isPlaybackActive={isPlaybackActive}
         tagSuggestions={tagsQuery.data ?? []}

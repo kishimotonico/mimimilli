@@ -3,17 +3,14 @@ import { createElement } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { ScanDiagnostics, ScanResult } from "@mimimilli/shared";
 import NotificationBell from "../../src/app/ui/NotificationBell";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
-import {
-  dlsiteBulkActionsAtom,
-  dlsiteBulkJobIdAtom,
-  dlsiteBulkProgressAtom,
-} from "../../src/entities/dlsite/model/bulkAtoms";
+import { dlsiteBulkStoreAtom } from "../../src/entities/dlsite/model/dlsiteBulkStore";
+import { createFakeDlsiteBulkStore } from "../helpers/fakeJobStores";
 
 const scanResult: ScanResult = {
   registered: 12,
@@ -62,19 +59,12 @@ function renderBell(
   });
 
   const store = createStore();
-  const onStartDlsiteBulk = vi.fn();
-  store.set(dlsiteBulkActionsAtom, {
-    start: onStartDlsiteBulk,
-    attach: vi.fn(),
-    cancel: vi.fn(),
-    dismiss: vi.fn(),
+  const dlsiteBulk = createFakeDlsiteBulkStore({
+    ...(atomOverrides?.active !== undefined && { jobId: atomOverrides.active ? "job-1" : null }),
+    ...(atomOverrides?.progress !== undefined && { progress: atomOverrides.progress }),
   });
-  if (atomOverrides?.active !== undefined) {
-    store.set(dlsiteBulkJobIdAtom, atomOverrides.active ? "job-1" : null);
-  }
-  if (atomOverrides?.progress !== undefined) {
-    store.set(dlsiteBulkProgressAtom, atomOverrides.progress);
-  }
+  const onStartDlsiteBulk = dlsiteBulk.start;
+  store.set(dlsiteBulkStoreAtom, dlsiteBulk);
 
   render(
     createElement(

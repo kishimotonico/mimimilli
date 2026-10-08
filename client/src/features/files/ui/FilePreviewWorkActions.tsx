@@ -6,8 +6,7 @@ import { useToast } from "../../../shared/ui/useToast";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
-import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
-import { SCAN_QUERY_KEYS } from "../../../entities/scan/queryKeys";
+import { updateCachesAfterRegistration } from "../../../entities/work/model/workCacheUpdates";
 import {
   useReassignWorkIdentityMutation,
   useUnregisterWorkMutation,
@@ -140,10 +139,7 @@ export default function FilePreviewWorkActions({
     onSuccess: async (preview) => {
       if (preview.alreadyRegistered) {
         toast.error("この場所は既に作品として登録されています");
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: FILE_SYSTEM_QUERY_KEYS.all() }),
-          queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.diagnostics() }),
-        ]);
+        await updateCachesAfterRegistration(queryClient);
         await onWorkRegistered?.();
         return;
       }

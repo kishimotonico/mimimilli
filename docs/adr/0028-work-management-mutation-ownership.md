@@ -139,7 +139,7 @@ scan 候補（`["scan", "candidates"]`）は必須更新に含めない。候補
 
 ### DLsite の無効化経路
 
-DLsite の必須更新は `entities/work/model` に置くため、Library の `DlsiteEditor` は共通モジュールを直接呼べる。`DlsiteBulkRuntime`（`features/dlsite`）も一括取得の完了時に `updateCachesAfterDlsiteBulkFetch` を直接呼ぶ。atom 越しに無効化関数を渡す `dlsiteInvalidateAtom` と `useDlsiteInvalidation` は利用者がいなくなるため削除する。一括取得ジョブの操作を渡す `dlsiteBulkActionsAtom` は残す。
+DLsite の必須更新は `entities/work/model` に置くため、Library の `DlsiteEditor` は共通モジュールを直接呼べる。`DlsiteBulkRuntime`（`features/dlsite`）も一括取得の完了時に `updateCachesAfterDlsiteBulkFetch` を直接呼ぶ。atom 越しに無効化関数を渡す `dlsiteInvalidateAtom` と `useDlsiteInvalidation` は利用者がいなくなるため削除する。一括取得ジョブの追跡と操作は `entities/dlsite` の `dlsiteBulkStore` が持つ。
 
 ## 帰結
 

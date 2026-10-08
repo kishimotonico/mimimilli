@@ -2,8 +2,7 @@ import type { ReactNode } from "react";
 import type { Track, Work } from "@mimimilli/shared";
 import { toSafeExternalUrlHref } from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
-import IconButton from "../../../../shared/ui/IconButton";
-import { I } from "../../../../shared/ui/Icon";
+import Modal, { ModalFooter, ModalHeader } from "../../../../shared/ui/Modal";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import { formatDate, formatDateTime, formatDuration } from "../../../../shared/lib/format";
 import { formatCoverInfoLabel } from "../../../../shared/lib/coverLabel";
@@ -45,7 +44,7 @@ export function WorkInfoDialog({
   resumeTime,
   onClose,
 }: WorkInfoDialogProps) {
-  const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({ onClose });
+  const dialog = useDialogModal({ onClose });
   const playlistLabel =
     work.playlists.length === 0
       ? "なし"
@@ -54,120 +53,106 @@ export function WorkInfoDialog({
         }`;
 
   return (
-    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックはuseDialogModalで判定する。
-    <dialog
-      ref={dialogRef}
-      aria-labelledby="work-info-title"
-      onCancel={handleCancel}
-      onClick={(event) => handleBackdropClick(event)}
-      className="m-auto w-[min(640px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[var(--scrim)]"
-    >
-      <div className="flex max-h-[calc(100vh-32px)] min-h-0 flex-col overflow-hidden">
-        <header className="flex shrink-0 items-center border-b border-line-soft px-[18px] py-[14px]">
-          <h2 id="work-info-title" className="min-w-0 flex-1 font-sans text-[14px] font-semibold">
-            作品の情報
-          </h2>
-          <IconButton icon={I.x} label="閉じる" size="sm" onClick={onClose} />
-        </header>
-        <div className="mll-selectable flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-[18px] py-4">
-          <section aria-labelledby="work-info-basic-title" className="flex flex-col gap-1">
-            <h3
-              id="work-info-basic-title"
-              className="mb-1 font-sans text-label font-semibold text-ink-1"
-            >
-              基本情報
-            </h3>
-            <dl className="flex flex-col divide-y divide-line-soft">
-              <InfoRow label="タイトル">{work.title}</InfoRow>
-              <InfoRow label="状態">
-                {STATUS_TEXT[work.status]}
-                {work.status === "error" && work.errorMessage && (
-                  <span className="mt-0.5 block text-ink-2">{work.errorMessage}</span>
-                )}
-              </InfoRow>
-              <InfoRow label="ブックマーク">{work.bookmarked ? "あり" : "なし"}</InfoRow>
-              <InfoRow label="タグ">{work.tags.length > 0 ? work.tags.join(", ") : "なし"}</InfoRow>
-              <InfoRow label="追加日">{formatDate(work.addedAt)}</InfoRow>
-              <InfoRow label="作成日時">
-                {work.createdAt ? formatDate(work.createdAt) : "不明"}
-              </InfoRow>
-              <InfoRow label="最終再生">
-                {work.lastPlayedAt ? formatDate(work.lastPlayedAt) : "再生履歴なし"}
-              </InfoRow>
-              <InfoRow label="再生位置">
-                {hasResume && resumeTrack ? `${resumeTrack.title} · ${resumeTime}` : "なし"}
-              </InfoRow>
-              <InfoRow label="トラック・時間">
-                {trackCount > 0
-                  ? `${trackCount} トラック · ${work.totalDurationSec !== null ? (formatDuration(work.totalDurationSec) ?? "--:--") : "--:--"}`
-                  : "なし"}
-              </InfoRow>
-              <InfoRow label="プレイリスト">{playlistLabel}</InfoRow>
-              <InfoRow label="カバー画像">{formatCoverInfoLabel(work.coverKind)}</InfoRow>
-              <InfoRow label="物理パス">
-                <span className="break-all font-mono text-mono">{work.physicalPath}</span>
-              </InfoRow>
-              <InfoRow label="外部リンク">
-                {work.urls.length > 0 ? (
-                  <ul className="flex flex-col gap-0.5">
-                    {work.urls.map((u) => {
-                      const href = toSafeExternalUrlHref(u.url);
-                      return (
-                        <li key={u.url}>
-                          {href ? (
-                            <a
-                              href={href}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-acc-ink hover:underline"
-                            >
-                              {u.label}
-                            </a>
-                          ) : (
-                            <span>{u.label}</span>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : (
-                  "なし"
-                )}
-              </InfoRow>
-            </dl>
-          </section>
-
-          <section
-            aria-labelledby="work-info-dlsite-title"
-            className="flex flex-col gap-1 border-t border-line-soft pt-4"
+    <Modal dialog={dialog} size={640} labelledBy="work-info-title">
+      <ModalHeader title="作品の情報" titleId="work-info-title" onClose={onClose} />
+      <div className="mll-selectable flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-[18px] py-4">
+        <section aria-labelledby="work-info-basic-title" className="flex flex-col gap-1">
+          <h3
+            id="work-info-basic-title"
+            className="mb-1 font-sans text-label font-semibold text-ink-1"
           >
-            <h3
-              id="work-info-dlsite-title"
-              className="mb-1 font-sans text-label font-semibold text-ink-1"
-            >
-              DLsite連携
-            </h3>
-            <dl className="flex flex-col divide-y divide-line-soft">
-              <InfoRow label="状態">{DLSITE_LINKAGE_STATUS_LABEL[work.dlsite.status]}</InfoRow>
-              <InfoRow label="RJコード">
-                <span className="font-mono text-mono">{work.dlsite.rjCode ?? "未設定"}</span>
-              </InfoRow>
-              <InfoRow label="最終取得日時">
-                {work.dlsite.lastAttemptAt ? formatDateTime(work.dlsite.lastAttemptAt) : "未取得"}
-              </InfoRow>
-              <InfoRow label="エラー内容">{work.dlsite.error ?? "-"}</InfoRow>
-              <InfoRow label="適用済みタグ">
-                {work.dlsite.appliedTags.length > 0 ? work.dlsite.appliedTags.join(", ") : "-"}
-              </InfoRow>
-            </dl>
-          </section>
-        </div>
-        <footer className="flex shrink-0 justify-end border-t border-line-soft px-[18px] py-3">
-          <Button variant="quiet" onClick={onClose}>
-            閉じる
-          </Button>
-        </footer>
+            基本情報
+          </h3>
+          <dl className="flex flex-col divide-y divide-line-soft">
+            <InfoRow label="タイトル">{work.title}</InfoRow>
+            <InfoRow label="状態">
+              {STATUS_TEXT[work.status]}
+              {work.status === "error" && work.errorMessage && (
+                <span className="mt-0.5 block text-ink-2">{work.errorMessage}</span>
+              )}
+            </InfoRow>
+            <InfoRow label="ブックマーク">{work.bookmarked ? "あり" : "なし"}</InfoRow>
+            <InfoRow label="タグ">{work.tags.length > 0 ? work.tags.join(", ") : "なし"}</InfoRow>
+            <InfoRow label="追加日">{formatDate(work.addedAt)}</InfoRow>
+            <InfoRow label="作成日時">
+              {work.createdAt ? formatDate(work.createdAt) : "不明"}
+            </InfoRow>
+            <InfoRow label="最終再生">
+              {work.lastPlayedAt ? formatDate(work.lastPlayedAt) : "再生履歴なし"}
+            </InfoRow>
+            <InfoRow label="再生位置">
+              {hasResume && resumeTrack ? `${resumeTrack.title} · ${resumeTime}` : "なし"}
+            </InfoRow>
+            <InfoRow label="トラック・時間">
+              {trackCount > 0
+                ? `${trackCount} トラック · ${work.totalDurationSec !== null ? (formatDuration(work.totalDurationSec) ?? "--:--") : "--:--"}`
+                : "なし"}
+            </InfoRow>
+            <InfoRow label="プレイリスト">{playlistLabel}</InfoRow>
+            <InfoRow label="カバー画像">{formatCoverInfoLabel(work.coverKind)}</InfoRow>
+            <InfoRow label="物理パス">
+              <span className="break-all font-mono text-mono">{work.physicalPath}</span>
+            </InfoRow>
+            <InfoRow label="外部リンク">
+              {work.urls.length > 0 ? (
+                <ul className="flex flex-col gap-0.5">
+                  {work.urls.map((u) => {
+                    const href = toSafeExternalUrlHref(u.url);
+                    return (
+                      <li key={u.url}>
+                        {href ? (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-acc-ink hover:underline"
+                          >
+                            {u.label}
+                          </a>
+                        ) : (
+                          <span>{u.label}</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                "なし"
+              )}
+            </InfoRow>
+          </dl>
+        </section>
+
+        <section
+          aria-labelledby="work-info-dlsite-title"
+          className="flex flex-col gap-1 border-t border-line-soft pt-4"
+        >
+          <h3
+            id="work-info-dlsite-title"
+            className="mb-1 font-sans text-label font-semibold text-ink-1"
+          >
+            DLsite連携
+          </h3>
+          <dl className="flex flex-col divide-y divide-line-soft">
+            <InfoRow label="状態">{DLSITE_LINKAGE_STATUS_LABEL[work.dlsite.status]}</InfoRow>
+            <InfoRow label="RJコード">
+              <span className="font-mono text-mono">{work.dlsite.rjCode ?? "未設定"}</span>
+            </InfoRow>
+            <InfoRow label="最終取得日時">
+              {work.dlsite.lastAttemptAt ? formatDateTime(work.dlsite.lastAttemptAt) : "未取得"}
+            </InfoRow>
+            <InfoRow label="エラー内容">{work.dlsite.error ?? "-"}</InfoRow>
+            <InfoRow label="適用済みタグ">
+              {work.dlsite.appliedTags.length > 0 ? work.dlsite.appliedTags.join(", ") : "-"}
+            </InfoRow>
+          </dl>
+        </section>
       </div>
-    </dialog>
+      <ModalFooter>
+        <Button variant="quiet" onClick={onClose}>
+          閉じる
+        </Button>
+      </ModalFooter>
+    </Modal>
   );
 }

@@ -72,13 +72,7 @@ function renderAppBody(store: ReturnType<typeof createStore>) {
     <QueryClientProvider client={queryClient}>
       <JotaiProvider store={store}>
         <LibraryNavigationProvider>
-          <AppBody
-            onPlay={vi.fn()}
-            onResume={vi.fn()}
-            onTogglePlay={vi.fn()}
-            onPlayFile={vi.fn()}
-            onOpenWorkDetail={vi.fn()}
-          />
+          <AppBody onOpenWorkDetail={vi.fn()} />
         </LibraryNavigationProvider>
       </JotaiProvider>
     </QueryClientProvider>,

@@ -16,9 +16,6 @@ interface PreviewPaneProps {
   onRetrySelectedWork?: () => void;
   playingTrackIndex: number | null;
   isPlaybackActive?: boolean;
-  onPlay: (trackIndex: number) => void;
-  onResume: () => void;
-  onTogglePlay: () => void;
   onTagClick: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
   tagSuggestions: string[];
   nav: LibraryViewState & Pick<LibraryViewActions, "selectWork">;
@@ -38,9 +35,6 @@ export default function PreviewPane({
   onRetrySelectedWork,
   playingTrackIndex,
   isPlaybackActive,
-  onPlay,
-  onResume,
-  onTogglePlay,
   onTagClick,
   tagSuggestions,
   nav,
@@ -61,9 +55,6 @@ export default function PreviewPane({
             work={selectedWork}
             nav={nav}
             searchQuery={searchQuery}
-            onPlay={onPlay}
-            onResume={onResume}
-            onTogglePlay={onTogglePlay}
             playingTrackIndex={playingTrackIndex}
             isPlaybackActive={isPlaybackActive}
             tagSuggestions={tagSuggestions}

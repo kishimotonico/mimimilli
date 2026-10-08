@@ -1,6 +1,6 @@
 import { formatTrackDuration } from "../../../shared/lib/trackDuration";
 import { cn } from "../../../shared/lib/cn";
-import { isResolvedTrack, type PlaybackTrack } from "../model/trackTime";
+import { isResolvedTrack, type PlaybackTrack } from "../../../entities/player/model/trackTime";
 
 interface NowPlayingTrackListProps {
   tracks: PlaybackTrack[];

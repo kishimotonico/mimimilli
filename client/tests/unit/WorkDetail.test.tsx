@@ -10,11 +10,28 @@ import { emptyDlsiteState } from "@mimimilli/shared";
 import { WorkDetail } from "../../src/features/library/ui/preview/WorkDetail";
 import { toastRequestsAtom } from "../../src/shared/model/toastRequestsAtom";
 
+const { playWork, resumeWork, togglePlay } = vi.hoisted(() => ({
+  playWork: vi.fn(),
+  resumeWork: vi.fn(),
+  togglePlay: vi.fn(),
+}));
+
+vi.mock("../../src/entities/player/model/usePlayWork", () => ({
+  usePlayWork: () => ({ playWork, resumeWork }),
+}));
+vi.mock("../../src/entities/player/model/usePlayerActions", () => ({
+  usePlayerActions: () => ({ playFile: vi.fn(), togglePlay }),
+}));
+
 vi.mock("../../src/features/library/ui/preview/WorkTagEditor", () => ({
   WorkTagEditor: () => <div data-testid="tag-editor" />,
 }));
 vi.mock("../../src/features/library/ui/preview/WorkTrackList", () => ({
-  WorkTrackList: () => <div data-testid="track-list" />,
+  WorkTrackList: ({ onPlay }: { onPlay: (trackIndex: number) => void }) => (
+    <button type="button" data-testid="track-list" onClick={() => onPlay(2)}>
+      トラック
+    </button>
+  ),
 }));
 vi.mock("../../src/features/library/ui/preview/WorkStatusWarnings", () => ({
   WorkStatusWarnings: () => null,
@@ -23,7 +40,10 @@ vi.mock("../../src/entities/settings/useSettingsQuery", () => ({
   useRootFolder: () => "/library",
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 const playlistId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
@@ -93,9 +113,6 @@ function renderDetail(props: Partial<React.ComponentProps<typeof WorkDetail>> = 
   return render(
     <WorkDetail
       work={makeWork()}
-      onPlay={vi.fn()}
-      onResume={vi.fn()}
-      onTogglePlay={vi.fn()}
       playingTrackIndex={null}
       isPlaybackActive={false}
       tagSuggestions={[]}
@@ -226,5 +243,35 @@ describe("WorkDetail: 作品登録の解除", () => {
     expect([...store.get(toastRequestsAtom).values()]).toContainEqual(
       expect.objectContaining({ message: "「作品Y」の登録を解除しました" }),
     );
+  });
+});
+
+describe("WorkDetail: 再生操作の配線", () => {
+  it("「最初から再生」はplayWork(作品, 0)を呼ぶ", () => {
+    renderDetail({ work: makeWork({ resume: null }) });
+    fireEvent.click(screen.getByRole("button", { name: "最初から再生" }));
+    expect(playWork).toHaveBeenCalledWith(expect.objectContaining({ id: "w1" }), 0);
+  });
+
+  it("トラック一覧で選んだトラックはplayWork(作品, trackIndex)に渡る", () => {
+    renderDetail();
+    fireEvent.click(screen.getByTestId("track-list"));
+    expect(playWork).toHaveBeenCalledWith(expect.objectContaining({ id: "w1" }), 2);
+  });
+
+  it("「続きから再生」はresumeWork(work)を呼ぶ", () => {
+    const work = makeWork({ resume: { playlistId, trackId: "t1", offsetSec: 30 } });
+    renderDetail({ work });
+    fireEvent.click(screen.getByRole("button", { name: "続きから再生" }));
+    expect(resumeWork).toHaveBeenCalledWith(work);
+    expect(playWork).not.toHaveBeenCalled();
+  });
+
+  it("ロード済みのときの主ボタンはtogglePlayを呼び、新規再生は始めない", () => {
+    renderDetail({ playingTrackIndex: 0, isPlaybackActive: true });
+    fireEvent.click(screen.getByRole("button", { name: "一時停止" }));
+    expect(togglePlay).toHaveBeenCalledTimes(1);
+    expect(playWork).not.toHaveBeenCalled();
+    expect(resumeWork).not.toHaveBeenCalled();
   });
 });

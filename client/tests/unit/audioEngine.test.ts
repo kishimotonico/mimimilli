@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createAudioEngine,
   type AudioEngineCallbacks,
-} from "../../src/features/player/model/audioEngine";
+} from "../../src/entities/player/model/audioEngine";
 
 class FakeAudio extends EventTarget {
   currentTime = 0;

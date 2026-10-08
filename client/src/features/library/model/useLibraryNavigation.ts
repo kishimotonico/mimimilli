@@ -2,7 +2,7 @@
 // Jotai atom の読み取りと write-only action atom を束ね、
 // setAxis・drillInto・toggleTag などのハイレベル操作を提供する。
 
-import { useContext, useTransition } from "react";
+import { useContext, useMemo, useTransition } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import type { NormalizedTag } from "@mimimilli/shared";
 import type { AxisId, SortId } from "../../../entities/library/types";
@@ -30,6 +30,7 @@ export interface LibraryViewState {
   selectedTags: NormalizedTag[];
   selectedWorkId: string | null;
   sort: SortId;
+  isPending: boolean;
 }
 
 export interface LibraryViewActions {
@@ -40,17 +41,23 @@ export interface LibraryViewActions {
   replaceTag: (tag: NormalizedTag) => void;
   /** 追加ボタン用の冪等なAND追加（ADR-0013）。既に選択済みなら何もしない */
   addTag: (tag: NormalizedTag) => void;
+  /** タグチップのクリック規則（ADR-0013）。Ctrl/Cmd+クリックはAND追加、それ以外は置き換え */
+  clickTag: (tag: NormalizedTag, modifiers: TagClickModifiers) => void;
   clearTags: () => void;
   selectWork: (id: string | null) => void;
   setSort: (sort: SortId) => void;
   goToSegment: (index: number) => void;
-  isPending: boolean;
 }
 
-export function useLibraryView(): LibraryViewState &
-  LibraryViewActions & {
-    startTransition: StartLibraryTransition;
-  } {
+export interface TagClickModifiers {
+  ctrlKey: boolean;
+  metaKey: boolean;
+}
+
+export function useLibraryView(): {
+  navigation: LibraryViewState & LibraryViewActions;
+  startTransition: StartLibraryTransition;
+} {
   const activeAxis = useAtomValue(activeAxisAtom);
   const selectedTags = useAtomValue(selectedTagsAtom);
   const selectedWorkId = useAtomValue(selectedWorkIdAtom);
@@ -66,33 +73,48 @@ export function useLibraryView(): LibraryViewState &
   const setSort = useSetAtom(setLibrarySortAtom);
   const goToSegment = useSetAtom(goToLibrarySegmentAtom);
 
-  const transition =
-    <T>(action: (value: T) => void) =>
-    (value: T) => {
-      startTransition(() => {
-        action(value);
-      });
+  const actions = useMemo<LibraryViewActions>(() => {
+    const transition =
+      <T>(action: (value: T) => void) =>
+      (value: T) => {
+        startTransition(() => {
+          action(value);
+        });
+      };
+    const replace = transition(replaceTag);
+    const add = transition(addTag);
+    return {
+      setAxis: transition(setAxis),
+      toggleTag: transition(toggleTag),
+      replaceTag: replace,
+      addTag: add,
+      clickTag: (tag, { ctrlKey, metaKey }) => (ctrlKey || metaKey ? add(tag) : replace(tag)),
+      clearTags: () =>
+        startTransition(() => {
+          clearTags();
+        }),
+      selectWork,
+      setSort: transition(setSort),
+      goToSegment: transition(goToSegment),
     };
-
-  return {
-    activeAxis,
-    selectedTags,
-    selectedWorkId,
-    sort,
-    setAxis: transition(setAxis),
-    toggleTag: transition(toggleTag),
-    replaceTag: transition(replaceTag),
-    addTag: transition(addTag),
-    clearTags: () =>
-      startTransition(() => {
-        clearTags();
-      }),
-    selectWork,
-    setSort: transition(setSort),
-    goToSegment: transition(goToSegment),
-    isPending,
+  }, [
     startTransition,
-  };
+    setAxis,
+    toggleTag,
+    replaceTag,
+    addTag,
+    clearTags,
+    selectWork,
+    setSort,
+    goToSegment,
+  ]);
+
+  const navigation = useMemo(
+    () => ({ activeAxis, selectedTags, selectedWorkId, sort, isPending, ...actions }),
+    [activeAxis, selectedTags, selectedWorkId, sort, isPending, actions],
+  );
+
+  return { navigation, startTransition };
 }
 
 export function useLibraryNavigation(): LibraryViewState & LibraryViewActions {

@@ -46,11 +46,12 @@ export function useGlobalShortcuts({
     // モーダルdialogが開いている間は、フォーカス位置に関わらず背後の再生を操作しない。
     if (document.querySelector("dialog[open]")) return;
 
-    const target = e.target as HTMLElement;
+    const target = e.target;
+    if (!(target instanceof Element)) return;
     // Spaceに限り、プレイヤー操作ボタン自身の活性化より常にグローバルの再生/一時停止を優先する。
-    const isPlayerControlSpace = e.code === "Space" && !!target.closest?.(PLAYER_CONTROL_SELECTOR);
-    if (!isPlayerControlSpace && target.closest?.(SHORTCUT_EXEMPT_SELECTOR)) return;
-    if (SLIDER_OWNED_KEYS.has(e.code) && target.closest?.(SLIDER_SELECTOR)) return;
+    const isPlayerControlSpace = e.code === "Space" && !!target.closest(PLAYER_CONTROL_SELECTOR);
+    if (!isPlayerControlSpace && target.closest(SHORTCUT_EXEMPT_SELECTOR)) return;
+    if (SLIDER_OWNED_KEYS.has(e.code) && target.closest(SLIDER_SELECTOR)) return;
     if (!isActiveRef.current) return;
 
     if (e.code === "Space") {

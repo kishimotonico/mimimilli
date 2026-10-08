@@ -13,7 +13,7 @@ import { useAtom, useAtomValue } from "jotai";
 import { playerIsActiveAtom } from "../../../entities/player/model/atoms";
 import { selectActiveTrackView } from "../../../entities/player/model/playerCoreState";
 import { nowPlayingViewModeAtom } from "../model/playerPresentationAtoms";
-import { usePlayerActions } from "../model/usePlayerActions";
+import { usePlayerActions } from "../../../entities/player/model/usePlayerActions";
 import { usePlayerState, type PlayerState } from "../model/usePlayerState";
 import PlaybackArtwork from "./PlaybackArtwork";
 import PlaybackErrorNotice from "./PlaybackErrorNotice";

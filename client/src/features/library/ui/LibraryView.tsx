@@ -1,6 +1,5 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
-import type { NormalizedTag, Work, WorkListItem } from "@mimimilli/shared";
 import { libraryViewModeAtom } from "../model/atoms";
 import { librarySearchQueryAtom } from "../../../entities/library/model/navigationAtoms";
 import { setAppModeAtom } from "../../../entities/navigation/model/appRouteStore";
@@ -18,7 +17,6 @@ import {
   isGridViewActive,
 } from "../model/libraryPresentation";
 import { isSmartAxis, getSmartFolderId } from "../../../entities/library/axisDefinitions";
-import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
 import { useLibrarySmartFolderEditor } from "../model/useLibrarySmartFolderEditor";
 import { useLibrarySelectionCleanup } from "../model/useLibrarySelectionCleanup";
 import { useLibraryPreviewActions } from "../model/useLibraryPreviewActions";
@@ -30,21 +28,11 @@ import SmartFolderEditorSection from "./SmartFolderEditorSection";
 import LibraryWorksBoundary from "./LibraryWorksBoundary";
 
 interface LibraryViewProps {
-  onPlay: (work: WorkListItem, trackIndex: number) => void;
-  onResume: (work: Work) => void;
-  /** ロード中トラックの再生/一時停止を切り替える（選択中作品が再生中のときのスプリットボタン用） */
-  onTogglePlay: () => void;
   /** 画面下張り付きの再生バーが表示中か（結果面の末尾余白の確保に使う） */
   dockedBarActive: boolean;
 }
 
-export default function LibraryView({
-  onPlay,
-  onResume,
-  onTogglePlay,
-  dockedBarActive,
-}: LibraryViewProps) {
-  const rootFolder = useRootFolder();
+export default function LibraryView({ dockedBarActive }: LibraryViewProps) {
   const searchQuery = useAtomValue(librarySearchQueryAtom);
   const debouncedSearchQuery = useLibraryDebouncedSearchQuery(searchQuery);
   const setSearchQuery = useSetAtom(setLibrarySearchQueryAtom);
@@ -92,23 +80,9 @@ export default function LibraryView({
 
   const previewActions = useLibraryPreviewActions({
     selectedWork,
-    rootFolder,
-    onPlay,
-    onResume,
     openWorkDetail,
     setAppMode,
   });
-
-  // タグチップクリック → replaceTagと同一挙動（ADR-0013）。Ctrl/Cmd+クリックは
-  // AND追加（addLibraryTagAtom相当）へ反転する。
-  const handleTagClick = useCallback(
-    (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => {
-      if (opts.ctrlKey || opts.metaKey) nav.addTag(tag);
-      else nav.replaceTag(tag);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- nav は毎レンダー新規オブジェクトのため参照する値だけに依存を絞る
-    [nav.addTag, nav.replaceTag],
-  );
 
   return (
     <>
@@ -194,9 +168,7 @@ export default function LibraryView({
                 selectedWork={selectedWork}
                 workDetailQuery={workDetailQuery}
                 previewActions={previewActions}
-                onTogglePlay={onTogglePlay}
-                onWorkPlay={(work) => onPlay(work, 0)}
-                onTagClick={handleTagClick}
+                onTagClick={nav.clickTag}
               />
             )}
           </LibraryWorksBoundary>

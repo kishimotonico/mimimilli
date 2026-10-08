@@ -2,14 +2,11 @@ import { act, createElement } from "react";
 import { render, screen } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import TopBar from "../../src/app/ui/TopBar";
-import {
-  dlsiteBulkActionsAtom,
-  dlsiteBulkJobIdAtom,
-  dlsiteBulkProgressAtom,
-} from "../../src/entities/dlsite/model/bulkAtoms";
-import { scanJobAtom } from "../../src/entities/scan/model/atoms";
+import { dlsiteBulkStoreAtom } from "../../src/entities/dlsite/model/dlsiteBulkStore";
+import { scanJobStoreAtom } from "../../src/entities/scan/model/scanJobStore";
+import { createFakeDlsiteBulkStore, createFakeScanJobStore } from "../helpers/fakeJobStores";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import { seedAppMode } from "../helpers/route";
 
@@ -20,22 +17,15 @@ function renderTopBar(atomState?: {
 }) {
   const store = createStore();
   seedAppMode(store, "library");
-  store.set(dlsiteBulkActionsAtom, {
-    start: vi.fn(),
-    attach: vi.fn(),
-    cancel: vi.fn(),
-    dismiss: vi.fn(),
+  const scanJob = createFakeScanJobStore({ job: atomState?.scanJob ?? null });
+  const dlsiteBulk = createFakeDlsiteBulkStore({
+    ...(atomState?.dlsiteActive !== undefined && {
+      jobId: atomState.dlsiteActive ? "job-1" : null,
+    }),
+    ...(atomState?.dlsiteProgress !== undefined && { progress: atomState.dlsiteProgress }),
   });
-
-  if (atomState?.scanJob !== undefined) {
-    store.set(scanJobAtom, atomState.scanJob);
-  }
-  if (atomState?.dlsiteActive !== undefined) {
-    store.set(dlsiteBulkJobIdAtom, atomState.dlsiteActive ? "job-1" : null);
-  }
-  if (atomState?.dlsiteProgress !== undefined) {
-    store.set(dlsiteBulkProgressAtom, atomState.dlsiteProgress);
-  }
+  store.set(scanJobStoreAtom, scanJob);
+  store.set(dlsiteBulkStoreAtom, dlsiteBulk);
 
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
@@ -55,7 +45,7 @@ function renderTopBar(atomState?: {
       ),
     ),
   );
-  return store;
+  return { store, scanJob, dlsiteBulk };
 }
 
 describe("TopBar のジョブ状態表示", () => {
@@ -92,8 +82,8 @@ describe("TopBar のジョブ状態表示", () => {
     expect(screen.getByRole("button", { name: "中止" })).toBeInTheDocument();
   });
 
-  it("atom 更新で進捗表示が追従する", () => {
-    const store = renderTopBar({
+  it("ストアの更新で進捗表示が追従する", () => {
+    const { dlsiteBulk } = renderTopBar({
       dlsiteActive: true,
       dlsiteProgress: {
         processed: 1,
@@ -105,11 +95,14 @@ describe("TopBar のジョブ状態表示", () => {
     expect(screen.getByText("— RJ111111")).toBeInTheDocument();
 
     act(() => {
-      store.set(dlsiteBulkProgressAtom, {
-        processed: 4,
-        total: 5,
-        work: { id: "work-2", rjCode: "RJ222222", title: "朝のラジオ" },
-      });
+      dlsiteBulk.setState((state) => ({
+        ...state,
+        progress: {
+          processed: 4,
+          total: 5,
+          work: { id: "work-2", rjCode: "RJ222222", title: "朝のラジオ" },
+        },
+      }));
     });
     expect(screen.getByText("DLsiteから取得中 (4/5)")).toBeInTheDocument();
     expect(screen.getByText("— 朝のラジオ")).toBeInTheDocument();

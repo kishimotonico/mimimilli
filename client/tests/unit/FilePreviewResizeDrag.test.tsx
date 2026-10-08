@@ -18,6 +18,10 @@ vi.mock("../../src/entities/scan/api", async (importOriginal) => ({
   getScanDiagnostics: (...args: unknown[]) => getScanDiagnostics(...args),
 }));
 
+vi.mock("../../src/entities/player/model/usePlayerActions", () => ({
+  usePlayerActions: () => ({ playFile: vi.fn(), togglePlay: vi.fn() }),
+}));
+
 vi.mock("../../src/entities/settings/useSettingsQuery", () => ({
   useRootFolder: () => "/lib",
 }));
@@ -33,9 +37,7 @@ function renderPreview() {
       { client: queryClient },
       createElement(JotaiProvider, { store }, children),
     );
-  return render(createElement(FilePreview, { onPlayFile: vi.fn(), onTogglePlay: vi.fn() }), {
-    wrapper,
-  });
+  return render(createElement(FilePreview), { wrapper });
 }
 
 afterEach(cleanup);

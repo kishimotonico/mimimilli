@@ -12,7 +12,7 @@ scan / DLsite 一括取得の操作失敗は、runtime が error atom へ保存�
 
 ### ユーザー操作の失敗（scan / DLsite 一括）
 
-`ScanRuntime` / `DlsiteBulkRuntime` がエラーの唯一の所有者とする。失敗時は対応する error atom（`scanErrorAtom` / `dlsiteBulkErrorAtom`）へメッセージを保存し、`GlobalToast` が表示する。`start` / `cancel` 等の操作 Promise は reject しない。戻り値は `ScanActionResult`（`{ ok: true, job }` または `{ ok: false, error }`）で、主画面の fire-and-forget 呼び出しは戻り値を無視してよい。初回セットアップ完了だけは `start()` の `{ ok: false, error }` で後続の状態遷移を止める（詳細は client-error-handling.md）。
+ジョブ追跡のストアがエラーの唯一の所有者とする。scan は `scanJobStore` が `state.error` に保持し、DLsite 一括は `dlsiteBulkStore` が `error` イベントで通知する。`ScanRuntime` / `DlsiteBulkRuntime` がそれをトーストへ変換し、`GlobalToast` が表示する。`start` / `cancel` 等の操作 Promise は reject しない。scan の戻り値は `ScanActionResult`（`{ ok: true, job }` または `{ ok: false, error }`）で、主画面の fire-and-forget 呼び出しは戻り値を無視してよい。初回セットアップ完了だけは `start()` の `{ ok: false, error }` で後続の状態遷移を止める（詳細は client-error-handling.md）。
 
 ### HTTP エラー応答の本文
 

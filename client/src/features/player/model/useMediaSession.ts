@@ -3,7 +3,7 @@ import type { Work, WorkListItem } from "../../../entities/work/model";
 import { getCircleName } from "../../../entities/work/model";
 import { getCoverImageUrl } from "../../../entities/work/api";
 import { hasResolvedPlaybackSource } from "../../../entities/player/model/playerCoreState";
-import type { PlaybackTrack } from "./trackTime";
+import type { PlaybackTrack } from "../../../entities/player/model/trackTime";
 
 const DEFAULT_SEEK_OFFSET = 10;
 const ARTWORK_WIDTH = 512;

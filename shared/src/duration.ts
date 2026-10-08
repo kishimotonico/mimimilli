@@ -109,3 +109,15 @@ export function trackDurationSecOrNull(result: TrackDurationResult): number | nu
 export function isTrackDurationFailed(kind: TrackDurationKind): boolean {
   return kind === "missing" || kind === "unsupported" || kind === "invalid-start";
 }
+
+/** 全トラックの長さが解決済みのときのみ合計を返す。未知のトラックが1つでもあれば null */
+export function sumTrackDurations(
+  tracks: ReadonlyArray<{ durationSec: number | null }>,
+): number | null {
+  let total = 0;
+  for (const track of tracks) {
+    if (track.durationSec === null) return null;
+    total += track.durationSec;
+  }
+  return total;
+}

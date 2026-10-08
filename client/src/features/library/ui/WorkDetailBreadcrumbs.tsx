@@ -3,19 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import Breadcrumbs from "../../../shared/ui/Breadcrumbs";
 import { setAppModeAtom } from "../../../entities/navigation/model/appRouteStore";
 import { workDetailIdAtom } from "../../../entities/work/model/navigationAtoms";
-import { getWork } from "../../../entities/work/api";
-import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
+import { workDetailQueryOptions } from "../../../entities/work/workDetailQueryOptions";
 
 /** 全画面作品詳細のパンくず。「ライブラリ」クリックでライブラリ（右ペイン状態は
  *  保持済み）へ、作品名セグメントは末尾のためクリック不可。 */
 export default function WorkDetailBreadcrumbs() {
   const workId = useAtomValue(workDetailIdAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
-  const workQuery = useQuery({
-    queryKey: WORK_QUERY_KEYS.detail(workId ?? ""),
-    queryFn: () => getWork(workId!),
-    enabled: workId !== null,
-  });
+  const workQuery = useQuery(workDetailQueryOptions(workId));
 
   const path = ["ライブラリ", workQuery.data?.title ?? ""];
 
