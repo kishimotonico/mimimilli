@@ -1,4 +1,4 @@
-// TASK-73: GET /works のサーバー側デフォルトページングと、ページ間の重複・欠落なしを検証。
+// GET /works のサーバー側デフォルトページングと、ページ間の重複・欠落なしを検証。
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { WORKS_DEFAULT_PAGE_SIZE, type WorksPage, type WorkSummary } from "@mimimilli/shared";

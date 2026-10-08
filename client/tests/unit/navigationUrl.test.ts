@@ -183,7 +183,7 @@ describe("navigation URL codec", () => {
     expect(result.warnings).toEqual(["存在しないライブラリ軸を拒否しました: smart-"]);
   });
 
-  it("rejects the abolished home axis and falls back to the default axis (TASK-302)", () => {
+  it("rejects the abolished home axis and falls back to the default axis", () => {
     const result = parseNavigationUrl("/library/home");
 
     expect(result.state).toEqual({

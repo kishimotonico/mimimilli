@@ -229,7 +229,7 @@ describe("ScanRuntime EventSource ownership", () => {
         expect.objectContaining({ result: scanResult }),
       ),
     );
-    // 候補の再取得は queryClient.fetchQuery 経由（TASK-387）のため、setQueryData のスパイではなく
+    // 候補の再取得は queryClient.fetchQuery 経由のため、setQueryData のスパイではなく
     // 反映後のキャッシュ内容そのものを見る。
     await waitFor(() =>
       expect(queryClient.getQueryData(SCAN_QUERY_KEYS.candidates())).toEqual(scanResult.candidates),

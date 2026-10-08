@@ -234,7 +234,7 @@ test("詳細パネル: 編集モードでのみタグ削除ボタンが現れる
   assertNoErrors(tracker);
 });
 
-test("詳細パネル: タグクリックで1クリックそのタグの作品一覧へ絞り込まれ詳細は閉じる（TASK-358）", async ({
+test("詳細パネル: タグクリックで1クリックそのタグの作品一覧へ絞り込まれ詳細は閉じる", async ({
   page,
 }) => {
   const tracker = trackErrors(page);
@@ -257,7 +257,7 @@ test("詳細パネル: タグクリックで1クリックそのタグの作品�
   assertNoErrors(tracker);
 });
 
-test("詳細パネル: 「全画面へ展開」で全画面詳細へ遷移し、戻るでパネル状態に戻る（TASK-361）", async ({
+test("詳細パネル: 「全画面へ展開」で全画面詳細へ遷移し、戻るでパネル状態に戻る", async ({
   page,
 }) => {
   const tracker = trackErrors(page);
@@ -443,7 +443,7 @@ test("スキャン完了後に候補を選択登録でき、問題をFilesで確
   assertNoErrors(tracker);
 });
 
-test("FilesでID重複を表示し、確認して別作品として取り込める（解決後はスキャンの要対応からも消える、TASK-322）", async ({
+test("FilesでID重複を表示し、確認して別作品として取り込める（解決後はスキャンの要対応からも消える）", async ({
   page,
 }) => {
   const tracker = trackErrors(page);
@@ -469,7 +469,7 @@ test("FilesでID重複を表示し、確認して別作品として取り込め�
   await expect(preview.getByText("ID重複", { exact: true })).toBeHidden();
 
   // 解決した診断はスキャン結果のスナップショットではなく常に最新を購読するため、
-  // ダイアログを開き直しても要対応タブに残らない（TASK-322）。
+  // ダイアログを開き直しても要対応タブに残らない。
   await page.getByRole("button", { name: "スキャン" }).click();
   const scanDialog = page.getByRole("dialog", { name: "スキャン" });
   await scanDialog.getByRole("tab", { name: /^要対応/ }).click();

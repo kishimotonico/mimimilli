@@ -84,6 +84,9 @@
 
   /* Shadows */
   --shadow-ink: oklch(20% 0.02 70); /* 影・暗幕の元色 */
+  --immersive-ink: oklch(15% 0.01 70); /* 没入モードの暗幕の元色 */
+  --immersive-text-shadow-ink: oklch(10% 0.02 70); /* 没入モードの文字影の元色 */
+  --shadow-black: oklch(0% 0 0); /* 画像上アイコンの影の元色 */
   --scrim: color-mix(in oklch, var(--shadow-ink) 30%, transparent); /* モーダル暗幕 */
   --shadow-1:
     0 1px 0 0 color-mix(in oklch, var(--shadow-ink) 2%, transparent),

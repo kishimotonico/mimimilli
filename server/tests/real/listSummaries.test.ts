@@ -1,4 +1,4 @@
-// TASK-57: listSummaries の N+1 解消と軽量投影の検証。
+// listSummaries がN+1にならないことと軽量投影の検証。
 // SQL 発行数が作品数に比例しないこととtrack_count列の維持を確認する。
 import assert from "node:assert/strict";
 import { test } from "node:test";

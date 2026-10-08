@@ -1,8 +1,7 @@
 // fingerprint.ts の normalize系（normalizeMetaContent/normalizeRawMetaContent/
 // normalizeRawPlaylist/normalizeRawTrack/normalizeRawUrlEntry）は MetaFile の対象フィールドを
 // 手動列挙している。shared/src/meta.ts 等のスキーマにフィールドが追加されても fingerprint.ts の
-// 更新を忘れると、その項目の編集がスキャンに反映されないサイレント不整合になる（増分スキャン
-// TASK-75 レビュー指摘）。
+// 更新を忘れると、その項目の編集がスキャンに反映されないサイレント不整合になる。
 //
 // ここではスキーマの `.shape` から導出したキー集合と、fingerprint.ts が対象にしているキー集合
 // （このテストに手動転記した期待値）を突き合わせる。スキーマにフィールドが増減すればどちらかの

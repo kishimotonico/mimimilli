@@ -1,4 +1,4 @@
-// TASK-74: スマートフォルダー軸の作品一覧ページ蓄積（追加読み込み）の検証。
+// スマートフォルダー軸の作品一覧ページ蓄積（追加読み込み）の検証。
 // useSuspenseSmartLibraryWorks の useSuspenseInfiniteQuery により、
 // page=1 取得後に fetchNextPage() で page=2 が連結され、random ソート時は seed が引き継がれる。
 
@@ -244,7 +244,7 @@ describe("スマートフォルダー軸への保持中フィルタの適用", (
     expect(urls.some((u) => u.includes("q=" + encodeURIComponent("藤田茜")))).toBe(true);
   });
 
-  it("qが空文字ならクエリパラメータへ含めない（既存挙動との回帰確認）", async () => {
+  it("qが空文字ならクエリパラメータへ含めない", async () => {
     const { result } = renderWorks(baseNav, "");
 
     await waitFor(() => expect(result.current.works.length).toBeGreaterThan(0));

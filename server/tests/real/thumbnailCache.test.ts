@@ -1,4 +1,4 @@
-// サムネイル初回生成の排他（TASK-32）: 同一キャッシュキーへの同時リクエストが
+// サムネイル初回生成の排他: 同一キャッシュキーへの同時リクエストが
 // 変換を1回だけ実行すること、生成失敗時に残骸を残さず再試行できることを検証する。
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, writeFileSync } from "node:fs";
@@ -129,7 +129,7 @@ test("異なるキーはSharp側semaphoreの上限以下に変換し、同一キ
   const [a, aAgain, b] = await Promise.all([first, duplicate, second]);
 
   // admission（stat/mkdir/inFlight登録）はキー単位のロックに縮小されており、異なるキー間の
-  // 開始順序は保証しない（TASK-87）。変換の同時実行数がmaxConcurrentを超えないことと、
+  // 開始順序は保証しない。変換の同時実行数がmaxConcurrentを超えないことと、
   // 両方とも実行されたことだけを検証する。
   assert.equal(maxRunning, 1);
   assert.deepEqual([...started].sort(), [join(baseDir, "a.jpg"), join(baseDir, "b.jpg")].sort());

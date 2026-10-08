@@ -1479,8 +1479,7 @@ test("DLsite HTMLキャッシュ: forceが失敗しても次回の通常取得�
   assert.equal(forced.ok, false);
   assert.equal(calls, 2);
 
-  // 以前はforce失敗時にok snapshotをexpireするだけで失敗記録を残さず、
-  // 次の通常取得が即座に再度HTTPしてしまっていた。
+  // force失敗時は失敗を記録し、次の通常取得が即座に再度HTTPしないこと。
   const normal = await adapter.dlsiteFetch(lib.existingWorkId);
   assert.equal(normal.ok, false);
   if (!normal.ok) assert.equal(normal.kind, "error");
@@ -1656,7 +1655,7 @@ test("DLsite HTML: Content-Lengthがtransfer上限を超える場合は本文読
 
 test("DLsite HTML: Content-Lengthが宣言値どおり転送上限以内でも、展開後の読込量がtransferMaxを超えexpandedMax以内なら成功する", async () => {
   // gzip応答は展開後サイズが転送(圧縮)サイズより大きくなるのが正常。Content-Lengthが検証済みなら
-  // 展開後の読込量はexpandedMaxまで許容する（TASK-406での回帰: transferMaxで誤って打ち切っていた）。
+  // 展開後の読込量はexpandedMaxまで許容する。
   const body = new ReadableStream<Uint8Array>({
     start(controller) {
       controller.enqueue(new Uint8Array(48));

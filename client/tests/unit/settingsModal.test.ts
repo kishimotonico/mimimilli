@@ -1,4 +1,4 @@
-// SettingsModal のEsc/backdrop挙動（TASK-29: ネイティブdialogへの統合）のコンポーネントテスト。
+// SettingsModal のEsc/backdrop挙動のコンポーネントテスト。
 // happy-dom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
 // TagPrefixSettings が react-query を使うため QueryClientProvider で包む。
 import { createElement } from "react";
@@ -123,7 +123,7 @@ describe("SettingsModal", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("スキャンボタンは即時実行せずonOpenScanを呼ぶ（TASK-56: スキャンモーダルへ経路を統一）", () => {
+  it("スキャンボタンは即時実行せずonOpenScanを呼ぶ", () => {
     const { onOpenScan } = renderModal();
     fireEvent.click(screen.getByRole("button", { name: "スキャン" }));
     expect(onOpenScan).toHaveBeenCalledTimes(1);

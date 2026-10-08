@@ -302,7 +302,7 @@ test("登録済み作品のメタが壊れた場合は missing ではなく erro
   assert.match(work?.errorMessage ?? "", /JSON パースエラー/);
 });
 
-// ── 増分スキャン（TASK-75） ─────────────────────────────────────────────────
+// ── 増分スキャン ─────────────────────────────────────────────────
 
 test("増分スキャン: 完全未変更の作品は2回目以降スキップされる", async (t) => {
   const { adapter } = await setup(t);
@@ -312,7 +312,7 @@ test("増分スキャン: 完全未変更の作品は2回目以降スキップ�
   assert.equal(first.insertedWorkIds.length, 0);
 
   const second = await adapter.scan();
-  assert.equal(second.registered, 1); // error状態の既存メタは毎回再評価（TASK-95）
+  assert.equal(second.registered, 1); // error状態の既存メタは毎回再評価
   assert.equal(second.insertedWorkIds.length, 0);
   assert.equal(second.skipped, 1); // 正常な自動生成メタのみスキップ
   assert.equal(second.missing, 0);

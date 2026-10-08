@@ -134,7 +134,7 @@ test("タグ ∋ ルールの values は tagSchema による検証を通り、�
   assert.equal(parsed.success, false);
 });
 
-test("タグ ∋ ルールの values は workPatchSchema と同じく正規形（trim・prefix小文字化・重複排除）で保存される（TASK-201）", () => {
+test("タグ ∋ ルールの values は workPatchSchema と同じく正規形（trim・prefix小文字化・重複排除）で保存される", () => {
   const parsed = smartFolderRuleSchema.parse({
     conjunction: "WHERE",
     field: "タグ",
@@ -166,7 +166,7 @@ test("保存済み sort を評価結果へ適用する", () => {
   assert.equal(result.total, 4);
 });
 
-test("保持中フィルタ: tags はフォルダーのルールに対する追加のAND条件として適用する（TASK-185）", () => {
+test("保持中フィルタ: tags はフォルダーのルールに対する追加のAND条件として適用する", () => {
   const rules: SmartFolderRule[] = [
     { conjunction: "WHERE", field: "長さ", operator: "≥", values: ["3600"] },
   ];
@@ -200,7 +200,7 @@ test("保持中フィルタ: @year/... 擬似タグ（組み込み軸）もル�
   );
 });
 
-test("保持中フィルタが無ければルール適用結果をそのまま返す（回帰確認）", () => {
+test("保持中フィルタが無ければルール適用結果をそのまま返す", () => {
   const rules: SmartFolderRule[] = [
     { conjunction: "WHERE", field: "タグ", operator: "∋", values: nts(["ASMR"]) },
   ];
@@ -239,7 +239,7 @@ test("作品検索q: OR・AND NOTを含むルール式の評価結果全体にAN
   assert.deepEqual(result.items.map((w) => w.id).sort(), ["RJ001", "RJ004"]);
 });
 
-test("作品検索qが空文字なら絞り込まない（回帰確認）", () => {
+test("作品検索qが空文字なら絞り込まない", () => {
   const rules: SmartFolderRule[] = [
     { conjunction: "WHERE", field: "タグ", operator: "∋", values: nts(["ASMR"]) },
   ];

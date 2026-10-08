@@ -25,7 +25,7 @@ interface NowPlayingImmersiveMiniControlsProps {
 }
 
 const GHOST_BTN =
-  "grid h-9 w-9 place-items-center rounded-full cursor-pointer text-white/90 drop-shadow-[0_1px_5px_rgba(0,0,0,0.65)] hover:text-white";
+  "grid h-9 w-9 place-items-center rounded-full cursor-pointer text-white/90 drop-shadow-[0_1px_5px_color-mix(in_oklch,var(--shadow-black)_65%,transparent)] hover:text-white";
 
 export default function NowPlayingImmersiveMiniControls({
   idle,
@@ -103,7 +103,10 @@ export default function NowPlayingImmersiveMiniControls({
       </div>
 
       <div className="mle-nowplaying__immersive-minicontrols-group">
-        <I.volume size={13} className="text-white/80 drop-shadow-[0_1px_4px_rgba(0,0,0,0.65)]" />
+        <I.volume
+          size={13}
+          className="text-white/80 drop-shadow-[0_1px_4px_color-mix(in_oklch,var(--shadow-black)_65%,transparent)]"
+        />
         <input
           type="range"
           aria-label="音量"

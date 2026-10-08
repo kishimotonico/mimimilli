@@ -1,4 +1,4 @@
-// TASK-92: トラックの解決済み durationSec（resolveTrackDurationSec）の契約検証。
+// トラックの解決済み durationSec（resolveTrackDurationSec）の契約検証。
 // end-start / end有start無 / start有end無 / 両無 / 同一ファイル複数区間 / デフォルト外playlist /
 // probe失敗 の組み合わせを実データでカバーする。
 import assert from "node:assert/strict";
@@ -245,8 +245,7 @@ test("end指定トラックでもstartがファイル全体長を超えていれ
   assert.ok(work);
 
   // end指定済みはend-startが自明値のため、可視化は作品のerror化（status/errorMessage）で行う。
-  // 以前はend===undefinedの分岐内でしかstart超過を判定していなかったため、この区間は
-  // probeされずstatus "ok"のまま見過ごされていた。
+  // end未指定の場合に限らず、start超過はprobeして検出する。
   assert.equal(work.status, "error");
   assert.match(work.errorMessage ?? "", /開始位置がファイル長を超えています/);
   const track = work.playlists.find((p) => p.id === defaultPlaylistId)?.tracks[0];

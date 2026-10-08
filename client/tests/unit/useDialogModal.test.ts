@@ -1,4 +1,4 @@
-// useDialogModal（TASK-29: モーダル基盤の共通化）の単体テスト。
+// useDialogModalの単体テスト。
 // happy-dom は <dialog> の showModal/close を実装していないため、テストに必要な分だけ差し替える。
 import { createElement, useRef } from "react";
 import { render, fireEvent, cleanup } from "@testing-library/react";

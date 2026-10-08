@@ -1,4 +1,4 @@
-// 通知ベルパネル（TASK-44）の開閉・バッジ件数・各セクションの表示条件のテスト。
+// 通知ベルパネルの開閉・バッジ件数・各セクションの表示条件のテスト。
 import { createElement } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
@@ -53,7 +53,7 @@ function renderBell(
     ...summaryDefaults,
     ...summaryOverrides,
   });
-  // App から降ろした購読（TASK-124）: NotificationBell 自身が SCAN_QUERY_KEYS.last() を持つ
+  // NotificationBell 自身が SCAN_QUERY_KEYS.last() を持つ
   queryClient.setQueryData(
     SCAN_QUERY_KEYS.last(),
     scanResultOverride

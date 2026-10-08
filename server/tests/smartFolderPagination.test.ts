@@ -1,4 +1,4 @@
-// TASK-74: GET /api/smart-folders/:id/works のサーバー側ページングを検証。
+// GET /api/smart-folders/:id/works のサーバー側ページングを検証。
 // fixture アダプタの evalSmartFolder を多数件データへの純粋関数呼び出しに差し替え、
 // デフォルト適用・ページ連結・random seed 引継ぎ・total・固有 sort 維持を担保する。
 import { test } from "node:test";

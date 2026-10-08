@@ -102,7 +102,7 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
 
   // 候補承認はreal adapterのregisterCandidates（scanner.ts）と同じく、実際にcatalog
   // （fixtureではstate.works）へ行を増やす。新規登録済みタブはこのworksを介して
-  // 承認分を表示するため、ここで見えなければタブにも出ない（TASK-328）。
+  // 承認分を表示するため、ここで見えなければタブにも出ない。
   const registeredWorkId = registration.registered[0]?.workId;
   assert.ok(registeredWorkId);
   const registeredWorksPage = await adapter.queryWorks({

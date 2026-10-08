@@ -29,7 +29,7 @@
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: oklch(15% 0.01 70 / 0.2);
+  background: color-mix(in oklch, var(--immersive-ink) 20%, transparent);
 }
 
 /* カバーの実画像は object-fit: contain で表示するため、この箱自体は
@@ -63,14 +63,14 @@
   width: 36px;
   border-radius: 999px;
   color: var(--paper-0);
-  background: oklch(15% 0.01 70 / 0.4);
+  background: color-mix(in oklch, var(--immersive-ink) 40%, transparent);
   backdrop-filter: blur(12px);
   transition:
     opacity 0.2s ease,
     background 0.15s ease;
 }
 .mle-nowplaying__immersive-toggle:hover {
-  background: oklch(15% 0.01 70 / 0.55);
+  background: color-mix(in oklch, var(--immersive-ink) 55%, transparent);
 }
 .mle-nowplaying__immersive-toggle.is-idle {
   opacity: 0;
@@ -90,7 +90,7 @@
   gap: 2px;
   max-width: min(60%, 420px);
   color: var(--paper-0);
-  text-shadow: 0 1px 8px oklch(10% 0.02 70 / 0.65);
+  text-shadow: 0 1px 8px color-mix(in oklch, var(--immersive-text-shadow-ink) 65%, transparent);
   transition: opacity 0.2s ease;
 }
 .mle-nowplaying__immersive-title.is-idle {
@@ -133,7 +133,7 @@
   width: 88px;
   height: 88px;
   border-radius: 999px;
-  background: oklch(15% 0.01 70 / 0.45);
+  background: color-mix(in oklch, var(--immersive-ink) 45%, transparent);
   color: var(--paper-0);
 }
 

@@ -110,7 +110,7 @@ describe("AxisColumn", () => {
     renderAxisColumn({ tagPrefixes: PREFIXES });
 
     // マウント直後、再レンダーを一切挟まずに最初のpointerEnterを発火する。実ブラウザでは
-    // 本物のホバーに必ず document レベルの pointermove が先行する（TASK-301のガードが
+    // 本物のホバーに必ず document レベルの pointermove が先行する（ホバーガードが
     // 誤起動と区別する材料）ため、テストでも先に発火させておく。
     fireEvent.pointerMove(document);
     fireEvent.pointerEnter(screen.getByRole("button", { name: /CV/ }));

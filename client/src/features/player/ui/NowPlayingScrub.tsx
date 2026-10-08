@@ -156,7 +156,14 @@ export default function NowPlayingScrub({
           "flex items-center gap-2.5 pt-1.5 font-mono text-xs",
           isImmersive ? "text-paper-0" : "text-ink-2",
         )}
-        style={isImmersive ? { textShadow: "0 1px 6px oklch(10% 0.02 70 / 0.6)" } : undefined}
+        style={
+          isImmersive
+            ? {
+                textShadow:
+                  "0 1px 6px color-mix(in oklch, var(--immersive-text-shadow-ink) 60%, transparent)",
+              }
+            : undefined
+        }
       >
         <span className={isImmersive ? undefined : "text-ink-0"}>
           {formatTime(currentTime) ?? "0:00"}

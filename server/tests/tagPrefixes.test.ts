@@ -222,7 +222,7 @@ test("buildAxisFacets: coversは追加日時の新しい順で最大4件、cover
   );
 });
 
-test("buildAxisFacets: filter を渡すと AND 条件として絞り込んだ集合から集計する（TASK-187）", () => {
+test("buildAxisFacets: filter を渡すと AND 条件として絞り込んだ集合から集計する", () => {
   const works = [
     summaryWith("W1", ["cv/藤田茜", "ASMR"]),
     summaryWith("W2", ["cv/霧島レイ", "ASMR"]),
@@ -252,7 +252,7 @@ test("buildAxisFacets: filterで0件になった値は一覧から除外され�
   assert.deepEqual(buildAxisFacets("cv", works, { tags: tf("ASMR"), tagOp: "AND" }), []);
 });
 
-test("buildAxisFacets: filterが無ければ従来どおり無絞り込みで集計する（回帰確認）", () => {
+test("buildAxisFacets: filterが無ければ無絞り込みで集計する", () => {
   const works = [summaryWith("W1", ["cv/藤田茜"]), summaryWith("W2", ["cv/霧島レイ"])];
   assert.deepEqual(buildAxisFacets("cv", works), buildAxisFacets("cv", works, {}));
 });

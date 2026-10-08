@@ -1,4 +1,4 @@
-// TASK-61: 検索入力の IME composition 対応とクリア動作の検証。
+// 検索入力の IME composition 対応とクリア動作の検証。
 
 import { act, createElement } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -207,7 +207,7 @@ describe("値一覧ペイン表示中は作品検索を無効化する（ADR-002
     expect(input.title).toBe("値一覧では作品を検索できません");
   });
 
-  it("works種の軸（all等）では従来どおり有効", () => {
+  it("works種の軸（all等）では有効", () => {
     const store = renderTopBar("");
     act(() => seedLibraryRoute(store, { activeAxis: "all" }));
     const input = screen.getByPlaceholderText(PLACEHOLDER) as HTMLInputElement;

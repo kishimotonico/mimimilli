@@ -1,7 +1,7 @@
 import { expect, test } from "./fixtures";
 import { assertNoErrors, expectNoHorizontalOverflow, openApp, trackErrors } from "./support";
 
-// 1024px（サポート下限）ではAB行がトランスポート下段へ退避する2段構成になる（TASK-366）。
+// 1024px（サポート下限）ではAB行がトランスポート下段へ退避する2段構成になる。
 // 1440x960のみのカバレッジだと退行に気づけないため、専用にこの幅で検証する。
 test.use({ viewport: { width: 1024, height: 960 } });
 

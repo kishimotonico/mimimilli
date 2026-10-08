@@ -23,7 +23,7 @@ test("再生中タブ: 没入モードでカバーが拡大クロップされて
   const cover = page.locator(".mle-nowplaying__immersive-cover");
   await expect(cover).toBeVisible();
 
-  // カバーは拡大（scale）してから親の overflow: hidden でクロップする設計（TASK-365）。
+  // カバーは拡大（scale）してから親の overflow: hidden でクロップする設計。
   // (1) 中身（img またはプレースホルダー svg）がビューポートより実際にはみ出している
   //     こと（拡大が効いている証拠。等倍に退行したら失敗する）
   // (2) クロップの器（.mle-nowplaying__immersive-cover）が overflow: hidden である

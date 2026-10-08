@@ -1,4 +1,4 @@
-// TASK-146: スマートフォルダー軸ではソートメニューを無効化し、フォルダー定義のソートを表示する。
+// スマートフォルダー軸ではソートメニューを無効化し、フォルダー定義のソートを表示する。
 
 import { createElement } from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
@@ -183,7 +183,7 @@ describe("LibrarySortMenu", () => {
     );
   });
 
-  it("ソートがランダムのときだけ再シャッフルボタンを表示し、押すとseedが変わる（TASK-305）", () => {
+  it("ソートがランダムのときだけ再シャッフルボタンを表示し、押すとseedが変わる", () => {
     const { store } = renderSortMenu({ axis: "all", sort: "added-desc" });
     expect(screen.queryByRole("button", { name: "再シャッフル" })).not.toBeInTheDocument();
 
@@ -211,7 +211,7 @@ describe("LibrarySortMenu", () => {
     expect(screen.queryByRole("button", { name: "再シャッフル" })).not.toBeInTheDocument();
   });
 
-  it("並び替えはLibraryNavigationProviderが持つ単一のstartTransitionを経由する（TASK-381）", () => {
+  it("並び替えはLibraryNavigationProviderが持つ単一のstartTransitionを経由する", () => {
     // ソートメニューだけの独立した遷移を持つと、他コンポーネントの遷移中表示
     // （WorkListPaneのis-pending暗転）にこの操作が反映されなくなる。
     const store = createStore();

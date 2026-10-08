@@ -1,4 +1,4 @@
-// TASK-140: スキャン中のディレクトリ読み取り失敗が missing 誤判定へ流れないことの検証。
+// スキャン中のディレクトリ読み取り失敗が missing 誤判定へ流れないことの検証。
 import assert from "node:assert/strict";
 import { chmodSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
