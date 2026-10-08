@@ -66,6 +66,7 @@ Vite は `/api` を同じ worktree の Bun サーバー（portless サービス 
 ```bash
 pnpm dev:fixture           # 手書きシードの11件のみ
 pnpm dev:fixture:new-work
+pnpm dev:fixture:identity-conflict   # 単一ファイル形式のID重複
 pnpm dev:fixture:empty
 pnpm dev:fixture:errors
 pnpm dev:fixture:scan-review

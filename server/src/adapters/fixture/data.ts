@@ -6,6 +6,7 @@ import {
   TEXT_PREVIEW_LIMIT_BYTES,
   DEFAULT_DLSITE_CACHE_TTLS_MS,
   isSidecarMetaFileName,
+  META_SIDECAR_SUFFIX,
   workPlacementOf,
 } from "@mimimilli/shared";
 import type {
@@ -326,6 +327,31 @@ export const SEED_WORKS: FixtureWorkRecord[] = RAW_SEED_WORKS.map((work) => {
   return { ...work, tags, cover };
 });
 
+/** 単一ファイル形式（`<stem>.mimimilli.json`）の作品。ID重複のシナリオで使う */
+export const SINGLE_FILE_SEED_WORK: FixtureWorkRecord = {
+  id: "d00002",
+  title: "FANZA単一ファイル作品（ID重複）",
+  cover: null,
+  status: "ok",
+  physicalPath: "/library/fanza/d00002.mp3",
+  metaPath: "/library/fanza/d00002.mimimilli.json",
+  totalDurationSec: 1800,
+  addedAt: "2026-06-20T00:00:00.000Z",
+  errorMessage: null,
+  urls: [],
+  tags: [],
+  trackCount: 1,
+  bookmarked: false,
+  lastPlayedAt: null,
+};
+
+/** SINGLE_FILE_SEED_WORK のID重複。コピー側にも同じIDのメタファイルがある */
+export const SINGLE_FILE_SEED_IDENTITY_CONFLICT: IdentityConflict = {
+  kind: "identity_conflict",
+  workId: SINGLE_FILE_SEED_WORK.id,
+  paths: ["fanza/d00002.mimimilli.json", "copies/d00002.mimimilli.json"],
+};
+
 /** シード作品のDLsite連携分類（meta linkage）。取得失敗はここには持たせず
  *  SEED_DLSITE_FAILURESに分ける。 */
 export const SEED_DLSITE_LINKAGES: ReadonlyMap<string, MetaDlsiteState> = new Map(
@@ -565,6 +591,31 @@ function ensurePath(
   if (child.isDir) ensurePath(child, rest, makeLeaf);
 }
 
+/** 単一ファイル形式の作品の音声ファイルを配置する。既にあるファイルは作品に紐付ける */
+function placeFileWorkAudio(
+  root: FsNode,
+  segments: readonly string[],
+  work: FixtureWorkRecord,
+): void {
+  const name = segments.at(-1);
+  if (name === undefined) return;
+  ensurePath(root, segments, () => fsFile(name, "mp3", 1024 * 1024));
+  let node = root;
+  for (const segment of segments) {
+    const child = node.children.find((c) => c.name === segment);
+    if (!child) return;
+    node = child;
+  }
+  node.workId = work.id;
+  node.workRelPath = "";
+}
+
+/** サイドカーメタ（`d00002.mimimilli.json`）と対になる音声ファイル名。拡張子は作品の音声ファイルに合わせる */
+function sidecarAudioFileName(sidecarName: string, work: FixtureWorkRecord): string {
+  const stem = sidecarName.slice(0, -META_SIDECAR_SUFFIX.length);
+  return `${stem}${posix.extname(work.physicalPath)}`;
+}
+
 /** /fs のルートツリーを構築する。works はその時点の最新状態を渡す。
  *  identityConflicts / invalidMetaFiles は、それぞれが指す重複コピーフォルダー・
  *  壊れたメタファイルを /fs ツリー上に実体化するために使う。 */
@@ -601,15 +652,9 @@ export function buildFsRoot(
       ),
     );
 
-  const fanzaAudio = fsFile("d00001.mp3", "mp3", 1024 * 1024);
-  const fanzaWork = fileWorks.find((work) => work.physicalPath.endsWith("/fanza/d00001.mp3"));
-  const fanzaNode = fanzaWork
-    ? { ...fanzaAudio, workId: fanzaWork.id, workRelPath: "" }
-    : fanzaAudio;
-
   const root = fsDir("library", [
     fsDir("dlsite", circleDirs),
-    fsDir("fanza", [fanzaNode]),
+    fsDir("fanza", [fsFile("d00001.mp3", "mp3", 1024 * 1024)]),
     fsDir("viewer", [
       fsFile("sample.png", "image", 64 * 1024),
       fsFile("sample.pdf", "pdf", 64 * 1024),
@@ -630,6 +675,12 @@ export function buildFsRoot(
     ensurePath(root, segments, () => fsWorkFolder(work, coverImage, name));
   }
 
+  for (const work of fileWorks) {
+    if (!isPathWithin(rootAbs, work.physicalPath, posix)) continue;
+    const segments = work.physicalPath.slice(rootAbs.length).split("/").filter(Boolean);
+    placeFileWorkAudio(root, segments, work);
+  }
+
   for (const conflict of identityConflicts) {
     const work = works.find((w) => w.id === conflict.workId);
     if (!work) continue;
@@ -638,11 +689,15 @@ export function buildFsRoot(
       const segments = path.split("/").filter(Boolean);
       const name = segments.at(-1);
       if (name === undefined) continue;
-      ensurePath(root, segments, () =>
-        isSidecarMetaFileName(name)
-          ? fsFile(name, "text", 128)
-          : fsWorkFolder(work, coverImage, name),
-      );
+      if (isSidecarMetaFileName(name)) {
+        ensurePath(root, segments, () => fsFile(name, "text", 128));
+        const audioName = sidecarAudioFileName(name, work);
+        ensurePath(root, [...segments.slice(0, -1), audioName], () =>
+          fsFile(audioName, "mp3", 1024 * 1024),
+        );
+      } else {
+        ensurePath(root, segments, () => fsWorkFolder(work, coverImage, name));
+      }
     }
   }
 

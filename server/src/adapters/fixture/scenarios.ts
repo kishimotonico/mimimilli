@@ -3,6 +3,7 @@
 import {
   workspacePath,
   type DlsiteCacheResolution,
+  type IdentityConflict,
   type InvalidMetaFile,
   type MetaDlsiteState,
   type ScanCandidate,
@@ -15,6 +16,8 @@ import {
   buildSeedDlsiteFailures,
   SEED_DLSITE_LINKAGES,
   SEED_WORKS,
+  SINGLE_FILE_SEED_IDENTITY_CONFLICT,
+  SINGLE_FILE_SEED_WORK,
   type FixtureWorkRecord,
 } from "./data.ts";
 
@@ -22,6 +25,7 @@ export type FixtureScenarioId =
   | "default"
   | "empty"
   | "new-work"
+  | "identity-conflict"
   | "errors"
   | "large"
   | "scan-review"
@@ -31,6 +35,7 @@ export const SCENARIO_IDS: readonly FixtureScenarioId[] = [
   "default",
   "empty",
   "new-work",
+  "identity-conflict",
   "errors",
   "large",
   "scan-review",
@@ -60,6 +65,7 @@ export interface FixtureScenario {
   scanUpdatedWorkIds: string[];
   scanCandidates: ScanCandidate[];
   invalidMetaFiles: InvalidMetaFile[];
+  identityConflicts: IdentityConflict[];
   /** rootの配下にないためcatalogから外れている作品。rootを戻すと同じIDで一覧へ戻る */
   detachedWorks: FixtureWorkRecord[];
   rootReconfiguration: FixtureRootReconfiguration | null;
@@ -114,6 +120,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanUpdatedWorkIds: [],
       scanCandidates: [],
       invalidMetaFiles: [],
+      identityConflicts: [],
       detachedWorks: [],
       rootReconfiguration: null,
     };
@@ -151,6 +158,40 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       invalidMetaFiles: [
         { path: workspacePath("壊れた/mimimilli.json"), message: "メタファイルが不正です" },
       ],
+      identityConflicts: [
+        {
+          kind: "identity_conflict",
+          workId: "RJ501001",
+          paths: [
+            "dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読",
+            "copies/RJ501001_夜更けの図書室で囁き朗読",
+          ],
+        },
+      ],
+      detachedWorks: [],
+      rootReconfiguration: null,
+    };
+  }
+
+  if (id === "identity-conflict") {
+    return {
+      id,
+      works: [...cloneWorks(SEED_WORKS), ...cloneWorks([SINGLE_FILE_SEED_WORK])],
+      dlsiteLinkages: cloneDlsiteLinkages(),
+      dlsiteFetchFailures: cloneDlsiteFailures(nowMs),
+      smartFolders: cloneSmartFolders(smartFolders),
+      rootFolder: "/library",
+      lastScanTime: now,
+      scanInsertedWorkIds: [],
+      scanUpdatedWorkIds: [],
+      scanCandidates: [],
+      invalidMetaFiles: [],
+      identityConflicts: [
+        {
+          ...SINGLE_FILE_SEED_IDENTITY_CONFLICT,
+          paths: [...SINGLE_FILE_SEED_IDENTITY_CONFLICT.paths],
+        },
+      ],
       detachedWorks: [],
       rootReconfiguration: null,
     };
@@ -174,6 +215,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanUpdatedWorkIds: [],
       scanCandidates: [],
       invalidMetaFiles: [],
+      identityConflicts: [],
       detachedWorks: [],
       rootReconfiguration: null,
     };
@@ -193,6 +235,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanUpdatedWorkIds: [],
       scanCandidates: [],
       invalidMetaFiles: [],
+      identityConflicts: [],
       detachedWorks: [],
       rootReconfiguration: null,
     };
@@ -211,6 +254,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanUpdatedWorkIds: [],
       scanCandidates: [],
       invalidMetaFiles: [],
+      identityConflicts: [],
       detachedWorks: cloneWorks(SEED_WORKS),
       rootReconfiguration: {
         phase: "failed",
@@ -249,6 +293,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       invalidMetaFiles: [
         { path: workspacePath("壊れた/mimimilli.json"), message: "メタファイルが不正です" },
       ],
+      identityConflicts: [],
       detachedWorks: [],
       rootReconfiguration: null,
     };
@@ -266,6 +311,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
     scanUpdatedWorkIds: [],
     scanCandidates: [],
     invalidMetaFiles: [],
+    identityConflicts: [],
     detachedWorks: [],
     rootReconfiguration: null,
   };

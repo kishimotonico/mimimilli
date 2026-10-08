@@ -123,12 +123,15 @@ interface WorkerServers {
   bunBaseURL: string;
 }
 
-export const test = base.extend<{ resetFixtureState: void }, { workerServers: WorkerServers }>({
+export const test = base.extend<
+  { resetFixtureState: void },
+  { workerServers: WorkerServers; fixtureScenario: string }
+>({
+  // spec側で test.use({ fixtureScenario }) するとworkerのサーバーがそのシナリオで起動する
+  fixtureScenario: ["new-work", { scope: "worker", option: true }],
+
   workerServers: [
-    // Playwrightのfixture解決は第1引数のオブジェクト分割代入構文を静的解析するため、
-    // 依存fixtureがなくても{}が必須。
-    // oxlint-disable-next-line no-empty-pattern
-    async ({}, use, workerInfo) => {
+    async ({ fixtureScenario }, use, workerInfo) => {
       const cwd = process.cwd();
       const bunPort = derivePort(
         cwd,
@@ -153,7 +156,7 @@ export const test = base.extend<{ resetFixtureState: void }, { workerServers: Wo
           env: {
             ...process.env,
             MIMIMILLI_ADAPTER: "fixture",
-            MIMIMILLI_MOCK_SCENARIO: "new-work",
+            MIMIMILLI_MOCK_SCENARIO: fixtureScenario,
             PORT: String(bunPort),
           },
           stdio: ["ignore", "pipe", "pipe"],

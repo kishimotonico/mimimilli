@@ -14,7 +14,7 @@ DLsite/FANZA 等からダウンロードした音声作品（ASMR・ボイスド
 
 構造・境界・データフロー（Vite proxy / portless の開発時トポロジー含む）は [docs/ARCHITECTURE.md](ARCHITECTURE.md) を参照。HANDOFF 固有の補足:
 
-- fixture アダプタはシナリオ切替（`MIMIMILLI_MOCK_SCENARIO` = default/empty/new-work/errors/large/scan-review/root-reconfiguration-failed）と**合成メディア**（無音WAV・SVGカバー、Range対応）を持つ。`large` は手書きシード11件 + 決定的生成989件の計1000件で、実ライブラリ規模の見え方を確認する用途
+- fixture アダプタはシナリオ切替（`MIMIMILLI_MOCK_SCENARIO` = default/empty/new-work/identity-conflict/errors/large/scan-review/root-reconfiguration-failed）と**合成メディア**（無音WAV・SVGカバー、Range対応）を持つ。`large` は手書きシード11件 + 決定的生成989件の計1000件で、実ライブラリ規模の見え方を確認する用途
 
 ### dev サーバーへの server/src 自動反映
 
@@ -37,12 +37,13 @@ pnpm test:server
 # server テストは bunfig.toml [test].preload で per-test タイムアウト 30s（ハング検出。Bun既定5sは並列負荷で偽陽性になる）
 pnpm test:client
 pnpm test:smoke          # Playwright スモークテスト（roleベースの動作確認）
-# smokeテストは worker ごとに MIMIMILLI_MOCK_SCENARIO=new-work の Bun + Vite サーバーペアを自前で立てる。
+# smokeテストは worker ごとに MIMIMILLI_MOCK_SCENARIO=new-work（spec で test.use({ fixtureScenario }) すると変更可）の Bun + Vite サーバーペアを自前で立てる。
 # ポートは worktree の絶対パスを sha256 ハッシュ化して 4200 番台から決定的に導出する（`derivePort.ts`）ため、worktree ごとに一意になる
 
 # fixture シナリオ
 pnpm dev:fixture           # 手書きシードの11件のみ
 pnpm dev:fixture:new-work
+pnpm dev:fixture:identity-conflict   # 単一ファイル形式のID重複
 pnpm dev:fixture:empty
 pnpm dev:fixture:errors
 pnpm dev:fixture:scan-review
