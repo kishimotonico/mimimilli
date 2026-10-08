@@ -4,7 +4,7 @@ title: fixtureの登録プレビュー規則をrealと共通にし、未設定ro
 status: To Do
 assignee: []
 created_date: '2026-10-02 11:48'
-updated_date: '2026-10-04 09:34'
+updated_date: '2026-10-08 03:39'
 labels:
   - server
   - fixture
@@ -34,4 +34,6 @@ fixtureの getWorkRegisterPreview は独自の正規表現 /RJ\d{6,8}/i でRJコ
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-04 Codex(Astra)レビュー（tmp/structural-audit-2026-10-02/review-astra.md）を反映: 登録プレビューのうち、このタスクの範囲は入力から決まる純粋な規則（RJ検出・タイトル候補）だけ。メタの読み込みと配置形式による登録の統合はTASK-481が扱う。
+
+2026-10-08 DRAFT-56（fixture/real conformance test）をarchive。全ポートの網羅契約は採らず、fixtureとrealで規則が食い違った箇所ごとに契約テストを足す運用で、既に adapterRulesContract・workPlacementContract・updatePayloadContract・dlsite*Contract・rootReconfigurationContract 等がある。検索系は real/worksQueryContract。fixtureの登録プレビュー規則とroot未設定の挙動の食い違いは本タスクで解消し、同様の食い違いを見つけたらその規則の契約テストを足す。
 <!-- SECTION:NOTES:END -->

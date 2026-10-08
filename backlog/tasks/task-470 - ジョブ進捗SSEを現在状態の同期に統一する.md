@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-24 07:22'
-updated_date: '2026-09-25 13:33'
+updated_date: '2026-10-08 03:39'
 labels:
   - scan
   - dlsite
@@ -32,6 +32,8 @@ DRAFT-76（一括取得結果API・失敗内訳・個別再取得導線）とは
 
 <!-- SECTION:NOTES:BEGIN -->
 設計方針（アドバイザー承認 2026-09-25）: 詳細は ADR-0030 に記録予定。scanのseq/reset/SSE idを削除し接続時にstate snapshot→live、終端・エラー・再接続はGETで確定をscan/DLsite共通の正とする、世代とstatusRankは既存ヘルパーで共通化、470.2は終端で常に一覧系+全作品詳細を無効化しDlsiteBulkResultは拡張しない（AC#3の選択的無効化は不要と判断、DRAFT-76と重ねない）。1 worktree（task/470）で470.1→470.2を直列、段階1（ADR+plan）で停止しレビュー。
+
+2026-10-08 DRAFT-71（長時間ジョブ進捗配信の共通化）をarchive。履歴・sequence・Last-Event-ID再生の廃止と現在状態同期への統一はADR-0030で決着。残る将来判断は、3つ目の長時間ジョブ（一括タグ変更・一括エクスポート等）を追加する時点、またはLAN公開段階で、ジョブ管理の実装（scanJobManager・dlsiteJobManager）を共通の基盤に寄せるかどうか。その時点で新規に起票する。
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
