@@ -289,7 +289,7 @@ export async function createWorkFromFolder(
   const workDir = resolveWithin(root, join(root, body.path));
   if (!workDir || !isDirectory(workDir)) {
     throw new WorkRegisterError(
-      "not_configured",
+      "invalid_path",
       "指定されたパスは存在しないか、ルート配下ではありません",
     );
   }
@@ -391,7 +391,7 @@ export async function createWorkFromPath(
   const target = resolveWithin(root, join(root, body.path));
   if (!target) {
     throw new WorkRegisterError(
-      "not_configured",
+      "invalid_path",
       "指定されたパスは存在しないか、ルート配下ではありません",
     );
   }
@@ -402,7 +402,7 @@ export async function createWorkFromPath(
     return createWorkFromAudioFile(repos, scanner, root, target, body, applyDlsiteCover);
   }
   throw new WorkRegisterError(
-    "not_configured",
+    "invalid_path",
     "指定されたパスは存在しないか、ルート配下ではありません",
   );
 }
