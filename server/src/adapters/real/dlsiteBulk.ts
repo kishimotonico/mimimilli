@@ -8,7 +8,6 @@ import {
   hasRjCode,
   type WorkSummary,
 } from "@mimimilli/shared";
-import { DlsiteOfflineError } from "../../errors.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 import {
   refreshWorkDlsiteProjection,
@@ -21,12 +20,14 @@ import type { Scanner } from "./scanner.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
 import type { createDlsiteFetch, DlsiteFetchAttempt } from "./dlsiteFetch.ts";
 
+type DlsiteFetchDeps = ReturnType<typeof createDlsiteFetch>;
+
 export interface DlsiteBulkDeps {
   db: Db;
   query: WorkQueryRepository;
   catalog: CatalogWorkRepository;
   scanner: Scanner;
-  fetch: ReturnType<typeof createDlsiteFetch>;
+  fetch: DlsiteFetchDeps;
   dlsiteCache: DlsiteCache;
 }
 
@@ -60,34 +61,38 @@ export function selectDlsiteBulkTargets(
   };
 }
 
-export async function fetchDlsiteBulkAttempts(
-  uniqueRjCodes: string[],
-  fetchCachedDlsiteAttempt: (
-    productCode: string,
-    force: boolean,
-    signal?: AbortSignal,
-  ) => Promise<DlsiteFetchAttempt>,
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+async function fetchDlsiteBulkAttempt(
+  rjCode: string,
+  fetchCachedDlsiteAttempt: DlsiteFetchDeps["fetchCachedDlsiteAttempt"],
   signal: AbortSignal | undefined,
-): Promise<Map<string, DlsiteFetchAttempt>> {
-  const attempts = new Map<string, DlsiteFetchAttempt>();
-  for (const rjCode of uniqueRjCodes) {
-    if (signal?.aborted === true) return attempts;
-    try {
-      attempts.set(rjCode, await fetchCachedDlsiteAttempt(rjCode, false, signal));
-    } catch (error) {
-      if (error instanceof DlsiteOfflineError) throw error;
-      if (error instanceof DOMException && error.name === "AbortError") return attempts;
-      attempts.set(rjCode, {
-        result: {
-          ok: false,
-          kind: "error",
-          message: error instanceof Error ? error.message : "DLsite取得に失敗しました",
-        },
-        httpAttempted: false,
-      });
-    }
+): Promise<DlsiteFetchAttempt> {
+  try {
+    return await fetchCachedDlsiteAttempt(rjCode, false, signal);
+  } catch (error) {
+    if (isAbortError(error)) throw error;
+    return {
+      result: {
+        ok: false,
+        kind: "error",
+        message: error instanceof Error ? error.message : "DLsite取得に失敗しました",
+      },
+      httpAttempted: false,
+    };
   }
-  return attempts;
+}
+
+function groupByRjCode(targets: DlsiteBulkTarget[]): DlsiteBulkTarget[][] {
+  const groups = new Map<string, DlsiteBulkTarget[]>();
+  for (const work of targets) {
+    const group = groups.get(work.dlsite.rjCode);
+    if (group) group.push(work);
+    else groups.set(work.dlsite.rjCode, [work]);
+  }
+  return [...groups.values()];
 }
 
 interface ApplyDlsiteBulkWorkInput {
@@ -158,6 +163,10 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
       const isAborted = (): boolean => signal?.aborted === true;
       const result: DlsiteBulkResult = { fetched: 0, failed: 0, parseErrors: 0, skipped: 0 };
       const bulkStartedAt = Date.now();
+      const applyDeps: ApplyDlsiteBulkWorkDeps = { logger: dlsiteLogger };
+      const logEnd = (message: string): void =>
+        dlsiteLogger.info(message, { mode, durationMs: Date.now() - bulkStartedAt, ...result });
+
       try {
         const selection = selectDlsiteBulkTargets(query, workIds, dlsiteLogger);
         if (selection.dataIntegrityWarning) {
@@ -165,108 +174,67 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
         }
         const { targets } = selection;
         result.skipped = selection.skipped;
-        const uniqueRjCodes = [...new Set(targets.map((work) => work.dlsite.rjCode))];
+        const groups = groupByRjCode(targets);
+        const ordered = groups.flat();
         dlsiteLogger.info("DLsite一括取得を開始しました", {
           mode,
           targetCount: targets.length,
-          uniqueRjCodeCount: uniqueRjCodes.length,
+          uniqueRjCodeCount: groups.length,
           skipped: result.skipped,
         });
-        const attempts = await fetchDlsiteBulkAttempts(
-          uniqueRjCodes,
-          fetchCachedDlsiteAttempt,
-          signal,
-        );
-        if (isAborted()) {
-          dlsiteLogger.info("DLsite一括取得を中断しました", {
-            mode,
-            durationMs: Date.now() - bulkStartedAt,
-            ...result,
-          });
-          return result;
-        }
+        const progressAt = (processed: number): DlsiteBulkProgressSnapshot => {
+          const next = ordered[processed];
+          return {
+            processed,
+            total: ordered.length,
+            work: next ? { id: next.id, rjCode: next.dlsite.rjCode, title: next.title } : null,
+          };
+        };
+        options?.onProgress?.(progressAt(0));
 
-        const applyDeps: ApplyDlsiteBulkWorkDeps = { logger: dlsiteLogger };
-
-        for (let index = 0; index < targets.length; index++) {
+        let processed = 0;
+        for (const group of groups) {
           if (isAborted()) {
-            dlsiteLogger.info("DLsite一括取得を中断しました", {
-              mode,
-              durationMs: Date.now() - bulkStartedAt,
-              ...result,
-            });
+            logEnd("DLsite一括取得を中断しました");
             return result;
           }
-          const work = targets[index]!;
-          options?.onProgress?.({
-            processed: index,
-            total: targets.length,
-            work: { id: work.id, rjCode: work.dlsite.rjCode, title: work.title },
-          });
-          if (isAborted()) {
-            dlsiteLogger.info("DLsite一括取得を中断しました", {
-              mode,
-              durationMs: Date.now() - bulkStartedAt,
-              ...result,
-            });
-            return result;
-          }
-          const attempt = attempts.get(work.dlsite.rjCode)!;
-          try {
-            const outcome = await applyDlsiteBulkWork(applyDeps, {
-              work,
-              attempt,
-            });
-            result.fetched += outcome.fetched;
-            result.failed += outcome.failed;
-            result.parseErrors += outcome.parseErrors;
-            if (shouldRefreshDlsiteProjectionAfterFetch(attempt.result)) {
-              refreshWorkProjection(work.id);
-            }
-          } catch (error) {
-            if (error instanceof DOMException && error.name === "AbortError") {
-              dlsiteLogger.info("DLsite一括取得を中断しました", {
-                mode,
-                durationMs: Date.now() - bulkStartedAt,
-                ...result,
-              });
-              await dlsiteScheduler.drain();
+          const rjCode = group[0]!.dlsite.rjCode;
+          const attempt = await fetchDlsiteBulkAttempt(rjCode, fetchCachedDlsiteAttempt, signal);
+          for (const work of group) {
+            if (isAborted()) {
+              logEnd("DLsite一括取得を中断しました");
               return result;
             }
-            if (error instanceof DlsiteOfflineError) {
+            try {
+              const outcome = await applyDlsiteBulkWork(applyDeps, { work, attempt });
+              result.fetched += outcome.fetched;
+              result.failed += outcome.failed;
+              result.parseErrors += outcome.parseErrors;
+              if (shouldRefreshDlsiteProjectionAfterFetch(attempt.result)) {
+                refreshWorkProjection(work.id);
+              }
+            } catch (error) {
+              dlsiteLogger.error("DLsite一括取得の結果処理に失敗しました", {
+                workId: work.id,
+                rjCode,
+                message: errorMessage(error),
+              });
               result.failed += 1;
-              continue;
             }
-            dlsiteLogger.error("DLsite一括取得の結果処理に失敗しました", {
-              workId: work.id,
-              rjCode: work.dlsite.rjCode,
-              message: errorMessage(error),
-            });
-            result.failed += 1;
+            processed += 1;
+            options?.onProgress?.(progressAt(processed));
           }
         }
-        options?.onProgress?.({
-          processed: targets.length,
-          total: targets.length,
-          work: null,
-        });
-        dlsiteLogger.info("DLsite一括取得を完了しました", {
-          mode,
-          durationMs: Date.now() - bulkStartedAt,
-          ...result,
-        });
-        await dlsiteScheduler.drain();
+        logEnd("DLsite一括取得を完了しました");
         return result;
       } catch (error) {
-        if (isAborted() || (error instanceof DOMException && error.name === "AbortError")) {
-          dlsiteLogger.info("DLsite一括取得を中断しました", {
-            mode,
-            durationMs: Date.now() - bulkStartedAt,
-            ...result,
-          });
+        if (isAborted() || isAbortError(error)) {
+          logEnd("DLsite一括取得を中断しました");
           return result;
         }
         throw error;
+      } finally {
+        await dlsiteScheduler.drain();
       }
     },
   };
