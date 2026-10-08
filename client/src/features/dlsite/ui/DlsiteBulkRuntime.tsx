@@ -41,7 +41,7 @@ export default function DlsiteBulkRuntime() {
             toast.error(terminal.message);
           }
         }
-        void updateCachesAfterDlsiteBulkFetch(queryClient).catch(() => {});
+        void updateCachesAfterDlsiteBulkFetch(queryClient);
       }),
     [bulk, queryClient, setApplyOpen, toast],
   );

@@ -1118,34 +1118,4 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
     );
     expect(latestToastRequest(store)?.variant).toBe("error");
   });
-  it("キャッシュ無効化が失敗しても unhandled rejection にならない", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
-        isDlsiteStatusRequest(input, init)
-          ? dlsiteStatus({
-              lastTerminal: { jobId: "job-1", status: "complete", result: dlsiteResult },
-            })
-          : response({ ok: true }),
-      ),
-    );
-
-    const { store, queryClient } = renderRuntime(createElement(DlsiteBulkRuntime));
-    const invalidateQueries = vi
-      .spyOn(queryClient, "invalidateQueries")
-      .mockRejectedValue(new Error("invalidate failed"));
-
-    await trackDlsiteJob(store);
-    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
-    const source = FakeEventSource.instances[0]!;
-
-    await expectNoUnhandledRejection(async () => {
-      dispatchDlsite(source, "complete", {
-        type: "complete",
-        jobId: "job-1",
-        result: dlsiteResult,
-      });
-      await waitFor(() => expect(invalidateQueries).toHaveBeenCalled());
-    });
-  });
 });

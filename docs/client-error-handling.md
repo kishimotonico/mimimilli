@@ -29,10 +29,16 @@ client のエラー所有権・Promise 契約・best-effort 失敗の基準。�
 - `useAudioEngineLifecycle` の `updateLastPlayed` — 同上。サイドバーの「最終再生」表示が更新されないだけ
 - `audioEngine` の `AudioContext.resume()` — ブラウザの自動再生ポリシーでよく失敗する。次の `play()` で再試行
 - `audioEngine` の `AudioContext.close()`（`destroy` 時）— 破棄時のクリーンアップ。既に再生は止まっている
+- `refreshScanCandidates` の呼び出し（`ScanRuntime` のスキャン完了時・起動時、root再設定の離脱時、`UnregisteredTab` の候補更新エラー後）— 失敗しても直前の候補キャッシュが残るだけ。ユーザーの明示操作（再スキャン・候補タブの再取得）で取り直せる
+- `dlsiteBulkStore.attach` の `getDlsiteBulkStatus` — 起動・スキャン完了後の再接続の試行。失敗しても一括取得は手動で開始でき、状態は次の `attach` で揃う
+- root再設定の離脱時（`rootReconfigurationController`）の直近スキャン結果取得 — 失敗すると DLsite 一括の自動再接続が行われないだけ。手動の一括取得は使える
+- `Toast` の `showPopover` / `hidePopover` — 既に同じ状態のときの `DOMException`。状態は目的どおりになっている
+- `useMediaSession` の `setActionHandler` — 個別 action に未対応のブラウザでは、その action だけ無効になる
 - `scanJobStore` の SSE 切断後 `getScanJob` 一時失敗 — EventSource の標準再接続に任せる。404/410 とスキーマ不一致だけ `state.error`（ScanRuntimeが読みuseToastへ渡す）へ
 
 **ローカル UI で扱う箇所**
 
-- `ScanModal` の新規作品一覧 `getWork` — モーダル内に「新規作品の読み込みに失敗しました」を表示
+- `useWorkTagEditor` のタグ追加・削除 / `RegisterWorkDialog` の登録 — 失敗は mutation の `error` からフォーム内に表示する。`catch` は再 throw を止めるだけ
+- `ScanModal` の「新規登録」「更新」タブの作品取得（`useScanResultWorks`）— タブ内の表に「新規作品の読み込みに失敗しました」「更新された作品の読み込みに失敗しました」を表示
 
 client にはサーバー側の logtape 相当のロガーはない。best-effort は debug ログを出さず完全無視とする。将来ロガーを導入する場合は、「完全に無視」箇所だけ `debug` レベルでの記録を検討する。
