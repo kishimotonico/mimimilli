@@ -1,6 +1,6 @@
 # デザインシステム規約
 
-レイアウト・機能仕様の正は実装（`client/src/`）。本書は実装からは読み取れない設計意図・規約だけを記す。出典の詳細モックは Git 履歴の `docs/design_handoff_mimimilli_library/`（2026-07-03 削除）にある。
+レイアウト・機能仕様の正は実装（`client/src/`）。本書は実装からは読み取れない設計意図・規約だけを記す。
 
 ## カラートークンの意味づけ
 
@@ -16,9 +16,7 @@
 
 ## テーマとアクセント
 
-ダークテーマは未実装（`.ml-dark` のトークン先行定義も撤去済み）。将来対応する場合はトークンから設計し直す。アクセント色は `.ml-acc-coral` / `.ml-acc-grass` / `.ml-acc-cobalt` の差し替えクラスだけで全体に伝播する。
-
-モックのみに存在した `.ml-acc-graph` は実装未移植。必要になった場合は Git 履歴の削除前ディレクトリを参照する。
+ダークテーマは未実装。将来対応する場合はトークンから設計し直す。アクセント色は `--acc` 系トークン（`--acc` / `--acc-soft` / `--acc-line` / `--acc-ink`）だけで全体に伝播し、差し替えクラスは持たない。
 
 ## タイポグラフィ
 
@@ -53,7 +51,7 @@
 - モーダル `<dialog open>` が開いている間は、フォーカス位置に関わらずグローバルショートカットを全キー無効化する（dialog内でSpaceや矢印キーが背後の再生・seekを変えない）
 - 除外セレクタ（ネイティブ操作を優先する）: `input, textarea, select, [contenteditable], [role="menu"], [role="listbox"], button, a`。フォーカスがこれらの中にあれば、Web標準どおりその要素自身の操作（テキスト入力・メニュー操作・ボタン活性化等）を優先し、グローバルショートカットは発火しない
 - ただし常設プレイヤーの操作ボタン（再生/一時停止・前後トラック・±10秒・ループ・チャンネル入替・速度トリガー・音量トリガー）には `data-player-control` 属性を付与しており、この属性を持つ要素にフォーカスがあるときだけ、Spaceは通常のbutton除外をバイパスして常にグローバルの再生/一時停止に回る（矢印キーは対象外で、通常のbuttonと同じくネイティブ動作優先のまま）。判定は`data-player-control`属性で行い、クラス名の文字列一致やDOM構造の推測には頼らない。ボタン自身のネイティブSpace活性化とグローバル側の再生トグルが二重発火しないよう、preventDefaultでボタンの既定動作を止める
-  - 付与した対象: `BarContent`（下部バー）・`PlayerTransportControls`（再生中タブ）・`PopupContent`（ポップアップ）・`NowPlayingImmersiveMiniControls`（没入モード）の各再生/一時停止・前後トラック・±10秒・ループ・チャンネル入替ボタン、`PopupContent`の速度トリガー（`mle-ratepill`、速度メニュー項目自体は`role="menu"`配下として従来どおり除外）、`BarVolumePopover`の音量トリガー
+  - 付与した対象: `BarContent`（下部バー）・`PlayerTransportControls`（再生中タブ）・`PopupContent`（ポップアップ）・`NowPlayingImmersiveMiniControls`（没入モード）の各再生/一時停止・前後トラック・±10秒・ループ・チャンネル入替ボタン、`PopupContent`の速度トリガー（`mle-ratepill`、速度メニュー項目自体は`role="menu"`配下として除外）、`BarVolumePopover`の音量トリガー
   - 意図的に付与しなかった対象: 停止・展開・折りたたみ・「再生中の作品を表示」等のナビゲーション系ボタン（再生状態を切り替える操作ではないため）、`ABRepeatBar`のA/B地点設定ボタン（再生状態を切り替える連続操作ではなく、その場で状態を確定させる一回限りのアクションのため、標準のSpace活性化のままでよい）
 - Escapeはレイヤーごとに一段だけ閉じる（`TagCombobox`）。候補表示中のEscapeは候補だけを閉じ、ダイアログのcancelや親popoverのdismissへは伝播させない。候補が閉じているときのEscapeは、呼び出し元が渡した`onCancel`があればそれ（編集キャンセル等）を呼び、`onCancel`が無ければ何もせずネイティブ`<dialog>`のcancelへ素通しする
 - IME変換中（`event.nativeEvent.isComposing`）はEscapeもEnterも無視する。変換の取り消し・確定はIME自身に任せ、候補の開閉・タグ確定・onCancelは発火させない
@@ -104,7 +102,7 @@
 
 設定モーダル・スキャンモーダル・スマートフォルダーエディタ・作品編集・DLsite適用プレビューは
 ネイティブ `<dialog>` + `showModal()` で実装しており、z-index ではなくブラウザの
-top layer によって最前面に重なる（TASK-29）。開閉ライフサイクル・Escapeキャンセル・
+top layer によって最前面に重なる。開閉ライフサイクル・Escapeキャンセル・
 backdropクリックの共通処理は `client/src/shared/ui/useDialogModal.ts` に集約している。
 フォーカストラップと「多重モーダル時は最前面のEscだけが効く」挙動は top layer の
 ブラウザ標準実装に任せる。Escape・×ボタン・backdropクリックの閉じ方は progressive
@@ -113,7 +111,7 @@ dismissal に統一しており、3経路とも `useDialogModal` の `onClose` 1
 保存中に閉じない等の条件は各モーダルが `onClose` 内で判断する。
 
 グローバルトーストは `popover="manual"` + `showPopover()` で同じ top layer に載せ、
-モーダル・ダイアログが開いていても通知が隠れないようにする（TASK-206）。表示は
+モーダル・ダイアログが開いていても通知が隠れないようにする。表示は
 `client/src/shared/ui/Toast.tsx` が `document.body` へポータルし、z-index では
 モーダルより上に出せない制約を避ける。top layer 内の前後関係は表示タイミングの
 新しい方が手前になるため、モーダル表示後にトーストを出せば常に最前面に見える。
@@ -143,12 +141,9 @@ dialog を `useTopmostOpenModalDialog`（`shared/ui/`）で検出し、そのdia
 閉じない。閉じたい場合は呼び出し側が `onAction` 内で明示的に `toast.dismiss()` を呼ぶ
 （非同期操作なら完了後でよい）。
 
-以前は「各画面が自分の判断でdialog内かdocument.bodyかを選ぶ」形だったため、GlobalToast
-（アプリルート）が偶然同じタイミングで表示要求を出すと、2つの独立したToastインスタンスが
-同じ固定位置（モーダルdialog直下）へ同時にポータルされ、一方が他方のボタンを覆って操作
-できなくなる不具合があった（スキャンダイアログでDLsite一括取得完了トーストと
-候補除外のUndoトーストが重なるケースで発生）。単一ホストに集約し、`GlobalToast` が
-「今どの1件を表示するか」を優先度チェーンで決めることでこの衝突を構造的に無くす。
+Toast を複数箇所で描画すると、独立した2つのインスタンスが同じ固定位置（モーダルdialog直下）へ
+同時にポータルされ、一方が他方のボタンを覆って操作できなくなる。単一ホストに集約し、
+`GlobalToast` が「今どの1件を表示するか」を優先度チェーンで決めることでこの衝突を構造的に避ける。
 
 優先度チェーンは次の順（上が勝つ）。
 
@@ -213,7 +208,7 @@ focus中はタイマーを止め、離れると残り時間から再開する。
 - 構造的なモーション（要素の出入り・スライド等）は `motion`（`motion/react`）の `AnimatePresence` で実装する。マウント境界は `{open && <Child />}` の条件レンダーにし、duration・easing・delay は `client/src/shared/ui/useMotionVariants.ts` の variant ビルダーに集約する。**`transition.delay` の直書きは禁止**（reduced-motion 時の 0 化を迂回するため）。delay が要る場合はビルダーのオプション経由にする
 - 汎用ラッパーコンポーネントは作らない。共有するのはトークン（variant ビルダー）と規約のみで、各所で motion コンポーネントを直接使う
 - 既存ルート要素は直接 `motion.div` 等に置き換える（ラッパー DOM を被せない）。ただし collapse でルート要素に padding/border がある場合は、`overflow: hidden` だけを持つ無地のラッパーを 1 枚だけ被せる
-- `layout` / `layoutId` は使わない（過去にカバー歪みで撤去済み）。スコープは出退場・opacity・transform・width・height(0↔auto) に限定する
+- `layout` / `layoutId` は使わない（カバーが歪むため）。スコープは出退場・opacity・transform・width・height(0↔auto) に限定する
 - fade の退出 `position: absolute` は最も近い positioned ancestor を基準にする。fade を使う箇所ごとに祖先が positioned かを確認する
 - AP 境界の子は必ずコンポーネントとして切り出し、内部で `useIsPresent()` を呼ぶ。用途は (a) ルート要素への `inert={!isPresent}`、(b) document/window レベルのリスナー（outside click・Escape 等）の退出中解除、(c) 再オープン時の初期フォーカス（退出アニメ中に同じ対象が開き直されたときに入力欄へフォーカスし直す）の 3 つに限定する。**閉じたときのフォーカス復帰には使わない** — 復帰は `activeElement` を検査して reason を渡す close ハンドラ側の責務。`isPresent` で復帰させると、対象を素早く切り替えたときに退出中の旧要素が新要素からフォーカスを奪う
 - クエリ購読は開閉状態に連動させない（`useXxxQuery(isOpen ? a : null)` のような引数の null 切替をしない）。子がマウントされている間は常に有効な引数で購読する
@@ -264,10 +259,6 @@ UI 全体は `client/src/styles/shell/index.css` の `@layer base` で `body { u
 - smoke が赤いときは常に実際の不具合を意味する。見た目の変更では落ちないよう、対象範囲を撮影せず role/text ベースのアサーションだけで組み立てる
 - コンソールエラー・未捕捉例外・4xx/5xxレスポンス・ネットワークリクエスト失敗が出ていないことも各テストの末尾で確認する（`support.ts` の `trackErrors` / `assertNoErrors`）
 - レイアウトに関わる変更をするタスクでは、そのタスクの受け入れ条件・完了確認に `pnpm test:smoke` の結果（新規失敗が増えていないか）を含める
-
-## 将来UIの参考資料
-
-スマートフォルダー条件エディタの新規作成フロー、複数chミキサーの詳細意匠、左ナビのラベル付き案、統計/メモ/詳細トラック表を含む拡張作品詳細のモックは、いずれもフェーズ1未実装の将来UI案として Git 履歴の削除前ディレクトリ（`docs/design_handoff_mimimilli_library/`、2026-07-03 削除時点のコミット）から復元できる。着手時に参照する。
 
 ## 見送ったUI案
 

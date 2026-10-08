@@ -1,6 +1,6 @@
 // 分類軸のファセット集計（GET /api/axes/:axis）の純粋関数。
 // 軸ID は "tag"（全タグ。flat・annotated 双方）・"year"（追加日の年）・
-// 任意の prefix 文字列（ADR-0005 追記）。
+// 任意の prefix 文字列（ADR-0005）。
 import { parseTag } from "@mimimilli/shared";
 import type { AxisFacetsQuery, AxisFacetItem, WorkSummary } from "@mimimilli/shared";
 import { EMPTY_TAG_FILTERS } from "@mimimilli/shared";

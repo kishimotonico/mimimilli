@@ -36,7 +36,7 @@ export type ViewId = z.infer<typeof viewIdSchema>;
 
 /** 分類軸の ID（ADR-0005）。enum ではなく文字列:
  *  - "tag": 全タグ軸（組み込み）。flat・annotated 双方を集計する
- *    （ADR-0005 追記: prefixグループ見出し付きチェックボックス一覧で表示）
+ *    （ADR-0005）
  *  - "year": 追加日の年（組み込み。addedAt 由来でタグではない）
  *  - それ以外: 登録済み prefix そのもの（例: "cv", "サークル"）。正規形（小文字）で扱う */
 export const facetAxisIdSchema = z

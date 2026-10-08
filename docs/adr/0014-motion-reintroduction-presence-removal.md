@@ -31,7 +31,7 @@ motion を再導入し、出現・退出アニメーションの基盤を `Anima
 4. **variantトークンモジュール**（`presenceDurations.ts` の後継、`useMotionVariants()` フック + booleanを受けるbuilderのペア）に duration・easing・delay・transform-origin を集約する。プロパティ別duration・enter/exitの非対称scale・overshoot easing（cubic-bezier(0.34,1.2,0.64,1)）を表現できる形式にする。**delayを含む全パラメータをbuilder経由にし、コンポーネント側の `transition.delay` 直書きは禁止**（reduced-motion時の0化を迂回するため）
 5. **汎用ラッパーコンポーネントは作らない**。TASK-156でAnimatePresence相当（TransitionPresence）の自作がレビュー5巡で破綻した教訓。共有するのはトークンと原則3の規約のみで、各所で motion コンポーネントを直接使う
 6. **既存ルート要素を直接 `motion.div` 等に置き換える**（ラッパーDOMを被せない）。`position: fixed` オーバーレイの座標系・stacking context破壊を防ぐ
-7. **`layout` / `layoutId` は再導入しない**。過去にカバー歪み等で撤去済み（docs/issues/2026-07-02-player-ui-redesign.md）。スコープは出退場・opacity・transform・width・height(0↔auto) に限定
+7. **`layout` / `layoutId` は再導入しない**。カバー歪み等の原因になる。スコープは出退場・opacity・transform・width・height(0↔auto) に限定
 
 ### 個別の確定事項
 

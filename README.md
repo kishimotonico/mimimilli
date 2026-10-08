@@ -5,19 +5,19 @@ DLsite や FANZA からダウンロードした音声作品を、手元の環境
 
 ## 特徴
 
-- **Library モード**：軸レール（サークル、CV、タグ別ピボット）、コンテンツ列、プレビューの 3 ペインで登録済み作品をブラウズ
+- **Library モード**：軸レール（サークル、CV、タグなどの値ブラウズ）と結果面で登録済み作品をブラウズし、作品を選ぶと右にプレビューを開く
 - **Files モード**：ルートフォルダー以下の物理ファイルシステムをそのまま巡回し、未登録フォルダーも表示
 - **タグ AND/OR 絞り込み**：複数タグを組み合わせ、ヒット件数をリアルタイム更新
 - **スマートフォルダー**：WHERE/AND/AND NOT の保存クエリで作品を動的に抽出
 - **タグベースの管理**：フラットタグと Annotated タグ（`cv/名前`、`サークル/名前`）で作品を整理
 - **メタファイル駆動**：`mimimilli.json` を正本とし、SQLite は検索と一覧表示のキャッシュとして再構築可能
-- **自動スキャン**：音声ファイルを含むフォルダーからメタファイルを自動生成
-- **常駐プレイヤー**：作品を眺めながら再生を継続し、必要に応じて全画面プレイヤーへ展開
+- **スキャンと登録**：ルートフォルダーを走査して未登録の候補を検出し、選んだものを登録するとメタファイルを生成
+- **常駐プレイヤー**：作品を眺めながら再生を継続し、左ナビの「再生中」タブで大きく表示
 
 ## スクリーンショット
 
 ![Library モード](docs/assets/readme/library-mode.png)
-Library モード（軸レール・作品一覧・詳細プレビューの3ペインと再生バー）
+Library モード（軸レール・作品一覧・詳細プレビューと再生バー）
 
 ![Files モード](docs/assets/readme/files-mode.png)
 Files モード（物理フォルダーの巡回とポップアッププレイヤー）
@@ -68,6 +68,7 @@ pnpm dev:fixture           # 手書きシードの11件のみ
 pnpm dev:fixture:new-work
 pnpm dev:fixture:empty
 pnpm dev:fixture:errors
+pnpm dev:fixture:scan-review
 ```
 
 実 SQLite と実ファイルシステムの real アダプタへ接続する場合は、サーバーとフロントを一括起動できる。
@@ -115,19 +116,19 @@ pnpm test:smoke     # Playwright スモークテスト（roleベースの動作�
 
 ### CI（GitHub Actions）
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) が `master` への push と pull_request で Ubuntu 上の `pnpm check` と `pnpm test` を実行する（Playwright smoke と Windows は対象外）。ブランチ保護を使う場合は、GitHub のリポジトリ設定でこの workflow の `check-and-test` ジョブを required check に指定する。
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) が `master` への push と pull_request で Ubuntu 上の `check-and-test`（`pnpm check && pnpm test`）と `smoke`（`pnpm test:smoke`）の2ジョブを実行する（Windows は対象外）。ブランチ保護を使う場合は、GitHub のリポジトリ設定でこれらのジョブを required check に指定する。
 
 ## 使い方
 
 1. 初回起動時にルートフォルダー（音声作品を保存しているフォルダー）を選択
-2. 自動スキャンが実行され、作品が検出される
+2. スキャンが実行され、未登録の作品候補が検出される。登録したい候補を選んで登録する
 3. Library モードで軸ピボットを表示し、Files モードで物理フォルダーを巡回
 4. タグの追加や削除で作品を整理
 
 ### メタファイルについて
 
 各作品フォルダー内に `mimimilli.json` を配置すると、mimimilli はそのフォルダーを作品として認識します。
-スキャン時にメタファイルがないフォルダーでは、`mimimilli.json` が自動生成されます。
+メタファイルがないフォルダーは、スキャンで作品の候補として検出され、登録操作の際に `mimimilli.json` が生成されます。
 
 ```jsonc
 {
@@ -151,7 +152,7 @@ pnpm test:smoke     # Playwright スモークテスト（roleベースの動作�
 }
 ```
 
-各 `id`（作品・プレイリスト・トラック）は UUID v4 で、スキャン時に自動生成・補完される。手書きする必要はない。スキーマの正典は `shared/src/meta.ts`（`metaFileSchema`）。
+各 `id`（作品・プレイリスト・トラック）は UUID v4 で、登録時に自動生成される。手書きする必要はない。スキーマの正典は `shared/src/meta.ts`（`metaFileSchema`）。
 
 ### キーボードショートカット
 
@@ -170,8 +171,8 @@ mimimilli/
 ├── client/                  # フロントエンド (React 19 + TypeScript + Vite)
 │   ├── src/
 │   │   ├── app/             # アプリルート、プロバイダー、グローバルショートカット
-│   │   ├── features/        # 機能単位モジュール (library/files/player/scan/settings/setup/navigation)
-│   │   ├── entities/        # ドメインエンティティ (work / tag / smart-folder / settings / file-system)
+│   │   ├── features/        # 機能単位モジュール (画面・操作ごと)
+│   │   ├── entities/        # ドメインエンティティ (API・クエリキー・状態)
 │   │   └── shared/          # 共通ユーティリティ、UI、API クライアント
 │   ├── tests/
 │   │   ├── helpers/         # テスト共通ヘルパー
@@ -183,18 +184,18 @@ mimimilli/
 │   └── src/
 │       ├── index.ts         # エントリポイント (env: PORT/MIMIMILLI_ADAPTER/MIMIMILLI_DATA_DIR/MIMIMILLI_MOCK_SCENARIO)
 │       ├── app.ts           # createApp（アダプタ注入）
-│       ├── adapter.ts       # DataAdapter インターフェース
+│       ├── adapter/         # DataAdapter インターフェース
 │       ├── adapters/
 │       │   ├── fixture/     # インメモリ開発データ（旧 client/mocks を統合）
-│       │   └── real/        # SQLite(Drizzle) + 実FS: scanner / dlsite / meta / workRepo ほか
-│       ├── core/            # ドメインロジック (worksQuery / axisFacets / smartFolder)
+│       │   └── real/        # SQLite(Drizzle) + 実FS: スキャン・DLsite・メタ・リポジトリ
+│       ├── core/            # 純粋関数によるドメインロジック
 │       └── routes/          # HTTP ルート定義
 ├── shared/                  # Zod スキーマ正典（API 契約、client/server 共有）
+├── scripts/                 # 開発用スクリプト（レイヤー境界検査など）
 ├── backlog/                 # タスク管理（Backlog.md CLI。`pnpm backlog` で操作、直接編集禁止）
 └── docs/                    # 設計ドキュメント（地図は docs/README.md）
     ├── HANDOFF.md           # 開発の現状・引き継ぎ
     ├── adr/                 # アーキテクチャ決定記録
-    ├── issues/              # 過去の作業記録アーカイブ（凍結）
     └── design-system.md      # デザインシステム規約（カラートークン等）
 ```
 

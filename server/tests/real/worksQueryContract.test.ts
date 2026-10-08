@@ -610,7 +610,7 @@ test("スマートフォルダー候補IDが900件を超えてもlistSummaries�
   assert.equal(real.total, fixture.total);
 });
 
-test("tag軸はprefixタグも自由タグも数える（ADR-0005 追記）", (t) => {
+test("tag軸はprefixタグも自由タグも数える（ADR-0005）", (t) => {
   const scope = makeTestScope();
   t.after(scope.cleanup);
   const db = scope.own(openDb({ kind: "memory" }));

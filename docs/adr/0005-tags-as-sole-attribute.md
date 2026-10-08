@@ -2,7 +2,7 @@
 
 - ステータス: 承認（実装済み）
 - 日付: 2026-07-11
-- 関連: [ADR-0004](0004-core-functions-over-sql.md)、[../requirements-v4.md](../requirements-v4.md) §4
+- 関連: [ADR-0004](0004-core-functions-over-sql.md)、[ADR-0012](0012-library-axis-as-value-browse.md)（§6の軸ドリルをタグフィルタへ統合）、[../requirements-v4.md](../requirements-v4.md) §4
 
 ## 文脈
 
@@ -47,10 +47,10 @@ CV・サークルを含め、作品の属性をデータモデルの専用カラ
 
 ### 6. 絞り込みの一致セマンティクス
 
-- 軸ドリル・タグ AND/OR 絞り込み・スマートフォルダーの `タグ ∋`: タグ全体の完全一致
+- タグ AND/OR 絞り込み・スマートフォルダーの `タグ ∋`: タグ全体の完全一致。軸の値選択もタグ絞り込みに統合されている（[ADR-0012](0012-library-axis-as-value-browse.md)）
 - グローバル検索ボックス: 部分一致
 
-現行の `filterByTags`（部分一致）はこの決定に合わせて完全一致へ改める。
+`filterByTags` は完全一致で実装する。
 
 ### 7. 帰結として必要になる機能
 
@@ -61,16 +61,6 @@ CV・サークルを含め、作品の属性をデータモデルの専用カラ
 
 - 「CV もサークルもタグの1つ」という思想がコード上も真になり、ユーザー定義 prefix（例: `気分/`）が標準 prefix と同格に軸・保護・色を持てる
 - `genre/` タグの受け皿問題は「初期設定で genre を軸表示にするか」という設定初期値の問題に還元される
-- `facetAxisSchema` の enum 廃止は API 契約・URL 同期（`navigationUrl.ts`）・軸レール UI に波及する。既存6軸相当を初期設定として投入すれば利用上の互換は保てる。なお `year`（追加日）はタグ由来でない組み込み軸として分類軸グループに残し、ドリル絞り込みを `addedAt` の年照合に統一した（従来は集計が `addedAt` 由来・ドリルがタグ照合という不整合があり、常に0件になっていた）
+- 分類軸は prefix 定義から動的に導出する。組み込み軸は2つで、`tag` は flat・annotated を問わず全タグを集計し（値は完全なタグ文字列。例: `cv/藤田茜`）、`year`（追加日）はタグ由来でなく `addedAt` の年で集計・絞り込みする
 - prefix 定義の保存場所（DB か、ポータビリティを重視してルートフォルダー直下の設定ファイルか）は要件決めタスクで確定する
 - 全タグが編集可能になるため、誤操作に対する安全性は保護フラグ（確認ダイアログ）に依存する
-
-## 追記（2026-07-31）: タグ軸（"tag"）は flat・annotated 全タグを集計する
-
-当初実装（`buildAxisFacets` / `shared/src/library.ts` の軸コメント）は `tag` を「フラットタグのみを集計する軸」として実装していた。実運用ではほぼ全タグが `prefix/値` 形式（annotated）になり、`tag` 軸が恒常的に0件になる問題を生んだため、この整理を改める。`buildAxisFacets`（`server/src/core/axisFacets.ts`）と real アダプタの SQL（`workRepo.ts`）を、axis `"tag"` では flat・annotated を問わず全タグを集計するよう変更する。
-
-- 集計値（`AxisFacetItem.value`）は完全なタグ文字列（例: `"cv/藤田茜"`）を保持する。既存の AND 絞り込み（`tags`/`tagOp=AND` パラメータ）はタグの完全一致で動くため、そのまま機能する
-- 表示側（`ContentColumn.tsx`）は `parseTag` で prefix を取り出し、`TagPrefix` の label/color を使って prefix グループ見出し付きのチェックボックス一覧にする。表示順序はフラットタグ→登録済み prefix（定義順）→未登録 prefix
-- `cv` 等の個別 prefix 軸（単一ドリル）とは役割が異なる: `tag` 軸はチェックボックスの複数選択 AND 絞り込みを prefix 横断で行うための面であり、両者は併存する
-
-これにより「タグ」軸が実データで意味を持つ操作面になる。ADR本文中・`shared/src/library.ts` 等コード中の「`tag`: フラットタグ軸」という記述はこの追記で上書きされたものとして読む。

@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-06-11
-- 関連: `docs/architecture-v2-proposal.md`（2026-07-04 削除、Git履歴参照。現行は [../ARCHITECTURE.md](../ARCHITECTURE.md)）、[ADR-0001](0001-typescript-api-server.md)
+- 関連: [../ARCHITECTURE.md](../ARCHITECTURE.md)、[ADR-0001](0001-typescript-api-server.md)、[ADR-0018](0018-vite-client-bun-server-separation.md)（dev サーバーへのマウントを Bun プロセスの別起動へ改訂）
 
 ## 文脈
 
@@ -13,9 +13,9 @@
 モックを「捨てる仮実装」ではなく、本実装サーバー（ADR-0001）の fixture アダプタへ昇格させる。
 
 - `server/` はルーター＋ドメインロジックを1系統だけ持ち、データ層を adapters（real: SQLite＋実FS / fixture: インメモリ fixtures）として差し替える
-- `client/` の dev サーバーはrealバックエンドサービスが指定されていないとき、workspace 依存で server の Hono アプリ（fixture アダプタ注入）をマウントする。`pnpm dev` 一発の DX とシナリオ切替（`MIMIMILLI_MOCK_SCENARIO`）を維持する
+- `client/` の dev サーバーはrealバックエンドサービスが指定されていないとき、workspace 依存で server の Hono アプリ（fixture アダプタ注入）をマウントする。`pnpm dev` 一発の DX とシナリオ切替（`MIMIMILLI_MOCK_SCENARIO`）を維持する（[ADR-0018](0018-vite-client-bun-server-separation.md) で改訂）
 - Playwright ビジュアルテストも fixture アダプタ経由とし、決定的なデータで実行する
-- 移行完了後、`client/mocks/` は削除する
+- `client/mocks/` は置かない
 
 ## 理由
 
@@ -27,7 +27,5 @@
 
 - 新機能の API は必ず shared スキーマ → fixture アダプタ → real アダプタの順で実装される（fixture が先行してよい）
 - fixture アダプタは本番コードの一部としてメンテナンスされる（テスト・dev 専用の使い捨てではない）
-
-## 現状（2026-07-04）
-
-実装完了。`client/mocks/` は fixture アダプタ（`server/src/adapters/fixture/`）へ統合済みで、Vite dev middleware 経由のマウント・`MIMIMILLI_MOCK_SCENARIO` によるシナリオ切替・音声やカバー画像の合成メディア配信まで稼働している。「shared → fixture → real」の実装順は現在も有効な方針で、real / fixture 両アダプタとも core の純粋関数（[ADR-0004](0004-core-functions-over-sql.md)）を通して同じロジックを実行する。
+- fixture アダプタは `server/src/adapters/fixture/` にあり、`MIMIMILLI_MOCK_SCENARIO` によるシナリオ切替と、音声・カバー画像の合成メディア配信を持つ
+- fixture アダプタは検索・集計を core の純粋関数に渡して行う。real アダプタとの検索ロジックの分担は [ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md) に従う

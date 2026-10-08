@@ -61,8 +61,8 @@ oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメン
 サーバー内部は3層に分かれるが、過剰なレイヤリングは避ける方針で、各層の責務は最小限にとどめている。
 
 - `routes/`（`server/src/routes/`）: HTTP とバリデーションだけを担う薄い層。ドメインロジックは持たない
-- `core/`（`server/src/core/`）: 純粋関数によるドメイン処理。`worksQuery`（検索・フィルタ・ソート・ページング）、`axisFacets`（分類軸の値集計）、`smartFolder`（スマートフォルダー条件の評価・ソート・ページング）に加え、`resumeValidation`（resume保存の検証規則）、`workRegistrationGuard`（作品登録の重複・配下登録チェック）がある。後者2つは real/fixture 両アダプタが直接呼び、fixture 固有の判定・real 固有のSQL判定という分岐を作らない。fixture アダプタはインメモリ配列を検索・集計系の純粋関数群（`applyWorksQuery` / `buildAxisFacets` / `evalSmartFolder`）に渡して検索・集計する
-- real アダプタの検索・ファセット集計は SQL で行う。`WorkQueryRepository` の `queryWorks()` が catalog に user を ATTACH した JOIN で件数とページを同じ絞り込み集合から求め（ADR-0008）、`getAxisFacets()` がタグ軸専用 SQL を含むファセット集計を担う。SQL フラグメントは `workQuerySql.ts` に集約する。日本語ソートキー（`japaneseSortKey`）は書き込み時に列へ事前計算する。SQL と core 純粋関数の結果が一致することは `server/tests/real/worksQueryContract.test.ts` の同値性契約テストで担保する。スマートフォルダー評価だけは real でも `listSummaries()` + `evalSmartFolder` を使い、戻り値は `WorksPage`（ページングエンベロープ）である
+- `core/`（`server/src/core/`）: 純粋関数によるドメイン処理（検索・集計・スマートフォルダー評価・検証規則・登録ガードなど）。構成物はディレクトリを正とする。fixture アダプタはインメモリ配列をこれらの関数に渡して検索・集計し、検証規則・登録ガード系は real/fixture 両アダプタが共有する。fixture 固有の判定・real 固有のSQL判定という分岐を作らない
+- real アダプタの検索・ファセット集計は SQL で行う。`WorkQueryRepository` の `queryWorks()` が catalog に user を ATTACH した JOIN で件数とページを同じ絞り込み集合から求め（ADR-0008）、`getAxisFacets()` がタグ軸専用 SQL を含むファセット集計を担う。SQL フラグメントは `workQuerySql.ts` に集約する。日本語ソートキー（`japaneseSortKey`）は書き込み時に列へ事前計算する。SQL と core 純粋関数の結果が一致することは `server/tests/real/worksQueryContract.test.ts` の同値性契約テストで担保する。スマートフォルダー評価だけは real でも `listSummaries()` + `evalSmartFolderRules` を使い、戻り値は `WorksPage`（ページングエンベロープ）である
 - `adapters/`（`server/src/adapters/`）: `DataAdapter` インターフェース（`server/src/adapter/index.ts`）でデータの出どころ（real | fixture）だけを差し替える。ルーターとドメインロジックは1系統のみ
 - プロセス内状態を持つアプリケーションサービス（`ScanJobManager` / `DlsiteJobManager` / `RootReconfigurationWorkflow`）は `server/src/` 直下に置き、`app.ts` が生成してルートと配線する。状態遷移や順序はサービスが持ち、I/Oは `DataAdapter` 経由で real/fixture 共通に行う
 
