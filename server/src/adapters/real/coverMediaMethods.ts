@@ -12,15 +12,17 @@ import type { WorkspacePath } from "@mimimilli/shared";
 import { browseFs as browseFilesystem } from "./fsBrowse.ts";
 import { mimeOf, resolveWithin, workspaceMediaMetadata } from "./paths.ts";
 import { ThumbnailCache } from "./thumbnailCache.ts";
+import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 
 export function createCoverMediaMethods(deps: {
   query: WorkQueryRepository;
+  catalog: CatalogWorkRepository;
   thumbnailCache: ThumbnailCache;
   thumbnailCacheDir: string;
   requireRoot: () => string;
 }) {
-  const { query, thumbnailCache, thumbnailCacheDir, requireRoot } = deps;
+  const { query, catalog, thumbnailCache, thumbnailCacheDir, requireRoot } = deps;
   async function describeCover(workId: string, width?: number): Promise<CoverDescriptor | null> {
     const work = query.getCoverLocation(workId);
     if (!work?.coverImage) return null;
@@ -116,7 +118,10 @@ export function createCoverMediaMethods(deps: {
       if (realRoot === null) return null;
       const target = resolveWithin(root, path ? join(root, path) : root);
       if (target === null) return null;
-      return browseFilesystem(realRoot, query.listFsWorkRefs(target), target);
+      const conflictPaths = new Set(
+        catalog.listIdentityConflicts().flatMap((diagnostic) => diagnostic.paths),
+      );
+      return browseFilesystem(realRoot, query.listFsWorkRefs(target), target, conflictPaths);
     },
 
     async describeCover(workId: string, width?: number): Promise<CoverDescriptor | null> {

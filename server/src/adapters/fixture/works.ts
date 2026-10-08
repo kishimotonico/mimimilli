@@ -2,6 +2,7 @@ import { posix } from "node:path";
 import {
   META_FILE_NAME,
   isAudioFileName,
+  isSidecarMetaFileName,
   isDlsiteFetchFailed,
   isDlsiteParseFailed,
   isRjCodeMissing,
@@ -44,6 +45,7 @@ import { buildFullWorkFromState, checkWorkPlacement } from "./playback.ts";
 import { normalizeFsPath } from "./fsResolve.ts";
 import {
   composeWorks,
+  copyWorkState,
   coverColumnsOf,
   dlsiteLinkageOf,
   reassignWorkId,
@@ -247,28 +249,54 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
     },
 
     async reassignIdentityConflict(
-      _body: IdentityConflictReassignBody,
+      body: IdentityConflictReassignBody,
     ): Promise<WorkSourceMutationResult | null> {
       const diagnostic = state.identityConflicts.find((candidate) =>
-        candidate.paths.includes(_body.path),
+        candidate.paths.includes(body.path),
       );
       if (!diagnostic) return null;
+      const owner = state.works.find((candidate) => candidate.id === diagnostic.workId);
+      if (!owner) return null;
       const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
-      const workDir = normalizeFsPath(`${rootAbs}/${_body.path}`);
-      const work = state.works.find((candidate) => candidate.physicalPath === workDir);
-      if (!work || work.id !== diagnostic.workId) return null;
-      const oldId = work.id;
-      work.id = crypto.randomUUID();
-      work.bookmarked = false;
-      work.lastPlayedAt = null;
-      reassignWorkId(state, oldId, work.id);
-      state.resumes.delete(diagnostic.workId);
+      const target = normalizeFsPath(`${rootAbs}/${body.path}`);
+      const metaPath = isSidecarMetaFileName(posix.basename(target))
+        ? target
+        : posix.join(target, META_FILE_NAME);
+      const newId = crypto.randomUUID();
+      let reassigned: FixtureWorkRecord;
+      if (metaPath === owner.metaPath) {
+        owner.id = newId;
+        owner.bookmarked = false;
+        owner.lastPlayedAt = null;
+        reassignWorkId(state, diagnostic.workId, newId);
+        state.resumes.delete(diagnostic.workId);
+        reassigned = owner;
+      } else {
+        const copy = checkWorkPlacement(state, {
+          ...owner,
+          id: newId,
+          metaPath,
+          physicalPath:
+            workPlacementOf(metaPath).kind === "folder"
+              ? target
+              : posix.join(posix.dirname(target), posix.basename(owner.physicalPath)),
+          bookmarked: false,
+          lastPlayedAt: null,
+        });
+        copyWorkState(state, diagnostic.workId, newId);
+        state.sourceRevisions.set(newId, "fixture");
+        state.works.push(copy);
+        reassigned = copy;
+      }
       state.identityConflicts = removeIdentityConflictPath(
         state.identityConflicts,
         diagnostic.workId,
-        _body.path,
+        body.path,
       );
-      return { snapshot: fixtureEditSnapshot(state, work), projection: { status: "published" } };
+      return {
+        snapshot: fixtureEditSnapshot(state, reassigned),
+        projection: { status: "published" },
+      };
     },
 
     async projectWorkSource(path: WorkspacePath): Promise<WorkSourceMutationResult | null> {

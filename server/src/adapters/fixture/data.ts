@@ -5,6 +5,7 @@ import {
   normalizeTags,
   TEXT_PREVIEW_LIMIT_BYTES,
   DEFAULT_DLSITE_CACHE_TTLS_MS,
+  isSidecarMetaFileName,
   workPlacementOf,
 } from "@mimimilli/shared";
 import type {
@@ -16,6 +17,8 @@ import type {
   SmartFolder,
   WorkSummary,
 } from "@mimimilli/shared";
+import { posix } from "node:path";
+import { isPathWithin } from "../../lib/path.ts";
 import { fixtureCoverFromColumns } from "./coverDto.ts";
 
 /** fixture 内部のカバー列（real の cover_image / cover_width / cover_height に相当） */
@@ -530,14 +533,14 @@ function fsWorkFolder(
   };
 }
 
-/** physicalPath が library/dlsite/<サークル>/<作品> ならサークル名を返す。それ以外は _その他 */
-function circleFromPhysicalPath(physicalPath: string): string {
+/** physicalPath が library/dlsite/<サークル>/<作品> ならサークル名を返す。それ以外は null */
+function circleFromPhysicalPath(physicalPath: string): string | null {
   const segments = physicalPath.split("/").filter(Boolean);
   const circle = segments[2];
   if (segments[0] === "library" && segments[1] === "dlsite" && segments.length >= 4 && circle) {
     return circle;
   }
-  return "_その他";
+  return null;
 }
 
 /** dir 配下に path のノードが無ければ作る（中間ディレクトリも補う）。既にあれば何もしない。
@@ -566,6 +569,7 @@ function ensurePath(
  *  identityConflicts / invalidMetaFiles は、それぞれが指す重複コピーフォルダー・
  *  壊れたメタファイルを /fs ツリー上に実体化するために使う。 */
 export function buildFsRoot(
+  rootAbs: string,
   works: FixtureWorkRecord[],
   coverColumns: ReadonlyMap<string, FixtureCoverColumns>,
   identityConflicts: ScanDiagnostic[] = [],
@@ -574,8 +578,13 @@ export function buildFsRoot(
   const folderWorks = works.filter((work) => workPlacementOf(work.metaPath).kind === "folder");
   const fileWorks = works.filter((work) => workPlacementOf(work.metaPath).kind === "audio-file");
   const byCircle = new Map<string, FixtureWorkRecord[]>();
+  const looseFolderWorks: FixtureWorkRecord[] = [];
   for (const work of folderWorks) {
     const circle = circleFromPhysicalPath(work.physicalPath);
+    if (circle === null) {
+      looseFolderWorks.push(work);
+      continue;
+    }
     const list = byCircle.get(circle) ?? [];
     list.push(work);
     byCircle.set(circle, list);
@@ -612,6 +621,15 @@ export function buildFsRoot(
     fsFile("readme.txt", "text", 512),
   ]);
 
+  for (const work of looseFolderWorks) {
+    if (!isPathWithin(rootAbs, work.physicalPath, posix)) continue;
+    const segments = work.physicalPath.slice(rootAbs.length).split("/").filter(Boolean);
+    const name = segments.at(-1);
+    if (name === undefined) continue;
+    const coverImage = coverColumns.get(work.id)?.image ?? fixtureCoverColumnsForWork(work).image;
+    ensurePath(root, segments, () => fsWorkFolder(work, coverImage, name));
+  }
+
   for (const conflict of identityConflicts) {
     const work = works.find((w) => w.id === conflict.workId);
     if (!work) continue;
@@ -620,7 +638,11 @@ export function buildFsRoot(
       const segments = path.split("/").filter(Boolean);
       const name = segments.at(-1);
       if (name === undefined) continue;
-      ensurePath(root, segments, () => fsWorkFolder(work, coverImage, name));
+      ensurePath(root, segments, () =>
+        isSidecarMetaFileName(name)
+          ? fsFile(name, "text", 128)
+          : fsWorkFolder(work, coverImage, name),
+      );
     }
   }
 

@@ -57,7 +57,7 @@ export interface FixtureState {
   /** 作品ごとのレジューム位置 */
   resumes: Map<string, ResumeBody>;
   playbackIds: Map<string, PlaybackIds>;
-  playlistSpecs: ReadonlyMap<string, SeedPlaylistSpec[]>;
+  playlistSpecs: Map<string, SeedPlaylistSpec[]>;
   /** scan() が insertedWorkIds として返す、未取り込みの新規作品ID（シナリオ "new-work" 用） */
   scanInsertedWorkIds: string[];
   /** scan() が updatedWorkIds として返す作品ID */
@@ -98,10 +98,21 @@ export function removeWorks(state: FixtureState, ids: ReadonlySet<string>): void
   for (const id of ids) state.dlsiteLinkages.delete(id);
 }
 
-/** workのidを付け替え、dlsiteLinkagesも新idへ移す。 */
+/** 作品に紐づく状態（DLsite連携・プレイリスト定義・明示カバー列）を別idへ複製する。 */
+export function copyWorkState(state: FixtureState, fromId: string, toId: string): void {
+  setDlsiteLinkage(state, toId, dlsiteLinkageOf(state, fromId));
+  const playlists = state.playlistSpecs.get(fromId);
+  if (playlists) state.playlistSpecs.set(toId, playlists);
+  const cover = state.coverColumns.get(fromId);
+  if (cover) state.coverColumns.set(toId, cover);
+}
+
+/** workのidを付け替え、作品に紐づく状態も新idへ移す。 */
 export function reassignWorkId(state: FixtureState, oldId: string, newId: string): void {
-  setDlsiteLinkage(state, newId, dlsiteLinkageOf(state, oldId));
+  copyWorkState(state, oldId, newId);
   state.dlsiteLinkages.delete(oldId);
+  state.playlistSpecs.delete(oldId);
+  state.coverColumns.delete(oldId);
 }
 
 /** rjCodeに対応するDLsite取得キャッシュの解決結果。realのDlsiteCache.resolveと同じくTTL切れはmiss扱い。 */
@@ -148,6 +159,8 @@ export interface FixtureAdapterOptions {
   dlsiteFetchFailures?: ReadonlyArray<{ rjCode: string; resolution: DlsiteCacheResolution }>;
   /** 作品IDごとのプレイリスト定義（meta の playlists に相当）。シードの定義に上書きで足す */
   playlistSpecs?: Readonly<Record<string, SeedPlaylistSpec[]>>;
+  /** works差し替え時に、ID重複の診断を明示的に与える（省略時はシナリオ既定） */
+  identityConflicts?: ScanDiagnostic[];
 }
 
 export function createInitialState(options: FixtureAdapterOptions): FixtureState {
@@ -212,7 +225,8 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     scanUpdatedWorkIds: scenario.scanUpdatedWorkIds,
     scanCandidateExclusions: [],
     identityConflicts:
-      scenario.id === "new-work"
+      options.identityConflicts ??
+      (scenario.id === "new-work"
         ? [
             {
               kind: "identity_conflict",
@@ -223,7 +237,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
               ],
             },
           ]
-        : [],
+        : []),
     scanCandidatePool: scenario.scanCandidates,
     scanCandidates: scenario.scanCandidates,
     scanIdentityConflicts: scenario.scanIdentityConflicts,

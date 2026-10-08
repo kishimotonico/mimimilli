@@ -65,6 +65,7 @@ export function createFsMethods(
       const target = path ? `${rootAbs}/${path}` : rootAbs;
 
       const root = buildFsRoot(
+        rootAbs,
         state.works,
         state.coverColumns,
         state.identityConflicts,
@@ -101,6 +102,7 @@ export function createFsMethods(
       const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
       const target = `${rootAbs}/${ref.path}`;
       const root = buildFsRoot(
+        rootAbs,
         state.works,
         state.coverColumns,
         state.identityConflicts,

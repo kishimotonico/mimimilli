@@ -104,6 +104,53 @@ test("listing 自身の workId と parent、mimimilli.json の非表示", async 
   assert.equal(rootListing.parent, null);
 });
 
+test("ID重複の対象になっているメタファイルだけが一覧に出て、再採番すると隠れる", async (t) => {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
+  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  const app = createApp(adapter);
+  await configureRoot(adapter, lib.root);
+  const meta = {
+    formatVersion: 1,
+    id: "33333333-3333-4333-8333-333333333333",
+    title: "single",
+    playlists: [
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        name: "default",
+        tracks: [{ id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", title: "t", file: "single.wav" }],
+      },
+    ],
+    defaultPlaylistId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  };
+  const place = (dir: string) => {
+    mkdirSync(join(lib.root, dir), { recursive: true });
+    writeWav(join(lib.root, dir, "single.wav"), 1);
+    writeFileSync(join(lib.root, dir, "single.mimimilli.json"), JSON.stringify(meta));
+  };
+  place("dup-a");
+  await adapter.scan({ full: true });
+  place("dup-b");
+  await adapter.scan({ full: true });
+
+  const names = async (dir: string) => (await listing(app, dir)).entries.map((e) => e.name);
+  assert.ok((await names("dup-a")).includes("single.mimimilli.json"));
+  assert.ok((await names("dup-b")).includes("single.mimimilli.json"));
+  assert.ok(
+    !(await names("dlsite/RJ900002_既存メタ")).includes("mimimilli.json"),
+    "重複の対象でないメタファイルは隠す",
+  );
+
+  const response = await app.request("/api/works/identity-conflicts/reassign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: "dup-b/single.mimimilli.json" }),
+  });
+  assert.equal(response.status, 201);
+  assert.ok(!(await names("dup-a")).includes("single.mimimilli.json"));
+  assert.ok(!(await names("dup-b")).includes("single.mimimilli.json"));
+});
+
 test("ネストした作品ルートではファイルを最も深い作品へ対応付ける", async (t) => {
   const nestedId = "22222222-2222-4222-8222-222222222222";
   const { app, existingWorkId } = await setup(t, (libraryRoot) => {

@@ -45,7 +45,13 @@ export function findOwnerWork(
   return null;
 }
 
-export function browseFs(root: string, works: FsWorkRef[], target: string): FsListing | null {
+/** visibleMetaPaths: ID重複の対象として一覧に出すメタファイルのroot相対パス。それ以外のメタファイルは隠す。 */
+export function browseFs(
+  root: string,
+  works: FsWorkRef[],
+  target: string,
+  visibleMetaPaths: ReadonlySet<string> = new Set(),
+): FsListing | null {
   const worksByPhysicalPath = buildWorkPathIndex(works);
 
   let entries;
@@ -81,7 +87,9 @@ export function browseFs(root: string, works: FsWorkRef[], target: string): FsLi
         preview: null,
       });
     } else if (entry.isFile()) {
-      if (isMetaFileName(entry.name) || entry.name.startsWith(".")) continue; // 管理ファイルは隠す
+      const relativePath = toPortableRelativePath(root, full);
+      const hiddenMeta = isMetaFileName(entry.name) && !visibleMetaPaths.has(relativePath);
+      if (hiddenMeta || entry.name.startsWith(".")) continue; // 管理ファイルは隠す
       let size = 0;
       try {
         size = statSync(full).size;
@@ -91,7 +99,7 @@ export function browseFs(root: string, works: FsWorkRef[], target: string): FsLi
       const owner = findOwnerWork(realRoot, full, worksByPhysicalPath);
       fsEntries.push({
         name: entry.name,
-        path: workspacePath(toPortableRelativePath(root, full)),
+        path: workspacePath(relativePath),
         isDir: false,
         size,
         fileType: fileExtensionOf(entry.name),

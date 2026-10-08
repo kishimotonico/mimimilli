@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from "react";
+import { useSetAtom } from "jotai";
+import { clearFilesSelectionAtom } from "../model/filesNavigationActions";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "../../../shared/ui/useToast";
 import { I } from "../../../shared/ui/Icon";
@@ -15,7 +17,10 @@ import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { useIdentityConflictFor } from "../model/useIdentityConflict";
 import RegisterWorkDialog from "./RegisterWorkDialog";
 import { SourceProjectionNotice } from "../../../entities/work/ui/SourceProjectionNotice";
-import { sourceMutationErrorMessage } from "../../../entities/work/sourceMutation";
+import {
+  projectionNoticeMessage,
+  sourceMutationErrorMessage,
+} from "../../../entities/work/sourceMutation";
 import type {
   ScanDiagnostic,
   WorkRegisterPreview,
@@ -34,15 +39,17 @@ interface FilePreviewWorkActionsProps {
 interface IdentityConflictSectionProps {
   identityConflict: ScanDiagnostic;
   currentPath: string;
+  isDir: boolean;
   reassignDisabled: boolean;
   onReassign: () => void;
 }
 
-/** ID重複セクション。identityConflictがある（＝entryがdirで重複がある）ときだけ描画される
- *  ので、他のpathsとの絞り込みをnon-nullな引数として受け取れる */
+/** ID重複セクション。identityConflictがある（＝entryが重複対象のフォルダーまたはメタファイル）
+ *  ときだけ描画されるので、他のpathsとの絞り込みをnon-nullな引数として受け取れる */
 function IdentityConflictSection({
   identityConflict,
   currentPath,
+  isDir,
   reassignDisabled,
   onReassign,
 }: IdentityConflictSectionProps) {
@@ -50,7 +57,7 @@ function IdentityConflictSection({
   return (
     <section className="mle-identity-conflict" aria-label="ID重複">
       <span className="mle-identity-conflict-badge">ID重複</span>
-      <p>同じWork IDを持つフォルダーがあります。</p>
+      <p>同じWork IDを持つ{isDir ? "フォルダー" : "メタファイル"}があります。</p>
       <div className="mle-identity-conflict__paths">
         {conflictingPaths.map((path) => (
           <code key={path}>{path}</code>
@@ -78,6 +85,7 @@ export default function FilePreviewWorkActions({
   const isSingleFileWorkEntry = isSingleFileWork(entry);
   const queryClient = useQueryClient();
   const toast = useToast();
+  const clearSelection = useSetAtom(clearFilesSelectionAtom);
   const [registerPreview, setRegisterPreview] = useState<WorkRegisterPreview | null>(null);
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
   const [showUnregisterConfirm, setShowUnregisterConfirm] = useState(false);
@@ -103,7 +111,21 @@ export default function FilePreviewWorkActions({
       await reassignMutation.mutateAsync(path, {
         onSuccess: (result) => {
           setShowReassignConfirm(false);
-          setPendingProjection(result);
+          if (entry.isDir) {
+            setPendingProjection(result);
+            return;
+          }
+          // 再採番したメタファイルは一覧から消えるため、親フォルダーへ移って結果を通知で伝える
+          clearSelection();
+          const message = projectionNoticeMessage(result.projection);
+          if (message) {
+            toast.show({
+              message,
+              variant: "warning",
+              priority: "action",
+              dismissOnUnmount: false,
+            });
+          }
         },
       });
     } catch (cause) {
@@ -177,10 +199,11 @@ export default function FilePreviewWorkActions({
           onProjected={setPendingProjection}
         />
       )}
-      {identityConflict && entry.isDir && (
+      {identityConflict && (
         <IdentityConflictSection
           identityConflict={identityConflict}
           currentPath={entry.path}
+          isDir={entry.isDir}
           reassignDisabled={reassignMutation.isPending}
           onReassign={() => setShowReassignConfirm(true)}
         />

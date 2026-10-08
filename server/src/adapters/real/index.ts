@@ -101,6 +101,7 @@ export function createRealAdapter(
   });
   const coverMediaMethods = createCoverMediaMethods({
     query,
+    catalog,
     thumbnailCache,
     thumbnailCacheDir,
     requireRoot,
