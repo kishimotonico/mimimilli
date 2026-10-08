@@ -14,15 +14,19 @@ import {
   playerDurationAtom,
   playerCoreAtom,
 } from "../../src/entities/player/model/atoms";
-import { saveResumePosition } from "../../src/features/player/api";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import type { ResolvedTrack, Track, Work, WorkSummary } from "../../src/entities/work/model";
 import { PLAYER_PLAYBACK_PREFS_KEY } from "../../src/entities/player/model/playerPlaybackPrefs";
+import { apiNoContent, mockApi, type ApiMock } from "../helpers/api";
+import { buildSettings } from "../helpers/builders";
 
-vi.mock("../../src/features/player/api", () => ({
-  saveResumePosition: vi.fn(() => Promise.resolve()),
-  updateLastPlayed: vi.fn(() => Promise.resolve()),
-}));
+let api: ApiMock;
+
+function resumeSaves() {
+  return api
+    .requestsTo("POST /api/works/:id/resume")
+    .map((request) => ({ workId: request.params.id, body: request.body }));
+}
 
 class FakeAudio extends EventTarget {
   currentTime = 0;
@@ -160,8 +164,11 @@ const work: WorkSummary = {
 beforeEach(() => {
   localStorage.removeItem(PLAYER_PLAYBACK_PREFS_KEY);
   audioInstances.length = 0;
-  vi.mocked(saveResumePosition).mockReset();
-  vi.mocked(saveResumePosition).mockResolvedValue(undefined);
+  api = mockApi({
+    "POST /api/works/:id/resume": () => apiNoContent(),
+    "POST /api/works/:id/last-played": () => apiNoContent(),
+    "GET /api/settings": buildSettings(),
+  });
   vi.stubGlobal(
     "Audio",
     vi.fn(function FakeAudioConstructor() {
@@ -476,15 +483,18 @@ describe("usePlayer adapters", () => {
     act(() => result.current.player.play(work, [track], 0, playlistId));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
     latestAudio().currentTime = 42;
-    vi.mocked(saveResumePosition).mockClear();
+    api.clear();
 
     act(() => latestAudio().dispatchEvent(new Event("error")));
 
     expect(result.current.player.state.playbackError).not.toBeNull();
-    expect(saveResumePosition).toHaveBeenCalledWith(work.id, {
-      playlistId,
-      trackId: track.id,
-      offsetSec: 42,
+    expect(resumeSaves()).toContainEqual({
+      workId: work.id,
+      body: {
+        playlistId,
+        trackId: track.id,
+        offsetSec: 42,
+      },
     });
   });
 
@@ -505,14 +515,17 @@ describe("usePlayer adapters", () => {
     });
     act(() => result.current.player.play(work, [track], 0, playlistId));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
-    vi.mocked(saveResumePosition).mockClear();
+    api.clear();
 
     act(() => latestAudio().dispatchEvent(new Event("ended")));
 
-    expect(saveResumePosition).toHaveBeenCalledWith(work.id, {
-      playlistId,
-      trackId: track.id,
-      offsetSec: 0,
+    expect(resumeSaves()).toContainEqual({
+      workId: work.id,
+      body: {
+        playlistId,
+        trackId: track.id,
+        offsetSec: 0,
+      },
     });
     expect(queryClient.getQueryData<Work>(WORK_QUERY_KEYS.detail(work.id))).toMatchObject({
       resume: { playlistId, trackId: track.id, offsetSec: 0 },
@@ -523,12 +536,12 @@ describe("usePlayer adapters", () => {
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
     act(() => result.current.player.play(work, [track], 0, null));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
-    vi.mocked(saveResumePosition).mockClear();
+    api.clear();
 
     act(() => latestAudio().dispatchEvent(new Event("ended")));
 
     expect(result.current.player.state.isPlaying).toBe(false);
-    expect(saveResumePosition).not.toHaveBeenCalled();
+    expect(resumeSaves()).toHaveLength(0);
   });
 
   it("再生速度変更と同時刻のトラック切替でも新しいengine.loadに新しい再生速度が渡る", async () => {
@@ -663,11 +676,11 @@ describe("usePlayer adapters", () => {
       expect(result.current.player.state.status).toBe("playing");
 
       // status固着が直っていれば、persistTick（5秒間隔のresume保存）も止まらない。
-      vi.mocked(saveResumePosition).mockClear();
+      api.clear();
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5000);
       });
-      expect(saveResumePosition).toHaveBeenCalled();
+      expect(resumeSaves().length).toBeGreaterThan(0);
     } finally {
       vi.useRealTimers();
     }
@@ -743,7 +756,7 @@ describe("usePlayer adapters", () => {
     await waitFor(() =>
       expect(
         screen.getByText("「壊れたトラック」を読み込めなかったためスキップしました"),
-      ).toBeTruthy(),
+      ).toBeInTheDocument(),
     );
     expect(result.current.player.state.currentTrackIndex).toBe(1);
 
@@ -800,14 +813,17 @@ describe("usePlayer adapters", () => {
     act(() => result.current.player.play(work, [track], 0, playlistId));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
     latestAudio().currentTime = 42;
-    vi.mocked(saveResumePosition).mockClear();
+    api.clear();
 
     act(() => result.current.player.stop());
 
-    expect(saveResumePosition).toHaveBeenCalledWith(work.id, {
-      playlistId,
-      trackId: track.id,
-      offsetSec: 42,
+    expect(resumeSaves()).toContainEqual({
+      workId: work.id,
+      body: {
+        playlistId,
+        trackId: track.id,
+        offsetSec: 42,
+      },
     });
     expect(result.current.player.state.currentWork).toBeNull();
   });
@@ -842,16 +858,19 @@ describe("usePlayer adapters", () => {
         await Promise.resolve();
       });
       expect(result.current.player.state.status).toBe("playing");
-      vi.mocked(saveResumePosition).mockClear();
+      api.clear();
 
       latestAudio().currentTime = 10;
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5000);
       });
-      expect(saveResumePosition).toHaveBeenCalledWith(work.id, {
-        playlistId,
-        trackId: track.id,
-        offsetSec: 10,
+      expect(resumeSaves()).toContainEqual({
+        workId: work.id,
+        body: {
+          playlistId,
+          trackId: track.id,
+          offsetSec: 10,
+        },
       });
     } finally {
       vi.useRealTimers();
@@ -872,12 +891,12 @@ describe("usePlayer adapters", () => {
 
       act(() => result.current.player.pause());
       expect(result.current.player.state.status).toBe("paused");
-      vi.mocked(saveResumePosition).mockClear();
+      api.clear();
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(10000);
       });
-      expect(saveResumePosition).not.toHaveBeenCalled();
+      expect(resumeSaves()).toHaveLength(0);
     } finally {
       vi.useRealTimers();
     }

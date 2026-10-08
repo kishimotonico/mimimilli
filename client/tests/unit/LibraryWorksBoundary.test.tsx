@@ -1,10 +1,12 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
 import { useLibraryNavigation } from "../../src/features/library/model/useLibraryNavigation";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
+import { mockApi } from "../helpers/api";
+import { buildWorkListItem, buildWorksPage } from "../helpers/builders";
 import LibraryWorksBoundary from "../../src/features/library/ui/LibraryWorksBoundary";
 
 const baseNav: LibraryViewState = {
@@ -14,26 +16,8 @@ const baseNav: LibraryViewState = {
   sort: "added-desc",
 };
 
-function response(items: { id: string; title: string }[]) {
-  return new Response(
-    JSON.stringify({
-      items: items.map((item) => ({
-        ...item,
-        cover: null,
-        status: "ok",
-        totalDurationSec: null,
-        trackCount: 0,
-        bookmarked: false,
-        lastPlayedAt: null,
-        circleName: null,
-        relativePath: item.id,
-        dlsite: { rjCode: null, status: "none" },
-      })),
-      total: items.length,
-      stats: { trackCount: 0, durationSec: 0 },
-    }),
-    { status: 200, headers: { "Content-Type": "application/json" } },
-  );
+function worksPage(items: { id: string; title: string }[]) {
+  return buildWorksPage(items.map((item) => buildWorkListItem(item)));
 }
 
 function renderBoundary(children: Parameters<typeof LibraryWorksBoundary>[0]["children"]) {
@@ -54,45 +38,35 @@ function renderBoundary(children: Parameters<typeof LibraryWorksBoundary>[0]["ch
   );
 }
 
-afterEach(() => vi.unstubAllGlobals());
-
 describe("LibraryWorksBoundary", () => {
   it("初回取得中だけ既存の読み込みfallbackを表示する", async () => {
-    let resolveFetch: ((value: Response) => void) | undefined;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        () =>
-          new Promise<Response>((resolve) => {
-            resolveFetch = resolve;
-          }),
-      ),
-    );
+    let resolveFetch: ((value: unknown) => void) | undefined;
+    mockApi({
+      "GET /api/works": () =>
+        new Promise<unknown>((resolve) => {
+          resolveFetch = resolve;
+        }),
+    });
 
     renderBoundary((result) => <div>{result.works[0]?.title}</div>);
 
     expect(screen.getByRole("status")).toHaveTextContent("読み込み中...");
-    await act(async () => resolveFetch?.(response([{ id: "old", title: "旧作品" }])));
+    await act(async () => resolveFetch?.(worksPage([{ id: "old", title: "旧作品" }])));
     expect(await screen.findByText("旧作品")).toBeInTheDocument();
   });
 
   it("並び替えactionのtransition中は旧一覧を薄表示で保持し、解決後に解除する", async () => {
-    let resolveRandom: ((value: Response) => void) | undefined;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn((input: RequestInfo | URL) => {
-        const url = new URL(
-          typeof input === "string" ? input : input.toString(),
-          "http://localhost",
-        );
+    let resolveRandom: ((value: unknown) => void) | undefined;
+    mockApi({
+      "GET /api/works": ({ url }) => {
         if (url.searchParams.get("sort") === "random") {
-          return new Promise<Response>((resolve) => {
+          return new Promise<unknown>((resolve) => {
             resolveRandom = resolve;
           });
         }
-        return Promise.resolve(response([{ id: "old", title: "旧作品" }]));
-      }),
-    );
+        return worksPage([{ id: "old", title: "旧作品" }]);
+      },
+    });
 
     function SortControl() {
       const { setSort } = useLibraryNavigation();
@@ -141,7 +115,7 @@ describe("LibraryWorksBoundary", () => {
     expect(screen.queryByText("読み込み中...")).not.toBeInTheDocument();
     expect(screen.getByText("旧作品")).toHaveClass("is-pending");
 
-    await act(async () => resolveRandom?.(response([{ id: "new", title: "新作品" }])));
+    await act(async () => resolveRandom?.(worksPage([{ id: "new", title: "新作品" }])));
     await waitFor(() => expect(screen.getByText("新作品")).toBeInTheDocument());
     expect(screen.getByText("新作品")).not.toHaveClass("is-pending");
   });

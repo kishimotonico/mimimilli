@@ -3,7 +3,25 @@ import { render, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { DlsiteBulkSnapshot, ScanJobEvent, ScanJobSnapshot } from "@mimimilli/shared";
+import {
+  dlsiteBulkProgressEventSchema,
+  workspacePath,
+  type DlsiteBulkSnapshot,
+  type ScanJobEvent,
+  type ScanJobSnapshot,
+} from "@mimimilli/shared";
+import { createApiHandler } from "../helpers/api";
+import { appShellRoutes } from "../helpers/appShellApi";
+import {
+  buildDlsiteBulkResult,
+  buildDlsiteBulkSnapshot,
+  buildDlsiteNotificationSummary,
+  buildScanCandidate,
+  buildScanDiagnostics,
+  buildScanJobEvent,
+  buildScanJobSnapshot,
+  buildScanResult,
+} from "../helpers/builders";
 import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
@@ -54,57 +72,27 @@ class FakeEventSource extends EventTarget {
   }
 }
 
-const running: ScanJobSnapshot = {
-  id: "job-1",
-  status: "running",
-  createdAt: "2026-01-01T00:00:00.000Z",
-  startedAt: "2026-01-01T00:00:01.000Z",
-  finishedAt: null,
-  progress: null,
-  result: null,
-  error: null,
-};
+const running: ScanJobSnapshot = buildScanJobSnapshot({ startedAt: "2026-01-01T00:00:01.000Z" });
 
-const scanResult = {
-  registered: 1,
-  insertedWorkIds: [],
-  updatedWorkIds: [],
-  errors: 0,
-  missing: 0,
-  skipped: 0,
-  coverErrors: 0,
-};
+const scanResult = buildScanResult({ registered: 1 });
 
-const candidate = {
-  path: "未登録作品",
-  inferredTitle: "未登録作品",
-  audioFileCount: 1,
-  audioBreakdown: [{ extension: "wav", count: 1 }],
-  rjCode: null,
-};
+const candidate = buildScanCandidate({ path: "未登録作品", inferredTitle: "未登録作品" });
 
-const noNeedsAttentionDiagnostics = { identityConflicts: [], invalidMetaFiles: [] };
-const dlsiteSummary = (rjCodeMissingCount: number) => ({
-  rjCodeMissingCount,
-  fetchFailedCount: 0,
-  parseErrorCount: 0,
-  parseErrorAlert: false,
-  unlinkedCount: 0,
-});
+const noNeedsAttentionDiagnostics = buildScanDiagnostics();
+const dlsiteSummary = (rjCodeMissingCount: number) =>
+  buildDlsiteNotificationSummary({ rjCodeMissingCount });
 
-const dlsiteResult = {
-  fetched: 2,
-  failed: 0,
-  parseErrors: 0,
-  skipped: 0,
-};
+const dlsiteResult = buildDlsiteBulkResult({ fetched: 2 });
 
-const completedJob: ScanJobSnapshot = {
+const completedJob: ScanJobSnapshot = buildScanJobSnapshot({
   ...running,
   status: "completed",
   finishedAt: "2026-01-01T00:00:02.000Z",
   result: scanResult,
-};
+});
+
+/** 検証対象外の付随リクエスト（設定・候補・通知など）に空ライブラリの既定応答を返す */
+const shell = createApiHandler(appShellRoutes());
 
 function response(body: unknown, status = 200): Response {
   return new Response(status === 204 ? null : JSON.stringify(body), {
@@ -115,12 +103,13 @@ function response(body: unknown, status = 200): Response {
 
 function dispatchScan(source: FakeEventSource, event: ScanJobEvent): void {
   act(() => {
-    source.dispatchEvent(new MessageEvent(event.type, { data: JSON.stringify(event) }));
+    const valid = buildScanJobEvent(event);
+    source.dispatchEvent(new MessageEvent(valid.type, { data: JSON.stringify(valid) }));
   });
 }
 
 function dlsiteStatus(snapshot: Partial<DlsiteBulkSnapshot>): Response {
-  return response({ current: null, lastTerminal: null, ...snapshot });
+  return response(buildDlsiteBulkSnapshot(snapshot));
 }
 
 function isDlsiteStatusRequest(input: RequestInfo | URL, init?: RequestInit): boolean {
@@ -131,10 +120,14 @@ function invalidatedKeys(spy: { mock: { calls: unknown[][] } }): unknown[] {
   return spy.mock.calls.map((call) => (call[0] as { queryKey: unknown }).queryKey);
 }
 
-function dispatchDlsite(source: FakeEventSource, type: string, data: unknown): void {
+function dispatchRawDlsite(source: FakeEventSource, type: string, data: unknown): void {
   act(() => {
     source.dispatchEvent(new MessageEvent(type, { data: JSON.stringify(data) }));
   });
+}
+
+function dispatchDlsite(source: FakeEventSource, type: string, data: unknown): void {
+  dispatchRawDlsite(source, type, dlsiteBulkProgressEventSchema.parse(data));
 }
 
 /** POST /dlsite/bulk だけ job-1 を返す fetch に差し替えて start() し、job-1 の追跡を始める */
@@ -204,10 +197,10 @@ async function expectNoUnhandledRejection(run: () => Promise<void>) {
 
 describe("ScanRuntime EventSource ownership", () => {
   it("起動時に未登録候補を GET /scan/candidates から1回取得し、取得済みなら取り直さない", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/scan/candidates")) return response({ candidates: [candidate] });
-      return response(null, 204);
+      return shell(input, init);
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -224,8 +217,8 @@ describe("ScanRuntime EventSource ownership", () => {
   it("active job への attach で EventSource を1つだけ生成する", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) =>
-        String(input).endsWith("/scan/active") ? response(running) : response(null, 204),
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+        String(input).endsWith("/scan/active") ? response(running) : shell(input, init),
       ),
     );
 
@@ -238,14 +231,14 @@ describe("ScanRuntime EventSource ownership", () => {
   it("terminal イベントを2回流しても完了副作用は1回だけ", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(completedJob);
         if (url.endsWith("/scan/candidates")) {
           return response({ candidates: [candidate] });
         }
-        return response(null, 204);
+        return shell(input, init);
       }),
     );
 
@@ -284,11 +277,11 @@ describe("ScanRuntime EventSource ownership", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
-        if (url.endsWith("/scan/active")) return response(null, 204);
+        if (url.endsWith("/scan/active")) return shell(input, init);
         if (url.endsWith("/scan") && init?.method === "POST") {
           return response({ job: running });
         }
-        return response(null, 204);
+        return shell(input, init);
       }),
     );
 
@@ -306,14 +299,14 @@ describe("ScanRuntime EventSource ownership", () => {
   it("完了イベントが遅れて複数回届いても、開始後に登録/除外した非表示（hiddenPaths）を巻き戻さない", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(completedJob);
         if (url.endsWith("/scan/candidates")) {
           return response({ candidates: [] });
         }
-        return response(null, 204);
+        return shell(input, init);
       }),
     );
 
@@ -341,8 +334,8 @@ describe("ScanRuntime EventSource ownership", () => {
   it("アンマウント時に EventSource を close する", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) =>
-        String(input).endsWith("/scan/active") ? response(running) : response(null, 204),
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+        String(input).endsWith("/scan/active") ? response(running) : shell(input, init),
       ),
     );
 
@@ -357,13 +350,13 @@ describe("ScanRuntime EventSource ownership", () => {
   it("候補再取得が失敗しても unhandled rejection にならない", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(completedJob);
         if (url.endsWith("/scan/candidates"))
           return response({ error: { code: "internal", message: "boom" } }, 500);
-        return response(null, 204);
+        return shell(input, init);
       }),
     );
 
@@ -388,7 +381,7 @@ describe("Runtime間連携: ScanRuntime → DlsiteBulkRuntime", () => {
 
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(completedWithNewWorks);
@@ -399,7 +392,7 @@ describe("Runtime間連携: ScanRuntime → DlsiteBulkRuntime", () => {
         if (url.endsWith("/dlsite/bulk")) {
           return dlsiteStatus({ current: { jobId: "job-2", status: "running", progress: null } });
         }
-        return response(null, 204);
+        return shell(input, init);
       }),
     );
 
@@ -428,13 +421,13 @@ describe("ScanRuntime: 完了・中止トースト", () => {
   it("スキャンモーダルが閉じていれば完了・中止トーストを出す", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(completedJob);
         if (url.endsWith("/scan/diagnostics")) return response(noNeedsAttentionDiagnostics);
         if (url.endsWith("/dlsite/notifications")) return response(dlsiteSummary(0));
-        return response(null, 204);
+        return shell(input, init);
       }),
     );
 
@@ -456,14 +449,14 @@ describe("ScanRuntime: 完了・中止トースト", () => {
     const needsAttentionResult = scanResult;
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1"))
-          return response({ ...completedJob, result: needsAttentionResult });
+          return response(buildScanJobSnapshot({ ...completedJob, result: needsAttentionResult }));
         if (url.endsWith("/scan/diagnostics")) return response(noNeedsAttentionDiagnostics);
         if (url.endsWith("/dlsite/notifications")) return response(dlsiteSummary(1));
-        return response(null, 204);
+        return shell(input, init);
       }),
     );
 
@@ -483,18 +476,21 @@ describe("ScanRuntime: 完了・中止トースト", () => {
   it("完了時点の診断に読み込めない作品情報ファイルがあれば、実行結果に関わらず「要対応を見る」を付ける", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(completedJob);
         if (url.endsWith("/scan/diagnostics")) {
-          return response({
-            identityConflicts: [],
-            invalidMetaFiles: [{ path: "壊れた/mimimilli.json", message: "不正です" }],
-          });
+          return response(
+            buildScanDiagnostics({
+              invalidMetaFiles: [
+                { path: workspacePath("壊れた/mimimilli.json"), message: "不正です" },
+              ],
+            }),
+          );
         }
         if (url.endsWith("/dlsite/notifications")) return response(dlsiteSummary(0));
-        return response(null, 204);
+        return shell(input, init);
       }),
     );
 
@@ -508,13 +504,13 @@ describe("ScanRuntime: 完了・中止トースト", () => {
   it("完了直後の診断の取得に失敗したら、要対応リンクは付けずに完了トーストだけ出す", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(completedJob);
         if (url.endsWith("/scan/diagnostics")) return response({ message: "失敗" }, 500);
         if (url.endsWith("/dlsite/notifications")) return response(dlsiteSummary(1));
-        return response(null, 204);
+        return shell(input, init);
       }),
     );
 
@@ -527,18 +523,19 @@ describe("ScanRuntime: 完了・中止トースト", () => {
   });
 
   it("診断の取得に失敗しても、実行結果のdataIntegrityWarningがあれば要対応リンクを付ける", async () => {
-    const warned = {
+    const warned = buildScanResult({
       ...scanResult,
       dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["bad"] },
-    };
+    });
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.endsWith("/scan/active")) return response(running);
-        if (url.endsWith("/scan/job-1")) return response({ ...completedJob, result: warned });
+        if (url.endsWith("/scan/job-1"))
+          return response(buildScanJobSnapshot({ ...completedJob, result: warned }));
         if (url.endsWith("/scan/diagnostics")) return response({ message: "失敗" }, 500);
-        return response(null, 204);
+        return shell(input, init);
       }),
     );
 
@@ -550,14 +547,17 @@ describe("ScanRuntime: 完了・中止トースト", () => {
   });
 
   it("中止時は「スキャンを中止しました」トーストを出す", async () => {
-    const cancelledJob: ScanJobSnapshot = { ...running, status: "cancelled", result: null };
+    const cancelledJob: ScanJobSnapshot = buildScanJobSnapshot({
+      ...running,
+      status: "cancelled",
+    });
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(cancelledJob);
-        return response(null, 204);
+        return shell(input, init);
       }),
     );
 
@@ -572,11 +572,11 @@ describe("ScanRuntime: 完了・中止トースト", () => {
   it("スキャンモーダルが開いていれば完了トーストを出さない（サイドバーの完了表示に任せる）", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(completedJob);
-        return response(null, 204);
+        return shell(input, init);
       }),
     );
 
@@ -597,7 +597,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
   it("active 時に EventSource を1つだけ生成する", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => response({ ok: true })),
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => shell(input, init)),
     );
 
     const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
@@ -615,7 +615,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
           ? dlsiteStatus({
               lastTerminal: { jobId: "job-1", status: "complete", result: dlsiteResult },
             })
-          : response({ ok: true }),
+          : shell(input, init),
       ),
     );
 
@@ -644,7 +644,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
   it("アンマウント時に EventSource を close する", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => response({ ok: true })),
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => shell(input, init)),
     );
 
     const { store, unmount } = renderRuntime(createElement(DlsiteBulkRuntime));
@@ -669,7 +669,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
           await postGate;
           return response({ jobId: "job-1" }, 202);
         }
-        return response(null, 204);
+        return shell(input, init);
       }),
     );
 
@@ -690,7 +690,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
   });
 
   it("progressの大半を受け取れないまま完了しても、GETの直近終端で結果を反映し全詳細と一覧系を無効化する", async () => {
-    const result = { fetched: 2, failed: 0, parseErrors: 0, skipped: 3 };
+    const result = buildDlsiteBulkResult({ fetched: 2, skipped: 3 });
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -700,7 +700,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
         if (isDlsiteStatusRequest(input, init)) {
           return dlsiteStatus({ lastTerminal: { jobId: "job-1", status: "complete", result } });
         }
-        return response({ ok: true });
+        return shell(input, init);
       }),
     );
 
@@ -734,12 +734,12 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
   });
 
   it("attach()で後乗りし進捗を1件も受け取らずに取消されても、取消結果を反映し全詳細を無効化する", async () => {
-    const result = { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 };
+    const result = buildDlsiteBulkResult({ fetched: 1 });
     let terminated = false;
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        if (!isDlsiteStatusRequest(input, init)) return response({ ok: true });
+        if (!isDlsiteStatusRequest(input, init)) return shell(input, init);
         return terminated
           ? dlsiteStatus({ lastTerminal: { jobId: "job-1", status: "cancelled", result } })
           : dlsiteStatus({
@@ -788,7 +788,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
               },
               lastTerminal: { jobId: "job-2", status: "complete", result: dlsiteResult },
             })
-          : response({ ok: true }),
+          : shell(input, init),
       ),
     );
 
@@ -821,7 +821,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
             current: { jobId: "job-2", status: "running", progress: null },
             lastTerminal: { jobId: "job-1", status: "complete", result: dlsiteResult },
           })
-        : response({ ok: true }),
+        : shell(input, init),
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -854,7 +854,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
         isDlsiteStatusRequest(input, init)
           ? response({ error: { code: "root_reconfiguring", message: "再設定中です" } }, 409)
-          : response({ ok: true }),
+          : shell(input, init),
       ),
     );
 
@@ -888,8 +888,8 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
   it("接続が CLOSED かつジョブなしのとき active を解除してエラーを表示する", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) =>
-        String(input).endsWith("/dlsite/bulk") ? dlsiteStatus({}) : response({ ok: true }),
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+        String(input).endsWith("/dlsite/bulk") ? dlsiteStatus({}) : shell(input, init),
       ),
     );
 
@@ -922,7 +922,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
         await postGate;
         return response({ jobId: "job-1" }, 202);
       }
-      return response(null, 204);
+      return shell(input, init);
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -961,7 +961,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
           },
         });
       }
-      return response({ ok: true });
+      return shell(input, init);
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -988,7 +988,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
   it("CLOSED かつジョブ実行中の status 照会で active を解除する", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) =>
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
         String(input).endsWith("/dlsite/bulk")
           ? dlsiteStatus({
               current: {
@@ -997,7 +997,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
                 progress: { processed: 1, total: 5, work: null },
               },
             })
-          : response({ ok: true }),
+          : shell(input, init),
       ),
     );
 
@@ -1022,7 +1022,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
   it("一時切断中は error リスナー経由のネイティブ Event でも active を維持する", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) =>
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
         String(input).endsWith("/dlsite/bulk")
           ? dlsiteStatus({
               current: {
@@ -1031,7 +1031,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
                 progress: { processed: 1, total: 5, work: null },
               },
             })
-          : response({ ok: true }),
+          : shell(input, init),
       ),
     );
 
@@ -1057,12 +1057,12 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
     const delayedStatus = new Promise<Response>((resolve) => {
       resolveStatus = resolve;
     });
-    const staleResult = { fetched: 99, failed: 0, parseErrors: 0, skipped: 0 };
+    const staleResult = buildDlsiteBulkResult({ fetched: 99 });
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         if (String(input).endsWith("/dlsite/bulk")) return delayedStatus;
-        return response({ ok: true });
+        return shell(input, init);
       }),
     );
 
@@ -1101,14 +1101,14 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
   it("不正な terminal イベントで active が固着しない", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => response({ ok: true })),
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => shell(input, init)),
     );
 
     const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
     await trackDlsiteJob(store);
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
-    dispatchDlsite(source, "complete", { type: "complete", jobId: "job-1", result: "invalid" });
+    dispatchRawDlsite(source, "complete", { type: "complete", jobId: "job-1", result: "invalid" });
 
     await waitFor(() =>
       expect(store.get(dlsiteBulkStoreAtom).getState().jobId !== null).toBe(false),

@@ -63,7 +63,7 @@ describe("WorkInfoDialog", () => {
       />,
     );
 
-    expect(screen.getByText("危険リンク")).toBeTruthy();
+    expect(screen.getByText("危険リンク")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "危険リンク" })).toBeNull();
   });
 });

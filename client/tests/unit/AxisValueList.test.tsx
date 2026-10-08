@@ -69,10 +69,10 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     await flushVirtualizer();
 
     const row = getRow(".mll-vrow", "藤田茜");
-    expect(within(row).getByText("藤田茜")).toBeTruthy();
-    expect(within(row).getByText("5")).toBeTruthy();
-    expect(within(row).getByText("2:05")).toBeTruthy();
-    expect(row.querySelector(".mll-collage")).toBeTruthy();
+    expect(within(row).getByText("藤田茜")).toBeInTheDocument();
+    expect(within(row).getByText("5")).toBeInTheDocument();
+    expect(within(row).getByText("2:05")).toBeInTheDocument();
+    expect(row.querySelector(".mll-collage")).toBeInTheDocument();
     sizeMock.restore();
   });
 
@@ -81,8 +81,8 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     renderAxisValueList({ facetItems: [makeItem()] });
     await flushVirtualizer();
 
-    expect(document.querySelector(".mll-vrow__count")).toBeTruthy();
-    expect(document.querySelector(".mll-vrow__dur")).toBeTruthy();
+    expect(document.querySelector(".mll-vrow__count")).toBeInTheDocument();
+    expect(document.querySelector(".mll-vrow__dur")).toBeInTheDocument();
     sizeMock.restore();
   });
 
@@ -91,7 +91,7 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     renderAxisValueList({ facetItems: [makeItem({ covers: [] })] });
     await flushVirtualizer();
 
-    expect(document.querySelector(".mll-collage--empty")).toBeTruthy();
+    expect(document.querySelector(".mll-collage--empty")).toBeInTheDocument();
     sizeMock.restore();
   });
 
@@ -121,7 +121,7 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     await flushVirtualizer();
 
     const collage = document.querySelector(".mll-collage");
-    expect(collage).toBeTruthy();
+    expect(collage).toBeInTheDocument();
     expect(collage?.querySelectorAll(".mll-collage__cell").length).toBe(4);
     expect(collage?.querySelectorAll("img").length).toBe(2);
     sizeMock.restore();
@@ -193,7 +193,7 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     await flushVirtualizer();
 
     const row = getRow(".mll-vrow", "藤田茜");
-    expect(row.querySelector(".mll-vrow__add")).toBeNull();
+    expect(within(row).queryByRole("button", { name: /AND追加/ })).toBeNull();
     sizeMock.restore();
   });
 
@@ -207,7 +207,7 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     await flushVirtualizer();
 
     const row = getRow(".mll-vrow", "藤田茜");
-    expect(row.querySelector(".mll-vrow__add")).toBeNull();
+    expect(within(row).queryByRole("button", { name: /AND追加/ })).toBeNull();
     sizeMock.restore();
   });
 
@@ -283,9 +283,9 @@ describe("AxisValueList grid 表示", () => {
     await flushVirtualizer();
 
     const tile = getRow(".mll-vtile", "藤田茜");
-    expect(within(tile).getByText("藤田茜")).toBeTruthy();
-    expect(within(tile).getByText("5 件")).toBeTruthy();
-    expect(tile.querySelector(".mll-collage")).toBeTruthy();
+    expect(within(tile).getByText("藤田茜")).toBeInTheDocument();
+    expect(within(tile).getByText("5 件")).toBeInTheDocument();
+    expect(tile.querySelector(".mll-collage")).toBeInTheDocument();
     sizeMock.restore();
   });
 
@@ -350,14 +350,14 @@ describe("AxisValueList コンテキスト検索（ADR-0012 §6）", () => {
     });
     await flushVirtualizer();
 
-    expect(getRow(".mll-vrow", "藤田茜")).toBeTruthy();
-    expect(getRow(".mll-vrow", "夜想曲サークル")).toBeTruthy();
+    expect(getRow(".mll-vrow", "藤田茜")).toBeInTheDocument();
+    expect(getRow(".mll-vrow", "夜想曲サークル")).toBeInTheDocument();
 
     const input = screen.getByPlaceholderText("値を絞り込み");
     await user.type(input, "藤田");
     await flushVirtualizer();
 
-    expect(getRow(".mll-vrow", "藤田茜")).toBeTruthy();
+    expect(getRow(".mll-vrow", "藤田茜")).toBeInTheDocument();
     expect(queryRow(".mll-vrow", "夜想曲サークル")).toBeNull();
     sizeMock.restore();
   });
@@ -421,6 +421,6 @@ describe("AxisValueList エラー・空状態の再試行導線", () => {
 
   it("キャッシュが無い（facetItems空）isFacetErrorは一覧全体をエラー画面に置き換える", () => {
     renderAxisValueList({ axis: "circle", isFacetError: true, facetItems: [] });
-    expect(screen.getByText("読み込みに失敗しました")).toBeTruthy();
+    expect(screen.getByText("読み込みに失敗しました")).toBeInTheDocument();
   });
 });

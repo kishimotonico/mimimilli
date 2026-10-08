@@ -1,7 +1,30 @@
 import "@testing-library/jest-dom";
 
-// global.fetch のモック（各テストで vi.mocked(fetch) を使う）
-global.fetch = vi.fn();
+// 未モックの fetch はテストを失敗させる。アプリ側が握りつぶしても afterEach で検出する。
+const unmockedFetchCalls: string[] = [];
+
+function describeFetchCall(input: RequestInfo | URL, init?: RequestInit): string {
+  const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+  const url = input instanceof Request ? input.url : String(input);
+  return `${method} ${url}`;
+}
+
+/** どのルートにも一致しなかった fetch を失敗として記録し、呼び出し側へは拒否を返す */
+export function rejectUnmockedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<never> {
+  const call = describeFetchCall(input, init);
+  unmockedFetchCalls.push(call);
+  return Promise.reject(new Error(`未モックの fetch 呼び出し: ${call}`));
+}
+
+const defaultFetch = vi.fn(rejectUnmockedFetch);
+global.fetch = defaultFetch;
+
+afterEach(() => {
+  global.fetch = defaultFetch;
+  if (unmockedFetchCalls.length === 0) return;
+  const calls = unmockedFetchCalls.splice(0);
+  throw new Error(`未モックの fetch 呼び出しがあります:\n${calls.map((c) => `- ${c}`).join("\n")}`);
+});
 
 // happy-dom では Element.scrollTo / scrollIntoView が未定義のため、テスト用にスタブを置く。
 if (!Element.prototype.scrollTo) {

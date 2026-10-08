@@ -5,32 +5,15 @@ import { createElement } from "react";
 import { renderHook, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import type { FsEntry, FsListing } from "@mimimilli/shared";
+import { describe, expect, it } from "vitest";
+import { workspacePath, type FsEntry } from "@mimimilli/shared";
 import { useFilesBrowse } from "../../src/features/files/model/useFilesBrowse";
 import { selectFilesEntryAtom } from "../../src/features/files/model/filesNavigationActions";
+import { mockApi } from "../helpers/api";
+import { buildFsEntry, buildFsListing } from "../helpers/builders";
 
-vi.mock("../../src/features/files/api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../src/features/files/api")>();
-  return { ...actual, browseFs: (path?: string) => browseFsMock(path) };
-});
-
-let browseFsMock: (path?: string) => Promise<FsListing>;
-
-function entry(overrides: Partial<FsEntry>): FsEntry {
-  return {
-    name: "entry",
-    path: "entry",
-    isDir: false,
-    size: 0,
-    fileType: "",
-    childCount: 0,
-    workId: null,
-    workRelPath: null,
-    mediaKind: null,
-    preview: null,
-    ...overrides,
-  } as FsEntry;
+function entry(overrides: Partial<FsEntry> & { path: string }): FsEntry {
+  return buildFsEntry({ size: 0, fileType: "", mediaKind: null, preview: null, ...overrides });
 }
 
 const parentAudio = entry({
@@ -45,10 +28,6 @@ const childAudio = entry({
   path: "sub/child.mp3",
   mediaKind: "audio",
   fileType: "mp3",
-});
-
-afterEach(() => {
-  vi.restoreAllMocks();
 });
 
 function renderBrowse() {
@@ -66,11 +45,11 @@ function renderBrowse() {
 
 describe("useFilesBrowse", () => {
   it("矢印キーで選択した子フォルダーの件数・再生対象は子自身の中身を見る", async () => {
-    browseFsMock = vi.fn(async (path?: string) => {
-      if (path === "sub") {
-        return { path: "sub", parent: "", workId: null, entries: [childAudio] };
-      }
-      return { path: "", parent: null, workId: null, entries: [subDir, parentAudio] };
+    mockApi({
+      "GET /api/fs": ({ url }) =>
+        url.searchParams.get("path") === "sub"
+          ? buildFsListing([childAudio], { path: workspacePath("sub"), parent: workspacePath("") })
+          : buildFsListing([subDir, parentAudio], { path: workspacePath("") }),
     });
 
     const { result, store } = renderBrowse();

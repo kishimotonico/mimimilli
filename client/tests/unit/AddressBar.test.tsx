@@ -12,6 +12,8 @@ import AddressBar from "../../src/app/ui/AddressBar";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import { libraryViewModeAtom } from "../../src/features/library/model/atoms";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
+import { mockApi } from "../helpers/api";
+import { buildSettings } from "../helpers/builders";
 import { seedAppMode, seedLibraryRoute, seedFilesRoute } from "../helpers/route";
 
 afterEach(cleanup);
@@ -23,6 +25,12 @@ function renderAddressBar(options?: {
   rootFolder?: string;
   filesRelPath?: string[];
 }) {
+  const settings = buildSettings({ rootFolder: options?.rootFolder ?? "/library" });
+  mockApi({
+    "GET /api/settings": settings,
+    "GET /api/smart-folders": [],
+    "GET /api/tag-prefixes": [],
+  });
   const store = createStore();
   seedAppMode(store, options?.mode ?? "library");
   seedLibraryRoute(store, { activeAxis: (options?.activeAxis ?? "all") as never });
@@ -30,10 +38,7 @@ function renderAddressBar(options?: {
   if (options?.filesRelPath) seedFilesRoute(store, { relPath: options.filesRelPath });
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
-    rootFolder: options?.rootFolder ?? "/library",
-    lastScanTime: null,
-  });
+  queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), settings);
 
   render(
     createElement(

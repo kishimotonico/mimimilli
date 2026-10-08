@@ -7,12 +7,15 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { WORKS_DEFAULT_PAGE_SIZE, workspacePath } from "@mimimilli/shared";
+import { WORKS_DEFAULT_PAGE_SIZE } from "@mimimilli/shared";
 import { useSuspenseSmartLibraryWorks } from "../../src/features/library/model/useLibraryQueries";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
 import type { WorkListItem } from "@mimimilli/shared";
+import { mockApi, type ApiMock } from "../helpers/api";
+import { buildSmartFolder, buildWorkListItem, buildWorksPage } from "../helpers/builders";
 
 const SMART_FOLDER_ID = "sf-1";
+const FOLDER_WORKS_ROUTE = "GET /api/smart-folders/:id/works";
 
 const baseNav: LibraryViewState = {
   activeAxis: `smart-${SMART_FOLDER_ID}`,
@@ -21,44 +24,16 @@ const baseNav: LibraryViewState = {
   sort: "added-desc",
 };
 
-function jsonResponse(data: unknown): Response {
-  return new Response(JSON.stringify(data), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-function urlOf(input: RequestInfo | URL): string {
-  if (typeof input === "string") return input;
-  if (input instanceof URL) return input.toString();
-  return input.url;
-}
-
 function makeWork(id: string): WorkListItem {
-  return {
-    id,
-    title: `作品 ${id}`,
-    cover: null,
-    status: "ok",
-    totalDurationSec: 60,
-    trackCount: 1,
-    bookmarked: false,
-    lastPlayedAt: null,
-    circleName: null,
-    relativePath: workspacePath(id),
-    dlsite: { rjCode: null, status: "none" },
-  };
+  return buildWorkListItem({ id, title: `作品 ${id}`, totalDurationSec: 60 });
 }
 
-function createFetchMock(
+function installApi(
   options: { total?: number; randomSeed?: number; folderSort?: "added-desc" | "random" } = {},
-) {
+): ApiMock {
   const { total = WORKS_DEFAULT_PAGE_SIZE + 50, randomSeed, folderSort = "added-desc" } = options;
-  return vi.fn((input: RequestInfo | URL, _init?: RequestInit) => {
-    const url = new URL(urlOf(input), "http://localhost");
-    const path = url.pathname;
-
-    if (path === `/api/smart-folders/${SMART_FOLDER_ID}/works`) {
+  return mockApi({
+    [FOLDER_WORKS_ROUTE]: ({ url }) => {
       const page = Number(url.searchParams.get("page") ?? 1);
       const pageSize = WORKS_DEFAULT_PAGE_SIZE;
       const start = (page - 1) * pageSize;
@@ -66,46 +41,23 @@ function createFetchMock(
       const items: WorkListItem[] = Array.from({ length: count }, (_, i) =>
         makeWork(`p${page}-w${i + 1}`),
       );
-      const body: {
-        items: WorkListItem[];
-        total: number;
-        stats: { trackCount: number; durationSec: number };
-        seed?: number;
-      } = {
-        items,
+      return buildWorksPage(items, {
         total,
-        stats: { trackCount: 0, durationSec: 0 },
-      };
-      if (page === 1 && folderSort === "random" && randomSeed !== undefined) {
-        body.seed = randomSeed;
-      }
-      return Promise.resolve(jsonResponse(body));
-    }
-
-    if (path === "/api/smart-folders") {
-      return Promise.resolve(
-        jsonResponse([
-          {
-            id: SMART_FOLDER_ID,
-            name: "テストスマートフォルダー",
-            rules: [],
-            sort: folderSort,
-            createdAt: "2024-01-01T00:00:00Z",
-          },
-        ]),
-      );
-    }
-    if (path === "/api/tag-prefixes") return Promise.resolve(jsonResponse([]));
-    if (path === "/api/tags") return Promise.resolve(jsonResponse([]));
-
-    return Promise.reject(new Error(`unexpected fetch: ${url.toString()}`));
+        ...(page === 1 &&
+          folderSort === "random" &&
+          randomSeed !== undefined && { seed: randomSeed }),
+      });
+    },
+    "GET /api/smart-folders": [
+      buildSmartFolder({ id: SMART_FOLDER_ID, name: "テストスマートフォルダー", sort: folderSort }),
+    ],
+    "GET /api/tag-prefixes": [],
+    "GET /api/tags": [],
   });
 }
 
-function smartFolderCallUrls(fetchMock: ReturnType<typeof createFetchMock>): string[] {
-  return fetchMock.mock.calls
-    .map(([input]) => urlOf(input))
-    .filter((u) => u.startsWith(`/api/smart-folders/${SMART_FOLDER_ID}/works`));
+function smartFolderCallUrls(api: ApiMock): string[] {
+  return api.urlsTo(FOLDER_WORKS_ROUTE);
 }
 
 function renderWorks(nav: LibraryViewState, searchQuery = "") {
@@ -126,11 +78,10 @@ function renderWorks(nav: LibraryViewState, searchQuery = "") {
 }
 
 describe("スマートフォルダー軸のページング", () => {
-  let fetchMock: ReturnType<typeof createFetchMock>;
+  let api: ApiMock;
 
   beforeEach(() => {
-    fetchMock = createFetchMock();
-    vi.stubGlobal("fetch", fetchMock);
+    api = installApi();
   });
 
   afterEach(() => {
@@ -139,13 +90,12 @@ describe("スマートフォルダー軸のページング", () => {
 
   it("page=1 取得後に fetchNextPage() で page=2 が連結される", async () => {
     const total = WORKS_DEFAULT_PAGE_SIZE + 50;
-    fetchMock = createFetchMock({ total });
-    vi.stubGlobal("fetch", fetchMock);
+    api = installApi({ total });
 
     const { result } = renderWorks(baseNav);
 
     await waitFor(() => expect(result.current.works).toHaveLength(WORKS_DEFAULT_PAGE_SIZE));
-    expect(smartFolderCallUrls(fetchMock).some((u) => u.includes("page=1"))).toBe(true);
+    expect(smartFolderCallUrls(api).some((u) => u.includes("page=1"))).toBe(true);
 
     await act(async () => {
       await result.current.fetchNextPage();
@@ -153,7 +103,7 @@ describe("スマートフォルダー軸のページング", () => {
 
     await waitFor(() => expect(result.current.works).toHaveLength(total));
 
-    const urls = smartFolderCallUrls(fetchMock);
+    const urls = smartFolderCallUrls(api);
     expect(urls.filter((u) => u.includes("page=2"))).toHaveLength(1);
 
     const ids = result.current.works.map((w) => w.id);
@@ -165,8 +115,7 @@ describe("スマートフォルダー軸のページング", () => {
 
   it("全件取得後は hasNextPage が false になる", async () => {
     const total = WORKS_DEFAULT_PAGE_SIZE + 50;
-    fetchMock = createFetchMock({ total });
-    vi.stubGlobal("fetch", fetchMock);
+    api = installApi({ total });
 
     const { result } = renderWorks(baseNav);
 
@@ -182,12 +131,11 @@ describe("スマートフォルダー軸のページング", () => {
   });
 
   it("random ソート時、page=1 の seed が page=2 リクエストに引き継がれる", async () => {
-    fetchMock = createFetchMock({
+    api = installApi({
       total: WORKS_DEFAULT_PAGE_SIZE + 50,
       randomSeed: 42_195,
       folderSort: "random",
     });
-    vi.stubGlobal("fetch", fetchMock);
 
     const { result } = renderWorks(baseNav);
 
@@ -197,18 +145,17 @@ describe("スマートフォルダー軸のページング", () => {
       await result.current.fetchNextPage();
     });
 
-    const page2Urls = smartFolderCallUrls(fetchMock).filter((u) => u.includes("page=2"));
+    const page2Urls = smartFolderCallUrls(api).filter((u) => u.includes("page=2"));
     expect(page2Urls).toHaveLength(1);
     expect(page2Urls[0]).toContain("seed=42195");
   });
 });
 
 describe("スマートフォルダー軸への保持中フィルタの適用", () => {
-  let fetchMock: ReturnType<typeof createFetchMock>;
+  let api: ApiMock;
 
   beforeEach(() => {
-    fetchMock = createFetchMock({ total: 3 });
-    vi.stubGlobal("fetch", fetchMock);
+    api = installApi({ total: 3 });
   });
 
   afterEach(() => {
@@ -221,7 +168,7 @@ describe("スマートフォルダー軸への保持中フィルタの適用", (
 
     await waitFor(() => expect(result.current.works.length).toBeGreaterThan(0));
 
-    const urls = smartFolderCallUrls(fetchMock);
+    const urls = smartFolderCallUrls(api);
     expect(urls.some((u) => u.includes("tags=cv%2F") && u.includes("tagOp=AND"))).toBe(true);
   });
 
@@ -231,7 +178,7 @@ describe("スマートフォルダー軸への保持中フィルタの適用", (
 
     await waitFor(() => expect(result.current.works.length).toBeGreaterThan(0));
 
-    const urls = smartFolderCallUrls(fetchMock);
+    const urls = smartFolderCallUrls(api);
     expect(urls.some((u) => u.includes("tags=%40year%2F2024"))).toBe(true);
   });
 
@@ -240,7 +187,7 @@ describe("スマートフォルダー軸への保持中フィルタの適用", (
 
     await waitFor(() => expect(result.current.works.length).toBeGreaterThan(0));
 
-    const urls = smartFolderCallUrls(fetchMock);
+    const urls = smartFolderCallUrls(api);
     expect(urls.some((u) => u.includes("q=" + encodeURIComponent("藤田茜")))).toBe(true);
   });
 
@@ -249,7 +196,7 @@ describe("スマートフォルダー軸への保持中フィルタの適用", (
 
     await waitFor(() => expect(result.current.works.length).toBeGreaterThan(0));
 
-    const urls = smartFolderCallUrls(fetchMock);
+    const urls = smartFolderCallUrls(api);
     expect(urls.every((u) => !u.includes("q="))).toBe(true);
   });
 
@@ -274,12 +221,12 @@ describe("スマートフォルダー軸への保持中フィルタの適用", (
 
     await waitFor(() => expect(result.current.works.length).toBeGreaterThan(0));
     await waitFor(() => expect(queryClient.isFetching()).toBe(0));
-    fetchMock.mockClear();
+    api.clear();
 
     rerender({ searchQuery: "藤田茜" });
 
-    await waitFor(() => expect(smartFolderCallUrls(fetchMock)).toHaveLength(1));
-    expect(smartFolderCallUrls(fetchMock)[0]).toContain("q=" + encodeURIComponent("藤田茜"));
+    await waitFor(() => expect(smartFolderCallUrls(api)).toHaveLength(1));
+    expect(smartFolderCallUrls(api)[0]).toContain("q=" + encodeURIComponent("藤田茜"));
   });
 
   it("フィルタが変わるとクエリキーが変わり、別クエリとしてフェッチし直す（キャッシュ分離）", async () => {
@@ -303,11 +250,11 @@ describe("スマートフォルダー軸への保持中フィルタの適用", (
 
     await waitFor(() => expect(result.current.works.length).toBeGreaterThan(0));
     await waitFor(() => expect(queryClient.isFetching()).toBe(0));
-    fetchMock.mockClear();
+    api.clear();
 
     rerender({ nav: { ...baseNav, selectedTags: ["cv/藤田茜"] }, searchQuery: "" });
 
-    await waitFor(() => expect(smartFolderCallUrls(fetchMock)).toHaveLength(1));
-    expect(smartFolderCallUrls(fetchMock)[0]).toContain("tags=cv%2F");
+    await waitFor(() => expect(smartFolderCallUrls(api)).toHaveLength(1));
+    expect(smartFolderCallUrls(api)[0]).toContain("tags=cv%2F");
   });
 });

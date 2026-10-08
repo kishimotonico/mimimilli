@@ -12,16 +12,14 @@ import { LibraryTransitionContext } from "../../src/features/library/model/libra
 import { sortAtom } from "../../src/entities/library/model/navigationAtoms";
 import { axisValueSortAtom, randomSeedAtom } from "../../src/features/library/model/atoms";
 import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
+import { mockApi } from "../helpers/api";
+import { buildSmartFolder } from "../helpers/builders";
 import { seedLibraryRoute } from "../helpers/route";
 
-const SMART_FOLDER: SmartFolder = {
-  id: "sf-1",
-  name: "お気に入りASMR",
-  rules: [],
-  sort: "title-asc",
-};
+const SMART_FOLDER = buildSmartFolder({ name: "お気に入りASMR", sort: "title-asc" });
 
 function renderSortMenu(options?: { axis?: string; sort?: string; smartFolders?: SmartFolder[] }) {
+  mockApi({ "GET /api/smart-folders": options?.smartFolders ?? [] });
   const store = createStore();
   seedLibraryRoute(store, {
     activeAxis: options?.axis ?? "all",

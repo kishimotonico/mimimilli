@@ -10,7 +10,7 @@ describe("CollectionStatus", () => {
     const { container } = render(<CollectionStatus variant="list" kind="loading" />);
 
     expect(screen.getByRole("status")).toHaveTextContent("読み込み中...");
-    expect(container.querySelector(".mll-status-skeleton")).toBeTruthy();
+    expect(container.querySelector(".mll-status-skeleton")).toBeInTheDocument();
   });
 
   it("kind=error は固定メッセージを role=status で通知する", () => {
@@ -38,7 +38,7 @@ describe("CollectionStatus", () => {
   it("kind=empty は message と hint を表示する", () => {
     render(<CollectionStatus variant="list" kind="empty" message="項目がありません" hint="補足" />);
 
-    expect(screen.getByText("項目がありません")).toBeTruthy();
-    expect(screen.getByText("補足")).toBeTruthy();
+    expect(screen.getByText("項目がありません")).toBeInTheDocument();
+    expect(screen.getByText("補足")).toBeInTheDocument();
   });
 });

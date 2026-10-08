@@ -128,29 +128,29 @@ function renderDetail(props: Partial<React.ComponentProps<typeof WorkDetail>> = 
 describe("WorkDetail: 再生ボタンの状態導出", () => {
   it("履歴なし・非ロード（playingTrackIndex=null）: 「最初から再生」", () => {
     renderDetail({ work: makeWork({ resume: null }), playingTrackIndex: null });
-    expect(screen.getByRole("button", { name: "最初から再生" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "最初から再生" })).toBeInTheDocument();
   });
 
   it("履歴あり・非ロード: 「続きから再生」", () => {
     const work = makeWork({ resume: { playlistId, trackId: "t1", offsetSec: 30 } });
     renderDetail({ work, playingTrackIndex: null });
-    expect(screen.getByRole("button", { name: "続きから再生" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "続きから再生" })).toBeInTheDocument();
   });
 
   it("playingTrackIndexが非null かつ isPlaybackActive=true: 「一時停止」（再生中）", () => {
     renderDetail({ playingTrackIndex: 0, isPlaybackActive: true });
-    expect(screen.getByRole("button", { name: "一時停止" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "一時停止" })).toBeInTheDocument();
   });
 
   it("playingTrackIndexが非null だが isPlaybackActive=false: 「再生を再開」（一時停止中、ロード済み）", () => {
     renderDetail({ playingTrackIndex: 0, isPlaybackActive: false });
-    expect(screen.getByRole("button", { name: "再生を再開" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "再生を再開" })).toBeInTheDocument();
   });
 
   it("履歴があるときだけカバーに進捗バーを表示する（role=progressbar）", () => {
     const withResume = makeWork({ resume: { playlistId, trackId: "t1", offsetSec: 50 } });
     renderDetail({ work: withResume, playingTrackIndex: null });
-    expect(screen.getByRole("progressbar", { name: "再開位置" })).toBeTruthy();
+    expect(screen.getByRole("progressbar", { name: "再開位置" })).toBeInTheDocument();
 
     cleanup();
     renderDetail({ work: makeWork({ resume: null }), playingTrackIndex: null });
@@ -175,7 +175,7 @@ describe("WorkDetail: 作品登録の解除", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "その他" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "作品登録を解除" }));
-    expect(screen.getByRole("alertdialog", { name: "登録を解除" })).toBeTruthy();
+    expect(screen.getByRole("alertdialog", { name: "登録を解除" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "解除する" }));
     expect(mutateAsync).toHaveBeenCalledWith("w1");

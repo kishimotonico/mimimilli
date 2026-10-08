@@ -7,7 +7,10 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SmartFolderEditorModal from "../../src/features/library/ui/SmartFolderEditorModal";
-import * as smartFolderApi from "../../src/entities/smart-folder/api";
+import { mockApi, type ApiMock } from "../helpers/api";
+
+let previewCount = 0;
+let api: ApiMock;
 
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
@@ -17,7 +20,8 @@ beforeEach(() => {
     this.open = false;
   });
   // ライブ件数プレビューはモーダル内でAPIを呼ぶため、テストでは常に固定値で応答する
-  vi.spyOn(smartFolderApi, "previewSmartFolderRuleCount").mockResolvedValue(0);
+  previewCount = 0;
+  api = mockApi({ "POST /api/smart-folders/preview": () => ({ total: previewCount }) });
 });
 
 function renderModal({
@@ -142,7 +146,7 @@ describe("SmartFolderEditorModal", () => {
   });
 
   it("妥当な条件のときライブ件数プレビューを表示する", async () => {
-    vi.spyOn(smartFolderApi, "previewSmartFolderRuleCount").mockResolvedValue(7);
+    previewCount = 7;
     const folder = {
       id: "sf-1",
       name: "テスト",
@@ -156,11 +160,9 @@ describe("SmartFolderEditorModal", () => {
   });
 
   it("条件が妥当でない間はライブ件数プレビューを問い合わせない", () => {
-    const preview = vi.spyOn(smartFolderApi, "previewSmartFolderRuleCount");
-    preview.mockClear();
     renderModal(); // 新規作成の初期ドラフトはタグ未選択で不正
 
-    expect(preview).not.toHaveBeenCalled();
+    expect(api.requestsTo("POST /api/smart-folders/preview")).toHaveLength(0);
   });
 
   it("選択した並び順が再表示後も保持される", () => {

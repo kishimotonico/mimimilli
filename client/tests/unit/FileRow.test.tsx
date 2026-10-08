@@ -38,7 +38,7 @@ function renderRow(entry: FsEntry, overrides: Partial<React.ComponentProps<typeo
 describe("FileRow", () => {
   it("単一ファイルが自分自身の作品として登録済みなら作品バッジを出す", () => {
     renderRow(makeEntry({ workId: "RJ501001", workRelPath: "" }));
-    expect(screen.getByText("RJ501001")).toBeTruthy();
+    expect(screen.getByText("RJ501001")).toBeInTheDocument();
   });
 
   it("フォルダー内の1ファイルだけが登録された作品扱いのときはバッジを出さない", () => {

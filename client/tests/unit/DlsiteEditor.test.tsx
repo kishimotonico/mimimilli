@@ -3,67 +3,32 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  emptyDlsiteState,
-  toDlsiteLinkageStatus,
-  type DlsitePreview,
-  type Work,
-  type WorkEditSnapshot,
-} from "@mimimilli/shared";
+import { emptyDlsiteState, type Work } from "@mimimilli/shared";
 import { DlsiteEditor } from "../../src/features/library/ui/preview/DlsiteEditor";
 import GlobalToast from "../../src/app/ui/GlobalToast";
+import { mockApi } from "../helpers/api";
+import {
+  buildDlsitePreview,
+  buildSettings,
+  buildWork,
+  buildWorkEditSnapshotOf,
+  buildWorkSourceMutationResult,
+} from "../helpers/builders";
 
 const fetchDlsiteInfo = vi.fn();
 const applyDlsiteInfo = vi.fn();
 const updateDlsiteState = vi.fn();
 
-vi.mock("../../src/entities/work/api", () => ({
-  fetchDlsiteInfo: (...args: unknown[]) => fetchDlsiteInfo(...args),
-  applyDlsiteInfo: (...args: unknown[]) => applyDlsiteInfo(...args),
-  updateDlsiteState: (...args: unknown[]) => updateDlsiteState(...args),
-}));
-
 function makeWork(overrides: Partial<Work> = {}): Work {
-  return {
-    id: "work-1",
+  return buildWork({
     title: "現在タイトル",
-    cover: null,
-    coverKind: "none",
-    coverImage: null,
-    status: "ok",
-    physicalPath: "/lib/work-1",
-    totalDurationSec: 0,
-    addedAt: "2026-01-01T00:00:00.000Z",
-    errorMessage: null,
-    urls: [],
     tags: ["サークル/夜想曲"],
-    bookmarked: false,
-    lastPlayedAt: null,
     dlsite: { ...emptyDlsiteState(), rjCode: "RJ501001" },
-    defaultPlaylistId: null,
-    createdAt: null,
-    playlists: [],
-    resume: null,
     ...overrides,
-  };
+  });
 }
 
-function makeSnapshot(work: Work): WorkEditSnapshot {
-  return {
-    sourceRevision: "rev-1",
-    id: work.id,
-    physicalPath: work.physicalPath,
-    title: work.title,
-    tags: work.tags,
-    urls: work.urls,
-    coverImage: work.coverImage,
-    dlsite: {
-      rjCode: work.dlsite.rjCode,
-      status: toDlsiteLinkageStatus(work.dlsite.status),
-      appliedTags: work.dlsite.appliedTags,
-    },
-  };
-}
+const makeSnapshot = buildWorkEditSnapshotOf;
 
 function renderEditor(work: Work) {
   const queryClient = new QueryClient({
@@ -102,6 +67,12 @@ describe("DlsiteEditor", () => {
     fetchDlsiteInfo.mockReset();
     applyDlsiteInfo.mockReset();
     updateDlsiteState.mockReset();
+    mockApi({
+      "POST /api/dlsite/:id/fetch": () => fetchDlsiteInfo() as unknown,
+      "POST /api/dlsite/:id/apply": () => applyDlsiteInfo() as unknown,
+      "PATCH /api/dlsite/:id": () => updateDlsiteState() as unknown,
+      "GET /api/settings": buildSettings(),
+    });
     HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
       this.open = true;
     });
@@ -114,24 +85,11 @@ describe("DlsiteEditor", () => {
 
   it("成功: 差分ありの適用でダイアログが閉じ、内部エラーを出さず成功トーストを出す", async () => {
     const work = makeWork();
-    const preview: DlsitePreview = {
-      info: {
-        rjCode: "RJ501001",
-        title: "取得タイトル",
-        circle: "夜想曲",
-        cvs: [],
-        genreTags: [],
-        ageRating: null,
-        coverUrl: "https://example.test/cover.jpg",
-        url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501001.html",
-      },
-      sourceRevision: "rev-1",
-    };
-    fetchDlsiteInfo.mockResolvedValue(preview);
-    applyDlsiteInfo.mockResolvedValue({
-      snapshot: makeSnapshot(makeWork({ title: "取得タイトル" })),
-      projection: { status: "published" },
-    });
+    const preview = buildDlsitePreview();
+    fetchDlsiteInfo.mockReturnValue(preview);
+    applyDlsiteInfo.mockReturnValue(
+      buildWorkSourceMutationResult(makeSnapshot(makeWork({ title: "取得タイトル" }))),
+    );
 
     renderEditor(work);
     fireEvent.click(screen.getByRole("button", { name: "取得結果を確認" }));
@@ -147,21 +105,11 @@ describe("DlsiteEditor", () => {
 
   it("失敗: 適用が例外を投げても生のエラーメッセージを画面に出さない", async () => {
     const work = makeWork();
-    const preview: DlsitePreview = {
-      info: {
-        rjCode: "RJ501001",
-        title: "取得タイトル",
-        circle: "夜想曲",
-        cvs: [],
-        genreTags: [],
-        ageRating: null,
-        coverUrl: "https://example.test/cover.jpg",
-        url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501001.html",
-      },
-      sourceRevision: "rev-1",
-    };
-    fetchDlsiteInfo.mockResolvedValue(preview);
-    applyDlsiteInfo.mockRejectedValue(new TypeError("invalidate.run is not a function"));
+    const preview = buildDlsitePreview();
+    fetchDlsiteInfo.mockReturnValue(preview);
+    applyDlsiteInfo.mockReturnValue(
+      new Response("invalidate.run is not a function", { status: 500 }),
+    );
     vi.spyOn(console, "error").mockImplementation(() => {});
 
     renderEditor(work);
@@ -178,20 +126,12 @@ describe("DlsiteEditor", () => {
 
   it("画像なし: カバー行が適用不可として理由付きで無効表示される", async () => {
     const work = makeWork();
-    const preview: DlsitePreview = {
-      info: {
-        rjCode: "RJ501001",
-        title: work.title,
-        circle: "夜想曲",
-        cvs: ["新CV"],
-        genreTags: [],
-        ageRating: null,
-        coverUrl: null,
-        url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501001.html",
-      },
-      sourceRevision: "rev-1",
-    };
-    fetchDlsiteInfo.mockResolvedValue(preview);
+    const preview = buildDlsitePreview({
+      title: work.title,
+      cvs: ["新CV"],
+      coverUrl: null,
+    });
+    fetchDlsiteInfo.mockReturnValue(preview);
 
     renderEditor(work);
     fireEvent.click(screen.getByRole("button", { name: "取得結果を確認" }));
@@ -214,20 +154,11 @@ describe("DlsiteEditor", () => {
         },
       ],
     });
-    const preview: DlsitePreview = {
-      info: {
-        rjCode: "RJ501001",
-        title: "同一タイトル",
-        circle: "夜想曲",
-        cvs: [],
-        genreTags: [],
-        ageRating: null,
-        coverUrl: null,
-        url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501001.html",
-      },
-      sourceRevision: "rev-1",
-    };
-    fetchDlsiteInfo.mockResolvedValue(preview);
+    const preview = buildDlsitePreview({
+      title: "同一タイトル",
+      coverUrl: null,
+    });
+    fetchDlsiteInfo.mockReturnValue(preview);
 
     renderEditor(work);
     fireEvent.click(screen.getByRole("button", { name: "取得結果を確認" }));

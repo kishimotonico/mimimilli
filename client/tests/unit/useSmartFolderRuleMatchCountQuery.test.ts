@@ -3,10 +3,10 @@
 import { createElement, type ReactNode } from "react";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { SmartFolderRule } from "@mimimilli/shared";
 import { useSmartFolderRuleMatchCountQuery } from "../../src/features/library/model/useLibraryQueries";
-import * as smartFolderApi from "../../src/entities/smart-folder/api";
+import { mockApi } from "../helpers/api";
 
 function renderCount(rules: SmartFolderRule[] | null) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -21,7 +21,7 @@ function renderCount(rules: SmartFolderRule[] | null) {
 
 describe("useSmartFolderRuleMatchCountQuery", () => {
   it("条件0件で件数を取得した後、無効なドラフトへ切り替えると古い件数を表示しない", async () => {
-    vi.spyOn(smartFolderApi, "previewSmartFolderRuleCount").mockResolvedValue(42);
+    mockApi({ "POST /api/smart-folders/preview": { total: 42 } });
     const { result, rerender } = renderCount([]);
 
     await waitFor(() => expect(result.current.total).toBe(42));

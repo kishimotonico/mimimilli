@@ -221,12 +221,14 @@ describe("WorkListPane 空状態", () => {
 
   it("お気に入りビューが0件のとき文脈付きの案内を1行添える", () => {
     renderWorkListPane({ nav: { activeAxis: "fav" }, works: [] });
-    expect(screen.getByText("作品をブックマークするとお気に入りに表示されます")).toBeTruthy();
+    expect(
+      screen.getByText("作品をブックマークするとお気に入りに表示されます"),
+    ).toBeInTheDocument();
   });
 
   it("選択中フィルタが原因の0件では専用メッセージを出す", () => {
     renderWorkListPane({ nav: { activeAxis: "all", selectedTags: nts(["タグ"]) }, works: [] });
-    expect(screen.getByText("選択中のフィルタに一致する作品はありません")).toBeTruthy();
+    expect(screen.getByText("選択中のフィルタに一致する作品はありません")).toBeInTheDocument();
   });
 
   it("検索語が原因の0件で検索クリアボタンを出す", async () => {
@@ -246,8 +248,8 @@ describe("WorkListPane 空状態", () => {
       emptyState: { isSmartFolder: true, onEditSmartFolderRules },
     });
 
-    expect(screen.getByText("条件に一致する作品がありません")).toBeTruthy();
-    expect(screen.getByText("条件を見直すか、絞り込みを外してください。")).toBeTruthy();
+    expect(screen.getByText("条件に一致する作品がありません")).toBeInTheDocument();
+    expect(screen.getByText("条件を見直すか、絞り込みを外してください。")).toBeInTheDocument();
     expect(screen.queryByText("絞り込みをすべてクリア")).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "条件を編集" }));

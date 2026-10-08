@@ -23,8 +23,8 @@ describe("Toast", () => {
     render(<Toast message="ライブラリのエクスポートに失敗しました" onDismiss={() => {}} />);
 
     const popover = document.body.querySelector("[popover='manual']");
-    expect(popover).toBeTruthy();
-    expect(screen.getByText("ライブラリのエクスポートに失敗しました")).toBeTruthy();
+    expect(popover).toBeInTheDocument();
+    expect(screen.getByText("ライブラリのエクスポートに失敗しました")).toBeInTheDocument();
     expect(showPopover).toHaveBeenCalled();
   });
 
@@ -38,7 +38,7 @@ describe("Toast", () => {
     });
 
     // 退出アニメーション中も文言は消えない（AnimatePresence が最後の要素を凍結表示する）
-    expect(screen.getByText("エラー")).toBeTruthy();
+    expect(screen.getByText("エラー")).toBeInTheDocument();
     expect(hidePopover).not.toHaveBeenCalled();
 
     await waitFor(() => expect(hidePopover).toHaveBeenCalled());
@@ -78,7 +78,7 @@ describe("Toast", () => {
     // 退出アニメーション相当の時間が経過してもなお、hidePopover は呼ばれない（呼ばれれば B も隠れてしまう）
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(hidePopover).not.toHaveBeenCalled();
-    expect(screen.getByText("トーストB")).toBeTruthy();
+    expect(screen.getByText("トーストB")).toBeInTheDocument();
   });
 
   it("action無しは既定5秒で自動的に閉じる", () => {

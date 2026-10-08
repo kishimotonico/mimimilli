@@ -8,19 +8,8 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useLibrarySupportingQueries } from "../../src/features/library/model/useLibraryQueries";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
-
-function jsonResponse(data: unknown): Response {
-  return new Response(JSON.stringify(data), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-function urlOf(input: RequestInfo | URL): string {
-  if (typeof input === "string") return input;
-  if (input instanceof URL) return input.toString();
-  return input.url;
-}
+import { mockApi } from "../helpers/api";
+import { buildAxisFacetItem, buildWorksPage } from "../helpers/builders";
 
 const baseNav: LibraryViewState = {
   activeAxis: "cv",
@@ -29,43 +18,18 @@ const baseNav: LibraryViewState = {
   sort: "added-desc",
 };
 
-function createFetchMock() {
-  return vi.fn((input: RequestInfo | URL) => {
-    const url = new URL(urlOf(input), "http://localhost");
-    const path = url.pathname;
-    if (path === "/api/axes/cv") {
-      return Promise.resolve(
-        jsonResponse(
-          Array.from({ length: 8 }, (_, i) => ({
-            value: `cv${i}`,
-            count: 1,
-            durationSec: 0,
-            covers: [],
-          })),
-        ),
-      );
-    }
-    if (path === "/api/axes/tag") {
-      return Promise.resolve(jsonResponse([]));
-    }
-    if (path === "/api/works") {
-      return Promise.resolve(
-        jsonResponse({ items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } }),
-      );
-    }
-    if (path === "/api/tag-prefixes") return Promise.resolve(jsonResponse([]));
-    if (path === "/api/tags") return Promise.resolve(jsonResponse([]));
-    if (path === "/api/smart-folders") return Promise.resolve(jsonResponse([]));
-    return Promise.reject(new Error(`unexpected fetch: ${url.toString()}`));
-  });
-}
-
 describe("分類軸切替時の facetItems 系列（R2 機序調査）", () => {
-  let fetchMock: ReturnType<typeof createFetchMock>;
-
   beforeEach(() => {
-    fetchMock = createFetchMock();
-    vi.stubGlobal("fetch", fetchMock);
+    mockApi({
+      "GET /api/axes/:axis": ({ params }) =>
+        params.axis === "cv"
+          ? Array.from({ length: 8 }, (_, i) => buildAxisFacetItem({ value: `cv${i}` }))
+          : [],
+      "GET /api/works": buildWorksPage(),
+      "GET /api/tag-prefixes": [],
+      "GET /api/tags": [],
+      "GET /api/smart-folders": [],
+    });
   });
 
   afterEach(() => {

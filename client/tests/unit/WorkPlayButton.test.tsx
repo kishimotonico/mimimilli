@@ -34,7 +34,7 @@ describe("WorkPlayButton", () => {
     renderButton({ hasResume: false, isLoaded: false, onPlayFromStart });
 
     const main = screen.getByRole("button", { name: "最初から再生" });
-    expect(screen.getByText("再生")).toBeTruthy();
+    expect(screen.getByText("再生")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "再生メニュー" })).toBeNull();
 
     await user.click(main);
@@ -55,7 +55,7 @@ describe("WorkPlayButton", () => {
     });
 
     const main = screen.getByRole("button", { name: "続きから再生" });
-    expect(screen.getByText("続きから")).toBeTruthy();
+    expect(screen.getByText("続きから")).toBeInTheDocument();
     // 時間テキストはボタンに載せない
     expect(screen.queryByText("1:23:45")).toBeNull();
 
@@ -64,7 +64,7 @@ describe("WorkPlayButton", () => {
 
     await user.click(screen.getByRole("button", { name: "再生メニュー" }));
     const item = screen.getByRole("menuitem", { name: "最初から再生" });
-    expect(item).toBeTruthy();
+    expect(item).toBeInTheDocument();
     await user.click(item);
     expect(onPlayFromStart).toHaveBeenCalledTimes(1);
     // メニューはクリックで閉じる
@@ -77,7 +77,7 @@ describe("WorkPlayButton", () => {
     renderButton({ hasResume: true, isLoaded: true, isPlaying: true, onTogglePlay });
 
     const main = screen.getByRole("button", { name: "一時停止" });
-    expect(screen.getByText("一時停止")).toBeTruthy();
+    expect(screen.getByText("一時停止")).toBeInTheDocument();
 
     await user.click(main);
     expect(onTogglePlay).toHaveBeenCalledTimes(1);
@@ -89,7 +89,7 @@ describe("WorkPlayButton", () => {
     renderButton({ hasResume: true, isLoaded: true, isPlaying: false, onTogglePlay });
 
     const main = screen.getByRole("button", { name: "再生を再開" });
-    expect(screen.getByText("再生")).toBeTruthy();
+    expect(screen.getByText("再生")).toBeInTheDocument();
 
     await user.click(main);
     expect(onTogglePlay).toHaveBeenCalledTimes(1);
@@ -97,7 +97,7 @@ describe("WorkPlayButton", () => {
 
   it("ロード中は履歴の有無に関わらず▾（最初から再生）を出す", () => {
     renderButton({ hasResume: false, isLoaded: true, isPlaying: true });
-    expect(screen.getByRole("button", { name: "再生メニュー" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "再生メニュー" })).toBeInTheDocument();
   });
 
   it("再生不可（isPlayable=false）: 主ボタンは無効化され▾も出さない", () => {

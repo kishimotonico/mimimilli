@@ -1,11 +1,19 @@
 import { createElement, type ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { emptyDlsiteState, type Work } from "@mimimilli/shared";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Work } from "@mimimilli/shared";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
 import { WorkDetailPatchScope } from "../../src/features/library/ui/preview/WorkDetailPatchScope";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
+import { apiResponse, mockApi } from "../helpers/api";
+import {
+  buildResolvedPlaylist,
+  buildSettings,
+  buildWork,
+  buildWorkEditSnapshotOf,
+  buildWorkSourceMutationResult,
+} from "../helpers/builders";
 
 vi.mock("../../src/entities/player/model/usePlayWork", () => ({
   usePlayWork: () => ({ playWork: vi.fn(), resumeWork: vi.fn() }),
@@ -31,50 +39,15 @@ const baseNav: LibraryViewState = {
   sort: "added-desc",
 };
 
-const playlistId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-
 function makeWork(id: string): Work {
-  return {
+  const playlist = buildResolvedPlaylist(1, ["track"]);
+  return buildWork({
     id,
     title: `作品 ${id}`,
-    cover: null,
-    coverKind: "none",
-    coverImage: null,
-    status: "ok",
     physicalPath: `/lib/${id}`,
     totalDurationSec: 60,
-    addedAt: "2025-01-01T00:00:00.000Z",
-    errorMessage: null,
-    urls: [],
-    tags: [],
-    bookmarked: false,
-    lastPlayedAt: null,
-    dlsite: emptyDlsiteState(),
-    defaultPlaylistId: playlistId,
-    createdAt: null,
-    playlists: [
-      {
-        id: playlistId,
-        name: "default",
-        tracks: [
-          {
-            id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-            title: "track",
-            file: "track.mp3",
-            durationSec: 60,
-            durationKind: "resolved",
-          },
-        ],
-      },
-    ],
-    resume: null,
-  };
-}
-
-function jsonResponse(data: unknown): Response {
-  return new Response(JSON.stringify(data), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
+    defaultPlaylistId: playlist.id,
+    playlists: [playlist],
   });
 }
 
@@ -82,10 +55,7 @@ function renderScopedDetail(workId: string) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
-    rootFolder: "/lib",
-    lastScanTime: null,
-  });
+  queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), buildSettings({ rootFolder: "/lib" }));
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(QueryClientProvider, { client: queryClient }, children);
 
@@ -104,7 +74,7 @@ function renderScopedDetail(workId: string) {
 }
 
 describe("WorkDetailPatchScope", () => {
-  let fetchMock: ReturnType<typeof vi.fn>;
+  let titlePatchReply: (body: { title?: string }) => Promise<Response> | Response;
 
   beforeEach(() => {
     HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
@@ -113,65 +83,22 @@ describe("WorkDetailPatchScope", () => {
     HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
       this.open = false;
     });
-    fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(typeof input === "string" ? input : input.toString(), "http://localhost");
-      const bookmarkId = url.pathname.match(/^\/api\/works\/([^/]+)\/bookmark$/)?.[1];
-      if (bookmarkId && init?.method === "PATCH") {
-        if (bookmarkId === "work-a") {
-          return Promise.resolve(
-            new Response(JSON.stringify({ error: "server error" }), {
-              status: 500,
-              headers: { "Content-Type": "application/json" },
-            }),
-          );
-        }
-        return Promise.resolve(jsonResponse({ bookmarked: true }));
-      }
-      const sourceId = url.pathname.match(/^\/api\/works\/([^/]+)\/source$/)?.[1];
-      if (sourceId) {
-        const work = makeWork(sourceId);
-        return Promise.resolve(
-          jsonResponse({
-            sourceRevision: "revision-1",
-            id: work.id,
-            physicalPath: work.physicalPath,
-            title: work.title,
-            tags: work.tags,
-            urls: work.urls,
-            coverImage: work.coverImage,
-            dlsite: work.dlsite,
-          }),
-        );
-      }
-      const workId = url.pathname.match(/^\/api\/works\/([^/]+)$/)?.[1];
-      if (workId && init?.method === "PATCH") {
-        const work = makeWork(workId);
-        return Promise.resolve(
-          jsonResponse({
-            snapshot: {
-              sourceRevision: "revision-2",
-              id: work.id,
-              physicalPath: work.physicalPath,
-              title: work.title,
-              tags: work.tags,
-              urls: work.urls,
-              coverImage: work.coverImage,
-              dlsite: work.dlsite,
-            },
-            projection: { status: "published" },
-          }),
-        );
-      }
-      if (workId) {
-        return Promise.resolve(jsonResponse(makeWork(workId)));
-      }
-      return Promise.reject(new Error(`unexpected fetch: ${url.toString()}`));
+    titlePatchReply = () =>
+      apiResponse(
+        buildWorkSourceMutationResult(buildWorkEditSnapshotOf(makeWork("work-a"), "revision-2")),
+      );
+    mockApi({
+      "PATCH /api/works/:id/bookmark": ({ params }) =>
+        params.id === "work-a"
+          ? new Response(JSON.stringify({ error: "server error" }), { status: 500 })
+          : { bookmarked: true },
+      "GET /api/works/:id/source": ({ params }) =>
+        buildWorkEditSnapshotOf(makeWork(params.id!), "revision-1"),
+      "PATCH /api/works/:id": ({ body }) => titlePatchReply(body as { title?: string }),
+      "GET /api/works/:id": ({ params }) => makeWork(params.id!),
+      "GET /api/settings": buildSettings({ rootFolder: "/lib" }),
+      "GET /api/tag-prefixes": [],
     });
-    vi.stubGlobal("fetch", fetchMock);
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
   });
 
   it("作品 A で失敗した mutation 状態が作品 B に持ち越されない", async () => {
@@ -201,41 +128,10 @@ describe("WorkDetailPatchScope", () => {
 
   it("タイトル mutation の失敗がブックマーク操作の pending 状態に影響しない", async () => {
     let resolvePatch: ((value: Response) => void) | undefined;
-    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(typeof input === "string" ? input : input.toString(), "http://localhost");
-      const bookmarkId = url.pathname.match(/^\/api\/works\/([^/]+)\/bookmark$/)?.[1];
-      if (bookmarkId && init?.method === "PATCH") {
-        return Promise.resolve(jsonResponse({ bookmarked: true }));
-      }
-      const sourceId = url.pathname.match(/^\/api\/works\/([^/]+)\/source$/)?.[1];
-      if (sourceId) {
-        const work = makeWork(sourceId);
-        return Promise.resolve(
-          jsonResponse({
-            sourceRevision: "revision-1",
-            id: work.id,
-            physicalPath: work.physicalPath,
-            title: work.title,
-            tags: work.tags,
-            urls: work.urls,
-            coverImage: work.coverImage,
-            dlsite: work.dlsite,
-          }),
-        );
-      }
-      const workId = url.pathname.match(/^\/api\/works\/([^/]+)$/)?.[1];
-      if (workId && init?.method === "PATCH") {
-        const body = JSON.parse(init.body as string) as { title?: string };
-        if (body.title !== undefined) {
-          return new Promise<Response>((resolve) => {
-            resolvePatch = resolve;
-          });
-        }
-        return Promise.resolve(jsonResponse({ bookmarked: true }));
-      }
-      if (workId) return Promise.resolve(jsonResponse(makeWork(workId)));
-      return Promise.reject(new Error(`unexpected fetch: ${url.toString()}`));
-    });
+    titlePatchReply = () =>
+      new Promise<Response>((resolve) => {
+        resolvePatch = resolve;
+      });
 
     renderScopedDetail("work-a");
 
@@ -252,19 +148,14 @@ describe("WorkDetailPatchScope", () => {
 
     await act(async () => {
       resolvePatch?.(
-        jsonResponse({
-          snapshot: {
-            sourceRevision: "revision-2",
-            id: "work-a",
-            physicalPath: "/lib/work-a",
-            title: "新しいタイトル",
-            tags: [],
-            urls: [],
-            coverImage: null,
-            dlsite: emptyDlsiteState(),
-          },
-          projection: { status: "published" },
-        }),
+        apiResponse(
+          buildWorkSourceMutationResult(
+            buildWorkEditSnapshotOf(
+              { ...makeWork("work-a"), title: "新しいタイトル" },
+              "revision-2",
+            ),
+          ),
+        ),
       );
     });
   });

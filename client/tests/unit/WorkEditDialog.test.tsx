@@ -3,7 +3,6 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Work, WorkEditSnapshot } from "@mimimilli/shared";
-import { emptyDlsiteState, toDlsiteLinkageStatus } from "@mimimilli/shared";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import type { EditWorkSourceMutation } from "../../src/entities/work/model/workMutations";
@@ -12,21 +11,19 @@ import type { LibraryViewState } from "../../src/features/library/model/useLibra
 import { WorkEditDialog } from "../../src/features/library/ui/preview/WorkEditDialog";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import { ApiRequestError } from "../../src/shared/api/http";
+import { apiError, mockApi } from "../helpers/api";
+import {
+  buildSettings,
+  buildTagPrefix,
+  buildWork,
+  buildWorkEditSnapshotOf,
+  buildWorkSourceMutationResult,
+} from "../helpers/builders";
 
-const { mockGetWorkEditSnapshot, mockProjectWorkSource, mockPatchWorkSource } = vi.hoisted(() => ({
-  mockGetWorkEditSnapshot: vi.fn(),
-  mockProjectWorkSource: vi.fn(),
-  mockPatchWorkSource: vi.fn(),
-}));
-vi.mock("../../src/entities/work/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../src/entities/work/api")>()),
-  getWorkEditSnapshot: (...args: unknown[]) => mockGetWorkEditSnapshot(...args),
-  projectWorkSource: (...args: unknown[]) => mockProjectWorkSource(...args),
-  patchWorkSource: (...args: unknown[]) => mockPatchWorkSource(...args),
-}));
-vi.mock("../../src/entities/tag/useTagPrefixes", () => ({
-  useTagPrefixes: () => ({ tagPrefixes: [{ prefix: "cv", protected: true }] }),
-}));
+const mockGetWorkEditSnapshot = vi.fn();
+const mockProjectWorkSource = vi.fn();
+const mockPatchWorkSource = vi.fn();
+
 vi.mock("../../src/features/library/ui/preview/DlsiteEditor", () => ({
   DlsiteEditor: () => null,
 }));
@@ -54,51 +51,30 @@ beforeEach(() => {
     this.open = false;
   });
   mockGetWorkEditSnapshot.mockReset();
-  mockGetWorkEditSnapshot.mockResolvedValue(makeSnapshot());
+  mockGetWorkEditSnapshot.mockReturnValue(makeSnapshot());
   mockProjectWorkSource.mockReset();
   mockPatchWorkSource.mockReset();
+  mockApi({
+    "GET /api/works/:id/source": () => mockGetWorkEditSnapshot() as unknown,
+    "POST /api/works/projection": () => mockProjectWorkSource() as unknown,
+    "PATCH /api/works/:id": () => mockPatchWorkSource() as unknown,
+    "GET /api/settings": buildSettings({ rootFolder: "/lib" }),
+    "GET /api/tag-prefixes": [buildTagPrefix({ prefix: "cv", label: "CV", protected: true })],
+  });
 });
 
 function makeWork(overrides: Partial<Work> = {}): Work {
-  return {
+  return buildWork({
     id: "w1",
-    title: "作品",
-    cover: null,
-    coverKind: "none",
-    coverImage: null,
-    status: "ok",
     physicalPath: "/lib/w1",
     totalDurationSec: 120,
     addedAt: "2025-01-01T00:00:00.000Z",
-    errorMessage: null,
-    urls: [],
-    tags: [],
-    bookmarked: false,
-    lastPlayedAt: null,
-    dlsite: emptyDlsiteState(),
-    defaultPlaylistId: null,
-    createdAt: null,
-    playlists: [],
-    resume: null,
     ...overrides,
-  };
+  });
 }
 
 function makeSnapshot(work: Work = makeWork(), revision = "revision-1"): WorkEditSnapshot {
-  return {
-    sourceRevision: revision,
-    id: work.id,
-    physicalPath: work.physicalPath,
-    title: work.title,
-    tags: work.tags,
-    urls: work.urls,
-    coverImage: work.coverImage,
-    dlsite: {
-      rjCode: work.dlsite.rjCode,
-      status: toDlsiteLinkageStatus(work.dlsite.status),
-      appliedTags: work.dlsite.appliedTags,
-    },
-  };
+  return buildWorkEditSnapshotOf(work, revision);
 }
 
 function renderDialog(ui: ReactElement) {
@@ -142,7 +118,7 @@ function renderEditDialog(
   const work = options.work ?? makeWork();
   const onClose = options.onClose ?? vi.fn();
   const editMutation = options.editMutation ?? makeEditMutation();
-  if (options.work) mockGetWorkEditSnapshot.mockResolvedValue(makeSnapshot(work));
+  if (options.work) mockGetWorkEditSnapshot.mockReturnValue(makeSnapshot(work));
   const view = renderDialog(
     <WorkEditDialog
       work={work}
@@ -181,8 +157,8 @@ function EditDialogWithRealMutation(props: {
 
 describe("WorkEditDialog", () => {
   it("正本が読めないときは入力を無効化し理由を表示する", async () => {
-    mockGetWorkEditSnapshot.mockRejectedValue(
-      new ApiRequestError(502, "parse_error", "作品の正本が壊れているため編集できません。"),
+    mockGetWorkEditSnapshot.mockReturnValue(
+      apiError(502, "parse_error", "作品の正本が壊れているため編集できません。"),
     );
     const { onClose } = renderEditDialog({ onClose: vi.fn() });
 
@@ -251,7 +227,7 @@ describe("WorkEditDialog", () => {
     });
     fireEvent.click(screen.getByRole("option", { name: /癒し系/ }));
 
-    expect(screen.getByText("癒し系")).toBeTruthy();
+    expect(screen.getByText("癒し系")).toBeInTheDocument();
     expect(editMutation.mutateAsync).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
@@ -271,14 +247,14 @@ describe("WorkEditDialog", () => {
     await waitForReady();
 
     fireEvent.click(screen.getByRole("button", { name: /を削除$/ }));
-    expect(screen.getByRole("alertdialog", { name: "保護タグの削除" })).toBeTruthy();
+    expect(screen.getByRole("alertdialog", { name: "保護タグの削除" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "削除する" }));
     expect(screen.queryByText("藤田茜")).toBeNull();
     expect(editMutation.mutateAsync).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "元に戻す" }));
-    expect(screen.getByText("藤田茜")).toBeTruthy();
+    expect(screen.getByText("藤田茜")).toBeInTheDocument();
     expect(editMutation.mutateAsync).not.toHaveBeenCalled();
   });
 
@@ -289,7 +265,7 @@ describe("WorkEditDialog", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /を削除$/ }));
     fireEvent.click(screen.getByRole("button", { name: "削除する" }));
-    expect(screen.getByRole("button", { name: "元に戻す" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "元に戻す" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
@@ -332,7 +308,7 @@ describe("WorkEditDialog", () => {
     fireEvent(dialog, new Event("cancel", { cancelable: true, bubbles: true }));
 
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByRole("alertdialog", { name: "未保存の変更があります" })).toBeTruthy();
+    expect(screen.getByRole("alertdialog", { name: "未保存の変更があります" })).toBeInTheDocument();
   });
 
   it("プロンプトの破棄するで入力を捨てて閉じる", async () => {
@@ -425,7 +401,7 @@ describe("WorkEditDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存する" }));
 
     // reject後の状態が確定した合図であるエラー表示を待ってから、残りの状態を検証する。
-    expect(await screen.findByText("保存できませんでした。")).toBeTruthy();
+    expect(await screen.findByText("保存できませんでした。")).toBeInTheDocument();
 
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.queryByRole("alertdialog")).toBeNull();
@@ -464,7 +440,9 @@ describe("WorkEditDialog", () => {
     fireEvent.change(screen.getByLabelText("タイトル"), { target: { value: "編集途中" } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
-    await waitFor(() => expect(screen.getByText(/作品データが他で更新されました/)).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByText(/作品データが他で更新されました/)).toBeInTheDocument(),
+    );
     expect(screen.getByLabelText("タイトル")).toHaveValue("編集途中");
 
     resolveRefetch(makeSnapshot(work, "revision-2"));
@@ -485,7 +463,7 @@ describe("WorkEditDialog", () => {
       tags: ["新タグ"],
     });
 
-    await waitFor(() => expect(screen.getByText("新タグ")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("新タグ")).toBeInTheDocument());
     expect(screen.getByLabelText("タイトル")).toHaveValue("編集中タイトル");
   });
 
@@ -501,7 +479,7 @@ describe("WorkEditDialog", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByText("保存後に別の変更がありました（タイトル）")).toBeTruthy(),
+      expect(screen.getByText("保存後に別の変更がありました（タイトル）")).toBeInTheDocument(),
     );
     expect(screen.getByLabelText("タイトル")).toHaveValue("自分の編集"); // draftは維持
 
@@ -525,7 +503,7 @@ describe("WorkEditDialog", () => {
       title: "他人が変更したタイトル",
     });
     await waitFor(() =>
-      expect(screen.getByText("保存後に別の変更がありました（タイトル）")).toBeTruthy(),
+      expect(screen.getByText("保存後に別の変更がありました（タイトル）")).toBeInTheDocument(),
     );
 
     fireEvent.click(screen.getByRole("button", { name: "自分の編集で上書きする" }));
@@ -564,7 +542,7 @@ describe("WorkEditDialog", () => {
         screen.getByText(
           "作品ファイルは保存しました。反映の直前にファイルが変わったため、一覧はまだ古いです。",
         ),
-      ).toBeTruthy(),
+      ).toBeInTheDocument(),
     );
 
     // dirtyが解除されているため、閉じる操作は未保存プロンプトへ戻さず即座に閉じる
@@ -584,31 +562,29 @@ describe("WorkEditDialog", () => {
     });
     const { queryClient } = renderEditDialog({ editMutation });
     await waitForReady();
-    queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
-      rootFolder: "/lib",
-      lastScanTime: null,
-    });
+    queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), buildSettings({ rootFolder: "/lib" }));
 
     fireEvent.change(screen.getByLabelText("タイトル"), { target: { value: "編集途中" } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(editMutation.mutateAsync).toHaveBeenCalledTimes(1));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "一覧へ反映する" })).toBeTruthy(),
+      expect(screen.getByRole("button", { name: "一覧へ反映する" })).toBeInTheDocument(),
     );
 
     // 保存が完了して基準へ追従した後、さらに編集してdirtyにする
     fireEvent.change(screen.getByLabelText("タイトル"), { target: { value: "再編集した内容" } });
 
     // 再投影の応答は「今の正本」であり、外部変更で別のタイトルになっているとする
-    mockProjectWorkSource.mockResolvedValue({
-      snapshot: makeSnapshot(makeWork({ title: "外部で変わったタイトル" }), "revision-3"),
-      projection: { status: "published" },
-    });
+    mockProjectWorkSource.mockReturnValue(
+      buildWorkSourceMutationResult(
+        makeSnapshot(makeWork({ title: "外部で変わったタイトル" }), "revision-3"),
+      ),
+    );
     fireEvent.click(screen.getByRole("button", { name: "一覧へ反映する" }));
 
     // 再投影後もdirtyなdraftはbackground refetchと同じ衝突判定に乗り、無条件で上書きされない
     await waitFor(() =>
-      expect(screen.getByText("保存後に別の変更がありました（タイトル）")).toBeTruthy(),
+      expect(screen.getByText("保存後に別の変更がありました（タイトル）")).toBeInTheDocument(),
     );
     expect(screen.getByLabelText("タイトル")).toHaveValue("再編集した内容");
   });
@@ -627,7 +603,7 @@ describe("WorkEditDialog", () => {
     await waitFor(() =>
       expect(
         screen.getByText("保存の結果を確認できませんでした。作品情報を読み直してください。"),
-      ).toBeTruthy(),
+      ).toBeInTheDocument(),
     );
     // draftは保持される（成功とも失敗とも推測しない）
     expect(screen.getByLabelText("タイトル")).toHaveValue("編集途中");
@@ -637,11 +613,12 @@ describe("WorkEditDialog", () => {
 
   it("実際のeditMutation経由で保存しても、自分の保存応答が外部変更として衝突通知にならない", async () => {
     const work = makeWork({ title: "元タイトル" });
-    mockGetWorkEditSnapshot.mockResolvedValue(makeSnapshot(work, "revision-1"));
-    mockPatchWorkSource.mockResolvedValue({
-      snapshot: makeSnapshot(makeWork({ title: "編集後タイトル" }), "revision-2"),
-      projection: { status: "published" },
-    });
+    mockGetWorkEditSnapshot.mockReturnValue(makeSnapshot(work, "revision-1"));
+    mockPatchWorkSource.mockReturnValue(
+      buildWorkSourceMutationResult(
+        makeSnapshot(makeWork({ title: "編集後タイトル" }), "revision-2"),
+      ),
+    );
     renderDialog(<EditDialogWithRealMutation work={work} />);
     await waitForReady();
 

@@ -111,7 +111,7 @@ describe("BarContent", () => {
     renderBar(0);
     fireEvent.click(screen.getByRole("button", { name: "音量 75%" }));
 
-    expect(screen.getByText("75")).toBeTruthy();
+    expect(screen.getByText("75")).toBeInTheDocument();
   });
 
   it("音量ボタンはデフォルトで単体表示され、クリックするとスライダーのポップオーバーが開く", () => {
@@ -122,7 +122,7 @@ describe("BarContent", () => {
 
     fireEvent.click(volumeButton);
 
-    expect(screen.getByRole("slider", { name: "音量" })).toBeTruthy();
+    expect(screen.getByRole("slider", { name: "音量" })).toBeInTheDocument();
   });
 
   it("音量スライダーを操作すると onSetVolume が呼ばれる", () => {
@@ -140,7 +140,7 @@ describe("BarContent", () => {
     renderBar(0);
     const volumeButton = screen.getByRole("button", { name: "音量 75%" });
     fireEvent.click(volumeButton);
-    expect(screen.getByRole("slider", { name: "音量" })).toBeTruthy();
+    expect(screen.getByRole("slider", { name: "音量" })).toBeInTheDocument();
 
     fireEvent.keyDown(document, { key: "Escape" });
 
