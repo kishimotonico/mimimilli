@@ -23,6 +23,8 @@ import { descendantsRegisteredError, restoreIdentityConflictError } from "../../
 import {
   META_FILE_NAME,
   MetaParseError,
+  inspectMetaFile,
+  type MetaInspection,
   patchMetaFileCas,
   readMetaSource,
   writeMetaFile,
@@ -49,7 +51,12 @@ import {
   registerMetaFile,
   type RegisterMetaFileOptions,
 } from "./scanRegister.ts";
-import type { PreparedMeta, ProjectOutcome, ScanExecutionResult } from "./scanTypes.ts";
+import type {
+  PreparedEntry,
+  PreparedMeta,
+  ProjectOutcome,
+  ScanExecutionResult,
+} from "./scanTypes.ts";
 import type { ProbeCacheEntry } from "./probe.ts";
 import { ScanUpsertBatch } from "./scanUpsertBatch.ts";
 import {
@@ -82,19 +89,28 @@ function emptyRegisterTracking(): Pick<
   return { coverErrors: 0, insertedWorkIds: [], updatedWorkIds: [] };
 }
 
-function findIdentityConflicts(root: string, metaPaths: string[]): ScanDiagnostic[] {
-  const pathsByWorkId = new Map<string, string[]>();
+function inspectMetaFiles(
+  metaPaths: string[],
+  checkAbort: () => void,
+): Map<string, MetaInspection> {
+  const inspections = new Map<string, MetaInspection>();
   for (const metaPath of metaPaths) {
-    try {
-      const value: unknown = JSON.parse(readFileSync(metaPath, "utf-8"));
-      if (typeof value !== "object" || value === null || !("id" in value)) continue;
-      if (typeof value.id !== "string") continue;
-      const paths = pathsByWorkId.get(value.id) ?? [];
-      paths.push(identityConflictPathOf(root, metaPath));
-      pathsByWorkId.set(value.id, paths);
-    } catch {
-      // 不正JSONは登録フェーズで parse error として扱う。
-    }
+    checkAbort();
+    inspections.set(metaPath, inspectMetaFile(metaPath));
+  }
+  return inspections;
+}
+
+function findIdentityConflicts(
+  root: string,
+  inspections: ReadonlyMap<string, MetaInspection>,
+): ScanDiagnostic[] {
+  const pathsByWorkId = new Map<string, string[]>();
+  for (const [metaPath, { declaredId }] of inspections) {
+    if (declaredId === null) continue;
+    const paths = pathsByWorkId.get(declaredId) ?? [];
+    paths.push(identityConflictPathOf(root, metaPath));
+    pathsByWorkId.set(declaredId, paths);
   }
   return [...pathsByWorkId]
     .filter(([, paths]) => paths.length > 1)
@@ -177,7 +193,6 @@ export class Scanner {
     const existingByMetaPath = new Map(
       [...existingWorks].map(([id, state]) => [state.metaPath, { id, state }]),
     );
-    result.identityConflicts = findIdentityConflicts(root, tree.metaPaths);
 
     const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, checkAbort);
 
@@ -235,6 +250,25 @@ export class Scanner {
     return tree;
   }
 
+  private prepareEntries(
+    root: string,
+    tree: WalkResult,
+    existingWorks: Map<string, ScanWorkState>,
+    full: boolean,
+    result: ScanResult,
+    checkAbort: () => void,
+  ): PreparedEntry[] {
+    const inspections = inspectMetaFiles(tree.metaPaths, checkAbort);
+    result.identityConflicts = findIdentityConflicts(root, inspections);
+    return prepareMetaEntries(
+      inspections,
+      existingWorks,
+      full,
+      checkAbort,
+      new Set(result.identityConflicts.map((diagnostic) => diagnostic.workId)),
+    );
+  }
+
   private async registerPhase(
     root: string,
     tree: WalkResult,
@@ -249,15 +283,7 @@ export class Scanner {
   ): Promise<void> {
     emit({ type: "progress", phase: "registering", processed: 0, total: tree.metaPaths.length });
 
-    const prepared = prepareMetaEntries(
-      root,
-      tree.metaPaths,
-      existingWorks,
-      full,
-      seenIds,
-      checkAbort,
-      new Set(result.identityConflicts.map((diagnostic) => diagnostic.workId)),
-    );
+    const prepared = this.prepareEntries(root, tree, existingWorks, full, result, checkAbort);
     const probeCache = buildProbeCache(this.query, prepared, full, checkAbort);
 
     const registeringThrottle = createProgressThrottle(PROGRESS_MIN_INTERVAL_MS);

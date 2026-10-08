@@ -60,48 +60,101 @@ export class MetaMutationReject {
   }
 }
 
-function candidateIdOf(raw: unknown): string | null {
+export type MetaDiagnostic = { kind: MetaParseKind; detail: string };
+
+/**
+ * メタファイル1回分の読み込み結果。JSON不正・スキーマ違反も例外にせず診断として保持する。
+ * declaredId はJSONとして読めた場合の `id`、candidateId は読めない場合に本文から拾った `id` も含む。
+ */
+export type MetaInspection = {
+  bytes: Buffer;
+  sourceRevision: string;
+  declaredId: string | null;
+  candidateId: string | null;
+} & ({ meta: MetaFile; diagnostic: null } | { meta: null; diagnostic: MetaDiagnostic });
+
+function declaredIdOf(raw: unknown): string | null {
   return typeof raw === "object" && raw !== null && "id" in raw && typeof raw.id === "string"
     ? raw.id
     : null;
 }
 
-function parseMetaRaw(metaPath: string, raw: unknown): MetaFile {
-  const candidateId = candidateIdOf(raw);
+function rescueIdFromText(text: string): string | null {
+  return text.match(/"id"\s*:\s*"([^"\\]+)"/)?.[1] ?? null;
+}
+
+/** バイト列からJSON解釈・formatVersion判定・スキーマ検証・候補ID抽出までを行う唯一の入口。 */
+export function inspectMetaBytes(bytes: Buffer): MetaInspection {
+  const base = { bytes, sourceRevision: sourceRevision(bytes) };
+  const text = bytes.toString("utf-8");
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch (error) {
+    return {
+      ...base,
+      declaredId: null,
+      candidateId: rescueIdFromText(text),
+      meta: null,
+      diagnostic: { kind: "json", detail: `JSON パースエラー: ${errorMessage(error)}` },
+    };
+  }
+  const declaredId = declaredIdOf(raw);
+  const invalid = (diagnostic: MetaDiagnostic): MetaInspection => ({
+    ...base,
+    declaredId,
+    candidateId: declaredId,
+    meta: null,
+    diagnostic,
+  });
   if (
     typeof raw === "object" &&
     raw !== null &&
     "formatVersion" in raw &&
     (raw as { formatVersion: unknown }).formatVersion !== 1
   ) {
-    throw new MetaParseError(metaPath, "unsupported formatVersion", candidateId, "formatVersion");
+    return invalid({ kind: "formatVersion", detail: "unsupported formatVersion" });
   }
   const parsed = metaFileSchema.safeParse(raw);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    throw new MetaParseError(
-      metaPath,
-      `${issue?.path.join(".") ?? ""} ${issue?.message ?? "不明"}`,
-      candidateId,
-      "schema",
-    );
+    return invalid({
+      kind: "schema",
+      detail: `${issue?.path.join(".") ?? ""} ${issue?.message ?? "不明"}`,
+    });
   }
-  return parsed.data;
+  return { ...base, declaredId, candidateId: declaredId, meta: parsed.data, diagnostic: null };
 }
 
-/** JSONだけを読む軽量経路。fingerprint 一致時はスキーマ検証を省略するために使う。 */
-export function readMetaFileRaw(metaPath: string): unknown {
-  const content = readFileSync(metaPath, "utf-8");
-  try {
-    return JSON.parse(content);
-  } catch (e) {
-    throw new MetaParseError(metaPath, `JSON パースエラー: ${errorMessage(e)}`, null, "json");
-  }
+export function inspectMetaFile(metaPath: string): MetaInspection {
+  return inspectMetaBytes(readFileSync(metaPath));
+}
+
+/** 診断つきの読み込み結果から MetaParseError を作る唯一の関数 */
+export function metaParseErrorOf(
+  metaPath: string,
+  inspection: MetaInspection & { diagnostic: MetaDiagnostic },
+): MetaParseError {
+  return new MetaParseError(
+    metaPath,
+    inspection.diagnostic.detail,
+    inspection.candidateId,
+    inspection.diagnostic.kind,
+  );
+}
+
+function sourceOf(metaPath: string, inspection: MetaInspection): MetaSource {
+  if (inspection.diagnostic !== null) throw metaParseErrorOf(metaPath, inspection);
+  return {
+    bytes: inspection.bytes,
+    meta: inspection.meta,
+    sourceRevision: inspection.sourceRevision,
+  };
 }
 
 /** メタファイルを読み込み・検証する。JSON 不正・スキーマ違反は MetaParseError */
 export function readMetaFile(metaPath: string): MetaFile {
-  return parseMetaRaw(metaPath, readMetaFileRaw(metaPath));
+  return readMetaSource(metaPath).meta;
 }
 
 export function sourceRevision(bytes: Buffer): string {
@@ -109,14 +162,7 @@ export function sourceRevision(bytes: Buffer): string {
 }
 
 export function readMetaSource(metaPath: string): MetaSource {
-  const bytes = readFileSync(metaPath);
-  let raw: unknown;
-  try {
-    raw = JSON.parse(bytes.toString("utf-8"));
-  } catch (error) {
-    throw new MetaParseError(metaPath, `JSON パースエラー: ${errorMessage(error)}`, null, "json");
-  }
-  return { bytes, meta: parseMetaRaw(metaPath, raw), sourceRevision: sourceRevision(bytes) };
+  return sourceOf(metaPath, inspectMetaFile(metaPath));
 }
 
 export interface AtomicReplaceOps {
@@ -264,15 +310,9 @@ export function mutateMetaSource(
     }
     const bytes = Buffer.from(next);
     if (bytes.equals(source.bytes)) return source;
-    let raw: unknown;
-    try {
-      raw = JSON.parse(bytes.toString("utf-8"));
-    } catch (error) {
-      throw new MetaParseError(metaPath, `JSON パースエラー: ${errorMessage(error)}`, null, "json");
-    }
-    const meta = parseMetaRaw(metaPath, raw);
+    const written = sourceOf(metaPath, inspectMetaBytes(bytes));
     installBytes(metaPath, bytes);
-    return { bytes, meta, sourceRevision: sourceRevision(bytes) };
+    return written;
   });
 }
 

@@ -1,6 +1,6 @@
 import { existsSync, renameSync, unlinkSync } from "node:fs";
 import { dirname } from "node:path";
-import { readMetaFileRaw } from "./meta.ts";
+import { inspectMetaFile } from "./meta.ts";
 import { errorMessage } from "@mimimilli/shared";
 import { canonicalMetaPathFromStaging } from "./metaStaging.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
@@ -12,14 +12,10 @@ const scanLogger = getCategoryLogger("scan");
 
 function readStagedMetaWorkId(stagedPath: string): string | null {
   try {
-    const raw = readMetaFileRaw(stagedPath);
-    if (typeof raw === "object" && raw !== null && "id" in raw && typeof raw.id === "string") {
-      return raw.id;
-    }
+    return inspectMetaFile(stagedPath).declaredId;
   } catch {
     return null;
   }
-  return null;
 }
 
 function addCanonicalMetaToWalkResult(root: string, tree: WalkResult, canonicalPath: string): void {

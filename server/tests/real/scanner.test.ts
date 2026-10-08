@@ -1049,3 +1049,18 @@ test("user先コミット後のcatalog失敗はuser孤児を残すがopenDbは�
   assert.equal(reopenedCatalog.countByStatus("ok"), 2);
   assert.equal(countWorkStates(reopened), 2);
 });
+
+test("formatVersionが未対応のmimimilli.jsonはinvalidMetaFilesにunsupported formatVersionで載る", async (t) => {
+  const { adapter, existingWorkId, root } = await setup(t);
+  const metaPath = join(root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");
+  const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
+  meta.formatVersion = 2;
+  writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+
+  const result = await adapter.scan({ full: true });
+
+  assert.equal(result.invalidMetaFiles.length, 1);
+  assert.equal(result.invalidMetaFiles[0]?.path, "dlsite/RJ900002_既存メタ/mimimilli.json");
+  assert.match(result.invalidMetaFiles[0]?.message ?? "", /unsupported formatVersion/);
+  assert.equal((await adapter.getWork(existingWorkId))?.status, "error");
+});

@@ -16,7 +16,7 @@ import {
   isDlsiteUrl,
   sidecarMetaFileName,
 } from "@mimimilli/shared";
-import { META_FILE_NAME, MetaParseError, readMetaFile, readMetaFileRaw } from "./meta.ts";
+import { META_FILE_NAME, MetaParseError, inspectMetaFile, readMetaFile } from "./meta.ts";
 import { metaStagingPath } from "./metaStaging.ts";
 import { identityConflictPathOf, resolveWithin } from "./paths.ts";
 import { restoreIdentityConflictError, WorkRegisterError } from "../../errors.ts";
@@ -98,14 +98,7 @@ interface MetaDeletionPlan {
 
 function metaFileIdMatches(metaPath: string, workId: string): boolean {
   try {
-    const raw = readMetaFileRaw(metaPath);
-    return (
-      typeof raw === "object" &&
-      raw !== null &&
-      "id" in raw &&
-      typeof raw.id === "string" &&
-      raw.id === workId
-    );
+    return inspectMetaFile(metaPath).declaredId === workId;
   } catch {
     return false;
   }

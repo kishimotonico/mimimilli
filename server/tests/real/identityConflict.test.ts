@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
+import * as fs from "node:fs";
 import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { spyOn } from "bun:test";
 import { test } from "node:test";
+import { openDb } from "../../src/adapters/real/db.ts";
+import { Scanner } from "../../src/adapters/real/scanner.ts";
+import { createWorkRepos } from "../helpers/workTestUtils.ts";
 import { createApp } from "../../src/app.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
@@ -400,4 +405,55 @@ test("同一ディレクトリの壊れたメタは従来どおり作品をerror
   assert.equal(work?.status, "error");
   assert.equal(work?.physicalPath, join(root, "work-a"));
   assert.deepEqual(result.identityConflicts, []);
+});
+
+test("scanは1つのメタファイルを1回しか読まない", async (t) => {
+  const directory = makeTestDirectory("identity-conflict-single-read");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "library");
+  const valid = makeWork(root, "work-a", "A", "22222222-2222-4222-8222-222222222222");
+  const duplicateA = makeWork(root, "work-b", "B");
+  const duplicateB = makeWork(root, "work-c", "C");
+  const broken = join(root, "work-d", "mimimilli.json");
+  mkdirSync(join(root, "work-d"), { recursive: true });
+  writeFileSync(broken, '{ "id": "33333333-3333-4333-8333-333333333333", ');
+  const db = directory.own(openDb({ kind: "memory" }));
+  const scanner = new Scanner(db, createWorkRepos(db));
+
+  const spy = spyOn(fs, "readFileSync");
+  let calls: unknown[][];
+  try {
+    await scanner.scan(root, { full: true });
+  } finally {
+    calls = [...spy.mock.calls];
+    spy.mockRestore();
+  }
+
+  const readCount = (path: string): number => calls.filter(([read]) => read === path).length;
+  assert.deepEqual([duplicateA, duplicateB, broken].map(readCount), [1, 1, 1]);
+  // 登録した作品だけ、公開前のsourceRevision再検証で読み直す
+  assert.equal(readCount(valid), 2);
+});
+
+test("有効な同IDが2つある状態で壊れた3つ目のコピーはinvalidMetaFilesに載る", async (t) => {
+  const directory = makeTestDirectory("identity-conflict-broken-third");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "library");
+  makeWork(root, "work-a", "A");
+  makeWork(root, "work-b", "B");
+  const brokenDir = join(root, "work-c");
+  mkdirSync(brokenDir, { recursive: true });
+  writeFileSync(join(brokenDir, "mimimilli.json"), `{ "id": "${WORK_ID}", `);
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  await configureRoot(adapter, root);
+
+  const result = await adapter.scan({ full: true });
+
+  assert.deepEqual(result.identityConflicts, [
+    { kind: "identity_conflict", workId: WORK_ID, paths: ["work-a", "work-b"] },
+  ]);
+  assert.deepEqual(
+    result.invalidMetaFiles.map((file) => file.path),
+    ["work-c/mimimilli.json"],
+  );
 });

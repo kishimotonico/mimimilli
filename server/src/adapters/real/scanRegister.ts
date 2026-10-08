@@ -1,9 +1,7 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import {
-  errorMessage,
   coverFieldsFromColumns,
-  metaFileSchema,
   resolveWorkPlacement,
   selectDefaultPlaylist,
   unresolvedWorkPhysicalPath,
@@ -20,7 +18,7 @@ import type {
 } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import { computeWorkRevisions } from "./fingerprint.ts";
-import { MetaParseError } from "./meta.ts";
+import { MetaParseError, metaParseErrorOf, type MetaInspection } from "./meta.ts";
 import type { SeenMetaIds } from "./duplicateMetaIdRepair.ts";
 import type { ProbeCacheEntry } from "./probe.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
@@ -46,11 +44,6 @@ const scanLogger = getCategoryLogger("scan");
 
 type ScanUpsertTracking = Pick<ScanResult, "coverErrors" | "insertedWorkIds" | "updatedWorkIds">;
 type ScanErrorTracking = ScanUpsertTracking & Pick<ScanResult, "errors">;
-
-function extractCandidateIdFromMetaContent(content: string): string | null {
-  const match = content.match(/"id"\s*:\s*"([^"\\]+)"/);
-  return match?.[1] ?? null;
-}
 
 function trackUpsertedWork(result: ScanUpsertTracking, workId: string, isNew: boolean): void {
   if (isNew) result.insertedWorkIds.push(workId);
@@ -179,68 +172,23 @@ async function assembleWorkForUpsert(
 }
 
 export function prepareMetaEntries(
-  _root: string,
-  metaPaths: string[],
+  inspections: ReadonlyMap<string, MetaInspection>,
   existingWorks: Map<string, ScanWorkState>,
   full: boolean,
-  _seenIds: SeenMetaIds,
   checkAbort: () => void = () => {},
   conflictedWorkIds: ReadonlySet<string> = new Set(),
 ): PreparedEntry[] {
   const prepared: PreparedEntry[] = [];
-  for (const metaPath of metaPaths) {
+  for (const [metaPath, inspection] of inspections) {
     checkAbort();
     try {
-      const bytes = readFileSync(metaPath);
-      const content = bytes.toString("utf-8");
-      const initialRaw = (() => {
-        try {
-          return JSON.parse(content) as unknown;
-        } catch (e) {
-          throw new MetaParseError(
-            metaPath,
-            `JSON パースエラー: ${errorMessage(e)}`,
-            extractCandidateIdFromMetaContent(content),
-          );
-        }
-      })();
-      const candidateId =
-        typeof initialRaw === "object" &&
-        initialRaw !== null &&
-        "id" in initialRaw &&
-        typeof initialRaw.id === "string"
-          ? initialRaw.id
-          : null;
-      if (candidateId !== null && conflictedWorkIds.has(candidateId)) {
-        prepared.push({ kind: "identity_conflict", metaPath, workId: candidateId });
+      const { declaredId } = inspection;
+      if (declaredId !== null && conflictedWorkIds.has(declaredId)) {
+        prepared.push({ kind: "identity_conflict", metaPath, workId: declaredId });
         continue;
       }
-
-      const raw = (() => {
-        try {
-          return JSON.parse(content) as unknown;
-        } catch (e) {
-          throw new MetaParseError(
-            metaPath,
-            `JSON パースエラー: ${errorMessage(e)}`,
-            extractCandidateIdFromMetaContent(content),
-          );
-        }
-      })();
-      const parsed = metaFileSchema.safeParse(raw);
-      if (!parsed.success) {
-        const issue = parsed.error.issues[0];
-        const candidateId =
-          typeof raw === "object" && raw !== null && "id" in raw && typeof raw.id === "string"
-            ? raw.id
-            : null;
-        throw new MetaParseError(
-          metaPath,
-          `${issue?.path.join(".") ?? ""} ${issue?.message ?? "不明"}`,
-          candidateId,
-        );
-      }
-      const meta = parsed.data;
+      if (inspection.diagnostic !== null) throw metaParseErrorOf(metaPath, inspection);
+      const { meta, bytes } = inspection;
       const placement = resolveWorkPlacement(metaPath, meta);
       const revisions = computeWorkRevisions(metaPath, meta, bytes);
       const state = existingWorks.get(meta.id);
