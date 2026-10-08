@@ -20,7 +20,7 @@ import {
   synthesizeSilentWav,
   synthesizeStaticContent,
 } from "./media.ts";
-import type { FixtureState } from "./state.ts";
+import { requireFixtureRoot, type FixtureState } from "./state.ts";
 import type { MediaAdapter } from "../../adapter/media.ts";
 
 export function createFsMethods(
@@ -61,7 +61,7 @@ export function createFsMethods(
   };
   return {
     async browseFs(path?: WorkspacePath): Promise<FsListing | null> {
-      const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+      const rootAbs = normalizeFsPath(requireFixtureRoot(state));
       const target = path ? `${rootAbs}/${path}` : rootAbs;
 
       const root = buildFsRoot(
@@ -99,7 +99,7 @@ export function createFsMethods(
     },
 
     async locateWorkspaceMedia(ref: WorkspaceResourceRef) {
-      const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+      const rootAbs = normalizeFsPath(requireFixtureRoot(state));
       const target = `${rootAbs}/${ref.path}`;
       const root = buildFsRoot(
         rootAbs,

@@ -11,7 +11,12 @@ import type { FixtureWorkRecord } from "./data.ts";
 import { isFsPathWithin, normalizeFsPath } from "./fsResolve.ts";
 import { checkWorkPlacement } from "./playback.ts";
 import { FIXTURE_UNREADABLE_ROOT } from "./scenarios.ts";
-import { dlsiteLinkageOf, setDlsiteLinkage, type FixtureState } from "./state.ts";
+import {
+  dlsiteLinkageOf,
+  requireFixtureRoot,
+  setDlsiteLinkage,
+  type FixtureState,
+} from "./state.ts";
 
 const FIXTURE_SCAN_STEP_MS = 20;
 const FIXTURE_ROOT_REBUILD_STEP_MS = 250;
@@ -154,7 +159,7 @@ export function createSettingsScanMethods(
       const candidatesByPath = new Map<string, ScanCandidate>(
         state.scanCandidates.map((candidate) => [candidate.path, candidate]),
       );
-      const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+      const rootAbs = normalizeFsPath(requireFixtureRoot(state));
       const now = new Date().toISOString();
       // real adapter の registerCandidates（scanCandidateSession.ts）と同じ意味論: 登録した候補は
       // 実際にcatalog（ここではstate.works）へ行が増える。作品一覧・スキャン結果一覧の

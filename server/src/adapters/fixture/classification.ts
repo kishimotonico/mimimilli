@@ -17,7 +17,7 @@ import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder, evalSmartFolderRules } from "../../core/smartFolder.ts";
 import { toWorksPage } from "../../core/worksQuery.ts";
-import { composeWorks, type FixtureState } from "./state.ts";
+import { composeWorks, requireFixtureRoot, type FixtureState } from "./state.ts";
 
 export function createClassificationMethods(state: FixtureState): ClassificationAdapter {
   return {
@@ -115,7 +115,7 @@ export function createClassificationMethods(state: FixtureState): Classification
       if (!folder) return null;
       const page = toWorksPage(
         evalSmartFolder(folder, composeWorks(state), query),
-        state.rootFolder ?? "/library",
+        requireFixtureRoot(state),
       );
       return state.dataIntegrityWarning
         ? { ...page, dataIntegrityWarning: state.dataIntegrityWarning }

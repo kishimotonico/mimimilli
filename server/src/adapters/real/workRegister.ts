@@ -21,6 +21,7 @@ import { metaStagingPath } from "./metaStaging.ts";
 import { identityConflictPathOf, resolveWithin } from "./paths.ts";
 import { restoreIdentityConflictError, WorkRegisterError } from "../../errors.ts";
 import { assertRegistrationAllowed } from "../../core/workRegistrationGuard.ts";
+import { fileRegisterNaming, folderRegisterNaming } from "../../core/workRegisterPreview.ts";
 import { removeIdentityConflictPath } from "../../core/identityConflicts.ts";
 import { isPathWithin } from "../../lib/path.ts";
 import type { Db } from "./db.ts";
@@ -198,13 +199,13 @@ export function buildWorkRegisterPreview(
   query: WorkQueryRepository,
   workDir: string,
 ): WorkRegisterPreview {
-  const folderName = basename(workDir);
+  const naming = folderRegisterNaming(basename(workDir));
   const descendants = query.listDescendantWorkRefs(workDir);
   const metaPath = `${workDir}/${META_FILE_NAME}`;
   const dbWork = query.getWorkByPhysicalPathSync(workDir);
   const orphanedMeta = existsSync(metaPath) && dbWork === null;
 
-  let suggestedTitle = folderName;
+  let suggestedTitle = naming.suggestedTitle;
   let tags: string[] = [];
   if (orphanedMeta) {
     try {
@@ -219,7 +220,7 @@ export function buildWorkRegisterPreview(
   return {
     suggestedTitle,
     tags,
-    detectedRjCode: detectRjCode([folderName]),
+    detectedRjCode: naming.detectedRjCode,
     descendantWorkCount: descendants.length,
     alreadyRegistered: dbWork !== null,
     orphanedMeta,
@@ -231,13 +232,12 @@ export function buildFileWorkRegisterPreview(
   audioPath: string,
   root: string,
 ): WorkRegisterPreview {
-  const fileName = basename(audioPath);
-  const stem = fileName.replace(/\.[^.]+$/, "");
+  const naming = fileRegisterNaming(basename(audioPath));
   const metaPath = sidecarPathForAudio(audioPath);
   const dbWork = query.getWorkByPhysicalPathSync(audioPath);
   const orphanedMeta = existsSync(metaPath) && dbWork === null;
 
-  let suggestedTitle = stem;
+  let suggestedTitle = naming.suggestedTitle;
   let tags: string[] = [];
   if (orphanedMeta) {
     try {
@@ -252,7 +252,7 @@ export function buildFileWorkRegisterPreview(
   return {
     suggestedTitle,
     tags,
-    detectedRjCode: detectRjCode([fileName, stem]),
+    detectedRjCode: naming.detectedRjCode,
     descendantWorkCount: 0,
     alreadyRegistered: dbWork !== null || ancestorFolderIsRegistered(query, audioPath, root),
     orphanedMeta,

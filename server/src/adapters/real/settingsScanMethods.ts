@@ -1,6 +1,7 @@
 import { realpathSync, statSync } from "node:fs";
 import { resolve } from "node:path";
-import { InvalidRootFolderError, NotConfiguredError } from "../../errors.ts";
+import { requireConfiguredRoot } from "../../core/rootFolder.ts";
+import { InvalidRootFolderError } from "../../errors.ts";
 import type {
   RootReconfigurationRecord,
   ScanOptions,
@@ -74,14 +75,7 @@ export function createSettingsScanMethods(deps: {
     runFileScanInWorker,
   } = deps;
   let candidateSession = ScanCandidateSession.empty();
-  const requireRoot = (): string => {
-    const root = user.getUserSetting(KEY_ROOT_FOLDER);
-    if (!root)
-      throw new NotConfiguredError(
-        "ルートフォルダーが設定されていません（POST /api/root-reconfiguration で設定してください）",
-      );
-    return root;
-  };
+  const requireRoot = (): string => requireConfiguredRoot(user.getUserSetting(KEY_ROOT_FOLDER));
   const getSettings = async (): Promise<StoredSettings> => ({
     rootFolder: user.getUserSetting(KEY_ROOT_FOLDER),
     lastScanTime: catalog.getScanState(LAST_SCAN_TIME_KEY),

@@ -18,6 +18,7 @@ import {
   type FixtureWorkRecord,
   type SeedPlaylistSpec,
 } from "./data.ts";
+import { requireConfiguredRoot } from "../../core/rootFolder.ts";
 import { createFixtureScenario, type FixtureRootReconfiguration } from "./scenarios.ts";
 
 /** rjCodeをDLsite取得キャッシュのキーとして正規化する（realのnormalizeDlsiteProductCodeに合わせ大文字化）。 */
@@ -30,6 +31,10 @@ const EMPTY_META_DLSITE_STATE: MetaDlsiteState = { rjCode: null, status: "none",
 /** 作品1件ぶんの安定したplaylist/track ID（呼び出しをまたいで同一IDを保つ） */
 export interface PlaybackIds {
   playlists: Array<{ id: string; trackIds: string[] }>;
+}
+
+export function requireFixtureRoot(state: FixtureState): string {
+  return requireConfiguredRoot(state.rootFolder);
 }
 
 export interface FixtureState {
