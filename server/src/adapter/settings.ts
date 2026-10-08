@@ -9,7 +9,7 @@ import type {
 } from "@mimimilli/shared";
 
 export interface ScanOptions {
-  /** true のとき fingerprint に関係なく全作品を再処理する（TASK-95） */
+  /** true のとき fingerprint に関係なく全作品を再処理する */
   full?: boolean;
   signal?: AbortSignal;
   onProgress?: (event: ScanProgressEvent) => void;

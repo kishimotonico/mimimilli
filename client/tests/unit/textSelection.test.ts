@@ -10,7 +10,7 @@ const shellCss = globSync("*.css", { cwd: shellDir })
   .map((f) => readFileSync(resolve(shellDir, f), "utf8"))
   .join("\n");
 
-describe("テキスト選択（TASK-107）", () => {
+describe("テキスト選択", () => {
   it("shell/ 配下のCSSで body 既定と入力要素・選択可能クラスを定義する", () => {
     expect(shellCss).toMatch(/body\s*\{[^}]*user-select:\s*none/s);
     expect(shellCss).toMatch(/input,\s*\n\s*textarea,\s*\n\s*select\s*\{[^}]*user-select:\s*text/s);

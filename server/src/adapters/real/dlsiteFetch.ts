@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { writeFileSync } from "node:fs";
+import { errorMessage } from "@mimimilli/shared";
 import type { DlsiteFetchResult } from "@mimimilli/shared";
 import { DlsiteOfflineError } from "../../errors.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
@@ -220,7 +221,7 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
           result: {
             ok: false,
             kind: "error",
-            message: `DLsiteとの通信に失敗しました（${key}: ${(error as Error).message}）`,
+            message: `DLsiteとの通信に失敗しました（${key}: ${errorMessage(error)}）`,
           },
           httpAttempted: true,
         };

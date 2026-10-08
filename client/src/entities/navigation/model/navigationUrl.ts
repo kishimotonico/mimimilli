@@ -1,5 +1,5 @@
 import { buildBuiltinAxisTag, splitSelectedTags, type NormalizedTag } from "@mimimilli/shared";
-import { isSmartAxis, isViewAxis } from "../../library/axisDefinitions";
+import { getSmartFolderId, isSmartAxis, isViewAxis } from "../../library/axisDefinitions";
 import { computeResultsPaneKind } from "../../library/resultsPane";
 import type { AxisId, SortId } from "../../library/types";
 
@@ -86,8 +86,8 @@ function isSafeRelativeSegment(value: string): boolean {
 function parseAxis(value: string): AxisId | null {
   if (value === "home") return null;
   if (isViewAxis(value as AxisId) || value === "tag") return value;
-  if (value.startsWith("smart-")) {
-    return value.length > "smart-".length ? value : null;
+  if (isSmartAxis(value)) {
+    return getSmartFolderId(value) ? value : null;
   }
   return value.toLowerCase();
 }

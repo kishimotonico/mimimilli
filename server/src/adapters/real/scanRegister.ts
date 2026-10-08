@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import {
+  errorMessage,
   coverFieldsFromColumns,
   metaFileSchema,
   resolveWorkPlacement,
@@ -198,7 +199,7 @@ export function prepareMetaEntries(
         } catch (e) {
           throw new MetaParseError(
             metaPath,
-            `JSON パースエラー: ${(e as Error).message}`,
+            `JSON パースエラー: ${errorMessage(e)}`,
             extractCandidateIdFromMetaContent(content),
           );
         }
@@ -221,7 +222,7 @@ export function prepareMetaEntries(
         } catch (e) {
           throw new MetaParseError(
             metaPath,
-            `JSON パースエラー: ${(e as Error).message}`,
+            `JSON パースエラー: ${errorMessage(e)}`,
             extractCandidateIdFromMetaContent(content),
           );
         }
@@ -467,7 +468,7 @@ export async function registerMetaFile(
     checkAbort,
   );
 
-  const errorMessage =
+  const workErrorMessage =
     placementErrorMessage(placement) ?? deriveWorkErrorMessage(mediaRoot, meta, invalidStartTracks);
   const totalDurationSec = totalDurationFromResolved(resolvedPlaylists, meta.defaultPlaylistId);
 
@@ -482,8 +483,8 @@ export async function registerMetaFile(
   );
   result.coverErrors += coverErrors;
 
-  assembled.work.status = errorMessage ? "error" : "ok";
-  assembled.work.errorMessage = errorMessage;
+  assembled.work.status = workErrorMessage ? "error" : "ok";
+  assembled.work.errorMessage = workErrorMessage;
   assembled.work.totalDurationSec = totalDurationSec;
   assembled.work.playlists = resolvedPlaylists;
 

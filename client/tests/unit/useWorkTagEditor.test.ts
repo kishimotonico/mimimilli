@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { TagPrefix } from "@mimimilli/shared";
+import { errorMessage, type TagPrefix } from "@mimimilli/shared";
 import type { WorkTagMutation } from "../../src/entities/work/model/workMutations";
 import { useWorkTagEditor } from "../../src/features/library/ui/preview/useWorkTagEditor";
 
@@ -187,7 +187,7 @@ describe("useWorkTagEditor", () => {
     expect(result.current.failedRemoveTag).toBe("ASMR");
     expect(result.current.tagUndoToast).toBeNull();
     expect(result.current.patchTagsError).toBeInstanceOf(Error);
-    expect((result.current.patchTagsError as Error).message).toBe("network error");
+    expect(errorMessage(result.current.patchTagsError)).toBe("network error");
   });
 
   it("undo待ちの間に別のタグを追加していても、undoはundo対象のタグだけを戻す", async () => {

@@ -32,7 +32,7 @@ function getAxisValueSortLabel(key: AxisValueSortKey): string {
 }
 
 // ADR-0012 帰結: ソートは UI が単一系・state が二重。結果面が値一覧のときは
-// axisValueSortAtom（名前/件数/総時間）、作品一覧のときは従来の sortAtom を
+// axisValueSortAtom（名前/件数/総時間）、作品一覧のときは sortAtom を
 // このメニューの接続先として切り替える。値一覧のソート状態と作品一覧のソート状態は
 // 別々に保持したまま、UI 側だけが結果面の内容に応じてどちらへ書き込むかを決める。
 export default function LibrarySortMenu() {

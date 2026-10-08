@@ -1,4 +1,4 @@
-// TASK-153: PATCH 後の一覧キャッシュ同期（3層設計）。
+// PATCH 後の一覧キャッシュ同期（3層設計）。
 // アクティブ一覧は直接更新または reset、非表示キャッシュは stale 化のみ。
 
 import { createElement, Suspense, type ReactNode } from "react";

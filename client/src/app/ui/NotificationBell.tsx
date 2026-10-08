@@ -1,5 +1,5 @@
 // ライブラリの健康状態（RJコード未検出・DLsite取得失敗・DLsite未連携・直近のスキャン結果）を
-// 集約する通知ベルパネル（TASK-44）。開閉・外側クリック/Escapeでの閉じ方は
+// 集約する通知ベルパネル。開閉・外側クリック/Escapeでの閉じ方は
 // AddressBar の並び替えメニュー（.mle-sortmenu）と同じ「position:relative + absolute」の
 // 素朴な実装に倣う（work-preview専用の useAnchoredPopover は左寄せクランプ前提でここには合わない）。
 import { useAtomValue, useSetAtom } from "jotai";
@@ -31,7 +31,7 @@ export default function NotificationBell() {
   const dlsiteBulkStarting = useAtomValue(dlsiteBulkStartingAtom);
   const dlsiteBulkProgress = useAtomValue(dlsiteBulkProgressAtom);
   const { start: onStartDlsiteBulk } = useDlsiteBulkActions();
-  // 前回スキャン結果（ディスク永続化なし、TASK-56）。App から降ろした購読（TASK-124）。
+  // 前回スキャン結果（ディスク永続化なし）。購読する。
   const lastScanQuery = useQuery({
     queryKey: SCAN_QUERY_KEYS.last(),
     queryFn: getLastScanResult,

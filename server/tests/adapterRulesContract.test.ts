@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
-import type { DlsiteWorkInfo } from "@mimimilli/shared";
+import { errorMessage, type DlsiteWorkInfo } from "@mimimilli/shared";
 import type { DataAdapter } from "../src/adapter/index.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { InvalidResumeError } from "../src/errors.ts";
@@ -82,11 +82,7 @@ async function assertResumeContract(adapter: DataAdapter, workId: string, label:
       }),
     (error: unknown) => {
       assert.ok(error instanceof InvalidResumeError, `${label}: 所属外trackはInvalidResumeError`);
-      assert.equal(
-        (error as Error).message,
-        "resumeのPlaylistまたはTrackが作品に属していません",
-        label,
-      );
+      assert.equal(errorMessage(error), "resumeのPlaylistまたはTrackが作品に属していません", label);
       return true;
     },
   );
@@ -95,7 +91,7 @@ async function assertResumeContract(adapter: DataAdapter, workId: string, label:
     () => adapter.saveResume(workId, { playlistId: playlist.id, trackId: track.id, offsetSec: -1 }),
     (error: unknown) => {
       assert.ok(error instanceof InvalidResumeError, `${label}: 負のoffsetSecはInvalidResumeError`);
-      assert.equal((error as Error).message, "resumeのoffsetSecがトラック区間外です", label);
+      assert.equal(errorMessage(error), "resumeのoffsetSecがトラック区間外です", label);
       return true;
     },
   );
@@ -112,7 +108,7 @@ async function assertResumeContract(adapter: DataAdapter, workId: string, label:
         error instanceof InvalidResumeError,
         `${label}: 区間外offsetSecはInvalidResumeError`,
       );
-      assert.equal((error as Error).message, "resumeのoffsetSecがトラック区間外です", label);
+      assert.equal(errorMessage(error), "resumeのoffsetSecがトラック区間外です", label);
       return true;
     },
   );

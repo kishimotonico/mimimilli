@@ -1,4 +1,5 @@
 import {
+  errorMessage,
   resolveWorkPlacement,
   type WorkEditSnapshot,
   type WorkSourceMutationResult,
@@ -143,7 +144,7 @@ export async function projectVerifiedSource(
   } catch (error) {
     scanLogger.error("作品の一覧反映に失敗しました", {
       workId: snapshot.id,
-      error: error instanceof Error ? error.message : String(error),
+      error: errorMessage(error),
     });
     return { snapshot, projection: { status: "pending", reason: "error" } };
   }

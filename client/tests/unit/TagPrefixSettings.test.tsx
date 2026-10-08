@@ -91,4 +91,18 @@ describe("TagPrefixSettings", () => {
     await waitFor(() => expect(reorderTagPrefixes).toHaveBeenCalledWith(["気分", "cv"]));
     expect(updateTagPrefix).not.toHaveBeenCalled();
   });
+
+  it("ラベル編集はIME変換中のEnterで確定せず、変換後のEnterで確定する", async () => {
+    renderSettings();
+    const [labelButton] = await screen.findAllByTitle("クリックしてラベルを編集");
+    fireEvent.click(labelButton);
+    const input = screen.getByLabelText(/のラベル$/);
+    fireEvent.change(input, { target: { value: "あたらしい" } });
+
+    fireEvent.keyDown(input, { key: "Enter", isComposing: true, keyCode: 229 });
+    expect(updateTagPrefix).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(updateTagPrefix).toHaveBeenCalledTimes(1));
+  });
 });

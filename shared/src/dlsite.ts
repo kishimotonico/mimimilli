@@ -13,6 +13,23 @@ import type { WorkSummary } from "./work.ts";
 export const dlsiteStatusSchema = z.enum(["none", "applied", "not_found", "error", "skipped"]);
 export type DlsiteStatus = z.infer<typeof dlsiteStatusSchema>;
 
+const DLSITE_HOSTNAME = "dlsite.com";
+
+/** hostname が dlsite.com またはそのサブドメインのURLか。不正なURLは false */
+export function isDlsiteUrl(url: string): boolean {
+  let hostname: string;
+  try {
+    hostname = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return hostname === DLSITE_HOSTNAME || hostname.endsWith(`.${DLSITE_HOSTNAME}`);
+}
+
+export function hasDlsiteUrl(urls: readonly { url: string }[]): boolean {
+  return urls.some((entry) => isDlsiteUrl(entry.url));
+}
+
 export const dlsiteFetchErrorKindSchema = z.enum(["not_found", "parse_error", "offline", "error"]);
 export type DlsiteFetchErrorKind = z.infer<typeof dlsiteFetchErrorKindSchema>;
 
@@ -231,7 +248,7 @@ export function evaluateParseErrorAlert(
 }
 
 /** DLsite未連携（RJコードは判明しているが取得を一度も試みていない）作品か。
- *  通知ベルの「まとめて取得」対象件数（TASK-44）の判定基準。
+ *  通知ベルの「まとめて取得」対象件数の判定基準。
  *  POST /dlsite/bulk（mode: "existing"）は取得失敗（error）も再試行対象に含めるため、
  *  実際に処理される件数とは意図的に区別している（error は isDlsiteFetchFailed 側で別掲する）。 */
 export function isDlsiteUnlinked(state: DlsiteState): boolean {
@@ -329,42 +346,12 @@ export function computeMissingDiff(
 ): { newTags: NormalizedTag[]; applyCover: boolean; applyUrl: boolean } {
   const newTags = fillUnsetDlsiteTags(work.tags, info);
   const applyCover = !work.cover && info.coverUrl !== null;
-  const applyUrl = !work.urls.some((entry) => entry.url.includes("dlsite.com"));
+  const applyUrl = !hasDlsiteUrl(work.urls);
   return { newTags, applyCover, applyUrl };
 }
 
-/** dlsiteApplyMissing（未設定項目まとめ適用）のtags/urls/linkageパッチを組み立てる。
- *  real/fixture 両adapterが共有する。差分が無ければnull（何も書かない）。
- *  linkageは単体適用と同じ規則で status: "applied" にする（title/coverはこの関数の対象外）。 */
-export function buildDlsiteMissingApplyPatch(
-  current: {
-    tags: readonly NormalizedTag[];
-    urls: readonly { label: string; url: string }[];
-    dlsite: MetaDlsiteState;
-  },
-  info: DlsiteWorkInfo,
-  diff: { newTags: readonly NormalizedTag[]; applyCover: boolean; applyUrl: boolean },
-): Omit<DlsiteApplyPatch, "title"> | null {
-  if (diff.newTags.length === 0 && !diff.applyCover && !diff.applyUrl) return null;
-  return {
-    tags: diff.newTags.length > 0 ? mergeAppliedDlsiteTags(current.tags, diff.newTags) : undefined,
-    urls:
-      diff.applyUrl && info.url
-        ? [
-            ...current.urls.filter((entry) => !entry.url.includes("dlsite.com")),
-            { label: "DLsite", url: info.url },
-          ]
-        : undefined,
-    dlsite: {
-      rjCode: info.rjCode,
-      status: "applied",
-      appliedTags: dedupeTags([...current.dlsite.appliedTags, ...diff.newTags]),
-    },
-  };
-}
-
 /** dlsiteApply（単体適用）のパッチ。cover は非同期I/Oを伴うため呼び出し側が別途解決し、
- *  {@link buildDlsiteApplyPatch} には含めない。title/tags/urls は未変更なら undefined。 */
+ *  パッチには含めない。title/tags/urls は未変更なら undefined。 */
 export interface DlsiteApplyPatch {
   title?: string;
   tags?: NormalizedTag[];
@@ -372,33 +359,57 @@ export interface DlsiteApplyPatch {
   dlsite: MetaDlsiteState;
 }
 
-/** dlsiteApply（単体適用）のtitle/tags/urlsパッチを組み立てる。real/fixture 両adapterが共有する。 */
-export function buildDlsiteApplyPatch(
-  current: {
-    title: string;
-    tags: readonly NormalizedTag[];
-    urls: readonly { label: string; url: string }[];
-    dlsite: MetaDlsiteState;
-  },
-  body: DlsiteApplyBody,
-): DlsiteApplyPatch {
-  const { applyTags } = body;
+interface DlsiteApplyCurrent {
+  tags: readonly NormalizedTag[];
+  urls: readonly { label: string; url: string }[];
+  dlsite: MetaDlsiteState;
+}
+
+/** 単体適用・欠落適用が共有する tags/urls/linkage の組み立て。linkage は status: "applied" にする */
+function buildDlsiteTagsUrlsPatch(
+  current: DlsiteApplyCurrent,
+  info: DlsiteWorkInfo,
+  applyTags: readonly NormalizedTag[],
+  applyUrl: boolean,
+): Omit<DlsiteApplyPatch, "title"> {
   return {
-    title: body.applyTitle && body.info.title ? body.info.title : undefined,
     tags: applyTags.length > 0 ? mergeAppliedDlsiteTags(current.tags, applyTags) : undefined,
     urls:
-      body.applyUrl && body.info.url
+      applyUrl && info.url
         ? [
-            ...current.urls.filter((entry) => !entry.url.includes("dlsite.com")),
-            { label: "DLsite", url: body.info.url },
+            ...current.urls.filter((entry) => !isDlsiteUrl(entry.url)),
+            { label: "DLsite", url: info.url },
           ]
         : undefined,
     dlsite: {
-      rjCode: body.info.rjCode,
+      rjCode: info.rjCode,
       status: "applied",
       appliedTags: dedupeTags([...current.dlsite.appliedTags, ...applyTags]),
     },
   };
+}
+
+/** dlsiteApply（単体適用）のtitle/tags/urlsパッチを組み立てる。real/fixture 両adapterが共有する。 */
+export function buildDlsiteApplyPatch(
+  current: DlsiteApplyCurrent & { title: string },
+  body: DlsiteApplyBody,
+): DlsiteApplyPatch {
+  return {
+    title: body.applyTitle && body.info.title ? body.info.title : undefined,
+    ...buildDlsiteTagsUrlsPatch(current, body.info, body.applyTags, body.applyUrl),
+  };
+}
+
+/** dlsiteApplyMissing（未設定項目まとめ適用）のtags/urls/linkageパッチを組み立てる。
+ *  real/fixture 両adapterが共有する。差分が無ければnull（何も書かない）。
+ *  title/coverはこの関数の対象外。 */
+export function buildDlsiteMissingApplyPatch(
+  current: DlsiteApplyCurrent,
+  info: DlsiteWorkInfo,
+  diff: { newTags: readonly NormalizedTag[]; applyCover: boolean; applyUrl: boolean },
+): Omit<DlsiteApplyPatch, "title"> | null {
+  if (diff.newTags.length === 0 && !diff.applyCover && !diff.applyUrl) return null;
+  return buildDlsiteTagsUrlsPatch(current, info, diff.newTags, diff.applyUrl);
 }
 
 /** 単体適用（replace）: ユーザーが明示的に選んだタグ（applyTags）を既存タグへ反映する。
@@ -516,7 +527,7 @@ export type DlsiteStateUpdateBody = z.infer<typeof dlsiteStateUpdateBodySchema>;
 
 /** updateDlsiteState の状態遷移（real/fixture 共通）。正本の連携分類（rjCode/status/
  *  appliedTags）だけを対象にする。RJコードが変わったときだけ旧コード由来の適用済みタグを捨てて
- *  未取得に戻す。skipped 指定時は従来どおり status を上書きする（rjCode 変更より後に適用）。 */
+ *  未取得に戻す。skipped 指定時は status を上書きする（rjCode 変更より後に適用）。 */
 export function applyDlsiteStatePatch(
   current: MetaDlsiteState,
   patch: DlsiteStatePatch,

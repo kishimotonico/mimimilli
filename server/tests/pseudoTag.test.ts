@@ -35,7 +35,7 @@ test("parseBuiltinAxisTag: 軸や値が欠けた不正な形は null", () => {
   assert.equal(parseBuiltinAxisTag(nt("@/2024")), null);
 });
 
-test("parseBuiltinAxisTag: 判定は正規化後の値に対して行われ、先頭に空白を挟んだ入力も擬似タグとして認識する（TASK-202）", () => {
+test("parseBuiltinAxisTag: 判定は正規化後の値に対して行われ、先頭に空白を挟んだ入力も擬似タグとして認識する", () => {
   assert.deepEqual(parseBuiltinAxisTag(nt(" @year/2024")), { axis: "year", value: "2024" });
   assert.deepEqual(parseBuiltinAxisTag(nt("  @Year/2024")), { axis: "year", value: "2024" });
 });
@@ -82,7 +82,7 @@ test("splitSelectedTags: 正規化後に空になるタグは警告付きで拒�
   assert.equal(result.warnings.length, 1);
 });
 
-test("splitSelectedTags: 擬似タグとして解釈できない @ 始まりの入力は警告付きで拒否し、実タグへ流さない（TASK-201）", () => {
+test("splitSelectedTags: 擬似タグとして解釈できない @ 始まりの入力は警告付きで拒否し、実タグへ流さない", () => {
   // "@year/" は normalizeTag が annotated タグの値が空（"@year" + 空値）とみなし正規化後に
   // null を返すため、拒否理由は「正規化後に空になるタグ」側になる。いずれの理由でも
   // tags へは積まれず実タグへ素通りしないことが本題。
@@ -96,7 +96,7 @@ test("splitSelectedTags: 擬似タグとして解釈できない @ 始まりの�
   assert.match(splitSelectedTags(["@/2024"]).warnings[0]!, /擬似タグとして解釈できない/);
 });
 
-test("splitSelectedTags: 4桁の数字でない year 値は警告付きで拒否する（TASK-201）", () => {
+test("splitSelectedTags: 4桁の数字でない year 値は警告付きで拒否する", () => {
   for (const badTag of ["@year/banana", "@year/24", "@year/20245"]) {
     const result = splitSelectedTags([badTag]);
     assert.deepEqual(result.tags, [], badTag);
@@ -105,7 +105,7 @@ test("splitSelectedTags: 4桁の数字でない year 値は警告付きで拒否
   }
 });
 
-test("splitSelectedTags: 先頭に空白を挟んだ擬似タグも正規化後の値で判定され、無警告でyearValueへ採用される（TASK-202）", () => {
+test("splitSelectedTags: 先頭に空白を挟んだ擬似タグも正規化後の値で判定され、無警告でyearValueへ採用される", () => {
   const result = splitSelectedTags([" @year/2024", "cv/藤田茜"]);
   assert.deepEqual(result.tags, ["cv/藤田茜"]);
   assert.equal(result.yearValue, "2024");

@@ -36,7 +36,7 @@ class FakeAudio extends EventTarget {
 
   // 実ブラウザの HTMLMediaElement 仕様に合わせる: play()/pause() は paused の実際の遷移
   // (true<->false) がある時だけ play/pause イベントを発火する。既に再生中の状態から play() を
-  // 呼んでも何も起きない（TASK-128: 区間トラックの reuse 経路で明示選択時にこれを踏む）。
+  // 呼んでも何も起きない（区間トラックの reuse 経路で明示選択時にこれを踏む）。
   paused = true;
 
   get src() {
@@ -633,7 +633,7 @@ describe("usePlayer adapters", () => {
     expect(result.current.player.state.currentTrackIndex).toBe(1);
   });
 
-  it("再生中の区間トラックを明示選択してもstatusがloadingに固着せずplayingへ収束する（TASK-128）", async () => {
+  it("再生中の区間トラックを明示選択してもstatusがloadingに固着せずplayingへ収束する", async () => {
     vi.useFakeTimers();
     try {
       const tracks: ResolvedTrack[] = [

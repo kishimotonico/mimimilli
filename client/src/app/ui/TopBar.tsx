@@ -79,7 +79,7 @@ export default function TopBar({ notificationBell }: TopBarProps) {
   const placeholder = "ライブラリを検索（タイトル · CV · タグ · RJ ...）";
 
   // 検索入力はローカル draft を即時表示し、親への通知は IME composition 中は保留する
-  // （composition 中間文字列でのリクエスト乱発を防ぐ。TASK-61）
+  // （composition 中間文字列でのリクエスト乱発を防ぐ）
   const [draft, setDraft] = useState(searchQuery);
   const composingRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -130,8 +130,6 @@ export default function TopBar({ notificationBell }: TopBarProps) {
               )}
               aria-label={pulseLabel}
             />
-            <span className="ch">1ch</span>
-            <span className="sep">·</span>
             <span className="lbl">{playingTrack}</span>
           </div>
         </>

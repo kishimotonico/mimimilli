@@ -3,7 +3,7 @@
 // ここではルート層の配線（バリデーション・adapterへの委譲・レスポンス形）だけを確認する。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { SmartFolderRule } from "@mimimilli/shared";
+import type { ApiError, SmartFolderRule } from "@mimimilli/shared";
 import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { nts } from "./helpers/tag.ts";
@@ -56,4 +56,26 @@ test("bodyが無ければ400を返す", async () => {
   const app = buildApp(async () => 0);
   const res = await app.request("/api/smart-folders/preview", { method: "POST" });
   assert.equal(res.status, 400);
+});
+
+test("不正なJSONとスキーマ不一致は同じ400でメッセージが異なる", async () => {
+  const app = buildApp(async () => 0);
+  const post = (body: string) =>
+    app.request("/api/smart-folders/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+
+  const malformed = await post("{rules:");
+  assert.equal(malformed.status, 400);
+  const malformedError = ((await malformed.json()) as ApiError).error;
+  assert.equal(malformedError.code, "invalid_request");
+  assert.equal(malformedError.message, "リクエストの JSON が不正です");
+
+  const invalidSchema = await post(JSON.stringify({ rules: [{ field: "タグ" }] }));
+  assert.equal(invalidSchema.status, 400);
+  const schemaError = ((await invalidSchema.json()) as ApiError).error;
+  assert.equal(schemaError.code, "invalid_request");
+  assert.equal(schemaError.message, "スマートフォルダーのプレビュー条件が不正です");
 });

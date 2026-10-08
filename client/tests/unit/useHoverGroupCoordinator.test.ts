@@ -20,7 +20,7 @@ function elAt(rect: Partial<DOMRect>): HTMLElement {
 }
 
 // ページ内で一度も本物のpointermoveを観測していない間はホバー起動を無視する
-// （TASK-301。ページ読み込み直後に静止したポインタ直下へ新しい行が現れただけの
+// （ページ読み込み直後に静止したポインタ直下へ新しい行が現れただけの
 // hover誤起動を防ぐガード）。ホバー系のテストは「ユーザーが既にマウスを動かした
 // 状態」を前提にするため、renderHook直後に一度だけ本物のpointermoveを発火させる。
 function renderCoordinator(...args: Parameters<typeof useHoverGroupCoordinator>) {
@@ -39,7 +39,7 @@ describe("useHoverGroupCoordinator", () => {
     vi.useRealTimers();
   });
 
-  it("ページ内で本物のpointermoveを観測するまではホバーで開かない（TASK-301）", () => {
+  it("ページ内で本物のpointermoveを観測するまではホバーで開かない", () => {
     const { result } = renderHook(() => useHoverGroupCoordinator());
     const elA = elAt({ left: 0, top: 90, bottom: 110 });
 

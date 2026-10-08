@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { SmartFolder } from "@mimimilli/shared";
+import { toSmartFolderAxisId, type SmartFolder } from "@mimimilli/shared";
 import {
   closedSmartFolderEditorState,
   createSmartFolderEditorState,
@@ -25,7 +25,7 @@ export function useLibrarySmartFolderEditor({
   const saveMutation = useSmartFolderMutation({
     onSaved: (savedFolder, wasNew) => {
       setState(closedSmartFolderEditorState);
-      if (wasNew) nav.setAxis(`smart-${savedFolder.id}`);
+      if (wasNew) nav.setAxis(toSmartFolderAxisId(savedFolder.id));
     },
     onError: () => {},
   });

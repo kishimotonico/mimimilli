@@ -129,6 +129,9 @@ const realHarness: HarnessFactory = async (t) => {
   return harness;
 };
 
+const skipUnreadable = (kind: string) =>
+  kind === "real" && process.platform === "win32" && "Windows の chmod は読取拒否にならない";
+
 const harnesses: Array<[string, HarnessFactory]> = [
   ["fixture", fixtureHarness],
   ["real", realHarness],
@@ -221,54 +224,62 @@ for (const [kind, createHarness] of harnesses) {
     );
   });
 
-  test(`${kind}: 構築に失敗すると失敗状態を保ち、通常APIを拒否したまま再試行できる`, async (t) => {
-    const h = await createHarness(t);
-    const failed = await reconfigure(h.app, h.unreadableRoot);
-    assert.equal(failed.status, "failed");
-    assert.ok(failed.status === "failed" && failed.rootFolder === h.unreadableRoot);
-    assert.ok(failed.status === "failed" && failed.message.length > 0);
+  test(
+    `${kind}: 構築に失敗すると失敗状態を保ち、通常APIを拒否したまま再試行できる`,
+    { skip: skipUnreadable(kind) },
+    async (t) => {
+      const h = await createHarness(t);
+      const failed = await reconfigure(h.app, h.unreadableRoot);
+      assert.equal(failed.status, "failed");
+      assert.ok(failed.status === "failed" && failed.rootFolder === h.unreadableRoot);
+      assert.ok(failed.status === "failed" && failed.message.length > 0);
 
-    const settings = settingsSchema.parse(await (await h.app.request("/api/settings")).json());
-    assert.deepEqual(settings.rootReconfiguration, failed);
-    await assertRootReconfiguring(await h.app.request("/api/works"));
+      const settings = settingsSchema.parse(await (await h.app.request("/api/settings")).json());
+      assert.deepEqual(settings.rootReconfiguration, failed);
+      await assertRootReconfiguring(await h.app.request("/api/works"));
 
-    // fixtureには物理FSがないため、存在しないパスの検証はrealだけで確認する。
-    const invalidPaths = [
-      "relative/library",
-      ...(kind === "real" ? [join(h.oldRoot, "存在しないフォルダー")] : []),
-    ];
-    for (const path of invalidPaths) {
-      assert.equal((await start(h.app, path)).status, 400, path);
-      assert.deepEqual(await getState(h.app), failed);
-    }
+      // fixtureには物理FSがないため、存在しないパスの検証はrealだけで確認する。
+      const invalidPaths = [
+        "relative/library",
+        ...(kind === "real" ? [join(h.oldRoot, "存在しないフォルダー")] : []),
+      ];
+      for (const path of invalidPaths) {
+        assert.equal((await start(h.app, path)).status, 400, path);
+        assert.deepEqual(await getState(h.app), failed);
+      }
 
-    assertIdleAfterCompletion(await reconfigure(h.app, h.newRoot));
-    assert.ok((await listWorkIds(h.app)).includes(h.keptWorkId));
-  });
+      assertIdleAfterCompletion(await reconfigure(h.app, h.newRoot));
+      assert.ok((await listWorkIds(h.app)).includes(h.keptWorkId));
+    },
+  );
 
-  test(`${kind}: 再設定中・失敗中は許可リスト以外のAPIを409 root_reconfiguringで拒否する`, async (t) => {
-    const h = await createHarness(t);
-    await reconfigure(h.app, h.unreadableRoot);
+  test(
+    `${kind}: 再設定中・失敗中は許可リスト以外のAPIを409 root_reconfiguringで拒否する`,
+    { skip: skipUnreadable(kind) },
+    async (t) => {
+      const h = await createHarness(t);
+      await reconfigure(h.app, h.unreadableRoot);
 
-    for (const path of ["/api/settings", "/api/root-reconfiguration"]) {
-      assert.equal((await h.app.request(path)).status, 200, path);
-    }
-    const denied: Array<[string, string]> = [
-      ["GET", "/api/works"],
-      ["GET", `/api/works/${h.keptWorkId}`],
-      ["GET", "/api/fs"],
-      ["GET", `/api/media/cover/${h.keptWorkId}`],
-      ["GET", `/api/media/audio/${h.keptWorkId}/track.wav`],
-      ["POST", "/api/scan"],
-      ["GET", "/api/scan/candidates"],
-      ["GET", "/api/dlsite/notifications"],
-      ["GET", "/api/tags"],
-      ["GET", "/api/smart-folders"],
-    ];
-    for (const [method, path] of denied) {
-      await assertRootReconfiguring(await h.app.request(path, { method }));
-    }
-  });
+      for (const path of ["/api/settings", "/api/root-reconfiguration"]) {
+        assert.equal((await h.app.request(path)).status, 200, path);
+      }
+      const denied: Array<[string, string]> = [
+        ["GET", "/api/works"],
+        ["GET", `/api/works/${h.keptWorkId}`],
+        ["GET", "/api/fs"],
+        ["GET", `/api/media/cover/${h.keptWorkId}`],
+        ["GET", `/api/media/audio/${h.keptWorkId}/track.wav`],
+        ["POST", "/api/scan"],
+        ["GET", "/api/scan/candidates"],
+        ["GET", "/api/dlsite/notifications"],
+        ["GET", "/api/tags"],
+        ["GET", "/api/smart-folders"],
+      ];
+      for (const [method, path] of denied) {
+        await assertRootReconfiguring(await h.app.request(path, { method }));
+      }
+    },
+  );
 
   test(`${kind}: ロック確立前に受理済みのscan開始要求は再構築開始前に取り消され、削除済み作品を再投入しない`, async (t) => {
     const h = await createHarness(t);
@@ -313,25 +324,29 @@ for (const [kind, createHarness] of harnesses) {
     assert.ok(!ids.includes(h.droppedWorkId));
   });
 
-  test(`${kind}: 再起動後も失敗・中断した再設定を状態から判断できる`, async (t) => {
-    const h = await createHarness(t);
-    const failed = await reconfigure(h.app, h.unreadableRoot);
-    await h.restart();
-    assert.deepEqual(await getState(h.app), failed);
-    await assertRootReconfiguring(await h.app.request("/api/works"));
+  test(
+    `${kind}: 再起動後も失敗・中断した再設定を状態から判断できる`,
+    { skip: skipUnreadable(kind) },
+    async (t) => {
+      const h = await createHarness(t);
+      const failed = await reconfigure(h.app, h.unreadableRoot);
+      await h.restart();
+      assert.deepEqual(await getState(h.app), failed);
+      await assertRootReconfiguring(await h.app.request("/api/works"));
 
-    await h.adapter.beginRootReconfiguration(h.newRoot);
-    await h.restart();
-    assert.deepEqual(await getState(h.app), {
-      status: "failed",
-      rootFolder: h.newRoot,
-      message: ROOT_RECONFIGURATION_INTERRUPTED_MESSAGE,
-    });
-    await assertRootReconfiguring(await h.app.request("/api/works"));
+      await h.adapter.beginRootReconfiguration(h.newRoot);
+      await h.restart();
+      assert.deepEqual(await getState(h.app), {
+        status: "failed",
+        rootFolder: h.newRoot,
+        message: ROOT_RECONFIGURATION_INTERRUPTED_MESSAGE,
+      });
+      await assertRootReconfiguring(await h.app.request("/api/works"));
 
-    assertIdleAfterCompletion(await reconfigure(h.app, h.newRoot));
-    assert.equal((await h.app.request("/api/works")).status, 200);
-  });
+      assertIdleAfterCompletion(await reconfigure(h.app, h.newRoot));
+      assert.equal((await h.app.request("/api/works")).status, 200);
+    },
+  );
 }
 
 test("fixture: 開始時に実行中のscanジョブを取り消し、再設定中は開始要求を409 conflictで拒否する", async (t) => {

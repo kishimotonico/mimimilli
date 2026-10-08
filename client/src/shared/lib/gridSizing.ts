@@ -6,8 +6,8 @@ export function clampTileSize(size: number): number {
 }
 
 // JS/CSS間の値のずれを防ぐため、WorkGrid が --grid-row-gap / --grid-col-gap /
-// --tile-chrome-h として shell.css の .mll-grid* 規則へ注入する。値を変える場合は
-// この定数だけを更新すればよい（shell.css 側に数値を直書きしない）。
+// --tile-chrome-h として styles/shell/ の .mll-grid* 規則へ注入する。値を変える場合は
+// この定数だけを更新すればよい（styles/shell/ 側に数値を直書きしない）。
 
 /** タイル間の縦gap（行間） */
 export const GRID_ROW_GAP = 18;

@@ -1,4 +1,4 @@
-// TASK-61: 検索クエリのデバウンスと AbortSignal 伝播の検証。
+// 検索クエリのデバウンスと AbortSignal 伝播の検証。
 // 実際の fetch 呼び出し回数・URL・signal をモック経由で検証する。
 
 import { createElement, Suspense } from "react";

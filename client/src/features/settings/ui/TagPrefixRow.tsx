@@ -3,6 +3,7 @@ import type { TagPrefix, TagPrefixColorKey } from "@mimimilli/shared";
 import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
 import TextInput from "../../../shared/ui/TextInput";
+import { useInlineEditKeyDown } from "../../../shared/ui/useInlineEditKeyDown";
 import { cn } from "../../../shared/lib/cn";
 import { ColorSwatches } from "./ColorSwatches";
 
@@ -56,6 +57,10 @@ export default function TagPrefixRow({
   onRequestDelete,
 }: TagPrefixRowProps) {
   const deleteDisabled = isMutating || p.protected;
+  const handleLabelKeyDown = useInlineEditKeyDown({
+    onCommit: onCommitEditLabel,
+    onCancel: onCancelEditLabel,
+  });
   return (
     <div className="flex items-center gap-2 border-b border-line-soft px-2.5 py-1.5 last:border-b-0">
       <div className="flex shrink-0 flex-col gap-px">
@@ -83,10 +88,7 @@ export default function TagPrefixRow({
           value={editingLabel}
           onChange={(e) => onEditingLabelChange(e.target.value)}
           onBlur={onCommitEditLabel}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onCommitEditLabel();
-            if (e.key === "Escape") onCancelEditLabel();
-          }}
+          onKeyDown={handleLabelKeyDown}
           aria-label={`「${p.prefix}」のラベル`}
           font="jp"
           className="h-[24px] flex-1 rounded-1 px-1.5 text-ink-1"

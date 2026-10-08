@@ -127,7 +127,7 @@ function normalizeKey(key: DlsiteCacheKey): NormalizedKey {
 
 /**
  * 入力の検証契約。transferSizeとexpandedSizeは意図的に分ける。
- * 現在のHTML保存は展開済みbodyを受け取るが、TASK-93.2では圧縮HTTP応答にも同じ検証を使う。
+ * 現在のHTML保存は展開済みbodyを受け取る。
  */
 export function validateDlsiteHtmlInput(
   input: DlsiteHtmlInputMetadata,

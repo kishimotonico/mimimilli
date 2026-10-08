@@ -3,7 +3,7 @@
    タグANDバンド(.mll-tagband* / .mll-taggroup)、カバーコラージュ
    (.mll-collage*)、軸値一覧(.mll-vsearch / .mll-vlist-hd / .mll-vrow* / .mll-vtile*)、
    クイックオーバーレイ(.mll-qoverlay / .mll-qlist*)、ドリルヘッダー(.mle-drill、
-   軸値へのドリルダウン)。元ファイルではこれらが連続した区画だったため1ファイルにまとめている。
+   軸値へのドリルダウン)。これらは連続した区画のため1ファイルにまとめている。
    library-a〜eの分割理由はlibrary-a.css冒頭コメント参照。
    import順: files-a.cssの次、files-b.cssより前。 */
 
@@ -146,7 +146,7 @@
   align-items: center;
   width: 100%;
   min-width: 0;
-  /* 行高を固定する（仮想スクロールの estimateSize と一致させ、行ごとの高さずれを防ぐ。TASK-59） */
+  /* 行高を固定する（仮想スクロールの estimateSize と一致させ、行ごとの高さずれを防ぐ） */
   block-size: 42px;
   box-sizing: border-box;
   padding: 5px 6px;
@@ -184,9 +184,7 @@
   overflow: hidden;
   background: var(--paper-2);
   flex-shrink: 0;
-  box-shadow:
-    0 1px 0 0 oklch(100% 0 0 / 0.5) inset,
-    0 2px 6px -3px oklch(20% 0.02 70 / 0.2);
+  box-shadow: var(--shadow-thumb);
 }
 .mll-wrow__cv img,
 .mll-wrow__cv svg {
@@ -385,9 +383,7 @@
   gap: 1px;
   overflow: hidden;
   background: var(--paper-3);
-  box-shadow:
-    0 1px 0 0 oklch(100% 0 0 / 0.5) inset,
-    0 2px 6px -3px oklch(20% 0.02 70 / 0.2);
+  box-shadow: var(--shadow-thumb);
 }
 .mll-collage__cell {
   background: var(--paper-2);
@@ -514,7 +510,7 @@
   background: var(--paper-3);
 }
 /* 入れ子タグの中間ノードのうち、実タグとして存在しないもの（選択不可の見出し。
-     ADR-0012 §5・統括判断）。名前順ソート時のみ axisValueHierarchy.ts が生成する。 */
+     ADR-0012 §5）。名前順ソート時のみ axisValueHierarchy.ts が生成する。 */
 .mll-vrow-heading {
   display: flex;
   align-items: center;

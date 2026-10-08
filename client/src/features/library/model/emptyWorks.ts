@@ -26,7 +26,7 @@ export function buildEmptyWorksHint(
   isEmptyDueToFilter: boolean,
 ): string | undefined {
   if (isEmptyDueToFilter) return undefined;
-  if (activeAxis === "fav") return "作品詳細の☆ボタンでお気に入りに追加できます";
+  if (activeAxis === "fav") return "作品をブックマークするとお気に入りに表示されます";
   if (activeAxis === "error")
     return "元ファイルが見つからない・メタデータの読み込みに失敗した作品はここに表示されます";
   return undefined;

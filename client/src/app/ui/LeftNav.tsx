@@ -81,7 +81,12 @@ export default function LeftNav() {
       <div className="mle-side__sp" />
 
       <div className="mle-side__group is-foot">
-        <button className="mle-side__btn" title="自分" aria-label="自分">
+        <button
+          className="mle-side__btn !cursor-not-allowed !text-ink-4 hover:!bg-transparent hover:!text-ink-4"
+          title="近日実装"
+          aria-label="自分"
+          disabled
+        >
           <I.user size={19} />
         </button>
       </div>

@@ -383,7 +383,7 @@ test("core参照実装とreal SQLのファセット値・件数・順序が同�
   }
 });
 
-test("軸ファセットの絞り込み（自軸除外カウント用フィルタ）もreal SQLとcoreが同値（TASK-187）", (t) => {
+test("軸ファセットの絞り込み（自軸除外カウント用フィルタ）もreal SQLとcoreが同値", (t) => {
   const scope = makeTestScope();
   t.after(scope.cleanup);
   const db = scope.own(openDb({ kind: "memory" }));
@@ -490,7 +490,7 @@ test("スマートフォルダーのSQL候補絞り込み(第1段)とcore純粋�
     seed: 42,
   });
 
-  // 保持中フィルタ（tags、@year/... 擬似タグも含む）はルールに対する追加のAND条件（TASK-185）。
+  // 保持中フィルタ（tags、@year/... 擬似タグも含む）はルールに対する追加のAND条件。
   // ルールなし（第1段のSQL高速経路）・ルールあり（第2段のcore純粋関数経路）の両方で
   // real⇔fixtureが同値になることを確認する。
   assertSmartFolderEquivalent(queryRepo, [], "added-desc", {
@@ -575,8 +575,8 @@ test("スマートフォルダー候補IDが900件を超えてもlistSummaries�
   t.after(scope.cleanup);
   const db = scope.own(openDb({ kind: "memory" }));
   const { query: queryRepo, catalog, user } = createWorkRepos(db);
-  // listSummaries(workIds) はSQLiteのパラメータ上限を避けるため900件ごとに分割してIN句を発行する
-  // （TASK-85）。候補IDがちょうどその境界をまたぐ件数になるデータセットで、分割・再結合が
+  // listSummaries(workIds) はSQLiteのパラメータ上限を避けるため900件ごとに分割してIN句を発行する。
+  // 候補IDがちょうどその境界をまたぐ件数になるデータセットで、分割・再結合が
   // 欠落や重複なく行われることを直接検証する。
   const largeDataset = Array.from({ length: 950 }, (_, index) => summary(index));
   db.transaction(() => {

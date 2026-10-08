@@ -12,7 +12,7 @@ const MAX_COVERS = 4;
 
 /** 指定された分類軸について、works から値ごとの件数・総時間・代表カバーを集計し count 降順で返す。
  *  axis は正規形（小文字）を前提とする。filter が渡された場合、集計対象を先に絞り込む
- *  （自軸除外カウント、TASK-187）。0件になった値は結果に含まれない（自然に除外される）。 */
+ *  （自軸除外カウント）。0件になった値は結果に含まれない（自然に除外される）。 */
 export function buildAxisFacets(
   axis: string,
   works: WorkSummary[],

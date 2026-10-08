@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import {
+  errorMessage,
   coverFieldsFromColumns,
   dlsiteStateSchema,
   emptyDlsiteState,
@@ -144,7 +145,7 @@ export function parseJsonField(
   try {
     return JSON.parse(raw);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorMessage(error);
     throw new PersistentDataError(table, recordId, `${field}: JSON パースエラー: ${message}`);
   }
 }

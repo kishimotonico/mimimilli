@@ -1,4 +1,4 @@
-import { dedupeTags, dlsiteInfoTags, normalizeTags } from "@mimimilli/shared";
+import { dedupeTags, dlsiteInfoTags, isDlsiteUrl, normalizeTags } from "@mimimilli/shared";
 import type { DlsiteApplyBody, DlsiteWorkInfo, NormalizedTag, Work } from "@mimimilli/shared";
 import { formatCoverEditLabel } from "../../shared/lib/coverLabel";
 
@@ -62,7 +62,7 @@ export function computeDlsiteApplyDiff(
   work: Pick<Work, "title" | "tags" | "urls" | "coverKind" | "coverImage" | "cover">,
   info: DlsiteWorkInfo,
 ): DlsiteApplyDiff {
-  const currentUrl = work.urls.find((entry) => entry.url.includes("dlsite.com"))?.url ?? "";
+  const currentUrl = work.urls.find((entry) => isDlsiteUrl(entry.url))?.url ?? "";
   const title: DlsiteFieldDiff =
     work.title === info.title
       ? { kind: "unchanged", value: work.title }

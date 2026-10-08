@@ -8,6 +8,7 @@ import {
   readdirSync,
   writeFileSync,
 } from "node:fs";
+import { errorMessage } from "@mimimilli/shared";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { parseDlsiteHtml } from "./adapters/real/dlsite.ts";
@@ -134,7 +135,7 @@ function importDirectory(
       const { outcome } = importOne(cache, productCode, bytes);
       succeeded.push({ file: name, productCode, outcome });
     } catch (error) {
-      failed.push({ file: name, error: (error as Error).message });
+      failed.push({ file: name, error: errorMessage(error) });
     }
   }
   return { succeeded, failed };
@@ -170,7 +171,7 @@ function exportDirectory(
       writeFileSync(join(dir, name), cache.exportHtmlGzip({ productCode }));
       succeeded.push(name);
     } catch (error) {
-      failed.push({ file: name, error: (error as Error).message });
+      failed.push({ file: name, error: errorMessage(error) });
     }
   }
   return { succeeded, failed };

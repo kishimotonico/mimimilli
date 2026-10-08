@@ -1,4 +1,4 @@
-// TASK-62: markMissingExcept の一時テーブル方式化の検証。
+// markMissingExcept の一時テーブル方式の検証。
 // SQLite パラメータ上限を超える seen ID でも動作し、一時テーブルを残さないことを確認する。
 import assert from "node:assert/strict";
 import { test } from "node:test";

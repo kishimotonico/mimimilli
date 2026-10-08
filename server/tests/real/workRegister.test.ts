@@ -20,6 +20,7 @@ import {
   workspacePath,
 } from "@mimimilli/shared";
 import { createApp } from "../../src/app.ts";
+import { WorkRegisterError } from "../../src/errors.ts";
 import { writeMetaFile } from "../../src/adapters/real/meta.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { folderMetaPath } from "../helpers/workTestUtils.ts";
@@ -908,6 +909,46 @@ test("GET /works/register-preview: 非音声ファイルは 404", async (t) => {
     body: JSON.stringify({ path: workspace(root, notes), title: "メモ" }),
   });
   assert.equal(created.status, 404);
+});
+
+test("POST /works: 存在しないパスは invalid_path で拒否し、API は 404 を返す", async (t) => {
+  const directory = makeTestDirectory("work-register-missing-path");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  mkdirSync(root, { recursive: true });
+
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  const app = createApp(adapter);
+  await configureRoot(adapter, root);
+
+  const body = { path: workspace(root, join(root, "missing")), title: "無い", tags: [] };
+  await assert.rejects(
+    adapter.createWork(body),
+    (error) => error instanceof WorkRegisterError && error.code === "invalid_path",
+  );
+  const res = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  assert.equal(res.status, 404);
+});
+
+test("POST /works: ルート未設定は他のAPIと同じ 409 を返す", async (t) => {
+  const directory = makeTestDirectory("work-register-unconfigured");
+  t.after(directory.cleanup);
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  const app = createApp(adapter);
+
+  const res = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      path: workspace(directory.path, join(directory.path, "x")),
+      title: "x",
+    }),
+  });
+  assert.equal(res.status, 409);
 });
 
 test("DELETE /works: 単一ファイル作品の解除はサイドカーだけ消し音声は残す", async (t) => {

@@ -1,4 +1,4 @@
-// ScanModal のEsc/backdrop挙動（TASK-56: NewWorkPopupの統合先）のコンポーネントテスト。
+// ScanModal のEsc/backdrop挙動のコンポーネントテスト。
 // happy-dom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
 import { createElement, Fragment } from "react";
 import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
@@ -28,7 +28,7 @@ import * as scanCandidatesCache from "../../src/entities/scan/scanCandidatesCach
 import * as scanEntityApi from "../../src/entities/scan/api";
 import { libraryTotalQueryOptions } from "../../src/entities/work/libraryTotalQueryOptions";
 
-/** ids指定のworks一覧クエリ結果のスタブ。テストごとに登録した作品だけ返す（TASK-210/276）。
+/** ids指定のworks一覧クエリ結果のスタブ。テストごとに登録した作品だけ返す。
  *  ids指定が無い呼び出し（libraryTotalQueryOptions等）は本来の実装（fetch経由）へ委譲する。 */
 const worksById = new Map<string, WorkListItem>();
 const originalSearchWorks = workApi.searchWorks;
@@ -177,11 +177,12 @@ function createRunningJob(
 }
 
 type ModalOverrides = Partial<Parameters<typeof ScanModal>[0]> & {
-  /** ScanModal 自身が SCAN_QUERY_KEYS.last() を購読する（TASK-124）ため、query cache 経由で渡す */
+  /** ScanModal 自身が SCAN_QUERY_KEYS.last() を購読するため、query cache 経由で渡す */
   lastResult?: ScanResult | null;
-  /** ScanModal 自身が libraryTotalQueryOptions（WORK_QUERY_KEYS.total()）を購読する
-   *  （TASK-124）ため、query cache 経由で渡す。実際のクエリは WorksPage 全体を返す
-   *  （TASK-188）ため、ここでは total だけを受け取り WorksPage へ組み立てる。 */
+  /**
+   * ScanModal 自身が libraryTotalQueryOptions（WORK_QUERY_KEYS.total()）を購読する。
+   * 実際のクエリは WorksPage 全体を返すため、ここでは total だけを受け取り WorksPage へ組み立てる。
+   */
   libraryTotal?: number | null;
 };
 
@@ -205,14 +206,14 @@ function seedScanQueries(
   if (libraryTotal !== undefined && libraryTotal !== null) {
     // queryKey は libraryTotalQueryOptions 由来（DataTag付き）を使う。setQueryData の第二引数が
     // WorksPage 型で型検査されるため、number など違う形を渡そうとするとコンパイルエラーになる
-    // （TASK-188: 同じキーに違う形のデータを期待する食い違いを型で検知する）。
+    // （同じキーに違う形のデータを期待する食い違いを型で検知する）。
     queryClient.setQueryData(libraryTotalQueryOptions.queryKey, {
       items: [],
       total: libraryTotal,
       stats: { trackCount: 0, durationSec: 0 },
     });
   }
-  // ID重複の診断（TASK-322で常に最新を購読する）。未シードだとテストごとに実fetchへ
+  // ID重複の診断（常に最新を購読する）。未シードだとテストごとに実fetchへ
   // 落ちてしまうため、明示的な指定がなければ空で固定する。
   if (queryClient.getQueryData(SCAN_QUERY_KEYS.diagnostics()) === undefined) {
     queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), { diagnostics: [] });
@@ -758,14 +759,13 @@ describe("ScanModal", () => {
   });
 });
 
-// TASK-188 回帰テスト: ScanModal とライブラリ画面（useLibrarySupportingQueries）は
+// ScanModal とライブラリ画面（useLibrarySupportingQueries）は
 // libraryTotalQueryOptions を通じて同じ queryKey を購読する。両者を同じ QueryClient 配下に
 // 同時マウントし、実際の fetch から解決させて（setQueryData での事前シードに頼らず）、
 // 一方が期待する形と cache の実際の形が食い違わないことを確認する。
-// 以前は ScanModal 側だけが number を期待する別の queryFn を持っていたため、先にキャッシュを
-// 占有した側（WorksPage 全体）がもう一方の .data になり、{items, total, stats} を
-// そのまま JSX の子として描画してクラッシュしていた。
-describe("ScanModalと他画面が同じlibraryTotalQueryOptionsを共有する（TASK-188回帰）", () => {
+// queryFn が食い違うと、先にキャッシュを占有した側（WorksPage 全体）がもう一方の .data になり、
+// {items, total, stats} をそのまま JSX の子として描画してクラッシュする。
+describe("ScanModalと他画面が同じlibraryTotalQueryOptionsを共有する", () => {
   function jsonResponse(data: unknown, status = 200): Response {
     return new Response(data === null ? null : JSON.stringify(data), {
       status,

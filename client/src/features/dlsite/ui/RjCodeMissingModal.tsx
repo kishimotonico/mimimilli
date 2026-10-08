@@ -1,5 +1,5 @@
 // RJコード未検出（フォルダー名からDLsite作品を特定できなかった）作品の一覧。
-// スキャン完了ポップアップの「確認する」、ヘッダーの通知ベルの両方から開ける（TASK-41）。
+// スキャン完了ポップアップの「確認する」、ヘッダーの通知ベルの両方から開ける。
 // 各行から作品詳細へ遷移し、警告の「連携設定を編集」から編集ダイアログのRJコード入力に進める。
 import { useRjCodeMissingWorks } from "../model/dlsiteMissingRjCode";
 import NotificationListModal from "./NotificationListModal";

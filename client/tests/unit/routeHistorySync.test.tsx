@@ -1,6 +1,6 @@
 // 同期は route の項目を知らず、codec の parse/serialize だけでURLを扱う（ADR-0031）。
 // 項目を1つ足した route 型と codec でも、同期のコードを変えずに同じ振る舞いになることを
-// 両方の codec で同じシナリオを流して確認する（TASK-466 AC#5）。
+// 両方の codec で同じシナリオを流して確認する。
 import { act, render } from "@testing-library/react";
 import { createElement } from "react";
 import { Provider, createStore } from "jotai";

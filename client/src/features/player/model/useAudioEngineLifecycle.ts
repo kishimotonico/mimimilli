@@ -208,7 +208,7 @@ export function useAudioEngineLifecycle({
         if (autoplay) {
           // 既に再生中（paused=false）の audio へ play() を呼んでも、実ブラウザは play
           // イベントを再発火しない。onPlay 経由の audioPlaying dispatch が永久に来ず
-          // status が loading に固着するため（TASK-128）、その場合は明示的に収束させる。
+          // status が loading に固着するため、その場合は明示的に収束させる。
           const wasAlreadyPlaying = engine.isPlaying();
           engine.play();
           if (wasAlreadyPlaying) controller.dispatch({ type: "audioPlaying" });

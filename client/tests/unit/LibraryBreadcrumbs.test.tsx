@@ -9,7 +9,7 @@ import { activeAxisAtom } from "../../src/entities/library/model/navigationAtoms
 import { seedLibraryRoute } from "../helpers/route";
 
 describe("LibraryBreadcrumbs", () => {
-  it("パンくずのクリックはLibraryNavigationProviderが持つ単一のstartTransitionを経由する（TASK-381）", () => {
+  it("パンくずのクリックはLibraryNavigationProviderが持つ単一のstartTransitionを経由する", () => {
     // パンくずだけの独立した遷移を持つと、他コンポーネントの遷移中表示
     // （WorkListPaneのis-pending暗転）にこの操作が反映されなくなる。
     const store = createStore();

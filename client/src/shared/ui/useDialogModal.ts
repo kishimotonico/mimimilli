@@ -15,7 +15,7 @@ interface UseDialogModalOptions {
 }
 
 /**
- * ネイティブ <dialog> + showModal() を薄くラップする共通フック（TASK-29）。
+ * ネイティブ <dialog> + showModal() を薄くラップする共通フック。
  * 「多重モーダル時は最前面のEscだけが効く」挙動はブラウザの top layer 実装に任せる。
  * フォーカストラップはネイティブ実装に加え、末尾/先頭でのTab循環を手動でも補完する
  * （編集モーダル末尾からのTabでBODYへフォーカスが落ちる欠陥があったため）。

@@ -17,6 +17,7 @@ import { resolveDataPaths } from "./adapters/real/dataRoot.ts";
 import { resolveDlsiteCacheConfig } from "./adapters/real/dlsiteCache.ts";
 import { resolveDlsiteRequestConfig } from "./adapters/real/dlsiteConfig.ts";
 import { createRealAdapter } from "./adapters/real/index.ts";
+import { terminateScanWorkers } from "./adapters/real/scanRunner.ts";
 import type { DataAdapter } from "./adapter/index.ts";
 import {
   createDlsiteEventLogger,
@@ -28,7 +29,7 @@ import {
   createUnhandledRejectionReporter,
   registerProcessErrorHandlers,
 } from "./lib/processErrorHandlers.ts";
-import { performGracefulShutdown, runCleanupAndExit } from "./serverLifecycle.ts";
+import { createShutdownHandler, performGracefulShutdown } from "./serverLifecycle.ts";
 import { resolveServerConfig, type ServerConfig } from "./serverConfig.ts";
 import { serveMimimilli } from "./serve.ts";
 import { buildStartupLogProperties } from "./lib/startupLog.ts";
@@ -70,7 +71,6 @@ function createAdapter(config: ServerConfig): DataAdapter {
   }
 }
 
-let shuttingDown = false;
 let adapter: DataAdapter | undefined;
 let server: ReturnType<typeof Bun.serve> | undefined;
 let app: ReturnType<typeof serveMimimilli>["app"] | undefined;
@@ -79,33 +79,35 @@ const reportUnhandledRejection = createUnhandledRejectionReporter((message, prop
   serverLogger.error(message, properties);
 });
 
-async function shutdown(exitCode: number, reason: string, error?: unknown): Promise<void> {
-  if (shuttingDown) return;
-  shuttingDown = true;
-  try {
+const shutdown = createShutdownHandler({
+  cleanup: () =>
+    performGracefulShutdown({ server, app, adapter, terminateWorkers: terminateScanWorkers }),
+  log: (reason, error) => {
     if (error) {
       serverLogger.fatal(reason, formatError(error));
     } else {
       serverLogger.info(reason);
     }
-  } catch (logError) {
-    console.error(logError);
-  }
-
-  await runCleanupAndExit(() => performGracefulShutdown({ server, app, adapter }), exitCode);
-}
+  },
+});
 
 registerProcessErrorHandlers({
   target: process,
   onUnhandledRejection: reportUnhandledRejection,
   onUncaughtException: (error) => {
-    void shutdown(1, "未捕捉例外で終了します", error);
+    void shutdown({
+      exitCode: 1,
+      immediateExitCode: 1,
+      reason: "未捕捉例外で終了します",
+      error,
+    });
   },
   onSignal: (signal) => {
-    void shutdown(
-      0,
-      signal === "SIGINT" ? "SIGINTを受信して終了します" : "SIGTERMを受信して終了します",
-    );
+    void shutdown({
+      exitCode: 0,
+      immediateExitCode: signal === "SIGINT" ? 130 : 143,
+      reason: `${signal}を受信して終了します`,
+    });
   },
 });
 

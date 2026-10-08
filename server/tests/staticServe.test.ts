@@ -91,20 +91,26 @@ test("staticDir 設定時は /apifoo を API ではなく SPA フォールバッ
   assert.equal(res.headers.get("cache-control"), "no-cache");
 });
 
-test("staticDir 配下のルート外シンボリックリンクは SPA フォールバックする", async () => {
-  const staticDir = createStaticFixture();
-  const outsideDir = mkdtempSync(join(tmpdir(), "mimimilli-static-outside-"));
-  const secretPath = join(outsideDir, "secret.txt");
-  writeFileSync(secretPath, "LEAKED_SECRET");
-  symlinkSync(secretPath, join(staticDir, "leak.txt"));
+test(
+  "staticDir 配下のルート外シンボリックリンクは SPA フォールバックする",
+  {
+    skip: process.platform === "win32" && "Windows の symlink 作成には特権が要る",
+  },
+  async () => {
+    const staticDir = createStaticFixture();
+    const outsideDir = mkdtempSync(join(tmpdir(), "mimimilli-static-outside-"));
+    const secretPath = join(outsideDir, "secret.txt");
+    writeFileSync(secretPath, "LEAKED_SECRET");
+    symlinkSync(secretPath, join(staticDir, "leak.txt"));
 
-  const app = createApp(createFixtureAdapter(), { staticDir });
-  const res = await app.request("/leak.txt");
-  assert.equal(res.status, 200);
-  const body = await res.text();
-  assert.match(body, /app/);
-  assert.doesNotMatch(body, /LEAKED_SECRET/);
-});
+    const app = createApp(createFixtureAdapter(), { staticDir });
+    const res = await app.request("/leak.txt");
+    assert.equal(res.status, 200);
+    const body = await res.text();
+    assert.match(body, /app/);
+    assert.doesNotMatch(body, /LEAKED_SECRET/);
+  },
+);
 
 test("staticDir 設定時も /api は API ハンドラが優先される", async () => {
   const staticDir = createStaticFixture();

@@ -1,7 +1,7 @@
 // AppBody → LibraryView → WorkGrid/WorkListPane の dockedBarActive 配線を検証する。
 // entities/player の playerIsActiveAtom・playerUiModeAtom から
 // features/player の playerDockBarVisibleAtom を経て、AppBody が計算した値が
-// 末端の結果面コンポーネントまで props で届くことを見る（TASK-368）。
+// 末端の結果面コンポーネントまで props で届くことを見る。
 // LibraryView自体の作品一覧取得・軸集計等は本題ではないため、重いhookはまとめて
 // モックし、実データ取得は行わない。
 

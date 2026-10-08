@@ -16,6 +16,8 @@ import {
   tagEquals,
   tagPrefixCreateSchema,
   tagPrefixNameSchema,
+  SMART_FOLDER_AXIS_PREFIX,
+  VIEW_IDS,
 } from "@mimimilli/shared";
 import type { WorkSummary } from "@mimimilli/shared";
 import { createApp } from "../src/app.ts";
@@ -108,11 +110,15 @@ test("tagEquals: 正規化済み同士の同値判定。値は大文字小文字
 
 // ── prefix 名スキーマ ─────────────────────────────────────────
 
-test("tagPrefixNameSchema: 予約軸ID・スラッシュ・smart- を拒否する", () => {
-  assert.ok(!tagPrefixNameSchema.safeParse("tag").success);
+test("tagPrefixNameSchema: 全ビューID・tag・year・smart- 接頭辞・スラッシュを拒否する", () => {
+  for (const id of [...VIEW_IDS, "tag", "year"]) {
+    assert.ok(!tagPrefixNameSchema.safeParse(id).success, id);
+  }
   assert.ok(!tagPrefixNameSchema.safeParse("YEAR").success); // 小文字化後に予約IDと衝突
   assert.ok(!tagPrefixNameSchema.safeParse("a/b").success);
-  assert.ok(!tagPrefixNameSchema.safeParse("smart-x").success);
+  assert.ok(!tagPrefixNameSchema.safeParse(SMART_FOLDER_AXIS_PREFIX).success);
+  assert.ok(!tagPrefixNameSchema.safeParse(`${SMART_FOLDER_AXIS_PREFIX}x`).success);
+  assert.ok(tagPrefixNameSchema.safeParse("smartx").success);
   assert.equal(tagPrefixNameSchema.parse(" 気分 "), "気分");
 });
 
@@ -216,7 +222,7 @@ test("buildAxisFacets: coversは追加日時の新しい順で最大4件、cover
   );
 });
 
-test("buildAxisFacets: filter を渡すと AND 条件として絞り込んだ集合から集計する（TASK-187）", () => {
+test("buildAxisFacets: filter を渡すと AND 条件として絞り込んだ集合から集計する", () => {
   const works = [
     summaryWith("W1", ["cv/藤田茜", "ASMR"]),
     summaryWith("W2", ["cv/霧島レイ", "ASMR"]),
@@ -246,7 +252,7 @@ test("buildAxisFacets: filterで0件になった値は一覧から除外され�
   assert.deepEqual(buildAxisFacets("cv", works, { tags: tf("ASMR"), tagOp: "AND" }), []);
 });
 
-test("buildAxisFacets: filterが無ければ従来どおり無絞り込みで集計する（回帰確認）", () => {
+test("buildAxisFacets: filterが無ければ無絞り込みで集計する", () => {
   const works = [summaryWith("W1", ["cv/藤田茜"]), summaryWith("W2", ["cv/霧島レイ"])];
   assert.deepEqual(buildAxisFacets("cv", works), buildAxisFacets("cv", works, {}));
 });

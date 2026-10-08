@@ -131,7 +131,7 @@
   padding-bottom: 30px;
 }
 /* カバー画像の直下に再生スプリットボタンだけを置く（.mle-prv__coverwrap）。
-     ハート・鉛筆・その他は従来どおりmeta列側（タグの下）に残す。 */
+     ハート・鉛筆・その他はmeta列側（タグの下）に残す。 */
 .mle-prv__hero {
   display: grid;
   grid-template-columns: 140px 1fr;
@@ -204,7 +204,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: oklch(72% 0.165 25 / 0.14);
+  background: color-mix(in oklch, var(--r-coral) 14%, transparent);
   color: var(--r-coral);
   padding: 1px 6px;
   border-radius: 4px;
@@ -395,8 +395,8 @@
   margin-top: 18px;
   padding: 12px 14px;
   border-radius: var(--r-2);
-  background: oklch(72% 0.165 25 / 0.08);
-  border: 1px solid oklch(72% 0.165 25 / 0.28);
+  background: color-mix(in oklch, var(--r-coral) 8%, transparent);
+  border: 1px solid color-mix(in oklch, var(--r-coral) 28%, transparent);
   color: var(--r-coral);
 }
 .mle-prv__warn-body {

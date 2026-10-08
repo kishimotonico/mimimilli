@@ -112,7 +112,7 @@ function UnsavedChangesPrompt({
       aria-label="未保存の変更があります"
       onCancel={handleCancel}
       onClick={(event) => handleBackdropClick(event)}
-      className="m-auto w-[360px] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-[18px_18px_14px] font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
+      className="m-auto w-[360px] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-[18px_18px_14px] font-jp text-ink-0 shadow-pop backdrop:bg-[var(--scrim)]"
     >
       <div className="flex flex-col gap-2.5">
         <span className="font-sans text-[13.5px] font-semibold text-ink-0">
@@ -391,7 +391,7 @@ export function WorkEditDialog({
         aria-labelledby="work-edit-title"
         onCancel={handleCancel}
         onClick={(event) => handleBackdropClick(event)}
-        className="m-auto w-[min(640px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
+        className="m-auto w-[min(640px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[var(--scrim)]"
       >
         <div className="flex max-h-[calc(100vh-32px)] min-h-0 flex-col overflow-hidden">
           <header className="flex shrink-0 items-center gap-2 border-b border-line-soft px-[18px] py-3">

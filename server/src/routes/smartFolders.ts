@@ -9,6 +9,7 @@ import {
 } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter/index.ts";
 import { invalidRequest, notFound } from "../lib/httpError.ts";
+import { readJsonBody } from "../lib/jsonBody.ts";
 
 export function smartFoldersRoute(adapter: DataAdapter): Hono {
   const app = new Hono();
@@ -19,32 +20,32 @@ export function smartFoldersRoute(adapter: DataAdapter): Hono {
   });
 
   app.post("/smart-folders/preview", async (c) => {
-    const body = await c.req.json().catch(() => null);
-    const parsed = smartFolderPreviewRequestSchema.safeParse(body);
-    if (!parsed.success) {
-      invalidRequest("スマートフォルダーのプレビュー条件が不正です");
-    }
-    const total = await adapter.previewSmartFolderRuleCount(parsed.data.rules);
+    const data = await readJsonBody(
+      c,
+      smartFolderPreviewRequestSchema,
+      "スマートフォルダーのプレビュー条件が不正です",
+    );
+    const total = await adapter.previewSmartFolderRuleCount(data.rules);
     return c.json({ total });
   });
 
   app.post("/smart-folders", async (c) => {
-    const body = await c.req.json().catch(() => null);
-    const parsed = smartFolderCreateSchema.safeParse(body);
-    if (!parsed.success) {
-      invalidRequest("スマートフォルダーの作成内容が不正です");
-    }
-    const folder = await adapter.createSmartFolder(parsed.data);
+    const data = await readJsonBody(
+      c,
+      smartFolderCreateSchema,
+      "スマートフォルダーの作成内容が不正です",
+    );
+    const folder = await adapter.createSmartFolder(data);
     return c.json(folder, 201);
   });
 
   app.put("/smart-folders/:id", async (c) => {
-    const body = await c.req.json().catch(() => null);
-    const parsed = smartFolderUpdateSchema.safeParse(body);
-    if (!parsed.success) {
-      invalidRequest("スマートフォルダーの更新内容が不正です");
-    }
-    const folder = await adapter.updateSmartFolder(c.req.param("id"), parsed.data);
+    const data = await readJsonBody(
+      c,
+      smartFolderUpdateSchema,
+      "スマートフォルダーの更新内容が不正です",
+    );
+    const folder = await adapter.updateSmartFolder(c.req.param("id"), data);
     if (!folder) notFound(`スマートフォルダーが見つかりません: ${c.req.param("id")}`);
     return c.json(folder);
   });

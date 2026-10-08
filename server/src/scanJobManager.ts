@@ -42,7 +42,7 @@ export class ScanJobManager {
   private activeId: string | null = null;
   private runCompletion: Promise<void> | null = null;
   private shuttingDown = false;
-  // terminal job はpruneTerminalで消えるため、前回結果はディスク永続化せずここにだけ保持する（TASK-56）。
+  // terminal job はpruneTerminalで消えるため、前回結果はディスク永続化せずここにだけ保持する。
   private lastCompleted: ScanLastResultResponse | null = null;
 
   constructor(

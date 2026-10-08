@@ -150,7 +150,7 @@ describe("buildWorksParams", () => {
     });
   });
 
-  it("passes a year pseudo-tag through in tags as-is; the server interprets it (ADR-0012 §2, TASK-199)", () => {
+  it("passes a year pseudo-tag through in tags as-is; the server interprets it (ADR-0012 §2)", () => {
     expect(
       buildWorksParams({
         activeAxis: "all",
@@ -198,7 +198,7 @@ describe("buildSmartFolderFilterParams（スマートフォルダー評価APIへ
       tagOp: "AND",
     });
   });
-  it("year 擬似タグも tags にそのまま渡す（サーバー側で解釈する、TASK-199）", () => {
+  it("year 擬似タグも tags にそのまま渡す（サーバー側で解釈する）", () => {
     expect(buildSmartFolderFilterParams(["@year/2024"], "")).toEqual({
       tags: ["@year/2024"],
       tagOp: "AND",

@@ -327,7 +327,7 @@ describe("App root subscriptions", () => {
   });
 
   describe("library total / last scan query", () => {
-    // TASK-124: libraryTotalQuery / lastScanQuery を ScanModal・NotificationBell へ降ろした後の退行テスト。
+    // libraryTotalQuery / lastScanQuery を ScanModal・NotificationBell が購読し、App は購読しないことのテスト。
     // trackedProps が空の観測者は無条件通知にフォールバックする（TanStack Query v5）ため、
     // App がこれらの query を直接持つと fetchStatus 等の変化だけでも再レンダリングされてしまう。
     it("ライブラリ総件数クエリの更新で App が再レンダリングされない", async () => {

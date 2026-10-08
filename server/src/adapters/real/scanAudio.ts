@@ -1,38 +1,24 @@
 import { readdirSync } from "node:fs";
 import { basename, extname, join } from "node:path";
-import type { Track } from "@mimimilli/shared";
+import { errorMessage, fileExtensionOf, isAudioFileName, type Track } from "@mimimilli/shared";
 import { toPortableRelativePath } from "./paths.ts";
 import { naturalCompare } from "./naturalCompare.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 
 const scanLogger = getCategoryLogger("scan");
 
-export const AUDIO_EXTENSIONS = new Set([
-  "mp3",
-  "m4a",
-  "aac",
-  "wav",
-  "ogg",
-  "flac",
-  "webm",
-  "opus",
-]);
-const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "bmp", "webp"]);
-
-export function extOf(name: string): string {
-  return extname(name).slice(1).toLowerCase();
-}
+export const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "bmp", "webp"]);
 
 export function findCoverImage(dir: string): string | null {
   let entries;
   try {
     entries = readdirSync(dir, { withFileTypes: true });
   } catch (e) {
-    scanLogger.warn(`ディレクトリを読めません: ${dir}`, { path: dir, error: (e as Error).message });
+    scanLogger.warn(`ディレクトリを読めません: ${dir}`, { path: dir, error: errorMessage(e) });
     return null;
   }
   const images = entries
-    .filter((e) => e.isFile() && IMAGE_EXTENSIONS.has(extOf(e.name)))
+    .filter((e) => e.isFile() && IMAGE_EXTENSIONS.has(fileExtensionOf(e.name)))
     .map((e) => e.name)
     .sort(naturalCompare);
   const preferred = images.find((n) => {
@@ -53,14 +39,14 @@ function collectAudioRecursive(dir: string): string[] {
     } catch (e) {
       scanLogger.warn(`ディレクトリを読めません: ${cur}`, {
         path: cur,
-        error: (e as Error).message,
+        error: errorMessage(e),
       });
       continue;
     }
     for (const e of entries) {
       const full = join(cur, e.name);
       if (e.isDirectory()) stack.push(full);
-      else if (e.isFile() && AUDIO_EXTENSIONS.has(extOf(e.name))) out.push(full);
+      else if (e.isFile() && isAudioFileName(e.name)) out.push(full);
     }
   }
   return out;
@@ -70,7 +56,7 @@ function collectAudioRecursive(dir: string): string[] {
 export function buildDefaultTracks(workDir: string): Track[] {
   const entries = readdirSync(workDir, { withFileTypes: true });
   const directAudio = entries
-    .filter((e) => e.isFile() && AUDIO_EXTENSIONS.has(extOf(e.name)))
+    .filter((e) => e.isFile() && isAudioFileName(e.name))
     .map((e) => join(workDir, e.name));
 
   let files: string[];

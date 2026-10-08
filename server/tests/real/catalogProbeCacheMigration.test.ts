@@ -1,11 +1,11 @@
 // migration 0006（audio_probe_cacheのNULLABLE化）と0008（0秒probe cache/fingerprintのデータ補正）が、
-// TASK-92以前の実データに対して安全に働くことを検証する。本テストは再現用migrations dirから0006-0009を除き
+// 0秒probe cacheを含む既存DBに対して安全に働くことを検証する。本テストは再現用migrations dirから0006-0009を除き
 // ケースは0009を飛ばして0006-0008だけ適用する（0009を先に記録するとfolderMillis順で0006-0008が
 // スキップされるため）。0009はテスト1のopenDb経由（空のworks）で適用される。
 //
 // drizzleのmigrate()は各migrationファイルのハッシュではなく__drizzle_migrations.created_atと
 // journalの'when'(folderMillis)の大小だけで適用要否を決める。そのため、0006の中身を後から書き換えても
-// 「0006を過去に適用済み」のDBでは新しい中身が実行されない（このファイルが一度失敗した経緯）。
+// 「0006を適用済み」のDBでは書き換え後の中身が実行されない。
 // データ補正は必ず新しいtimestampを持つ独立migration（0008）に置き、既に0006/0007を適用済みのDBでも
 // 0008だけが新規適用されることを保証する。
 import assert from "node:assert/strict";
@@ -20,7 +20,7 @@ import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
 
 const CATALOG_MIGRATIONS_DIR = join(import.meta.dir, "../../drizzle/catalog");
 
-/** 0006以降の適用前（TASK-92導入前）の migrations フォルダーを一時ディレクトリへ再現する。 */
+/** 0006以降を適用する前の migrations フォルダーを一時ディレクトリへ再現する。 */
 function buildPreTask92MigrationsDir(destDir: string): void {
   cpSync(CATALOG_MIGRATIONS_DIR, destDir, { recursive: true });
   const journalPath = join(destDir, "meta", "_journal.json");
@@ -191,7 +191,7 @@ test("migration 0008: 旧0006（データ補正なし）を適用済みのDBで�
   sqlite.exec("PRAGMA journal_mode = WAL");
   migrate(drizzle(sqlite), { migrationsFolder: preMigrationsDir });
 
-  // 旧0006適用後・0008導入前の状態を再現する：データ補正が一度も走っていないため
+  // 素の0006のみ適用済みで0008が未適用の状態を再現する：データ補正が一度も走っていないため
   // 0秒のprobe cache行が残り、再スキャン済みでfingerprintが非NULLに戻っている。
   sqlite.exec(
     `INSERT INTO audio_probe_cache (path, size, mtime_ms, duration_sec) VALUES ('/lib/broken.wav', 100, 1000, 0)`,

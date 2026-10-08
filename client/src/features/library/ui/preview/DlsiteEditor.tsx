@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   detectRjCode,
+  hasDlsiteUrl,
   type DlsitePreview,
   type Work,
   type WorkEditSnapshot,
@@ -134,7 +135,7 @@ function DlsiteApplyDialog({
       aria-labelledby="dlsite-apply-title"
       onCancel={handleCancel}
       onClick={(event) => handleBackdropClick(event)}
-      className="m-auto w-[min(680px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
+      className="m-auto w-[min(680px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[var(--scrim)]"
     >
       <div className="flex max-h-[calc(100vh-48px)] min-h-0 flex-col overflow-hidden">
         <header className="flex shrink-0 items-center border-b border-line-soft px-[18px] py-[14px]">
@@ -292,7 +293,7 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
       setSelectedTags(nextDiff.newTags);
       setApplyTitle(false);
       setApplyCover(!current.coverImage && Boolean(nextPreview.info.coverUrl));
-      setApplyUrl(!current.urls.some((entry) => entry.url.includes("dlsite.com")));
+      setApplyUrl(!hasDlsiteUrl(current.urls));
       setPreview(nextPreview);
     } catch (cause) {
       setError(dlsiteFetchErrorMessage(cause));

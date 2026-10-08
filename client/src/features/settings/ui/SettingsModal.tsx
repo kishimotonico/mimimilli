@@ -29,7 +29,7 @@ const ROW_CLASS = "flex items-center gap-2";
 interface SettingsModalProps {
   lastScanTime: string | null;
   onClose: () => void;
-  /** TopBarのスキャンボタンと同じくスキャンモーダルを開く（即時実行はしない、TASK-56） */
+  /** TopBarのスキャンボタンと同じくスキャンモーダルを開く（即時実行はしない） */
   onOpenScan: () => void;
   /** 失敗時はrejectする。成功を待ってから編集フォームを閉じる */
   onChangeFolder: (path: string) => Promise<unknown>;
@@ -101,7 +101,7 @@ export default function SettingsModal({
       aria-label="設定"
       onCancel={handleCancel}
       onClick={handleBackdropClick}
-      className="m-auto flex w-[440px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] flex-col overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
+      className="m-auto flex w-[440px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] flex-col overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[var(--scrim)]"
     >
       {/* Header */}
       <div className="flex shrink-0 items-center border-b border-line-soft px-[18px] py-[14px]">
@@ -212,7 +212,7 @@ export default function SettingsModal({
           </Button>
         </div>
 
-        {/* 候補から外したフォルダー（TASK-330） */}
+        {/* 候補から外したフォルダー */}
         <ExcludedFoldersSettings />
 
         {/* Tag prefixes（ADR-0005） */}

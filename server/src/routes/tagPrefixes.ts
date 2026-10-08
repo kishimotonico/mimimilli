@@ -10,6 +10,7 @@ import {
 } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter/index.ts";
 import { conflict, invalidRequest, notFound } from "../lib/httpError.ts";
+import { readJsonBody } from "../lib/jsonBody.ts";
 
 export function tagPrefixesRoute(adapter: DataAdapter): Hono {
   const app = new Hono();
@@ -23,23 +24,23 @@ export function tagPrefixesRoute(adapter: DataAdapter): Hono {
   });
 
   app.post("/tag-prefixes", async (c) => {
-    const body = await c.req.json().catch(() => null);
-    const parsed = tagPrefixCreateSchema.safeParse(body);
-    if (!parsed.success) {
-      invalidRequest(`prefix 定義が不正です: ${parsed.error.issues[0]?.message ?? ""}`);
-    }
-    const created = await adapter.createTagPrefix(parsed.data);
-    if (!created) conflict(`prefix は既に登録されています: ${parsed.data.prefix}`);
+    const data = await readJsonBody(
+      c,
+      tagPrefixCreateSchema,
+      (error) => `prefix 定義が不正です: ${error.issues[0]?.message ?? ""}`,
+    );
+    const created = await adapter.createTagPrefix(data);
+    if (!created) conflict(`prefix は既に登録されています: ${data.prefix}`);
     return c.json(created, 201);
   });
 
   app.put("/tag-prefixes/order", async (c) => {
-    const body = await c.req.json().catch(() => null);
-    const parsed = tagPrefixOrderSchema.safeParse(body);
-    if (!parsed.success) {
-      invalidRequest(`並び順が不正です: ${parsed.error.issues[0]?.message ?? ""}`);
-    }
-    const reordered = await adapter.reorderTagPrefixes(parsed.data.prefixes);
+    const data = await readJsonBody(
+      c,
+      tagPrefixOrderSchema,
+      (error) => `並び順が不正です: ${error.issues[0]?.message ?? ""}`,
+    );
+    const reordered = await adapter.reorderTagPrefixes(data.prefixes);
     if (!reordered) {
       invalidRequest("並び順の prefix 集合が現在の登録済み prefix と一致しません");
     }
@@ -48,12 +49,12 @@ export function tagPrefixesRoute(adapter: DataAdapter): Hono {
 
   app.patch("/tag-prefixes/:prefix", async (c) => {
     const prefix = normalizePrefixParam(c.req.param("prefix"));
-    const body = await c.req.json().catch(() => null);
-    const parsed = tagPrefixUpdateSchema.safeParse(body);
-    if (!parsed.success) {
-      invalidRequest(`prefix 定義の更新内容が不正です: ${parsed.error.issues[0]?.message ?? ""}`);
-    }
-    const updated = await adapter.updateTagPrefix(prefix, parsed.data);
+    const data = await readJsonBody(
+      c,
+      tagPrefixUpdateSchema,
+      (error) => `prefix 定義の更新内容が不正です: ${error.issues[0]?.message ?? ""}`,
+    );
+    const updated = await adapter.updateTagPrefix(prefix, data);
     if (!updated) notFound(`prefix 定義が見つかりません: ${prefix}`);
     return c.json(updated);
   });

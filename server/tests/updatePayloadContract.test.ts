@@ -1,4 +1,4 @@
-// 更新系 API の空 payload 拒否（TASK-136）。
+// 更新系 API の空 payload 拒否。
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createApp } from "../src/app.ts";

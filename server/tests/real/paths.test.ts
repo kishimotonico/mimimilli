@@ -62,7 +62,7 @@ test("祖先 LIKE 接頭辞 SQL は Windows 区切りでも子孫判定できる
   assert.equal(row.isNotPrefix, 1);
 });
 
-// ── excludeDescendantPaths（TASK-62: 祖先除外の線形化） ─────────
+// ── excludeDescendantPaths（祖先除外） ─────────
 
 test("祖先除外: 候補0件は空を返す", () => {
   assert.deepEqual(excludeDescendantPaths(new Set(), undefined, posix), []);

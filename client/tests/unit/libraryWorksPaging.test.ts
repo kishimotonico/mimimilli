@@ -1,4 +1,4 @@
-// TASK-73: 通常 works 一覧のページ蓄積（追加読み込み）の検証。
+// 通常 works 一覧のページ蓄積（追加読み込み）の検証。
 // useSuspenseNormalLibraryWorks の useSuspenseInfiniteQuery により、page=1 取得後に fetchNextPage()
 // で page=2 が連結され、random ソート時は seed が引き継がれることを検証する。
 
@@ -192,7 +192,7 @@ describe("ライブラリ works 一覧のページング", () => {
     expect(page2Urls[0]).toContain("seed=42195");
   });
 
-  it("random ソート時、page=1 のリクエストに randomSeedAtom の値を送る（TASK-305）", async () => {
+  it("random ソート時、page=1 のリクエストに randomSeedAtom の値を送る", async () => {
     fetchMock = createFetchMock({ total: WORKS_DEFAULT_PAGE_SIZE, randomSeed: 999 });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -207,7 +207,7 @@ describe("ライブラリ works 一覧のページング", () => {
     expect(page1Urls[0]).toContain("seed=12345");
   });
 
-  it("random ソート時、randomSeedAtom を変えるとqueryKeyが変わり別クエリとして再取得する（再シャッフル、TASK-305）", async () => {
+  it("random ソート時、randomSeedAtom を変えるとqueryKeyが変わり別クエリとして再取得する（再シャッフル）", async () => {
     fetchMock = createFetchMock({ total: WORKS_DEFAULT_PAGE_SIZE, randomSeed: 999 });
     vi.stubGlobal("fetch", fetchMock);
 

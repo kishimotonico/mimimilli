@@ -25,6 +25,9 @@ import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
 
+const skipOnWindows =
+  process.platform === "win32" && "Windows の chmod はフォルダーを書込不可にしない";
+
 interface FileSnapshot {
   path: string;
   size: number;
@@ -214,25 +217,29 @@ test("DELETE /works/:id: 解除後に同じフォルダーを再登録できる"
   assert.ok(existsSync(folderMetaPath(folder)));
 });
 
-test("DELETE /works/:id: メタ削除に失敗した場合はDB上の作品データを保持する", async (t) => {
-  const { app, folder, work } = await setupRegisteredWork(t);
-  const metaPath = folderMetaPath(folder);
-  assert.ok(existsSync(metaPath));
+test(
+  "DELETE /works/:id: メタ削除に失敗した場合はDB上の作品データを保持する",
+  { skip: skipOnWindows },
+  async (t) => {
+    const { app, folder, work } = await setupRegisteredWork(t);
+    const metaPath = folderMetaPath(folder);
+    assert.ok(existsSync(metaPath));
 
-  const { chmodSync } = await import("node:fs");
-  chmodSync(folder, 0o555);
+    const { chmodSync } = await import("node:fs");
+    chmodSync(folder, 0o555);
 
-  const res = await app.request(`/api/works/${work.id}`, { method: "DELETE" });
-  assert.notEqual(res.status, 204);
+    const res = await app.request(`/api/works/${work.id}`, { method: "DELETE" });
+    assert.notEqual(res.status, 204);
 
-  const stillThere = await app.request(`/api/works/${work.id}`);
-  assert.equal(stillThere.status, 200);
-  const body = await stillThere.json();
-  assert.equal(body.id, work.id);
-  assert.ok(existsSync(metaPath));
+    const stillThere = await app.request(`/api/works/${work.id}`);
+    assert.equal(stillThere.status, 200);
+    const body = await stillThere.json();
+    assert.equal(body.id, work.id);
+    assert.ok(existsSync(metaPath));
 
-  chmodSync(folder, 0o755);
-});
+    chmodSync(folder, 0o755);
+  },
+);
 
 test("unregisterWork: DB削除失敗時に退避したメタ正本を復元する", async (t) => {
   const directory = makeTestDirectory("work-unregister-db-failure");
@@ -520,50 +527,54 @@ test("スキャン: 正本と退避の併存では退避を削除し、その後
   assert.ok(!existsSync(metaPath));
 });
 
-test("スキャン: 退避メタの回収でfs操作が失敗してもスキャンは完了する", async (t) => {
-  const directory = makeTestDirectory("work-unregister-staged-fs-fail");
-  t.after(directory.cleanup);
-  const catalogPath = join(directory.path, "catalog.db");
-  const userPath = join(directory.path, "user.db");
-  const root = join(directory.path, "lib");
-  const folder = join(root, "RJ900030_staged_fs_fail");
-  mkdirSync(folder, { recursive: true });
-  writeWav(join(folder, "track.wav"), 2);
+test(
+  "スキャン: 退避メタの回収でfs操作が失敗してもスキャンは完了する",
+  { skip: skipOnWindows },
+  async (t) => {
+    const directory = makeTestDirectory("work-unregister-staged-fs-fail");
+    t.after(directory.cleanup);
+    const catalogPath = join(directory.path, "catalog.db");
+    const userPath = join(directory.path, "user.db");
+    const root = join(directory.path, "lib");
+    const folder = join(root, "RJ900030_staged_fs_fail");
+    mkdirSync(folder, { recursive: true });
+    writeWav(join(folder, "track.wav"), 2);
 
-  const adapter = directory.own(
-    createTestRealAdapter({
-      database: { kind: "files", catalogPath, userPath },
-    }),
-  );
-  const app = createApp(adapter);
-  await configureRoot(adapter, root);
+    const adapter = directory.own(
+      createTestRealAdapter({
+        database: { kind: "files", catalogPath, userPath },
+      }),
+    );
+    const app = createApp(adapter);
+    await configureRoot(adapter, root);
 
-  const createRes = await app.request("/api/works", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, folder), title: "回収fs失敗テスト" }),
-  });
-  assert.equal(createRes.status, 201);
-  const work = { id: (await createRes.json()).snapshot.id } as Work;
+    const createRes = await app.request("/api/works", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: workspace(root, folder), title: "回収fs失敗テスト" }),
+    });
+    assert.equal(createRes.status, 201);
+    const work = { id: (await createRes.json()).snapshot.id } as Work;
 
-  const metaPath = folderMetaPath(folder);
-  const stagedPath = metaStagingPath(metaPath);
-  writeFileSync(stagedPath, readFileSync(metaPath, "utf-8"));
-  assert.ok(existsSync(metaPath));
-  assert.ok(existsSync(stagedPath));
+    const metaPath = folderMetaPath(folder);
+    const stagedPath = metaStagingPath(metaPath);
+    writeFileSync(stagedPath, readFileSync(metaPath, "utf-8"));
+    assert.ok(existsSync(metaPath));
+    assert.ok(existsSync(stagedPath));
 
-  chmodSync(folder, 0o555);
-  t.after(() => chmodSync(folder, 0o755));
+    chmodSync(folder, 0o555);
+    t.after(() => chmodSync(folder, 0o755));
 
-  const result = await adapter.scan();
-  assert.ok(result);
-  assert.ok(existsSync(metaPath));
-  assert.ok(existsSync(stagedPath));
+    const result = await adapter.scan();
+    assert.ok(result);
+    assert.ok(existsSync(metaPath));
+    assert.ok(existsSync(stagedPath));
 
-  const stillThere = await adapter.getWork(work.id);
-  assert.ok(stillThere);
-  assert.notEqual(stillThere.status, "missing");
-});
+    const stillThere = await adapter.getWork(work.id);
+    assert.ok(stillThere);
+    assert.notEqual(stillThere.status, "missing");
+  },
+);
 
 test("スキャン: Work IDを読めない退避ファイルはスキップし削除しない", async (t) => {
   const directory = makeTestDirectory("work-unregister-staged-corrupt");

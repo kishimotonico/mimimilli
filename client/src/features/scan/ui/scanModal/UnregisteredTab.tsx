@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSetAtom } from "jotai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -17,6 +11,7 @@ import {
 import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
 import { useToast } from "../../../../shared/ui/useToast";
+import { useInlineEditKeyDown } from "../../../../shared/ui/useInlineEditKeyDown";
 import { I } from "../../../../shared/ui/Icon";
 import { cn } from "../../../../shared/lib/cn";
 import { ApiRequestError } from "../../../../shared/api/http";
@@ -213,17 +208,10 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     setEditingPath(null);
   };
 
-  const handleEditKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
-    if (event.nativeEvent.isComposing) return;
-    if (event.key === "Enter") commitEdit();
-    if (event.key === "Escape") {
-      // 入力欄側で編集を取り消し、モーダルのEscapeクローズ（<dialog>のcancel既定動作）
-      // まで伝播させない。親は編集中かどうかを知らなくてよい。
-      event.preventDefault();
-      event.stopPropagation();
-      cancelEdit();
-    }
-  };
+  const handleEditKeyDown = useInlineEditKeyDown({
+    onCommit: commitEdit,
+    onCancel: cancelEdit,
+  });
 
   const handleRegisterSelected = () => {
     const items = registerableCandidates.map((candidate) => ({

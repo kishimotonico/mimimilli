@@ -1,36 +1,24 @@
-/// <reference types="vitest" />
-import { defineConfig } from "vitest/config";
-import { execFileSync } from "node:child_process";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { compression } from "vite-plugin-compression2";
 
-function resolveBackendProxy(service: string) {
-  // Windows の portless は node_modules/.bin のバッチシム（.CMD）なので shell 経由が必須。
-  // 引数は静的な文字列のみのため shell 経由でもエスケープの懸念はない。
-  const publicUrl = new URL(
-    execFileSync("portless", ["get", service], {
-      encoding: "utf8",
-      shell: process.platform === "win32",
-    }).trim(),
-  );
-  if (publicUrl.protocol !== "http:") {
-    throw new Error(`バックエンドの portless URL は http である必要があります: ${publicUrl.href}`);
+function resolveApiProxy() {
+  const backendUrl = process.env.MIMIMILLI_BACKEND_URL;
+  if (!backendUrl) {
+    throw new Error(
+      "MIMIMILLI_BACKEND_URL が未設定です。pnpm dev など scripts/dev-client.mjs 経由で起動してください",
+    );
+  }
+  const url = new URL(backendUrl);
+  if (url.protocol !== "http:") {
+    throw new Error(`MIMIMILLI_BACKEND_URL は http である必要があります: ${url.href}`);
   }
 
   return {
-    target: `http://127.0.0.1${publicUrl.port ? `:${publicUrl.port}` : ""}`,
-    headers: { host: publicUrl.hostname },
+    target: `http://127.0.0.1${url.port ? `:${url.port}` : ""}`,
+    headers: { host: url.hostname },
   };
-}
-
-function resolveApiProxy() {
-  const backendUrl = process.env.MIMIMILLI_BACKEND_URL;
-  if (backendUrl) {
-    return { target: backendUrl };
-  }
-  const backendService = process.env.MIMIMILLI_BACKEND_SERVICE ?? "api.mimi";
-  return resolveBackendProxy(backendService);
 }
 
 export default defineConfig(({ command }) => ({
@@ -43,14 +31,6 @@ export default defineConfig(({ command }) => ({
       algorithms: ["gzip", "brotliCompress"],
     }),
   ],
-
-  test: {
-    environment: "happy-dom",
-    pool: "threads",
-    globals: true,
-    include: ["tests/unit/**/*.test.ts?(x)"],
-    setupFiles: "./tests/unit/setup.ts",
-  },
 
   server: command === "serve" ? { proxy: { "/api": resolveApiProxy() } } : undefined,
 

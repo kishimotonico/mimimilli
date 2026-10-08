@@ -219,7 +219,7 @@ describe("WorkListPane 空状態", () => {
 
   it("お気に入りビューが0件のとき文脈付きの案内を1行添える", () => {
     renderWorkListPane({ nav: { activeAxis: "fav" }, works: [] });
-    expect(screen.getByText("作品詳細の☆ボタンでお気に入りに追加できます")).toBeTruthy();
+    expect(screen.getByText("作品をブックマークするとお気に入りに表示されます")).toBeTruthy();
   });
 
   it("選択中フィルタが原因の0件では専用メッセージを出す", () => {

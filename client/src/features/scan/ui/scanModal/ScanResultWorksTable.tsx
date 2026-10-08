@@ -2,6 +2,7 @@
 import type { WorkListItem } from "@mimimilli/shared";
 import { dlsiteLinkDisplayStatus, hasRjCode } from "@mimimilli/shared";
 import { cn } from "../../../../shared/lib/cn";
+import { useInlineEditKeyDown } from "../../../../shared/ui/useInlineEditKeyDown";
 import { parentDirOf } from "../../../../shared/lib/workspacePath";
 import { DLSITE_LINK_STATUS_LABEL, DLSITE_LINK_STATUS_TONE } from "./dlsiteLinkStatus";
 import type { InlineTitleEdit } from "./useInlineTitleEdit";
@@ -83,6 +84,10 @@ function WorkRow({ work, edit }: { work: WorkListItem; edit: InlineTitleEdit }) 
   const editError = edit.editErrorFor(work.id);
   const linkStatus = dlsiteLinkDisplayStatus(work.dlsite);
   const folderDisplay = parentDirOf(work.relativePath) ?? "（ルート直下）";
+  const handleKeyDown = useInlineEditKeyDown({
+    onCommit: () => edit.saveTitle(work.id),
+    onCancel: edit.cancelEdit,
+  });
 
   return (
     <tr className="border-b border-line-soft last:border-b-0">
@@ -94,16 +99,7 @@ function WorkRow({ work, edit }: { work: WorkListItem; edit: InlineTitleEdit }) 
             disabled={edit.editSaving}
             onChange={(e) => edit.changeTitle(e.target.value)}
             onBlur={() => edit.saveTitle(work.id)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") edit.saveTitle(work.id);
-              if (e.key === "Escape") {
-                // 入力欄側で編集を取り消し、モーダルのEscapeクローズ（<dialog>のcancel既定動作）
-                // まで伝播させない。親は編集中かどうかを知らなくてよい。
-                e.preventDefault();
-                e.stopPropagation();
-                edit.cancelEdit();
-              }
-            }}
+            onKeyDown={handleKeyDown}
             className={cn(
               "min-w-0 w-full rounded-[4px] border bg-paper-2 px-2 py-0.5 font-jp text-body text-ink-0 disabled:opacity-60",
               editError ? "border-[var(--r-coral)]" : "border-acc",

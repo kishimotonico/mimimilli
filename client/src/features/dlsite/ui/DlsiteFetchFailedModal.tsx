@@ -1,5 +1,5 @@
 // DLsite取得に失敗した（work.dlsite.status が "error" または "not_found"）作品の一覧。
-// RjCodeMissingModal と同じ流儀（useDialogModal 基盤）で、通知ベルから開く（TASK-44）。
+// RjCodeMissingModal と同じ流儀（useDialogModal 基盤）で、通知ベルから開く。
 // 各行から作品詳細へ遷移し、DlsitePanelで再取得やRJコードの見直しに進める。
 import type { DlsiteStatus } from "@mimimilli/shared";
 import { useDlsiteFetchFailedWorks } from "../model/dlsiteFetchFailed";

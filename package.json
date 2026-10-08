@@ -14,10 +14,10 @@
     "dev:fixture:empty": "cross-env MIMIMILLI_MOCK_SCENARIO=empty run-p dev:fixture:client dev:fixture:server",
     "dev:fixture:errors": "cross-env MIMIMILLI_MOCK_SCENARIO=errors run-p dev:fixture:client dev:fixture:server",
     "dev:fixture:scan-review": "cross-env MIMIMILLI_MOCK_SCENARIO=scan-review run-p dev:fixture:client dev:fixture:server",
-    "dev:real": "pnpm -r --parallel --if-present run dev:real",
+    "dev:real": "run-p dev:real:server dev:real:client",
     "dev:real:server": "pnpm --filter @mimimilli/server dev:real",
-    "dev:real:client": "pnpm --filter @mimimilli/client dev:real",
-    "lint": "oxlint --deny-warnings client server shared",
+    "dev:real:client": "pnpm --filter @mimimilli/client dev",
+    "lint": "oxlint --deny-warnings client server shared scripts",
     "fmt": "oxfmt --write .",
     "fmt:check": "oxfmt --check .",
     "check:shared": "pnpm --filter @mimimilli/shared check",
@@ -49,6 +49,7 @@
   "engines": {
     "node": ">=24"
   },
+  "packageManager": "pnpm@11.9.0",
   "portless": {
     "name": "backlog",
     "appPort": 6420

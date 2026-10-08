@@ -4,7 +4,9 @@ import { realpathSync } from "node:fs";
 import { basename, dirname, join, relative, sep } from "node:path";
 import { isPathWithin } from "../../lib/path.ts";
 import {
+  fileExtensionOf,
   IMAGE_PREVIEW_LIMIT_BYTES,
+  isAudioFileName,
   META_FILE_NAME,
   isSidecarMetaFileName,
   PDF_PREVIEW_LIMIT_BYTES,
@@ -75,7 +77,7 @@ export function identityConflictMetaPath(target: string): string {
   return isSidecarMetaFileName(basename(target)) ? target : join(target, META_FILE_NAME);
 }
 
-// ── 祖先パス除外（スキャンの workRoots 統合用。TASK-62） ─────────
+// ── 祖先パス除外（スキャンの workRoots 統合用） ─────────
 
 export interface AncestorExclusionOps {
   dirname(path: string): string;
@@ -182,24 +184,16 @@ const MIME_BY_EXT: Record<string, string> = {
 };
 
 export function mimeOf(path: string): string {
-  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  const ext = fileExtensionOf(path);
   return MIME_BY_EXT[ext] ?? "application/octet-stream";
-}
-
-const AUDIO_EXTENSIONS = new Set(["mp3", "m4a", "aac", "wav", "ogg", "flac", "webm", "opus"]);
-
-/** 音声ファイル拡張子かどうか（ドットなし小文字） */
-export function isAudioPath(path: string): boolean {
-  const ext = path.split(".").pop()?.toLowerCase() ?? "";
-  return AUDIO_EXTENSIONS.has(ext);
 }
 
 export function workspaceMediaMetadata(
   path: string,
   size: number,
 ): { mediaKind: MediaKind; preview: PreviewCapability } {
-  const ext = path.split(".").pop()?.toLowerCase() ?? "";
-  const mediaKind: MediaKind = isAudioPath(path)
+  const ext = fileExtensionOf(path);
+  const mediaKind: MediaKind = isAudioFileName(path)
     ? "audio"
     : ["jpg", "jpeg", "png", "gif", "bmp", "webp", "avif", "svg"].includes(ext)
       ? "image"

@@ -101,7 +101,7 @@ interface WorksParamsInput {
  *  通常の works query（buildWorksParams）とスマートフォルダー評価（buildSmartFolderFilterParams）
  *  で共通のロジック。組み込み軸（year等）専用のクエリパラメータは持たない（ADR-0012 §2）。
  *  擬似タグの解釈（実タグ／yearへの分解）はサーバー側の共通フィルタ解釈層が一度だけ行う
- *  （shared/pseudoTag.ts、TASK-199） */
+ *  （shared/pseudoTag.ts） */
 export interface TagFilterParams {
   tags?: string[];
   tagOp?: "AND";

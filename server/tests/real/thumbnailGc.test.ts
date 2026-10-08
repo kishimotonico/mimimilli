@@ -1,4 +1,4 @@
-// サムネイルキャッシュのGC（TASK-26）: validNames に含まれないエントリを削除することを検証する。
+// サムネイルキャッシュのGC: validNames に含まれないエントリを削除することを検証する。
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { stat } from "node:fs/promises";

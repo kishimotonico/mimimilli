@@ -1,4 +1,4 @@
-// TASK-73: 追加読み込みボタン LoadMore の表示・挙動検証。
+// 追加読み込みボタン LoadMore の表示・挙動検証。
 
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";

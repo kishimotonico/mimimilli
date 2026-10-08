@@ -9,11 +9,6 @@
     "**/playwright-report/**",
     "**/test-results/**"
   ],
-  "settings": {
-    "react": {
-      "version": "19.1.0"
-    }
-  },
   "overrides": [
     {
       "files": ["**/client/src/shared/**"],

@@ -1,6 +1,11 @@
 import { useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { AnimatePresence } from "motion/react";
-import type { NormalizedTag, SmartFolder, TagPrefix } from "@mimimilli/shared";
+import {
+  toSmartFolderAxisId,
+  type NormalizedTag,
+  type SmartFolder,
+  type TagPrefix,
+} from "@mimimilli/shared";
 import type { AxisId } from "../../../entities/library/types";
 import {
   buildFacetAxisRows,
@@ -191,7 +196,7 @@ export default function AxisColumn({
         <div className="mll-axisgroup">
           <div className="mll-axisgroup__hd">スマートフォルダー</div>
           {smartFolders.map((sf) =>
-            renderRow({ id: `smart-${sf.id}` as AxisId, name: sf.name, icon: "gridS" }),
+            renderRow({ id: toSmartFolderAxisId(sf.id), name: sf.name, icon: "gridS" }),
           )}
           <button type="button" className="mll-axis is-action" onClick={onNewSmartFolder}>
             <span className="ic">

@@ -46,8 +46,8 @@ export default function ScanModal({
   const { start, cancel } = useScanActions();
   const [activeTab, setActiveTab] = useState<ScanTabKey>(initialTab);
   const toast = useToast();
-  // 候補承認で登録された作品ID（このモーダル表示中に蓄積、TASK-325の分離を踏まえクライアント側で
-  // 集約する）。insertedWorkIds（スキャン時点の自動登録分）とは別経路のため、ここで結合する。
+  // 候補承認で登録された作品ID（このモーダル表示中に蓄積しクライアント側で集約する）。
+  // insertedWorkIds（スキャン時点の自動登録分）とは別経路のため、ここで結合する。
   const [approvedWorkIds, setApprovedWorkIds] = useState<string[]>([]);
 
   const handleUnregisteredRegistered = ({
@@ -70,7 +70,7 @@ export default function ScanModal({
     if (remainingCount === 0) setActiveTab("newlyRegistered");
   };
 
-  // 前回スキャン結果（ディスク永続化なし、TASK-56）。サーバー起動後に一度でも完了していれば
+  // 前回スキャン結果（ディスク永続化なし）。サーバー起動後に一度でも完了していれば
   // GET /api/scan/last から取得でき、リロードをまたいでスキャンモーダルに表示できる。
   const lastScanQuery = useQuery({
     queryKey: SCAN_QUERY_KEYS.last(),
@@ -86,7 +86,7 @@ export default function ScanModal({
   }, [queryClient]);
 
   // ID重複はFilesでの解決を随時反映する必要があるため、スキャン時点のスナップショットではなく
-  // 常に最新の診断を購読する（TASK-322）。FilePreview の解決操作が同じキーを無効化する。
+  // 常に最新の診断を購読する。FilePreview の解決操作が同じキーを無効化する。
   const diagnosticsQuery = useQuery({
     queryKey: SCAN_QUERY_KEYS.diagnostics(),
     queryFn: getScanDiagnostics,
@@ -134,7 +134,7 @@ export default function ScanModal({
     updated: updatedWorkIds.length,
   };
 
-  // スキャン実行中でも閉じられる。スキャン自体はバックグラウンドで継続する（TASK-56）。
+  // スキャン実行中でも閉じられる。スキャン自体はバックグラウンドで継続する。
   const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({ onClose });
 
   return (
@@ -144,7 +144,7 @@ export default function ScanModal({
       aria-labelledby="scan-modal-title"
       onCancel={handleCancel}
       onClick={handleBackdropClick}
-      className="m-auto w-[min(740px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
+      className="m-auto w-[min(740px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[var(--scrim)]"
     >
       <div className="flex max-h-[min(80vh,calc(100vh-32px))] min-h-0 flex-col overflow-hidden">
         <header className="flex shrink-0 items-center gap-2 border-b border-line-soft px-[18px] py-[14px]">

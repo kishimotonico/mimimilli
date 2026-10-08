@@ -36,7 +36,7 @@ test("GET /api/works は複数の tags を配列で受け、タグ内のカン�
   assert.deepEqual(receivedTags, tf("tag,one", "tag2"));
 });
 
-test("GET /api/works は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する（TASK-201）", async () => {
+test("GET /api/works は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する", async () => {
   const app = buildApp();
   for (const badTag of ["@year", "@year/", "@/2024", "@year/banana", "@unknown/2024"]) {
     const res = await app.request(`/api/works?tags=${encodeURIComponent(badTag)}`);
@@ -52,7 +52,7 @@ test("GET /api/works は正しい @year/2024 擬似タグを受理する", async
   assert.equal(res.status, 200);
 });
 
-test("GET /api/works は先頭に空白を挟んだ擬似タグも正規化後の値で判定し受理する（TASK-202）", async () => {
+test("GET /api/works は先頭に空白を挟んだ擬似タグも正規化後の値で判定し受理する", async () => {
   const app = buildApp();
   const res = await app.request(`/api/works?tags=${encodeURIComponent(" @year/2024")}`);
   assert.equal(res.status, 200);
@@ -349,7 +349,7 @@ test("GET /api/axes/:axis にスラッシュ入りの軸を渡すと400", async 
   assert.equal(body.error.code, "invalid_request");
 });
 
-test("GET /api/axes/:axis は tags/tagOp を絞り込みとしてadapterへ渡す。組み込み軸の擬似タグも tags に含まれる（TASK-187, TASK-199）", async () => {
+test("GET /api/axes/:axis は tags/tagOp を絞り込みとしてadapterへ渡す。組み込み軸の擬似タグも tags に含まれる", async () => {
   const adapter = createFixtureAdapter();
   let receivedFilter: unknown;
   adapter.getAxisFacets = async (_axis, filter) => {
@@ -380,7 +380,7 @@ test("GET /api/axes/:axis はクエリ省略時、空配列相当のフィルタ
   assert.deepEqual(receivedFilter, { tags: EMPTY_TAG_FILTERS, tagOp: "AND" });
 });
 
-test("GET /api/axes/:axis は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する（TASK-201）", async () => {
+test("GET /api/axes/:axis は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する", async () => {
   const app = buildApp();
   const res = await app.request("/api/axes/cv?tags=%40year%2Fbanana");
   assert.equal(res.status, 400);
@@ -388,7 +388,7 @@ test("GET /api/axes/:axis は擬似タグとして解釈できない @ 始まり
   assert.equal(body.error.code, "invalid_request");
 });
 
-test("GET /api/smart-folders/:id/works は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する（TASK-201）", async () => {
+test("GET /api/smart-folders/:id/works は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する", async () => {
   const app = buildApp();
   const createRes = await app.request("/api/smart-folders", {
     method: "POST",

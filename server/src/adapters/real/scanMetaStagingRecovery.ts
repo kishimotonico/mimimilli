@@ -1,6 +1,7 @@
 import { existsSync, renameSync, unlinkSync } from "node:fs";
 import { dirname } from "node:path";
 import { readMetaFileRaw } from "./meta.ts";
+import { errorMessage } from "@mimimilli/shared";
 import { canonicalMetaPathFromStaging } from "./metaStaging.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
@@ -74,7 +75,7 @@ export function recoverStagedMetaFiles(
     } catch (error) {
       scanLogger.warn("退避メタの回収に失敗しました", {
         path: stagedPath,
-        error: (error as Error).message,
+        error: errorMessage(error),
       });
     }
   }

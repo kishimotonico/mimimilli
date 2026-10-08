@@ -55,25 +55,18 @@ export class CandidatePoolChangedError extends Error {
   }
 }
 
+export type WorkRegisterErrorCode =
+  | "already_registered"
+  | "descendants_registered"
+  | "identity_conflict"
+  | "invalid_path"
+  | "invalid_meta";
+
 export class WorkRegisterError extends Error {
-  readonly code:
-    | "already_registered"
-    | "descendants_registered"
-    | "identity_conflict"
-    | "not_configured"
-    | "invalid_meta";
+  readonly code: WorkRegisterErrorCode;
   readonly descendantCount?: number;
 
-  constructor(
-    code:
-      | "already_registered"
-      | "descendants_registered"
-      | "identity_conflict"
-      | "not_configured"
-      | "invalid_meta",
-    message: string,
-    descendantCount?: number,
-  ) {
+  constructor(code: WorkRegisterErrorCode, message: string, descendantCount?: number) {
     super(message);
     this.name = "WorkRegisterError";
     this.code = code;

@@ -1,10 +1,11 @@
 import { readdir } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
+import { errorMessage, fileExtensionOf, isAudioFileName } from "@mimimilli/shared";
 import { isMetaFileName } from "./meta.ts";
 import { isMetaStagingFileName } from "./metaStaging.ts";
 import { isPathWithin } from "../../lib/path.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
-import { AUDIO_EXTENSIONS, extOf } from "./scanAudio.ts";
+import { IMAGE_EXTENSIONS } from "./scanAudio.ts";
 import { naturalCompare } from "./naturalCompare.ts";
 
 const scanLogger = getCategoryLogger("scan");
@@ -36,15 +37,13 @@ export interface WalkResult {
 /** ルートフォルダーの readdir 失敗。スキャン全体をエラー終了させ missing 更新を防ぐ。 */
 export class ScanRootUnreadableError extends Error {
   constructor(root: string, cause: unknown) {
-    const detail = cause instanceof Error ? cause.message : String(cause);
+    const detail = errorMessage(cause);
     super(`ルートフォルダーを読み取れません: ${root}: ${detail}`);
     this.name = "ScanRootUnreadableError";
   }
 }
 
 const WALK_PROGRESS_INTERVAL = 50;
-
-const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "bmp", "webp"]);
 
 export class ScanCancelledError extends Error {
   constructor() {
@@ -94,7 +93,7 @@ export async function walk(
       if (dir === root) throw new ScanRootUnreadableError(root, e);
       scanLogger.warn(`ディレクトリを読めません: ${dir}`, {
         path: dir,
-        error: (e as Error).message,
+        error: errorMessage(e),
       });
       result.unreadablePaths.push(dir);
       continue;
@@ -116,13 +115,13 @@ export async function walk(
           markDirsWithMetaInSubtree(dir, root, result.dirsWithMetaInSubtree);
         } else if (isMetaStagingFileName(entry.name)) {
           result.stagedMetaPaths.push(full);
-        } else if (AUDIO_EXTENSIONS.has(extOf(entry.name))) {
+        } else if (isAudioFileName(entry.name)) {
           result.audioDirs.add(dir);
           const breakdown = result.audioBreakdownByDir.get(dir) ?? new Map<string, number>();
-          const extension = extOf(entry.name);
+          const extension = fileExtensionOf(entry.name);
           breakdown.set(extension, (breakdown.get(extension) ?? 0) + 1);
           result.audioBreakdownByDir.set(dir, breakdown);
-        } else if (IMAGE_EXTENSIONS.has(extOf(entry.name))) {
+        } else if (IMAGE_EXTENSIONS.has(fileExtensionOf(entry.name))) {
           hasImage = true;
         }
       }

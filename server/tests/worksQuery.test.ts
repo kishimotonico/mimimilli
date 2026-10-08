@@ -286,7 +286,7 @@ test("stats: totalDurationSec が未知（null）の作品は合計から除外�
   assert.equal(result.stats.durationSec, 1800 + 3600 + 5400);
 });
 
-// ── TASK-73: ページング前後の集合一致（重複・欠落なし） ──────────
+// ── ページング前後の集合一致（重複・欠落なし） ──────────
 
 const MANY_WORKS: WorkSummary[] = Array.from({ length: 10 }, (_, index) => ({
   id: `w-${String(index).padStart(2, "0")}`,

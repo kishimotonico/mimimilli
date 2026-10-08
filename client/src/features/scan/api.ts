@@ -69,7 +69,7 @@ export async function cancelScan(id: string): Promise<ScanJobSnapshot> {
   return deleteParsed(scanJobSnapshotSchema, `/scan/${encodeURIComponent(id)}`);
 }
 
-/** サーバー起動後に一度でも完了したスキャンの結果（TASK-56）。一度も完了していなければnull。 */
+/** サーバー起動後に一度でも完了したスキャンの結果。一度も完了していなければnull。 */
 export async function getLastScanResult(): Promise<ScanLastResultResponse | null> {
   return getParsed(scanLastResultResponseSchema, "/scan/last", { noContentAsNull: true });
 }

@@ -13,6 +13,7 @@ import {
   detectRjCode,
   emptyMetaDlsiteState,
   isAudioFileName,
+  isDlsiteUrl,
   sidecarMetaFileName,
 } from "@mimimilli/shared";
 import { META_FILE_NAME, MetaParseError, readMetaFile, readMetaFileRaw } from "./meta.ts";
@@ -288,7 +289,7 @@ export async function createWorkFromFolder(
   const workDir = resolveWithin(root, join(root, body.path));
   if (!workDir || !isDirectory(workDir)) {
     throw new WorkRegisterError(
-      "not_configured",
+      "invalid_path",
       "指定されたパスは存在しないか、ルート配下ではありません",
     );
   }
@@ -334,10 +335,7 @@ export async function createWorkFromFolder(
     if (body.dlsite) {
       const applied = await buildMetaFromDlsiteApply(body.dlsite, workDir, applyDlsiteCover);
       if (body.dlsite.applyUrl) {
-        metaPatch.urls = [
-          ...meta.urls.filter((entry) => !entry.url.includes("dlsite.com")),
-          ...applied.urls,
-        ];
+        metaPatch.urls = [...meta.urls.filter((entry) => !isDlsiteUrl(entry.url)), ...applied.urls];
       }
       if (applied.coverImage !== undefined) metaPatch.coverImage = applied.coverImage;
       metaPatch.dlsite = applied.dlsite;
@@ -393,7 +391,7 @@ export async function createWorkFromPath(
   const target = resolveWithin(root, join(root, body.path));
   if (!target) {
     throw new WorkRegisterError(
-      "not_configured",
+      "invalid_path",
       "指定されたパスは存在しないか、ルート配下ではありません",
     );
   }
@@ -404,7 +402,7 @@ export async function createWorkFromPath(
     return createWorkFromAudioFile(repos, scanner, root, target, body, applyDlsiteCover);
   }
   throw new WorkRegisterError(
-    "not_configured",
+    "invalid_path",
     "指定されたパスは存在しないか、ルート配下ではありません",
   );
 }
@@ -463,10 +461,7 @@ async function createWorkFromAudioFile(
     if (body.dlsite) {
       const applied = await buildMetaFromDlsiteApply(body.dlsite, parentDir, applyDlsiteCover);
       if (body.dlsite.applyUrl) {
-        metaPatch.urls = [
-          ...meta.urls.filter((entry) => !entry.url.includes("dlsite.com")),
-          ...applied.urls,
-        ];
+        metaPatch.urls = [...meta.urls.filter((entry) => !isDlsiteUrl(entry.url)), ...applied.urls];
       }
       if (applied.coverImage !== undefined) metaPatch.coverImage = applied.coverImage;
       metaPatch.dlsite = applied.dlsite;
