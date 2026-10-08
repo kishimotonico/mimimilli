@@ -413,29 +413,33 @@ test("DLsiteキャッシュCLI: exportはTTL切れのsnapshotでも読み出せ�
   assert.equal(readFileSync(out, "utf8"), VALID_HTML);
 });
 
-test("DLsiteキャッシュCLI: symlinkを拒否し、magic byteでgzip入力を受け入れる", (t) => {
-  const directory = makeTestDirectory("dlsite-cache-cli-input");
-  t.after(directory.cleanup);
-  const source = join(directory.path, "source.html");
-  const symlink = join(directory.path, "link.html");
-  const gzip = join(directory.path, "compressed.html");
-  writeFileSync(source, VALID_HTML);
-  symlinkSync(source, symlink);
-  writeFileSync(gzip, gzipSync(VALID_HTML));
-  const env = {
-    MIMIMILLI_DATA_DIR: directory.path,
-    MIMIMILLI_DLSITE_CACHE_DB: join(directory.path, "cache.sqlite"),
-  };
-  assert.throws(
-    () => runDlsiteCacheCli(["import", "--product-code", "RJ123456", "--file", symlink], env),
-    /symlink/,
-  );
-  assert.deepEqual(
-    JSON.parse(runDlsiteCacheCli(["import", "--product-code", "RJ123457", "--file", gzip], env)),
-    { productCode: "RJ123457", outcome: "ok" },
-  );
-  assert.equal(readFileSync(source, "utf8"), VALID_HTML);
-});
+test(
+  "DLsiteキャッシュCLI: symlinkを拒否し、magic byteでgzip入力を受け入れる",
+  { skip: process.platform === "win32" && "Windows の symlink 作成には特権が要る" },
+  (t) => {
+    const directory = makeTestDirectory("dlsite-cache-cli-input");
+    t.after(directory.cleanup);
+    const source = join(directory.path, "source.html");
+    const symlink = join(directory.path, "link.html");
+    const gzip = join(directory.path, "compressed.html");
+    writeFileSync(source, VALID_HTML);
+    symlinkSync(source, symlink);
+    writeFileSync(gzip, gzipSync(VALID_HTML));
+    const env = {
+      MIMIMILLI_DATA_DIR: directory.path,
+      MIMIMILLI_DLSITE_CACHE_DB: join(directory.path, "cache.sqlite"),
+    };
+    assert.throws(
+      () => runDlsiteCacheCli(["import", "--product-code", "RJ123456", "--file", symlink], env),
+      /symlink/,
+    );
+    assert.deepEqual(
+      JSON.parse(runDlsiteCacheCli(["import", "--product-code", "RJ123457", "--file", gzip], env)),
+      { productCode: "RJ123457", outcome: "ok" },
+    );
+    assert.equal(readFileSync(source, "utf8"), VALID_HTML);
+  },
+);
 
 test("DLsiteキャッシュCLI: gzip展開サイズが上限を超えると拒否する", (t) => {
   const directory = makeTestDirectory("dlsite-cache-cli-gzip-limit");

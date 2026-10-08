@@ -334,9 +334,7 @@ test("作品編集: タイトルとタグをまとめて1回の保存で確定�
   assertNoErrors(tracker);
 });
 
-test("スキャンダイアログが開いて完了し、閉じられる", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop-chromium", "desktop scenario only");
-
+test("スキャンダイアログが開いて完了し、閉じられる", async ({ page }) => {
   const tracker = trackErrors(page);
   await openApp(page);
   await page.getByRole("button", { name: "スキャン" }).click();
@@ -360,11 +358,7 @@ test("スキャンダイアログが開いて完了し、閉じられる", async
   assertNoErrors(tracker);
 });
 
-test("未登録タブでRJコードを編集でき、候補を1件ずつ除外して元に戻せる", async ({
-  page,
-}, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop-chromium", "desktop scenario only");
-
+test("未登録タブでRJコードを編集でき、候補を1件ずつ除外して元に戻せる", async ({ page }) => {
   const tracker = trackErrors(page);
   await openApp(page);
   await page.getByRole("button", { name: "スキャン" }).click();
@@ -405,9 +399,7 @@ test("未登録タブでRJコードを編集でき、候補を1件ずつ除外�
   assertNoErrors(tracker);
 });
 
-test("スキャン完了後に候補を選択登録でき、問題をFilesで確認できる", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop-chromium", "desktop scenario only");
-
+test("スキャン完了後に候補を選択登録でき、問題をFilesで確認できる", async ({ page }) => {
   const tracker = trackErrors(page);
   await openApp(page);
   await page.getByRole("button", { name: "スキャン" }).click();
