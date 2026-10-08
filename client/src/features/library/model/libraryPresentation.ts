@@ -35,7 +35,7 @@ export function isGridViewActive(axis: AxisId, viewMode: ViewMode): boolean {
 }
 
 /** facet/tag 軸の値一覧で1項目を選んだときに selectedTagsAtom へ追加する完全なタグ文字列を組み立てる。
- *  tag 軸は AxisFacetItem.value が既に完全なタグ文字列（ADR-0005 追記）、
+ *  tag 軸は AxisFacetItem.value が既に完全なタグ文字列（ADR-0005）、
  *  year のようなタグ由来でない組み込み軸は擬似タグ、それ以外の facet 軸
  *  （prefix 定義に基づく実タグ由来の軸）は "軸/値" の実タグとして表現する。 */
 export function buildFilterTag(axis: AxisId, value: string): NormalizedTag {

@@ -14,7 +14,7 @@ DLsite/FANZA 等からダウンロードした音声作品（ASMR・ボイスド
 
 構造・境界・データフロー（Vite proxy / portless の開発時トポロジー含む）は [docs/ARCHITECTURE.md](ARCHITECTURE.md) を参照。HANDOFF 固有の補足:
 
-- fixture アダプタはシナリオ切替（`MIMIMILLI_MOCK_SCENARIO` = default/empty/new-work/errors/large）と**合成メディア**（無音WAV・SVGカバー、Range対応）を持つ。`large` は手書きシード11件 + 決定的生成989件の計1000件で、実ライブラリ規模の見え方を確認する用途
+- fixture アダプタはシナリオ切替（`MIMIMILLI_MOCK_SCENARIO` = default/empty/new-work/errors/large/scan-review/root-reconfiguration-failed）と**合成メディア**（無音WAV・SVGカバー、Range対応）を持つ。`large` は手書きシード11件 + 決定的生成989件の計1000件で、実ライブラリ規模の見え方を確認する用途
 
 ### dev サーバーへの server/src 自動反映
 
@@ -22,7 +22,7 @@ fixture API は Bun サーバー（`bun --watch`）で動く。`server/src`・`s
 
 ### CSS レイヤー
 
-`client/src/styles/shell/` 配下 CSS にセレクタを足すときは必ずカスケードレイヤー内に置くこと（レイヤー外の素のセレクタが Tailwind ユーティリティを潰す不具合が過去に発生済み）。仕組みと規約は [design-system.md](design-system.md) の「クラス命名」節が正。
+`client/src/styles/shell/` 配下 CSS にセレクタを足すときは必ずカスケードレイヤー内に置くこと（レイヤー外の素のセレクタは Tailwind ユーティリティを潰す）。仕組みと規約は [design-system.md](design-system.md) の「クラス命名」節が正。
 
 ## 起動・検証コマンド
 
@@ -37,14 +37,15 @@ pnpm test:server
 # server テストは bunfig.toml [test].preload で per-test タイムアウト 30s（ハング検出。Bun既定5sは並列負荷で偽陽性になる）
 pnpm test:client
 pnpm test:smoke          # Playwright スモークテスト（roleベースの動作確認）
-# smokeテストの webServer は MIMIMILLI_MOCK_SCENARIO=new-work で自前サーバーを立てる。
-# ポートはworktreeの絶対パスをsha256ハッシュ化して4200〜4699の範囲から決定的に導出するため、worktreeごとに一意になる
+# smokeテストは worker ごとに MIMIMILLI_MOCK_SCENARIO=new-work の Bun + Vite サーバーペアを自前で立てる。
+# ポートは worktree の絶対パスを sha256 ハッシュ化して 4200 番台から決定的に導出する（`derivePort.ts`）ため、worktree ごとに一意になる
 
 # fixture シナリオ
 pnpm dev:fixture           # 手書きシードの11件のみ
 pnpm dev:fixture:new-work
 pnpm dev:fixture:empty
 pnpm dev:fixture:errors
+pnpm dev:fixture:scan-review
 
 # real アダプタ（実SQLite + 実FS）
 pnpm dev:real          # API サーバー + client を並行起動
@@ -56,7 +57,7 @@ pnpm smoke:real        # 固定のサンプル音声で real 経路を手動ス�
 # linked worktree から起動した場合は、本番データディレクトリを共有しないよう
 # MIMIMILLI_DATA_DIR を自動で <本番データルートの親>/mimimilli-worktrees/<basename>-<絶対パスsha256先頭8桁> に設定する
 # （例: task-222-88693cac。起動ログの "[dev-real] ..." 行でどのディレクトリが使われたか確認できる）。
-# メインの作業ディレクトリでは従来どおり本番データディレクトリを使う。
+# メインの作業ディレクトリでは本番データディレクトリを使う。
 # worktreeから本番データを明示的に使いたい場合は MIMIMILLI_DATA_DIR を自分で指定する（最優先される）。
 
 # fixture サーバーを単体起動して curl 確認（合成メディアの検証等）
@@ -66,71 +67,35 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 pnpm --filter @mimimilli/server start
 smokeテストの注意:
 
 - 最終確認は目視で行う方針のため、スクリーンショット比較は行わない。smoke が赤いときは常に実際の不具合を意味する（見た目のズレでは落ちない設計）
-- 共有 fixture 状態に依存するため直列実行が前提（`playwright.config.ts`: workers:1 / fullyParallel:false / retries:0。リトライで不具合を隠さない）
+- 並列度は `client/tests/smoke/workerCount.ts` の `SMOKE_WORKERS` が正。fixture の可変状態は worker ごとのサーバーペアに分離され、テストごとにリセットされる。リトライはしない（`playwright.config.ts` の `retries: 0`。リトライで不具合を隠さない）
 - Codex のサンドボックスは Playwright（Chromium 起動・vite listen）が EPERM で動かないことがあるので、Codex に実装を委譲した場合も smoke の実行は別の環境で行う
 
-## API 契約（現行エンドポイント）
+## API 契約
 
-すべて `/api` 配下。リクエスト/レスポンスは `shared/src/*.ts` の Zod スキーマが正典。エラーは `{ error: { code, message } }`（`apiErrorSchema`）。**下表はあくまで概観で、エンドポイントを追加・変更したときに更新漏れしうる。実装時は必ず `shared/src/` を直接確認すること。**
+すべて `/api` 配下。リクエスト/レスポンスの正典は `shared/src/*.ts` の Zod スキーマ、エンドポイントの一覧は `server/src/routes/` のルートファイル。エラーは `{ error: { code, message } }`（`apiErrorSchema`）。
 
-| メソッド     | パス                                         | 備考                                                                                                                      |
-| ------------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| GET / PUT    | `/settings`                                  |                                                                                                                           |
-| POST         | `/scan`                                      | 202 で `{ job }` を即返す（`Location: /api/scan/:id`）。実行中の二重POSTは409（`active` 付き）                            |
-| GET          | `/scan/active`                               | 実行中ジョブのスナップショット。なければ204                                                                               |
-| GET          | `/scan/last`                                 | サーバー起動後に一度でも完了した直近スキャンの結果（`finishedAt` 付き）。なければ204（メモリのみ保持）                    |
-| GET          | `/scan/:id`                                  | ジョブスナップショット。なければ404                                                                                       |
-| DELETE       | `/scan/:id`                                  | キャンセル（`status` → `cancelling`）。なければ404                                                                        |
-| GET          | `/scan/:id/events`                           | ジョブ進捗のSSE（接続時に現在の`state`、以後`state`/`progress`/`completed`/`failed`/`cancelled`・15秒`ping`）             |
-| GET          | `/scan/diagnostics`                          | スキャン診断（候補プール・identity conflict 等のサマリー）                                                                |
-| GET          | `/scan/candidates`                           | 未登録候補一覧                                                                                                            |
-| POST         | `/scan/candidates/exclude`                   | 候補の除外                                                                                                                |
-| GET          | `/scan/candidates/exclusions`                | 除外済み候補一覧                                                                                                          |
-| POST         | `/scan/candidates/exclusions/restore`        | 除外の取り消し                                                                                                            |
-| POST         | `/scan/candidates/register`                  | 候補の登録                                                                                                                |
-| GET          | `/works`                                     | **ページングエンベロープ `{ items, total }`**（page/limit省略時は page=1, limit=200）                                     |
-| GET          | `/works/register-preview`                    | 未登録候補の登録プレビュー                                                                                                |
-| POST         | `/works/projection`                          | `{ path }`（root相対）で正本を再投影し catalog へ反映。応答は `{ snapshot, projection }`                                  |
-| POST         | `/works`                                     | 候補から作品を登録。応答は `{ snapshot, projection }`                                                                     |
-| POST         | `/works/identity-conflicts/reassign`         | identity conflict の再採番。応答は `{ snapshot, projection }`                                                             |
-| GET          | `/works/missing-count`                       | 行方不明作品の件数                                                                                                        |
-| POST         | `/works/unregister-missing`                  | 行方不明作品の登録解除                                                                                                    |
-| GET          | `/works/:id/source`                          | 編集用の正本スナップショット（`WorkEditSnapshot`。`sourceRevision` を含む）                                               |
-| GET          | `/works/:id`                                 | 完全な Work（playlists・defaultPlaylistId・resume 含む）。総時間は同期しない                                              |
-| PATCH        | `/works/:id`                                 | `{ sourceRevision, title?, tags?, urls? }`（正本の部分更新。応答は `{ snapshot, projection }`）                           |
-| PATCH        | `/works/:id/bookmark`                        | `{ bookmarked }`                                                                                                          |
-| PUT          | `/works/:id/tags/:tag`                       | タグ追加。応答は `{ snapshot, projection }`                                                                               |
-| DELETE       | `/works/:id/tags/:tag`                       | タグ削除。応答は `{ snapshot, projection }`                                                                               |
-| DELETE       | `/works/:id`                                 | 作品の登録解除                                                                                                            |
-| POST         | `/works/:id/playback-preparation`            | 再生準備。live probe を行い総時間を catalog へ公開する                                                                    |
-| POST         | `/works/:id/resume`                          | `{ playlistId, trackId, offsetSec }`（`shared/src/work.ts` の `resumeSchema`。高頻度のため PATCH と分離）                 |
-| POST         | `/works/:id/last-played`                     |                                                                                                                           |
-| POST         | `/dlsite/fetch-by-code`                      | RJ/VJコード指定のプレビュー取得                                                                                           |
-| POST         | `/dlsite/:id/fetch`                          | DLsite情報のプレビュー取得。失敗分類は `not_found / parse_error / error`                                                  |
-| POST         | `/dlsite/:id/apply`                          | タイトル・カバー・選択タグを適用し、連携状態をメタへ保存                                                                  |
-| POST         | `/dlsite/apply-missing`                      | 未取得作品への一括適用（既存値は上書きしない。dry-runとcomputeMissingDiffを共有）                                         |
-| POST         | `/dlsite/apply-missing/preview`              | `/dlsite/apply-missing` のdry-run。作品ごとの追加タグ・cover/url適用有無を書き込みせず返す                                |
-| PATCH        | `/dlsite/:id`                                | RJコード修正・skipped切替                                                                                                 |
-| GET          | `/dlsite/bulk`                               | 実行中ジョブ（`current`）と直近に終わったジョブ（`lastTerminal`）。どちらもジョブID付き、無ければ`null`                   |
-| POST         | `/dlsite/bulk`                               | none/error作品の一括取得ジョブを開始し、`jobId` を返す                                                                    |
-| DELETE       | `/dlsite/bulk`                               | 実行中の一括取得をキャンセル                                                                                              |
-| GET          | `/dlsite/events`                             | 一括取得ジョブの進捗SSE（各イベントに`jobId`）                                                                            |
-| GET          | `/dlsite/notifications`                      | RJコード未検出・取得失敗・パース失敗の件数サマリー                                                                        |
-| GET          | `/dlsite/notifications/:kind`                | `rj-missing` / `fetch-failed` / `parse-failed` の該当作品一覧（詳細は docs/dlsite.md）                                    |
-| GET          | `/tags`                                      | フラット/構造化タグの一覧                                                                                                 |
-| GET/POST     | `/tag-prefixes`                              | prefix定義の一覧・追加                                                                                                    |
-| PATCH/DELETE | `/tag-prefixes/:prefix`                      | prefix定義の変更・削除                                                                                                    |
-| GET          | `/tag-prefixes/candidates`                   | データ中に存在する未登録prefixの候補                                                                                      |
-| POST         | `/export`                                    | `{ data }`（JSON文字列）                                                                                                  |
-| GET          | `/axes/:axis`                                | prefix定義から動的生成した軸と、組み込みのタグ・追加日軸のファセット集計                                                  |
-| GET/POST     | `/smart-folders`                             |                                                                                                                           |
-| PUT/DELETE   | `/smart-folders/:id`                         |                                                                                                                           |
-| GET          | `/smart-folders/:id/works`                   | スマートフォルダー評価結果                                                                                                |
-| GET          | `/fs`                                        | 物理FSブラウズ（Filesモード）                                                                                             |
-| GET          | `/media/workspace`                           | File Explorer のプレビュー用メディア（`?path=`）                                                                          |
-| GET          | `/media/cover/:id`、`/media/audio/:id/:path` | audio は Range(206) 対応。cover は `?w=128\|256\|512` でサムネイル（realはwebp化+ディスクキャッシュ、fixtureのSVGは原寸） |
+| ルートファイル           | 担当                                                                                          |
+| ------------------------ | --------------------------------------------------------------------------------------------- |
+| `settings.ts`            | 設定の取得                                                                                    |
+| `rootReconfiguration.ts` | ルートフォルダーの再設定ワークフロー（[ADR-0029](adr/0029-root-reconfiguration-workflow.md)） |
+| `scan.ts`                | スキャンジョブ（開始・取得・キャンセル・SSE）、候補プール・除外・登録、診断                   |
+| `works.ts`               | 作品の一覧・登録・正本編集・タグ編集・しおり・再生準備・resume・登録解除、`/tags`、`/export`  |
+| `dlsite.ts`              | DLsite の取得・適用・一括取得ジョブ（SSE）・通知（[dlsite.md](dlsite.md)）                    |
+| `tagPrefixes.ts`         | prefix 定義の一覧・追加・変更・削除・並び替え・候補                                           |
+| `axes.ts`                | 軸ごとのファセット集計                                                                        |
+| `smartFolders.ts`        | スマートフォルダーの CRUD・プレビュー・評価結果                                               |
+| `fs.ts`                  | 物理 FS ブラウズ（Files モード）                                                              |
+| `media.ts`               | カバー画像・音声・ワークスペースファイルの配信                                                |
 
-メディアURLは client の `entities/work/api.ts` の `getCoverImageUrl`/`getAudioUrl` が組み立てる（`<img src>`/`<audio src>` に直接使える）。
+契約上の要点:
+
+- `GET /works` は常にページングエンベロープ `{ items, total }` を返す（page/limit 省略時は page=1, limit=200）
+- 作品の変更系（`PATCH /works/:id`、タグの追加・削除など）は応答に `{ snapshot, projection }` を返す。`PATCH` は `sourceRevision` を要求する
+- `POST /scan` は 202 で `{ job }` を即返し（`Location: /api/scan/:id`）、実行中の二重 POST は 409（`active` 付き）。`GET /scan/active` と `GET /scan/last` は該当なしのとき 204。進捗は `GET /scan/:id/events` の SSE（[ADR-0030](adr/0030-job-progress-sse-current-state.md)）
+- `POST /works/:id/resume` は高頻度のため `PATCH /works/:id` と分離している
+- 音声は Range(206) 対応。カバーは `?w=128|256|512` でサムネイル（real は webp 化 + ディスクキャッシュ、fixture の SVG は原寸）
+
+メディア URL は client の `entities/work/api.ts` の `getCoverImageUrl`/`getAudioUrl` が組み立てる（`<img src>`/`<audio src>` に直接使える）。
 
 ### タグの構造（編集時に注意）
 
@@ -161,11 +126,12 @@ smokeテストの注意:
 
 - `model/playerController.ts`: 再生状態の正。`PlayerControllerState`（`status`: idle/loading/playing/paused/ended/error、`PlaybackItem`、position/duration、volume/loop/playbackRate/channelSwap/abRepeat 等）と、入力→遷移+コマンドの純粋な `reducePlayer`、それを駆動する `PlayerController` クラス。聴了（トラック終端到達）もここのドメインイベントとして扱う。トラック切替は `withTrackIndex` が再生意図を決める: `intent: "preserve"`（次へ・前へ・自動送り）は現在の再生状態を維持し、`intent: "explicit"`（明示選択）は常に再生を開始する。実ロードへは `loadTrack` コマンド（autoplayフラグ付き）で配線する
 - `model/playerRuntime.ts`: controller と React の間で共有する参照型（`PlayerRuntimeRefs` / `LoadedTrack` / `PendingResume` 等）
-- `model/atoms.ts`:
+- `entities/player/model/atoms.ts`（他 feature からも読むため entity 層に置く）:
   - `playerCoreAtom`（低頻度 state。`toPlayerCoreState` で controller state から導出）
   - `playerCurrentTimeAtom` / `playerDurationAtom`（**高頻度**。timeupdate 毎に更新。`usePlaybackProgress` を介して **BarSeekStrip / PopupSeek / NowPlayingScrub の3 leaf だけが subscribe**する。親コンポーネント（BarContent / PopupContent / NowPlayingView）や App.tsx は subscribe しないので再生中に上位が再レンダリングされない — この分離は**維持必須**）
-  - `playerUiModeAtom`（bar⇄popup。localStorage 永続）
-  - `nowPlayingViewModeAtom`（再生中タブの通常⇄没入。localStorage 永続）
+- `model/playerPresentationAtoms.ts`: プレイヤーの表示状態（いずれも localStorage 永続）
+  - `playerUiModeAtom`（bar⇄popup）
+  - `nowPlayingViewModeAtom`（再生中タブの通常⇄没入）
 - `model/audioEngine.ts`: 低レベル。`new Audio()`（DOM外）。load/play/pause/seek/setVolume/setPlaybackRate/setChannelSwap、timeupdate/durationchange/ended コールバック
 - `model/useAudioEngineLifecycle.ts`: エンジンの生成・イベント購読・last-played 送信。同一アセットを再利用する経路（再生中のトラックへ戻る等）では `<audio>` の `play()` がすでに再生中だとイベントを発火しないため、`audioPlaying` を代理で dispatch して状態機械を同期させる
 - `model/useResumePersistence.ts`: レジューム（playlistId/trackId/offsetSec）の保存・復元ポート
@@ -190,4 +156,4 @@ Git・実装方針・デバッグ方法・タスク管理の共通ルールは [
 
 - コミットはユーザー指示があるまでしない（監督がレビュー後にまとめる）
 - デザイントークンの正は `client/src/styles/tokens.css`（規約は [docs/design-system.md](design-system.md)）
-- ドキュメント全体の地図・正典/削除済みの区分は [docs/README.md](README.md) を参照
+- ドキュメント全体の地図は [docs/README.md](README.md) を参照

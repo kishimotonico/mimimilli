@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-06-11
-- 関連: `docs/architecture-v2-proposal.md`（2026-07-04 削除、Git履歴参照。現行は [../ARCHITECTURE.md](../ARCHITECTURE.md)）
+- 関連: [../ARCHITECTURE.md](../ARCHITECTURE.md)、[ADR-0007](0007-bun-distribution-runtime.md)（配布形態を単一 exe からディレクトリ/zip へ改訂）
 
 ## 文脈
 
@@ -13,7 +13,7 @@ Tauri 時代のサービス層を HTTP 化した Rust(axum) サーバーが `ser
 API サーバーは Rust 資産を引き継がず、TypeScript で新規開発する。
 
 - フレームワーク: Hono（ランタイム非依存。Vite dev middleware にマウント可能）
-- 開発ランタイム: Node / Bun いずれも可。配布は `bun build --compile` の単一 exe を本線とし、ネイティブモジュール依存を避ける（SQLite は Drizzle 経由で `bun:sqlite`、watcher は chokidar v4、音声メタデータは music-metadata）
+- 開発ランタイム: Node / Bun いずれも可。配布は `bun build --compile` の単一 exe を本線とし、ネイティブモジュール依存を避ける（SQLite は Drizzle 経由で `bun:sqlite`、watcher は chokidar v4、音声メタデータは music-metadata）（配布形態は [ADR-0007](0007-bun-distribution-runtime.md) で改訂）
 - API 契約は `shared/` パッケージの Zod スキーマを正典とし、client / server が共有する
 
 ## 理由
@@ -26,10 +26,6 @@ API サーバーは Rust 資産を引き継がず、TypeScript で新規開発�
 
 ## 帰結
 
-- `server/`（Rust）は v2 サーバーが機能同等に達した時点で削除する。スキャンフロー・`.meta.json` 自動生成規則・DLsite セレクタは仕様として吸い上げる
-- リポジトリはルート pnpm workspace（`client/` / `server/` / `shared/`）に再編する
+- `server/` は TypeScript（Hono）で、旧 Rust 実装は残していない。SQLite は `bun:sqlite`（Drizzle 経由）を使う
+- リポジトリはルート pnpm workspace（`client/` / `server/` / `shared/`）
 - ギャップレス再生など「Rust が欲しくなる」処理が将来出た場合は、その機能に限定したサイドカーとして追加する
-
-## 現状（2026-07-10）
-
-実装完了。`server/` は TypeScript（Hono）になり、旧 Rust 実装は `server-rust/` に退避したのち、全機能（scanner / db / dlsite / handlers）の移植完了を確認して 2026-07-10 に削除した（Git 履歴で参照可能。本文中の「`server/`（Rust）」は決定当時の配置を指す）。SQLite は `bun:sqlite`（Drizzle 経由）を使用している。Bun compile による単一 exe 配布は未達（詳細は [ARCHITECTURE.md](../ARCHITECTURE.md) 参照）。

@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-09-25
-- 関連: [ADR-0025](0025-source-mutation-projection-read-separation.md)（正本変更と投影の分離）、[ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md)、[ADR-0027](0027-dlsite-meta-state-type-separation.md)、backlog TASK-465
+- 関連: [ADR-0025](0025-source-mutation-projection-read-separation.md)（正本変更と投影の分離）、[ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md)、[ADR-0027](0027-dlsite-meta-state-type-separation.md)、[ADR-0030](0030-job-progress-sse-current-state.md)（DLsite 一括取得完了時のキャッシュ更新を置き換え）、backlog TASK-465
 
 ## 文脈
 

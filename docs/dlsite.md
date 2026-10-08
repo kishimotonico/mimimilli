@@ -1,10 +1,10 @@
 # DLsite連携
 
-DLsiteの作品ページから情報を取得し、作品のタイトル・タグ・カバー画像・URLへ反映する機能。要件は[requirements-v4.md](requirements-v4.md) 4.4節。実装は主に `server/src/adapters/real/dlsite.ts`、`dlsiteCache.ts`、`dlsiteScheduler.ts`、`index.ts` にある。API契約の正典はこのドキュメントではなく `shared/src/dlsite.ts`（Zodスキーマ）。
+DLsiteの作品ページから情報を取得し、作品のタイトル・タグ・カバー画像・URLへ反映する機能。要件は[requirements-v4.md](requirements-v4.md) 4.4節。実装は `server/src/adapters/real/` の `dlsite.ts`（パース）、`dlsiteFetch.ts`（取得）、`dlsiteCache.ts`（キャッシュ）、`dlsiteScheduler.ts`（レート制限）、`dlsiteApply.ts`・`dlsiteBulk.ts`・`dlsiteProjection.ts` と、ジョブを管理する `server/src/dlsiteJobManager.ts` にある。API契約の正典はこのドキュメントではなく `shared/src/dlsite.ts`（Zodスキーマと、real/fixture 共通の純関数）。
 
 ## RJ/VJコードの検出
 
-`detectRjCode`（`dlsite.ts`）が、フォルダー名・タイトルの順で候補文字列を調べ、`RJ\d{6,8}`（大文字小文字を無視）にマッチした最初のコードを採用する。作品に紐づくRJコードが未検出のときだけ、この自動検出を試みる。
+`detectRjCode`（`shared/src/dlsite.ts`）が、フォルダー名・タイトルの順で候補文字列を調べ、`RJ\d{6,8}`（大文字小文字を無視）にマッチした最初のコードを採用する。作品に紐づくRJコードが未検出のときだけ、この自動検出を試みる。
 
 自動検出の対象はRJコードのみで、VJコードは自動検出しない。VJ作品は `PATCH /dlsite/:id` でユーザーが手動でコードを設定する。
 
@@ -39,7 +39,7 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 
 ## 適用の流れ
 
-適用経路は2つある。
+作品への反映経路は2つある。一括取得は反映せず、取得結果をキャッシュへ記録するだけ（後述）。
 
 **手動プレビュー→適用**: `POST /dlsite/:id/fetch` で取得結果をプレビューし、ユーザーが選んだ項目だけを `POST /dlsite/:id/apply`（`DlsiteApplyBody`）で反映する。タイトル・タグ・カバーそれぞれに適用可否のフラグがあり、ユーザーが個別に選べる。
 
@@ -49,13 +49,15 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 
 このデータドリフト自体への対応（単発適用の`sourceRevision`のようなCASチェック）は行っていない。理由: (1) このアプリはローカル単一ユーザー向けで、プレビュー取得から適用実行までの時間差が短い、(2) 差分が消えた場合はskipされるため壊れる方向には倒れない、(3) 一括適用は「未設定項目を埋める」操作なので、埋める先が既に埋まっていれば埋めない、という結果自体は妥当。将来複数クライアント・長時間放置されたプレビュー等でズレが問題になった場合は改めて検討する。
 
-**一括取得**: `POST /dlsite/bulk` が `runDlsiteBulk`（`index.ts`）を呼び、対象作品をまとめて処理する。`mode` には `new` と `existing` があり、スキャン直後の自動起動（`scanJobManager.ts`）は新規作品だけを対象に `new` で呼ぶ。手動の「まとめて取得」ボタンは `existing` で呼ぶ。
+**一括取得**: `DlsiteJobManager`（`server/src/dlsiteJobManager.ts`）が待機キューのジョブを1本ずつ `runDlsiteBulk`（`adapters/real/dlsiteBulk.ts`）で処理する。対象作品の作品ページを取得してキャッシュへ記録し、`work_dlsite.state_json` を再投影するだけで、タイトル・タグ・カバー・`mimimilli.json` は変更しない。取得した内容を作品へ反映するのは、上の手動適用か未設定項目の一括適用。
 
-両モードの違いは、取得したジャンル・サークル・CVタグをどこまで適用するか。`new` は取得した全タグをそのまま追加する。`existing` は `work.dlsite.appliedTags`（前回までにこの作品へ適用したタグ）と比較した差分だけを追加する。再取得のたびに同じタグが積み上がるのを防ぐための仕組みで、適用したタグは `appliedTags` として作品ごとに記録し続ける。
+`mode`（`new` / `existing`）は起動元を表す。スキャン完了後・候補登録・作品登録の自動起動は新規作品だけを対象に `new`、手動の「まとめて取得」は `existing` で投入する。処理内容は両モードで同じ。
+
+`work.dlsite.appliedTags` は、手動適用と一括適用でこの作品へ反映したタグを `mimimilli.json` に記録したもの。
 
 ## 作品ごとの状態
 
-`work.dlsite.status`（`shared/src/dlsite.ts` の `dlsiteStatusSchema`）は次の5値を取る。
+`work.dlsite.status`（`shared/src/dlsite.ts` の `dlsiteStatusSchema`）は次の5値を取る。`mimimilli.json` に保存されるのは `none` / `applied` / `skipped` だけで、`not_found` と `error` はキャッシュの取得結果から投影した値（`projectDlsiteState`）。
 
 | status      | 意味                                                                                           |
 | ----------- | ---------------------------------------------------------------------------------------------- |
@@ -65,7 +67,7 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 | `error`     | 直近の取得または適用が失敗した（`errorKind` で HTTP エラーと `parse_error` を区別）            |
 | `skipped`   | ユーザーが明示的にこの作品を対象から外した                                                     |
 
-`none`・`error`・`not_found` の作品は一括取得の対象になり、`applied` と `skipped` は対象から外れる（`runDlsiteBulk` 冒頭のフィルタ）。適用に成功すると `applied` に、失敗すると `error` か `not_found` に遷移する。`skipped` は `PATCH /dlsite/:id` でユーザーが操作したときだけ遷移し、一括取得では変化しない。
+RJコードがあり、`none`・`error`・`not_found` の作品が一括取得の対象になる。`applied` と `skipped` は対象から外れる（`selectDlsiteBulkTargets`）。適用に成功すると `applied` になる。取得が失敗しても `mimimilli.json` は変わらず、次の投影で `error` か `not_found` として見える。`skipped` は `PATCH /dlsite/:id` でユーザーが操作したときだけ遷移し、一括取得では変化しない。
 
 なお `shared/src/dlsite.ts` の `isDlsiteUnlinked()` は `rjCode !== null && status === "none"` で「RJコードはあるが未連携」を判定する。これは通知バッジ用の別の基準で、`none` そのものの定義とは区別する。
 
@@ -95,11 +97,9 @@ failure_kind（失敗記録側）と既定TTL。
 | `not_found`  | HTTP 404               | 3日   |
 | `error`      | 一時的なHTTP・通信障害 | 1時間 |
 
-TTLは `DEFAULT_DLSITE_CACHE_TTLS_MS`（`dlsiteCache.ts`）の定数で固定されている。通常取得の判断順序は、有効な失敗記録があればそれを返し（ネットワークへ出ない）、なければ有効なHTML snapshotをパースして返し、どちらもなければネットワークへ出る。`?force=true` はキャッシュの読み取りだけを無視して必ずネットワークへ出るが、書き込みは通常時と同じ規則に従う。
+TTLは `DEFAULT_DLSITE_CACHE_TTLS_MS`（`shared/src/dlsite.ts`）の定数で固定されている。通常取得の判断順序は、有効な失敗記録があればそれを返し（ネットワークへ出ない）、なければ有効なHTML snapshotをパースして返し、どちらもなければネットワークへ出る。`?force=true` はキャッシュの読み取りだけを無視して必ずネットワークへ出るが、書き込みは通常時と同じ規則に従う。
 
 HTMLの転送・展開サイズには上限があり（既定2 MiB / 8 MiB、`DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES` / `DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES`）、gzip展開時にも `zlib` の `maxOutputLength` で同じ上限を渡してgzip bombを防ぐ。転送サイズの上限はHTTP応答にだけ課す。CLIのローカルファイルimportは転送を伴わないため、展開後サイズの上限だけで判定する。
-
-一括取得の対象は `applied` と `skipped` を除く（上記「作品ごとの状態」参照）。`applied` の作品は2回目以降の一括取得では対象外になるため、成功時の「変更なしなら書き込まない」判定は存在しない。
 
 取得が失敗した作品は、HTTPレスポンスまたはパース結果を DLsite キャッシュへ記録する。`mimimilli.json`は変更しない。キャッシュ更新後、scan・一括取得・手動fetch・`POST /dlsite/apply-missing` はいずれも、`mimimilli.json`の正本とキャッシュを合成して `work_dlsite.state_json` を再投影する（`dlsiteProjection.ts`）。これにより通知ベルの取得失敗件数・パースエラー警報が、フルスキャンを待たずに反映される。`offline` 由来の miss はキャッシュにも catalog にも書かない。
 
@@ -228,16 +228,16 @@ importはHTML snapshotを成功記録として書き直すため、取り込ん�
 
 ## HTTPエンドポイント
 
-`server/src/routes/dlsite.ts` と `dlsiteProgress.ts` に実装がある。
+`server/src/routes/dlsite.ts` に実装がある。進捗SSEの契約は [ADR-0030](adr/0030-job-progress-sse-current-state.md)。
 
 - `GET /dlsite/notifications` — RJコード未検出・取得失敗・パース失敗の件数サマリー（`parseErrorAlert` 含む）
 - `GET /dlsite/notifications/:kind` — `rj-missing` / `fetch-failed` / `parse-failed` の該当作品一覧（ページング。`parse-failed` のみ `rjCode` 付き）
 - `POST /dlsite/:id/fetch` — 1作品分の取得プレビュー。`?force=true` でキャッシュを無視
 - `POST /dlsite/:id/apply` — プレビュー結果のうち選択した項目を適用
 - `PATCH /dlsite/:id` — RJコードの手動設定、または `skipped` の切り替え
-- `POST /dlsite/bulk` — 一括取得ジョブを開始（`mode: "existing"`で起動。実行中は409相当のエラー）
-- `GET /dlsite/bulk` — 実行中または直近の一括取得ジョブスナップショット。なければ204
-- `DELETE /dlsite/bulk` — 実行中の一括取得をキャンセル（実行中ジョブがなければ404）
-- `GET /dlsite/events` — 一括取得の進捗をSSEで配信。ジョブ実行中に接続すると直近の進捗を再送し、実行中でなければ直近の完了/エラーを1件返す
+- `POST /dlsite/bulk` — 一括取得ジョブを`mode: "existing"`で待機キューへ積み、202 `{ jobId }` を返す。実行中は409（`conflict`）
+- `GET /dlsite/bulk` — 常に200で `{ current, lastTerminal }`。`current` は実行中ジョブ（`jobId`・`status`・`progress`）、`lastTerminal` は直近に終わったジョブの結果。どちらも無ければ `null`
+- `DELETE /dlsite/bulk` — 実行中の一括取得をキャンセルし `{ cancelling: true }` を返す。実行中ジョブがなければ404
+- `GET /dlsite/events` — 一括取得の進捗SSE（`progress` / `cancelling` / `complete` / `cancelled` / `error`。各イベントに `jobId`）。接続時、実行中なら直近の `progress`、実行中でなければ直近の終端を1件送る。以後はlive配信し、終端で閉じる
 
-一括取得ジョブは `DlsiteJobManager` のFIFOキューで直列実行するが、投入経路によって挙動が非対称になっている。スキャン完了・候補登録の自動起動（`mode: "new"`）は `dlsiteJobs.enqueue()` を直接呼ぶため、実行中のジョブがあってもキューに積まれ、順番に処理される。スキャン完了時の配線は `app.ts` が `ScanJobManager` のコンストラクタへ渡す完了コールバックで行い（`ScanJobManager` は `DlsiteJobManager` を直接知らない）、`result.insertedWorkIds` が1件以上あるときだけ `enqueue("new", insertedWorkIds)` を呼ぶ。一方、手動の `POST /dlsite/bulk` は先に `isDlsiteJobInProgress()` を確認し、実行中ならキューに積まれずconflictエラーで即座に弾かれる。
+一括取得ジョブは `DlsiteJobManager` のFIFOキューで直列実行するが、投入経路によって挙動が非対称になっている。スキャン完了・候補登録・作品登録の自動起動（`mode: "new"`）は `dlsiteJobs.enqueue()` を直接呼ぶため、実行中のジョブがあってもキューに積まれ、順番に処理される。配線は `app.ts` が `ScanJobManager` のコンストラクタ、`scanRoute`、`worksRoute` へ渡すコールバックで行い（これらは `DlsiteJobManager` を直接知らない）、スキャン完了時は `result.insertedWorkIds` が1件以上あるときだけ `enqueue("new", insertedWorkIds)` を呼ぶ。一方、手動の `POST /dlsite/bulk` は先に `dlsiteJobs.isInProgress()` を確認し、実行中ならキューに積まれずconflictエラーで即座に弾かれる。
