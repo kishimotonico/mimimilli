@@ -12,7 +12,7 @@ export function useSettingsQuery() {
       query.state.data?.rootReconfiguration?.status === "running" ? 1000 : false,
     // 全体既定はfalseだが、このクエリだけは"always"にする。タブへ戻った時点で
     // rootFolder/completedAtの変化（別クライアントでの再設定）を観測できるように
-    // （ADR-0029、RootReconfigurationDriftEffect参照）。trueだとstaleTime（30s）が
+    // （ADR-0029、ReconfigurationReadyEffect参照）。trueだとstaleTime（30s）が
     // 効いて直近30秒以内のフォーカス復帰では再取得されないため、staleTimeに関わらず
     // 必ず再取得する"always"にする。
     refetchOnWindowFocus: "always",

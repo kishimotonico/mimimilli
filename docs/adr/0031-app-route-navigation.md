@@ -78,7 +78,7 @@ navigate(
 
 ### root再設定の突入時リセット
 
-TASK-469.2の3点（URLを直接書き換える `resetLibraryNavigationUrl`、`resetNavigationToDefaultAtom`、`resetLibraryNavigationAtom`）を廃止し、`navigate(既定のAppRoute, { replace: true })` の1操作にする。突入時の後処理とdrift検知（`RootReconfigurationDriftEffect`）はこの操作を呼ぶ。同期が常時マウントなので、再設定画面の表示中でもURLはその場で既定へ置き換わり、通常画面へ戻ったときに古いURLから状態が復元されることはない。
+TASK-469.2の3点（URLを直接書き換える `resetLibraryNavigationUrl`、`resetNavigationToDefaultAtom`、`resetLibraryNavigationAtom`）を廃止し、`navigate(既定のAppRoute, { replace: true })` の1操作にする。突入時の後処理とdrift検知（`rootReconfigurationController`）はこの操作を呼ぶ。同期が常時マウントなので、再設定画面の表示中でもURLはその場で既定へ置き換わり、通常画面へ戻ったときに古いURLから状態が復元されることはない。
 
 既定のAppRouteはLibraryの全作品一覧で、sortも既定値へ戻す。
 

@@ -310,7 +310,7 @@ describe("root再設定の高速完了（runningが描画されない）競合",
     });
     // invalidateSettings（GET /api/settings再取得）が即座にidleを返す競合を模す。
     // Reactが中間状態（running）の描画を挟まないケースでも、performEntryReset・
-    // reconfigurationExitEpochAtomは描画観測に依存せず必ず進む想定。
+    // leavePendingは描画観測に依存せず必ず立つ想定。
     vi.spyOn(settingsApi, "getSettings").mockResolvedValue({
       rootFolder: "/new/root",
       lastScanTime: "2026-01-01T00:00:00.000Z",

@@ -10,9 +10,9 @@ export interface RunStartRootReconfigurationDeps {
   persistFinalResume: () => Promise<void>;
   /** 202成功後にのみ呼ぶ。検証失敗（400）では再生を止めない。再生停止・nav/URL/
    *  モーダル等のリセット・作品系クエリのstale化（非破壊）をまとめて行う。runningの
-   *  描画を実際に観測できたかに依存せず必ず実行する（App.performReconfigurationEntryResetと共有）。
+   *  描画を実際に観測できたかに依存せず必ず実行する（rootReconfigurationController.enterと共有）。
    *  実際のクエリ破棄（removeQueries）はここでは行わない
-   *  （ReconfigurationEntryEffect/ReconfigurationExitEffect参照） */
+   *  （ReconfigurationEntryEffect/ReconfigurationReadyEffect参照） */
   performEntryReset: () => void;
   /** 202成功後にのみ呼ぶ。settingsキャッシュのrootReconfigurationを202応答で即時反映する */
   applyRootReconfigurationState: (state: RootReconfigurationState) => void;

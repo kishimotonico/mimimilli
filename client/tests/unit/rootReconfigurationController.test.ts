@@ -6,7 +6,7 @@ import {
   markReconfigurationAffectedQueriesStale,
   removeReconfigurationAffectedQueries,
   resetReconfigurationAffectedQueries,
-} from "../../src/app/model/resetLibraryForReconfiguration";
+} from "../../src/app/model/rootReconfigurationController";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../src/entities/tag/queryKeys";
