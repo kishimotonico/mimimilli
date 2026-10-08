@@ -2,15 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DlsiteJobManager } from "../src/dlsiteJobManager.ts";
 import type { DataAdapter } from "../src/adapter/index.ts";
+import { withRunDlsiteBulk } from "./helpers/adapterStub.ts";
 
 function createManager(adapter?: DataAdapter): DlsiteJobManager {
   return new DlsiteJobManager(
     adapter ??
-      ({
-        async runDlsiteBulk() {
-          return { fetched: 0, failed: 0, parseErrors: 0, skipped: 0 };
-        },
-      } as unknown as DataAdapter),
+      withRunDlsiteBulk(async () => ({ fetched: 0, failed: 0, parseErrors: 0, skipped: 0 })),
   );
 }
 
@@ -75,18 +72,14 @@ test("DLsiteジョブは進捗を購読者へ配信し、完了を再接続時�
 test("実行中のDLsite一括取得はcancelで打ち切り、cancelledを配信する", async () => {
   let release!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
-  const adapter = {
-    async runDlsiteBulk(
-      _mode: string,
-      _workIds: string[] | undefined,
-      options?: { signal?: AbortSignal },
-    ) {
+  const adapter = withRunDlsiteBulk(
+    async (_mode: string, _workIds: string[] | undefined, options?: { signal?: AbortSignal }) => {
       await gate;
       const result = { fetched: 2, failed: 1, parseErrors: 0, skipped: 0 };
       if (options?.signal?.aborted) return result;
       return result;
     },
-  } as unknown as DataAdapter;
+  );
   const manager = createManager(adapter);
 
   manager.enqueue("existing", undefined);
@@ -107,19 +100,15 @@ test("実行中のDLsite一括取得はcancelで打ち切り、cancelledを配�
 test("実行中のDLsite一括取得はcancel後にadapterがAbortErrorでrejectしてもcancelledを配信する", async () => {
   let release!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
-  const adapter = {
-    async runDlsiteBulk(
-      _mode: string,
-      _workIds: string[] | undefined,
-      options?: { signal?: AbortSignal },
-    ) {
+  const adapter = withRunDlsiteBulk(
+    async (_mode: string, _workIds: string[] | undefined, options?: { signal?: AbortSignal }) => {
       await gate;
       if (options?.signal?.aborted) {
         throw new DOMException("DLsiteリクエストはキャンセルされました", "AbortError");
       }
       return { fetched: 2, failed: 1, parseErrors: 0, skipped: 0 };
     },
-  } as unknown as DataAdapter;
+  );
   const manager = createManager(adapter);
 
   manager.enqueue("existing", undefined);
@@ -140,12 +129,10 @@ test("実行中のDLsite一括取得はcancel後にadapterがAbortErrorでreject
 test("adapterが通常例外でrejectした場合はerrorを配信する", async () => {
   let release!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
-  const adapter = {
-    async runDlsiteBulk() {
-      await gate;
-      throw new Error("ネットワークエラー");
-    },
-  } as unknown as DataAdapter;
+  const adapter = withRunDlsiteBulk(async () => {
+    await gate;
+    throw new Error("ネットワークエラー");
+  });
   const manager = createManager(adapter);
   const events: Array<{ type: string; message?: string }> = [];
   manager.enqueue("existing", undefined);
@@ -167,13 +154,11 @@ test("中止時はキューに積まれた未実行ジョブを破棄する", as
   const calls: string[] = [];
   let release!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
-  const adapter = {
-    async runDlsiteBulk(mode: string) {
-      calls.push(mode);
-      if (calls.length === 1) await gate;
-      return { fetched: 0, failed: 0, parseErrors: 0, skipped: 0 };
-    },
-  } as unknown as DataAdapter;
+  const adapter = withRunDlsiteBulk(async (mode: string) => {
+    calls.push(mode);
+    if (calls.length === 1) await gate;
+    return { fetched: 0, failed: 0, parseErrors: 0, skipped: 0 };
+  });
   const manager = createManager(adapter);
 
   manager.enqueue("existing", undefined);
@@ -190,17 +175,13 @@ test("実行中に追加された自動取得をFIFOで後続実行する", asyn
   const calls: Array<{ mode: string; workIds: string[] | undefined }> = [];
   let releaseFirst!: () => void;
   const firstGate = new Promise<void>((resolve) => (releaseFirst = resolve));
-  const adapter = {
-    async runDlsiteBulk(
-      mode: string,
-      workIds: string[] | undefined,
-      _options?: { signal?: AbortSignal },
-    ) {
+  const adapter = withRunDlsiteBulk(
+    async (mode: string, workIds: string[] | undefined, _options?: { signal?: AbortSignal }) => {
       calls.push({ mode, workIds });
       if (calls.length === 1) await firstGate;
       return { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 };
     },
-  } as unknown as DataAdapter;
+  );
   const manager = createManager(adapter);
 
   manager.enqueue("existing", undefined);
@@ -217,19 +198,11 @@ test("実行中に追加された自動取得をFIFOで後続実行する", asyn
 
 test("enqueueのjobIdがイベントとsnapshotに載り、終端直後に次のジョブが始まるとcurrentとlastTerminalが別jobIdで両方返る", async () => {
   const gates: Array<() => void> = [];
-  const adapter = {
-    async runDlsiteBulk(
-      _mode: string,
-      _workIds: string[] | undefined,
-      options?: {
-        onProgress?: (progress: { processed: number; total: number; work: null }) => void;
-      },
-    ) {
-      options?.onProgress?.({ processed: 0, total: 1, work: null });
-      await new Promise<void>((resolve) => gates.push(resolve));
-      return { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 };
-    },
-  } as unknown as DataAdapter;
+  const adapter = withRunDlsiteBulk(async (_mode, _workIds, options) => {
+    options?.onProgress?.({ processed: 0, total: 1, work: null });
+    await new Promise<void>((resolve) => gates.push(resolve));
+    return { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 };
+  });
   const manager = createManager(adapter);
   const events: Array<{ type: string; jobId: string }> = [];
   const firstId = manager.enqueue("existing", undefined);
@@ -259,17 +232,13 @@ test("enqueueのjobIdがイベントとsnapshotに載り、終端直後に次の
 test("createApp ごとに DLsite ジョブ状態が隔離される", async () => {
   let release!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
-  const adapter = {
-    async runDlsiteBulk(
-      _mode: string,
-      _workIds: string[] | undefined,
-      options?: { signal?: AbortSignal },
-    ) {
+  const adapter = withRunDlsiteBulk(
+    async (_mode: string, _workIds: string[] | undefined, options?: { signal?: AbortSignal }) => {
       await gate;
       options?.signal?.throwIfAborted();
       return { fetched: 0, failed: 0, parseErrors: 0, skipped: 0 };
     },
-  } as unknown as DataAdapter;
+  );
 
   const managerA = createManager(adapter);
   const managerB = createManager(adapter);
@@ -285,19 +254,15 @@ test("shutdown は実行中ジョブを取消し、pending を破棄して完了
   const calls: string[] = [];
   let release!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
-  const adapter = {
-    async runDlsiteBulk(
-      mode: string,
-      _workIds: string[] | undefined,
-      options?: { signal?: AbortSignal },
-    ) {
+  const adapter = withRunDlsiteBulk(
+    async (mode: string, _workIds: string[] | undefined, options?: { signal?: AbortSignal }) => {
       calls.push(mode);
       await gate;
       const result = { fetched: 0, failed: 0, parseErrors: 0, skipped: 0 };
       if (options?.signal?.aborted) return result;
       return result;
     },
-  } as unknown as DataAdapter;
+  );
   const manager = createManager(adapter);
 
   manager.enqueue("existing", undefined);

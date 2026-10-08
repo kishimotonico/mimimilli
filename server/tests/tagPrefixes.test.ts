@@ -1,6 +1,6 @@
 // タグ正規化・prefix 定義（ADR-0005）のテスト。
 // 純粋関数（normalizeTag / buildAxisFacets / buildTagPrefixCandidates）と
-// fixture アダプタの保存処理と HTTP CRUD を確認する。
+// fixture / real 両 adapter の HTTP CRUD を確認する。
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -19,16 +19,11 @@ import {
   VIEW_IDS,
 } from "@mimimilli/shared";
 import type { WorkSummary } from "@mimimilli/shared";
-import { createApp } from "../src/app.ts";
-import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { buildAxisFacets } from "../src/core/axisFacets.ts";
+import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
 import { tf } from "./helpers/tag.ts";
 import { buildTagPrefixCandidates } from "../src/core/tagPrefixCandidates.ts";
 import { nt, nts } from "./helpers/tag.ts";
-
-function buildApp() {
-  return createApp(createFixtureAdapter());
-}
 
 function summaryWith(
   id: string,
@@ -268,333 +263,288 @@ test("buildTagPrefixCandidates: 登録できない予約 prefix と禁止形を�
   assert.deepEqual(buildTagPrefixCandidates(works, []), [{ prefix: "気分", count: 1 }]);
 });
 
-// ── fixture アダプタ ─────────────────────────────────────────
+// ── HTTP（fixture / real の両 adapter）──────────────────────
+
+const contract = defineContract({
+  works: [
+    { key: "a", tags: ["ASMR", "mood/甘め", "mood/眠い"] },
+    { key: "b", tags: ["mood/甘め", "ジャンル/耳かき"] },
+  ],
+});
+
+const applyBody = (sourceRevision: string, applyTags: string[]) => ({
+  info: {
+    rjCode: "RJ000001",
+    title: "テスト作品",
+    circle: null,
+    cvs: [],
+    genreTags: [],
+    ageRating: null,
+    coverUrl: null,
+    url: "https://www.dlsite.com/maniax/work/=/product_id/RJ000001.html",
+  },
+  applyTitle: false,
+  applyCover: false,
+  applyUrl: false,
+  sourceRevision,
+  applyTags,
+});
+
+async function sourceRevisionOf(harness: ContractHarness, workId: string): Promise<string> {
+  const { body } = await harness.json(`/api/works/${workId}/source`);
+  return body.sourceRevision;
+}
 
 // 生の（空白混じり・大文字小文字混在の）タグ文字列の正規化は、adapter の内部ではなく
 // HTTP 境界（workSourcePatchSchema + normalizeTags）で行う。実際にその境界を通す。
-test("PATCH /api/works/:id: タグを正規化して保存する", async () => {
-  const app = buildApp();
-  const listRes = await app.request("/api/works");
-  const { items } = await listRes.json();
-  const workId: string = items[0].id;
-  const source = await (await app.request(`/api/works/${workId}/source`)).json();
-
-  const patched = await app.request(`/api/works/${workId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sourceRevision: source.sourceRevision, tags: ["CV/ x ", "cv/x"] }),
+contract("PATCH /api/works/:id: タグを正規化して保存する", async (harness) => {
+  const id = harness.workId("a");
+  const patched = await harness.send("PATCH", `/api/works/${id}`, {
+    sourceRevision: await sourceRevisionOf(harness, id),
+    tags: ["CV/ x ", "cv/x"],
   });
   assert.equal(patched.status, 200);
-  const body = await patched.json();
-  assert.deepEqual(body.snapshot.tags, ["cv/x"]);
+  assert.deepEqual(patched.body.snapshot.tags, ["cv/x"]);
+  assert.deepEqual((await harness.json(`/api/works/${id}`)).body.tags, ["cv/x"]);
 });
 
-test("PATCH /api/works/:id: 正規化後に空になるタグは400で拒否する（隠蔽しない）", async () => {
-  const app = buildApp();
-  const listRes = await app.request("/api/works");
-  const { items } = await listRes.json();
-  const workId: string = items[0].id;
+contract(
+  "PATCH /api/works/:id: 正規化後に空になるタグは400で拒否し、保存しない",
+  async (harness) => {
+    const id = harness.workId("a");
+    const before = (await harness.json(`/api/works/${id}`)).body.tags;
+    const patched = await harness.send("PATCH", `/api/works/${id}`, {
+      sourceRevision: await sourceRevisionOf(harness, id),
+      tags: ["cv/x", "  "],
+    });
+    assert.equal(patched.status, 400);
+    assert.deepEqual((await harness.json(`/api/works/${id}`)).body.tags, before);
+  },
+);
 
-  const patched = await app.request(`/api/works/${workId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sourceRevision: "fixture", tags: ["cv/x", "  "] }),
-  });
-  assert.equal(patched.status, 400);
-});
+contract(
+  "PATCH /api/works/:id のタグは正規形で保存される（大文字小文字違いは別タグ）",
+  async (harness) => {
+    const id = harness.workId("a");
+    const res = await harness.send("PATCH", `/api/works/${id}`, {
+      sourceRevision: await sourceRevisionOf(harness, id),
+      tags: ["CV/ 新人 ", "ASMR", "asmr", "ASMR"],
+    });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.snapshot.tags, ["cv/新人", "ASMR", "asmr"]);
+  },
+);
 
-test("POST /api/dlsite/:id/apply: applyTags を正規化して保存する", async () => {
-  const app = buildApp();
-  const listRes = await app.request("/api/works");
-  const { items } = await listRes.json();
-  const workId: string = items[0].id;
-  const sourceRevision = "fixture";
-
-  const applied = await app.request(`/api/dlsite/${workId}/apply`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      info: {
-        rjCode: "RJ000001",
-        title: "テスト作品",
-        circle: null,
-        cvs: [],
-        genreTags: [],
-        ageRating: null,
-        coverUrl: null,
-        url: "https://www.dlsite.com/maniax/work/=/product_id/RJ000001.html",
-      },
-      applyTitle: false,
-      applyCover: false,
-      applyUrl: false,
-      sourceRevision,
-      applyTags: ["Genre/ 耳かき ", "genre/耳かき"],
-    }),
-  });
+contract("POST /api/dlsite/:id/apply: applyTags を正規化して保存する", async (harness) => {
+  const id = harness.workId("a");
+  const applied = await harness.send(
+    "POST",
+    `/api/dlsite/${id}/apply`,
+    applyBody(await sourceRevisionOf(harness, id), ["Genre/ 耳かき ", "genre/耳かき"]),
+  );
   assert.equal(applied.status, 200);
-
-  const work = await app.request(`/api/works/${workId}`);
-  const body = await work.json();
-  assert.ok(body.tags.includes("genre/耳かき"));
+  const work = await harness.json(`/api/works/${id}`);
+  assert.ok(work.body.tags.includes("genre/耳かき"));
 });
 
-test("POST /api/dlsite/:id/apply: 正規化後に空になる applyTags は400で拒否する", async () => {
-  const app = buildApp();
-  const listRes = await app.request("/api/works");
-  const { items } = await listRes.json();
-  const workId: string = items[0].id;
-  const sourceRevision = "fixture";
+contract(
+  "POST /api/dlsite/:id/apply: 正規化後に空になる applyTags は400で拒否する",
+  async (harness) => {
+    const id = harness.workId("a");
+    const applied = await harness.send(
+      "POST",
+      `/api/dlsite/${id}/apply`,
+      applyBody(await sourceRevisionOf(harness, id), ["genre/耳かき", "  "]),
+    );
+    assert.equal(applied.status, 400);
+  },
+);
 
-  const applied = await app.request(`/api/dlsite/${workId}/apply`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      info: {
-        rjCode: "RJ000001",
-        title: "テスト作品",
-        circle: null,
-        cvs: [],
-        genreTags: [],
-        ageRating: null,
-        coverUrl: null,
-        url: "https://www.dlsite.com/maniax/work/=/product_id/RJ000001.html",
-      },
-      applyTitle: false,
-      applyCover: false,
-      applyUrl: false,
-      sourceRevision,
-      applyTags: ["genre/耳かき", "  "],
-    }),
-  });
-  assert.equal(applied.status, 400);
-});
+contract(
+  "POST /api/dlsite/:id/apply: 予約文字 @ 始まりの applyTags は400で拒否する",
+  async (harness) => {
+    const id = harness.workId("a");
+    const applied = await harness.send(
+      "POST",
+      `/api/dlsite/${id}/apply`,
+      applyBody(await sourceRevisionOf(harness, id), ["@year/2024"]),
+    );
+    assert.equal(applied.status, 400);
+  },
+);
 
-test("POST /api/dlsite/:id/apply: 予約文字 @ 始まりの applyTags は400で拒否する", async () => {
-  const app = buildApp();
-  const listRes = await app.request("/api/works");
-  const { items } = await listRes.json();
-  const workId: string = items[0].id;
-  const sourceRevision = "fixture";
-
-  const applied = await app.request(`/api/dlsite/${workId}/apply`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      info: {
-        rjCode: "RJ000001",
-        title: "テスト作品",
-        circle: null,
-        cvs: [],
-        genreTags: [],
-        ageRating: null,
-        coverUrl: null,
-        url: "https://www.dlsite.com/maniax/work/=/product_id/RJ000001.html",
-      },
-      applyTitle: false,
-      applyCover: false,
-      applyUrl: false,
-      sourceRevision,
-      applyTags: ["@year/2024"],
-    }),
-  });
-  assert.equal(applied.status, 400);
-});
-
-// ── HTTP CRUD（fixture アダプタ）─────────────────────────────
-
-test("GET /api/tag-prefixes は seed 済みの初期定義を返す", async () => {
-  const app = buildApp();
-  const res = await app.request("/api/tag-prefixes");
-  assert.equal(res.status, 200);
-  const body = await res.json();
+contract("GET /api/tag-prefixes は初期定義を order 昇順で返す", async (harness) => {
+  const { status, body } = await harness.json("/api/tag-prefixes");
+  assert.equal(status, 200);
   assert.deepEqual(
     body.map((p: { prefix: string }) => p.prefix),
     DEFAULT_TAG_PREFIXES.map((p) => p.prefix),
   );
 });
 
-test("POST /api/tag-prefixes で登録し、PATCH・DELETE できる", async () => {
-  const app = buildApp();
-
-  const created = await app.request("/api/tag-prefixes", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prefix: "気分", label: "気分" }),
+contract("POST /api/tag-prefixes で登録し、PATCH・DELETE できる", async (harness) => {
+  const created = await harness.send("POST", "/api/tag-prefixes", {
+    prefix: "気分",
+    label: "気分",
   });
   assert.equal(created.status, 201);
-  const createdBody = await created.json();
-  assert.equal(createdBody.prefix, "気分");
-  assert.equal(createdBody.showAsAxis, true);
-  assert.equal(createdBody.protected, false);
+  assert.equal(created.body.prefix, "気分");
+  assert.equal(created.body.showAsAxis, true);
+  assert.equal(created.body.protected, false);
 
-  const patched = await app.request(`/api/tag-prefixes/${encodeURIComponent("気分")}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ protected: true, showAsAxis: false }),
+  const patched = await harness.send("PATCH", `/api/tag-prefixes/${encodeURIComponent("気分")}`, {
+    protected: true,
+    showAsAxis: false,
   });
   assert.equal(patched.status, 200);
-  const patchedBody = await patched.json();
-  assert.equal(patchedBody.protected, true);
-  assert.equal(patchedBody.showAsAxis, false);
+  assert.equal(patched.body.protected, true);
+  assert.equal(patched.body.showAsAxis, false);
 
-  const deleted = await app.request(`/api/tag-prefixes/${encodeURIComponent("気分")}`, {
+  const deleted = await harness.request(`/api/tag-prefixes/${encodeURIComponent("気分")}`, {
     method: "DELETE",
   });
   assert.equal(deleted.status, 204);
 
-  const list = await (await app.request("/api/tag-prefixes")).json();
-  assert.ok(!list.some((p: { prefix: string }) => p.prefix === "気分"));
+  const list = await harness.json("/api/tag-prefixes");
+  assert.ok(!list.body.some((p: { prefix: string }) => p.prefix === "気分"));
 });
 
-test("POST /api/tag-prefixes: 重複は409、予約IDは400", async () => {
-  const app = buildApp();
-
-  const duplicate = await app.request("/api/tag-prefixes", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prefix: "CV", label: "CV" }), // 正規化で cv と衝突
-  });
+contract("POST /api/tag-prefixes: 重複は409、予約IDは400", async (harness) => {
+  const duplicate = await harness.send("POST", "/api/tag-prefixes", {
+    prefix: "CV",
+    label: "CV",
+  }); // 正規化で cv と衝突
   assert.equal(duplicate.status, 409);
 
-  const reserved = await app.request("/api/tag-prefixes", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prefix: "year", label: "年" }),
+  const reserved = await harness.send("POST", "/api/tag-prefixes", {
+    prefix: "year",
+    label: "年",
   });
   assert.equal(reserved.status, 400);
 });
 
-test("PATCH・DELETE /api/tag-prefixes/:prefix は未登録なら404", async () => {
-  const app = buildApp();
-  const patched = await app.request("/api/tag-prefixes/unknown", {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ label: "x" }),
+contract("PATCH・DELETE /api/tag-prefixes/:prefix は未登録なら404", async (harness) => {
+  const patched = await harness.send("PATCH", "/api/tag-prefixes/unknown", {
+    label: "x",
   });
   assert.equal(patched.status, 404);
 
-  const deleted = await app.request("/api/tag-prefixes/unknown", { method: "DELETE" });
+  const deleted = await harness.send("DELETE", "/api/tag-prefixes/unknown");
   assert.equal(deleted.status, 404);
 });
 
-test("POST /api/tag-prefixes: 新規は末尾へ自動採番され、一覧は order 昇順で返る", async () => {
-  const app = buildApp();
+contract(
+  "POST /api/tag-prefixes: 新規は末尾へ自動採番され、一覧は order 昇順で返る",
+  async (harness) => {
+    const created = await harness.send("POST", "/api/tag-prefixes", {
+      prefix: "気分",
+      label: "気分",
+    });
+    const maxSeedOrder = Math.max(...DEFAULT_TAG_PREFIXES.map((p) => p.order));
+    assert.equal(created.body.order, maxSeedOrder + 1);
 
-  const created = await app.request("/api/tag-prefixes", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prefix: "気分", label: "気分" }),
-  });
-  const createdBody = await created.json();
-  const maxSeedOrder = Math.max(...DEFAULT_TAG_PREFIXES.map((p) => p.order));
-  assert.equal(createdBody.order, maxSeedOrder + 1);
+    const list = await harness.json("/api/tag-prefixes");
+    const orders = list.body.map((p: { order: number }) => p.order);
+    assert.deepEqual(
+      orders,
+      [...orders].sort((a: number, b: number) => a - b),
+    );
+  },
+);
 
-  const list = await (await app.request("/api/tag-prefixes")).json();
-  assert.deepEqual(
-    list.map((p: { order: number }) => p.order),
-    [...list].map((p: { order: number }) => p.order).sort((a: number, b: number) => a - b),
-  );
-});
+contract(
+  "PATCH /api/tag-prefixes/:prefix: order のみを送っても無視され、実質空更新として400になる（並び替えは一括APIのみ）",
+  async (harness) => {
+    const before = (await harness.json("/api/tag-prefixes")).body as Array<{
+      prefix: string;
+    }>;
+    const first = before[0]!;
 
-test("PATCH /api/tag-prefixes/:prefix: order のみを送っても無視され、実質空更新として400になる（並び替えは一括APIのみ）", async () => {
-  const app = buildApp();
-  const before = await (await app.request("/api/tag-prefixes")).json();
-  const [first] = before as Array<{ prefix: string; order: number }>;
-  assert.ok(first);
+    const patched = await harness.send(
+      "PATCH",
+      `/api/tag-prefixes/${encodeURIComponent(first.prefix)}`,
+      { order: 99 },
+    );
+    assert.equal(patched.status, 400);
 
-  const patched = await app.request(`/api/tag-prefixes/${encodeURIComponent(first.prefix)}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ order: 99 }),
-  });
-  assert.equal(patched.status, 400);
+    assert.deepEqual((await harness.json("/api/tag-prefixes")).body, before);
+  },
+);
 
-  const after = await (await app.request("/api/tag-prefixes")).json();
-  assert.deepEqual(after, before);
-});
+contract(
+  "PATCH /api/tag-prefixes/:prefix: order を他フィールドと同時に送っても無視され、並び順は変わらない",
+  async (harness) => {
+    const before = (await harness.json("/api/tag-prefixes")).body as Array<{
+      prefix: string;
+      order: number;
+    }>;
+    const first = before[0]!;
 
-test("PATCH /api/tag-prefixes/:prefix: order を他フィールドと同時に送っても無視され、並び順は変わらない", async () => {
-  const app = buildApp();
-  const before = await (await app.request("/api/tag-prefixes")).json();
-  const [first] = before as Array<{ prefix: string; order: number }>;
-  assert.ok(first);
+    const patched = await harness.send(
+      "PATCH",
+      `/api/tag-prefixes/${encodeURIComponent(first.prefix)}`,
+      { label: "更新後ラベル", order: 99 },
+    );
+    assert.equal(patched.status, 200);
+    assert.equal(patched.body.label, "更新後ラベル");
+    assert.equal(patched.body.order, first.order);
+  },
+);
 
-  const patched = await app.request(`/api/tag-prefixes/${encodeURIComponent(first.prefix)}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ label: "更新後ラベル", order: 99 }),
-  });
-  assert.equal(patched.status, 200);
-  const patchedBody = await patched.json();
-  assert.equal(patchedBody.label, "更新後ラベル");
-  assert.equal(patchedBody.order, first.order);
-});
+contract(
+  "PUT /api/tag-prefixes/order: 全prefixの新しい順序を一括・アトミックに適用する",
+  async (harness) => {
+    const before = (await harness.json("/api/tag-prefixes")).body as Array<{
+      prefix: string;
+    }>;
+    const reversedOrder = [...before].reverse().map((p) => p.prefix);
 
-test("PUT /api/tag-prefixes/order: 全prefixの新しい順序を一括・アトミックに適用する", async () => {
-  const app = buildApp();
-  const before = (await (await app.request("/api/tag-prefixes")).json()) as Array<{
-    prefix: string;
-  }>;
-  const reversedOrder = [...before].reverse().map((p) => p.prefix);
+    const res = await harness.send("PUT", "/api/tag-prefixes/order", {
+      prefixes: reversedOrder,
+    });
+    assert.equal(res.status, 200);
+    assert.deepEqual(
+      res.body.map((p: { prefix: string }) => p.prefix),
+      reversedOrder,
+    );
 
-  const res = await app.request("/api/tag-prefixes/order", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prefixes: reversedOrder }),
-  });
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.deepEqual(
-    body.map((p: { prefix: string }) => p.prefix),
-    reversedOrder,
-  );
+    const after = await harness.json("/api/tag-prefixes");
+    assert.deepEqual(
+      after.body.map((p: { prefix: string }) => p.prefix),
+      reversedOrder,
+    );
+  },
+);
 
-  const after = await (await app.request("/api/tag-prefixes")).json();
-  assert.deepEqual(
-    after.map((p: { prefix: string }) => p.prefix),
-    reversedOrder,
-  );
-});
+contract(
+  "PUT /api/tag-prefixes/order: prefix集合が一覧と一致しなければ400で、並び順は変わらない",
+  async (harness) => {
+    const before = (await harness.json("/api/tag-prefixes")).body;
 
-test("PUT /api/tag-prefixes/order: prefix集合が一覧と一致しなければ400で、並び順は変わらない", async () => {
-  const app = buildApp();
-  const before = await (await app.request("/api/tag-prefixes")).json();
+    const res = await harness.send("PUT", "/api/tag-prefixes/order", {
+      prefixes: ["cv", "存在しないprefix"],
+    });
+    assert.equal(res.status, 400);
 
-  const res = await app.request("/api/tag-prefixes/order", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prefixes: ["cv", "存在しないprefix"] }),
-  });
-  assert.equal(res.status, 400);
+    assert.deepEqual((await harness.json("/api/tag-prefixes")).body, before);
+  },
+);
 
-  const after = await (await app.request("/api/tag-prefixes")).json();
-  assert.deepEqual(after, before);
-});
+contract(
+  "GET /api/tag-prefixes/candidates は作品に現れる未登録 prefix を件数降順で返す",
+  async (harness) => {
+    const { status, body } = await harness.json("/api/tag-prefixes/candidates");
+    assert.equal(status, 200);
+    assert.deepEqual(body, [
+      { prefix: "mood", count: 3 },
+      { prefix: "ジャンル", count: 1 },
+    ]);
 
-test("GET /api/tag-prefixes/candidates は未登録 prefix を返す", async () => {
-  const app = buildApp();
-  const res = await app.request("/api/tag-prefixes/candidates");
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.ok(Array.isArray(body));
-  // fixture の初期定義（genre 含む）に含まれる prefix は候補に出ない
-  for (const candidate of body) {
-    assert.ok(!DEFAULT_TAG_PREFIXES.some((p) => p.prefix === candidate.prefix));
-  }
-});
-
-test("PATCH /api/works/:id のタグは正規形で保存される", async () => {
-  const app = buildApp();
-  const works = await (await app.request("/api/works")).json();
-  const id = works.items[0].id;
-  const sourceRevision = "fixture";
-
-  const res = await app.request(`/api/works/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sourceRevision, tags: ["CV/ 新人 ", "ASMR", "asmr", "ASMR"] }),
-  });
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  assert.deepEqual(body.snapshot.tags, ["cv/新人", "ASMR", "asmr"]);
-});
+    await harness.send("POST", "/api/tag-prefixes", {
+      prefix: "mood",
+      label: "気分",
+    });
+    const afterRegister = await harness.json("/api/tag-prefixes/candidates");
+    assert.deepEqual(afterRegister.body, [{ prefix: "ジャンル", count: 1 }]);
+  },
+);

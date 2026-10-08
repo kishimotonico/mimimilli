@@ -1,67 +1,69 @@
-// POST /api/smart-folders/preview（保存前ルールのライブ件数プレビュー）を検証。
-// マッチングロジック自体は evalSmartFolderRules 側（smartFolder.test.ts）で担保済みのため、
-// ここではルート層の配線（バリデーション・adapterへの委譲・レスポンス形）だけを確認する。
-import { test } from "node:test";
+// POST /api/smart-folders/preview（保存前ルールのライブ件数プレビュー）を fixture / real の両方で検証。
+// ルールの評価結果が件数として返ることと、リクエスト検証の400を確認する。
 import assert from "node:assert/strict";
 import type { ApiError, SmartFolderRule } from "@mimimilli/shared";
-import { createApp } from "../src/app.ts";
-import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
+import { defineContract } from "./helpers/contractHarness.ts";
 import { nts } from "./helpers/tag.ts";
 
-function buildApp(previewSmartFolderRuleCount: (rules: SmartFolderRule[]) => Promise<number>) {
-  return createApp({ ...createFixtureAdapter(), previewSmartFolderRuleCount });
-}
+const contract = defineContract(
+  {
+    works: [
+      { key: "a", tags: ["ASMR", "cv/x"] },
+      { key: "b", tags: ["ASMR"] },
+      { key: "c", tags: ["耳かき"] },
+    ],
+  },
+  { shared: true },
+);
 
-test("ルールをadapterへそのまま渡し、件数をtotalとして返す", async () => {
-  let received: SmartFolderRule[] | null = null;
-  const app = buildApp(async (rules) => {
-    received = rules;
-    return 3;
-  });
-  const rules: SmartFolderRule[] = [
-    { conjunction: "WHERE", field: "タグ", operator: "∋", values: nts(["ASMR"]) },
-  ];
-  const res = await app.request("/api/smart-folders/preview", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ rules }),
-  });
-  assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { total: 3 });
-  assert.deepEqual(received, rules);
+const tagRule = (conjunction: SmartFolderRule["conjunction"], tag: string): SmartFolderRule => ({
+  conjunction,
+  field: "タグ",
+  operator: "∋",
+  values: nts([tag]),
 });
 
-test("rulesが空配列でも受け付ける", async () => {
-  const app = buildApp(async (rules) => rules.length);
-  const res = await app.request("/api/smart-folders/preview", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ rules: [] }),
+contract("ルールに一致する作品数をtotalとして返す", async (harness) => {
+  const asmr = await harness.send("POST", "/api/smart-folders/preview", {
+    rules: [tagRule("WHERE", "ASMR")],
   });
-  assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { total: 0 });
+  assert.equal(asmr.status, 200);
+  assert.deepEqual(asmr.body, { total: 2 });
+
+  const both = await harness.send("POST", "/api/smart-folders/preview", {
+    rules: [tagRule("WHERE", "ASMR"), tagRule("AND", "cv/x")],
+  });
+  assert.deepEqual(both.body, { total: 1 });
+
+  const either = await harness.send("POST", "/api/smart-folders/preview", {
+    rules: [tagRule("WHERE", "cv/x"), tagRule("OR", "耳かき")],
+  });
+  assert.deepEqual(either.body, { total: 2 });
 });
 
-test("不正なルールは400を返す", async () => {
-  const app = buildApp(async () => 0);
-  const res = await app.request("/api/smart-folders/preview", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ rules: [{ field: "タグ" }] }),
+contract("rulesが空配列なら全作品が対象になる", async (harness) => {
+  const res = await harness.send("POST", "/api/smart-folders/preview", {
+    rules: [],
+  });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body, { total: 3 });
+});
+
+contract("不正なルールは400を返す", async (harness) => {
+  const res = await harness.send("POST", "/api/smart-folders/preview", {
+    rules: [{ field: "タグ" }],
   });
   assert.equal(res.status, 400);
 });
 
-test("bodyが無ければ400を返す", async () => {
-  const app = buildApp(async () => 0);
-  const res = await app.request("/api/smart-folders/preview", { method: "POST" });
+contract("bodyが無ければ400を返す", async (harness) => {
+  const res = await harness.request("/api/smart-folders/preview", { method: "POST" });
   assert.equal(res.status, 400);
 });
 
-test("不正なJSONとスキーマ不一致は同じ400でメッセージが異なる", async () => {
-  const app = buildApp(async () => 0);
+contract("不正なJSONとスキーマ不一致は同じ400でメッセージが異なる", async (harness) => {
   const post = (body: string) =>
-    app.request("/api/smart-folders/preview", {
+    harness.request("/api/smart-folders/preview", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body,

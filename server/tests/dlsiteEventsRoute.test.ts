@@ -7,15 +7,12 @@ import { createApp } from "../src/app.ts";
 import type { DataAdapter } from "../src/adapter/index.ts";
 import { DlsiteJobManager } from "../src/dlsiteJobManager.ts";
 import { dlsiteRoute } from "../src/routes/dlsite.ts";
+import { withRunDlsiteBulk } from "./helpers/adapterStub.ts";
 
 function createManager(adapter?: DataAdapter): DlsiteJobManager {
   return new DlsiteJobManager(
     adapter ??
-      ({
-        async runDlsiteBulk() {
-          return { fetched: 0, failed: 0, parseErrors: 0, skipped: 0 };
-        },
-      } as unknown as DataAdapter),
+      withRunDlsiteBulk(async () => ({ fetched: 0, failed: 0, parseErrors: 0, skipped: 0 })),
   );
 }
 

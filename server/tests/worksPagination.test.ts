@@ -1,50 +1,30 @@
-// GET /works のサーバー側デフォルトページングと、ページ間の重複・欠落なしを検証。
-import { test } from "node:test";
+// GET /works のサーバー側デフォルトページングと、ページ間の重複・欠落なしを fixture / real の両方で検証。
 import assert from "node:assert/strict";
-import { WORKS_DEFAULT_PAGE_SIZE, type WorksPage, type WorkSummary } from "@mimimilli/shared";
-import { createApp } from "../src/app.ts";
-import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
-import { applyWorksQuery, toWorksPage } from "../src/core/worksQuery.ts";
-import { makeWorkSummary } from "./helpers/workTestUtils.ts";
+import { WORKS_DEFAULT_PAGE_SIZE, type WorksPage } from "@mimimilli/shared";
+import { defineContract, numberedWorks, type ContractHarness } from "./helpers/contractHarness.ts";
 
-const RECENT = new Date(Date.now() - 5 * 86400000).toISOString();
+const TOTAL = WORKS_DEFAULT_PAGE_SIZE + 10;
+const contract = defineContract({ works: numberedWorks(TOTAL) }, { shared: true });
 
-function summary(index: number): WorkSummary {
-  const id = `work-${String(index).padStart(4, "0")}`;
-  return makeWorkSummary({
-    id,
-    title: `作品 ${id}`,
-    physicalPath: `/library/${id}`,
-    totalDurationSec: 600,
-    addedAt: RECENT,
-  });
+async function getWorks(harness: ContractHarness, query = ""): Promise<WorksPage> {
+  const { status, body } = await harness.json<WorksPage>(`/api/works${query}`);
+  assert.equal(status, 200);
+  return body;
 }
 
-// fixture アダプタの queryWorks を、210件データへの applyWorksQuery に差し替える
-function buildAppWithManyWorks(count = 210) {
-  const adapter = createFixtureAdapter();
-  const manyWorks = Array.from({ length: count }, (_, index) => summary(index));
-  adapter.queryWorks = async (query) => toWorksPage(applyWorksQuery(manyWorks, query), "/library");
-  return createApp(adapter);
-}
+contract(
+  "limit 未指定でも全件返さない（デフォルト page=1 + デフォルト limit）",
+  async (harness) => {
+    const body = await getWorks(harness);
+    assert.equal(body.items.length, WORKS_DEFAULT_PAGE_SIZE);
+    assert.equal(body.total, TOTAL);
+  },
+);
 
-async function getWorks(app: ReturnType<typeof createApp>, query = ""): Promise<WorksPage> {
-  const res = await app.request(`/api/works${query}`);
-  assert.equal(res.status, 200);
-  return (await res.json()) as WorksPage;
-}
-
-test("limit 未指定でも全件返さない（デフォルト page=1 + デフォルト limit）", async () => {
-  const app = buildAppWithManyWorks(210);
-  const body = await getWorks(app);
-  assert.equal(body.items.length, WORKS_DEFAULT_PAGE_SIZE);
-  assert.equal(body.total, 210);
-});
-
-test("一覧HTTPレスポンスは軽量DTOの許可キーだけを返す", async () => {
-  const app = buildAppWithManyWorks(1);
-  const body = await getWorks(app);
-  assert.deepEqual(Object.keys(body.items[0]!).sort(), [
+contract("一覧HTTPレスポンスは軽量DTOの許可キーだけを返す", async (harness) => {
+  const body = await getWorks(harness, "?limit=1");
+  const item = body.items[0]!;
+  assert.deepEqual(Object.keys(item).sort(), [
     "bookmarked",
     "circleName",
     "cover",
@@ -57,46 +37,57 @@ test("一覧HTTPレスポンスは軽量DTOの許可キーだけを返す", asyn
     "totalDurationSec",
     "trackCount",
   ]);
-  assert.deepEqual(Object.keys(body.items[0]!.dlsite).sort(), ["rjCode", "status"]);
-  assert.equal("physicalPath" in body.items[0]!, false);
-  assert.equal("playlists" in body.items[0]!, false);
+  assert.deepEqual(Object.keys(item.dlsite).sort(), ["rjCode", "status"]);
+  assert.equal("physicalPath" in item, false);
+  assert.equal("playlists" in item, false);
 });
 
-test("limit のみ指定時は page=1 として動作する", async () => {
-  const app = buildAppWithManyWorks(210);
-  const body = await getWorks(app, "?limit=5");
+contract("limit のみ指定時は page=1 として動作する", async (harness) => {
+  const body = await getWorks(harness, "?limit=5&sort=id-asc");
   assert.equal(body.items.length, 5);
-  assert.equal(body.total, 210);
-  assert.equal(body.items[0]!.id, "work-0000");
+  assert.equal(body.total, TOTAL);
+  assert.equal(body.items[0]!.id, harness.workId("work-0000"));
 });
 
-test("全件がページの連結で重複・欠落なく取得できる", async () => {
-  const app = buildAppWithManyWorks(210);
-  const first = await getWorks(app, `?limit=${WORKS_DEFAULT_PAGE_SIZE}&page=1`);
-  const second = await getWorks(app, `?limit=${WORKS_DEFAULT_PAGE_SIZE}&page=2`);
+contract("全件がページの連結で重複・欠落なく取得できる", async (harness) => {
+  const first = await getWorks(harness, `?limit=${WORKS_DEFAULT_PAGE_SIZE}&page=1`);
+  const second = await getWorks(harness, `?limit=${WORKS_DEFAULT_PAGE_SIZE}&page=2`);
   const ids = [...first.items, ...second.items].map((work) => work.id);
-  assert.equal(new Set(ids).size, 210, "ページ間で重複があります");
-  assert.equal(ids.length, 210, "ページ間で欠落があります");
-  assert.equal(second.total, 210);
+  assert.equal(new Set(ids).size, TOTAL, "ページ間で重複があります");
+  assert.equal(ids.length, TOTAL, "ページ間で欠落があります");
+  assert.equal(second.total, TOTAL);
 });
 
-test("randomソートは発行されたseedを次ページへ送ると重複・欠落なく取得できる", async () => {
-  const app = buildAppWithManyWorks(210);
-  const first = await getWorks(app, "?sort=random&limit=200&page=1");
-  assert.equal(typeof first.seed, "number");
-  const second = await getWorks(app, `?sort=random&seed=${first.seed}&limit=200&page=2`);
-  const ids = [...first.items, ...second.items].map((work) => work.id);
-  assert.equal(new Set(ids).size, 210, "random ページ間で重複があります");
-  assert.equal(ids.length, 210, "random ページ間で欠落があります");
+contract(
+  "randomソートは発行されたseedを次ページへ送ると重複・欠落なく取得できる",
+  async (harness) => {
+    const first = await getWorks(harness, "?sort=random&limit=200&page=1");
+    assert.equal(typeof first.seed, "number");
+    const second = await getWorks(harness, `?sort=random&seed=${first.seed}&limit=200&page=2`);
+    const ids = [...first.items, ...second.items].map((work) => work.id);
+    assert.equal(new Set(ids).size, TOTAL, "random ページ間で重複があります");
+    assert.equal(ids.length, TOTAL, "random ページ間で欠落があります");
+  },
+);
+
+contract("デフォルト limit を超えた分は次ページで取得できる", async (harness) => {
+  const second = await getWorks(harness, "?page=2");
+  assert.equal(second.items.length, TOTAL - WORKS_DEFAULT_PAGE_SIZE);
+  assert.equal(second.total, TOTAL);
 });
 
-test("スキャン後の新規作品も先頭ページ外なら次ページで取得できる", async () => {
-  // デフォルト limit ちょうどの件数から1件増えるケース（追加作品は added-desc の先頭に来ても
-  // 末尾ページの件数が増えるだけで、既存のページ境界ではみ出た分は次ページで取得できる）
-  const app = buildAppWithManyWorks(WORKS_DEFAULT_PAGE_SIZE + 1);
-  const first = await getWorks(app);
-  assert.equal(first.items.length, WORKS_DEFAULT_PAGE_SIZE);
-  const second = await getWorks(app, "?page=2");
-  assert.equal(second.items.length, 1);
-  assert.equal(second.total, WORKS_DEFAULT_PAGE_SIZE + 1);
-});
+for (const total of [WORKS_DEFAULT_PAGE_SIZE, WORKS_DEFAULT_PAGE_SIZE + 1]) {
+  const boundary = defineContract({ works: numberedWorks(total) }, { shared: true });
+
+  boundary(
+    `デフォルト limit に対して ${total} 件のとき、1ページ目は上限まで・超過分だけが2ページ目`,
+    async (harness) => {
+      const first = await getWorks(harness);
+      assert.equal(first.items.length, WORKS_DEFAULT_PAGE_SIZE);
+      assert.equal(first.total, total);
+      const second = await getWorks(harness, "?page=2");
+      assert.equal(second.items.length, total - WORKS_DEFAULT_PAGE_SIZE);
+      assert.equal(second.total, total);
+    },
+  );
+}
