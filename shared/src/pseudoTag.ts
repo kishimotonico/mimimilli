@@ -22,7 +22,7 @@ export interface ParsedBuiltinAxisTag {
 
 /** 擬似タグ文字列を軸と値に分解する。擬似タグでなければ null（軸が既知かどうかは見ない）。
  *  正規化済み（NormalizedTag）を受け取る前提で、内部で正規化はしない。呼び出し元
- *  （splitSelectedTags・client の tagFilterGroupKey・axisOfFilterTag）が正規化済みの値を渡す。 */
+ *  （splitSelectedTags・client の axisOfFilterTag）が正規化済みの値を渡す。 */
 export function parseBuiltinAxisTag(tag: NormalizedTag): ParsedBuiltinAxisTag | null {
   if (!tag.startsWith(RESERVED_TAG_PREFIX)) return null;
   const rest = tag.slice(RESERVED_TAG_PREFIX.length);
