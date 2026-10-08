@@ -1,10 +1,11 @@
 ---
 id: TASK-482
 title: メタファイルの読み込みとパースの入口を1つにし、scan中の重複読み込みと二重パースをなくす
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@mimi2'
 created_date: '2026-10-02 11:46'
-updated_date: '2026-10-04 09:34'
+updated_date: '2026-10-08 05:31'
 labels:
   - server
   - refactor
@@ -25,12 +26,12 @@ TASK-474のメタJSONパース失敗の集約と二重パース解消はこの�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 メタファイルのJSONパースとスキーマ検証の入口が1つで、formatVersion判定を全経路が通る
-- [ ] #2 scanが1つのメタファイルを再検証以外の目的で複数回読まない
-- [ ] #3 パース失敗をMetaParseErrorにする処理が1関数にまとまっている
-- [ ] #4 不正JSON・不正スキーマ・identity衝突のscan結果が既存テストの期待値どおり
-- [ ] #5 pnpm check && pnpm test が通る
-- [ ] #6 候補IDの抽出（不正JSONからの救済を含む）の実装が1箇所にある
+- [x] #1 メタファイルのJSONパースとスキーマ検証の入口が1つで、formatVersion判定を全経路が通る
+- [x] #2 scanが1つのメタファイルを再検証以外の目的で複数回読まない
+- [x] #3 パース失敗をMetaParseErrorにする処理が1関数にまとまっている
+- [x] #4 不正JSON・不正スキーマ・identity衝突のscan結果が既存テストの期待値どおり
+- [x] #5 pnpm check && pnpm test が通る
+- [x] #6 候補IDの抽出（不正JSONからの救済を含む）の実装が1箇所にある
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -38,3 +39,9 @@ TASK-474のメタJSONパース失敗の集約と二重パース解消はこの�
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-04 Codex(Astra)レビュー（tmp/structural-audit-2026-10-02/review-astra.md）を反映: 不正JSONからcandidateIdを拾ってidentity_conflictにする挙動は、壊れたコピーで既存作品の投影を乗っ取らせないための既存仕様（server/tests/real/identityConflict.test.ts の「壊れたコピーのcandidateIdで既存作品の投影を乗っ取らない」、TASK-399）なので維持する。旧AC#2（正規表現抽出の廃止）は取り下げ、抽出実装を1箇所にする条件に変えた。readMetaSourceは現状パース失敗時にcandidateId=nullを投げるため、単一入口はraw・候補ID・診断・検証済みMetaFileを取り出せる形にする。検証済みMetaFileだけを返す関数への置き換えでは足りない。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+inspectMetaFile/inspectMetaBytes をメタファイルの読み込み・検証・候補ID抽出の唯一の入口にし、MetaParseError は metaParseErrorOf に一本化。scan は1ファイル1回の読み込みで ID・診断・投影入力を取り出し、使い終わった inspection は解放する。壊れたコピーは従来どおり invalid。 個別レビュー＋統合ブランチの横断レビュー、master への仮マージ（衝突解消込み）で pnpm check・test（server 953 / client 1247）・smoke 30 全通過。15013618 で master へマージ。
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,10 +1,11 @@
 ---
 id: TASK-483
 title: DBスキーマ版数の手書き定数をやめ、マイグレーションの判定の情報源をjournalに揃える
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@mimi2'
 created_date: '2026-10-02 11:46'
-updated_date: '2026-10-04 09:34'
+updated_date: '2026-10-08 05:31'
 labels:
   - server
   - db
@@ -24,11 +25,11 @@ db.ts の CATALOG_SCHEMA_VERSION=9・USER_SCHEMA_VERSION=8 は手書きの定数
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 スキーマ版数の手書き定数が無い
-- [ ] #2 未適用マイグレーションの判定と「DBがアプリより新しい」判定が同じ情報源（journal）から導かれる
-- [ ] #3 ADR-0023が新しい判定方式を説明している
-- [ ] #4 pnpm check && pnpm test が通る
-- [ ] #5 journalより新しい未知のmigration履歴を持つDBで起動するとfail-fastする既存の挙動が維持され、テストで縛られている
+- [x] #1 スキーマ版数の手書き定数が無い
+- [x] #2 未適用マイグレーションの判定と「DBがアプリより新しい」判定が同じ情報源（journal）から導かれる
+- [x] #3 ADR-0023が新しい判定方式を説明している
+- [x] #4 pnpm check && pnpm test が通る
+- [x] #5 journalより新しい未知のmigration履歴を持つDBで起動するとfail-fastする既存の挙動が維持され、テストで縛られている
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -36,3 +37,9 @@ db.ts の CATALOG_SCHEMA_VERSION=9・USER_SCHEMA_VERSION=8 は手書きの定数
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-04 Codex(Astra)レビュー（tmp/structural-audit-2026-10-02/review-astra.md）を反映: 当初の説明「fail-fastが形骸化している」は、ledgerとjournalの時刻照合（sqliteMigrationExecutor.ts:130付近、dbBackup.test.ts:283でテスト済み）を見落としていたので訂正した。単なる情報源の整理なのでlowに下げた。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+PRAGMA user_version と手書きの版数定数を廃止し、ledger と journal の突き合わせ1関数で未適用・未知の created_at（新旧）・重複・履歴の穴を判定。hash 照合はしない。ADR-0023・0021 を書き換え。 個別レビュー＋統合ブランチの横断レビュー、master への仮マージ（衝突解消込み）で pnpm check・test（server 953 / client 1247）・smoke 30 全通過。15013618 で master へマージ。
+<!-- SECTION:FINAL_SUMMARY:END -->

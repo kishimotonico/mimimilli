@@ -1,10 +1,11 @@
 ---
 id: TASK-495
 title: DLsite一括取得を作品ごとの取得→結果集計・投影更新→進捗の流れに作り替える
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@mimi2'
 created_date: '2026-10-02 11:48'
-updated_date: '2026-10-04 09:34'
+updated_date: '2026-10-08 05:31'
 labels:
   - server
   - dlsite
@@ -23,12 +24,12 @@ dlsiteBulk.ts の runDlsiteBulk は、先に fetchDlsiteBulkAttempts で全rjCod
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 一括取得中、作品1件の処理が終わるたびに進捗が通知される
-- [ ] #2 同じrjCodeを持つ作品が複数あってもDLsiteへの取得は1回だけ
-- [ ] #3 進捗・取消・オフライン時の終端がテストで縛られている
-- [ ] #4 pnpm check && pnpm test が通る
-- [ ] #5 取消時の結果が、取消までに取得成功・取得失敗・パース失敗として処理した作品の件数を返す（通常の取消と例外による中断を区別してテストしている）
-- [ ] #6 全件の取得完了を待ってから集計する二段階の構造が無い
+- [x] #1 一括取得中、作品1件の処理が終わるたびに進捗が通知される
+- [x] #2 同じrjCodeを持つ作品が複数あってもDLsiteへの取得は1回だけ
+- [x] #3 進捗・取消・オフライン時の終端がテストで縛られている
+- [x] #4 pnpm check && pnpm test が通る
+- [x] #5 取消時の結果が、取消までに取得成功・取得失敗・パース失敗として処理した作品の件数を返す（通常の取消と例外による中断を区別してテストしている）
+- [x] #6 全件の取得完了を待ってから集計する二段階の構造が無い
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -36,3 +37,9 @@ dlsiteBulk.ts の runDlsiteBulk は、先に fetchDlsiteBulkAttempts で全rjCod
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-04 Codex(Astra)レビュー（tmp/structural-audit-2026-10-02/review-astra.md）を反映: 当初の説明「取消時のresultも0固定」は誤りで、通常の取消はadapterが返したresultをそのまま送り、0固定は例外経路（dlsiteJobManager.ts:181付近）だけ。applyDlsiteBulkWorkは正本への書き込みではなく件数集計と投影更新なので、タイトルと説明を直した。同じrjCodeの取得を1回にしつつ全件保持もしないため、rjCodeごとに作品をまとめて処理する。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+rjCode ごとに 取得→作品ごとの集計・投影更新→進捗通知 の1段にし、全件取得の二段構造を廃止。進捗の work は実処理順、取消時は処理済み件数を返し、到達不能だった DlsiteOfflineError 分岐を削除、drain は finally。 個別レビュー＋統合ブランチの横断レビュー、master への仮マージ（衝突解消込み）で pnpm check・test（server 953 / client 1247）・smoke 30 全通過。15013618 で master へマージ。
+<!-- SECTION:FINAL_SUMMARY:END -->

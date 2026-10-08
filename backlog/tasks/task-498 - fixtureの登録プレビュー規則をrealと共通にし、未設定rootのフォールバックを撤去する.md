@@ -1,10 +1,11 @@
 ---
 id: TASK-498
 title: fixtureの登録プレビュー規則をrealと共通にし、未設定rootのフォールバックを撤去する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@mimi2'
 created_date: '2026-10-02 11:48'
-updated_date: '2026-10-08 03:39'
+updated_date: '2026-10-08 05:32'
 labels:
   - server
   - fixture
@@ -23,11 +24,11 @@ fixtureの getWorkRegisterPreview は独自の正規表現 /RJ\d{6,8}/i でRJコ
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 登録プレビューのRJ検出とタイトル候補の規則がcoreの関数で、fixtureとrealが同じ関数を使う
-- [ ] #2 fixtureに独自のRJコード正規表現が無い
-- [ ] #3 fixtureのroot参照が1関数を通り、未設定時はrealと同じエラーになる
-- [ ] #4 登録プレビューの規則が両adapterで同じ結果になることがテストで確認されている
-- [ ] #5 pnpm check && pnpm test が通る
+- [x] #1 登録プレビューのRJ検出とタイトル候補の規則がcoreの関数で、fixtureとrealが同じ関数を使う
+- [x] #2 fixtureに独自のRJコード正規表現が無い
+- [x] #3 fixtureのroot参照が1関数を通り、未設定時はrealと同じエラーになる
+- [x] #4 登録プレビューの規則が両adapterで同じ結果になることがテストで確認されている
+- [x] #5 pnpm check && pnpm test が通る
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -37,3 +38,9 @@ fixtureの getWorkRegisterPreview は独自の正規表現 /RJ\d{6,8}/i でRJコ
 
 2026-10-08 DRAFT-56（fixture/real conformance test）をarchive。全ポートの網羅契約は採らず、fixtureとrealで規則が食い違った箇所ごとに契約テストを足す運用で、既に adapterRulesContract・workPlacementContract・updatePayloadContract・dlsite*Contract・rootReconfigurationContract 等がある。検索系は real/worksQueryContract。fixtureの登録プレビュー規則とroot未設定の挙動の食い違いは本タスクで解消し、同様の食い違いを見つけたらその規則の契約テストを足す。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+登録プレビューの命名規則（RJ検出・タイトル候補）と root 参照を core に出し、fixture の独自正規表現と state.rootFolder ?? "/library" のフォールバックを撤去。契約テストで両 adapter の一致を縛った。 個別レビュー＋統合ブランチの横断レビュー、master への仮マージ（衝突解消込み）で pnpm check・test（server 953 / client 1247）・smoke 30 全通過。15013618 で master へマージ。
+<!-- SECTION:FINAL_SUMMARY:END -->

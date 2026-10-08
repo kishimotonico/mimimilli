@@ -1,9 +1,11 @@
 ---
 id: TASK-499
 title: 作品登録エラーのnot_configuredをパス不正と未設定で分ける
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@mimi2'
 created_date: '2026-10-02 11:49'
+updated_date: '2026-10-08 04:12'
 labels:
   - server
   - refactor
@@ -22,9 +24,15 @@ WorkRegisterError の code のうち not_configured が、rootが未設定の場
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 パスが存在しない・root配下でない場合の登録エラーが、未設定とは別のコードで返る
-- [ ] #2 rootが未設定のときの登録エラーが他のAPIと同じステータスになる
-- [ ] #3 WorkRegisterErrorのコードの型が1箇所で定義されている
-- [ ] #4 clientの表示が新しいコードに追従している
-- [ ] #5 pnpm check && pnpm test が通る
+- [x] #1 パスが存在しない・root配下でない場合の登録エラーが、未設定とは別のコードで返る
+- [x] #2 rootが未設定のときの登録エラーが他のAPIと同じステータスになる
+- [x] #3 WorkRegisterErrorのコードの型が1箇所で定義されている
+- [x] #4 clientの表示が新しいコードに追従している
+- [x] #5 pnpm check && pnpm test が通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+パス不正を invalid_path（404）として分け、root 未設定は NotConfiguredError（409）に。WorkRegisterErrorCode を1回だけ定義。client はステータスとメッセージだけを見ているため追従不要。 個別レビュー＋統合ブランチの横断レビュー、feat/audit-sweep 先端で pnpm check・test 全通過、smoke 29/30（失敗1件は別プロジェクトの vite とのポート衝突で、単体再実行3/3通過）。17736da3 で master へマージ。
+<!-- SECTION:FINAL_SUMMARY:END -->

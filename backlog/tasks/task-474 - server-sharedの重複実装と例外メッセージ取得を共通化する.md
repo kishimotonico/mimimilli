@@ -1,10 +1,11 @@
 ---
 id: TASK-474
 title: server/sharedの重複実装と例外メッセージ取得を共通化する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@mimi2'
 created_date: '2026-10-02 11:40'
-updated_date: '2026-10-02 11:50'
+updated_date: '2026-10-08 04:12'
 labels:
   - server
   - shared
@@ -22,10 +23,10 @@ ordinal: 532000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 音声拡張子の定義と拡張子取得がsharedの1箇所に集約されている
-- [ ] #2 例外からのメッセージ取得がunknownを受けるヘルパー経由になり、(e as Error).message が残っていない
-- [ ] #3 routeのリクエストボディ読み取りが1系統に統一され、不正JSONと不正スキーマが区別されて応答される
-- [ ] #4 pnpm check && pnpm test が通る
+- [x] #1 音声拡張子の定義と拡張子取得がsharedの1箇所に集約されている
+- [x] #2 例外からのメッセージ取得がunknownを受けるヘルパー経由になり、(e as Error).message が残っていない
+- [x] #3 routeのリクエストボディ読み取りが1系統に統一され、不正JSONと不正スキーマが区別されて応答される
+- [x] #4 pnpm check && pnpm test が通る
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -33,3 +34,9 @@ ordinal: 532000
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-02構造点検（doc-6・doc-7）より: メタJSONのパース失敗の集約とscanRegisterの二重パース（旧AC#2）は、メタファイル読み込みの入口を一本化するTASK-482で扱うためこのタスクから外した。音声拡張子の三重定義（AC#1）は点検でも確認済み（doc-6 shared-8）。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+音声拡張子と拡張子取得を shared/meta.ts に集約、errorMessage(unknown) を shared/error.ts に新設して (e as Error).message を全廃、route のボディ読み取りを readJsonBody/readOptionalJsonBody の1系統にし不正JSONとスキーマ不一致をメッセージで区別。 個別レビュー＋統合ブランチの横断レビュー、feat/audit-sweep 先端で pnpm check・test 全通過、smoke 29/30（失敗1件は別プロジェクトの vite とのポート衝突で、単体再実行3/3通過）。17736da3 で master へマージ。
+<!-- SECTION:FINAL_SUMMARY:END -->

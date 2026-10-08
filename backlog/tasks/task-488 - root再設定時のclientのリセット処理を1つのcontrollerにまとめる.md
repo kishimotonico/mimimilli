@@ -1,10 +1,11 @@
 ---
 id: TASK-488
 title: root再設定時のclientのリセット処理を1つのcontrollerにまとめる
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@mimi2'
 created_date: '2026-10-02 11:47'
-updated_date: '2026-10-04 09:34'
+updated_date: '2026-10-08 06:44'
 labels:
   - client
   - refactor
@@ -25,11 +26,11 @@ root再設定の突入・離脱時の処理が App.tsx の performReconfiguratio
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 再設定の突入・離脱時にリセットする対象が1箇所に列挙されている
-- [ ] #2 突入・離脱・drift検知時のリセットがReactを使わない単体テストで縛られている
-- [ ] #3 pnpm check && pnpm test が通る
-- [ ] #4 突入時は通常UIのobserverが外れた後に作品系クエリを破棄し、離脱・drift検知時は再取得し、初回readyでは不要なresetをしないことがテストで確認されている
-- [ ] #5 root再設定の前後で画面・再生・モーダル・キャッシュの状態が現在と同じになることをpnpm test:smokeで確認している
+- [x] #1 再設定の突入・離脱時にリセットする対象が1箇所に列挙されている
+- [x] #2 突入・離脱・drift検知時のリセットがReactを使わない単体テストで縛られている
+- [x] #3 pnpm check && pnpm test が通る
+- [x] #4 突入時は通常UIのobserverが外れた後に作品系クエリを破棄し、離脱・drift検知時は再取得し、初回readyでは不要なresetをしないことがテストで確認されている
+- [x] #5 root再設定の前後で画面・再生・モーダル・キャッシュの状態が現在と同じになることをpnpm test:smokeで確認している
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -37,3 +38,9 @@ root再設定の突入・離脱時の処理が App.tsx の performReconfiguratio
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-04 Codex(Astra)レビュー（tmp/structural-audit-2026-10-02/review-astra.md）を反映: EntryEffect・ExitEffectの分離はlint回避だけでなく、Reactのコミット前後の実行時点（通常UIのobserverが外れてからremoveする、ready時のobserverを残してresetする）にも意味がある。純TSのcontrollerにはUI離脱完了などの境界をイベントとして渡すか、薄いReactの接続部分を残す。Effectの数を減らすことは完了基準にしない（旧AC#2を取り下げ）。scan.reset・DLsite.attachの操作契約はTASK-487で確定させ、それを使うため487に依存させた。再生の停止はTASK-489が実装する停止契約を呼ぶ側に回る。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+root 再設定の突入・離脱・drift のリセットを rootReconfigurationController の1リストに集約し、突入時に DLsite 一括取得の追跡も reset。離脱は navigate のコミット後・settings が idle のときに1回だけ走る。 個別レビュー＋統合ブランチの横断レビュー、master への仮マージで pnpm check・test（server 951 / client 1339）・smoke 30 全通過、fixture でのブラウザ確認（再生・作品編集・スキャン・root 再設定）で崩れ・エラーなし。61e4b7bb で master へマージ。
+<!-- SECTION:FINAL_SUMMARY:END -->

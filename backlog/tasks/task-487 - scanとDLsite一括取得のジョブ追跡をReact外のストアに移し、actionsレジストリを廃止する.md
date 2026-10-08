@@ -1,9 +1,11 @@
 ---
 id: TASK-487
 title: scanとDLsite一括取得のジョブ追跡をReact外のストアに移し、actionsレジストリを廃止する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@mimi2'
 created_date: '2026-10-02 11:47'
+updated_date: '2026-10-08 06:44'
 labels:
   - client
   - refactor
@@ -22,9 +24,15 @@ useScanJob.ts はuseRefを8本使ってジョブの世代・終端処理を手�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 scanとDLsite一括取得のジョブ状態・SSE購読・終端処理がReactコンポーネントの外の同じ形のストアにある
-- [ ] #2 操作の呼び出しがRuntimeコンポーネントのマウントに依存せず、actionsレジストリのatomとrequire系の例外が無い
-- [ ] #3 ジョブの開始・取消・再接続・終端の遷移がReactを使わない単体テストで縛られている
-- [ ] #4 トースト・キャッシュ更新など終端時の副作用が現在と同じタイミングで起きる
-- [ ] #5 pnpm check && pnpm test && pnpm test:smoke が通る
+- [x] #1 scanとDLsite一括取得のジョブ状態・SSE購読・終端処理がReactコンポーネントの外の同じ形のストアにある
+- [x] #2 操作の呼び出しがRuntimeコンポーネントのマウントに依存せず、actionsレジストリのatomとrequire系の例外が無い
+- [x] #3 ジョブの開始・取消・再接続・終端の遷移がReactを使わない単体テストで縛られている
+- [x] #4 トースト・キャッシュ更新など終端時の副作用が現在と同じタイミングで起きる
+- [x] #5 pnpm check && pnpm test && pnpm test:smoke が通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+scan と DLsite 一括取得のジョブ追跡（スナップショット・SSE・世代・終端）を scanJobStore・dlsiteBulkStore の同じ形の純 TS ストアに移し、actions レジストリと require 系の例外を廃止。Runtime はストアのイベントをトースト・キャッシュ更新へつなぐだけ。 個別レビュー＋統合ブランチの横断レビュー、master への仮マージで pnpm check・test（server 951 / client 1339）・smoke 30 全通過、fixture でのブラウザ確認（再生・作品編集・スキャン・root 再設定）で崩れ・エラーなし。61e4b7bb で master へマージ。
+<!-- SECTION:FINAL_SUMMARY:END -->

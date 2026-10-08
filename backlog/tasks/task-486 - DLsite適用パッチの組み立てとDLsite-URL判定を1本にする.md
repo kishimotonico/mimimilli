@@ -1,9 +1,11 @@
 ---
 id: TASK-486
 title: DLsite適用パッチの組み立てとDLsite URL判定を1本にする
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@mimi2'
 created_date: '2026-10-02 11:46'
+updated_date: '2026-10-08 04:12'
 labels:
   - shared
   - refactor
@@ -22,9 +24,15 @@ shared/src/dlsite.ts の buildDlsiteApplyPatch と buildDlsiteMissingApplyPatch 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 通常適用と欠落適用のパッチが同じ組み立て関数を通る
-- [ ] #2 DLsite URLの判定がhostname比較の1関数で、部分一致の判定が残っていない
-- [ ] #3 dlsite.com を含む別ホストのURLがDLsite URLと判定されないことがテストで確認されている
-- [ ] #4 DLsite取得失敗の種別が他のエラーコード定義と重複して手書きされていない
-- [ ] #5 pnpm check && pnpm test が通る
+- [x] #1 通常適用と欠落適用のパッチが同じ組み立て関数を通る
+- [x] #2 DLsite URLの判定がhostname比較の1関数で、部分一致の判定が残っていない
+- [x] #3 dlsite.com を含む別ホストのURLがDLsite URLと判定されないことがテストで確認されている
+- [x] #4 DLsite取得失敗の種別が他のエラーコード定義と重複して手書きされていない
+- [x] #5 pnpm check && pnpm test が通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+通常適用と欠落適用のパッチを共通関数に、DLsite URL 判定を hostname 比較の isDlsiteUrl に、apiErrorSchema の code を dlsiteFetchErrorKindSchema から導出。別ホストを弾くテストを追加。 個別レビュー＋統合ブランチの横断レビュー、feat/audit-sweep 先端で pnpm check・test 全通過、smoke 29/30（失敗1件は別プロジェクトの vite とのポート衝突で、単体再実行3/3通過）。17736da3 で master へマージ。
+<!-- SECTION:FINAL_SUMMARY:END -->

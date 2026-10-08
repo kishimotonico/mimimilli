@@ -1,10 +1,11 @@
 ---
 id: TASK-490
 title: styles/shellのCSSを元ファイル順の機械分割から所有コンポーネント単位に再編する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@mimi2'
 created_date: '2026-10-02 11:47'
-updated_date: '2026-10-04 09:35'
+updated_date: '2026-10-08 06:12'
 labels:
   - client
   - css
@@ -27,15 +28,23 @@ client/src/styles/shell は library-a〜e・frame-a〜c・files-a〜c・shared-a
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 shellのCSSファイルが所有コンポーネント単位で名付けられ、a/b/c形式の分割が無い
-- [ ] #2 読み込み順に依存した同詳細度ルールの上書きが無い（依存が残る箇所は詳細度かレイヤーで明示されている）
-- [ ] #3 経緯を書いたコメントが無い
-- [ ] #4 見た目が変わらないことをpnpm test:smokeと主要画面のスクリーンショット比較で確認している
-- [ ] #5 pnpm check && pnpm test が通る
+- [x] #1 shellのCSSファイルが所有コンポーネント単位で名付けられ、a/b/c形式の分割が無い
+- [x] #2 読み込み順に依存した同詳細度ルールの上書きが無い（依存が残る箇所は詳細度かレイヤーで明示されている）
+- [x] #3 経緯を書いたコメントが無い
+- [x] #4 見た目が変わらないことをpnpm test:smokeと主要画面のスクリーンショット比較で確認している
+- [x] #5 pnpm check && pnpm test が通る
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-04 Codex(Astra)レビュー（tmp/structural-audit-2026-10-02/review-astra.md）を反映: library-d.css の値一覧の無効行スタイルの重複はTASK-493で整理するので、493の後に再編する。
+
+意図的に変えた見た目（reduced-motion 時のみ）: 旧 shared-d の一括打ち消しが詳細度で負けて止まっていなかった2件、TopBar の再生中インジケータの点の点滅（.mll-bar__pulse .dot.is-playing）と Files のカラム追加時のスライドイン（.ml-file-col-enter[data-dir]）を、所有ファイル内で同じ詳細度の animation: none にして止めた。通常時の見た目は不変。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+styles/shell を所有コンポーネント単位の40ファイルに再編。ソース順依存は詳細度と同ファイル配置で明示、reduced-motion を所有ファイルごとに置き、打ち消し漏れ2件を修正、参照ゼロの CSS を削除。AC#4 は、主要14画面の再編前後スクリーンショット比較（fixture new-work、1440x757、差分は再生時刻・hover・没入モードのフェード状態のノイズのみ）と smoke 30 通過で確認し、加えてレビューで postcss による全ルール突き合わせ（@media 文脈＋セレクタ＋宣言）を行い意図しない差分なし。個別レビュー＋横断レビュー、master への仮マージで check・test・smoke 全通過。9939fe4d で master へマージ。
+<!-- SECTION:FINAL_SUMMARY:END -->

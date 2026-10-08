@@ -1,10 +1,11 @@
 ---
 id: TASK-501
 title: clientのbest-effortな握りつぶしとキャッシュ更新の手書きを規約どおりに整理する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@mimi2'
 created_date: '2026-10-02 11:49'
-updated_date: '2026-10-04 09:35'
+updated_date: '2026-10-08 06:44'
 labels:
   - client
   - refactor
@@ -26,11 +27,11 @@ docs/client-error-handling.md の「完全に無視する箇所」は5件だが�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 実質的に不要な.catchが無い
-- [ ] #2 残った握りつぶしがすべてclient-error-handling.mdの一覧に載っている
-- [ ] #3 ADR-0015の本文に廃止済みのatomが現行として書かれていない
-- [ ] #4 Filesから既登録作品を扱ったときのキャッシュ更新がworkCacheUpdatesの関数を通る
-- [ ] #5 pnpm check && pnpm test が通る
+- [x] #1 実質的に不要な.catchが無い
+- [x] #2 残った握りつぶしがすべてclient-error-handling.mdの一覧に載っている
+- [x] #3 ADR-0015の本文に廃止済みのatomが現行として書かれていない
+- [x] #4 Filesから既登録作品を扱ったときのキャッシュ更新がworkCacheUpdatesの関数を通る
+- [x] #5 pnpm check && pnpm test が通る
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -38,3 +39,9 @@ docs/client-error-handling.md の「完全に無視する箇所」は5件だが�
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-04 Codex(Astra)レビュー（tmp/structural-audit-2026-10-02/review-astra.md）を反映: ReconfigurationExitEffectの握りつぶしはTASK-488で移動するので、最終的な整理は488の後に行う。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+不要だった updateCachesAfterDlsiteBulkFetch の catch を削除し、残す握りつぶしを理由付きで client-error-handling.md に（古い記述も修正）、ADR-0015 を現行のストアとイベントの構成に、Files の登録後キャッシュ更新を updateCachesAfterRegistration に。 個別レビュー＋統合ブランチの横断レビュー、master への仮マージで pnpm check・test（server 951 / client 1339）・smoke 30 全通過、fixture でのブラウザ確認（再生・作品編集・スキャン・root 再設定）で崩れ・エラーなし。61e4b7bb で master へマージ。
+<!-- SECTION:FINAL_SUMMARY:END -->

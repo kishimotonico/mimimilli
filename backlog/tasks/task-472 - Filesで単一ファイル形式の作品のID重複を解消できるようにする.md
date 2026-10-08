@@ -1,9 +1,11 @@
 ---
 id: TASK-472
 title: Filesで単一ファイル形式の作品のID重複を解消できるようにする
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@mimi2'
 created_date: '2026-09-25 14:48'
+updated_date: '2026-10-08 05:32'
 labels:
   - ui
   - files
@@ -28,10 +30,16 @@ TASK-467 以前でも、単一ファイル形式の再採番は動いていな�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Filesで、ID重複の対象になっている単一ファイル形式のメタファイルが一覧に表示され、選択できる
-- [ ] #2 重複の対象でないメタファイルは、今までどおりFilesに表示されない
-- [ ] #3 単一ファイル形式のメタファイルの行から再採番でき、そのメタファイルのidが書き換わって重複が解消する
-- [ ] #4 フォルダー形式の重複解消の表示と操作は変わらない
-- [ ] #5 fixtureとrealの両方で、単一ファイル形式の重複を解消できることをテストで縛る
-- [ ] #6 pnpm check && pnpm test && pnpm test:smoke が通る
+- [x] #1 Filesで、ID重複の対象になっている単一ファイル形式のメタファイルが一覧に表示され、選択できる
+- [x] #2 重複の対象でないメタファイルは、今までどおりFilesに表示されない
+- [x] #3 単一ファイル形式のメタファイルの行から再採番でき、そのメタファイルのidが書き換わって重複が解消する
+- [x] #4 フォルダー形式の重複解消の表示と操作は変わらない
+- [x] #5 fixtureとrealの両方で、単一ファイル形式の重複を解消できることをテストで縛る
+- [x] #6 pnpm check && pnpm test && pnpm test:smoke が通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+real の Files 一覧に ID 重複の対象のメタファイルだけを出し、メタファイル行から再採番できるようにした。成功後は親フォルダーへ選択を移し、反映の保留はトーストで出す。 個別レビュー＋統合ブランチの横断レビュー、master への仮マージ（衝突解消込み）で pnpm check・test（server 953 / client 1247）・smoke 30 全通過。15013618 で master へマージ。
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,9 +1,11 @@
 ---
 id: TASK-484
 title: ビュー・軸IDの予約語をsharedの1か所から導出する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@mimi2'
 created_date: '2026-10-02 11:46'
+updated_date: '2026-10-08 04:12'
 labels:
   - shared
   - client
@@ -23,8 +25,14 @@ viewIdSchema（shared/src/library.ts）、RESERVED_AXIS_IDS（shared/src/tagPref
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 予約軸IDとclientのビュー軸ID一覧がsharedのビューID定義から導出され、手書きの重複リストが無い
-- [ ] #2 smart- 接頭辞の判定がsharedの1関数を通る
-- [ ] #3 予約語のprefix名を拒否する既存の挙動がテストで縛られている
-- [ ] #4 pnpm check && pnpm test が通る
+- [x] #1 予約軸IDとclientのビュー軸ID一覧がsharedのビューID定義から導出され、手書きの重複リストが無い
+- [x] #2 smart- 接頭辞の判定がsharedの1関数を通る
+- [x] #3 予約語のprefix名を拒否する既存の挙動がテストで縛られている
+- [x] #4 pnpm check && pnpm test が通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+VIEW_IDS を正にして RESERVED_AXIS_IDS と client のビュー軸ID一覧を導出、smart- 接頭辞の判定・組み立てを shared の関数に集約、予約語拒否をテストで縛った。 個別レビュー＋統合ブランチの横断レビュー、feat/audit-sweep 先端で pnpm check・test 全通過、smoke 29/30（失敗1件は別プロジェクトの vite とのポート衝突で、単体再実行3/3通過）。17736da3 で master へマージ。
+<!-- SECTION:FINAL_SUMMARY:END -->
