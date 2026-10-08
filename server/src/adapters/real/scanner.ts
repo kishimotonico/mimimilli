@@ -1,28 +1,21 @@
 // ライブラリスキャン。
 import { existsSync, readFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import type {
+  IdentityConflict,
   MetaFile,
-  NormalizedTag,
   ScanCandidate,
-  ScanDiagnostic,
+  ScanDiagnostics,
   ScanResult,
-  UrlEntry,
 } from "@mimimilli/shared";
-import {
-  errorMessage,
-  detectRjCode,
-  emptyMetaDlsiteState,
-  isRjCodeMissing,
-  sidecarMetaFileName,
-  workspacePath,
-} from "@mimimilli/shared";
+import { errorMessage, detectRjCode, emptyMetaDlsiteState, workspacePath } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import type { ScanOptions } from "../../adapter/index.ts";
-import { descendantsRegisteredError, restoreIdentityConflictError } from "../../errors.ts";
+import { descendantsRegisteredError } from "../../errors.ts";
 import {
-  META_FILE_NAME,
   MetaParseError,
+  inspectMetaFile,
+  type MetaInspection,
   patchMetaFileCas,
   readMetaSource,
   writeMetaFile,
@@ -49,7 +42,19 @@ import {
   registerMetaFile,
   type RegisterMetaFileOptions,
 } from "./scanRegister.ts";
-import type { PreparedMeta, ProjectOutcome, ScanExecutionResult } from "./scanTypes.ts";
+import type {
+  PreparedEntry,
+  PreparedMeta,
+  ProjectOutcome,
+  RegisterWorkOptions,
+  RestoreMetaPatch,
+  ScanExecutionResult,
+} from "./scanTypes.ts";
+import {
+  assertNoIdentityConflict,
+  targetName,
+  type RegistrationTarget,
+} from "./registrationTarget.ts";
 import type { ProbeCacheEntry } from "./probe.ts";
 import { ScanUpsertBatch } from "./scanUpsertBatch.ts";
 import {
@@ -82,19 +87,28 @@ function emptyRegisterTracking(): Pick<
   return { coverErrors: 0, insertedWorkIds: [], updatedWorkIds: [] };
 }
 
-function findIdentityConflicts(root: string, metaPaths: string[]): ScanDiagnostic[] {
-  const pathsByWorkId = new Map<string, string[]>();
+function inspectMetaFiles(
+  metaPaths: string[],
+  checkAbort: () => void,
+): Map<string, MetaInspection> {
+  const inspections = new Map<string, MetaInspection>();
   for (const metaPath of metaPaths) {
-    try {
-      const value: unknown = JSON.parse(readFileSync(metaPath, "utf-8"));
-      if (typeof value !== "object" || value === null || !("id" in value)) continue;
-      if (typeof value.id !== "string") continue;
-      const paths = pathsByWorkId.get(value.id) ?? [];
-      paths.push(identityConflictPathOf(root, metaPath));
-      pathsByWorkId.set(value.id, paths);
-    } catch {
-      // 不正JSONは登録フェーズで parse error として扱う。
-    }
+    checkAbort();
+    inspections.set(metaPath, inspectMetaFile(metaPath));
+  }
+  return inspections;
+}
+
+function findIdentityConflicts(
+  root: string,
+  inspections: ReadonlyMap<string, MetaInspection>,
+): IdentityConflict[] {
+  const pathsByWorkId = new Map<string, string[]>();
+  for (const [metaPath, { declaredId }] of inspections) {
+    if (declaredId === null) continue;
+    const paths = pathsByWorkId.get(declaredId) ?? [];
+    paths.push(identityConflictPathOf(root, metaPath));
+    pathsByWorkId.set(declaredId, paths);
   }
   return [...pathsByWorkId]
     .filter(([, paths]) => paths.length > 1)
@@ -116,6 +130,8 @@ export interface ScannerOptions {
   upsertBatchSize?: number;
   measureCover?: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>;
   dlsiteCache?: DlsiteCache | null;
+  /** 単体の登録・投影で、診断の相対パスを現在のrootに解決するために使う */
+  resolveRoot?: () => string;
 }
 
 export class Scanner {
@@ -125,6 +141,7 @@ export class Scanner {
   private readonly user: UserWorkStateRepository;
   private readonly measureCover: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>;
   private readonly dlsiteCache: DlsiteCache | null;
+  private readonly resolveRoot: (() => string) | null;
 
   constructor(db: Db, repos: WorkPersistence, options?: ScannerOptions) {
     this.db = db;
@@ -139,6 +156,7 @@ export class Scanner {
     }
     this.measureCover = options?.measureCover ?? measureCoverDimensions;
     this.dlsiteCache = options?.dlsiteCache ?? null;
+    this.resolveRoot = options?.resolveRoot ?? null;
   }
 
   async scan(
@@ -161,13 +179,10 @@ export class Scanner {
       updatedWorkIds: [],
       errors: 0,
       missing: 0,
-      rjCodeMissingCount: 0,
       skipped: 0,
       coverErrors: 0,
-      identityConflicts: [],
-      invalidMetaFiles: [],
-      candidates: [],
     };
+    const diagnostics: ScanDiagnostics = { identityConflicts: [], invalidMetaFiles: [] };
 
     const tree = await this.walkPhase(root, emit, signal, abortToken, checkAbort);
     recoverStagedMetaFiles(root, tree, this.catalog);
@@ -177,7 +192,6 @@ export class Scanner {
     const existingByMetaPath = new Map(
       [...existingWorks].map(([id, state]) => [state.metaPath, { id, state }]),
     );
-    result.identityConflicts = findIdentityConflicts(root, tree.metaPaths);
 
     const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, checkAbort);
 
@@ -190,14 +204,13 @@ export class Scanner {
       existingByMetaPath,
       batch,
       result,
+      diagnostics,
       emit,
       checkAbort,
     );
 
     const candidatePool = this.collectCandidates(root, tree, { filterExclusions: false });
-    result.candidates = this.collectCandidates(root, tree);
-
-    await this.generatePhase(root, result, emit, checkAbort);
+    await this.generatePhase(root, this.collectCandidates(root, tree), emit, checkAbort);
 
     return {
       result: this.finalizePhase(
@@ -206,6 +219,7 @@ export class Scanner {
         existingWorks,
         batch,
         result,
+        diagnostics,
         emit,
         abortHooks,
         checkAbort,
@@ -235,6 +249,25 @@ export class Scanner {
     return tree;
   }
 
+  private prepareEntries(
+    root: string,
+    tree: WalkResult,
+    existingWorks: Map<string, ScanWorkState>,
+    full: boolean,
+    diagnostics: ScanDiagnostics,
+    checkAbort: () => void,
+  ): PreparedEntry[] {
+    const inspections = inspectMetaFiles(tree.metaPaths, checkAbort);
+    diagnostics.identityConflicts = findIdentityConflicts(root, inspections);
+    return prepareMetaEntries(
+      inspections,
+      existingWorks,
+      full,
+      checkAbort,
+      new Set(diagnostics.identityConflicts.map((diagnostic) => diagnostic.workId)),
+    );
+  }
+
   private async registerPhase(
     root: string,
     tree: WalkResult,
@@ -244,20 +277,13 @@ export class Scanner {
     existingByMetaPath: Map<string, { id: string; state: ScanWorkState }>,
     batch: ScanUpsertBatch,
     result: ScanResult,
+    diagnostics: ScanDiagnostics,
     emit: NonNullable<ScanOptions["onProgress"]>,
     checkAbort: () => void,
   ): Promise<void> {
     emit({ type: "progress", phase: "registering", processed: 0, total: tree.metaPaths.length });
 
-    const prepared = prepareMetaEntries(
-      root,
-      tree.metaPaths,
-      existingWorks,
-      full,
-      seenIds,
-      checkAbort,
-      new Set(result.identityConflicts.map((diagnostic) => diagnostic.workId)),
-    );
+    const prepared = this.prepareEntries(root, tree, existingWorks, full, diagnostics, checkAbort);
     const probeCache = buildProbeCache(this.query, prepared, full, checkAbort);
 
     const registeringThrottle = createProgressThrottle(PROGRESS_MIN_INTERVAL_MS);
@@ -277,9 +303,9 @@ export class Scanner {
             existingWorks,
             existingByMetaPath,
             root,
-            result.identityConflicts,
+            diagnostics.identityConflicts,
           );
-          result.invalidMetaFiles.push({
+          diagnostics.invalidMetaFiles.push({
             path: workspacePath(toPortableRelativePath(root, entry.metaPath)),
             message: entry.error.message,
           });
@@ -314,9 +340,9 @@ export class Scanner {
             existingWorks,
             existingByMetaPath,
             root,
-            result.identityConflicts,
+            diagnostics.identityConflicts,
           );
-          result.invalidMetaFiles.push({
+          diagnostics.invalidMetaFiles.push({
             path: workspacePath(toPortableRelativePath(root, entry.metaPath)),
             message: e.message,
           });
@@ -334,11 +360,11 @@ export class Scanner {
 
   private async generatePhase(
     root: string,
-    result: ScanResult,
+    candidates: ScanCandidate[],
     emit: NonNullable<ScanOptions["onProgress"]>,
     checkAbort: () => void,
   ): Promise<void> {
-    const roots = result.candidates.map((candidate) => resolve(root, candidate.path));
+    const roots = candidates.map((candidate) => resolve(root, candidate.path));
 
     emit({ type: "progress", phase: "generating", processed: 0, total: roots.length });
     const generatingThrottle = createProgressThrottle(PROGRESS_MIN_INTERVAL_MS);
@@ -395,6 +421,7 @@ export class Scanner {
     existingWorks: Map<string, ScanWorkState>,
     batch: ScanUpsertBatch,
     result: ScanResult,
+    diagnostics: ScanDiagnostics,
     emit: NonNullable<ScanOptions["onProgress"]>,
     abortHooks: ScannerAbortHooks | undefined,
     checkAbort: () => void,
@@ -433,12 +460,12 @@ export class Scanner {
     batch.publishScanGeneration({
       seenIds: [...seenIds.work],
       unverifiedIds: [...unverifiedIds],
-      diagnostics: result.identityConflicts,
+      identityConflicts: diagnostics.identityConflicts,
+      invalidMetaFiles: diagnostics.invalidMetaFiles,
     });
     result.missing = this.catalog.countByStatus("missing");
-    const { summaries, skipped } = this.query.listSummaries();
+    const { skipped } = this.query.listSummaries();
     logDataIntegritySkips(scanLogger, "scan-finalize", skipped);
-    result.rjCodeMissingCount = summaries.filter((work) => isRjCodeMissing(work.dlsite)).length;
     const dataIntegrityWarning = toDataIntegrityWarning(skipped);
     if (dataIntegrityWarning) result.dataIntegrityWarning = dataIntegrityWarning;
     emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
@@ -499,6 +526,11 @@ export class Scanner {
           currentSourceRevision: currentSourceRevision(prepared.metaPath),
         };
       }
+      if (this.resolveRoot) {
+        this.catalog.removeInvalidMetaFile(
+          toPortableRelativePath(this.resolveRoot(), prepared.metaPath),
+        );
+      }
       return { status: "published", snapshot };
     } catch (error) {
       scanLogger.error("作品の一覧反映に失敗しました", {
@@ -515,25 +547,16 @@ export class Scanner {
   }
 
   private snapshotForRestore(
-    metaPath: string,
-    physicalPath: string,
-    patch: {
-      title?: string;
-      tags?: string[];
-      urls?: UrlEntry[];
-      coverImage?: string | null;
-      dlsite?: MetaFile["dlsite"];
-    },
+    target: RegistrationTarget,
+    patch: RestoreMetaPatch,
   ): { meta: MetaFile; bytes: Buffer; sourceRevision: string } {
+    const { metaPath } = target.placement;
     if (!existsSync(metaPath)) {
       throw new Error("復元対象のメタファイルがありません");
     }
     const source = readMetaSource(metaPath);
-    const existing = this.query.getScanWorkMap().get(source.meta.id);
-    if (existing && existing.physicalPath !== physicalPath && existing.status !== "missing") {
-      throw restoreIdentityConflictError();
-    }
-    const metaPatch: typeof patch = {};
+    assertNoIdentityConflict(this.query, source.meta.id, target.physicalPath);
+    const metaPatch: RestoreMetaPatch = {};
     if (patch.title !== undefined) metaPatch.title = patch.title;
     if (patch.tags !== undefined) metaPatch.tags = patch.tags;
     if (patch.urls !== undefined) metaPatch.urls = patch.urls;
@@ -545,39 +568,52 @@ export class Scanner {
     return source;
   }
 
-  async registerFolderWork(
-    workDir: string,
-    options: {
-      title: string;
-      tags?: NormalizedTag[];
-      urls?: UrlEntry[];
-      coverImage?: string | null;
-      dlsite?: MetaFile["dlsite"];
-      rjCode?: string;
-    },
+  private draftMetaFor(
+    target: RegistrationTarget,
+    fields: Omit<Parameters<typeof createDraftMetaFile>[1], "id">,
+  ): MetaFile {
+    const { mediaRoot } = target.placement;
+    if (target.placement.kind === "folder") {
+      return createDraftMetaFile(mediaRoot, { ...fields, id: crypto.randomUUID() });
+    }
+    const audioName = targetName(target);
+    return createDraftMetaFile(mediaRoot, {
+      ...fields,
+      id: crypto.randomUUID(),
+      coverImage: fields.coverImage ?? null,
+      tracks: [
+        { id: crypto.randomUUID(), title: audioName.replace(/\.[^.]+$/, ""), file: audioName },
+      ],
+    });
+  }
+
+  async registerWork(
+    target: RegistrationTarget,
+    options: RegisterWorkOptions,
   ): Promise<ProjectOutcome> {
-    this.assertNoRegisteredDescendants(workDir);
-    const metaPath = join(workDir, META_FILE_NAME);
+    if (target.placement.kind === "folder") this.assertNoRegisteredDescendants(target.physicalPath);
+    const { metaPath } = target.placement;
     if (existsSync(metaPath)) {
-      throw new Error("このフォルダーには既にメタファイルがあります");
+      throw new Error(
+        target.placement.kind === "folder"
+          ? "このフォルダーには既にメタファイルがあります"
+          : "このファイルには既にメタファイルがあります",
+      );
     }
 
     let dlsite = options.dlsite;
     if (dlsite === undefined) {
       if (options.rjCode === undefined) {
-        const detected = detectRjCode([basename(workDir), options.title]);
+        const detected = detectRjCode([targetName(target), options.title]);
         dlsite = detected
           ? { ...emptyMetaDlsiteState(), rjCode: detected }
           : emptyMetaDlsiteState();
-      } else if (options.rjCode === "") {
-        dlsite = { ...emptyMetaDlsiteState(), rjCode: "" };
       } else {
         dlsite = { ...emptyMetaDlsiteState(), rjCode: options.rjCode };
       }
     }
 
-    const meta = createDraftMetaFile(workDir, {
-      id: crypto.randomUUID(),
+    const meta = this.draftMetaFor(target, {
       title: options.title,
       tags: options.tags,
       urls: options.urls,
@@ -596,71 +632,10 @@ export class Scanner {
     return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
   }
 
-  async restoreFolderWork(
-    workDir: string,
-    patch: {
-      title?: string;
-      tags?: string[];
-      urls?: UrlEntry[];
-      coverImage?: string | null;
-      dlsite?: MetaFile["dlsite"];
-    },
-  ): Promise<ProjectOutcome> {
-    this.assertNoRegisteredDescendants(workDir);
-    const metaPath = join(workDir, META_FILE_NAME);
-    const snapshot = this.snapshotForRestore(metaPath, workDir, patch);
-    return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
-  }
-
-  async registerFileWork(
-    audioPath: string,
-    options: {
-      title: string;
-      tags?: NormalizedTag[];
-      urls?: UrlEntry[];
-      coverImage?: string | null;
-      dlsite?: MetaFile["dlsite"];
-    },
-  ): Promise<ProjectOutcome> {
-    const audioName = basename(audioPath);
-    const metaPath = join(dirname(audioPath), sidecarMetaFileName(audioName));
-    if (existsSync(metaPath)) {
-      throw new Error("このファイルには既にメタファイルがあります");
-    }
-
-    const stem = audioName.replace(/\.[^.]+$/, "");
-    const dlsite =
-      options.dlsite ??
-      (() => {
-        const detected = detectRjCode([audioName, options.title]);
-        return detected ? { ...emptyMetaDlsiteState(), rjCode: detected } : emptyMetaDlsiteState();
-      })();
-
-    const meta = createDraftMetaFile(dirname(audioPath), {
-      id: crypto.randomUUID(),
-      title: options.title,
-      tags: options.tags,
-      urls: options.urls,
-      coverImage: options.coverImage ?? null,
-      dlsite,
-      tracks: [{ id: crypto.randomUUID(), title: stem, file: audioName }],
-    });
-    const snapshot = writeMetaFile(metaPath, meta);
-    return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
-  }
-
-  async restoreSidecarWork(
-    audioPath: string,
-    patch: {
-      title?: string;
-      tags?: string[];
-      urls?: UrlEntry[];
-      coverImage?: string | null;
-      dlsite?: MetaFile["dlsite"];
-    },
-  ): Promise<ProjectOutcome> {
-    const metaPath = join(dirname(audioPath), sidecarMetaFileName(basename(audioPath)));
-    const snapshot = this.snapshotForRestore(metaPath, audioPath, patch);
+  async restoreWork(target: RegistrationTarget, patch: RestoreMetaPatch): Promise<ProjectOutcome> {
+    if (target.placement.kind === "folder") this.assertNoRegisteredDescendants(target.physicalPath);
+    const { metaPath } = target.placement;
+    const snapshot = this.snapshotForRestore(target, patch);
     return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
   }
 }

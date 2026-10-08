@@ -35,6 +35,8 @@ test("resolveRootFolder / beginRootReconfiguration は receiver なしで呼び�
     getScanState: () => null,
     setScanState: () => undefined,
     listIdentityConflicts: () => [],
+    listInvalidMetaFiles: () => [],
+    clearDiagnostics: () => undefined,
     deleteWorksOutsideRoot: () => 0,
   };
   const query = {

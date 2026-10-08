@@ -21,22 +21,28 @@ Anki、Signal Desktop、Joplin、Zotero、beets、Navidrome 等の実装調査�
 
 ### executor の原子性
 
-- migration 1件ごとに「DDL・`__drizzle_migrations` への追記・`PRAGMA user_version` 更新」を同一トランザクションで原子的に適用する
+- migration 1件ごとに「DDL・`__drizzle_migrations` への追記」を同一トランザクションで原子的に適用する
 - `PRAGMA foreign_keys=OFF/ON` はトランザクション外で適用する（SQLite 公式の 12-step 手順と同構造）
 - `foreign_keys` を無効化した状態で DDL を適用した場合は `COMMIT` 前に `PRAGMA foreign_key_check` を実行し、違反があれば失敗させる
 - 成功・失敗どちらの経路でも接続の `foreign_keys` 設定を ON へ戻す
 
-### forward-only
+### forward-only と履歴の検証
 
-- DB がアプリより新しい場合（`user_version` がアプリ版を超える、または ledger に journal にない新しいエントリがある）は、バックアップ作成も `user_version` 書換えもせず即エラーで起動失敗する
-- catalog の `user_version` 不一致時の退避→再作成分岐は廃止する。ledger を正とする
+- 適用済み履歴の正は `__drizzle_migrations`（ledger）と journal の照合だけとする。`PRAGMA user_version` と手書きのスキーマ版数定数は持たない
+- 起動時、書込み・バックアップより前に ledger の全行を journal と突き合わせ、次のいずれかに当たれば即エラーで起動失敗とする
+  - journal にない `created_at` を持つ行がある（アプリより新しい履歴、または未知の古い履歴）
+  - `created_at` が重複している
+  - journal にあるのに ledger に無いエントリが、ledger の最大 `created_at` より古い（履歴の穴）
+- 照合を通った状態で journal にだけあるエントリが未適用であり、バックアップの要否と適用対象はこの集合から導く。未適用判定と「アプリより新しい」判定は同じ照合から出る
+- hash は照合しない。過去に適用済み migration の SQL を修正したコミットが存在し、forward-only で守るのは順序と未知の履歴であるため
+- catalog の version 不一致時の退避→再作成分岐は廃止する。ledger を正とする
 
 ### バックアップ
 
 - マイグレーション前バックアップは `VACUUM INTO` で作成する
 - 検証は独立接続での `PRAGMA integrity_check` のみとする（スキーマ固定リストによる検証は行わない）
 - `VACUUM INTO` 失敗・検証 NG 時は出力ファイルを削除する
-- バックアップ・検証は `user_version=0` かつテーブルゼロの新規DBに限りスキップする
+- バックアップ・検証はテーブルが1つも無い新規DBに限りスキップする
 - `purgeOldBackups` は連番付きファイル名（`user-…-pre-migration-1.sqlite` 等）も世代管理対象とし、タイムスタンプ＋連番を生成順として並べる（同一タイムスタンプでは連番が大きい方が新しい）
 - マイグレーション失敗時は例外を投げて起動失敗とする。自動リストア・自動リセットは実装しない
 
@@ -120,7 +126,7 @@ DLsiteの取得失敗（`not_found` / `error`）は `db/dlsite-cache.sqlite`（`
 - 旧スキーマの pre-migration バックアップが検証で落ちる矛盾が解消され、既存DB環境でも起動できる
 - migration 途中クラッシュ時は旧状態または各 migration 完了境界のいずれかの一貫状態に収束する
 - FK を伴うテーブル再作成 migration が意図どおり動作する
-- DB がアプリより新しい場合はデータを書き換えず fail-fast する
+- DB がアプリより新しい場合、または履歴が journal と整合しない場合は、データを書き換えず fail-fast する。判定の情報源は journal 1つ
 - 失敗時の復旧は手動リストアに委ねる。運用は単純化される一方、自動ロールバックは提供しない
 - DLsite取得失敗の表示は一時的な観測であり、catalog再構築後の保持を保証しない。cacheのTTL（再取得の可否）と表示の保持は別の寿命として扱う
 - user DB単独復元でcatalogとの不整合が起きた場合、同世代のcatalogバックアップへの復元、またはcatalog再構築＋full scanのいずれかで整合を取る。userの不足値を現在時刻等で自動補完する処理は追加しない

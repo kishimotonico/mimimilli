@@ -5,6 +5,7 @@ import * as filesApi from "../../src/features/files/api";
 import * as libraryApi from "../../src/features/library/api";
 import * as settingsApi from "../../src/features/settings/api";
 import * as scanApi from "../../src/features/scan/api";
+import * as scanEntityApi from "../../src/entities/scan/api";
 import {
   emptyDlsiteState,
   emptyMetaDlsiteState,
@@ -233,7 +234,7 @@ describe("scan api", () => {
       status: 204,
       json: () => Promise.reject(new Error("no body")),
     } as Response);
-    await expect(scanApi.getLastScanResult()).resolves.toBeNull();
+    await expect(scanEntityApi.getLastScanResult()).resolves.toBeNull();
   });
 
   it("getScanJob: 404はサーバーのcode/messageをApiRequestErrorとして保持する", async () => {

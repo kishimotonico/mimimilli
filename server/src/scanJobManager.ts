@@ -3,7 +3,7 @@ import type {
   ScanJobEvent,
   ScanJobSnapshot,
   ScanLastResultResponse,
-  ScanDiagnostic,
+  ScanDiagnostics,
   ScanCandidate,
   ScanCandidateRegisterItem,
   ScanCandidatesRegisterResponse,
@@ -116,7 +116,7 @@ export class ScanJobManager {
     if (result.insertedWorkIds.length > 0) this.onCompleted(result.insertedWorkIds);
   }
 
-  async listDiagnostics(): Promise<ScanDiagnostic[]> {
+  async listDiagnostics(): Promise<ScanDiagnostics> {
     return this.adapter.listScanDiagnostics();
   }
 
@@ -291,8 +291,6 @@ export class ScanJobManager {
       missing: result.missing,
       skipped: result.skipped,
       coverErrors: result.coverErrors,
-      rjCodeMissingCount: result.rjCodeMissingCount,
-      identityConflictsCount: result.identityConflicts.length,
       unreadablePathsCount: unreadablePaths.length,
       unreadablePathsSample: unreadablePaths.slice(0, UNREADABLE_PATH_LOG_SAMPLE_LIMIT),
       dataIntegrityWarning: result.dataIntegrityWarning !== undefined,

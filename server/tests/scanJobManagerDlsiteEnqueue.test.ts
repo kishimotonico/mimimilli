@@ -13,12 +13,8 @@ const emptyResult: ScanResult = {
   updatedWorkIds: [],
   errors: 0,
   missing: 0,
-  rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
-  identityConflicts: [],
-  invalidMetaFiles: [],
-  candidates: [],
 };
 
 function withStubAdapter(overrides: Partial<DataAdapter> & Pick<DataAdapter, "scan">): DataAdapter {

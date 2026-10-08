@@ -2,6 +2,7 @@ import { posix } from "node:path";
 import {
   META_FILE_NAME,
   isAudioFileName,
+  isSidecarMetaFileName,
   isDlsiteFetchFailed,
   isDlsiteParseFailed,
   isRjCodeMissing,
@@ -36,6 +37,7 @@ import type { WorkAdapter } from "../../adapter/work.ts";
 import { summarizeDlsiteNotifications } from "../../core/dlsiteNotifications.ts";
 import { removeIdentityConflictPath } from "../../core/identityConflicts.ts";
 import { compareJapaneseSortKeys, compareUtf8Bytes } from "../../core/japaneseSortKey.ts";
+import { fileRegisterNaming, folderRegisterNaming } from "../../core/workRegisterPreview.ts";
 import { validateResumeRequest } from "../../core/resumeValidation.ts";
 import { assertRegistrationAllowed } from "../../core/workRegistrationGuard.ts";
 import { applyWorksQuery, toWorksPage } from "../../core/worksQuery.ts";
@@ -44,12 +46,14 @@ import { buildFullWorkFromState, checkWorkPlacement } from "./playback.ts";
 import { normalizeFsPath } from "./fsResolve.ts";
 import {
   composeWorks,
+  copyWorkState,
   coverColumnsOf,
   dlsiteLinkageOf,
   reassignWorkId,
   removeWorks,
   setDlsiteLinkage,
   type FixtureState,
+  requireFixtureRoot,
 } from "./state.ts";
 import type { FixtureWorkRecord } from "./data.ts";
 
@@ -100,7 +104,7 @@ export function fixtureSourceMutation(
 function removeIdentityConflictForWork(state: FixtureState, workId: string): void {
   const work = state.works.find((candidate) => candidate.id === workId);
   if (!work) return;
-  const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+  const rootAbs = normalizeFsPath(requireFixtureRoot(state));
   const workPath = unresolvedWorkPhysicalPath(workPlacementOf(work.metaPath));
   if (!isPathWithin(rootAbs, workPath, posix)) return;
   const path = workPath.slice(rootAbs.length + 1);
@@ -117,7 +121,7 @@ function registrationMetaPath(target: string): string {
 
 export function createWorkMethods(state: FixtureState): WorkAdapter {
   async function getWorkRegisterPreview(path: WorkspacePath): Promise<WorkRegisterPreview | null> {
-    const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+    const rootAbs = normalizeFsPath(requireFixtureRoot(state));
     const target = normalizeFsPath(`${rootAbs}/${path}`);
     if (!isPathWithin(rootAbs, target, posix)) return null;
     const name = target.split("/").filter(Boolean).pop() ?? target;
@@ -131,12 +135,10 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       if (workPlacementOf(work.metaPath).kind === "audio-file") return false;
       return target === work.physicalPath || target.startsWith(`${work.physicalPath}/`);
     });
-    const rjMatch = name.match(/RJ\d{6,8}/i);
-    const suggestedTitle = isFile ? name.replace(/\.[^.]+$/, "") : name;
+    const naming = isFile ? fileRegisterNaming(name) : folderRegisterNaming(name);
     return {
-      suggestedTitle,
+      ...naming,
       tags: [],
-      detectedRjCode: rjMatch ? rjMatch[0]!.toUpperCase() : null,
       descendantWorkCount: descendants.length,
       alreadyRegistered:
         state.works.some((work) => work.physicalPath === target) || (isFile && ancestorRegistered),
@@ -148,7 +150,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
     async queryWorks(params: WorksQuery): Promise<WorksPage> {
       const page = toWorksPage(
         applyWorksQuery(composeWorks(state), params),
-        state.rootFolder ?? "/library",
+        requireFixtureRoot(state),
       );
       return state.dataIntegrityWarning
         ? { ...page, dataIntegrityWarning: state.dataIntegrityWarning }
@@ -203,7 +205,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
     async createWork(body: WorkCreateBody): Promise<WorkSourceMutationResult | null> {
       const preview = await getWorkRegisterPreview(body.path);
       if (!preview) return null;
-      const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+      const rootAbs = normalizeFsPath(requireFixtureRoot(state));
       const workDir = normalizeFsPath(`${rootAbs}/${body.path}`);
       const metaPath = registrationMetaPath(workDir);
       const isFile = workPlacementOf(metaPath).kind === "audio-file";
@@ -247,32 +249,58 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
     },
 
     async reassignIdentityConflict(
-      _body: IdentityConflictReassignBody,
+      body: IdentityConflictReassignBody,
     ): Promise<WorkSourceMutationResult | null> {
       const diagnostic = state.identityConflicts.find((candidate) =>
-        candidate.paths.includes(_body.path),
+        candidate.paths.includes(body.path),
       );
       if (!diagnostic) return null;
-      const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
-      const workDir = normalizeFsPath(`${rootAbs}/${_body.path}`);
-      const work = state.works.find((candidate) => candidate.physicalPath === workDir);
-      if (!work || work.id !== diagnostic.workId) return null;
-      const oldId = work.id;
-      work.id = crypto.randomUUID();
-      work.bookmarked = false;
-      work.lastPlayedAt = null;
-      reassignWorkId(state, oldId, work.id);
-      state.resumes.delete(diagnostic.workId);
+      const owner = state.works.find((candidate) => candidate.id === diagnostic.workId);
+      if (!owner) return null;
+      const rootAbs = normalizeFsPath(requireFixtureRoot(state));
+      const target = normalizeFsPath(`${rootAbs}/${body.path}`);
+      const metaPath = isSidecarMetaFileName(posix.basename(target))
+        ? target
+        : posix.join(target, META_FILE_NAME);
+      const newId = crypto.randomUUID();
+      let reassigned: FixtureWorkRecord;
+      if (metaPath === owner.metaPath) {
+        owner.id = newId;
+        owner.bookmarked = false;
+        owner.lastPlayedAt = null;
+        reassignWorkId(state, diagnostic.workId, newId);
+        state.resumes.delete(diagnostic.workId);
+        reassigned = owner;
+      } else {
+        const copy = checkWorkPlacement(state, {
+          ...owner,
+          id: newId,
+          metaPath,
+          physicalPath:
+            workPlacementOf(metaPath).kind === "folder"
+              ? target
+              : posix.join(posix.dirname(target), posix.basename(owner.physicalPath)),
+          bookmarked: false,
+          lastPlayedAt: null,
+        });
+        copyWorkState(state, diagnostic.workId, newId);
+        state.sourceRevisions.set(newId, "fixture");
+        state.works.push(copy);
+        reassigned = copy;
+      }
       state.identityConflicts = removeIdentityConflictPath(
         state.identityConflicts,
         diagnostic.workId,
-        _body.path,
+        body.path,
       );
-      return { snapshot: fixtureEditSnapshot(state, work), projection: { status: "published" } };
+      return {
+        snapshot: fixtureEditSnapshot(state, reassigned),
+        projection: { status: "published" },
+      };
     },
 
     async projectWorkSource(path: WorkspacePath): Promise<WorkSourceMutationResult | null> {
-      const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+      const rootAbs = normalizeFsPath(requireFixtureRoot(state));
       const target = normalizeFsPath(`${rootAbs}/${path}`);
       if (!isPathWithin(rootAbs, target, posix)) return null;
       const work = state.works.find((candidate) => candidate.physicalPath === target);

@@ -41,6 +41,18 @@ DLsite一括取得のサーバーは履歴もsequenceも持たず、購読時に
 - 接続時点でジョブが終端済みなら、終端snapshotの `state` を1件送って閉じる。
 - イベントの種別は `state`・`progress`・`completed`・`failed`・`cancelled` の5種で、どれも `seq` を持たない。
 
+### scanの完了結果の中身
+
+`ScanResult`（`GET /api/scan/:id` の `result`、SSEの `completed`、`GET /api/scan/last`）はその実行のサマリーに限る。件数（`registered`・`errors`・`missing`・`skipped`・`coverErrors`）、その実行で新規登録・更新された作品ID（`insertedWorkIds`・`updatedWorkIds`）、実行時の警告（`unreadablePaths`・`dataIntegrityWarning`）だけを持つ。`dataIntegrityWarning` はその実行の警告で、サーバー再起動後は次のスキャンまで得られない。
+
+現在の状態は完了結果に載せず、それぞれの取得経路から読む。
+
+- 要対応の診断（ID重複・読み込めない作品情報ファイル）: `GET /api/scan/diagnostics` の `{ identityConflicts, invalidMetaFiles }`。どちらもcatalog DBの診断投影（`identity_conflicts`・`invalid_meta_files`）で、スキャン完了時に全置換され、登録解除で該当行が消える。サーバー再起動をまたいで残る
+- 未登録候補: `GET /api/scan/candidates`
+- RJコード未検出などDLsite関連の件数: `GET /api/dlsite/notifications`
+
+クライアントは診断を `entities/scan` のqueryOptionsで1経路だけ購読し、スキャン完了時と作品の登録・解除後に無効化する（[ADR-0028](0028-work-management-mutation-ownership.md)）。完了結果を要対応表示の根拠にしない。スキャン完了トーストの要対応リンクも、完了直後に取得した診断で決める。
+
 ### DLsiteの契約
 
 DLsite一括取得のジョブにIDを採番する。IDはジョブを待機キューへ積んだ時点で決める。

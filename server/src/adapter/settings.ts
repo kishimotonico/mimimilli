@@ -1,5 +1,5 @@
 import type {
-  ScanDiagnostic,
+  ScanDiagnostics,
   ScanCandidate,
   ScanCandidateRegisterItem,
   ScanCandidatesRegisterResponse,
@@ -22,7 +22,7 @@ export interface SettingsAdapter {
   getSettings(): Promise<StoredSettings>;
   /** signal はジョブ取消用。 */
   scan(options?: ScanOptions): Promise<ScanResult>;
-  listScanDiagnostics(): Promise<ScanDiagnostic[]>;
+  listScanDiagnostics(): Promise<ScanDiagnostics>;
   listScanCandidates(): Promise<ScanCandidate[]>;
   registerScanCandidates(
     items: ScanCandidateRegisterItem[],

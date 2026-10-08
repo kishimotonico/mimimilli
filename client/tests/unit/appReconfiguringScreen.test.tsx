@@ -24,7 +24,7 @@ import {
   sortAtom,
 } from "../../src/entities/library/model/navigationAtoms";
 import * as workApi from "../../src/entities/work/api";
-import * as scanApi from "../../src/features/scan/api";
+import * as scanApi from "../../src/entities/scan/api";
 import * as settingsApi from "../../src/entities/settings/api";
 import type { Settings } from "@mimimilli/shared";
 
@@ -34,12 +34,8 @@ const EMPTY_SCAN_RESULT = {
   updatedWorkIds: [],
   errors: 0,
   missing: 0,
-  rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
-  identityConflicts: [],
-  invalidMetaFiles: [],
-  candidates: [],
 };
 
 function renderAppWithSettings(settings: Settings) {

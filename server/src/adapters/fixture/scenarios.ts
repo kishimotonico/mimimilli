@@ -6,7 +6,6 @@ import {
   type InvalidMetaFile,
   type MetaDlsiteState,
   type ScanCandidate,
-  type ScanDiagnostic,
   type SmartFolder,
 } from "@mimimilli/shared";
 import type { RootReconfigurationRecord } from "../../adapter/index.ts";
@@ -60,8 +59,7 @@ export interface FixtureScenario {
   scanInsertedWorkIds: string[];
   scanUpdatedWorkIds: string[];
   scanCandidates: ScanCandidate[];
-  scanIdentityConflicts: ScanDiagnostic[];
-  scanInvalidMetaFiles: InvalidMetaFile[];
+  invalidMetaFiles: InvalidMetaFile[];
   /** rootの配下にないためcatalogから外れている作品。rootを戻すと同じIDで一覧へ戻る */
   detachedWorks: FixtureWorkRecord[];
   rootReconfiguration: FixtureRootReconfiguration | null;
@@ -115,8 +113,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanInsertedWorkIds: [],
       scanUpdatedWorkIds: [],
       scanCandidates: [],
-      scanIdentityConflicts: [],
-      scanInvalidMetaFiles: [],
+      invalidMetaFiles: [],
       detachedWorks: [],
       rootReconfiguration: null,
     };
@@ -151,10 +148,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
           rjCode: null,
         },
       ],
-      scanIdentityConflicts: [
-        { kind: "identity_conflict", workId: "duplicate-id", paths: ["viewer", "dlsite"] },
-      ],
-      scanInvalidMetaFiles: [
+      invalidMetaFiles: [
         { path: workspacePath("壊れた/mimimilli.json"), message: "メタファイルが不正です" },
       ],
       detachedWorks: [],
@@ -179,8 +173,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanInsertedWorkIds: [],
       scanUpdatedWorkIds: [],
       scanCandidates: [],
-      scanIdentityConflicts: [],
-      scanInvalidMetaFiles: [],
+      invalidMetaFiles: [],
       detachedWorks: [],
       rootReconfiguration: null,
     };
@@ -199,8 +192,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanInsertedWorkIds: [],
       scanUpdatedWorkIds: [],
       scanCandidates: [],
-      scanIdentityConflicts: [],
-      scanInvalidMetaFiles: [],
+      invalidMetaFiles: [],
       detachedWorks: [],
       rootReconfiguration: null,
     };
@@ -218,8 +210,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanInsertedWorkIds: [],
       scanUpdatedWorkIds: [],
       scanCandidates: [],
-      scanIdentityConflicts: [],
-      scanInvalidMetaFiles: [],
+      invalidMetaFiles: [],
       detachedWorks: cloneWorks(SEED_WORKS),
       rootReconfiguration: {
         phase: "failed",
@@ -255,10 +246,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
           rjCode: null,
         },
       ],
-      scanIdentityConflicts: [
-        { kind: "identity_conflict", workId: "duplicate-id", paths: ["viewer", "dlsite"] },
-      ],
-      scanInvalidMetaFiles: [
+      invalidMetaFiles: [
         { path: workspacePath("壊れた/mimimilli.json"), message: "メタファイルが不正です" },
       ],
       detachedWorks: [],
@@ -277,8 +265,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
     scanInsertedWorkIds: [],
     scanUpdatedWorkIds: [],
     scanCandidates: [],
-    scanIdentityConflicts: [],
-    scanInvalidMetaFiles: [],
+    invalidMetaFiles: [],
     detachedWorks: [],
     rootReconfiguration: null,
   };

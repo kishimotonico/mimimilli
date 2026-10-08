@@ -12,12 +12,8 @@ const emptyResult: ScanResult = {
   updatedWorkIds: [],
   errors: 0,
   missing: 0,
-  rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
-  identityConflicts: [],
-  invalidMetaFiles: [],
-  candidates: [],
 };
 
 function withStubAdapter(overrides: Partial<DataAdapter> & Pick<DataAdapter, "scan">): DataAdapter {
@@ -67,18 +63,8 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
     updatedWorkIds: [],
     errors: 1,
     missing: 3,
-    rjCodeMissingCount: 5,
     skipped: 6,
     coverErrors: 7,
-    candidates: [],
-    identityConflicts: [
-      {
-        kind: "identity_conflict",
-        workId: "work-id",
-        paths: ["copy-a/mimimilli.json", "copy-b/mimimilli.json"],
-      },
-    ],
-    invalidMetaFiles: [],
     unreadablePaths,
     dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["bad-work"] },
   };
@@ -106,8 +92,6 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
     assert.equal(properties.missing, 3);
     assert.equal(properties.skipped, 6);
     assert.equal(properties.coverErrors, 7);
-    assert.equal(properties.rjCodeMissingCount, 5);
-    assert.equal(properties.identityConflictsCount, 1);
     assert.equal(properties.unreadablePathsCount, 12);
     assert.deepEqual(properties.unreadablePathsSample, unreadablePaths.slice(0, 10));
     assert.equal(properties.dataIntegrityWarning, true);

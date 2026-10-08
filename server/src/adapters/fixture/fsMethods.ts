@@ -20,7 +20,7 @@ import {
   synthesizeSilentWav,
   synthesizeStaticContent,
 } from "./media.ts";
-import type { FixtureState } from "./state.ts";
+import { requireFixtureRoot, type FixtureState } from "./state.ts";
 import type { MediaAdapter } from "../../adapter/media.ts";
 
 export function createFsMethods(
@@ -61,14 +61,15 @@ export function createFsMethods(
   };
   return {
     async browseFs(path?: WorkspacePath): Promise<FsListing | null> {
-      const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+      const rootAbs = normalizeFsPath(requireFixtureRoot(state));
       const target = path ? `${rootAbs}/${path}` : rootAbs;
 
       const root = buildFsRoot(
+        rootAbs,
         state.works,
         state.coverColumns,
         state.identityConflicts,
-        state.scanInvalidMetaFiles,
+        state.invalidMetaFiles,
       );
       const dir = resolveFsDir(root, rootAbs, target);
       if (!dir) return null;
@@ -98,13 +99,14 @@ export function createFsMethods(
     },
 
     async locateWorkspaceMedia(ref: WorkspaceResourceRef) {
-      const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+      const rootAbs = normalizeFsPath(requireFixtureRoot(state));
       const target = `${rootAbs}/${ref.path}`;
       const root = buildFsRoot(
+        rootAbs,
         state.works,
         state.coverColumns,
         state.identityConflicts,
-        state.scanInvalidMetaFiles,
+        state.invalidMetaFiles,
       );
       const node = resolveFsPath(root, rootAbs, target);
       if (!node || node.isDir) return null;

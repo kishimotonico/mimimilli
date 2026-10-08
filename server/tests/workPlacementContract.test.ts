@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { emptyMetaDlsiteState, META_FILE_NAME, type MetaFile } from "@mimimilli/shared";
+import {
+  emptyMetaDlsiteState,
+  META_FILE_NAME,
+  workspacePath,
+  type MetaFile,
+} from "@mimimilli/shared";
 import type { DataAdapter } from "../src/adapter/index.ts";
 import { createFixtureAdapter, type FixtureSeedWork } from "../src/adapters/fixture/index.ts";
 import { writeMetaFile } from "../src/adapters/real/meta.ts";
@@ -230,9 +235,9 @@ test("単一ファイル形式の壊れたメタのコピーはメタファイ�
   await configureRoot(adapter, root);
   await adapter.scan();
   writeFileSync(join(root, "b", "single.mimimilli.json"), `{ "id": "${meta.id}", broken`);
-  const result = await adapter.scan();
+  await adapter.scan();
 
-  assert.deepEqual(result.identityConflicts, [
+  assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, [
     {
       kind: "identity_conflict",
       workId: meta.id,
@@ -305,7 +310,7 @@ test("単一ファイル形式の重複は、メタファイルのパスで再�
   assert.ok(result);
   const reassigned = JSON.parse(readFileSync(copyPath, "utf-8")) as { id: string };
   assert.notEqual(reassigned.id, meta.id);
-  assert.deepEqual(await adapter.listScanDiagnostics(), []);
+  assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, []);
 });
 
 test("再採番の前にメタが消えていても、単一ファイル形式はフォルダーとして読まない（real）", async (t) => {
@@ -352,7 +357,7 @@ test("壊れた単一ファイル形式のメタを直して反映すると、�
   const work = await adapter.getWork(meta.id);
   assert.equal(work?.status, "ok");
   assert.equal(work?.physicalPath, join(root, "a", "single.wav"));
-  assert.deepEqual(await adapter.listScanDiagnostics(), []);
+  assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, []);
 });
 
 test("メタファイルを単一ファイル形式の名前に改名すると、増分scanでも配置を検査し直す（real）", async (t) => {
@@ -380,4 +385,143 @@ test("メタファイルを単一ファイル形式の名前に改名すると�
     `${PREFIX}single.mimimilli.json のトラックが参照する track.wav は、このメタファイルに対応する音声ファイルではありません`,
   );
   assert.equal(work?.physicalPath, renamed);
+});
+
+type ReassignLayout = "folder" | "file";
+
+interface ReassignHarness {
+  adapter: DataAdapter;
+  ownerId: string;
+  /** 配置ごとの作品のphysicalPath。dir は "a"（登録側）/"b"（コピー側） */
+  physicalPathOf(dir: string): string;
+  conflictPathOf(dir: string): string;
+  cleanup(): void;
+}
+
+const REASSIGN_OWNER_ID = workIdOf("single");
+
+async function realReassignHarness(layout: ReassignLayout): Promise<ReassignHarness> {
+  const directory = makeTestDirectory(`work-placement-reassign-both-${layout}`);
+  const root = join(directory.path, "library");
+  const meta =
+    layout === "file"
+      ? metaOf("single", [{ name: "default", files: ["single.wav"] }])
+      : metaOf("single", [{ name: "default", files: ["track.wav"] }]);
+  const metaName = layout === "file" ? "single.mimimilli.json" : META_FILE_NAME;
+  const place = (dir: string) => {
+    mkdirSync(join(root, dir), { recursive: true });
+    writeWav(join(root, dir, layout === "file" ? "single.wav" : "track.wav"), 1);
+    writeMetaFile(join(root, dir, metaName), meta);
+  };
+  place("a");
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  await configureRoot(adapter, root);
+  await adapter.scan();
+  place("b");
+  await adapter.scan();
+  assert.equal((await adapter.listScanDiagnostics()).identityConflicts.length, 1);
+  return {
+    adapter,
+    ownerId: meta.id,
+    physicalPathOf: (dir) => join(root, dir, ...(layout === "file" ? ["single.wav"] : [])),
+    conflictPathOf: (dir) => (layout === "file" ? `${dir}/${metaName}` : dir),
+    cleanup: directory.cleanup,
+  };
+}
+
+function fixtureReassignHarness(layout: ReassignLayout): ReassignHarness {
+  const metaName = layout === "file" ? "single.mimimilli.json" : META_FILE_NAME;
+  const physicalPathOf = (dir: string) =>
+    `/library/${dir}${layout === "file" ? "/single.wav" : ""}`;
+  const conflictPathOf = (dir: string) => (layout === "file" ? `${dir}/${metaName}` : dir);
+  const adapter = createFixtureAdapter({
+    works: [
+      {
+        id: REASSIGN_OWNER_ID,
+        title: "single",
+        cover: null,
+        status: "ok",
+        physicalPath: physicalPathOf("a"),
+        metaPath: `/library/a/${metaName}`,
+        totalDurationSec: 1,
+        addedAt: "2026-01-01T00:00:00.000Z",
+        errorMessage: null,
+        urls: [],
+        tags: [],
+        trackCount: 1,
+        bookmarked: false,
+        lastPlayedAt: null,
+        dlsite: { ...emptyMetaDlsiteState(), lastAttemptAt: null, error: null, errorKind: null },
+      },
+    ],
+    playlistSpecs: {
+      [REASSIGN_OWNER_ID]: [
+        {
+          name: "default",
+          tracks: [
+            {
+              title: "t",
+              file: layout === "file" ? "single.wav" : "track.wav",
+              durationSec: 1,
+            },
+          ],
+        },
+      ],
+    },
+    identityConflicts: [
+      {
+        kind: "identity_conflict",
+        workId: REASSIGN_OWNER_ID,
+        paths: [conflictPathOf("a"), conflictPathOf("b")],
+      },
+    ],
+  });
+  return { adapter, ownerId: REASSIGN_OWNER_ID, physicalPathOf, conflictPathOf, cleanup: () => {} };
+}
+
+for (const layout of ["folder", "file"] as const) {
+  for (const adapterKind of ["real", "fixture"] as const) {
+    test(`ID重複は登録側のパスでも再採番できる（${layout}・${adapterKind}）`, async (t) => {
+      const harness =
+        adapterKind === "real" ? await realReassignHarness(layout) : fixtureReassignHarness(layout);
+      t.after(harness.cleanup);
+      const result = await harness.adapter.reassignIdentityConflict({
+        path: harness.conflictPathOf("a") as never,
+      });
+      assert.ok(result);
+      assert.notEqual(result.snapshot.id, harness.ownerId);
+      assert.equal(result.snapshot.physicalPath, harness.physicalPathOf("a"));
+      assert.deepEqual((await harness.adapter.listScanDiagnostics()).identityConflicts, []);
+      const work = await harness.adapter.getWork(result.snapshot.id);
+      assert.equal(work?.physicalPath, harness.physicalPathOf("a"));
+      assert.equal(work?.playlists[0]?.tracks.length, 1);
+    });
+
+    test(`ID重複はコピー側のパスでも再採番でき、登録側の作品は変わらない（${layout}・${adapterKind}）`, async (t) => {
+      const harness =
+        adapterKind === "real" ? await realReassignHarness(layout) : fixtureReassignHarness(layout);
+      t.after(harness.cleanup);
+      const result = await harness.adapter.reassignIdentityConflict({
+        path: harness.conflictPathOf("b") as never,
+      });
+      assert.ok(result);
+      assert.notEqual(result.snapshot.id, harness.ownerId);
+      assert.equal(result.snapshot.physicalPath, harness.physicalPathOf("b"));
+      assert.deepEqual((await harness.adapter.listScanDiagnostics()).identityConflicts, []);
+      const copy = await harness.adapter.getWork(result.snapshot.id);
+      assert.equal(copy?.physicalPath, harness.physicalPathOf("b"));
+      assert.equal(copy?.playlists[0]?.tracks.length, 1);
+      const owner = await harness.adapter.getWork(harness.ownerId);
+      assert.equal(owner?.physicalPath, harness.physicalPathOf("a"));
+    });
+  }
+}
+
+test("単一ファイル形式のID重複は、対象のメタファイルがFilesの一覧に出る（fixture）", async () => {
+  const { adapter, conflictPathOf } = fixtureReassignHarness("file");
+  const listed = await adapter.browseFs(workspacePath("b"));
+  assert.deepEqual(
+    listed?.entries.map((entry) => entry.path),
+    [conflictPathOf("b")],
+  );
 });

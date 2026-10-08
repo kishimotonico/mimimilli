@@ -7,14 +7,14 @@ import { I } from "../../../shared/ui/Icon";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import { classifyFile, sortEntries, type FsEntry } from "../model/types";
 import type { WorkspacePath } from "@mimimilli/shared";
-import type { ScanDiagnostic } from "@mimimilli/shared";
+import type { IdentityConflict } from "@mimimilli/shared";
 import FileRow from "./FileRow";
 import { useListKeyboardNav } from "../../../shared/ui/useListKeyboardNav";
 
 interface FileColumnProps {
   title: string;
   entries: FsEntry[];
-  identityConflictPaths: ReadonlyMap<string, ScanDiagnostic>;
+  identityConflictPaths: ReadonlyMap<string, IdentityConflict>;
   selectedPath: WorkspacePath | null;
   matchPlaying: (entry: FsEntry) => boolean;
   isPlaybackActive?: boolean;

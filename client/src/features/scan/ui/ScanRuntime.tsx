@@ -1,10 +1,12 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
-import type { ScanJobSnapshot, StartScanRequest } from "@mimimilli/shared";
+import type { ScanJobSnapshot, ScanResult, StartScanRequest } from "@mimimilli/shared";
 import { SETTINGS_QUERY_KEYS } from "../../../entities/settings/queryKeys";
 import { useDlsiteBulkActions } from "../../../entities/dlsite/useDlsiteBulkActions";
 import { SCAN_QUERY_KEYS } from "../api";
+import { scanDiagnosticsQueryOptions } from "../../../entities/scan/queryOptions";
+import { dlsiteNotificationSummaryQueryOptions } from "../../../entities/dlsite/model/dlsiteNotificationSummaryQueryOptions";
 import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
 import { updateCachesAfterLibraryScan } from "../../../entities/work/model/workCacheUpdates";
 import {
@@ -18,6 +20,24 @@ import { useScanJob } from "../model/useScanJob";
 import { formatScanResult } from "../model/formatScanResult";
 import { activeModalAtom } from "../../../shared/model/activeModalAtom";
 import { useToast } from "../../../shared/ui/useToast";
+
+/** 要対応の有無は実行結果ではなく完了直後の現在の診断で判定する。取得に失敗したら要対応リンクを出さない。 */
+async function showCompletionToast(queryClient: QueryClient, result: ScanResult): Promise<boolean> {
+  try {
+    const [diagnostics, notificationSummary] = await Promise.all([
+      queryClient.fetchQuery({ ...scanDiagnosticsQueryOptions, staleTime: 0 }),
+      queryClient.fetchQuery({ ...dlsiteNotificationSummaryQueryOptions, staleTime: 0 }),
+    ]);
+    return (
+      diagnostics.identityConflicts.length > 0 ||
+      diagnostics.invalidMetaFiles.length > 0 ||
+      notificationSummary.rjCodeMissingCount > 0 ||
+      result.dataIntegrityWarning !== undefined
+    );
+  } catch {
+    return result.dataIntegrityWarning !== undefined;
+  }
+}
 
 // SSE 購読の単一所有者。scanJobAtom / scanActionsAtom をここで配線する。
 export default function ScanRuntime() {
@@ -56,30 +76,33 @@ export default function ScanRuntime() {
       void updateCachesAfterLibraryScan(queryClient);
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
       if (!scanModalOpen) {
-        const hasNeedsAttention =
-          result.identityConflicts.length > 0 ||
-          result.invalidMetaFiles.length > 0 ||
-          result.rjCodeMissingCount > 0 ||
-          result.dataIntegrityWarning !== undefined;
-        terminalToast.show({
-          message: `スキャン完了: ${formatScanResult(result)}`,
-          variant: result.errors > 0 || result.missing > 0 ? "warning" : "success",
-          priority: "notice",
-          actionLabel: hasNeedsAttention ? "要対応を見る" : undefined,
-          // onActionはトーストを自動では閉じない契約（design-system.md）。ここは同期的に
-          // 完結する操作なので押した直後に閉じる
-          onAction: hasNeedsAttention
-            ? () => {
-                setActiveModal({ kind: "scan", tab: "needsAttention" });
-                terminalToast.dismiss();
-              }
-            : undefined,
+        void showCompletionToast(queryClient, result).then((hasNeedsAttention) => {
+          terminalToast.show({
+            message: `スキャン完了: ${formatScanResult(result)}`,
+            variant: result.errors > 0 || result.missing > 0 ? "warning" : "success",
+            priority: "notice",
+            actionLabel: hasNeedsAttention ? "要対応を見る" : undefined,
+            // onActionはトーストを自動では閉じない契約（design-system.md）。ここは同期的に
+            // 完結する操作なので押した直後に閉じる
+            onAction: hasNeedsAttention
+              ? () => {
+                  setActiveModal({ kind: "scan", tab: "needsAttention" });
+                  terminalToast.dismiss();
+                }
+              : undefined,
+          });
         });
       }
       if (result.insertedWorkIds.length > 0) dlsiteBulk.attach();
     },
     [dlsiteBulk, errorToast, queryClient, scanModalOpen, setActiveModal, terminalToast],
   );
+
+  // 候補は明示的な取得でしか更新されないため、アプリ起動時に一度取得して未登録バッジを揃える。
+  useEffect(() => {
+    if (queryClient.getQueryData(SCAN_QUERY_KEYS.candidates()) !== undefined) return;
+    void refreshScanCandidates(queryClient).catch(() => {});
+  }, [queryClient]);
 
   // 新しいスキャンの開始がサーバー側の真実の境界になるため、開始時点でそれ以前のローカル非表示を破棄する。
   // 完了時ではなく開始時に行うことで、完了通知の非同期到達（SSE再接続・再取得）と

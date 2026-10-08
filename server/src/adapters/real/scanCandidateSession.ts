@@ -6,6 +6,7 @@ import type {
   ScanCandidatesRegisterResponse,
 } from "@mimimilli/shared";
 import { CandidatePoolChangedError } from "../../errors.ts";
+import { folderTarget } from "./registrationTarget.ts";
 import type { Scanner } from "./scanner.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 
@@ -78,7 +79,7 @@ export class ScanCandidateSession {
     for (const { item, candidate } of selected) {
       const current = candidate!;
       try {
-        const outcome = await scanner.registerFolderWork(resolve(root, current.path), {
+        const outcome = await scanner.registerWork(folderTarget(resolve(root, current.path)), {
           title: current.inferredTitle,
           rjCode: item.rjCode,
         });

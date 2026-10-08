@@ -1,12 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { getDlsiteNotificationSummary } from "../../work/api";
-import { WORK_QUERY_KEYS } from "../../work/queryKeys";
+import { dlsiteNotificationSummaryQueryOptions } from "./dlsiteNotificationSummaryQueryOptions";
 
 export function useDlsiteNotificationSummary() {
-  const query = useQuery({
-    queryKey: WORK_QUERY_KEYS.dlsiteNotificationSummary(),
-    queryFn: getDlsiteNotificationSummary,
-  });
+  const query = useQuery(dlsiteNotificationSummaryQueryOptions);
   const data = query.data;
   return {
     rjCodeMissingCount: data?.rjCodeMissingCount ?? 0,

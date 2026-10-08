@@ -1,5 +1,5 @@
-import { existsSync, statSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type {
   DataIntegrityWarning,
   DlsiteNotificationKind,
@@ -7,7 +7,7 @@ import type {
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
   IdentityConflictReassignBody,
-  ScanDiagnostic,
+  IdentityConflict,
   NormalizedTag,
   ResumeBody,
   Work,
@@ -23,21 +23,9 @@ import type {
   WorksQuery,
 } from "@mimimilli/shared";
 import type { WorkSourceProjectionResult } from "../../adapter/work.ts";
-import {
-  errorMessage,
-  isAudioFileName,
-  resolveWorkPlacement,
-  sidecarMetaFileName,
-  tagEquals,
-} from "@mimimilli/shared";
+import { errorMessage, resolveWorkPlacement, tagEquals } from "@mimimilli/shared";
 import { type Db } from "./db.ts";
-import {
-  META_FILE_NAME,
-  MetaMutationReject,
-  encodeMetaRaw,
-  patchMetaFileCas,
-  readMetaSource,
-} from "./meta.ts";
+import { MetaMutationReject, encodeMetaRaw, patchMetaFileCas, readMetaSource } from "./meta.ts";
 import { SourceChangedError } from "../../errors.ts";
 import { removeIdentityConflictPath } from "../../core/identityConflicts.ts";
 import { validateResumeRequest } from "../../core/resumeValidation.ts";
@@ -58,12 +46,8 @@ import {
   readVerifiedEditSource,
   toEditSnapshot,
 } from "./workEditSource.ts";
-import {
-  buildFileWorkRegisterPreview,
-  buildWorkRegisterPreview,
-  createWorkFromPath,
-  unregisterWork,
-} from "./workRegister.ts";
+import { registrationTargetOfPath } from "./registrationTarget.ts";
+import { buildWorkRegisterPreview, createWorkFromPath, unregisterWork } from "./workRegister.ts";
 
 const scanLogger = getCategoryLogger("scan");
 
@@ -84,7 +68,7 @@ export function createWorkMethods(deps: {
     const conflictPath = identityConflictPathOf(root, conflictMetaPath);
     const diagnostics = catalog.listIdentityConflicts();
     const existing = diagnostics.find(
-      (diagnostic): diagnostic is Extract<ScanDiagnostic, { kind: "identity_conflict" }> =>
+      (diagnostic): diagnostic is Extract<IdentityConflict, { kind: "identity_conflict" }> =>
         diagnostic.kind === "identity_conflict" && diagnostic.workId === workId,
     );
     if (existing) {
@@ -102,20 +86,8 @@ export function createWorkMethods(deps: {
   }
 
   function metaPathForTarget(target: string): string | null {
-    try {
-      const stat = statSync(target);
-      if (stat.isDirectory()) {
-        const metaPath = join(target, META_FILE_NAME);
-        return existsSync(metaPath) ? metaPath : null;
-      }
-      if (stat.isFile() && isAudioFileName(basename(target))) {
-        const metaPath = join(dirname(target), sidecarMetaFileName(basename(target)));
-        return existsSync(metaPath) ? metaPath : null;
-      }
-      return null;
-    } catch {
-      return null;
-    }
+    const metaPath = registrationTargetOfPath(target)?.placement.metaPath;
+    return metaPath && existsSync(metaPath) ? metaPath : null;
   }
 
   async function persistSourceMutation(
@@ -160,12 +132,10 @@ export function createWorkMethods(deps: {
       const target = resolveWithin(root, join(root, path));
       if (!target) return null;
       try {
-        const stat = statSync(target);
-        if (stat.isDirectory()) return buildWorkRegisterPreview(query, target);
-        if (stat.isFile() && isAudioFileName(basename(target))) {
-          return buildFileWorkRegisterPreview(query, target, root);
-        }
-        return null;
+        const registrationTarget = registrationTargetOfPath(target);
+        return registrationTarget
+          ? buildWorkRegisterPreview(query, registrationTarget, root)
+          : null;
       } catch {
         return null;
       }

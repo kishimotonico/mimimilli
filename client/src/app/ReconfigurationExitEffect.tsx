@@ -9,8 +9,8 @@ import { useAtomValue } from "jotai";
 import { useQueryClient } from "@tanstack/react-query";
 import { reconfigurationExitEpochAtom } from "../entities/settings/reconfigurationExitAtom";
 import { resetReconfigurationAffectedQueries } from "./model/resetLibraryForReconfiguration";
-import { SCAN_QUERY_KEYS } from "../entities/scan/queryKeys";
-import { getLastScanResult } from "../features/scan/api";
+import { refreshScanCandidates } from "../entities/scan/scanCandidatesCache";
+import { scanLastResultQueryOptions } from "../entities/scan/queryOptions";
 import { useDlsiteBulkActions } from "../entities/dlsite/useDlsiteBulkActions";
 
 export default function ReconfigurationExitEffect() {
@@ -25,8 +25,9 @@ export default function ReconfigurationExitEffect() {
     if (epoch === processedEpochRef.current) return;
     processedEpochRef.current = epoch;
     resetReconfigurationAffectedQueries(queryClient);
+    void refreshScanCandidates(queryClient).catch(() => {});
     void queryClient
-      .fetchQuery({ queryKey: SCAN_QUERY_KEYS.last(), queryFn: getLastScanResult })
+      .fetchQuery(scanLastResultQueryOptions)
       .then((last) => {
         if (last && last.result.insertedWorkIds.length > 0) dlsiteBulk.attach();
       })

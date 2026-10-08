@@ -1,7 +1,9 @@
 import type {
   MetaFile,
+  NormalizedTag,
   ScanCandidate,
   ScanResult,
+  UrlEntry,
   Work,
   WorkPlacementResolution,
 } from "@mimimilli/shared";
@@ -31,6 +33,24 @@ export type ProjectOutcome =
       reason: "error";
       snapshot: { meta: MetaFile; bytes: Buffer; sourceRevision: string };
     };
+
+/** 既存メタへ当てる差分。未指定の項目は触らない */
+export interface RestoreMetaPatch {
+  title?: string;
+  tags?: string[];
+  urls?: UrlEntry[];
+  coverImage?: string | null;
+  dlsite?: MetaFile["dlsite"];
+}
+
+export interface RegisterWorkOptions {
+  title: string;
+  tags?: NormalizedTag[];
+  urls?: UrlEntry[];
+  coverImage?: string | null;
+  dlsite?: MetaFile["dlsite"];
+  rjCode?: string;
+}
 
 export interface PreparedMeta {
   kind: "ok";

@@ -1,4 +1,4 @@
-import { META_FILE_NAME, isRjCodeMissing, workspacePath } from "@mimimilli/shared";
+import { META_FILE_NAME, workspacePath } from "@mimimilli/shared";
 import type { ScanCandidate, ScanCandidatesRegisterResponse, ScanResult } from "@mimimilli/shared";
 import type {
   RootReconfigurationAdapter,
@@ -11,7 +11,7 @@ import type { FixtureWorkRecord } from "./data.ts";
 import { isFsPathWithin, normalizeFsPath } from "./fsResolve.ts";
 import { checkWorkPlacement } from "./playback.ts";
 import { FIXTURE_UNREADABLE_ROOT } from "./scenarios.ts";
-import { dlsiteLinkageOf, setDlsiteLinkage, type FixtureState } from "./state.ts";
+import { requireFixtureRoot, setDlsiteLinkage, type FixtureState } from "./state.ts";
 
 const FIXTURE_SCAN_STEP_MS = 20;
 const FIXTURE_ROOT_REBUILD_STEP_MS = 250;
@@ -58,21 +58,15 @@ async function runPseudoScan(
   state.works = state.works.map((work) => checkWorkPlacement(state, work));
   state.lastScanTime = new Date().toISOString();
   state.scanCandidates = [...state.scanCandidatePool];
-  const excluded = new Set(state.scanCandidateExclusions);
   return {
     registered: state.works.length,
     insertedWorkIds: state.scanInsertedWorkIds,
     updatedWorkIds: state.scanUpdatedWorkIds,
     errors: state.works.filter((w) => w.status === "error").length,
     missing: state.works.filter((w) => w.status === "missing").length,
-    rjCodeMissingCount: state.works.filter((w) => isRjCodeMissing(dlsiteLinkageOf(state, w.id)))
-      .length,
     skipped: 0,
     coverErrors: 0,
     unreadablePaths: [],
-    identityConflicts: state.scanIdentityConflicts,
-    invalidMetaFiles: state.scanInvalidMetaFiles,
-    candidates: state.scanCandidates.filter((candidate) => !excluded.has(candidate.path)),
     ...(state.dataIntegrityWarning ? { dataIntegrityWarning: state.dataIntegrityWarning } : {}),
   };
 }
@@ -144,7 +138,10 @@ export function createSettingsScanMethods(
     },
 
     async listScanDiagnostics() {
-      return state.identityConflicts;
+      return {
+        identityConflicts: state.identityConflicts,
+        invalidMetaFiles: state.invalidMetaFiles,
+      };
     },
     async listScanCandidates(): Promise<ScanCandidate[]> {
       const excluded = new Set(state.scanCandidateExclusions);
@@ -154,7 +151,7 @@ export function createSettingsScanMethods(
       const candidatesByPath = new Map<string, ScanCandidate>(
         state.scanCandidates.map((candidate) => [candidate.path, candidate]),
       );
-      const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+      const rootAbs = normalizeFsPath(requireFixtureRoot(state));
       const now = new Date().toISOString();
       // real adapter の registerCandidates（scanCandidateSession.ts）と同じ意味論: 登録した候補は
       // 実際にcatalog（ここではstate.works）へ行が増える。作品一覧・スキャン結果一覧の

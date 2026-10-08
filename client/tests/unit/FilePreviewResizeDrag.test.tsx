@@ -11,6 +11,10 @@ const getScanDiagnostics = vi.fn();
 
 vi.mock("../../src/features/files/api", () => ({
   browseFs: (...args: unknown[]) => browseFs(...args),
+}));
+
+vi.mock("../../src/entities/scan/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/entities/scan/api")>()),
   getScanDiagnostics: (...args: unknown[]) => getScanDiagnostics(...args),
 }));
 
@@ -20,7 +24,7 @@ vi.mock("../../src/entities/settings/useSettingsQuery", () => ({
 
 function renderPreview() {
   browseFs.mockResolvedValue({ entries: [], workId: null });
-  getScanDiagnostics.mockResolvedValue({ diagnostics: [] });
+  getScanDiagnostics.mockResolvedValue({ identityConflicts: [], invalidMetaFiles: [] });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const store = createStore();
   const wrapper = ({ children }: { children: ReactNode }) =>

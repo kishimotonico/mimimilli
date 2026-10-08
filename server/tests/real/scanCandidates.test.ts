@@ -45,9 +45,9 @@ test("listScanCandidatesは最後のスキャン結果を返し、再帰走査�
   const after = await adapter.listScanCandidates();
   assert.deepEqual(after, before);
 
-  const rescanned = await adapter.scan();
+  await adapter.scan();
   assert.deepEqual(
-    rescanned.candidates.map((candidate) => candidate.path).sort(),
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path).sort(),
     ["初期候補", "走査後追加"].sort(),
   );
 });
@@ -66,9 +66,9 @@ test("選択した候補だけを登録し、除外した候補は以後返さ�
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
   const beforeScan = snapshotTree(root);
-  const scanned = await adapter.scan();
+  await adapter.scan();
   assert.deepEqual(
-    scanned.candidates.map((candidate) => candidate.path).sort(),
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path).sort(),
     ["選択作品", "除外作品"].sort(),
   );
   assert.equal(existsSync(join(selected, "mimimilli.json")), false);

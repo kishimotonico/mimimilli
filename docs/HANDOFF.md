@@ -91,7 +91,7 @@ smokeテストの注意:
 
 - `GET /works` は常にページングエンベロープ `{ items, total }` を返す（page/limit 省略時は page=1, limit=200）
 - 作品の変更系（`PATCH /works/:id`、タグの追加・削除など）は応答に `{ snapshot, projection }` を返す。`PATCH` は `sourceRevision` を要求する
-- `POST /scan` は 202 で `{ job }` を即返し（`Location: /api/scan/:id`）、実行中の二重 POST は 409（`active` 付き）。`GET /scan/active` と `GET /scan/last` は該当なしのとき 204。進捗は `GET /scan/:id/events` の SSE（[ADR-0030](adr/0030-job-progress-sse-current-state.md)）
+- `POST /scan` は 202 で `{ job }` を即返し（`Location: /api/scan/:id`）、実行中の二重 POST は 409（`active` 付き）。`GET /scan/active` と `GET /scan/last` は該当なしのとき 204。進捗は `GET /scan/:id/events` の SSE（[ADR-0030](adr/0030-job-progress-sse-current-state.md)）。`GET /scan/last` はその実行のサマリー（件数・新規/更新作品ID・警告）だけを返し、要対応の現在状態は `GET /scan/diagnostics` の `{ identityConflicts, invalidMetaFiles }`、未登録候補は `GET /scan/candidates` から取る
 - `POST /works/:id/resume` は高頻度のため `PATCH /works/:id` と分離している
 - 音声は Range(206) 対応。カバーは `?w=128|256|512` でサムネイル（real は webp 化 + ディスクキャッシュ、fixture の SVG は原寸）
 

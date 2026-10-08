@@ -3,7 +3,6 @@
 
 import {
   dlsiteWorkInfoSchema,
-  scanDiagnosticsResponseSchema,
   workRegisterPreviewSchema,
   type DlsiteWorkInfo,
   type WorkRegisterPreview,
@@ -22,10 +21,6 @@ export async function browseFs(path?: string): Promise<FsListing> {
 export async function getWorkRegisterPreview(path: WorkspacePath): Promise<WorkRegisterPreview> {
   const q = `?path=${encodeURIComponent(path)}`;
   return getParsed(workRegisterPreviewSchema, `/works/register-preview${q}`);
-}
-
-export async function getScanDiagnostics() {
-  return getParsed(scanDiagnosticsResponseSchema, "/scan/diagnostics");
 }
 
 /** 作品未登録時の DLsite メタ取得（RJ/VJコード指定） */

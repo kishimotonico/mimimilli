@@ -5,10 +5,7 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { describe, expect, it } from "vitest";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import { scanCandidateHiddenPathsAtom } from "../../src/entities/scan/model/atoms";
-import {
-  syncScanCandidatesFromLast,
-  useUnregisteredCandidateCount,
-} from "../../src/features/scan/model/useScanCandidatesCache";
+import { useUnregisteredCandidateCount } from "../../src/features/scan/model/useScanCandidatesCache";
 
 const candidateA = {
   path: "候補A" as const,
@@ -27,23 +24,6 @@ const candidateB = {
 };
 
 const scanCandidates = [candidateA, candidateB];
-
-const lastScanResult = {
-  finishedAt: "2026-01-01T00:00:00.000Z",
-  result: {
-    registered: 0,
-    insertedWorkIds: [] as string[],
-    updatedWorkIds: [] as string[],
-    errors: 0,
-    missing: 0,
-    rjCodeMissingCount: 0,
-    skipped: 0,
-    coverErrors: 0,
-    identityConflicts: [],
-    invalidMetaFiles: [],
-    candidates: scanCandidates,
-  },
-};
 
 function CountProbe() {
   const count = useUnregisteredCandidateCount();
@@ -64,12 +44,6 @@ function renderCount(queryClient: QueryClient, store = createStore()) {
 async function expectCount(text: string) {
   await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent(text));
 }
-
-describe("syncScanCandidatesFromLast", () => {
-  it("キャッシュ済み候補を優先する", () => {
-    expect(syncScanCandidatesFromLast(lastScanResult, [])).toEqual([]);
-  });
-});
 
 describe("useUnregisteredCandidateCount", () => {
   it("候補キャッシュの件数を返す", async () => {
@@ -99,18 +73,13 @@ describe("useUnregisteredCandidateCount", () => {
     await expectCount("0");
   });
 
-  it("キャッシュが undefined のときだけ last.result.candidates にフォールバックする", async () => {
+  it("候補キャッシュが未取得のときは件数0で、直近のスキャン結果から件数を補わない", async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
-    queryClient.setQueryData(SCAN_QUERY_KEYS.last(), lastScanResult);
 
     renderCount(queryClient);
-    await expectCount("2");
 
-    act(() => {
-      queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), []);
-    });
     await expectCount("0");
   });
 });

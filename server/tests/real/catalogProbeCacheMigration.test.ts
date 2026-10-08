@@ -15,7 +15,7 @@ import { test } from "node:test";
 import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
-import { openDb, CATALOG_SCHEMA_VERSION } from "../../src/adapters/real/db.ts";
+import { openDb } from "../../src/adapters/real/db.ts";
 import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
 
 const CATALOG_MIGRATIONS_DIR = join(import.meta.dir, "../../drizzle/catalog");
@@ -77,8 +77,6 @@ test("migration 0006: 旧実装が0秒で保存したaudio_probe_cacheをNULLへ
   const sqlite = new Database(catalogPath, { create: true });
   sqlite.exec("PRAGMA journal_mode = WAL");
   migrate(drizzle(sqlite), { migrationsFolder: preMigrationsDir });
-  // openDbはDBがアプリより新しい場合にfail-fastするため、テスト用の旧catalogに現行版を設定する。
-  sqlite.exec(`PRAGMA user_version = ${CATALOG_SCHEMA_VERSION}`);
 
   // 旧実装（probe失敗/解析失敗時にdurationSec:0で保存）が残した行を再現する。
   sqlite.exec(

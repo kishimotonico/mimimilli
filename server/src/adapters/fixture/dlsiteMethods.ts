@@ -7,6 +7,7 @@ import {
 } from "@mimimilli/shared";
 import type {
   DlsiteApplyMissingPreviewItem,
+  DlsiteBulkProgressSnapshot,
   DlsiteBulkResult,
   DlsiteFetchResult,
   DlsiteStateUpdateBody,
@@ -171,22 +172,20 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
         skipped: requested.length - targets.length,
         ...(state.dataIntegrityWarning ? { dataIntegrityWarning: state.dataIntegrityWarning } : {}),
       };
+      const progressAt = (processed: number): DlsiteBulkProgressSnapshot => {
+        const next = targets[processed];
+        return {
+          processed,
+          total: targets.length,
+          work: next ? { id: next.id, rjCode: next.rjCode, title: next.title } : null,
+        };
+      };
+      options?.onProgress?.(progressAt(0));
       for (let index = 0; index < targets.length; index++) {
         if (options?.signal?.aborted) return result;
-        const work = targets[index]!;
-        options?.onProgress?.({
-          processed: index,
-          total: targets.length,
-          work: { id: work.id, rjCode: work.rjCode, title: work.title },
-        });
-        if (options?.signal?.aborted) return result;
         result.fetched += 1;
+        options?.onProgress?.(progressAt(index + 1));
       }
-      options?.onProgress?.({
-        processed: targets.length,
-        total: targets.length,
-        work: null,
-      });
       return result;
     },
   };

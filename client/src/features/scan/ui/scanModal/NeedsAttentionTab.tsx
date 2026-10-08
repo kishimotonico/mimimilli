@@ -1,11 +1,11 @@
 import { useSetAtom } from "jotai";
-import type { DataIntegrityWarning, InvalidMetaFile, ScanDiagnostic } from "@mimimilli/shared";
+import type { DataIntegrityWarning, InvalidMetaFile, IdentityConflict } from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
 import { activeModalAtom, type ActiveModal } from "../../../../shared/model/activeModalAtom";
 import { buildNeedsAttentionRows, type NeedsAttentionRow } from "../../model/needsAttention";
 
 export interface NeedsAttentionTabProps {
-  identityConflicts: ScanDiagnostic[];
+  identityConflicts: IdentityConflict[];
   invalidMetaFiles: InvalidMetaFile[];
   rjCodeMissingCount: number;
   dlsiteFetchFailedCount: number;

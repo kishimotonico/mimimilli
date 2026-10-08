@@ -66,7 +66,7 @@ export function createRealAdapter(
   const scanner = new Scanner(
     db,
     { query, catalog, user },
-    { measureCover: measureCoverDimensions, dlsiteCache },
+    { measureCover: measureCoverDimensions, dlsiteCache, resolveRoot: () => requireRoot() },
   );
   const dlsiteRequestConfig: DlsiteRequestConfig = {
     ...DEFAULT_DLSITE_REQUEST_CONFIG,
@@ -101,6 +101,7 @@ export function createRealAdapter(
   });
   const coverMediaMethods = createCoverMediaMethods({
     query,
+    catalog,
     thumbnailCache,
     thumbnailCacheDir,
     requireRoot,

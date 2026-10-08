@@ -1,10 +1,10 @@
 // 「要対応」の一元定義。通知ベルのバッジと要対応タブのバッジが
 // 同じ問題一覧・同じ件数を出すよう、両方がこのビルダーの結果だけを見る。
 // 件数は「問題の件数（行数）」で数える。ID重複は競合（workId）単位で1件。
-import type { DataIntegrityWarning, InvalidMetaFile, ScanDiagnostic } from "@mimimilli/shared";
+import type { DataIntegrityWarning, InvalidMetaFile, IdentityConflict } from "@mimimilli/shared";
 
 export interface NeedsAttentionSource {
-  identityConflicts: ScanDiagnostic[];
+  identityConflicts: IdentityConflict[];
   invalidMetaFiles: InvalidMetaFile[];
   rjCodeMissingCount: number;
   dlsiteFetchFailedCount: number;
