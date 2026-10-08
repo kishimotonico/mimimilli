@@ -1,0 +1,125 @@
+/* 軸値一覧（.mll-vsearch / .mll-vlist-hd* / .mll-vrow*）。 */
+
+.mll-vsearch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--paper-1);
+}
+.mll-vsearch:focus-within {
+  border-bottom-color: var(--line-strong);
+}
+.mll-vsearch input {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--ink-0);
+  background: transparent;
+}
+.mll-vsearch input::placeholder {
+  color: var(--ink-3);
+}
+.mll-vlist-hd {
+  display: grid;
+  grid-template-columns: 32px 1fr 72px 88px;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 6px 4px 4px;
+}
+.mll-vlist-hd__sort {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+.mll-vlist-hd__sort:first-of-type {
+  justify-content: flex-start;
+}
+.mll-vlist-hd__sort:hover {
+  color: var(--ink-1);
+  background: var(--paper-2);
+}
+.mll-vlist-hd__sort.is-active {
+  color: var(--ink-0);
+}
+.mll-vlist-hd__sort .chev {
+  display: inline-flex;
+}
+.mll-vlist-hd__sort .chev.is-asc {
+  transform: rotate(180deg);
+}
+.mll-vrow {
+  position: relative;
+  border-radius: 4px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--ink-1);
+}
+.mll-vrow:hover {
+  background: var(--paper-2);
+}
+.mll-vrow.is-on {
+  background: var(--paper-4);
+  color: var(--ink-0);
+}
+.mll-vrow__main {
+  display: grid;
+  grid-template-columns: 32px 1fr 72px 88px;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  block-size: 42px;
+  box-sizing: border-box;
+  padding: 5px 30px 5px 4px;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+/* 入れ子タグの中間ノードのうち、実タグとして存在しないもの（選択不可の見出し。
+     ADR-0012 §5）。名前順ソート時のみ axisValueHierarchy.ts が生成する。 */
+.mll-vrow-heading {
+  display: flex;
+  align-items: center;
+  block-size: 42px;
+  box-sizing: border-box;
+  padding-right: 4px;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--ink-2);
+  /* 値行（.mll-vrow__nm）と同じく折り返さない。仮想化が行高を固定値で見積もっているため、
+       折り返すと translateY の計算がずれて以降の行が重なる。 */
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.mll-vrow__nm {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-0);
+  font-weight: 500;
+}
+.mll-vrow__count,
+.mll-vrow__dur {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

@@ -1,0 +1,166 @@
+/* Filesのプレビュー（.mle-fprev*、.mle-identity-conflict*）。 */
+
+.mle-fprev {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+/* コンパクトなヒーロー（フォルダー・非画像ファイル）。巨大な空ボックスを置かない */
+.mle-fprev__hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-3);
+  background: var(--paper-0);
+}
+.mle-fprev__hero .ic {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-2);
+  background: var(--paper-2);
+  color: var(--ink-2);
+}
+.mle-fprev__hero.is-dir .ic {
+  color: var(--acc);
+}
+.mle-fprev__hero.is-audio .ic {
+  color: var(--r-leaf);
+}
+.mle-fprev__hero.is-image .ic {
+  color: var(--r-plum);
+}
+.mle-fprev__hero.is-pdf .ic,
+.mle-fprev__hero.is-video .ic {
+  color: var(--r-coral);
+}
+.mle-fprev__hero .bd {
+  min-width: 0;
+}
+/* 画像のみ大きく表示 */
+.mle-fprev__media {
+  width: 100%;
+  min-height: 200px;
+  display: grid;
+  place-items: center;
+  background: var(--paper-0);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-3);
+  padding: 18px;
+  overflow: hidden;
+}
+.mle-fprev__img {
+  max-width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+  border-radius: var(--r-2);
+  box-shadow: var(--shadow-cover);
+  background: var(--paper-2);
+}
+.mle-fprev__media.is-document,
+.mle-fprev__media.is-video,
+.mle-fprev__media.is-text {
+  height: min(52vh, 480px);
+  padding: 0;
+}
+.mle-fprev__document,
+.mle-fprev__video,
+.mle-fprev__text {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: var(--r-2);
+}
+.mle-fprev__video {
+  background: var(--ink-0);
+}
+.mle-fprev__text {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--paper-0);
+  color: var(--ink-0);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: 1.6;
+  text-align: start;
+  user-select: text;
+}
+.mle-fprev__name {
+  font-family: var(--font-jp);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink-0);
+  line-height: 1.4;
+  word-break: break-all;
+}
+.mle-fprev__path {
+  user-select: text;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
+  word-break: break-all;
+  margin-top: 3px;
+}
+.mle-fprev__meta {
+  font-family: var(--font-sans);
+  font-size: var(--fs-secondary);
+  color: var(--ink-2);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+.mle-fprev__caption {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.mle-fprev__actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.mle-identity-conflict {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid color-mix(in oklch, var(--r-coral) 28%, transparent);
+  border-radius: var(--r-2);
+  background: color-mix(in oklch, var(--r-coral) 8%, transparent);
+}
+.mle-identity-conflict p {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--ink-1);
+}
+.mle-identity-conflict__paths {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.mle-identity-conflict__paths code {
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  user-select: text;
+}
+.mle-fprev__note {
+  font-size: var(--fs-secondary);
+  color: var(--ink-2);
+  line-height: 1.6;
+  background: var(--paper-0);
+  border-left: 2px solid var(--acc-line);
+  padding: 8px 12px;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}

@@ -1,0 +1,24 @@
+/* 汎用アイコンボタン（.mle-icbtn*）。 */
+
+.mle-icbtn {
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+}
+.mle-icbtn:hover {
+  background: var(--paper-3);
+  color: var(--ink-0);
+}
+.mle-icbtn:disabled,
+.mle-icbtn[aria-disabled="true"] {
+  cursor: not-allowed;
+  color: var(--ink-4);
+}
+.mle-icbtn:disabled:hover,
+.mle-icbtn[aria-disabled="true"]:hover {
+  background: transparent;
+  color: var(--ink-4);
+}

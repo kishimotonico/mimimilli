@@ -1,0 +1,56 @@
+/* グリッド操作（.mle-grid-controls / .mll-grid-size）。 */
+
+.mle-grid-controls {
+  display: grid;
+  grid-template-columns: 0fr;
+  margin-right: -10px;
+  opacity: 0;
+  transform: translateX(8px);
+  transition:
+    grid-template-columns 180ms ease-out,
+    margin-right 180ms ease-out,
+    opacity 120ms ease-out,
+    transform 180ms ease-out;
+}
+.mle-grid-controls.is-visible {
+  grid-template-columns: 1fr;
+  margin-right: 0;
+  opacity: 1;
+  transform: translateX(0);
+}
+.mle-grid-controls__inner {
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mle-grid-controls {
+    transition: none;
+  }
+}
+.mll-grid-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+  white-space: nowrap;
+}
+.mll-grid-size input[type="range"] {
+  width: 112px;
+  accent-color: var(--acc);
+  cursor: ew-resize;
+}
+.mll-grid-size output {
+  width: 34px;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  text-align: right;
+}

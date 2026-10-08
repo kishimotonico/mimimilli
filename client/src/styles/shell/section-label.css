@@ -1,9 +1,4 @@
-/* mimimilli shell — shared-b
-   所有範囲: セクション見出し(.mle-sect*、preview・library双方で使用)。
-   shared-a〜dの分割理由はshared-a.css冒頭コメント参照。
-   import順: preview-a.cssの次、library-e.cssより前。 */
-
-/* ── Section labels ───────────────────────────────────────── */
+/* セクション見出し（.mle-sect*）。 */
 
 .mle-sect {
   font-family: var(--font-sans);

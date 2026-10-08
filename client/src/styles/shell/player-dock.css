@@ -1,23 +1,16 @@
-/* mimimilli shell — player-dock
-   所有範囲: 画面下張り付きバー（.mle-bar1*）。position: fixed のオーバーレイで、
-   frame のグリッド行を持たない。
-   import順: shared-c.cssの次、player-popup.cssより前。
+/* 画面下張り付きバー（.mle-bar1*）。position: fixed のオーバーレイで、アプリシェルのグリッド行を持たない。
    z-index の割り当ては docs/design-system.md の Overlay/z-index 一覧を参照。 */
 
 /* 両モードとも常駐チェック用 UI で position: fixed のオーバーレイ。
    設定・スキャン等のモーダルは dialog の top layer に出るため、ここではモーダルより下に置く。 */
-
 .mle-bar1 {
   position: fixed;
   left: 56px;
   right: 0;
   bottom: 0;
   z-index: 32;
-  /* 60px（操作行）+ 12px（シーク行）。経過/総時間のテキストは撤去し
-       （縦幅を圧迫する割に、詳しい時間はポップアップ展開で見れば十分なため）、
-       シーク行はトラック分の帯だけ確保する。空いた縦幅はカバー画像を
-       大きくする方へ回す。シーク行は操作行と高さを分け合わず専用の帯として
-       確保し、ボタン行との重なり・クリップを避ける。 */
+  /* 60px（操作行）+ 12px（シーク行）。シーク行はトラック分の帯だけを専用に確保し、
+       操作行との重なり・クリップを避ける。 */
   height: 72px;
   background: var(--paper-1);
   border-top: 1px solid var(--line);
@@ -124,8 +117,7 @@
   color: var(--ink-4);
 }
 /* 音量ボタン。デフォルトは.mle-bar1__track-buttonと同じ単体ボタン表示で、
-     クリックすると上へ開くポップオーバーにスライダーを出す（ミュート単体の
-     ボタンは撤去。0まで下げればミュート相当になる）。 */
+   クリックすると上へ開くポップオーバーにスライダーを出す（0まで下げればミュート相当）。 */
 .mle-bar1__vol {
   position: relative;
   display: flex;
@@ -203,10 +195,9 @@
   background: var(--paper-2);
   color: var(--r-coral);
 }
-
 /* シークバーは要素全体の下辺を使う（DLsite Play 風。スライダーではない）。
    当たり判定は表示より広く取り、バー最下端（= 画面最下端）まで含める。
-   経過/総時間のテキストは出さない（撤去。詳しい時間はポップアップ展開で見る）。 */
+   経過/総時間のテキストは出さず、詳しい時間はポップアップ展開で見る。 */
 .mle-bar1__seek {
   position: absolute;
   left: 0;
@@ -236,32 +227,4 @@
   top: 0;
   bottom: 0;
   background: var(--acc);
-}
-.mle-bar1__seek-tooltip,
-.mle-seek-tooltip {
-  position: absolute;
-  bottom: 100%;
-  margin-bottom: 8px;
-  transform: translateX(-50%);
-  background: var(--ink-0);
-  color: var(--paper-1);
-  font-family: var(--font-mono);
-  font-size: var(--fs-mono);
-  line-height: var(--lh-mono);
-  font-weight: 600;
-  padding: 3px 7px;
-  border-radius: 5px;
-  white-space: nowrap;
-  pointer-events: none;
-  box-shadow: var(--shadow-2);
-}
-.mle-bar1__seek-tooltip::after,
-.mle-seek-tooltip::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 4px solid transparent;
-  border-top-color: var(--ink-0);
 }

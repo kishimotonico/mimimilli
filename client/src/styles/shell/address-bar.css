@@ -1,10 +1,4 @@
-/* mimimilli shell — frame-b
-   所有範囲: アドレスバー(.mle-addr / .mle-crumbs / .mle-grid-controls、Library modeでは
-   is-lib 修飾で流用)。frame-a・frame-cと合わせて frame 全体を構成する（分割理由は
-   frame-a.css 冒頭コメント参照）。
-   import順: library-a.cssの次、library-b.cssより前。 */
-
-/* ── Address bar ─────────────────────────────────────────── */
+/* アドレスバーとパンくず（.mle-addr / .mle-crumbs*）。 */
 
 .mle-addr {
   grid-column: 1 / 3;
@@ -73,35 +67,4 @@
 .mle-crumbs__measure .mle-crumbs__seg::before,
 .mle-crumbs__measure .mle-crumbs__sep::before {
   content: attr(data-label);
-}
-.mle-grid-controls {
-  display: grid;
-  grid-template-columns: 0fr;
-  margin-right: -10px;
-  opacity: 0;
-  transform: translateX(8px);
-  transition:
-    grid-template-columns 180ms ease-out,
-    margin-right 180ms ease-out,
-    opacity 120ms ease-out,
-    transform 180ms ease-out;
-}
-.mle-grid-controls.is-visible {
-  grid-template-columns: 1fr;
-  margin-right: 0;
-  opacity: 1;
-  transform: translateX(0);
-}
-.mle-grid-controls__inner {
-  min-width: 0;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  white-space: nowrap;
-}
-@media (prefers-reduced-motion: reduce) {
-  .mle-grid-controls {
-    transition: none;
-  }
 }

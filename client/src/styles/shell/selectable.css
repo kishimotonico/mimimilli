@@ -1,0 +1,5 @@
+/* テキスト選択を許可するユーティリティ（.mll-selectable）。 */
+
+.mll-selectable {
+  user-select: text;
+}

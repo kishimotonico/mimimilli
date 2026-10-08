@@ -1,10 +1,4 @@
-/* mimimilli shell — files-a
-   所有範囲: ファイル行(.mle-row、mle- prefixだが File Explorer mode 専用)。
-   files系はfiles-a〜files-cの3ファイルに分かれている（library・preview等の区画が
-   カスケード順でfilesの区画を挟むため）。
-   import順: library-c.cssの次、library-d.cssより前。 */
-
-/* ── File rows (mle-row — File Explorer mode) ─────────────── */
+/* Filesの行（.mle-row*、.mle-identity-conflict-badge）。 */
 
 .mle-row {
   display: grid;
@@ -95,19 +89,20 @@
 .mle-row.is-now .name {
   font-weight: 600;
 }
-.mle-row .wbadge,
-.mle-fprev__name .wbadge {
+.mle-row.is-now .barwave {
   display: inline-flex;
-  align-items: center;
+  margin-right: 2px;
+}
+.mle-identity-conflict-badge {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 1px 5px;
+  border: 1px solid color-mix(in oklch, var(--r-coral) 36%, transparent);
+  border-radius: var(--r-1);
+  background: color-mix(in oklch, var(--r-coral) 12%, transparent);
+  color: var(--r-coral);
   font-family: var(--font-mono);
   font-size: var(--fs-mono);
   line-height: var(--lh-mono);
-  letter-spacing: 0.04em;
-  background: var(--acc-soft);
-  color: var(--acc-ink);
-  padding: 1px 4px;
-  border-radius: 3px;
-  margin-right: 4px;
   font-weight: 600;
-  vertical-align: 1px;
 }

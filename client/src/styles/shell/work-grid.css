@@ -1,0 +1,70 @@
+/* 作品グリッド（.mll-grid-pane / .mll-grid-body / .mll-grid-scroll / .mll-grid / .mll-grid-row）。 */
+
+.mll-grid-pane {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper-0);
+  border-right: 1px solid var(--line-soft);
+  position: relative;
+}
+.mll-grid-pane.is-pending {
+  opacity: 0.55;
+  transition: opacity 150ms ease;
+}
+.mll-grid-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+.mll-grid-scroll {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden auto;
+  /* 水平paddingはここに。.mll-grid側だと絶対配置の仮想化行に効かない。
+       縦は virtualizer の paddingStart/End（WorkGrid.tsx）に一本化 */
+  padding: 0 16px;
+}
+.mll-grid-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.mll-grid-scroll::-webkit-scrollbar-thumb {
+  background: var(--paper-4);
+  border-radius: 4px;
+}
+.mll-grid {
+  display: grid;
+  /* 初回マウント（コンテナ幅未計測）時のみ使う。計測後は WorkGrid が computeGridColumnCount の
+       実測列数を gridTemplateColumns としてインライン指定する（auto-fill+minmax は
+       列数境界でタイル実寸が飛ぶため） */
+  grid-template-columns: repeat(auto-fill, minmax(var(--tile-size), 1fr));
+  align-items: start;
+  gap: var(--grid-row-gap) var(--grid-col-gap);
+}
+/* 原寸ジャスティファイド。行ごとに display:flex な .mll-grid-row を
+     縦積みし、各タイルの幅・行高さは WorkGrid が justifiedLayout の計算結果を
+     インラインstyleで与える。行内のジャスティファイ（幅ぴったり詰め）は
+     アイテム側の明示幅の合計で実現しており、CSS側で追加のjustify調整は不要 */
+.mll-grid--justified {
+  display: flex;
+  flex-direction: column;
+  gap: var(--grid-row-gap);
+}
+.mll-grid-row {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  gap: var(--grid-col-gap);
+  content-visibility: auto;
+}
+/* 1:1タイルの仮想化行。行内は grid で列数を固定し、gap は列間のみ。 */
+.mll-grid-row--square {
+  display: grid;
+  align-items: start;
+  width: 100%;
+  content-visibility: auto;
+}

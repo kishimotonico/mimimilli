@@ -1,0 +1,18 @@
+/* Filesの行・プレビューに出す作品バッジ（.wbadge）。 */
+
+.mle-row .wbadge,
+.mle-fprev__name .wbadge {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  letter-spacing: 0.04em;
+  background: var(--acc-soft);
+  color: var(--acc-ink);
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-right: 4px;
+  font-weight: 600;
+  vertical-align: 1px;
+}
