@@ -1,6 +1,6 @@
 // ファイルモードからの手動作品登録。メタファイル生成のみ行い、物理ファイルは移動しない。
-import { existsSync, renameSync, statSync, unlinkSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { existsSync, renameSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
 import type {
   DlsiteRegistrationBody,
   MetaFile,
@@ -9,17 +9,11 @@ import type {
   WorkRegisterPreview,
   WorkSourceMutationResult,
 } from "@mimimilli/shared";
-import {
-  detectRjCode,
-  emptyMetaDlsiteState,
-  isAudioFileName,
-  isDlsiteUrl,
-  sidecarMetaFileName,
-} from "@mimimilli/shared";
-import { META_FILE_NAME, MetaParseError, inspectMetaFile, readMetaFile } from "./meta.ts";
+import { detectRjCode, emptyMetaDlsiteState, isDlsiteUrl } from "@mimimilli/shared";
+import { inspectMetaFile } from "./meta.ts";
 import { metaStagingPath } from "./metaStaging.ts";
 import { identityConflictPathOf, resolveWithin } from "./paths.ts";
-import { restoreIdentityConflictError, WorkRegisterError } from "../../errors.ts";
+import { WorkRegisterError } from "../../errors.ts";
 import { assertRegistrationAllowed } from "../../core/workRegistrationGuard.ts";
 import { fileRegisterNaming, folderRegisterNaming } from "../../core/workRegisterPreview.ts";
 import { removeIdentityConflictPath } from "../../core/identityConflicts.ts";
@@ -29,7 +23,15 @@ import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import type { Scanner } from "./scanner.ts";
-import type { ProjectOutcome } from "./scanTypes.ts";
+import type { ProjectOutcome, RestoreMetaPatch } from "./scanTypes.ts";
+import {
+  assertNoIdentityConflict,
+  inspectOrphanMeta,
+  registrationConflictCheck,
+  registrationTargetOfPath,
+  targetName,
+  type RegistrationTarget,
+} from "./registrationTarget.ts";
 import { mutationResultFromOutcome, toEditSnapshot } from "./workEditSource.ts";
 
 function mutationResultFromProjectOutcome(
@@ -47,42 +49,6 @@ function mutationResultFromProjectOutcome(
     ),
     outcome,
   );
-}
-
-function isDirectory(path: string): boolean {
-  try {
-    return statSync(path).isDirectory();
-  } catch {
-    return false;
-  }
-}
-
-function isFile(path: string): boolean {
-  try {
-    return statSync(path).isFile();
-  } catch {
-    return false;
-  }
-}
-
-function sidecarPathForAudio(audioPath: string): string {
-  return join(dirname(audioPath), sidecarMetaFileName(basename(audioPath)));
-}
-
-function ancestorFolderIsRegistered(
-  query: WorkQueryRepository,
-  audioPath: string,
-  root: string,
-): boolean {
-  let current = dirname(audioPath);
-  while (true) {
-    if (query.getWorkByPhysicalPathSync(current) !== null) return true;
-    if (current === root) break;
-    const parent = dirname(current);
-    if (parent === current) break;
-    current = parent;
-  }
-  return false;
 }
 
 export class MetaUnregisterError extends Error {
@@ -197,66 +163,36 @@ export function unregisterWork(
 
 export function buildWorkRegisterPreview(
   query: WorkQueryRepository,
-  workDir: string,
+  target: RegistrationTarget,
+  root: string,
 ): WorkRegisterPreview {
-  const naming = folderRegisterNaming(basename(workDir));
-  const descendants = query.listDescendantWorkRefs(workDir);
-  const metaPath = `${workDir}/${META_FILE_NAME}`;
-  const dbWork = query.getWorkByPhysicalPathSync(workDir);
-  const orphanedMeta = existsSync(metaPath) && dbWork === null;
-
-  let suggestedTitle = naming.suggestedTitle;
-  let tags: string[] = [];
-  if (orphanedMeta) {
-    try {
-      const meta = readMetaFile(metaPath);
-      suggestedTitle = meta.title;
-      tags = meta.tags;
-    } catch {
-      // メタ不正は preview では隠蔽せずフォルダ名へフォールバック。POST で invalid_meta を返す。
-    }
-  }
+  const name = targetName(target);
+  const naming =
+    target.placement.kind === "folder" ? folderRegisterNaming(name) : fileRegisterNaming(name);
+  const conflict = registrationConflictCheck(query, target, root);
+  const orphan =
+    query.getWorkByPhysicalPathSync(target.physicalPath) === null
+      ? inspectOrphanMetaForPreview(target)
+      : null;
 
   return {
-    suggestedTitle,
-    tags,
+    suggestedTitle: orphan?.meta?.title ?? naming.suggestedTitle,
+    tags: orphan?.meta?.tags ?? [],
     detectedRjCode: naming.detectedRjCode,
-    descendantWorkCount: descendants.length,
-    alreadyRegistered: dbWork !== null,
-    orphanedMeta,
+    descendantWorkCount: conflict.descendantWorkCount,
+    alreadyRegistered: conflict.alreadyRegistered,
+    orphanedMeta: orphan !== null,
   };
 }
 
-export function buildFileWorkRegisterPreview(
-  query: WorkQueryRepository,
-  audioPath: string,
-  root: string,
-): WorkRegisterPreview {
-  const naming = fileRegisterNaming(basename(audioPath));
-  const metaPath = sidecarPathForAudio(audioPath);
-  const dbWork = query.getWorkByPhysicalPathSync(audioPath);
-  const orphanedMeta = existsSync(metaPath) && dbWork === null;
-
-  let suggestedTitle = naming.suggestedTitle;
-  let tags: string[] = [];
-  if (orphanedMeta) {
-    try {
-      const meta = readMetaFile(metaPath);
-      suggestedTitle = meta.title;
-      tags = meta.tags;
-    } catch {
-      // メタ不正は preview では隠蔽せずファイル名へフォールバック。POST で invalid_meta を返す。
-    }
+// メタ不正・読み取り失敗は preview では隠蔽せず名前へフォールバックする。POST で invalid_meta を返す。
+function inspectOrphanMetaForPreview(target: RegistrationTarget): { meta: MetaFile | null } | null {
+  if (!existsSync(target.placement.metaPath)) return null;
+  try {
+    return inspectOrphanMeta(target);
+  } catch {
+    return { meta: null };
   }
-
-  return {
-    suggestedTitle,
-    tags,
-    detectedRjCode: naming.detectedRjCode,
-    descendantWorkCount: 0,
-    alreadyRegistered: dbWork !== null || ancestorFolderIsRegistered(query, audioPath, root),
-    orphanedMeta,
-  };
 }
 
 /** DLsite適用結果のうち、フォーム由来の title/tags を上書きしない部分だけを表す */
@@ -264,109 +200,6 @@ interface DlsiteAppliedMeta {
   urls: Work["urls"];
   coverImage?: string | null;
   dlsite: MetaFile["dlsite"];
-}
-
-export async function createWorkFromFolder(
-  repos: {
-    db: Db;
-    query: WorkQueryRepository;
-    catalog: CatalogWorkRepository;
-    user: UserWorkStateRepository;
-  },
-  scanner: Scanner,
-  root: string,
-  body: WorkCreateBody,
-  applyDlsiteCover?: (coverUrl: string, workDir: string) => Promise<string | null>,
-): Promise<WorkSourceMutationResult> {
-  const { query } = repos;
-  const workDir = resolveWithin(root, join(root, body.path));
-  if (!workDir || !isDirectory(workDir)) {
-    throw new WorkRegisterError(
-      "invalid_path",
-      "指定されたパスは存在しないか、ルート配下ではありません",
-    );
-  }
-
-  const metaPath = `${workDir}/${META_FILE_NAME}`;
-  const dbWork = query.getWorkByPhysicalPathSync(workDir);
-  const descendants = query.listDescendantWorkRefs(workDir);
-  assertRegistrationAllowed({
-    alreadyRegistered: dbWork !== null,
-    descendantWorkCount: descendants.length,
-    kind: "folder",
-  });
-
-  const orphanedMeta = existsSync(metaPath);
-  if (orphanedMeta) {
-    let meta: MetaFile;
-    try {
-      meta = readMetaFile(metaPath);
-    } catch (error) {
-      if (error instanceof MetaParseError) {
-        throw new WorkRegisterError("invalid_meta", "メタファイルが不正なため復元できません");
-      }
-      throw error;
-    }
-
-    const existing = query.getScanWorkMap().get(meta.id);
-    if (existing && existing.physicalPath !== workDir && existing.status !== "missing") {
-      throw restoreIdentityConflictError();
-    }
-
-    const metaPatch: {
-      title?: string;
-      tags?: string[];
-      urls?: Work["urls"];
-      coverImage?: string | null;
-      dlsite?: MetaFile["dlsite"];
-    } = {};
-
-    if (body.title !== meta.title) metaPatch.title = body.title;
-    // body.tags は workCreateBodySchema の境界で既に正規化済み（NormalizedTag[]）。
-    metaPatch.tags = body.tags;
-
-    if (body.dlsite) {
-      const applied = await buildMetaFromDlsiteApply(body.dlsite, workDir, applyDlsiteCover);
-      if (body.dlsite.applyUrl) {
-        metaPatch.urls = [...meta.urls.filter((entry) => !isDlsiteUrl(entry.url)), ...applied.urls];
-      }
-      if (applied.coverImage !== undefined) metaPatch.coverImage = applied.coverImage;
-      metaPatch.dlsite = applied.dlsite;
-    }
-
-    return mutationResultFromProjectOutcome(
-      await scanner.restoreFolderWork(workDir, metaPatch),
-      workDir,
-    );
-  }
-
-  const title = body.title;
-  // body.tags は workCreateBodySchema の境界で既に正規化済み（NormalizedTag[]）。
-  const tags = body.tags;
-  let urls: Work["urls"] = [];
-  let coverImage: string | null | undefined;
-  let dlsite = emptyMetaDlsiteState();
-
-  if (body.dlsite) {
-    const applied = await buildMetaFromDlsiteApply(body.dlsite, workDir, applyDlsiteCover);
-    urls = applied.urls;
-    coverImage = applied.coverImage;
-    dlsite = applied.dlsite;
-  } else {
-    const detectedRjCode = detectRjCode([basename(workDir), title]);
-    if (detectedRjCode) dlsite = { ...emptyMetaDlsiteState(), rjCode: detectedRjCode };
-  }
-
-  return mutationResultFromProjectOutcome(
-    await scanner.registerFolderWork(workDir, {
-      title,
-      tags,
-      urls,
-      coverImage,
-      dlsite,
-    }),
-    workDir,
-  );
 }
 
 export async function createWorkFromPath(
@@ -381,78 +214,33 @@ export async function createWorkFromPath(
   body: WorkCreateBody,
   applyDlsiteCover?: (coverUrl: string, workDir: string) => Promise<string | null>,
 ): Promise<WorkSourceMutationResult> {
-  const target = resolveWithin(root, join(root, body.path));
+  const { query } = repos;
+  const path = resolveWithin(root, join(root, body.path));
+  const target = path ? registrationTargetOfPath(path) : null;
   if (!target) {
     throw new WorkRegisterError(
       "invalid_path",
       "指定されたパスは存在しないか、ルート配下ではありません",
     );
   }
-  if (isDirectory(target)) {
-    return createWorkFromFolder(repos, scanner, root, body, applyDlsiteCover);
-  }
-  if (isFile(target) && isAudioFileName(basename(target))) {
-    return createWorkFromAudioFile(repos, scanner, root, target, body, applyDlsiteCover);
-  }
-  throw new WorkRegisterError(
-    "invalid_path",
-    "指定されたパスは存在しないか、ルート配下ではありません",
-  );
-}
+  assertRegistrationAllowed(registrationConflictCheck(query, target, root));
 
-async function createWorkFromAudioFile(
-  repos: {
-    db: Db;
-    query: WorkQueryRepository;
-    catalog: CatalogWorkRepository;
-    user: UserWorkStateRepository;
-  },
-  scanner: Scanner,
-  root: string,
-  audioPath: string,
-  body: WorkCreateBody,
-  applyDlsiteCover?: (coverUrl: string, workDir: string) => Promise<string | null>,
-): Promise<WorkSourceMutationResult> {
-  const { query } = repos;
-  const dbWork = query.getWorkByPhysicalPathSync(audioPath);
-  assertRegistrationAllowed({
-    alreadyRegistered: dbWork !== null || ancestorFolderIsRegistered(query, audioPath, root),
-    descendantWorkCount: 0,
-    kind: "file",
-  });
-
-  const metaPath = sidecarPathForAudio(audioPath);
-  const parentDir = dirname(audioPath);
-  const orphanedMeta = existsSync(metaPath);
-  if (orphanedMeta) {
-    let meta: MetaFile;
-    try {
-      meta = readMetaFile(metaPath);
-    } catch (error) {
-      if (error instanceof MetaParseError) {
-        throw new WorkRegisterError("invalid_meta", "メタファイルが不正なため復元できません");
-      }
-      throw error;
+  const assetDir = target.placement.mediaRoot;
+  const orphan = inspectOrphanMeta(target);
+  if (orphan) {
+    if (orphan.diagnostic !== null) {
+      throw new WorkRegisterError("invalid_meta", "メタファイルが不正なため復元できません");
     }
+    const { meta } = orphan;
+    assertNoIdentityConflict(query, meta.id, target.physicalPath);
 
-    const existing = query.getScanWorkMap().get(meta.id);
-    if (existing && existing.physicalPath !== audioPath && existing.status !== "missing") {
-      throw restoreIdentityConflictError();
-    }
-
-    const metaPatch: {
-      title?: string;
-      tags?: string[];
-      urls?: Work["urls"];
-      coverImage?: string | null;
-      dlsite?: MetaFile["dlsite"];
-    } = {};
-
+    const metaPatch: RestoreMetaPatch = {};
     if (body.title !== meta.title) metaPatch.title = body.title;
+    // body.tags は workCreateBodySchema の境界で既に正規化済み（NormalizedTag[]）。
     metaPatch.tags = body.tags;
 
     if (body.dlsite) {
-      const applied = await buildMetaFromDlsiteApply(body.dlsite, parentDir, applyDlsiteCover);
+      const applied = await buildMetaFromDlsiteApply(body.dlsite, assetDir, applyDlsiteCover);
       if (body.dlsite.applyUrl) {
         metaPatch.urls = [...meta.urls.filter((entry) => !isDlsiteUrl(entry.url)), ...applied.urls];
       }
@@ -461,36 +249,29 @@ async function createWorkFromAudioFile(
     }
 
     return mutationResultFromProjectOutcome(
-      await scanner.restoreSidecarWork(audioPath, metaPatch),
-      audioPath,
+      await scanner.restoreWork(target, metaPatch),
+      target.physicalPath,
     );
   }
 
   const title = body.title;
-  const tags = body.tags;
   let urls: Work["urls"] = [];
   let coverImage: string | null | undefined;
   let dlsite = emptyMetaDlsiteState();
 
   if (body.dlsite) {
-    const applied = await buildMetaFromDlsiteApply(body.dlsite, parentDir, applyDlsiteCover);
+    const applied = await buildMetaFromDlsiteApply(body.dlsite, assetDir, applyDlsiteCover);
     urls = applied.urls;
     coverImage = applied.coverImage;
     dlsite = applied.dlsite;
   } else {
-    const detectedRjCode = detectRjCode([basename(audioPath), title]);
+    const detectedRjCode = detectRjCode([targetName(target), title]);
     if (detectedRjCode) dlsite = { ...emptyMetaDlsiteState(), rjCode: detectedRjCode };
   }
 
   return mutationResultFromProjectOutcome(
-    await scanner.registerFileWork(audioPath, {
-      title,
-      tags,
-      urls,
-      coverImage,
-      dlsite,
-    }),
-    audioPath,
+    await scanner.registerWork(target, { title, tags: body.tags, urls, coverImage, dlsite }),
+    target.physicalPath,
   );
 }
 

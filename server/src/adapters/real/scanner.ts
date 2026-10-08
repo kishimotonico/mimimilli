@@ -1,27 +1,18 @@
 // ライブラリスキャン。
 import { existsSync, readFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
-import type {
-  MetaFile,
-  NormalizedTag,
-  ScanCandidate,
-  ScanDiagnostic,
-  ScanResult,
-  UrlEntry,
-} from "@mimimilli/shared";
+import { basename, resolve } from "node:path";
+import type { MetaFile, ScanCandidate, ScanDiagnostic, ScanResult } from "@mimimilli/shared";
 import {
   errorMessage,
   detectRjCode,
   emptyMetaDlsiteState,
   isRjCodeMissing,
-  sidecarMetaFileName,
   workspacePath,
 } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import type { ScanOptions } from "../../adapter/index.ts";
-import { descendantsRegisteredError, restoreIdentityConflictError } from "../../errors.ts";
+import { descendantsRegisteredError } from "../../errors.ts";
 import {
-  META_FILE_NAME,
   MetaParseError,
   inspectMetaFile,
   type MetaInspection,
@@ -55,8 +46,15 @@ import type {
   PreparedEntry,
   PreparedMeta,
   ProjectOutcome,
+  RegisterWorkOptions,
+  RestoreMetaPatch,
   ScanExecutionResult,
 } from "./scanTypes.ts";
+import {
+  assertNoIdentityConflict,
+  targetName,
+  type RegistrationTarget,
+} from "./registrationTarget.ts";
 import type { ProbeCacheEntry } from "./probe.ts";
 import { ScanUpsertBatch } from "./scanUpsertBatch.ts";
 import {
@@ -541,25 +539,16 @@ export class Scanner {
   }
 
   private snapshotForRestore(
-    metaPath: string,
-    physicalPath: string,
-    patch: {
-      title?: string;
-      tags?: string[];
-      urls?: UrlEntry[];
-      coverImage?: string | null;
-      dlsite?: MetaFile["dlsite"];
-    },
+    target: RegistrationTarget,
+    patch: RestoreMetaPatch,
   ): { meta: MetaFile; bytes: Buffer; sourceRevision: string } {
+    const { metaPath } = target.placement;
     if (!existsSync(metaPath)) {
       throw new Error("復元対象のメタファイルがありません");
     }
     const source = readMetaSource(metaPath);
-    const existing = this.query.getScanWorkMap().get(source.meta.id);
-    if (existing && existing.physicalPath !== physicalPath && existing.status !== "missing") {
-      throw restoreIdentityConflictError();
-    }
-    const metaPatch: typeof patch = {};
+    assertNoIdentityConflict(this.query, source.meta.id, target.physicalPath);
+    const metaPatch: RestoreMetaPatch = {};
     if (patch.title !== undefined) metaPatch.title = patch.title;
     if (patch.tags !== undefined) metaPatch.tags = patch.tags;
     if (patch.urls !== undefined) metaPatch.urls = patch.urls;
@@ -571,39 +560,52 @@ export class Scanner {
     return source;
   }
 
-  async registerFolderWork(
-    workDir: string,
-    options: {
-      title: string;
-      tags?: NormalizedTag[];
-      urls?: UrlEntry[];
-      coverImage?: string | null;
-      dlsite?: MetaFile["dlsite"];
-      rjCode?: string;
-    },
+  private draftMetaFor(
+    target: RegistrationTarget,
+    fields: Omit<Parameters<typeof createDraftMetaFile>[1], "id">,
+  ): MetaFile {
+    const { mediaRoot } = target.placement;
+    if (target.placement.kind === "folder") {
+      return createDraftMetaFile(mediaRoot, { ...fields, id: crypto.randomUUID() });
+    }
+    const audioName = targetName(target);
+    return createDraftMetaFile(mediaRoot, {
+      ...fields,
+      id: crypto.randomUUID(),
+      coverImage: fields.coverImage ?? null,
+      tracks: [
+        { id: crypto.randomUUID(), title: audioName.replace(/\.[^.]+$/, ""), file: audioName },
+      ],
+    });
+  }
+
+  async registerWork(
+    target: RegistrationTarget,
+    options: RegisterWorkOptions,
   ): Promise<ProjectOutcome> {
-    this.assertNoRegisteredDescendants(workDir);
-    const metaPath = join(workDir, META_FILE_NAME);
+    if (target.placement.kind === "folder") this.assertNoRegisteredDescendants(target.physicalPath);
+    const { metaPath } = target.placement;
     if (existsSync(metaPath)) {
-      throw new Error("このフォルダーには既にメタファイルがあります");
+      throw new Error(
+        target.placement.kind === "folder"
+          ? "このフォルダーには既にメタファイルがあります"
+          : "このファイルには既にメタファイルがあります",
+      );
     }
 
     let dlsite = options.dlsite;
     if (dlsite === undefined) {
       if (options.rjCode === undefined) {
-        const detected = detectRjCode([basename(workDir), options.title]);
+        const detected = detectRjCode([targetName(target), options.title]);
         dlsite = detected
           ? { ...emptyMetaDlsiteState(), rjCode: detected }
           : emptyMetaDlsiteState();
-      } else if (options.rjCode === "") {
-        dlsite = { ...emptyMetaDlsiteState(), rjCode: "" };
       } else {
         dlsite = { ...emptyMetaDlsiteState(), rjCode: options.rjCode };
       }
     }
 
-    const meta = createDraftMetaFile(workDir, {
-      id: crypto.randomUUID(),
+    const meta = this.draftMetaFor(target, {
       title: options.title,
       tags: options.tags,
       urls: options.urls,
@@ -622,71 +624,10 @@ export class Scanner {
     return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
   }
 
-  async restoreFolderWork(
-    workDir: string,
-    patch: {
-      title?: string;
-      tags?: string[];
-      urls?: UrlEntry[];
-      coverImage?: string | null;
-      dlsite?: MetaFile["dlsite"];
-    },
-  ): Promise<ProjectOutcome> {
-    this.assertNoRegisteredDescendants(workDir);
-    const metaPath = join(workDir, META_FILE_NAME);
-    const snapshot = this.snapshotForRestore(metaPath, workDir, patch);
-    return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
-  }
-
-  async registerFileWork(
-    audioPath: string,
-    options: {
-      title: string;
-      tags?: NormalizedTag[];
-      urls?: UrlEntry[];
-      coverImage?: string | null;
-      dlsite?: MetaFile["dlsite"];
-    },
-  ): Promise<ProjectOutcome> {
-    const audioName = basename(audioPath);
-    const metaPath = join(dirname(audioPath), sidecarMetaFileName(audioName));
-    if (existsSync(metaPath)) {
-      throw new Error("このファイルには既にメタファイルがあります");
-    }
-
-    const stem = audioName.replace(/\.[^.]+$/, "");
-    const dlsite =
-      options.dlsite ??
-      (() => {
-        const detected = detectRjCode([audioName, options.title]);
-        return detected ? { ...emptyMetaDlsiteState(), rjCode: detected } : emptyMetaDlsiteState();
-      })();
-
-    const meta = createDraftMetaFile(dirname(audioPath), {
-      id: crypto.randomUUID(),
-      title: options.title,
-      tags: options.tags,
-      urls: options.urls,
-      coverImage: options.coverImage ?? null,
-      dlsite,
-      tracks: [{ id: crypto.randomUUID(), title: stem, file: audioName }],
-    });
-    const snapshot = writeMetaFile(metaPath, meta);
-    return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
-  }
-
-  async restoreSidecarWork(
-    audioPath: string,
-    patch: {
-      title?: string;
-      tags?: string[];
-      urls?: UrlEntry[];
-      coverImage?: string | null;
-      dlsite?: MetaFile["dlsite"];
-    },
-  ): Promise<ProjectOutcome> {
-    const metaPath = join(dirname(audioPath), sidecarMetaFileName(basename(audioPath)));
-    const snapshot = this.snapshotForRestore(metaPath, audioPath, patch);
+  async restoreWork(target: RegistrationTarget, patch: RestoreMetaPatch): Promise<ProjectOutcome> {
+    if (target.placement.kind === "folder") this.assertNoRegisteredDescendants(target.physicalPath);
+    const { metaPath } = target.placement;
+    const snapshot = this.snapshotForRestore(target, patch);
     return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
   }
 }
