@@ -17,6 +17,7 @@ import IconButton from "../../../../shared/ui/IconButton";
 import { I } from "../../../../shared/ui/Icon";
 import TextInput from "../../../../shared/ui/TextInput";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
+import { DLSITE_LINKAGE_STATUS_LABEL } from "../../../../entities/work/workStatusLabel";
 import { SourceProjectionNotice } from "../../../../entities/work/ui/SourceProjectionNotice";
 import {
   projectionWorkspacePath,
@@ -35,14 +36,6 @@ import {
   type DlsiteApplyDiff,
   type DlsiteFieldDiff,
 } from "../../../../entities/work/dlsitePreview";
-
-export const STATUS_LABEL = {
-  none: "未連携",
-  applied: "連携済み",
-  not_found: "見つかりません",
-  error: "取得エラー",
-  skipped: "連携しない",
-} as const;
 
 function folderNameOf(physicalPath: string): string {
   const cut = Math.max(physicalPath.lastIndexOf("/"), physicalPath.lastIndexOf("\\"));
@@ -359,7 +352,7 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
             DLsite連携
           </h3>
           <span className={`rounded-pill px-2 py-0.5 font-sans text-label ${statusTone}`}>
-            {STATUS_LABEL[snapshot.dlsite.status]}
+            {DLSITE_LINKAGE_STATUS_LABEL[snapshot.dlsite.status]}
           </span>
         </div>
         <label className="flex items-center gap-1.5 font-jp text-secondary text-ink-2">

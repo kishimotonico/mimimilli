@@ -9,3 +9,11 @@ export const WORK_STATUS_LABEL: Record<Exclude<WorkStatus, "ok">, string> = {
 export function getWorkStatusLabel(status: WorkStatus): string | null {
   return status === "ok" ? null : WORK_STATUS_LABEL[status];
 }
+
+export const DLSITE_LINKAGE_STATUS_LABEL = {
+  none: "未連携",
+  applied: "連携済み",
+  not_found: "見つかりません",
+  error: "取得エラー",
+  skipped: "連携しない",
+} as const;

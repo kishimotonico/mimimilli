@@ -5,10 +5,12 @@ import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
 import { I } from "../../../../shared/ui/Icon";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
-import { STATUS_LABEL } from "./DlsiteEditor";
 import { formatDate, formatDateTime, formatDuration } from "../../../../shared/lib/format";
 import { formatCoverInfoLabel } from "../../../../shared/lib/coverLabel";
-import { WORK_STATUS_LABEL } from "../../../../entities/work/workStatusLabel";
+import {
+  DLSITE_LINKAGE_STATUS_LABEL,
+  WORK_STATUS_LABEL,
+} from "../../../../entities/work/workStatusLabel";
 
 const STATUS_TEXT: Record<Work["status"], string> = {
   ok: "登録済み",
@@ -146,7 +148,7 @@ export function WorkInfoDialog({
               DLsite連携
             </h3>
             <dl className="flex flex-col divide-y divide-line-soft">
-              <InfoRow label="状態">{STATUS_LABEL[work.dlsite.status]}</InfoRow>
+              <InfoRow label="状態">{DLSITE_LINKAGE_STATUS_LABEL[work.dlsite.status]}</InfoRow>
               <InfoRow label="RJコード">
                 <span className="font-mono text-mono">{work.dlsite.rjCode ?? "未設定"}</span>
               </InfoRow>
