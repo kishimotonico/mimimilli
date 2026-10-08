@@ -84,13 +84,6 @@
     box-shadow: 0 0 0 6px color-mix(in oklch, var(--r-leaf) 0%, transparent);
   }
 }
-.mll-bar__pulse .ch {
-  color: var(--ink-0);
-  font-weight: 600;
-}
-.mll-bar__pulse .sep {
-  color: var(--ink-4);
-}
 .mll-bar__pulse .lbl {
   color: var(--ink-2);
 }

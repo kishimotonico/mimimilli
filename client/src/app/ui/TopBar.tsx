@@ -130,8 +130,6 @@ export default function TopBar({ notificationBell }: TopBarProps) {
               )}
               aria-label={pulseLabel}
             />
-            <span className="ch">1ch</span>
-            <span className="sep">·</span>
             <span className="lbl">{playingTrack}</span>
           </div>
         </>

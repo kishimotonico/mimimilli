@@ -26,7 +26,9 @@ describe("buildEmptyWorksMessage", () => {
 
 describe("buildEmptyWorksHint", () => {
   it("adds context for fav view when not filtered", () => {
-    expect(buildEmptyWorksHint("fav", false)).toBe("作品詳細の☆ボタンでお気に入りに追加できます");
+    expect(buildEmptyWorksHint("fav", false)).toBe(
+      "作品をブックマークするとお気に入りに表示されます",
+    );
   });
 
   it("adds context for error view when not filtered", () => {

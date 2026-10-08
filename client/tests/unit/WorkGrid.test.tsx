@@ -337,7 +337,7 @@ describe("WorkGrid empty states", () => {
 
   it("お気に入りビューが0件のとき文脈付きの案内を1行添える", () => {
     renderWorkGrid({ overrides: { nav: { activeAxis: "fav" }, works: [] } });
-    expect(screen.getByText("作品詳細の☆ボタンでお気に入りに追加できます")).toBeTruthy();
+    expect(screen.getByText("作品をブックマークするとお気に入りに表示されます")).toBeTruthy();
   });
 
   it("スマートフォルダーが0件のとき専用の見出しと「条件を編集」を出す", () => {
