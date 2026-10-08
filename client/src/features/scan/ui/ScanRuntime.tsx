@@ -1,22 +1,19 @@
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { useAtomValue, useSetAtom } from "jotai";
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
-import type { ScanJobSnapshot, ScanResult, StartScanRequest } from "@mimimilli/shared";
+import { useSetAtom, useStore } from "jotai";
+import { useEffect } from "react";
+import type { ScanResult } from "@mimimilli/shared";
 import { SETTINGS_QUERY_KEYS } from "../../../entities/settings/queryKeys";
-import { useDlsiteBulkActions } from "../../../entities/dlsite/useDlsiteBulkActions";
+import { useDlsiteBulkStore } from "../../../entities/dlsite/useDlsiteBulk";
 import { SCAN_QUERY_KEYS } from "../api";
 import { scanDiagnosticsQueryOptions } from "../../../entities/scan/queryOptions";
 import { dlsiteNotificationSummaryQueryOptions } from "../../../entities/dlsite/model/dlsiteNotificationSummaryQueryOptions";
 import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
 import { updateCachesAfterLibraryScan } from "../../../entities/work/model/workCacheUpdates";
 import {
-  scanActionsAtom,
   scanCandidateHiddenPathsAtom,
-  scanJobAtom,
   scanModalOpenAtom,
-  type ScanActions,
 } from "../../../entities/scan/model/atoms";
-import { useScanJob } from "../model/useScanJob";
+import { useScanJobState, useScanJobStore } from "../../../entities/scan/useScanJob";
 import { formatScanResult } from "../model/formatScanResult";
 import { activeModalAtom } from "../../../shared/model/activeModalAtom";
 import { useToast } from "../../../shared/ui/useToast";
@@ -39,63 +36,82 @@ async function showCompletionToast(queryClient: QueryClient, result: ScanResult)
   }
 }
 
-// SSE 購読の単一所有者。scanJobAtom / scanActionsAtom をここで配線する。
+// スキャンジョブ（scanJobStore）の終端・開始イベントとエラー状態を、トースト・キャッシュ更新へつなぐ。
 export default function ScanRuntime() {
   const queryClient = useQueryClient();
-  const dlsiteBulk = useDlsiteBulkActions();
-  const setJob = useSetAtom(scanJobAtom);
-  const setActions = useSetAtom(scanActionsAtom);
+  const jotaiStore = useStore();
+  const scanJob = useScanJobStore();
+  const dlsiteBulk = useDlsiteBulkStore();
   const setHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
   const setActiveModal = useSetAtom(activeModalAtom);
   // dismiss()は発行元（useToastの呼び出し）単位でしか効かないため、終了通知用とエラー用で分ける。
   const terminalToast = useToast();
   const errorToast = useToast();
-  // モーダルが開いている間はサイドバーの「完了しました」が完了通知を担うため、
-  // トースト側は重ねて出さない。
-  const scanModalOpen = useAtomValue(scanModalOpenAtom);
+  const error = useScanJobState((state) => state.error);
 
-  const handleScanTerminal = useCallback(
-    (job: ScanJobSnapshot) => {
-      if (job.status === "cancelled") {
-        // 終了通知を出すのと同じ同期経路でエラー要求を取り下げる
+  useEffect(
+    () =>
+      scanJob.subscribeEvents((event) => {
+        if (event.type === "started") {
+          // 新しいスキャンの開始がサーバー側の真実の境界になるため、開始時点でそれ以前のローカル非表示を破棄する。
+          // 完了時ではなく開始時に行うことで、完了通知の非同期到達（SSE再接続・再取得）と
+          // 登録/除外操作の競合を避ける。
+          setHiddenPaths(new Set());
+          return;
+        }
+        const job = event.job;
+        // モーダルが開いている間はサイドバーの「完了しました」が完了通知を担うため、
+        // トースト側は重ねて出さない。
+        const scanModalOpen = jotaiStore.get(scanModalOpenAtom);
+        if (job.status === "cancelled") {
+          // 終了通知を出すのと同じ同期経路でエラー要求を取り下げる
+          errorToast.dismiss();
+          if (!scanModalOpen) {
+            terminalToast.show({
+              message: "スキャンを中止しました",
+              variant: "warning",
+              priority: "notice",
+            });
+          }
+          return;
+        }
+        if (job.status !== "completed" || !job.result || !job.finishedAt) return;
         errorToast.dismiss();
+        const result = job.result;
+        queryClient.setQueryData(SCAN_QUERY_KEYS.last(), { result, finishedAt: job.finishedAt });
+        void refreshScanCandidates(queryClient).catch(() => {});
+        void updateCachesAfterLibraryScan(queryClient);
+        queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
         if (!scanModalOpen) {
-          terminalToast.show({
-            message: "スキャンを中止しました",
-            variant: "warning",
-            priority: "notice",
+          void showCompletionToast(queryClient, result).then((hasNeedsAttention) => {
+            terminalToast.show({
+              message: `スキャン完了: ${formatScanResult(result)}`,
+              variant: result.errors > 0 || result.missing > 0 ? "warning" : "success",
+              priority: "notice",
+              actionLabel: hasNeedsAttention ? "要対応を見る" : undefined,
+              // onActionはトーストを自動では閉じない契約（design-system.md）。ここは同期的に
+              // 完結する操作なので押した直後に閉じる
+              onAction: hasNeedsAttention
+                ? () => {
+                    setActiveModal({ kind: "scan", tab: "needsAttention" });
+                    terminalToast.dismiss();
+                  }
+                : undefined,
+            });
           });
         }
-        return;
-      }
-      if (job.status !== "completed" || !job.result || !job.finishedAt) return;
-      errorToast.dismiss();
-      const result = job.result;
-      queryClient.setQueryData(SCAN_QUERY_KEYS.last(), { result, finishedAt: job.finishedAt });
-      void refreshScanCandidates(queryClient).catch(() => {});
-      void updateCachesAfterLibraryScan(queryClient);
-      queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
-      if (!scanModalOpen) {
-        void showCompletionToast(queryClient, result).then((hasNeedsAttention) => {
-          terminalToast.show({
-            message: `スキャン完了: ${formatScanResult(result)}`,
-            variant: result.errors > 0 || result.missing > 0 ? "warning" : "success",
-            priority: "notice",
-            actionLabel: hasNeedsAttention ? "要対応を見る" : undefined,
-            // onActionはトーストを自動では閉じない契約（design-system.md）。ここは同期的に
-            // 完結する操作なので押した直後に閉じる
-            onAction: hasNeedsAttention
-              ? () => {
-                  setActiveModal({ kind: "scan", tab: "needsAttention" });
-                  terminalToast.dismiss();
-                }
-              : undefined,
-          });
-        });
-      }
-      if (result.insertedWorkIds.length > 0) dlsiteBulk.attach();
-    },
-    [dlsiteBulk, errorToast, queryClient, scanModalOpen, setActiveModal, terminalToast],
+        if (result.insertedWorkIds.length > 0) void dlsiteBulk.attach();
+      }),
+    [
+      dlsiteBulk,
+      errorToast,
+      jotaiStore,
+      queryClient,
+      scanJob,
+      setActiveModal,
+      setHiddenPaths,
+      terminalToast,
+    ],
   );
 
   // 候補は明示的な取得でしか更新されないため、アプリ起動時に一度取得して未登録バッジを揃える。
@@ -104,51 +120,24 @@ export default function ScanRuntime() {
     void refreshScanCandidates(queryClient).catch(() => {});
   }, [queryClient]);
 
-  // 新しいスキャンの開始がサーバー側の真実の境界になるため、開始時点でそれ以前のローカル非表示を破棄する。
-  // 完了時ではなく開始時に行うことで、完了通知の非同期到達（SSE再接続・再取得）と
-  // 登録/除外操作の競合を避ける。
-  const handleScanStart = useCallback(() => {
-    setHiddenPaths(new Set());
-  }, [setHiddenPaths]);
-
-  const scanJob = useScanJob({ onTerminal: handleScanTerminal, onStart: handleScanStart });
-  const scanJobRef = useRef(scanJob);
-  useLayoutEffect(() => {
-    scanJobRef.current = scanJob;
+  // リロード後も実行中のジョブへ再接続する
+  useEffect(() => {
+    void scanJob.attach();
+    return () => scanJob.reset();
   }, [scanJob]);
 
   useEffect(() => {
-    setJob(scanJob.job);
-  }, [scanJob.job, setJob]);
-
-  useEffect(() => {
-    if (!scanJob.error) {
+    if (!error) {
       errorToast.dismiss();
       return;
     }
     errorToast.show({
-      message: scanJob.error,
+      message: error,
       variant: "error",
       priority: "notice",
-      onDismiss: () => scanJobRef.current.clearError(),
+      onDismiss: () => scanJob.clearError(),
     });
-  }, [scanJob.error, errorToast]);
-
-  const actionsRef = useRef<ScanActions>({
-    start: async (options?: StartScanRequest) => scanJobRef.current.start(options),
-    cancel: async () => scanJobRef.current.cancel(),
-    clearError: () => {
-      scanJobRef.current.clearError();
-    },
-    reset: () => {
-      scanJobRef.current.reset();
-    },
-  });
-
-  useEffect(() => {
-    setActions(actionsRef.current);
-    return () => setActions(null);
-  }, [setActions]);
+  }, [error, errorToast, scanJob]);
 
   return null;
 }

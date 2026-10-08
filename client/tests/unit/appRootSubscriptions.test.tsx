@@ -8,13 +8,14 @@ import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import NavigationHistorySync from "../../src/features/navigation/ui/NavigationHistorySync";
 import { PlayerRuntimeProvider } from "../../src/entities/player/model/PlayerRuntimeProvider";
-import { dlsiteBulkProgressAtom } from "../../src/entities/dlsite/model/bulkAtoms";
+import { dlsiteBulkStoreAtom } from "../../src/entities/dlsite/model/dlsiteBulkStore";
 import { PLAYER_CORE_INITIAL, playerCoreAtom } from "../../src/entities/player/model/atoms";
-import { scanJobAtom } from "../../src/entities/scan/model/atoms";
+import { scanJobStoreAtom } from "../../src/entities/scan/model/scanJobStore";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import type { WorkSummary } from "../../src/entities/work/model";
+import { createFakeDlsiteBulkStore, createFakeScanJobStore } from "../helpers/fakeJobStores";
 import { seedLibraryRoute } from "../helpers/route";
 
 let appShellCallCount = 0;
@@ -34,20 +35,6 @@ function JotaiSubscriptionProbe() {
   jotaiProbeRenderCount += 1;
   return null;
 }
-
-const scanJobStub = {
-  job: null,
-  error: null,
-  scanning: false,
-  start: vi.fn(),
-  cancel: vi.fn(),
-  attach: vi.fn(),
-  clearError: vi.fn(),
-};
-
-vi.mock("../../src/features/scan/model/useScanJob", () => ({
-  useScanJob: () => scanJobStub,
-}));
 
 const summaryDefaults = {
   rjCodeMissingCount: 0,
@@ -128,6 +115,10 @@ function createTestQueryClient() {
 function renderApp() {
   const queryClient = createTestQueryClient();
   const store = createStore();
+  const scanJob = createFakeScanJobStore();
+  const dlsiteBulk = createFakeDlsiteBulkStore();
+  store.set(scanJobStoreAtom, scanJob);
+  store.set(dlsiteBulkStoreAtom, dlsiteBulk);
 
   function Wrapper({ children }: { children: ReactNode }) {
     const client = useMemo(() => queryClient, []);
@@ -152,7 +143,7 @@ function renderApp() {
   }
 
   render(createElement(Wrapper, null, createElement(App)));
-  return { queryClient, store };
+  return { queryClient, store, scanJob, dlsiteBulk };
 }
 
 async function waitForAppShellBaseline() {
@@ -308,14 +299,20 @@ describe("App root subscriptions", () => {
     });
 
     it("スキャン進捗の更新で App が再レンダリングされない", async () => {
-      const { store } = renderApp();
+      const { scanJob } = renderApp();
       const baseline = await waitForAppShellBaseline();
 
       act(() => {
-        store.set(scanJobAtom, runningJob({ phase: "walking", processed: 1, total: 10 }));
+        scanJob.setState({
+          job: runningJob({ phase: "walking", processed: 1, total: 10 }),
+          error: null,
+        });
       });
       act(() => {
-        store.set(scanJobAtom, runningJob({ phase: "registering", processed: 5, total: 10 }));
+        scanJob.setState({
+          job: runningJob({ phase: "registering", processed: 5, total: 10 }),
+          error: null,
+        });
       });
 
       expect(appShellCallCount).toBe(baseline);
@@ -367,14 +364,20 @@ describe("App root subscriptions", () => {
 
   describe("dlsite bulk progress", () => {
     it("DLsite 一括取得の進捗更新で App が再レンダリングされない", async () => {
-      const { store } = renderApp();
+      const { dlsiteBulk } = renderApp();
       const baseline = await waitForAppShellBaseline();
 
       act(() => {
-        store.set(dlsiteBulkProgressAtom, { processed: 1, total: 10, work: null });
+        dlsiteBulk.setState((state) => ({
+          ...state,
+          progress: { processed: 1, total: 10, work: null },
+        }));
       });
       act(() => {
-        store.set(dlsiteBulkProgressAtom, { processed: 7, total: 10, work: null });
+        dlsiteBulk.setState((state) => ({
+          ...state,
+          progress: { processed: 7, total: 10, work: null },
+        }));
       });
 
       expect(appShellCallCount).toBe(baseline);

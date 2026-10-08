@@ -11,11 +11,11 @@ import { reconfigurationExitEpochAtom } from "../entities/settings/reconfigurati
 import { resetReconfigurationAffectedQueries } from "./model/resetLibraryForReconfiguration";
 import { refreshScanCandidates } from "../entities/scan/scanCandidatesCache";
 import { scanLastResultQueryOptions } from "../entities/scan/queryOptions";
-import { useDlsiteBulkActions } from "../entities/dlsite/useDlsiteBulkActions";
+import { useDlsiteBulkStore } from "../entities/dlsite/useDlsiteBulk";
 
 export default function ReconfigurationExitEffect() {
   const queryClient = useQueryClient();
-  const dlsiteBulk = useDlsiteBulkActions();
+  const dlsiteBulk = useDlsiteBulkStore();
   const epoch = useAtomValue(reconfigurationExitEpochAtom);
   // 処理済みepochをrefで持つ。StrictModeの開発時二重effectでも同じ値なら1回しか
   // 処理しない一方、処理中に新しいepochが積まれても（値が変わるので）取りこぼさない。
@@ -29,7 +29,7 @@ export default function ReconfigurationExitEffect() {
     void queryClient
       .fetchQuery(scanLastResultQueryOptions)
       .then((last) => {
-        if (last && last.result.insertedWorkIds.length > 0) dlsiteBulk.attach();
+        if (last && last.result.insertedWorkIds.length > 0) void dlsiteBulk.attach();
       })
       .catch(() => {});
   }, [epoch, queryClient, dlsiteBulk]);

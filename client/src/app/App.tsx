@@ -29,7 +29,7 @@ import AppModals from "./ui/AppModals";
 import { activeModalAtom } from "../shared/model/activeModalAtom";
 import type { RootReconfigurationState, Settings } from "@mimimilli/shared";
 import { useDownloadLibraryExport } from "../features/library/useDownloadLibraryExport";
-import { useScanActions } from "../entities/scan/useScanActions";
+import { useScanJobStore } from "../entities/scan/useScanJob";
 import { startRootReconfiguration } from "../entities/settings/api";
 import { runStartRootReconfiguration } from "./model/runStartRootReconfiguration";
 import { markReconfigurationAffectedQueriesStale } from "./model/resetLibraryForReconfiguration";
@@ -50,7 +50,7 @@ import { openWorkDetailAtom } from "../entities/work/model/navigationActions";
 export default function App() {
   const player = usePlayerActions();
   const queryClient = useQueryClient();
-  const scanActions = useScanActions();
+  const scanJob = useScanJobStore();
   const navigate = useSetAtom(navigateAtom);
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
   const showLibraryWork = useSetAtom(showLibraryWorkAtom);
@@ -88,7 +88,7 @@ export default function App() {
     player.stop();
     setActiveModal(null);
     setDlsiteBulkApplyOpen(false);
-    scanActions.reset();
+    scanJob.reset();
     navigate(DEFAULT_APP_ROUTE, { replace: true });
     setScanCandidateHiddenPaths(new Set());
     bumpReconfigurationExitEpoch((epoch) => epoch + 1);
@@ -96,7 +96,7 @@ export default function App() {
   }, [
     navigate,
     queryClient,
-    scanActions,
+    scanJob,
     setActiveModal,
     setDlsiteBulkApplyOpen,
     bumpReconfigurationExitEpoch,

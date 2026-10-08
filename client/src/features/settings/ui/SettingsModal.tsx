@@ -4,15 +4,15 @@ import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 import TextInput from "../../../shared/ui/TextInput";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
+import { dlsiteBulkApplyBusyAtom } from "../../../entities/dlsite/model/bulkAtoms";
 import {
-  dlsiteBulkActiveAtom,
-  dlsiteBulkApplyBusyAtom,
-  dlsiteBulkProgressAtom,
-  dlsiteBulkStartingAtom,
-} from "../../../entities/dlsite/model/bulkAtoms";
-import { useDlsiteBulkActions } from "../../../entities/dlsite/useDlsiteBulkActions";
+  useDlsiteBulkActive,
+  useDlsiteBulkProgress,
+  useDlsiteBulkStarting,
+  useDlsiteBulkStore,
+} from "../../../entities/dlsite/useDlsiteBulk";
 import { useDlsiteBulkApplyActions } from "../../../entities/dlsite/useDlsiteBulkApplyActions";
-import { scanningAtom, scanProgressLabelAtom } from "../../../entities/scan/model/atoms";
+import { useScanning, useScanProgressLabel } from "../../../entities/scan/useScanJob";
 import TagPrefixSettings from "./TagPrefixSettings";
 import ExcludedFoldersSettings from "./ExcludedFoldersSettings";
 import Modal, { ModalHeader } from "../../../shared/ui/Modal";
@@ -45,14 +45,14 @@ export default function SettingsModal({
   onExport,
 }: SettingsModalProps) {
   const rootFolder = useRootFolder();
-  const scanning = useAtomValue(scanningAtom);
-  const scanProgressLabel = useAtomValue(scanProgressLabelAtom);
-  const dlsiteBulkActive = useAtomValue(dlsiteBulkActiveAtom);
-  const dlsiteBulkStarting = useAtomValue(dlsiteBulkStartingAtom);
-  const dlsiteBulkProgress = useAtomValue(dlsiteBulkProgressAtom);
+  const scanning = useScanning();
+  const scanProgressLabel = useScanProgressLabel();
+  const dlsiteBulkActive = useDlsiteBulkActive();
+  const dlsiteBulkStarting = useDlsiteBulkStarting();
+  const dlsiteBulkProgress = useDlsiteBulkProgress();
   const dlsiteBulkApplyBusy = useAtomValue(dlsiteBulkApplyBusyAtom);
   const dlsiteBulkBusy = dlsiteBulkActive || dlsiteBulkStarting;
-  const { start: onStartDlsiteBulk } = useDlsiteBulkActions();
+  const { start: onStartDlsiteBulk } = useDlsiteBulkStore();
   const { openDialog: onOpenDlsiteBulkApply } = useDlsiteBulkApplyActions();
   const [isEditingFolder, setIsEditingFolder] = useState(false);
   const [folderDraft, setFolderDraft] = useState(rootFolder);

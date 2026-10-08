@@ -7,7 +7,8 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SettingsModal from "../../src/features/settings/ui/SettingsModal";
-import { dlsiteBulkActionsAtom } from "../../src/entities/dlsite/model/bulkAtoms";
+import { dlsiteBulkStoreAtom } from "../../src/entities/dlsite/model/dlsiteBulkStore";
+import { createFakeDlsiteBulkStore } from "../helpers/fakeJobStores";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { ApiRequestError } from "../../src/shared/api/http";
 
@@ -43,12 +44,7 @@ function renderModal(options: RenderModalOptions = {}) {
     lastScanTime: null,
   });
   const store = createStore();
-  store.set(dlsiteBulkActionsAtom, {
-    start: vi.fn(),
-    attach: vi.fn(),
-    cancel: vi.fn(),
-    dismiss: vi.fn(),
-  });
+  store.set(dlsiteBulkStoreAtom, createFakeDlsiteBulkStore());
   render(
     createElement(
       QueryClientProvider,

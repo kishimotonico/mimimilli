@@ -7,7 +7,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ReconfigurationExitEffect from "../../src/app/ReconfigurationExitEffect";
 import { reconfigurationExitEpochAtom } from "../../src/entities/settings/reconfigurationExitAtom";
-import { dlsiteBulkActionsAtom } from "../../src/entities/dlsite/model/bulkAtoms";
+import { dlsiteBulkStoreAtom } from "../../src/entities/dlsite/model/dlsiteBulkStore";
+import { createFakeDlsiteBulkStore } from "../helpers/fakeJobStores";
 import * as scanApi from "../../src/entities/scan/api";
 import * as scanCandidatesCache from "../../src/entities/scan/scanCandidatesCache";
 
@@ -26,12 +27,13 @@ function setup() {
     result: EMPTY_SCAN_RESULT,
     finishedAt: "2026-01-01T00:00:00.000Z",
   });
-  const attach = vi.fn();
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const store = createStore();
-  store.set(dlsiteBulkActionsAtom, { start: vi.fn(), attach, cancel: vi.fn() });
+  const dlsiteBulk = createFakeDlsiteBulkStore();
+  const attach = dlsiteBulk.attach;
+  store.set(dlsiteBulkStoreAtom, dlsiteBulk);
   return { getLastScanResult, attach, queryClient, store };
 }
 

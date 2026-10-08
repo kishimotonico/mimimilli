@@ -21,7 +21,8 @@ import ScanModal from "../../src/features/scan/ui/ScanModal";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import * as workApi from "../../src/entities/work/api";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
-import { scanActionsAtom, scanJobAtom } from "../../src/entities/scan/model/atoms";
+import { scanJobStoreAtom } from "../../src/entities/scan/model/scanJobStore";
+import { createFakeScanJobStore } from "../helpers/fakeJobStores";
 import * as scanApi from "../../src/features/scan/api";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import * as scanCandidatesCache from "../../src/entities/scan/scanCandidatesCache";
@@ -248,16 +249,10 @@ function renderModal(
   scanState: { job?: ScanJobSnapshot | null } = {},
 ) {
   const store = createStore();
-  const onStart = vi.fn();
-  const onCancel = vi.fn();
-  store.set(scanActionsAtom, {
-    start: onStart.mockResolvedValue({ ok: true, job: null }),
-    cancel: onCancel.mockResolvedValue({ ok: true, job: null }),
-    clearError: vi.fn(),
-  });
-  if (scanState.job !== undefined) {
-    store.set(scanJobAtom, scanState.job);
-  }
+  const scanJob = createFakeScanJobStore({ job: scanState.job ?? null });
+  const onStart = scanJob.start;
+  const onCancel = scanJob.cancel;
+  store.set(scanJobStoreAtom, scanJob);
 
   const { lastResult, candidates, libraryTotal, ...rest } = overrides;
   const queryClient = createTestQueryClient();
@@ -324,7 +319,7 @@ function renderModal(
     );
   };
 
-  return { ...view, store, onStart, onCancel, rerenderModal, queryClient };
+  return { ...view, store, scanJob, onStart, onCancel, rerenderModal, queryClient };
 }
 
 describe("ScanModal", () => {
@@ -428,13 +423,13 @@ describe("ScanModal", () => {
   it("実行中から完了への遷移を見ていたときだけ、完了サインが一時的に出る", async () => {
     vi.useFakeTimers();
     try {
-      const { store, rerenderModal } = renderModal(
+      const { scanJob, rerenderModal } = renderModal(
         { lastResult: scanResult },
         { job: createRunningJob({ phase: "registering", processed: 1, total: 1 }) },
       );
 
       act(() => {
-        store.set(scanJobAtom, null);
+        scanJob.setState({ job: null, error: null });
         rerenderModal({ lastScanTime: "2026-01-01T00:00:00.000Z" });
       });
 
@@ -826,11 +821,7 @@ describe("ScanModalと他画面が同じlibraryTotalQueryOptionsを共有する"
     vi.stubGlobal("fetch", fetchMock);
 
     const store = createStore();
-    store.set(scanActionsAtom, {
-      start: vi.fn().mockResolvedValue({ ok: true, job: null }),
-      cancel: vi.fn().mockResolvedValue({ ok: true, job: null }),
-      clearError: vi.fn(),
-    });
+    store.set(scanJobStoreAtom, createFakeScanJobStore());
     const queryClient = createTestQueryClient();
 
     // useLibrarySupportingQueries の libraryStatsQuery 相当。ScanModal と同じ

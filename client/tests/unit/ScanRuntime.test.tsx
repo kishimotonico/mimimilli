@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import GlobalToast from "../../src/app/ui/GlobalToast";
-import { scanActionsAtom, scanJobAtom } from "../../src/entities/scan/model/atoms";
+import { scanJobStoreAtom } from "../../src/entities/scan/model/scanJobStore";
 import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
 import { toastRequestsAtom } from "../../src/shared/model/toastRequestsAtom";
 import type { ScanJobEvent, ScanResult } from "@mimimilli/shared";
@@ -96,10 +96,9 @@ describe("ScanRuntime", () => {
     );
 
     const { store } = renderRuntime();
-    await waitFor(() => expect(store.get(scanActionsAtom)).not.toBeNull());
 
     await act(async () => {
-      await store.get(scanActionsAtom)!.start();
+      await store.get(scanJobStoreAtom).start();
     });
 
     await waitFor(() => expect(getErrorToastMessage(store)).not.toBeNull());
@@ -150,10 +149,9 @@ describe("ScanRuntime", () => {
 
     const { store } = renderRuntime();
     store.set(activeModalAtom, { kind: "scan" });
-    await waitFor(() => expect(store.get(scanActionsAtom)).not.toBeNull());
 
     await act(async () => {
-      await store.get(scanActionsAtom)!.start();
+      await store.get(scanJobStoreAtom).start();
     });
 
     await waitFor(() => expect(getErrorToastMessage(store)).not.toBeNull());
@@ -161,7 +159,7 @@ describe("ScanRuntime", () => {
     expect(screen.getByText(message)).toBeTruthy();
 
     await act(async () => {
-      await store.get(scanActionsAtom)!.start();
+      await store.get(scanJobStoreAtom).start();
     });
 
     await waitFor(() => expect(getErrorToastMessage(store)).toBeNull());
@@ -215,17 +213,16 @@ describe("ScanRuntime", () => {
 
     // scanModalOpenAtomは未設定（閉じている）。完了トーストが出る経路を検証する。
     const { store } = renderRuntime();
-    await waitFor(() => expect(store.get(scanActionsAtom)).not.toBeNull());
 
     await act(async () => {
-      await store.get(scanActionsAtom)!.start();
+      await store.get(scanJobStoreAtom).start();
     });
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
 
     // 中止APIがHTTPレベルで失敗し、SSE接続は生きたままエラーだけが残る状態を作る。
     await act(async () => {
-      await store.get(scanActionsAtom)!.cancel();
+      await store.get(scanJobStoreAtom).cancel();
     });
     await waitFor(() => expect(getErrorToastMessage(store)).not.toBeNull());
     const errorMessage = getErrorToastMessage(store)!;
@@ -262,18 +259,17 @@ describe("ScanRuntime", () => {
     );
 
     const { store } = renderRuntime();
-    await waitFor(() => expect(store.get(scanActionsAtom)).not.toBeNull());
 
     await act(async () => {
-      await store.get(scanActionsAtom)!.start();
+      await store.get(scanJobStoreAtom).start();
     });
-    await waitFor(() => expect(store.get(scanJobAtom)).not.toBeNull());
+    await waitFor(() => expect(store.get(scanJobStoreAtom).getState().job).not.toBeNull());
 
     act(() => {
-      store.get(scanActionsAtom)!.reset();
+      store.get(scanJobStoreAtom).reset();
     });
 
-    expect(store.get(scanJobAtom)).toBeNull();
+    expect(store.get(scanJobStoreAtom).getState().job).toBeNull();
     expect(getErrorToastMessage(store)).toBeNull();
   });
 
@@ -310,10 +306,9 @@ describe("ScanRuntime", () => {
     );
 
     const { store } = renderRuntime();
-    await waitFor(() => expect(store.get(scanActionsAtom)).not.toBeNull());
 
     await act(async () => {
-      await store.get(scanActionsAtom)!.start();
+      await store.get(scanJobStoreAtom).start();
     });
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
@@ -323,7 +318,7 @@ describe("ScanRuntime", () => {
       source.onerror?.(new Event("error"));
     });
 
-    await waitFor(() => expect(store.get(scanJobAtom)).toBeNull());
+    await waitFor(() => expect(store.get(scanJobStoreAtom).getState().job).toBeNull());
     expect(getErrorToastMessage(store)).toBeNull();
     // リトライや待機ループを足していないため、1回のGETで終わっている。
     expect(getJobCallCount).toBe(1);
@@ -349,9 +344,8 @@ describe("ScanRuntime", () => {
     );
 
     const { store } = renderRuntime();
-    await waitFor(() => expect(store.get(scanActionsAtom)).not.toBeNull());
 
-    const result = await act(async () => store.get(scanActionsAtom)!.start());
+    const result = await act(async () => store.get(scanJobStoreAtom).start());
 
     expect(result.ok).toBe(false);
     expect(getErrorToastMessage(store)).toBeNull();

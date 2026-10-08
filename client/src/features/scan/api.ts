@@ -1,70 +1,15 @@
-// scan feature の API。ライブラリのスキャン実行。
+// scan feature の API。スキャン候補の除外。
 // 依存方向: shared/api/http・entities/scan（候補除外の一覧・解除）と自 feature の model のみを参照する。
 
-import {
-  ApiRequestError,
-  deleteParsed,
-  getParsed,
-  postParsed,
-  postVoid,
-  type StatusHandler,
-} from "../../shared/api/http";
+import { postVoid } from "../../shared/api/http";
 import { SCAN_QUERY_KEYS } from "../../entities/scan/queryKeys";
 import type { StartScanRequest } from "@mimimilli/shared";
-import {
-  scanConflictResponseSchema,
-  scanJobSnapshotSchema,
-  scanCandidatesMutationSchema,
-  startScanRequestSchema,
-  startScanResponseSchema,
-  type ScanJobSnapshot,
-} from "@mimimilli/shared";
+import { scanCandidatesMutationSchema } from "@mimimilli/shared";
 
 export { SCAN_QUERY_KEYS };
 
 export type { ScanResult } from "./model";
 export type { StartScanRequest };
-
-export class ScanAlreadyActiveError extends ApiRequestError {
-  readonly active: ScanJobSnapshot;
-
-  constructor(active: ScanJobSnapshot) {
-    super(409, "conflict", "スキャンは既に実行中です");
-    this.active = active;
-  }
-}
-
-const scanConflictHandler: Partial<Record<number, StatusHandler>> = {
-  409: (_res, body) => {
-    const conflict = scanConflictResponseSchema.safeParse(body);
-    if (conflict.success) throw new ScanAlreadyActiveError(conflict.data.active);
-  },
-};
-
-export async function startScan(options?: StartScanRequest): Promise<ScanJobSnapshot> {
-  const body = startScanRequestSchema.parse(options ?? {});
-  const { job } = await postParsed(
-    startScanResponseSchema,
-    "/scan",
-    body.full === undefined ? undefined : body,
-    {
-      onStatus: scanConflictHandler,
-    },
-  );
-  return job;
-}
-
-export async function getActiveScan(): Promise<ScanJobSnapshot | null> {
-  return getParsed(scanJobSnapshotSchema, "/scan/active", { noContentAsNull: true });
-}
-
-export async function getScanJob(id: string): Promise<ScanJobSnapshot> {
-  return getParsed(scanJobSnapshotSchema, `/scan/${encodeURIComponent(id)}`);
-}
-
-export async function cancelScan(id: string): Promise<ScanJobSnapshot> {
-  return deleteParsed(scanJobSnapshotSchema, `/scan/${encodeURIComponent(id)}`);
-}
 
 export async function excludeScanCandidates(paths: string[]): Promise<void> {
   await postVoid("/scan/candidates/exclude", scanCandidatesMutationSchema.parse({ paths }));

@@ -1040,12 +1040,7 @@
             ],
             "patterns": [
               {
-                "group": [
-                  "**/features/**/model/**",
-                  "!**/features/scan/model/useScanActions",
-                  "!**/features/dlsite/model/useDlsiteBulkActions",
-                  "!**/features/files/model/types"
-                ],
+                "group": ["**/features/**/model/**", "!**/features/files/model/types"],
                 "message": "App.tsx は features/*/model 配下を import しない（action フック・型モジュールのみ許可）"
               }
             ]

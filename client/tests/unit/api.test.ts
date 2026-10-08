@@ -4,7 +4,6 @@ import * as smartFolderApi from "../../src/entities/smart-folder/api";
 import * as filesApi from "../../src/features/files/api";
 import * as libraryApi from "../../src/features/library/api";
 import * as settingsApi from "../../src/features/settings/api";
-import * as scanApi from "../../src/features/scan/api";
 import * as scanEntityApi from "../../src/entities/scan/api";
 import {
   emptyDlsiteState,
@@ -155,7 +154,7 @@ describe("scan api", () => {
       },
     };
     mockFetch.mockResolvedValue(makeResponse(mockResult, 202));
-    const result = await scanApi.startScan();
+    const result = await scanEntityApi.startScan();
     expect(mockFetch).toHaveBeenCalledWith(
       "/api/scan",
       expect.objectContaining({ method: "POST" }),
@@ -177,7 +176,7 @@ describe("scan api", () => {
       },
     };
     mockFetch.mockResolvedValue(makeResponse(mockResult, 202));
-    await scanApi.startScan({ full: true });
+    await scanEntityApi.startScan({ full: true });
     expect(mockFetch).toHaveBeenCalledWith(
       "/api/scan",
       expect.objectContaining({
@@ -201,7 +200,7 @@ describe("scan api", () => {
     mockFetch.mockResolvedValue(
       makeResponse({ error: { code: "conflict", message: "already active" }, active }, 409),
     );
-    await expect(scanApi.startScan()).rejects.toMatchObject({
+    await expect(scanEntityApi.startScan()).rejects.toMatchObject({
       status: 409,
       code: "conflict",
       active,
@@ -212,7 +211,7 @@ describe("scan api", () => {
     mockFetch.mockResolvedValue(
       makeResponse({ error: { code: "internal", message: "start failed" } }, 500),
     );
-    await expect(scanApi.startScan()).rejects.toMatchObject({
+    await expect(scanEntityApi.startScan()).rejects.toMatchObject({
       status: 500,
       code: "internal",
       message: "start failed",
@@ -225,7 +224,7 @@ describe("scan api", () => {
       status: 204,
       json: () => Promise.reject(new Error("no body")),
     } as Response);
-    await expect(scanApi.getActiveScan()).resolves.toBeNull();
+    await expect(scanEntityApi.getActiveScan()).resolves.toBeNull();
   });
 
   it("getLastScanResult: 204はnullを返す", async () => {
@@ -241,7 +240,7 @@ describe("scan api", () => {
     mockFetch.mockResolvedValue(
       makeResponse({ error: { code: "not_found", message: "evicted" } }, 404),
     );
-    await expect(scanApi.getScanJob("job-1")).rejects.toMatchObject({
+    await expect(scanEntityApi.getScanJob("job-1")).rejects.toMatchObject({
       status: 404,
       code: "not_found",
       message: "evicted",
@@ -637,7 +636,7 @@ describe("レスポンス検証（getParsed等）", () => {
         job: { id: 1 },
       }),
     );
-    await expect(scanApi.startScan()).rejects.toThrow(/POST \/scan/);
+    await expect(scanEntityApi.startScan()).rejects.toThrow(/POST \/scan/);
   });
 
   it("browseFs: 契約に適合しない一覧は検証エラーになる", async () => {

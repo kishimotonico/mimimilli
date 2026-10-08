@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { useAtomValue } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
 import Modal, { ModalHeader } from "../../../shared/ui/Modal";
@@ -7,8 +6,7 @@ import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
 import { useToast } from "../../../shared/ui/useToast";
-import { scanningAtom, scanProgressAtom } from "../../../entities/scan/model/atoms";
-import { useScanActions } from "../../../entities/scan/useScanActions";
+import { useScanJobStore, useScanProgress, useScanning } from "../../../entities/scan/useScanJob";
 import {
   scanDiagnosticsQueryOptions,
   scanLastResultQueryOptions,
@@ -42,9 +40,9 @@ export default function ScanModal({
   initialTab = "unregistered",
   onOpenFiles,
 }: ScanModalProps) {
-  const scanning = useAtomValue(scanningAtom);
-  const progress = useAtomValue(scanProgressAtom);
-  const { start, cancel } = useScanActions();
+  const scanning = useScanning();
+  const progress = useScanProgress();
+  const { start, cancel } = useScanJobStore();
   const [activeTab, setActiveTab] = useState<ScanTabKey>(initialTab);
   const toast = useToast();
   // 候補承認で登録された作品ID（このモーダル表示中に蓄積しクライアント側で集約する）。

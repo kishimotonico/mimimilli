@@ -2,16 +2,16 @@
 // 集約する通知ベルパネル。開閉・外側クリック/Escapeでの閉じ方は
 // AddressBar の並び替えメニュー（.mle-sortmenu）と同じ「position:relative + absolute」の
 // 素朴な実装に倣う（work-preview専用の useAnchoredPopover は左寄せクランプ前提でここには合わない）。
-import { useAtomValue, useSetAtom } from "jotai";
+import { useSetAtom } from "jotai";
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { activeModalAtom } from "../../shared/model/activeModalAtom";
 import {
-  dlsiteBulkActiveAtom,
-  dlsiteBulkProgressAtom,
-  dlsiteBulkStartingAtom,
-} from "../../entities/dlsite/model/bulkAtoms";
-import { useDlsiteBulkActions } from "../../entities/dlsite/useDlsiteBulkActions";
+  useDlsiteBulkActive,
+  useDlsiteBulkProgress,
+  useDlsiteBulkStarting,
+  useDlsiteBulkStore,
+} from "../../entities/dlsite/useDlsiteBulk";
 import { useDlsiteNotificationSummary } from "../../entities/dlsite/model/useDlsiteNotificationSummary";
 import {
   scanDiagnosticsQueryOptions,
@@ -30,10 +30,10 @@ import { usePopoverDismissal } from "../../shared/ui/usePopoverDismissal";
 
 export default function NotificationBell() {
   const setActiveModal = useSetAtom(activeModalAtom);
-  const dlsiteBulkActive = useAtomValue(dlsiteBulkActiveAtom);
-  const dlsiteBulkStarting = useAtomValue(dlsiteBulkStartingAtom);
-  const dlsiteBulkProgress = useAtomValue(dlsiteBulkProgressAtom);
-  const { start: onStartDlsiteBulk } = useDlsiteBulkActions();
+  const dlsiteBulkActive = useDlsiteBulkActive();
+  const dlsiteBulkStarting = useDlsiteBulkStarting();
+  const dlsiteBulkProgress = useDlsiteBulkProgress();
+  const { start: onStartDlsiteBulk } = useDlsiteBulkStore();
   // 前回スキャン結果（ディスク永続化なし）。購読する。
   const lastScanQuery = useQuery(scanLastResultQueryOptions);
   const scanResult = lastScanQuery.data?.result ?? null;

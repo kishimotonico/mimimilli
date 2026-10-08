@@ -7,12 +7,12 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { useMotionVariants } from "../../shared/ui/useMotionVariants";
 import { activeModalAtom } from "../../shared/model/activeModalAtom";
 import {
-  dlsiteBulkActiveAtom,
-  dlsiteBulkCancellingAtom,
-  dlsiteBulkCurrentWorkLabelAtom,
-  dlsiteBulkProgressLabelAtom,
-} from "../../entities/dlsite/model/bulkAtoms";
-import { useDlsiteBulkActions } from "../../entities/dlsite/useDlsiteBulkActions";
+  useDlsiteBulkActive,
+  useDlsiteBulkCancelling,
+  useDlsiteBulkCurrentWorkLabel,
+  useDlsiteBulkProgressLabel,
+  useDlsiteBulkStore,
+} from "../../entities/dlsite/useDlsiteBulk";
 import {
   activeAxisAtom,
   librarySearchQueryAtom,
@@ -26,7 +26,7 @@ import {
   playingTrackTitleAtom,
 } from "../../entities/player/model/atoms";
 import { cn } from "../../shared/lib/cn";
-import { scanningAtom, scanProgressLabelAtom } from "../../entities/scan/model/atoms";
+import { useScanning, useScanProgressLabel } from "../../entities/scan/useScanJob";
 import { useUnregisteredCandidateCount } from "../../features/scan/model/useScanCandidatesCache";
 
 interface TopBarProps {
@@ -53,14 +53,14 @@ function DlsiteBulkCancelButton({ onClick }: { onClick: () => void }) {
 
 export default function TopBar({ notificationBell }: TopBarProps) {
   const setActiveModal = useSetAtom(activeModalAtom);
-  const scanning = useAtomValue(scanningAtom);
-  const scanProgressLabel = useAtomValue(scanProgressLabelAtom);
+  const scanning = useScanning();
+  const scanProgressLabel = useScanProgressLabel();
   const unregisteredCount = useUnregisteredCandidateCount();
-  const dlsiteBulkActive = useAtomValue(dlsiteBulkActiveAtom);
-  const dlsiteBulkProgressLabel = useAtomValue(dlsiteBulkProgressLabelAtom);
-  const dlsiteBulkCurrentWorkLabel = useAtomValue(dlsiteBulkCurrentWorkLabelAtom);
-  const dlsiteBulkCancelling = useAtomValue(dlsiteBulkCancellingAtom);
-  const { cancel: onCancelDlsiteBulk } = useDlsiteBulkActions();
+  const dlsiteBulkActive = useDlsiteBulkActive();
+  const dlsiteBulkProgressLabel = useDlsiteBulkProgressLabel();
+  const dlsiteBulkCurrentWorkLabel = useDlsiteBulkCurrentWorkLabel();
+  const dlsiteBulkCancelling = useDlsiteBulkCancelling();
+  const { cancel: onCancelDlsiteBulk } = useDlsiteBulkStore();
   const mode = useAtomValue(appModeAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
   const searchQuery = useAtomValue(librarySearchQueryAtom);
