@@ -2,7 +2,6 @@ import {
   relativeToRoot,
   type WorkEditSnapshot,
   type WorkProjection,
-  type WorkSourceMutationResult,
   type WorkspacePath,
 } from "@mimimilli/shared";
 import { ApiRequestError, ApiTransportError } from "../../shared/api/http";
@@ -41,12 +40,4 @@ export function projectionWorkspacePath(
   root: string,
 ): WorkspacePath {
   return relativeToRoot(snapshot.physicalPath, root);
-}
-
-export function isProjectionPending(
-  result: WorkSourceMutationResult | null | undefined,
-): result is WorkSourceMutationResult & {
-  projection: Extract<WorkProjection, { status: "pending" }>;
-} {
-  return result?.projection.status === "pending";
 }

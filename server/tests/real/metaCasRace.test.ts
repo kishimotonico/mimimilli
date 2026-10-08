@@ -120,18 +120,6 @@ function assertSingleCompleteWrite(metaPath: string, results: [WorkerDone, Worke
   assert.equal(existsSync(join(dirname(metaPath), `.${basename(metaPath)}.lock`)), false);
 }
 
-async function withCasDelay<T>(delayMs: number, fn: () => Promise<T>): Promise<T> {
-  const previous = process.env.MIMIMILLI_ATOMIC_WRITE_CAS_DELAY_MS;
-  if (delayMs > 0) process.env.MIMIMILLI_ATOMIC_WRITE_CAS_DELAY_MS = String(delayMs);
-  else delete process.env.MIMIMILLI_ATOMIC_WRITE_CAS_DELAY_MS;
-  try {
-    return await fn();
-  } finally {
-    if (previous === undefined) delete process.env.MIMIMILLI_ATOMIC_WRITE_CAS_DELAY_MS;
-    else process.env.MIMIMILLI_ATOMIC_WRITE_CAS_DELAY_MS = previous;
-  }
-}
-
 test("同じ revision の並行 mutateMetaSource は一方だけ成功し後勝ち消失しない", async (t) => {
   const directory = makeTestDirectory("meta-cas-lock");
   t.after(directory.cleanup);
@@ -144,13 +132,11 @@ test("同じ revision の並行 mutateMetaSource は一方だけ成功し後勝�
     for (const worker of workers) worker.terminate();
   });
 
-  await withCasDelay(0, async () => {
-    for (let i = 0; i < 20; i++) {
-      const bytes = writeSampleMeta(metaPath);
-      const results = await runConcurrentPatches(workers, metaPath, sourceRevision(bytes));
-      assertSingleCompleteWrite(metaPath, results);
-    }
-  });
+  for (let i = 0; i < 20; i++) {
+    const bytes = writeSampleMeta(metaPath);
+    const results = await runConcurrentPatches(workers, metaPath, sourceRevision(bytes));
+    assertSingleCompleteWrite(metaPath, results);
+  }
 });
 
 function lockPathFor(metaPath: string): string {

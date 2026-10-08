@@ -4,7 +4,7 @@ import Lightbox from "../../../shared/ui/Lightbox";
 import { formatFileSize } from "../../../shared/lib/format";
 import { getWorkspaceMediaUrl } from "../../../entities/file-system/api";
 import { getWorkFolderDisplay } from "../model/workFolderDisplay";
-import type { MediaKind } from "@mimimilli/shared";
+import type { MediaKind, PreviewCapability } from "@mimimilli/shared";
 import { FILE_KIND_ICON, FILE_KIND_LABEL, type FileKind, type FsEntry } from "../model/types";
 
 function formatBreakdownLine(breakdown: { kind: FileKind; count: number }[]): string {
@@ -53,17 +53,19 @@ export function Hero({
 
 export function WorkspaceMedia({
   entry,
+  kind,
+  preview,
   isRegisteredWork,
   workTitle,
 }: {
   entry: FsEntry;
+  kind: MediaKind;
+  preview: PreviewCapability;
   /** 作品として登録済みか（フォルダー単位・単一ファイル単位どちらも含む）。
    *  Heroの isWorkFolder とは意味が異なる（あちらはフォルダー単位限定）ため名前を分ける */
   isRegisteredWork: boolean;
   workTitle?: string;
 }) {
-  const kind = entry.mediaKind!;
-  const preview = entry.preview!;
   const src = getWorkspaceMediaUrl(entry.path);
 
   if (preview.kind === "unavailable") {
@@ -105,9 +107,16 @@ export function FilePreviewMediaSlot({
   breakdown: { kind: FileKind; count: number }[];
   workTitle?: string;
 }) {
-  if (!isDir && entry.preview && entry.mediaKind) {
+  const { preview, mediaKind } = entry;
+  if (!isDir && preview && mediaKind) {
     return (
-      <WorkspaceMedia entry={entry} isRegisteredWork={isRegisteredWork} workTitle={workTitle} />
+      <WorkspaceMedia
+        entry={entry}
+        kind={mediaKind}
+        preview={preview}
+        isRegisteredWork={isRegisteredWork}
+        workTitle={workTitle}
+      />
     );
   }
   return (

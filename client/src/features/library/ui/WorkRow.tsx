@@ -5,9 +5,11 @@ import { getWorkStatusLabel } from "../../../entities/work/workStatusLabel";
 import { I } from "../../../shared/ui/Icon";
 import { formatDuration } from "../../../shared/lib/format";
 import { cn } from "../../../shared/lib/cn";
-import type { GridArrowKey } from "../../../shared/lib/gridNavigation";
-
-const LIST_ARROW_KEYS = new Set<GridArrowKey>(["ArrowUp", "ArrowDown", "Home", "End"]);
+import {
+  isGridArrowKey,
+  LIST_ARROW_KEYS,
+  type GridArrowKey,
+} from "../../../shared/lib/gridNavigation";
 
 interface WorkRowProps {
   work: WorkListItem;
@@ -69,9 +71,9 @@ export default function WorkRow({
           if (isPlayable) onPlay();
           return;
         }
-        if (!LIST_ARROW_KEYS.has(event.key as GridArrowKey)) return;
+        if (!isGridArrowKey(event.key, LIST_ARROW_KEYS)) return;
         event.preventDefault();
-        onArrowKey(flatIndex, event.key as GridArrowKey);
+        onArrowKey(flatIndex, event.key);
       }}
     >
       <div className="mll-wrow__cv">

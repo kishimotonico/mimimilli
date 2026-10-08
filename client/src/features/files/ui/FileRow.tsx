@@ -3,9 +3,11 @@ import { formatFileSize } from "../../../shared/lib/format";
 import { classifyFile, FILE_KIND_ICON, FILE_KIND_ROW_CLASS, type FsEntry } from "../model/types";
 import { getWorkFolderDisplay } from "../model/workFolderDisplay";
 import type { ScanDiagnostic } from "@mimimilli/shared";
-import type { GridArrowKey } from "../../../shared/lib/gridNavigation";
-
-const LIST_ARROW_KEYS = new Set<GridArrowKey>(["ArrowUp", "ArrowDown", "Home", "End"]);
+import {
+  isGridArrowKey,
+  LIST_ARROW_KEYS,
+  type GridArrowKey,
+} from "../../../shared/lib/gridNavigation";
 
 interface FileRowProps {
   entry: FsEntry;
@@ -63,9 +65,9 @@ export default function FileRow({
       onClick={onClick}
       onDoubleClick={onActivate}
       onKeyDown={(event) => {
-        if (!LIST_ARROW_KEYS.has(event.key as GridArrowKey)) return;
+        if (!isGridArrowKey(event.key, LIST_ARROW_KEYS)) return;
         event.preventDefault();
-        onArrowKey(flatIndex, event.key as GridArrowKey);
+        onArrowKey(flatIndex, event.key);
       }}
       title={entry.name}
     >

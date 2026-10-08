@@ -99,7 +99,7 @@ export default function TopBar({ notificationBell }: TopBarProps) {
     if (isValueListPane) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== "k" || !(e.metaKey || e.ctrlKey)) return;
-      const target = e.target as HTMLElement | null;
+      const target = e.target instanceof HTMLElement ? e.target : null;
       const isEditable =
         target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
       if (isEditable && target !== searchInputRef.current) return;
@@ -148,7 +148,8 @@ export default function TopBar({ notificationBell }: TopBarProps) {
               if (!composingRef.current) onSearchChange(e.target.value);
             }}
             onFocus={(e) => {
-              previousFocusRef.current = (e.relatedTarget as HTMLElement | null) ?? null;
+              previousFocusRef.current =
+                e.relatedTarget instanceof HTMLElement ? e.relatedTarget : null;
             }}
             onCompositionStart={() => {
               composingRef.current = true;

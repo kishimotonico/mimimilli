@@ -3,12 +3,13 @@
 // コンポーネント側は返された view model を配線するだけにする。
 
 import {
+  skipToken,
   useMutation,
   useQuery,
   useQueryClient,
   useSuspenseInfiniteQuery,
 } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useState } from "react";
 import { useAtomValue } from "jotai";
 import { randomSeedAtom } from "./atoms";
 import {
@@ -34,6 +35,7 @@ import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 import { invalidateSmartFolderSaveQueries } from "./smartFolderInvalidation";
 import {
   buildSmartFolderFilterParams,
+  buildNormalWorksParams,
   buildWorksParams,
   computeCollectionStatsDisplay,
   getFacetAxisForQuery,
@@ -86,15 +88,14 @@ function getNextWorksPageParam(
 /** Suspense 境界配下でのみ使う通常作品一覧。親で enabled を切り替えない。 */
 export function useSuspenseNormalLibraryWorks(nav: LibraryViewState, searchQuery: string) {
   const randomSeed = useAtomValue(randomSeedAtom);
-  const worksParams = buildWorksParams({
+  // 呼び出し側は通常軸だけをマウントする。スマート軸は専用の子コンポーネントが担当する。
+  const normalWorksParams = buildNormalWorksParams({
     activeAxis: nav.activeAxis,
     sort: nav.sort,
     searchQuery,
     selectedTags: nav.selectedTags,
     randomSeed,
   });
-  // 呼び出し側は通常軸だけをマウントする。スマート軸は専用の子コンポーネントが担当する。
-  const normalWorksParams = worksParams!;
 
   const query = useSuspenseInfiniteQuery({
     queryKey: WORK_QUERY_KEYS.list(normalWorksParams),
@@ -181,10 +182,10 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
     queryKey: SMART_FOLDER_QUERY_KEYS.all(),
     queryFn: listSmartFolders,
   });
+  const selectedWorkId = nav.selectedWorkId;
   const workDetailQuery = useQuery({
     queryKey: WORK_QUERY_KEYS.detail(nav.selectedWorkId ?? ""),
-    queryFn: () => getWork(nav.selectedWorkId!),
-    enabled: nav.selectedWorkId !== null,
+    queryFn: selectedWorkId === null ? skipToken : () => getWork(selectedWorkId),
   });
   const tagsQuery = useQuery({ queryKey: TAG_QUERY_KEYS.all(), queryFn: getAllTags });
   const {
@@ -292,28 +293,30 @@ export function useSmartFolderRuleMatchCountQuery(
   options?: { immediate?: boolean },
 ) {
   const rulesKey = rules ? JSON.stringify(rules) : null;
-  const debouncedKey = useDebouncedValue(
-    rulesKey,
+  // rules は毎レンダー新規参照になりうるため、内容（rulesKey）が変わったときだけ差し替える
+  const [stableRules, setStableRules] = useState({ key: rulesKey, rules });
+  if (stableRules.key !== rulesKey) setStableRules({ key: rulesKey, rules });
+  const debounced = useDebouncedValue(
+    stableRules,
     SMART_FOLDER_PREVIEW_DEBOUNCE_MS,
     rulesKey === null || (options?.immediate ?? false),
   );
-  const debouncedRules = useMemo<SmartFolderRule[] | null>(
-    () => (debouncedKey ? (JSON.parse(debouncedKey) as SmartFolderRule[]) : null),
-    [debouncedKey],
-  );
+  const debouncedRules = debounced.rules;
 
   // debouncedRules が null（条件が妥当でない）のときも一意なキーにする。null を [] に潰すと
   // 「条件0件（＝全作品に一致する妥当な状態）」のキャッシュと衝突し、無効な間も直前の件数が
   // 表示され続けてしまう
   const query = useQuery({
     queryKey: SMART_FOLDER_QUERY_KEYS.preview(debouncedRules ?? { invalid: true }),
-    queryFn: ({ signal }) => previewSmartFolderRuleCount(debouncedRules!, { signal }),
-    enabled: debouncedRules !== null,
+    queryFn:
+      debouncedRules === null
+        ? skipToken
+        : ({ signal }) => previewSmartFolderRuleCount(debouncedRules, { signal }),
   });
 
   return {
     // 無効な間は同じキーに紐づくキャッシュが万一残っていても参照しない
     total: debouncedRules === null ? undefined : query.data,
-    isCounting: debouncedRules !== null && (rulesKey !== debouncedKey || query.isFetching),
+    isCounting: debouncedRules !== null && (rulesKey !== debounced.key || query.isFetching),
   };
 }

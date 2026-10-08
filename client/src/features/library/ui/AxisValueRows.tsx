@@ -3,15 +3,13 @@ import type { AxisFacetItem } from "@mimimilli/shared";
 import type { AxisValueSortKey, AxisValueSortState } from "../model/axisValueSort";
 import { AXIS_VALUE_SORT_OPTIONS, toggleAxisValueSort } from "../model/axisValueSort";
 import type { AxisValueHierarchyRow } from "../model/axisValueHierarchy";
-import type { AxisValueRowArrowKey } from "../model/axisValueRowNav";
+import { isAxisValueRowArrowKey } from "../model/axisValueRowNav";
 import { formatDuration } from "../../../shared/lib/format";
 import { I } from "../../../shared/ui/Icon";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import CoverCollage from "./CoverCollage";
 import type { IconName } from "../../../shared/ui/Icon";
 import { useAxisValueListNav } from "./useAxisValueListNav";
-
-const ROW_ARROW_KEYS = new Set<AxisValueRowArrowKey>(["ArrowUp", "ArrowDown", "Home", "End"]);
 
 const ROW_COLLAGE_SIZE = 32;
 /** 階層1段あたりのインデント幅。深さに制限は設けない（4階層以上でも破綻しない）。 */
@@ -173,9 +171,9 @@ export default function AxisValueRows({
                             onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
                           }
                           onKeyDown={(e) => {
-                            if (!ROW_ARROW_KEYS.has(e.key as AxisValueRowArrowKey)) return;
+                            if (!isAxisValueRowArrowKey(e.key)) return;
                             e.preventDefault();
-                            moveFocus(e.key as AxisValueRowArrowKey);
+                            moveFocus(e.key);
                           }}
                         >
                           <CoverCollage

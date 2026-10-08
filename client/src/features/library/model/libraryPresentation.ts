@@ -119,12 +119,10 @@ export function buildTagFilterParams(selectedTags: NormalizedTag[]): TagFilterPa
   return selectedTags.length > 0 ? { tags: selectedTags, tagOp: "AND" } : {};
 }
 
-/** works 種の結果面（ビュー軸・スマートフォルダー軸）以外は works query を発行しない。
- *  スマートフォルダーは別 query（evalSmartFolder）で取得する。 */
-export function buildWorksParams(input: WorksParamsInput): WorksQueryInput | null {
+/** 通常軸（ビュー軸）の works query パラメータ。結果面が works で非スマート軸であることは
+ *  呼び出し側（LibraryWorksBoundary の NormalWorks）が保証する。 */
+export function buildNormalWorksParams(input: WorksParamsInput): WorksQueryInput {
   const { activeAxis, sort, searchQuery, selectedTags, randomSeed } = input;
-  if (computeResultsPaneKind(activeAxis) !== "works" || isSmartAxis(activeAxis)) return null;
-
   const p: WorksQueryInput = { sort, ...buildTagFilterParams(selectedTags) };
   if (searchQuery) p.q = searchQuery;
   if (isViewAxis(activeAxis) && activeAxis !== "all") {
@@ -132,6 +130,14 @@ export function buildWorksParams(input: WorksParamsInput): WorksQueryInput | nul
   }
   if (sort === "random" && randomSeed !== undefined) p.seed = randomSeed;
   return p;
+}
+
+/** works 種の結果面（ビュー軸・スマートフォルダー軸）以外は works query を発行しない。
+ *  スマートフォルダーは別 query（evalSmartFolder）で取得する。 */
+export function buildWorksParams(input: WorksParamsInput): WorksQueryInput | null {
+  const { activeAxis } = input;
+  if (computeResultsPaneKind(activeAxis) !== "works" || isSmartAxis(activeAxis)) return null;
+  return buildNormalWorksParams(input);
 }
 
 /** スマートフォルダー評価API（GET /smart-folders/:id/works）へ渡す追加フィルタ。

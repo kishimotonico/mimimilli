@@ -9,7 +9,6 @@ import {
   sortIdSchema,
   viewIdSchema,
   toWorkListItem,
-  coverFieldsFromCover,
   type SmartFolderRule,
   type Work,
   type WorksQuery,
@@ -25,6 +24,7 @@ import {
   resolvedDuration,
   createWorkRepos,
   makeWorkSummary,
+  coverFieldsFromCover,
 } from "../helpers/workTestUtils.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { makeTestScope, writeSampleCover } from "../helpers/sampleLibrary.ts";
@@ -591,15 +591,12 @@ test("スマートフォルダー候補IDが900件を超えてもlistSummaries�
   };
   const query = { page: 1, limit: largeDataset.length };
 
-  const candidateIds = queryRepo.resolveSmartFolderCandidateIds([rule]);
-  assert.notEqual(candidateIds, null);
+  const works = queryRepo.listSmartFolderCandidateSummaries([rule]).summaries;
   assert.ok(
-    candidateIds!.size > 900,
-    `候補IDがchunk境界(900件)を超えている前提が崩れている: ${candidateIds!.size}`,
+    works.length > 900,
+    `候補がchunk境界(900件)を超えている前提が崩れている: ${works.length}`,
   );
-
-  const works = queryRepo.listSummaries([...candidateIds!]).summaries;
-  assert.equal(works.length, candidateIds!.size, "chunk分割後も欠落・重複がない");
+  assert.equal(new Set(works.map((work) => work.id)).size, works.length, "chunk分割後も重複がない");
 
   const fixture = evalSmartFolder({ rules: [rule], sort: "id-asc" }, largeDataset, query);
   const real = evalSmartFolder({ rules: [rule], sort: "id-asc" }, works, query);

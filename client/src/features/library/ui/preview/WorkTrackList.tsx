@@ -4,9 +4,11 @@ import { I } from "../../../../shared/ui/Icon";
 import { formatTime } from "../../../../shared/lib/format";
 import { formatTrackDuration, trackDurationAriaLabel } from "../../../../shared/lib/trackDuration";
 import { cn } from "../../../../shared/lib/cn";
-import { getNextGridIndex, type GridArrowKey } from "../../../../shared/lib/gridNavigation";
-
-const TRACK_ARROW_KEYS = new Set<GridArrowKey>(["ArrowUp", "ArrowDown", "Home", "End"]);
+import {
+  getNextGridIndex,
+  isGridArrowKey,
+  LIST_ARROW_KEYS,
+} from "../../../../shared/lib/gridNavigation";
 
 interface WorkTrackListProps {
   tracks: ResolvedTrack[];
@@ -68,9 +70,9 @@ export function WorkTrackList({
               }}
               onFocus={() => setActiveIndex(i)}
               onKeyDown={(event) => {
-                if (!TRACK_ARROW_KEYS.has(event.key as GridArrowKey)) return;
+                if (!isGridArrowKey(event.key, LIST_ARROW_KEYS)) return;
                 event.preventDefault();
-                const nextIndex = getNextGridIndex(i, event.key as GridArrowKey, 1, tracks.length);
+                const nextIndex = getNextGridIndex(i, event.key, 1, tracks.length);
                 if (nextIndex === i) return;
                 rowRefs.current[nextIndex]?.focus();
               }}

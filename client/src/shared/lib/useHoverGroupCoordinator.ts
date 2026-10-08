@@ -128,6 +128,12 @@ export function useHoverGroupCoordinator(
     document.removeEventListener("pointermove", stableOnDocumentPointerMove);
   };
 
+  const clearTimers = () => {
+    clearOpenTimer();
+    clearCloseTimer();
+    disengageTriangleGuard();
+  };
+
   const commitOpen = (key: string, el: HTMLElement | null) => {
     clearOpenTimer();
     const next: OpenState = { key, anchorEl: el, token: Symbol(key) };
@@ -247,27 +253,22 @@ export function useHoverGroupCoordinator(
   });
 
   const openImmediately = (key: string, el: HTMLElement | null) => {
-    clearOpenTimer();
-    clearCloseTimer();
-    disengageTriangleGuard();
+    clearTimers();
     commitOpen(key, el);
   };
 
   const close = () => {
-    clearOpenTimer();
-    clearCloseTimer();
-    disengageTriangleGuard();
+    clearTimers();
     panelHoveredRef.current = false;
     commitClose();
   };
 
+  // 毎レンダー作り直される処理を、依存配列を持たない effect からも最新の実体で呼ぶための参照
+  const latestRef = useRef({ handleTriggerEnter, close, clearTimers });
+  latestRef.current = { handleTriggerEnter, close, clearTimers };
+
   useEffect(() => {
-    return () => {
-      clearOpenTimer();
-      clearCloseTimer();
-      disengageTriangleGuard();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- アンマウント時のクリーンアップのみ
+    return () => latestRef.current.clearTimers();
   }, []);
 
   useEffect(() => {
@@ -275,11 +276,10 @@ export function useHoverGroupCoordinator(
       hasGenuinePointerMovedRef.current = true;
       document.removeEventListener("pointermove", handleFirstPointerMove);
       const hovered = hoveredTriggerRef.current;
-      if (hovered) handleTriggerEnter(hovered.key, hovered.el);
+      if (hovered) latestRef.current.handleTriggerEnter(hovered.key, hovered.el);
     };
     document.addEventListener("pointermove", handleFirstPointerMove);
     return () => document.removeEventListener("pointermove", handleFirstPointerMove);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleTriggerEnterはrefのみ参照する安定した処理のため、マウント時の1回だけで良い
   }, []);
 
   // トリガー・パネルの外への pointerdown はタイマーを待たず即座に閉じる
@@ -292,11 +292,10 @@ export function useHoverGroupCoordinator(
       const panelEl = panelElRef.current;
       const anchorEl = openStateRef.current?.anchorEl;
       if (panelEl?.contains(target) || anchorEl?.contains(target)) return;
-      close();
+      latestRef.current.close();
     };
     document.addEventListener("pointerdown", handlePointerDown, true);
     return () => document.removeEventListener("pointerdown", handlePointerDown, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- close/panelElRef/openStateRefは安定参照
   }, [openState]);
 
   return {

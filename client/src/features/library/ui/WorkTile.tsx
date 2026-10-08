@@ -5,16 +5,11 @@ import { getWorkStatusLabel } from "../../../entities/work/workStatusLabel";
 import { I } from "../../../shared/ui/Icon";
 import { cn } from "../../../shared/lib/cn";
 import { selectCoverThumbnailWidth } from "../model/gridSizing";
-import type { GridArrowKey } from "../../../shared/lib/gridNavigation";
-
-const GRID_ARROW_KEYS = new Set<GridArrowKey>([
-  "ArrowLeft",
-  "ArrowRight",
-  "ArrowUp",
-  "ArrowDown",
-  "Home",
-  "End",
-]);
+import {
+  isGridArrowKey,
+  GRID_ARROW_KEYS,
+  type GridArrowKey,
+} from "../../../shared/lib/gridNavigation";
 
 export interface WorkTileProps {
   work: WorkListItem;
@@ -77,9 +72,9 @@ function WorkTile({
           if (isPlayable) onPlay(work);
           return;
         }
-        if (!GRID_ARROW_KEYS.has(event.key as GridArrowKey)) return;
+        if (!isGridArrowKey(event.key, GRID_ARROW_KEYS)) return;
         event.preventDefault();
-        onArrowKey(flatIndex, event.key as GridArrowKey);
+        onArrowKey(flatIndex, event.key);
       }}
     >
       <span

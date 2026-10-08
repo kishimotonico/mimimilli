@@ -8,12 +8,12 @@ import * as scanApi from "../../src/features/scan/api";
 import {
   emptyDlsiteState,
   emptyMetaDlsiteState,
-  coverFieldsFromCover,
   workspacePath,
   type Work,
   type WorkListItem,
   type WorkSummary,
 } from "@mimimilli/shared";
+import { coverFieldsFromCover } from "../helpers/cover";
 
 const mockFetch = vi.mocked(fetch);
 

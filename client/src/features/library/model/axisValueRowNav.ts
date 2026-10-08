@@ -2,6 +2,10 @@ import type { AxisValueHierarchyRow } from "./axisValueHierarchy";
 
 export type AxisValueRowArrowKey = "ArrowUp" | "ArrowDown" | "Home" | "End";
 
+export function isAxisValueRowArrowKey(key: string): key is AxisValueRowArrowKey {
+  return key === "ArrowUp" || key === "ArrowDown" || key === "Home" || key === "End";
+}
+
 function isValueRow(row: AxisValueHierarchyRow | undefined): boolean {
   return row?.kind === "value";
 }

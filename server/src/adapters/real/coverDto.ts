@@ -25,7 +25,7 @@ export function coverDtoFromColumns(
 ): Cover {
   const { cover } = coverFieldsFromColumns(coverImage, coverWidth, coverHeight);
   if (cover === null) return null;
-  const source = statCoverSource(placement, coverImage!);
+  const source = statCoverSource(placement, cover.image);
   if (source === null) return null;
   return { ...cover, version: deriveCoverVersion(workId, undefined, source) };
 }

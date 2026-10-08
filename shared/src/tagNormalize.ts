@@ -28,12 +28,6 @@ export function withNormalizeTagBatchCache<T>(fn: () => T): T {
   }
 }
 
-/** テスト用。バッチキャッシュが有効かどうかとエントリ数を返す。 */
-export function getNormalizeTagBatchCacheStateForTests(): { active: boolean; size: number } {
-  const cache = activeNormalizeTagBatchCache;
-  return { active: cache !== null, size: cache?.size ?? 0 };
-}
-
 function hasEdgeWhitespace(s: string): boolean {
   return EDGE_WHITESPACE.test(s);
 }
@@ -83,15 +77,6 @@ export function normalizeTag(tag: string): NormalizedTag | null {
   cache.set(tag, result);
   return result;
 }
-
-/** DB 読み出し境界用。正規形かどうかは normalizeTag の結果が入力と同一かで判定する（判定の正本は normalizeTag のみ）。 */
-export function isTagNormalized(tag: string): boolean {
-  const normalized = normalizeTag(tag);
-  return normalized !== null && normalized === tag;
-}
-
-/** ローカル検証スクリプト互換。判定は isTagNormalized と同一（正本は normalizeTag のみ）。 */
-export const isStoredTagNormalized = isTagNormalized;
 
 export type StoredNormalizedTagsResult =
   | { ok: true; value: NormalizedTag[] }

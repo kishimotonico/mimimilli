@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   emptyDlsiteState,
-  coverFieldsFromCover,
   hasRjCode,
   isDlsiteUnlinked,
   isRjCodeMissing,
@@ -13,7 +12,7 @@ import {
 import { summarizeDlsiteNotifications } from "../src/core/dlsiteNotifications.ts";
 import { selectDlsiteBulkTargets } from "../src/adapters/real/dlsiteBulk.ts";
 import { openDb } from "../src/adapters/real/db.ts";
-import { createWorkRepos, upsertTestWork } from "./helpers/workTestUtils.ts";
+import { coverFieldsFromCover, createWorkRepos, upsertTestWork } from "./helpers/workTestUtils.ts";
 import { nts } from "./helpers/tag.ts";
 
 function dlsiteState(

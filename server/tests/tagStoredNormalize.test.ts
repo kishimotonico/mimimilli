@@ -1,9 +1,7 @@
-// DB 読み出し境界のタグ正規形判定（parseStoredNormalizedTags / isTagNormalized）。
+// DB 読み出し境界のタグ正規形判定（parseStoredNormalizedTags）。
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  getNormalizeTagBatchCacheStateForTests,
-  isTagNormalized,
   normalizeTag,
   parseStoredNormalizedTags,
   withNormalizeTagBatchCache,
@@ -18,9 +16,8 @@ const UNICODE_BOUNDARY_FALSE_POSITIVES = [
   "\ufeffcv/bom-prefix",
 ] as const;
 
-test("Unicode 境界値: 非正規タグを isTagNormalized / parseStoredNormalizedTags が検知する", () => {
+test("Unicode 境界値: 非正規タグを parseStoredNormalizedTags が検知する", () => {
   for (const tag of UNICODE_BOUNDARY_FALSE_POSITIVES) {
-    assert.equal(isTagNormalized(tag), false, `isTagNormalized: ${JSON.stringify(tag)}`);
     const normalized = normalizeTag(tag);
     assert.notEqual(normalized, tag, `normalizeTag は入力と異なる: ${JSON.stringify(tag)}`);
     const parsed = parseStoredNormalizedTags([tag]);
@@ -28,19 +25,6 @@ test("Unicode 境界値: 非正規タグを isTagNormalized / parseStoredNormali
     if (!parsed.ok) {
       assert.match(parsed.message, /正規化されていません/);
     }
-  }
-});
-
-test("isTagNormalized は normalizeTag の同一性判定と常に一致する", () => {
-  const corpus = buildTagValidationCorpus();
-  for (const tag of corpus) {
-    const normalized = normalizeTag(tag);
-    const expected = normalized !== null && normalized === tag;
-    assert.equal(
-      isTagNormalized(tag),
-      expected,
-      `isTagNormalized mismatch for ${JSON.stringify(tag)}`,
-    );
   }
 });
 
@@ -62,34 +46,30 @@ test("parseStoredNormalizedTags は normalizeTag 基準で受理・拒否を判�
   }
 });
 
-test("withNormalizeTagBatchCache: 正常終了後にキャッシュがスコープ外へ漏れない", () => {
-  withNormalizeTagBatchCache(() => {
-    normalizeTag("cv/テスト");
-    assert.equal(getNormalizeTagBatchCacheStateForTests().active, true);
-    assert.equal(getNormalizeTagBatchCacheStateForTests().size, 1);
-  });
-  assert.deepEqual(getNormalizeTagBatchCacheStateForTests(), { active: false, size: 0 });
+test("parseStoredNormalizedTags: 正規化して空になる入力は「正規化できません」で拒否する", () => {
+  for (const tag of ["", "   ", "cv/", "cv/  "]) {
+    assert.equal(normalizeTag(tag), null, JSON.stringify(tag));
+    const parsed = parseStoredNormalizedTags([tag]);
+    assert.equal(parsed.ok, false);
+    if (!parsed.ok) assert.match(parsed.message, /正規化できません/);
+  }
 });
 
-test("withNormalizeTagBatchCache: 例外時もキャッシュがスコープ外へ漏れない", () => {
+test("withNormalizeTagBatchCache: 例外はそのまま伝播する", () => {
   assert.throws(() => {
     withNormalizeTagBatchCache(() => {
       normalizeTag("cv/テスト");
       throw new Error("batch failed");
     });
   }, /batch failed/);
-  assert.deepEqual(getNormalizeTagBatchCacheStateForTests(), { active: false, size: 0 });
 });
 
 test("withNormalizeTagBatchCache: ネスト終了後に外側のキャッシュが復元される", () => {
   withNormalizeTagBatchCache(() => {
     normalizeTag("outer/tag");
-    assert.equal(getNormalizeTagBatchCacheStateForTests().size, 1);
     withNormalizeTagBatchCache(() => {
       normalizeTag("inner/tag");
-      assert.equal(getNormalizeTagBatchCacheStateForTests().size, 1);
     });
-    assert.equal(getNormalizeTagBatchCacheStateForTests().size, 1);
     assert.equal(normalizeTag("outer/tag"), "outer/tag");
   });
 });
@@ -123,7 +103,6 @@ test("高カーディナリティでも parseStoredNormalizedTags の判定は�
       assert.equal(parsed.value.at(-1), tags.at(-1));
     }
   });
-  assert.deepEqual(getNormalizeTagBatchCacheStateForTests(), { active: false, size: 0 });
 });
 
 function buildTagValidationCorpus(): string[] {

@@ -36,8 +36,7 @@ export function querySmartFolderWorks(
       root,
     );
   }
-  const candidateIds = query.resolveSmartFolderCandidateIds(folder.rules)!;
-  const { summaries, skipped } = query.listSummaries([...candidateIds]);
+  const { summaries, skipped } = query.listSmartFolderCandidateSummaries(folder.rules);
   logDataIntegritySkips(smartFolderLogger, "smart-folder-works", skipped);
   const dataIntegrityWarning = toDataIntegrityWarning(skipped);
   const page = evalSmartFolder(folder, summaries, evalQuery);
@@ -50,11 +49,7 @@ export function countSmartFolderRuleMatches(
   query: WorkQueryRepository,
   rules: SmartFolderRule[],
 ): number {
-  if (rules.length === 0) {
-    return query.listSummaries().summaries.length;
-  }
-  const candidateIds = query.resolveSmartFolderCandidateIds(rules)!;
-  const { summaries, skipped } = query.listSummaries([...candidateIds]);
+  const { summaries, skipped } = query.listSmartFolderCandidateSummaries(rules);
   logDataIntegritySkips(smartFolderLogger, "smart-folder-preview", skipped);
   return evalSmartFolderRules(rules, summaries).length;
 }
@@ -62,7 +57,7 @@ export function countSmartFolderRuleMatches(
 /** スマートフォルダー表示中の軸ファセット集計（GET /axes/:axis?smartFolder=<id>）。
  *  フォルダー条件に一致する作品だけを対象に集計し、チップ選択タグとのANDは
  *  buildAxisFacets（作品一覧・条件プレビューと同じ core 関数）に委ねる。
- *  ルール評価そのものは resolveSmartFolderCandidateIds によるSQL候補抽出と
+ *  ルール評価そのものは listSmartFolderCandidateSummaries によるSQL候補抽出と
  *  evalSmartFolderRules による最終評価という、他の2経路と同じ2段構成を使う（ADR-0008）。 */
 export function getSmartFolderAxisFacets(
   query: WorkQueryRepository,
@@ -73,8 +68,7 @@ export function getSmartFolderAxisFacets(
   if (folder.rules.length === 0) {
     return query.getAxisFacets(axis, filter);
   }
-  const candidateIds = query.resolveSmartFolderCandidateIds(folder.rules)!;
-  const { summaries, skipped } = query.listSummaries([...candidateIds]);
+  const { summaries, skipped } = query.listSmartFolderCandidateSummaries(folder.rules);
   logDataIntegritySkips(smartFolderLogger, "smart-folder-axis-facets", skipped);
   const matched = evalSmartFolderRules(folder.rules, summaries);
   return buildAxisFacets(axis, matched, filter);

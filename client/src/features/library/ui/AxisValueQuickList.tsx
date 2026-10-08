@@ -9,7 +9,7 @@ import {
 } from "../model/axisValueSort";
 import { axisValueSortAtom } from "../model/atoms";
 import { buildAxisValueDisplayRows } from "../model/axisValueDisplayRows";
-import type { AxisValueRowArrowKey } from "../model/axisValueRowNav";
+import { isAxisValueRowArrowKey } from "../model/axisValueRowNav";
 import type { AxisId } from "../../../entities/library/types";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
@@ -157,8 +157,8 @@ export default function AxisValueQuickList({
       close();
       return;
     }
-    const key = event.key as AxisValueRowArrowKey;
-    if (key !== "ArrowDown" && key !== "ArrowUp" && key !== "Home" && key !== "End") return;
+    const key = event.key;
+    if (!isAxisValueRowArrowKey(key)) return;
     // Home/Endは検索入力欄のカーソル移動（ネイティブ動作）を横取りしない。矢印キーは
     // 検索欄側が個別処理する（handleSearchKeyDown）ため、ここへは既に処理済みで届かない。
     if ((key === "Home" || key === "End") && event.target instanceof HTMLInputElement) return;

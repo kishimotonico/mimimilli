@@ -1,7 +1,7 @@
 import {
   EMPTY_TAG_FILTERS,
   normalizeTag,
-  tagFiltersFromSelected,
+  splitSelectedTags,
   type NormalizedTag,
   type TagFilters,
 } from "@mimimilli/shared";
@@ -23,7 +23,11 @@ export function nts(tags: string[]): NormalizedTag[] {
 
 /** WorksQuery.tags 等の TagFilters をテスト用に組み立てる */
 export function tf(...rawTags: string[]): TagFilters {
-  return tagFiltersFromSelected(rawTags);
+  const result = splitSelectedTags(rawTags);
+  if (result.warnings.length > 0) {
+    throw new Error(result.warnings.join(" / "));
+  }
+  return { tags: result.tags, yearValue: result.yearValue };
 }
 
 export { EMPTY_TAG_FILTERS };

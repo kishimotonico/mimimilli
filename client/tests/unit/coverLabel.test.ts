@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coverFieldsFromColumns, coverFieldsFromCover } from "@mimimilli/shared";
+import { coverFieldsFromColumns } from "@mimimilli/shared";
 import { formatCoverEditLabel, formatCoverInfoLabel } from "../../src/shared/lib/coverLabel";
 
 describe("coverFieldsFromColumns", () => {
@@ -28,33 +28,19 @@ describe("coverFieldsFromColumns", () => {
   });
 });
 
-describe("coverFieldsFromCover", () => {
-  it("表示用 cover から編集用フィールドを導出する", () => {
-    expect(coverFieldsFromCover(null)).toEqual({ coverKind: "none", coverImage: null });
-    expect(
-      coverFieldsFromCover({ image: "a.jpg", dimensions: { width: 1, height: 2 }, version: "v1" }),
-    ).toEqual({
-      coverKind: "measured",
-      coverImage: "a.jpg",
-    });
-  });
-});
-
 describe("formatCoverEditLabel", () => {
   it("3状態を区別して表示する", () => {
-    expect(formatCoverEditLabel({ coverKind: "none", coverImage: null, cover: null })).toBe("なし");
+    expect(formatCoverEditLabel({ coverKind: "none", coverImage: null })).toBe("なし");
     expect(
       formatCoverEditLabel({
         coverKind: "unmeasured",
         coverImage: "cover.jpg",
-        cover: null,
       }),
     ).toBe("cover.jpg（計測できません）");
     expect(
       formatCoverEditLabel({
         coverKind: "measured",
         coverImage: "cover.jpg",
-        cover: { image: "cover.jpg", dimensions: { width: 800, height: 600 }, version: "v1" },
       }),
     ).toBe("cover.jpg");
   });

@@ -25,6 +25,11 @@ function disableIdleTimeout(c: Context): void {
   }
 }
 
+/** node:stream/web と lib.dom の ReadableStream は型定義が噛み合わないため、Response に渡せる型への変換をここに閉じる。 */
+function fileBody(path: string, range?: { start: number; end: number }): ReadableStream {
+  return Readable.toWeb(createReadStream(path, range)) as unknown as ReadableStream;
+}
+
 /** 開放端Range（bytes=N-）を打ち切る上限チャンクサイズ。 */
 const DEFAULT_CHUNK_SIZE_BYTES = 8 * 1024 * 1024;
 
@@ -100,9 +105,7 @@ async function streamWhole(
   }
 
   const size = location.size ?? (await stat(location.absolutePath)).size;
-  const stream = Readable.toWeb(
-    createReadStream(location.absolutePath),
-  ) as unknown as ReadableStream;
+  const stream = fileBody(location.absolutePath);
   return new Response(stream, {
     status: 200,
     headers: {
@@ -182,9 +185,7 @@ async function streamWithRange(
       });
     }
 
-    const stream = Readable.toWeb(
-      createReadStream(location.absolutePath, { start: 0, end: fileSize - 1 }),
-    ) as unknown as ReadableStream;
+    const stream = fileBody(location.absolutePath, { start: 0, end: fileSize - 1 });
     return new Response(stream, {
       status: 200,
       headers: {
@@ -220,9 +221,7 @@ async function streamWithRange(
     });
   }
 
-  const stream = Readable.toWeb(
-    createReadStream(location.absolutePath, { start, end }),
-  ) as unknown as ReadableStream;
+  const stream = fileBody(location.absolutePath, { start, end });
 
   return new Response(stream, {
     status: 206,
