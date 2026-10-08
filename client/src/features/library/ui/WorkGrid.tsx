@@ -48,11 +48,7 @@ export default function WorkGrid({
   const hasSelectedTags = nav.selectedTags.length > 0;
   const onWorkSelect = nav.selectWork;
   const onClearAllFilters = nav.clearTags;
-  const onDeselect = useCallback(
-    () => nav.selectWork(null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- nav は毎レンダー新規オブジェクトのため参照する値だけに依存を絞る
-    [nav.selectWork],
-  );
+  const onDeselect = useCallback(() => onWorkSelect(null), [onWorkSelect]);
   const playingWorkId = useAtomValue(playingWorkIdAtom) ?? null;
   const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
   const [tileSize, setTileSize] = useAtom(libraryTileSizeAtom);

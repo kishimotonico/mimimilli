@@ -22,10 +22,11 @@ export function useLibrarySmartFolderEditor({
 }: UseLibrarySmartFolderEditorOptions) {
   const [state, setState] = useState<SmartFolderEditorState>(closedSmartFolderEditorState);
 
+  const { setAxis } = nav;
   const saveMutation = useSmartFolderMutation({
     onSaved: (savedFolder, wasNew) => {
       setState(closedSmartFolderEditorState);
-      if (wasNew) nav.setAxis(toSmartFolderAxisId(savedFolder.id));
+      if (wasNew) setAxis(toSmartFolderAxisId(savedFolder.id));
     },
     onError: () => {},
   });
@@ -33,23 +34,24 @@ export function useLibrarySmartFolderEditor({
   const deleteMutation = useSmartFolderDeleteMutation({
     onDeleted: () => {
       setState(closedSmartFolderEditorState);
-      nav.setAxis("all");
+      setAxis("all");
     },
   });
 
+  const { reset: resetSave } = saveMutation;
+  const { reset: resetDelete } = deleteMutation;
+
   const openNew = useCallback(() => {
-    saveMutation.reset();
+    resetSave();
     setState(createSmartFolderEditorState);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset系は毎レンダー新規参照のため省く
-  }, []);
+  }, [resetSave]);
 
   const openEdit = useCallback(() => {
     if (!activeSmartFolder) return;
-    saveMutation.reset();
-    deleteMutation.reset();
+    resetSave();
+    resetDelete();
     setState(editSmartFolderEditorState(activeSmartFolder));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset系は毎レンダー新規参照のため省く
-  }, [activeSmartFolder]);
+  }, [activeSmartFolder, resetSave, resetDelete]);
 
   const close = useCallback(() => setState(closedSmartFolderEditorState), []);
 

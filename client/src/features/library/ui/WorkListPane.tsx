@@ -46,11 +46,7 @@ export default function WorkListPane({
   const hasSelectedTags = nav.selectedTags.length > 0;
   const onWorkSelect = nav.selectWork;
   const onClearAllFilters = nav.clearTags;
-  const onDeselect = useCallback(
-    () => nav.selectWork(null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- nav は毎レンダー新規オブジェクトのため参照する値だけに依存を絞る
-    [nav.selectWork],
-  );
+  const onDeselect = useCallback(() => onWorkSelect(null), [onWorkSelect]);
   const { playWork } = usePlayWork();
   const playingWorkId = useAtomValue(playingWorkIdAtom);
   const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);

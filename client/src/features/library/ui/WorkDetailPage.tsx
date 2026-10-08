@@ -31,6 +31,7 @@ export default function WorkDetailPage() {
   const setAppMode = useSetAtom(setAppModeAtom);
   const replaceAppMode = useSetAtom(replaceAppModeAtom);
   const nav = useLibraryNavigation();
+  const { clickTag } = nav;
 
   const workQuery = useQuery(workDetailQueryOptions(workId));
   const tagsQuery = useQuery(allTagsQueryOptions);
@@ -52,12 +53,10 @@ export default function WorkDetailPage() {
 
   const handleTagClick = useCallback(
     (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => {
-      if (opts.ctrlKey || opts.metaKey) nav.addTag(tag);
-      else nav.replaceTag(tag);
+      clickTag(tag, opts);
       setAppMode("library");
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- nav は毎レンダー新規オブジェクトのため参照する値だけに依存を絞る
-    [nav.addTag, nav.replaceTag, setAppMode],
+    [clickTag, setAppMode],
   );
 
   const handleGoToPlayingScreen = useCallback(() => setAppMode("nowPlaying"), [setAppMode]);

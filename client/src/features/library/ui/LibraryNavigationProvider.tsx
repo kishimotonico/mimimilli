@@ -4,7 +4,7 @@ import { LibraryTransitionContext } from "../model/libraryTransitionContext";
 import { useLibraryView } from "../model/useLibraryNavigation";
 
 export function LibraryNavigationProvider({ children }: { children: ReactNode }) {
-  const { startTransition, ...navigation } = useLibraryView();
+  const { navigation, startTransition } = useLibraryView();
   return createElement(
     LibraryTransitionContext.Provider,
     { value: startTransition },

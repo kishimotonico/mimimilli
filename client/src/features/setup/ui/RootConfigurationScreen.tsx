@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { RootReconfigurationState, ScanProgressEvent } from "@mimimilli/shared";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
+import TextInput from "../../../shared/ui/TextInput";
 import { formatScanProgressLabel } from "../../../entities/scan/model/scanProgressLabel";
 import { formatUserError, type UserErrorDisplay } from "../../../shared/lib/formatUserError";
 
@@ -102,13 +103,14 @@ export default function RootConfigurationScreen({ state, onSubmit }: RootConfigu
           <form onSubmit={(e) => void handleSubmit(e)} className="flex w-full flex-col gap-3">
             <div className="flex h-10 items-center gap-2 rounded-[8px] border border-line bg-paper-1 px-[14px] focus-within:border-line-strong">
               <I.folder size={14} className="shrink-0 text-ink-3" />
-              <input
+              <TextInput
                 ref={pathInputRef}
+                font="mono"
                 value={path}
                 onChange={(e) => setPath(e.target.value)}
                 placeholder={isIdle ? "/Users/yourname/Music/ASMR" : undefined}
                 aria-label="ルートフォルダーのパス"
-                className="min-w-0 flex-1 border-none bg-transparent font-mono text-xs text-ink-0"
+                className="h-full flex-1 border-none bg-transparent px-0 text-xs focus-visible:border-transparent"
                 disabled={isSubmitting}
               />
             </div>

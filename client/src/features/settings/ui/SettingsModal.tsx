@@ -2,6 +2,7 @@ import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
+import TextInput from "../../../shared/ui/TextInput";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
 import {
   dlsiteBulkActiveAtom,
@@ -112,14 +113,15 @@ export default function SettingsModal({
                   void saveFolder();
                 }}
               >
-                <input
+                <TextInput
+                  font="mono"
                   ref={folderInputRef}
                   value={folderDraft}
                   onChange={(e) => setFolderDraft(e.target.value)}
                   aria-label="ルートフォルダーのパス"
                   placeholder="ルートフォルダーのパスを入力"
                   disabled={savingFolder}
-                  className="h-[34px] flex-1 rounded-[6px] border border-acc bg-paper-0 px-3 font-mono text-mono text-ink-1 disabled:opacity-60"
+                  className="h-[34px] flex-1 border-acc px-3 text-ink-1 focus-visible:border-acc disabled:opacity-60"
                 />
                 <Button
                   variant="quiet"

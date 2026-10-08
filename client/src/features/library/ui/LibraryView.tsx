@@ -1,6 +1,5 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
-import type { NormalizedTag } from "@mimimilli/shared";
 import { libraryViewModeAtom } from "../model/atoms";
 import { librarySearchQueryAtom } from "../../../entities/library/model/navigationAtoms";
 import { setAppModeAtom } from "../../../entities/navigation/model/appRouteStore";
@@ -84,17 +83,6 @@ export default function LibraryView({ dockedBarActive }: LibraryViewProps) {
     openWorkDetail,
     setAppMode,
   });
-
-  // タグチップクリック → replaceTagと同一挙動（ADR-0013）。Ctrl/Cmd+クリックは
-  // AND追加（addLibraryTagAtom相当）へ反転する。
-  const handleTagClick = useCallback(
-    (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => {
-      if (opts.ctrlKey || opts.metaKey) nav.addTag(tag);
-      else nav.replaceTag(tag);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- nav は毎レンダー新規オブジェクトのため参照する値だけに依存を絞る
-    [nav.addTag, nav.replaceTag],
-  );
 
   return (
     <>
@@ -180,7 +168,7 @@ export default function LibraryView({ dockedBarActive }: LibraryViewProps) {
                 selectedWork={selectedWork}
                 workDetailQuery={workDetailQuery}
                 previewActions={previewActions}
-                onTagClick={handleTagClick}
+                onTagClick={nav.clickTag}
               />
             )}
           </LibraryWorksBoundary>

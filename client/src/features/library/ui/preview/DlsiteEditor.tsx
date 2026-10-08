@@ -123,7 +123,7 @@ function DlsiteApplyDialog({
   return createPortal(
     <Modal dialog={dialog} size={680} labelledBy="dlsite-apply-title">
       <ModalHeader
-        title={"DLsite情報の適用"}
+        title="DLsite情報の適用"
         titleId="dlsite-apply-title"
         onClose={close}
         closeDisabled={busy}
