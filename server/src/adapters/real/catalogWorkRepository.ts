@@ -170,7 +170,6 @@ export class CatalogWorkRepository {
     this.db.catalog.delete(works).where(eq(works.id, id)).run();
   }
 
-  /** root の配下にない作品の行を関連行ごと削除し、削除した件数を返す。 */
   /** 診断のpathはroot相対なので、rootが変わったら旧rootの行は意味を失う。 */
   clearDiagnostics(): void {
     this.db.transaction(() => {
@@ -179,6 +178,7 @@ export class CatalogWorkRepository {
     });
   }
 
+  /** root の配下にない作品の行を関連行ごと削除し、削除した件数を返す。 */
   deleteWorksOutsideRoot(root: string): number {
     const outside = this.db.catalog
       .select({ id: works.id, physicalPath: works.physicalPath })

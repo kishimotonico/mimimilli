@@ -28,11 +28,11 @@ DBを分ける主目的は、catalog再構築がuserデータに触れる経路�
 
 テーブルは次のように分類する。
 
-| 分類           | テーブル・列                                                                                                                                                                                                              | 回復元・扱い                                                                                                                                                  |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| catalog        | `works` のメタ列（`id`・`title`・`cover_image`・`default_playlist_id`・`created_at`・`urls_json`）、`status`・`physical_path`・`error_message`、Playlist・Track、`tags`・`work_tags`、`work_dlsite`、`identity_conflicts` | `mimimilli.json` とファイル走査の結果から再構築する。Work ID は `mimimilli.json.id`（[ADR-0010](0010-meta-file-rename-mimimilli-json.md)）                    |
-| user           | `work_states`（`added_at`・`bookmarked`・`last_played_at`・resume v2）、`tag_prefixes`、`smart_folders`、`scan_candidate_exclusions`、`app_settings` の `root_folder`・`tag_prefixes_seeded`                              | DBが正本。`added_at` は初回登録日時で、再構築で現在時刻へ変えてはならない。`tag_prefixes_seeded` は初期値の再投入でユーザーの削除を取り消さないために保持する |
-| 派生キャッシュ | `works.total_duration_sec`、検索・ソート用のキー列、`audio_probe_cache`、`scan_state`（`last_scan_time` など）                                                                                                            | プレイリスト区間と音声プローブ、スキャンから再計算する                                                                                                        |
+| 分類           | テーブル・列                                                                                                                                                                                                                                    | 回復元・扱い                                                                                                                                                  |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| catalog        | `works` のメタ列（`id`・`title`・`cover_image`・`default_playlist_id`・`created_at`・`urls_json`）、`status`・`physical_path`・`error_message`、Playlist・Track、`tags`・`work_tags`、`work_dlsite`、`identity_conflicts`、`invalid_meta_files` | `mimimilli.json` とファイル走査の結果から再構築する。Work ID は `mimimilli.json.id`（[ADR-0010](0010-meta-file-rename-mimimilli-json.md)）                    |
+| user           | `work_states`（`added_at`・`bookmarked`・`last_played_at`・resume v2）、`tag_prefixes`、`smart_folders`、`scan_candidate_exclusions`、`app_settings` の `root_folder`・`tag_prefixes_seeded`                                                    | DBが正本。`added_at` は初回登録日時で、再構築で現在時刻へ変えてはならない。`tag_prefixes_seeded` は初期値の再投入でユーザーの削除を取り消さないために保持する |
+| 派生キャッシュ | `works.total_duration_sec`、検索・ソート用のキー列、`audio_probe_cache`、`scan_state`（`last_scan_time` など）                                                                                                                                  | プレイリスト区間と音声プローブ、スキャンから再計算する                                                                                                        |
 
 今後`app_settings`へキーを追加するときは、キーごとにuserか派生キャッシュかを宣言する。寿命の異なる値を未分類のまま汎用KVへ追加しない。
 
@@ -42,10 +42,10 @@ DBを分ける主目的は、catalog再構築がuserデータに触れる経路�
 
 新しい論理配置は次の通りとする。
 
-| DB               | 主なデータ                                                                                                                                    |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `catalog.sqlite` | Workのメタ・走査状態、Playlist・Track関係、TagとWork-Tag関係、DLsite状態、音声プローブ結果、スキャン状態、検索用の派生キー                    |
-| `user.sqlite`    | Workごとの`addedAt`・`bookmarked`・`lastPlayedAt`、resume v2、設定、タグprefix、スマートフォルダー、候補の除外、schema version、migration履歴 |
+| DB               | 主なデータ                                                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `catalog.sqlite` | Workのメタ・走査状態、Playlist・Track関係、TagとWork-Tag関係、DLsite状態、音声プローブ結果、スキャン状態、検索用の派生キー    |
+| `user.sqlite`    | Workごとの`addedAt`・`bookmarked`・`lastPlayedAt`、resume v2、設定、タグprefix、スマートフォルダー、候補の除外、migration履歴 |
 
 この2DBの外に、DLsite取得キャッシュだけを独立ファイル`db/dlsite-cache.sqlite`として置く（`MIMIMILLI_DLSITE_CACHE_DB`で差し替え可）。中身は外部サイトのHTMLスナップショット・取得失敗記録・カバー画像BLOBで、catalogからもローカルファイルからも計算し直せないため上の3分類のどれにも当てはまらない。失っても意味上のデータは失わず、実HTTPへ出れば埋め直せる、という一方向の性質だけを持つ。catalog DBへ同居させると、catalog再構築のたびにこのBLOBを巻き添えで捨て、再構築のたびにDLsiteへ再アクセスすることになる。寿命がcatalogと無関係なので物理的に分ける。この例外はDLsiteキャッシュに限る。「削除・再生成できる」ことを理由に、catalogから計算し直せる派生キャッシュを独立ファイルへ切り出してよいわけではない。
 
