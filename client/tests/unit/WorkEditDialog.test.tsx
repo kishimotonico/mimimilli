@@ -424,13 +424,12 @@ describe("WorkEditDialog", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "閉じる" })[0]!);
     fireEvent.click(screen.getByRole("button", { name: "保存する" }));
 
-    // mutateAsyncの呼び出し回数ではなく、reject→catch→setStateが完了した後の
-    // UIの最終状態そのものをwaitForの条件にする。
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    // reject後の状態が確定した合図であるエラー表示を待ってから、残りの状態を検証する。
+    expect(await screen.findByText("保存できませんでした。")).toBeTruthy();
 
     expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(screen.getByLabelText("タイトル")).toHaveValue("編集途中");
-    await waitFor(() => expect(screen.getByText("保存できませんでした。")).toBeTruthy());
   });
 
   it("保存に失敗するとタイトル欄へフォーカスが戻る", async () => {
