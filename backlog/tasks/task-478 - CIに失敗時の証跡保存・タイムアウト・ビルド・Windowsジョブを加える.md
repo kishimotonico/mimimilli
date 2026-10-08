@@ -4,7 +4,7 @@ title: CIに失敗時の証跡保存・タイムアウト・ビルド・Windows�
 status: To Do
 assignee: []
 created_date: '2026-10-02 11:40'
-updated_date: '2026-10-02 11:50'
+updated_date: '2026-10-08 03:24'
 labels:
   - ci
   - test
@@ -27,7 +27,10 @@ ordinal: 536000
 - [ ] #4 Windowsランナーでpnpm check && pnpm test が実行される
 - [ ] #5 rootにpackageManagerが宣言されている
 - [ ] #6 列挙した死んだ設定・常にno-opのskipが取り除かれ、oxlintがscriptsとserver/benchも対象にする
+- [ ] #7 Windowsジョブでserverのreal-testsが並列実行され、temp・DB削除のEBUSYなしで通る（TASK-345で残っていたWindows実機確認をここで担う）
 <!-- AC:END -->
+
+
 
 ## Implementation Notes
 

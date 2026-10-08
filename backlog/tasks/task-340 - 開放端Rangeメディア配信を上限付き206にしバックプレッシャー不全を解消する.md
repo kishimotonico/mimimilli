@@ -1,10 +1,10 @@
 ---
 id: TASK-340
 title: 開放端Rangeメディア配信を上限付き206にしバックプレッシャー不全を解消する
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-14 10:39'
-updated_date: '2026-08-18 23:26'
+updated_date: '2026-10-08 03:24'
 labels: []
 dependencies:
   - TASK-339
@@ -45,7 +45,7 @@ streamWithRange（server/src/routes/media.ts:135-215）は開放端Range（bytes
 - [x] #3 配信中のサーバー側ファイル読み取り量がチャンク上限で有界になる（全量先読みが起きない）
 - [x] #4 pnpm check と server側テストが通る
 - [x] #5 打ち切られた206の続きをChromeが次のRangeリクエストで取得し、8MiB境界を跨いで再生が継続する（headless Chromeで確認）
-- [ ] #6 実機Chromeでの長時間音声の通し再生とシークが正常動作する（ドッグフーディングで確認）
+- [x] #6 実機Chromeでの長時間音声の通し再生とシークが正常動作する（ドッグフーディングで確認）
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -87,4 +87,12 @@ streamWithRange（server/src/routes/media.ts:135-215）は開放端Range（bytes
 - headless Chromeのため実際の音声出力は確認できない。数時間級の連続再生も未確認
 
 残件はAC#6（実機Chromeでの通し再生・シーク）のみ。ドッグフーディング中に不具合が出なければ達成とみなす。
+
+2026-10-08 整理: ユーザーのドッグフーディング（Windows実機Chrome）で再生停止・シーク不具合は出ていない。数時間級の通し再生は厳密には確認していないため、不具合が出たら新規タスクで扱う。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+開放端Range（bytes=N-）を8MiB上限の206に丸め、ファイル読み取り量を有界にした。自動テスト・headless ChromeのRange追従・実機ドッグフーディングで確認。
+<!-- SECTION:FINAL_SUMMARY:END -->

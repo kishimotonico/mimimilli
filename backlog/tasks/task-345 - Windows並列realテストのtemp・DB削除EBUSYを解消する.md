@@ -1,10 +1,10 @@
 ---
 id: TASK-345
 title: Windows並列realテストのtemp・DB削除EBUSYを解消する
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-14 18:33'
-updated_date: '2026-08-18 23:19'
+updated_date: '2026-10-08 03:24'
 labels:
   - bug
   - server
@@ -75,4 +75,12 @@ TASK-341（DLsite系フレーキー）は2026-08-18に完了済み。scanWorker.
 除外なしで `cd server && bun test tests/real --parallel` を10回連続実行。10回とも 374 pass / 0 fail（43ファイル、各回 8.8〜10.4秒）。TASK-341完了前に観測されていた dlsite.test.ts の SQLITE_BUSY は一度も再現せず、除外条件が不要になったことを確認した。`pnpm check` も exit 0。
 
 残件はAC#3（Windows実機での並列real-tests再検証）のみ。ドッグフーディング中にEBUSYを踏まなければ達成とみなす。
+
+2026-10-08 整理: AC#3（Windows実機での並列real-tests再検証）はTASK-478のWindows CIジョブのAC#7へ移した。構造対応とLinuxでの検証は完了済みのため、本タスクはDoneとする。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+テストのDB・ファイルハンドルをmakeTestScope/ownで登録逆順に解放してからtempを削除する構造にし、Linuxで除外なし10回連続全成功を確認。Windows実機での再検証はTASK-478のWindows CIジョブへ移管。
+<!-- SECTION:FINAL_SUMMARY:END -->
