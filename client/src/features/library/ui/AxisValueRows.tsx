@@ -1,21 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import type { AxisFacetItem } from "@mimimilli/shared";
 import type { AxisValueSortKey, AxisValueSortState } from "../model/axisValueSort";
 import { AXIS_VALUE_SORT_OPTIONS, toggleAxisValueSort } from "../model/axisValueSort";
 import type { AxisValueHierarchyRow } from "../model/axisValueHierarchy";
-import {
-  getNextAxisValueRowIndex,
-  nearestValueRowIndex,
-  type AxisValueRowArrowKey,
-} from "../model/axisValueRowNav";
+import type { AxisValueRowArrowKey } from "../model/axisValueRowNav";
 import { formatDuration } from "../../../shared/lib/format";
 import { I } from "../../../shared/ui/Icon";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import CoverCollage from "./CoverCollage";
 import type { IconName } from "../../../shared/ui/Icon";
-import { useVirtualList } from "../../../shared/ui/useVirtualList";
-import { useRovingIndex } from "./useRovingIndex";
-import { focusVirtualItem } from "../../../shared/lib/focusVirtualItem";
+import { useAxisValueListNav } from "./useAxisValueListNav";
 
 const ROW_ARROW_KEYS = new Set<AxisValueRowArrowKey>(["ArrowUp", "ArrowDown", "Home", "End"]);
 
@@ -99,41 +93,27 @@ export default function AxisValueRows({
   );
 
   const measureElement = useCallback(() => ROW_ESTIMATE_SIZE, []);
-  const { scrollRef, virtualizer, virtualItems, wrapperStyle, getItemStyle } = useVirtualList({
-    count: rows.length,
-    estimateSize: ROW_ESTIMATE_SIZE,
-    resetKey,
-    resetScrollTop: true,
-    gap: 1,
-    padding: { start: LIST_PADDING_START, end: LIST_PADDING_END },
-    overscan: 8,
-    measureElement,
-  });
-
-  // roving tabindexの現在位置。値の選択は多重（タグ集合）で「現在の1件」が無いため、
-  // 作品一覧（選択作品を対象にする）とは異なり、フォーカス移動
-  // だけで独立管理する。-1は「まだ矢印キー・Tabで触れていない」を表す。
-  const [activeIndex, setActiveIndex] = useState(-1);
-  useEffect(() => {
-    setActiveIndex(-1);
-  }, [resetKey]);
-  const rawRovingIndex = useRovingIndex({
-    itemCount: rows.length,
-    targetIndex: activeIndex >= 0 ? activeIndex : null,
+  const {
+    scrollRef,
+    virtualizer,
     virtualItems,
-    toRowIndex: (index) => index,
-    firstFlatIndexOfRow: (index) => index,
+    wrapperStyle,
+    getItemStyle,
+    rovingIndex,
+    moveFocus,
+    handleListFocus,
+  } = useAxisValueListNav({
+    rows,
+    virtualList: {
+      estimateSize: ROW_ESTIMATE_SIZE,
+      resetKey,
+      gap: 1,
+      padding: { start: LIST_PADDING_START, end: LIST_PADDING_END },
+      overscan: 8,
+      measureElement,
+    },
+    itemSelector: (index) => `[data-flat-index="${index}"]`,
   });
-  const rovingIndex = nearestValueRowIndex(rows, rawRovingIndex);
-
-  const moveRowFocus = (currentIndex: number, key: AxisValueRowArrowKey) => {
-    const listEl = scrollRef.current;
-    if (!listEl) return;
-    const nextIndex = getNextAxisValueRowIndex(rows, currentIndex, key);
-    if (nextIndex === -1 || nextIndex === currentIndex) return;
-    setActiveIndex(nextIndex);
-    focusVirtualItem(listEl, virtualizer, nextIndex, `[data-flat-index="${nextIndex}"]`);
-  };
 
   return (
     <>
@@ -158,10 +138,7 @@ export default function AxisValueRows({
         // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 値ボタン集合を名前付き集合として表す。fieldset等の代替タグは適合しない
         role="group"
         aria-label={`${axisLabel}の値一覧`}
-        onFocus={(e) => {
-          const indexAttr = e.target.closest("[data-flat-index]")?.getAttribute("data-flat-index");
-          if (indexAttr !== null && indexAttr !== undefined) setActiveIndex(Number(indexAttr));
-        }}
+        onFocus={handleListFocus}
       >
         <div style={wrapperStyle}>
           {virtualItems.map((virtualRow) => {
@@ -198,7 +175,7 @@ export default function AxisValueRows({
                           onKeyDown={(e) => {
                             if (!ROW_ARROW_KEYS.has(e.key as AxisValueRowArrowKey)) return;
                             e.preventDefault();
-                            moveRowFocus(virtualRow.index, e.key as AxisValueRowArrowKey);
+                            moveFocus(e.key as AxisValueRowArrowKey);
                           }}
                         >
                           <CoverCollage

@@ -242,7 +242,44 @@ describe("AxisValueQuickList のキーボード移動", () => {
     sizeMock.restore();
   });
 
-  it("items だけが変わっても activeIndexRef はリセットされず、位置を維持したまま移動する", async () => {
+  it("Enterでフォーカス中の値行を選択する", async () => {
+    const sizeMock = mockElementSize(260, 260);
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    renderQuickList({ items: makeItems(3), onSelect });
+    await flushVirtualizer();
+
+    screen.getByPlaceholderText("CVを検索").focus();
+    await user.keyboard("{ArrowDown}{ArrowDown}");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    await user.keyboard("{Enter}");
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect.mock.calls[0]?.[0]).toMatchObject({ value: "値0001" });
+    sizeMock.restore();
+  });
+
+  it("矢印移動の移動先を画面内へスクロールし、マウント時・データ更新時にはスクロールしない", async () => {
+    const sizeMock = mockElementSize(260, 260);
+    const user = userEvent.setup();
+    const scrollSpy = vi.spyOn(Element.prototype, "scrollIntoView");
+    renderQuickList({ items: makeItems(50) });
+    await flushVirtualizer();
+    expect(scrollSpy).not.toHaveBeenCalled();
+
+    screen.getByPlaceholderText("CVを検索").focus();
+    await user.keyboard("{ArrowDown}");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(scrollSpy).toHaveBeenCalled();
+    scrollSpy.mockRestore();
+    sizeMock.restore();
+  });
+
+  it("items だけが変わっても位置を維持したまま移動する", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
     const store = createStore();
