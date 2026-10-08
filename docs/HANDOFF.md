@@ -65,6 +65,11 @@ pnpm smoke:real        # 固定のサンプル音声で real 経路を手動ス�
 MIMIMILLI_ADAPTER=fixture PORT=18099 pnpm --filter @mimimilli/server start
 ```
 
+unit テストの約束:
+
+- client は API を fetch 境界でモックする（`client/tests/helpers/api.ts` の `mockApi`）。応答は shared のスキーマを parse する `client/tests/helpers/builders.ts` で作る。`entities/*/api` などのモジュールを `vi.mock` で差し替えない。未モックの fetch はテストを失敗させる（`client/tests/unit/setup.ts`）
+- server の HTTP の振る舞いは、`server/tests/helpers/contractHarness.ts` の `defineContract` で fixture と real の両 adapter に同じ期待値を通す。adapter の戻り値を差し替えないと作れない状況だけ fixture ベースのスタブで書く
+
 smokeテストの注意:
 
 - 最終確認は目視で行う方針のため、スクリーンショット比較は行わない。smoke が赤いときは常に実際の不具合を意味する（見た目のズレでは落ちない設計）
