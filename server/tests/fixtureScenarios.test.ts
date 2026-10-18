@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { scanCandidateSchema, workspacePath } from "@mimimilli/shared";
 import type { DataAdapter } from "../src/adapter/index.ts";
-import { createApp } from "../src/app.ts";
+import { createApp } from "./helpers/testApp.ts";
 import { pollUntil } from "./helpers/poll.ts";
 import { createClassificationMethods } from "../src/adapters/fixture/classification.ts";
 import { createCoverMediaMethods } from "../src/adapters/fixture/coverMedia.ts";

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Hono } from "hono";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
-import { createApp } from "../src/app.ts";
+import { createApp } from "./helpers/testApp.ts";
 import type { DataAdapter } from "../src/adapter/index.ts";
 import { scanRoute } from "../src/routes/scan.ts";
 import { ScanJobManager } from "../src/scanJobManager.ts";

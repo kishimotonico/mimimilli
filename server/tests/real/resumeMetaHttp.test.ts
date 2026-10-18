@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import type { Work } from "@mimimilli/shared";
-import { createApp, type App } from "../../src/app.ts";
+import { createApp, type App } from "../helpers/testApp.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { pollUntil } from "../helpers/poll.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";

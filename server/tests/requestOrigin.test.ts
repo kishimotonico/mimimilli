@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ApiError, SmartFolder } from "@mimimilli/shared";
-import { createApp } from "../src/app.ts";
+import { createApp } from "./helpers/testApp.ts";
 import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
 
 const contract = defineContract({ works: [{ key: "a" }] }, { shared: true });
@@ -73,11 +73,16 @@ contract("loopbackのHostは通す（ポート・大文字小文字を問わな�
   }
 });
 
-contract("Hostヘッダーが無いときは要求URLのhostnameで判定する", async (harness) => {
-  const rejected = await harness.app.request("http://evil.example/api/works");
-  assert.equal(rejected.status, 403);
-  await assertRejected(harness, "url-evil", {}, "http://evil.example/api/smart-folders");
-  await assertAccepted(harness, "url-localhost", {}, "http://localhost/api/smart-folders");
+contract("Hostヘッダーが無い要求は要求URLがlocalhostでも拒否する", async (harness) => {
+  for (const url of ["http://localhost/api/works", "http://evil.example/api/works"]) {
+    const res = await harness.app.fetch(new Request(url));
+    assert.equal(res.status, 403, url);
+  }
+  const post = await harness.app.fetch(
+    new Request("http://localhost/api/smart-folders", createFolderRequest("url-localhost", {})),
+  );
+  assert.equal(post.status, 403);
+  assert.ok(!(await folderNames(harness)).includes("url-localhost"));
 });
 
 contract("Hostヘッダーが外部なら要求URLがlocalhostでも拒否する", async (harness) => {

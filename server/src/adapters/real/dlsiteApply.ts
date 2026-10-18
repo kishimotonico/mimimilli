@@ -21,7 +21,7 @@ import {
   readVerifiedEditSource,
 } from "./workEditSource.ts";
 import type { Scanner } from "./scanner.ts";
-import type { StagedCover, createDlsiteFetch } from "./dlsiteFetch.ts";
+import type { createDlsiteFetch } from "./dlsiteFetch.ts";
 
 export interface DlsiteApplyDeps {
   catalog: CatalogWorkRepository;
@@ -77,16 +77,19 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
       const current = readVerifiedEditSource(catalog, workId);
       if (!current) return null;
 
-      let cover: StagedCover | null = null;
-      if (body.applyCover && body.info.coverUrl) {
-        const mediaRoot = workPlacementOf(current.metaPath).mediaRoot;
-        cover = await stageCover(body.info.coverUrl, mediaRoot, requireRoot(), signal);
-        if (!cover) throw new CoverSaveError();
-      }
+      const coverUrl = body.applyCover ? body.info.coverUrl : null;
+      const cover = coverUrl
+        ? await stageCover(
+            coverUrl,
+            workPlacementOf(current.metaPath).mediaRoot,
+            requireRoot(),
+            signal,
+          )
+        : null;
+      if (coverUrl && !cover) throw new CoverSaveError();
 
       try {
         throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
-        const staged = cover;
         return await persistVerified(
           mutateVerifiedMetaSource(catalog, workId, (source) => {
             if (source.sourceRevision !== body.sourceRevision) {
@@ -101,8 +104,8 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
               },
               body,
             );
-            staged?.commit();
-            return applyDlsiteMergeToRaw(source.bytes, { ...patch, coverImage: staged?.fileName });
+            cover?.commit();
+            return applyDlsiteMergeToRaw(source.bytes, { ...patch, coverImage: cover?.fileName });
           }),
         );
       } finally {
@@ -128,17 +131,15 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
         return "skipped";
       }
 
-      let cover: StagedCover | null = null;
-      if (planned.applyCover && info.coverUrl) {
-        const mediaRoot = workPlacementOf(current.metaPath).mediaRoot;
-        cover = await stageCover(info.coverUrl, mediaRoot, requireRoot());
-        if (!cover) return "skipped";
-      }
+      const coverUrl = planned.applyCover ? info.coverUrl : null;
+      const cover = coverUrl
+        ? await stageCover(coverUrl, workPlacementOf(current.metaPath).mediaRoot, requireRoot())
+        : null;
+      if (coverUrl && !cover) return "skipped";
 
       let wrote = false;
       let verified: ReturnType<typeof mutateVerifiedMetaSource>;
       try {
-        const staged = cover;
         verified = mutateVerifiedMetaSource(catalog, workId, (source) => {
           const diff = computeMissingDiff(
             {
@@ -155,7 +156,7 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
           );
           if (!patch) return source.bytes;
           wrote = true;
-          const applied = diff.applyCover ? staged : null;
+          const applied = diff.applyCover ? cover : null;
           applied?.commit();
           return applyDlsiteMergeToRaw(source.bytes, {
             ...patch,

@@ -1,6 +1,6 @@
 // real アダプタの手動スモーク（node tests/helpers/smoke.ts で実行）。
 // 一時ライブラリを生成し、root再設定 → スキャン → 検索 → fs → メディア（Range）まで一気に確認する。
-import { createApp } from "../../src/app.ts";
+import { createApp } from "./testApp.ts";
 import { pollUntil } from "./poll.ts";
 import { createTestRealAdapter } from "./realAdapter.ts";
 import { makeSampleLibrary } from "./sampleLibrary.ts";

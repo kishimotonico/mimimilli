@@ -32,11 +32,10 @@ function isLoopbackOrigin(origin: string): boolean {
   }
 }
 
-/** 全リクエストのHostがloopbackであること。Hostヘッダーが無いときだけ要求URLのhostnameで判定する。 */
+/** 全リクエストのHostがloopbackであること。Hostヘッダーが無い要求も拒否する。 */
 export const requireLoopbackHost: MiddlewareHandler = async (c, next) => {
   const host = c.req.header("Host");
-  const allowed = host === undefined ? isLoopbackOrigin(c.req.url) : isLoopbackAuthority(host);
-  if (!allowed) {
+  if (host === undefined || !isLoopbackAuthority(host)) {
     throw apiError("forbidden", "このHostからのリクエストは受け付けません");
   }
   await next();

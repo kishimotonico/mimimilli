@@ -10,7 +10,7 @@ import type { FsWorkRef } from "../../src/adapters/real/fsBrowse.ts";
 import { buildWorkPathIndex, findOwnerWork } from "../../src/adapters/real/fsBrowse.ts";
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
 import { createWorkRepos, makeWork } from "../helpers/workTestUtils.ts";
-import { createApp, type AppEnv } from "../../src/app.ts";
+import { createApp, type AppEnv } from "../helpers/testApp.ts";
 import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
 import { makeSampleLibrary, writeWav } from "../helpers/sampleLibrary.ts";
 import { makeTestScope } from "../helpers/sampleLibrary.ts";

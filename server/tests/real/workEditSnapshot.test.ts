@@ -10,7 +10,7 @@ import {
   SourceConflictError,
   SourceParseError,
 } from "../../src/errors.ts";
-import { createApp } from "../../src/app.ts";
+import { createApp } from "../helpers/testApp.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 import { nt, nts } from "../helpers/tag.ts";

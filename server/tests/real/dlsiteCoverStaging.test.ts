@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import { emptyMetaDlsiteState, META_FILE_NAME, type DlsiteApplyBody } from "@mimimilli/shared";
 import { CoverSaveError, SourceChangedError } from "../../src/errors.ts";
-import { createApp } from "../../src/app.ts";
+import { createApp } from "../helpers/testApp.ts";
 import { writeMetaFile } from "../../src/adapters/real/meta.ts";
 import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../../src/adapters/real/dlsiteConfig.ts";
 import {

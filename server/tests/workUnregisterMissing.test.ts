@@ -5,7 +5,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import { emptyDlsiteState, workspacePath, type Work, type WorkSummary } from "@mimimilli/shared";
-import { createApp } from "../src/app.ts";
+import { createApp } from "./helpers/testApp.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { openDb } from "../src/adapters/real/db.ts";
 import { createTestRealAdapter } from "./helpers/realAdapter.ts";

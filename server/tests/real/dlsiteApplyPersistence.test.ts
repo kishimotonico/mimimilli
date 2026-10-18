@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import type { DlsiteWorkInfo } from "@mimimilli/shared";
 import { META_FILE_NAME } from "@mimimilli/shared";
-import { createApp } from "../../src/app.ts";
+import { createApp } from "../helpers/testApp.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../../src/adapters/real/dlsiteConfig.ts";
 import {

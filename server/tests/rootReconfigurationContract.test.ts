@@ -11,7 +11,7 @@ import {
 import type { DataAdapter } from "../src/adapter/index.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { FIXTURE_UNREADABLE_ROOT } from "../src/adapters/fixture/scenarios.ts";
-import { createApp, type App } from "../src/app.ts";
+import { createApp, type App } from "./helpers/testApp.ts";
 import { ROOT_RECONFIGURATION_INTERRUPTED_MESSAGE } from "../src/rootReconfiguration.ts";
 import { pollUntil } from "./helpers/poll.ts";
 import { createTestRealAdapter } from "./helpers/realAdapter.ts";

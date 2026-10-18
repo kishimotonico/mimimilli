@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { emptyMetaDlsiteState, META_FILE_NAME, type MetaFile } from "@mimimilli/shared";
 import type { DataAdapter } from "../../src/adapter/index.ts";
-import { createApp } from "../../src/app.ts";
+import { createApp } from "./testApp.ts";
 import {
   createFixtureAdapter,
   type FixtureAdapterOptions,

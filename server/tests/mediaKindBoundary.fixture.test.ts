@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
-import { createApp, type App } from "../src/app.ts";
+import { createApp, type App } from "./helpers/testApp.ts";
 
 const WORK_ID = "RJ501001";
 const REGISTERED_AUDIO = "track01.mp3";

@@ -5,7 +5,7 @@ import { createApp, type App, type CreateAppOptions } from "./app.ts";
 export const SERVER_IDLE_TIMEOUT_SECONDS = 90;
 
 /** 数万件規模の一括登録・編集の本文(1件あたり数百バイト)に十分な余裕を持たせた上限。Bun既定の128MiBは過大。 */
-export const SERVER_MAX_REQUEST_BODY_BYTES = 16 * 1024 * 1024;
+export const SERVER_MAX_REQUEST_BODY_BYTES = 64 * 1024 * 1024;
 
 export type BunServer = ReturnType<typeof Bun.serve>;
 

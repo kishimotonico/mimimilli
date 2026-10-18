@@ -3,6 +3,7 @@ import type { CreateAppOptions } from "../../src/app.ts";
 import { createFixtureAdapter } from "../../src/adapters/fixture/index.ts";
 import { serveMimimilli } from "../../src/serve.ts";
 import { TEST_RUNNER_TIMEOUT_MS } from "../helpers/poll.ts";
+import { withDefaultHost } from "../helpers/testApp.ts";
 
 export type FixtureTransportServer = {
   app: ReturnType<typeof serveMimimilli>["app"];
@@ -17,7 +18,7 @@ export function serveFixtureTransport(
 ): FixtureTransportServer {
   const { app, server } = serveMimimilli({ adapter, port: 0, appOptions: options });
   return {
-    app,
+    app: withDefaultHost(app),
     server,
     adapter,
     baseUrl: `http://127.0.0.1:${server.port}`,

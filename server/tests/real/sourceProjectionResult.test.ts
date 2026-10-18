@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import { spyOn } from "bun:test";
 import { emptyDlsiteState, workspacePath } from "@mimimilli/shared";
-import { createApp } from "../../src/app.ts";
+import { createApp } from "../helpers/testApp.ts";
 import { DlsiteJobManager } from "../../src/dlsiteJobManager.ts";
 import { CatalogWorkRepository } from "../../src/adapters/real/catalogWorkRepository.ts";
 import { DlsiteScheduler } from "../../src/adapters/real/dlsiteScheduler.ts";

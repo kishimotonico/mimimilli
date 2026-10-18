@@ -3,7 +3,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import { axisFacetListSchema, emptyDlsiteState, type WorksPage } from "@mimimilli/shared";
-import { createApp } from "../../src/app.ts";
+import { createApp } from "../helpers/testApp.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { createWorkRepos, folderMetaPath, resolvedDuration } from "../helpers/workTestUtils.ts";

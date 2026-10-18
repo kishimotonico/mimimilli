@@ -8,7 +8,7 @@ import {
   type DlsiteBulkResult,
 } from "@mimimilli/shared";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
-import { createApp } from "../src/app.ts";
+import { createApp } from "./helpers/testApp.ts";
 import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
 import { pollUntil } from "./helpers/poll.ts";
 

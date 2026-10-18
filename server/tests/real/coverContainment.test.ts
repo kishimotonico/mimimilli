@@ -5,7 +5,7 @@ import { mkdirSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync
 import { dirname, join } from "node:path";
 import { test, type TestContext } from "node:test";
 import type { WorksPage } from "@mimimilli/shared";
-import { createApp } from "../../src/app.ts";
+import { createApp } from "../helpers/testApp.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";

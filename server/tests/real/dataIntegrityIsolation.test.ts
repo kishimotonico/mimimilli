@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
 import { eq } from "drizzle-orm";
-import { createApp } from "../../src/app.ts";
+import { createApp } from "../helpers/testApp.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { tags, works } from "../../src/adapters/real/catalogSchema.ts";

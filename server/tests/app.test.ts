@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { compareJapaneseSortKeys } from "../src/core/japaneseSortKey.ts";
-import { createApp } from "../src/app.ts";
+import { createApp } from "./helpers/testApp.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
 

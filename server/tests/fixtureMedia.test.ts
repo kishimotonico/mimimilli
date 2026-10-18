@@ -1,7 +1,7 @@
 // fixture アダプタのメディア合成（カバーSVG・無音WAV・Range配信）のテスト。
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createApp } from "../src/app.ts";
+import { createApp } from "./helpers/testApp.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 
 function buildApp() {
