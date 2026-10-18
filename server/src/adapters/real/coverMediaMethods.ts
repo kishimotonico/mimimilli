@@ -1,4 +1,3 @@
-import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { TEXT_PREVIEW_LIMIT_BYTES, type WorkspaceResourceRef } from "@mimimilli/shared";
 import type { FsListing } from "@mimimilli/shared";
@@ -69,25 +68,19 @@ export function createCoverMediaMethods(deps: {
   return {
     async locateWorkspaceMedia(ref: WorkspaceResourceRef) {
       const root = requireRoot();
-      const resolved = resolveWithin(root, join(root, ref.path));
-      if (!resolved) return null;
-      try {
-        const stats = await stat(resolved);
-        if (!stats.isFile()) return null;
-        const metadata = workspaceMediaMetadata(resolved, stats.size);
-        return {
-          location: {
-            type: "file" as const,
-            absolutePath: resolved,
-            mime: mimeOf(resolved),
-            size: stats.size,
-          },
-          ...metadata,
-          maxBytes: metadata.mediaKind === "text" ? TEXT_PREVIEW_LIMIT_BYTES : undefined,
-        };
-      } catch {
-        return null;
-      }
+      const file = resolveRegularFileWithin(root, join(root, ref.path));
+      if (!file) return null;
+      const metadata = workspaceMediaMetadata(file.absolutePath, file.size);
+      return {
+        location: {
+          type: "file" as const,
+          absolutePath: file.absolutePath,
+          mime: mimeOf(file.absolutePath),
+          size: file.size,
+        },
+        ...metadata,
+        maxBytes: metadata.mediaKind === "text" ? TEXT_PREVIEW_LIMIT_BYTES : undefined,
+      };
     },
 
     async locateMedia(

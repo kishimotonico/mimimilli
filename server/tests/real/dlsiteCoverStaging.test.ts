@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -298,3 +299,29 @@ test("カバー保存の失敗は登録と適用で同じ扱い(502 error)にな
   assert.equal(apply.status, 502);
   assert.equal((await apply.json()).error.code, "error");
 });
+
+const canDenyWrites = process.platform !== "win32" && process.getuid?.() !== 0;
+
+test(
+  "作業フォルダーが書き込み不可で一時ファイルを作れないときも、登録と適用は502 errorになる",
+  { skip: !canDenyWrites },
+  async (t) => {
+    const registration = await setupRegistration(t);
+    chmodSync(registration.folder, 0o555);
+    t.after(() => chmodSync(registration.folder, 0o755));
+    const res = await registration.register();
+    assert.equal(res.status, 502);
+    assert.equal((await res.json()).error.code, "error");
+
+    const { adapter, workId, workDir, applyBody } = await setup(t);
+    chmodSync(workDir, 0o555);
+    t.after(() => chmodSync(workDir, 0o755));
+    const apply = await createApp(adapter).request(`/api/dlsite/${workId}/apply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(await applyBody()),
+    });
+    assert.equal(apply.status, 502);
+    assert.equal((await apply.json()).error.code, "error");
+  },
+);

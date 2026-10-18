@@ -335,7 +335,12 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     const realWorkDir = resolveWithin(root, workDir);
     if (!realWorkDir) return null;
     const fileName = `${DLSITE_COVER_BASENAME}.${extension}`;
-    const tmpPath = writeTempFile(realWorkDir, DLSITE_COVER_BASENAME, image.body);
+    let tmpPath: string;
+    try {
+      tmpPath = writeTempFile(realWorkDir, DLSITE_COVER_BASENAME, image.body);
+    } catch (error) {
+      throw new CoverSaveError({ cause: error });
+    }
     let dimensions: CoverColumns["dimensions"] | null = null;
     try {
       dimensions = await measureCoverDimensions(tmpPath);

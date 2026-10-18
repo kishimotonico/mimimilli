@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ApiError } from "@mimimilli/shared";
 import { CoverSaveError, NotConfiguredError, RootReconfiguringError } from "./errors.ts";
+import { apiError } from "./lib/httpError.ts";
 import type { DataAdapter } from "./adapter/index.ts";
 import { formatError, getCategoryLogger } from "./lib/logger.ts";
 import { InFlightRequestGate } from "./lib/inFlightRequestGate.ts";
@@ -150,8 +151,7 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
     }
     if (err instanceof CoverSaveError) {
       httpLogger.warn("DLsiteカバーを保存できませんでした", { requestId, path, status: 502 });
-      const body: ApiError = { error: { code: "error", message: err.message } };
-      return c.json(body, 502);
+      return apiError("error", err.message).getResponse();
     }
     httpLogger.error("リクエスト処理中にエラーが発生しました", { requestId, ...formatError(err) });
     const body: ApiError = {
