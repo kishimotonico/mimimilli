@@ -3,7 +3,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ApiError } from "@mimimilli/shared";
-import { NotConfiguredError, RootReconfiguringError } from "./errors.ts";
+import { CoverSaveError, NotConfiguredError, RootReconfiguringError } from "./errors.ts";
 import type { DataAdapter } from "./adapter/index.ts";
 import { formatError, getCategoryLogger } from "./lib/logger.ts";
 import { InFlightRequestGate } from "./lib/inFlightRequestGate.ts";
@@ -147,6 +147,11 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
       httpLogger.warn("未設定のためリクエストを拒否しました", { requestId, path, status: 409 });
       const body: ApiError = { error: { code: "conflict", message: err.message } };
       return c.json(body, 409);
+    }
+    if (err instanceof CoverSaveError) {
+      httpLogger.warn("DLsiteカバーを保存できませんでした", { requestId, path, status: 502 });
+      const body: ApiError = { error: { code: "error", message: err.message } };
+      return c.json(body, 502);
     }
     httpLogger.error("リクエスト処理中にエラーが発生しました", { requestId, ...formatError(err) });
     const body: ApiError = {

@@ -1,21 +1,12 @@
 // `mimimilli.json`（Source of Truth）の読み書き。
 // 書き込みは lock 内で read → コールバック → fsync/atomic replace の mutateMetaSource 1本。
 // 部分更新は生 JSON を直接編集し、スキーマが知らないユーザー定義フィールドを保持する。
-import {
-  closeSync,
-  existsSync,
-  fsyncSync,
-  openSync,
-  readFileSync,
-  renameSync,
-  statSync,
-  unlinkSync,
-  writeSync,
-} from "node:fs";
+import { closeSync, openSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { basename, dirname, join } from "node:path";
 import { errorMessage, META_FILE_NAME, metaFileSchema, type MetaFile } from "@mimimilli/shared";
 import { SourceChangedError } from "../../errors.ts";
+import { installBytes } from "./atomicFile.ts";
 
 export { SourceChangedError } from "../../errors.ts";
 
@@ -165,12 +156,6 @@ export function readMetaSource(metaPath: string): MetaSource {
   return sourceOf(metaPath, inspectMetaFile(metaPath));
 }
 
-export interface AtomicReplaceOps {
-  exists(path: string): boolean;
-  rename(from: string, to: string): void;
-  unlink(path: string): void;
-}
-
 function waitMs(ms: number): void {
   if (ms <= 0) return;
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
@@ -216,68 +201,6 @@ function withMetaPathLock<T>(filePath: string, fn: () => T): T {
       unlinkSync(lockPath);
     } catch {
       /* lock cleanup */
-    }
-  }
-}
-
-export function replaceWithRollback(
-  filePath: string,
-  tmp: string,
-  rollback: string,
-  ops: AtomicReplaceOps,
-): boolean {
-  try {
-    ops.rename(tmp, filePath);
-    return false;
-  } catch (installError) {
-    if (!ops.exists(filePath)) throw installError;
-    ops.rename(filePath, rollback);
-    try {
-      ops.rename(tmp, filePath);
-    } catch (replaceError) {
-      try {
-        ops.rename(rollback, filePath);
-      } catch (restoreError) {
-        throw new Error("作品情報の復元に失敗しました", { cause: restoreError });
-      }
-      throw replaceError;
-    }
-    return true;
-  }
-}
-
-function installBytes(filePath: string, bytes: Buffer): void {
-  const tmp = join(dirname(filePath), `.${basename(filePath)}.${crypto.randomUUID()}.tmp`);
-  const rollback = join(
-    dirname(filePath),
-    `.${basename(filePath)}.${crypto.randomUUID()}.rollback`,
-  );
-  let fd: number | undefined;
-  let rollbackCanBeRemoved = false;
-  try {
-    fd = openSync(tmp, "wx", 0o600);
-    writeSync(fd, bytes);
-    fsyncSync(fd);
-    closeSync(fd);
-    fd = undefined;
-    rollbackCanBeRemoved = replaceWithRollback(filePath, tmp, rollback, {
-      exists: existsSync,
-      rename: renameSync,
-      unlink: unlinkSync,
-    });
-  } finally {
-    if (fd !== undefined) closeSync(fd);
-    try {
-      unlinkSync(tmp);
-    } catch {
-      // rename済み、または一時ファイル未作成。
-    }
-    if (rollbackCanBeRemoved) {
-      try {
-        unlinkSync(rollback);
-      } catch {
-        /* rollback cleanup */
-      }
     }
   }
 }

@@ -268,8 +268,19 @@ export function normalizeDlsiteAgeRating(raw: string): DlsiteAgeRating | null {
   return null;
 }
 
+/** RJ/VJコードの形式。DLsiteキャッシュが受け付ける形式（`^(RJ|VJ)\d{6,8}$`）と一致させる。 */
+export const RJ_CODE_PATTERN = /^(RJ|VJ)\d{6,8}$/i;
+
+/** 非空のRJ/VJコード1件の形式検証・正規化（大文字化）の正典。
+ *  空文字（RJコードなしの明示）・未指定は呼び出し側で個別に扱う。 */
+export const rjCodeFormatSchema = z
+  .string()
+  .trim()
+  .regex(RJ_CODE_PATTERN, "RJ/VJコードはRJまたはVJに続く6〜8桁で入力してください")
+  .transform((value) => value.toUpperCase());
+
 export const dlsiteWorkInfoSchema = z.object({
-  rjCode: z.string(),
+  rjCode: rjCodeFormatSchema,
   title: z.string(),
   circle: z.string().nullable(),
   cvs: z.array(z.string()),
@@ -495,17 +506,6 @@ export const dlsiteApplyMissingPreviewSchema = z.object({
   items: z.array(dlsiteApplyMissingPreviewItemSchema),
 });
 export type DlsiteApplyMissingPreview = z.infer<typeof dlsiteApplyMissingPreviewSchema>;
-
-/** RJ/VJコードの形式。DLsiteキャッシュが受け付ける形式（`^(RJ|VJ)\d{6,8}$`）と一致させる。 */
-export const RJ_CODE_PATTERN = /^(RJ|VJ)\d{6,8}$/i;
-
-/** 非空のRJ/VJコード1件の形式検証・正規化（大文字化）の正典。
- *  空文字（RJコードなしの明示）・未指定は呼び出し側で個別に扱う。 */
-export const rjCodeFormatSchema = z
-  .string()
-  .trim()
-  .regex(RJ_CODE_PATTERN, "RJ/VJコードはRJまたはVJに続く6〜8桁で入力してください")
-  .transform((value) => value.toUpperCase());
 
 export const dlsiteStatePatchSchema = z
   .object({

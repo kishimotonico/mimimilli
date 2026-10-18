@@ -78,17 +78,6 @@ export function createRealAdapter(
   );
   initializeTagPrefixes(user);
 
-  const { cachedCover, ...dlsiteMethods } = createDlsiteMethods({
-    db,
-    query,
-    catalog,
-    scanner,
-    dlsiteCache,
-    dlsiteCacheOptions: options.dlsiteCache,
-    dlsiteRequestConfig,
-    dlsiteScheduler,
-    schedulerDependencies: options.dlsiteSchedulerDependencies,
-  });
   const { requireRoot, ...settingsScanMethods } = createSettingsScanMethods({
     database: options.database,
     query,
@@ -98,6 +87,18 @@ export function createRealAdapter(
     thumbnailCacheDir,
     dlsiteCache: dlsiteCache.config,
     runFileScanInWorker: assembly.runFileScanInWorker ?? runFileScanInWorker,
+  });
+  const { stageCover, ...dlsiteMethods } = createDlsiteMethods({
+    db,
+    query,
+    catalog,
+    scanner,
+    dlsiteCache,
+    dlsiteCacheOptions: options.dlsiteCache,
+    dlsiteRequestConfig,
+    dlsiteScheduler,
+    schedulerDependencies: options.dlsiteSchedulerDependencies,
+    requireRoot,
   });
   const coverMediaMethods = createCoverMediaMethods({
     query,
@@ -113,7 +114,7 @@ export function createRealAdapter(
     user,
     scanner,
     requireRoot,
-    cachedCover,
+    stageCover,
   });
   const classificationMethods = createClassificationMethods({ query, user, requireRoot });
 

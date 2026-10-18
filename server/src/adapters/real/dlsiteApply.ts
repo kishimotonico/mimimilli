@@ -12,7 +12,7 @@ import {
   type WorkSourceMutationResult,
 } from "@mimimilli/shared";
 import { MetaMutationReject, encodeMetaRaw } from "./meta.ts";
-import { SourceChangedError } from "../../errors.ts";
+import { CoverSaveError, SourceChangedError } from "../../errors.ts";
 import { throwIfAborted } from "./sharedFlight.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import {
@@ -21,12 +21,13 @@ import {
   readVerifiedEditSource,
 } from "./workEditSource.ts";
 import type { Scanner } from "./scanner.ts";
-import type { createDlsiteFetch } from "./dlsiteFetch.ts";
+import type { StagedCover, createDlsiteFetch } from "./dlsiteFetch.ts";
 
 export interface DlsiteApplyDeps {
   catalog: CatalogWorkRepository;
   scanner: Scanner;
   fetch: ReturnType<typeof createDlsiteFetch>;
+  requireRoot: () => string;
 }
 
 function coverStub(coverImage: string | null) {
@@ -55,8 +56,8 @@ function applyDlsiteMergeToRaw(
 }
 
 export function createDlsiteApply(deps: DlsiteApplyDeps) {
-  const { catalog, scanner, fetch } = deps;
-  const { cachedCover, measureDownloadedCover } = fetch;
+  const { catalog, scanner, fetch, requireRoot } = deps;
+  const { stageCover } = fetch;
 
   async function persistVerified(
     verified: ReturnType<typeof mutateVerifiedMetaSource>,
@@ -76,35 +77,37 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
       const current = readVerifiedEditSource(catalog, workId);
       if (!current) return null;
 
-      let coverImage: string | undefined;
+      let cover: StagedCover | null = null;
       if (body.applyCover && body.info.coverUrl) {
         const mediaRoot = workPlacementOf(current.metaPath).mediaRoot;
-        coverImage = await cachedCover(body.info.coverUrl, mediaRoot, signal);
-        throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
-        const cover = await measureDownloadedCover(mediaRoot, coverImage);
-        if (!cover) return null;
-        throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
+        cover = await stageCover(body.info.coverUrl, mediaRoot, requireRoot(), signal);
+        if (!cover) throw new CoverSaveError();
       }
 
-      throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
-
-      return persistVerified(
-        mutateVerifiedMetaSource(catalog, workId, (source) => {
-          if (source.sourceRevision !== body.sourceRevision) {
-            return new MetaMutationReject(new SourceChangedError());
-          }
-          const patch = buildDlsiteApplyPatch(
-            {
-              title: source.meta.title,
-              tags: source.meta.tags,
-              urls: source.meta.urls,
-              dlsite: source.meta.dlsite,
-            },
-            body,
-          );
-          return applyDlsiteMergeToRaw(source.bytes, { ...patch, coverImage });
-        }),
-      );
+      try {
+        throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
+        const staged = cover;
+        return await persistVerified(
+          mutateVerifiedMetaSource(catalog, workId, (source) => {
+            if (source.sourceRevision !== body.sourceRevision) {
+              return new MetaMutationReject(new SourceChangedError());
+            }
+            const patch = buildDlsiteApplyPatch(
+              {
+                title: source.meta.title,
+                tags: source.meta.tags,
+                urls: source.meta.urls,
+                dlsite: source.meta.dlsite,
+              },
+              body,
+            );
+            staged?.commit();
+            return applyDlsiteMergeToRaw(source.bytes, { ...patch, coverImage: staged?.fileName });
+          }),
+        );
+      } finally {
+        cover?.discard();
+      }
     },
 
     async applyDlsiteMissingItem(
@@ -125,36 +128,43 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
         return "skipped";
       }
 
-      let coverImage: string | undefined;
+      let cover: StagedCover | null = null;
       if (planned.applyCover && info.coverUrl) {
         const mediaRoot = workPlacementOf(current.metaPath).mediaRoot;
-        coverImage = await cachedCover(info.coverUrl, mediaRoot);
-        const cover = await measureDownloadedCover(mediaRoot, coverImage);
+        cover = await stageCover(info.coverUrl, mediaRoot, requireRoot());
         if (!cover) return "skipped";
       }
 
       let wrote = false;
-      const verified = mutateVerifiedMetaSource(catalog, workId, (source) => {
-        const diff = computeMissingDiff(
-          {
-            tags: source.meta.tags,
-            urls: source.meta.urls,
-            cover: coverStub(source.meta.coverImage ?? null),
-          },
-          info,
-        );
-        const patch = buildDlsiteMissingApplyPatch(
-          { tags: source.meta.tags, urls: source.meta.urls, dlsite: source.meta.dlsite },
-          info,
-          diff,
-        );
-        if (!patch) return source.bytes;
-        wrote = true;
-        return applyDlsiteMergeToRaw(source.bytes, {
-          ...patch,
-          coverImage: diff.applyCover ? coverImage : undefined,
+      let verified: ReturnType<typeof mutateVerifiedMetaSource>;
+      try {
+        const staged = cover;
+        verified = mutateVerifiedMetaSource(catalog, workId, (source) => {
+          const diff = computeMissingDiff(
+            {
+              tags: source.meta.tags,
+              urls: source.meta.urls,
+              cover: coverStub(source.meta.coverImage ?? null),
+            },
+            info,
+          );
+          const patch = buildDlsiteMissingApplyPatch(
+            { tags: source.meta.tags, urls: source.meta.urls, dlsite: source.meta.dlsite },
+            info,
+            diff,
+          );
+          if (!patch) return source.bytes;
+          wrote = true;
+          const applied = diff.applyCover ? staged : null;
+          applied?.commit();
+          return applyDlsiteMergeToRaw(source.bytes, {
+            ...patch,
+            coverImage: applied?.fileName,
+          });
         });
-      });
+      } finally {
+        cover?.discard();
+      }
       if (!verified) return "missing";
       if (!wrote) return "skipped";
       const projected = await projectVerifiedSource(scanner, verified);

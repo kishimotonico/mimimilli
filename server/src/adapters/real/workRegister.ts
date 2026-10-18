@@ -13,7 +13,7 @@ import { detectRjCode, emptyMetaDlsiteState, isDlsiteUrl } from "@mimimilli/shar
 import { inspectMetaFile } from "./meta.ts";
 import { metaStagingPath } from "./metaStaging.ts";
 import { identityConflictPathOf, resolveWithin, toPortableRelativePath } from "./paths.ts";
-import { WorkRegisterError } from "../../errors.ts";
+import { CoverSaveError, WorkRegisterError } from "../../errors.ts";
 import { assertRegistrationAllowed } from "../../core/workRegistrationGuard.ts";
 import { fileRegisterNaming, folderRegisterNaming } from "../../core/workRegisterPreview.ts";
 import { removeIdentityConflictPath } from "../../core/identityConflicts.ts";
@@ -23,6 +23,7 @@ import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import type { Scanner } from "./scanner.ts";
+import type { StagedCover } from "./dlsiteFetch.ts";
 import type { ProjectOutcome, RestoreMetaPatch } from "./scanTypes.ts";
 import {
   assertNoIdentityConflict,
@@ -201,7 +202,7 @@ function inspectOrphanMetaForPreview(target: RegistrationTarget): { meta: MetaFi
 /** DLsite適用結果のうち、フォーム由来の title/tags を上書きしない部分だけを表す */
 interface DlsiteAppliedMeta {
   urls: Work["urls"];
-  coverImage?: string | null;
+  cover: StagedCover | null;
   dlsite: MetaFile["dlsite"];
 }
 
@@ -215,7 +216,7 @@ export async function createWorkFromPath(
   scanner: Scanner,
   root: string,
   body: WorkCreateBody,
-  applyDlsiteCover?: (coverUrl: string, workDir: string) => Promise<string | null>,
+  stageDlsiteCover?: (coverUrl: string, workDir: string) => Promise<StagedCover | null>,
 ): Promise<WorkSourceMutationResult> {
   const { query } = repos;
   const path = resolveWithin(root, join(root, body.path));
@@ -242,61 +243,81 @@ export async function createWorkFromPath(
     // body.tags は workCreateBodySchema の境界で既に正規化済み（NormalizedTag[]）。
     metaPatch.tags = body.tags;
 
-    if (body.dlsite) {
-      const applied = await buildMetaFromDlsiteApply(body.dlsite, assetDir, applyDlsiteCover);
-      if (body.dlsite.applyUrl) {
-        metaPatch.urls = [...meta.urls.filter((entry) => !isDlsiteUrl(entry.url)), ...applied.urls];
+    let cover: StagedCover | null = null;
+    try {
+      if (body.dlsite) {
+        const applied = await buildMetaFromDlsiteApply(body.dlsite, assetDir, stageDlsiteCover);
+        cover = applied.cover;
+        if (body.dlsite.applyUrl) {
+          metaPatch.urls = [
+            ...meta.urls.filter((entry) => !isDlsiteUrl(entry.url)),
+            ...applied.urls,
+          ];
+        }
+        if (cover) metaPatch.coverImage = cover.fileName;
+        metaPatch.dlsite = applied.dlsite;
       }
-      if (applied.coverImage !== undefined) metaPatch.coverImage = applied.coverImage;
-      metaPatch.dlsite = applied.dlsite;
+      cover?.commit();
+      return mutationResultFromProjectOutcome(
+        await scanner.restoreWork(target, metaPatch),
+        target.physicalPath,
+      );
+    } finally {
+      cover?.discard();
     }
-
-    return mutationResultFromProjectOutcome(
-      await scanner.restoreWork(target, metaPatch),
-      target.physicalPath,
-    );
   }
 
   const title = body.title;
   let urls: Work["urls"] = [];
-  let coverImage: string | null | undefined;
+  let cover: StagedCover | null = null;
   let dlsite = emptyMetaDlsiteState();
 
-  if (body.dlsite) {
-    const applied = await buildMetaFromDlsiteApply(body.dlsite, assetDir, applyDlsiteCover);
-    urls = applied.urls;
-    coverImage = applied.coverImage;
-    dlsite = applied.dlsite;
-  } else {
-    const detectedRjCode = detectRjCode([targetName(target), title]);
-    if (detectedRjCode) dlsite = { ...emptyMetaDlsiteState(), rjCode: detectedRjCode };
-  }
+  try {
+    if (body.dlsite) {
+      const applied = await buildMetaFromDlsiteApply(body.dlsite, assetDir, stageDlsiteCover);
+      urls = applied.urls;
+      cover = applied.cover;
+      dlsite = applied.dlsite;
+    } else {
+      const detectedRjCode = detectRjCode([targetName(target), title]);
+      if (detectedRjCode) dlsite = { ...emptyMetaDlsiteState(), rjCode: detectedRjCode };
+    }
 
-  return mutationResultFromProjectOutcome(
-    await scanner.registerWork(target, { title, tags: body.tags, urls, coverImage, dlsite }),
-    target.physicalPath,
-  );
+    cover?.commit();
+    return mutationResultFromProjectOutcome(
+      await scanner.registerWork(target, {
+        title,
+        tags: body.tags,
+        urls,
+        coverImage: cover?.fileName,
+        dlsite,
+      }),
+      target.physicalPath,
+    );
+  } finally {
+    cover?.discard();
+  }
 }
 
 async function buildMetaFromDlsiteApply(
   body: DlsiteRegistrationBody,
   workDir: string,
-  applyDlsiteCover?: (coverUrl: string, workDir: string) => Promise<string | null>,
+  stageDlsiteCover?: (coverUrl: string, workDir: string) => Promise<StagedCover | null>,
 ): Promise<DlsiteAppliedMeta> {
-  let coverImage: string | null | undefined;
+  let cover: StagedCover | null = null;
   if (body.applyCover && body.info.coverUrl) {
-    if (!applyDlsiteCover) {
+    if (!stageDlsiteCover) {
       throw new Error("DLsiteカバーの適用に必要な処理が構成されていません");
     }
-    coverImage = await applyDlsiteCover(body.info.coverUrl, workDir);
-    if (!coverImage) {
-      throw new Error("DLsiteカバーの保存に失敗しました");
+    cover = await stageDlsiteCover(body.info.coverUrl, workDir);
+    if (!cover) {
+      throw new CoverSaveError();
     }
   }
 
   return {
     urls: body.applyUrl && body.info.url ? [{ label: "DLsite", url: body.info.url }] : [],
-    coverImage,
+    cover,
     dlsite: {
       rjCode: body.info.rjCode,
       status: "applied",

@@ -1,9 +1,8 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { writeFileSync } from "node:fs";
 import { errorMessage } from "@mimimilli/shared";
 import type { DlsiteFetchResult } from "@mimimilli/shared";
-import { DlsiteOfflineError } from "../../errors.ts";
+import { CoverSaveError, DlsiteOfflineError } from "../../errors.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import {
   fetchDlsiteCover,
@@ -24,12 +23,31 @@ import {
   type DlsiteHttpLogContext,
   type DlsiteSchedulerDependencies,
 } from "./dlsiteScheduler.ts";
+import { commitTempFile, removeTempFile, writeTempFile } from "./atomicFile.ts";
 import { resolveWithin } from "./paths.ts";
 import { SharedFlightPool, throwIfAborted } from "./sharedFlight.ts";
 import { measureCoverDimensions } from "./thumbnailCache.ts";
 import type { CoverColumns } from "./workRowMapping.ts";
 
 const dlsiteLogger = getCategoryLogger("dlsite");
+
+const DLSITE_COVER_BASENAME = "dlsite_cover";
+const DLSITE_COVER_EXTENSIONS: ReadonlySet<string> = new Set(["jpg", "jpeg", "png", "webp", "gif"]);
+
+function coverExtensionOfUrl(url: string): string | null {
+  const lastSegment = new URL(url).pathname.split("/").pop() ?? "";
+  const dot = lastSegment.lastIndexOf(".");
+  if (dot < 0) return null;
+  const extension = lastSegment.slice(dot + 1).toLowerCase();
+  return DLSITE_COVER_EXTENSIONS.has(extension) ? extension : null;
+}
+
+export interface StagedCover {
+  fileName: string;
+  dimensions: NonNullable<CoverColumns["dimensions"]>;
+  commit(): void;
+  discard(): void;
+}
 
 export interface DlsiteFetchAttempt {
   result: DlsiteFetchResult;
@@ -248,11 +266,10 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     return (await fetchCachedDlsiteAttempt(productCode, force, signal)).result;
   }
 
-  async function cachedCover(
+  async function fetchCoverImage(
     coverUrl: string,
-    workDir: string,
     signal?: AbortSignal,
-  ): Promise<string> {
+  ): Promise<{ body: Uint8Array; normalizedUrl: string }> {
     throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
     const normalizedUrl = normalizeDlsiteCoverUrl(coverUrl);
     const key = `cover:${createHash("sha256").update(normalizedUrl).digest("hex")}`;
@@ -265,17 +282,9 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
         reason: "cached",
       });
       throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
-      const extension = (new URL(normalizedUrl).pathname.split(".").pop() ?? "jpg").toLowerCase();
-      const fileName = `dlsite_cover.${extension}`;
-      writeFileSync(join(workDir, fileName), cached.body);
-      return fileName;
+      return { body: cached.body, normalizedUrl };
     }
-    try {
-      dlsiteScheduler.assertOnline();
-    } catch (error) {
-      if (error instanceof DlsiteOfflineError) throw error;
-      throw error;
-    }
+    dlsiteScheduler.assertOnline();
     try {
       const image = await dlsiteCoverFlightPool.run(key, signal, (flightSignal) => {
         const cachedInFlight = dlsiteCache.getCover(normalizedUrl);
@@ -304,26 +313,48 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
         });
       });
       throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
-      const extension = (
-        new URL(image.normalizedUrl).pathname.split(".").pop() ?? "jpg"
-      ).toLowerCase();
-      const fileName = `dlsite_cover.${extension}`;
-      writeFileSync(join(workDir, fileName), image.body);
-      return fileName;
+      return image;
     } finally {
       await dlsiteScheduler.drain();
     }
   }
 
-  async function measureDownloadedCover(
+  /**
+   * カバーを取得して作品フォルダー内の一時ファイルへ置く。最終名への確定は呼び出し側が
+   * commit() で行う。許可外の拡張子・ルート外の作品フォルダー・画像として読めない場合は null。
+   */
+  async function stageCover(
+    coverUrl: string,
     workDir: string,
-    coverImage: string,
-  ): Promise<CoverColumns | null> {
-    const resolved = resolveWithin(workDir, join(workDir, coverImage));
-    if (!resolved) return null;
-    const dimensions = await measureCoverDimensions(resolved);
+    root: string,
+    signal?: AbortSignal,
+  ): Promise<StagedCover | null> {
+    const image = await fetchCoverImage(coverUrl, signal);
+    const extension = coverExtensionOfUrl(image.normalizedUrl);
+    if (!extension) return null;
+    const realWorkDir = resolveWithin(root, workDir);
+    if (!realWorkDir) return null;
+    const fileName = `${DLSITE_COVER_BASENAME}.${extension}`;
+    const tmpPath = writeTempFile(realWorkDir, DLSITE_COVER_BASENAME, image.body);
+    let dimensions: CoverColumns["dimensions"] | null = null;
+    try {
+      dimensions = await measureCoverDimensions(tmpPath);
+    } finally {
+      if (!dimensions) removeTempFile(tmpPath);
+    }
     if (!dimensions) return null;
-    return { image: coverImage, dimensions };
+    return {
+      fileName,
+      dimensions,
+      commit: () => {
+        try {
+          commitTempFile(tmpPath, join(realWorkDir, fileName));
+        } catch (error) {
+          throw new CoverSaveError({ cause: error });
+        }
+      },
+      discard: () => removeTempFile(tmpPath),
+    };
   }
 
   return {
@@ -331,7 +362,6 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     dlsiteScheduler,
     fetchCachedDlsiteAttempt,
     fetchCachedDlsite,
-    cachedCover,
-    measureDownloadedCover,
+    stageCover,
   };
 }

@@ -25,6 +25,7 @@ import type {
 import type { WorkSourceProjectionResult } from "../../adapter/work.ts";
 import { errorMessage, resolveWorkPlacement, tagEquals } from "@mimimilli/shared";
 import { type Db } from "./db.ts";
+import type { StagedCover } from "./dlsiteFetch.ts";
 import { MetaMutationReject, encodeMetaRaw, patchMetaFileCas, readMetaSource } from "./meta.ts";
 import { SourceChangedError } from "../../errors.ts";
 import { removeIdentityConflictPath } from "../../core/identityConflicts.ts";
@@ -58,9 +59,14 @@ export function createWorkMethods(deps: {
   user: UserWorkStateRepository;
   scanner: Scanner;
   requireRoot: () => string;
-  cachedCover: (coverUrl: string, workDir: string, signal?: AbortSignal) => Promise<string>;
+  stageCover: (
+    coverUrl: string,
+    workDir: string,
+    root: string,
+    signal?: AbortSignal,
+  ) => Promise<StagedCover | null>;
 }) {
-  const { db, query, catalog, user, scanner, requireRoot, cachedCover } = deps;
+  const { db, query, catalog, user, scanner, requireRoot, stageCover } = deps;
 
   function recordIdentityConflict(workId: string, ownerMetaPath: string, conflictMetaPath: string) {
     const root = requireRoot();
@@ -148,7 +154,7 @@ export function createWorkMethods(deps: {
         scanner,
         root,
         body,
-        (coverUrl, workDir) => cachedCover(coverUrl, workDir),
+        (coverUrl, workDir) => stageCover(coverUrl, workDir, root),
       );
     },
 
