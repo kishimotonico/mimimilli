@@ -7,6 +7,7 @@ import { NotConfiguredError, RootReconfiguringError } from "./errors.ts";
 import type { DataAdapter } from "./adapter/index.ts";
 import { formatError, getCategoryLogger } from "./lib/logger.ts";
 import { InFlightRequestGate } from "./lib/inFlightRequestGate.ts";
+import { requireLoopbackHost, requireSameMachineOrigin } from "./lib/requestOrigin.ts";
 import { createRootReconfigurationLockMiddleware } from "./lib/rootReconfigurationLockMiddleware.ts";
 import { axesRoute } from "./routes/axes.ts";
 import { dlsiteRoute } from "./routes/dlsite.ts";
@@ -64,6 +65,9 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
       httpLogger.debug("HTTPリクエストを処理しました", properties);
     }
   });
+
+  app.use("*", requireLoopbackHost);
+  app.use("*", requireSameMachineOrigin);
 
   const api = new Hono();
   const dlsiteJobs = new DlsiteJobManager(adapter);

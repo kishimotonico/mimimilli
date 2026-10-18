@@ -1,7 +1,7 @@
-// route のリクエストボディ読み取り。不正 JSON は固定メッセージ、スキーマ不一致は route ごとのメッセージで 400 invalid_request を返す。
+// route のリクエストボディ読み取り。本文があってメディア型が application/json でなければ 415、不正 JSON は固定メッセージ、スキーマ不一致は route ごとのメッセージで 400 invalid_request を返す。
 import type { Context } from "hono";
 import type { ZodError, ZodType } from "zod";
-import { invalidRequest } from "./httpError.ts";
+import { apiError, invalidRequest } from "./httpError.ts";
 
 const MALFORMED_JSON_MESSAGE = "リクエストの JSON が不正です";
 
@@ -13,6 +13,14 @@ function parseWithSchema<T>(schema: ZodType<T>, value: unknown, invalidMessage: 
   invalidRequest(
     typeof invalidMessage === "function" ? invalidMessage(parsed.error) : invalidMessage,
   );
+}
+
+function requireJsonMediaType(c: Context, raw: string): void {
+  if (raw.length === 0) return;
+  const mediaType = c.req.header("Content-Type")?.split(";")[0]?.trim().toLowerCase();
+  if (mediaType !== "application/json") {
+    throw apiError("unsupported_media_type", "Content-Type は application/json にしてください");
+  }
 }
 
 function parseJson(raw: string): unknown {
@@ -29,7 +37,9 @@ export async function readJsonBody<T>(
   schema: ZodType<T>,
   invalidMessage: InvalidMessage,
 ): Promise<T> {
-  return parseWithSchema(schema, parseJson(await c.req.text()), invalidMessage);
+  const raw = await c.req.text();
+  requireJsonMediaType(c, raw);
+  return parseWithSchema(schema, parseJson(raw), invalidMessage);
 }
 
 /** 任意ボディ。未送信・空は {} として検証する。 */
@@ -39,5 +49,6 @@ export async function readOptionalJsonBody<T>(
   invalidMessage: InvalidMessage,
 ): Promise<T> {
   const raw = await c.req.text();
+  requireJsonMediaType(c, raw);
   return parseWithSchema(schema, raw.length === 0 ? {} : parseJson(raw), invalidMessage);
 }

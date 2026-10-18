@@ -117,7 +117,7 @@ test("POST /scan は不正なbodyを400で拒否する", async () => {
   assert.equal((await res.json()).error.code, "invalid_request");
 });
 
-test("POST /scan は壊れたJSON・null・非JSON bodyを400で拒否する", async () => {
+test("POST /scan は壊れたJSON・nullは400、非JSON bodyは415で拒否する", async () => {
   const app = createApp(createFixtureAdapter());
   const broken = await app.request("/api/scan", {
     method: "POST",
@@ -139,7 +139,7 @@ test("POST /scan は壊れたJSON・null・非JSON bodyを400で拒否する", a
     headers: { "Content-Type": "text/plain" },
     body: "not-json",
   });
-  assert.equal(plain.status, 400);
+  assert.equal(plain.status, 415);
 
   const empty = await app.request("/api/scan", {
     method: "POST",

@@ -13,7 +13,10 @@ async function postApplyMissing(
 ) {
   return app.request(ENDPOINT, {
     method: "POST",
-    headers: init?.headers,
+    headers:
+      init?.body === undefined
+        ? init?.headers
+        : { "Content-Type": "application/json", ...init.headers },
     body: init?.body,
   });
 }

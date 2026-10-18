@@ -95,6 +95,8 @@ oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメン
 ## 公開範囲と配布
 
 - サーバーの bind は `127.0.0.1` に固定している。LAN 内の別端末への公開は認証とセットで将来対応する
+- 全リクエストで `Host` を検証し、loopback（`localhost`・`127.0.0.1`・`[::1]`・`*.localhost`、ポートは不問）以外は 403 にする（DNSリバインディング対策）。`Host` が無いときは要求URLのhostnameで判定する。GET/HEAD/OPTIONS 以外は `Origin` がloopbackでない場合と `Sec-Fetch-Site: cross-site` も 403 にする（CSRF対策）。どちらのヘッダーも無い要求は通す
+- JSON本文を読む route は、本文があって `Content-Type` が `application/json` でなければ 415 にする。CORS ヘッダーは出さない
 - 開発serverと配布ランタイムはBunを使う。Windows配布物はsharpの外部資産を含むzipを前提とし、compile・実機smokeは配布タスクで整備する
 - システムトレイ常駐・インストーラー・コード署名も将来検討事項で、詳細設計は未着手
 
