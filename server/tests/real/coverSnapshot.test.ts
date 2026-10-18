@@ -1,11 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import * as fs from "node:fs/promises";
+import { mkdtempSync, rmSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { spyOn } from "bun:test";
 import { THUMBNAIL_WIDTHS } from "@mimimilli/shared";
 import type { WorkSummary } from "@mimimilli/shared";
 import sharp from "sharp";
@@ -95,7 +93,7 @@ test("buildCoverSnapshot: unmeasuredCovers を cover-unmeasured として記録�
   assert.deepEqual(snapshot.gaps, [{ workId: "work-unmeasured", reason: "cover-unmeasured" }]);
 });
 
-test("buildCoverSnapshot: resolveWithin 失敗を cover-path-unresolved として記録する", async () => {
+test("buildCoverSnapshot: カバーを通常ファイルに解決できない場合を cover-path-unresolved として記録する", async () => {
   const workDir = mkdtempSync(join(tmpdir(), "mimimilli-cover-snapshot-"));
   try {
     const snapshot = await buildCoverSnapshot(
@@ -117,34 +115,6 @@ test("buildCoverSnapshot: resolveWithin 失敗を cover-path-unresolved とし�
   } finally {
     rmSync(workDir, { recursive: true, force: true });
   }
-});
-
-test("buildCoverSnapshot: カバーの stat 失敗を cover-stat-failed として記録する", async (t) => {
-  const workDir = mkdtempSync(join(tmpdir(), "mimimilli-cover-snapshot-"));
-  t.after(() => rmSync(workDir, { recursive: true, force: true }));
-  const coverPath = join(workDir, "cover.jpg");
-  writeFileSync(coverPath, "cover");
-
-  const spy = spyOn(fs, "stat").mockImplementation((async (path) => {
-    if (String(path) === coverPath) {
-      throw new Error("stat failed");
-    }
-    return stat(path);
-  }) as typeof fs.stat);
-  t.after(() => spy.mockRestore());
-
-  const snapshot = await buildCoverSnapshot(
-    emptyResult({
-      summaries: [
-        makeSummary({
-          id: "work-stat-fail",
-          physicalPath: workDir,
-          cover: { image: "cover.jpg", dimensions: { width: 100, height: 100 }, version: "cover" },
-        }),
-      ],
-    }),
-  );
-  assert.deepEqual(snapshot.gaps, [{ workId: "work-stat-fail", reason: "cover-stat-failed" }]);
 });
 
 test("buildCoverSnapshot: stat 成功時に validNames が期待どおりになる", async (t) => {

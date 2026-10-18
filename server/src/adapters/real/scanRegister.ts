@@ -38,7 +38,7 @@ import type { CoverDimensions } from "./thumbnailCache.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
 import { resolveMetaDlsiteProjection } from "./dlsiteProjection.ts";
 import { naturalCompare } from "./naturalCompare.ts";
-import { identityConflictPathOf } from "./paths.ts";
+import { identityConflictPathOf, resolveRegularFileWithin } from "./paths.ts";
 import { isPathWithin } from "../../lib/path.ts";
 
 const scanLogger = getCategoryLogger("scan");
@@ -123,7 +123,8 @@ async function assembleWorkForUpsert(
   const cover: CoverColumns = { image: meta.coverImage, dimensions: null };
   let coverErrors = 0;
   if (meta.coverImage) {
-    const dimensions = await measureCover(join(mediaRoot, meta.coverImage));
+    const file = resolveRegularFileWithin(mediaRoot, join(mediaRoot, meta.coverImage));
+    const dimensions = file && (await measureCover(file.absolutePath));
     checkAbort();
     if (dimensions) cover.dimensions = dimensions;
     else coverErrors += 1;
