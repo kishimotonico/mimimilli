@@ -3,12 +3,19 @@ import { z } from "zod";
 declare const workspacePathBrand: unique symbol;
 export type WorkspacePath = string & { readonly [workspacePathBrand]: "WorkspacePath" };
 
+export function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 0x2f) end -= 1;
+  return value.slice(0, end);
+}
+
+export function toSlashPathWithoutTrailingSlash(value: string): string {
+  return trimTrailingSlashes(value.replace(/\\/g, "/"));
+}
+
 export function workspacePath(value: string): WorkspacePath {
   if (/^(?:[\\/]|[A-Za-z]:)/.test(value)) throw new Error("WorkspacePath は絶対パスにできません");
-  const slashed = value.replace(/\\/g, "/");
-  let end = slashed.length;
-  while (end > 0 && slashed.charCodeAt(end - 1) === 0x2f) end -= 1;
-  const normalized = slashed.slice(0, end);
+  const normalized = toSlashPathWithoutTrailingSlash(value);
   if (normalized.split("/").some((part: string) => part === "." || part === "..")) {
     throw new Error("WorkspacePath は root 相対の正規化済みパスである必要があります");
   }

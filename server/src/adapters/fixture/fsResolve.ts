@@ -1,7 +1,8 @@
+import { trimTrailingSlashes } from "@mimimilli/shared";
 import type { FsNode } from "./data.ts";
 
 export function normalizeFsPath(path: string): string {
-  const trimmed = path.replace(/\/+$/, "");
+  const trimmed = trimTrailingSlashes(path);
   return trimmed === "" ? "/" : trimmed;
 }
 
