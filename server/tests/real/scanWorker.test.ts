@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import type { ScanJobSnapshot, WorksPage } from "@mimimilli/shared";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
-import { createApp } from "../../src/app.ts";
+import { createApp } from "../helpers/testApp.ts";
 import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
 import { pollUntil } from "../helpers/poll.ts";

@@ -10,6 +10,8 @@ const STATUS_BY_CODE = {
   offline: 503,
   error: 502,
   invalid_request: 400,
+  forbidden: 403,
+  unsupported_media_type: 415,
   conflict: 409,
   source_changed: 409,
   root_reconfiguring: 409,

@@ -19,7 +19,7 @@ import {
   type MetaFile,
   workspacePath,
 } from "@mimimilli/shared";
-import { createApp } from "../../src/app.ts";
+import { createApp } from "../helpers/testApp.ts";
 import { WorkRegisterError } from "../../src/errors.ts";
 import { writeMetaFile } from "../../src/adapters/real/meta.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";

@@ -37,10 +37,16 @@ export function createDlsiteMethods(deps: {
   dlsiteRequestConfig: DlsiteRequestConfig;
   dlsiteScheduler: DlsiteScheduler;
   schedulerDependencies?: DlsiteSchedulerDependencies;
+  requireRoot: () => string;
 }) {
   const { db, query, catalog, dlsiteCache } = deps;
   const fetch = createDlsiteFetch(deps);
-  const apply = createDlsiteApply({ catalog, scanner: deps.scanner, fetch });
+  const apply = createDlsiteApply({
+    catalog,
+    scanner: deps.scanner,
+    fetch,
+    requireRoot: deps.requireRoot,
+  });
   const bulk = createDlsiteBulk({
     db,
     query,
@@ -51,7 +57,7 @@ export function createDlsiteMethods(deps: {
   });
 
   return {
-    cachedCover: fetch.cachedCover,
+    stageCover: fetch.stageCover,
     async dlsiteFetch(
       workId: string,
       force = false,

@@ -15,6 +15,14 @@ export class RootReconfiguringError extends Error {
 /** ルートフォルダーとして指定されたパスが存在しない、またはディレクトリではない。HTTP では 400 invalid_request */
 export class InvalidRootFolderError extends Error {}
 
+/** DLsiteカバーを作品フォルダーへ保存できなかった。 */
+export class CoverSaveError extends Error {
+  constructor(options?: ErrorOptions) {
+    super("DLsiteカバーの保存に失敗しました", options);
+    this.name = "CoverSaveError";
+  }
+}
+
 export class SourceChangedError extends Error {
   constructor() {
     super("作品データが外部で変更されました。再読み込みしてから編集してください");

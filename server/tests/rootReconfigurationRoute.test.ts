@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { createTestRealAdapter } from "./helpers/realAdapter.ts";
-import { createApp } from "../src/app.ts";
+import { createApp } from "./helpers/testApp.ts";
 import { makeTestScope } from "./helpers/sampleLibrary.ts";
 
 async function startReconfiguration(app: ReturnType<typeof createApp>, rootFolder: string) {

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { coverKindSchema, coverSchema } from "./cover.ts";
 import { dlsiteStateSchema } from "./dlsite.ts";
 import type { DlsiteState } from "./dlsite.ts";
-import { workspacePath, workspacePathSchema } from "./media.ts";
+import { toSlashPathWithoutTrailingSlash, workspacePath, workspacePathSchema } from "./media.ts";
 import type { WorkspacePath } from "./media.ts";
 import { trackDurationKindSchema } from "./duration.ts";
 import {
@@ -217,9 +217,8 @@ export function toWorkListItemDlsite(dlsite: DlsiteState): WorkListItemDlsite {
  *  physicalPath は必ず root 配下という前提（カタログの正本はスキャン時に root 配下でのみ書かれる）。
  *  区切り文字はどちらも "/" へ正規化してから比較する。 */
 export function relativeToRoot(physicalPath: string, root: string): WorkspacePath {
-  const normalize = (value: string) => value.replace(/\\/g, "/").replace(/\/+$/g, "");
-  const normalizedPath = normalize(physicalPath);
-  const normalizedRoot = normalize(root);
+  const normalizedPath = toSlashPathWithoutTrailingSlash(physicalPath);
+  const normalizedRoot = toSlashPathWithoutTrailingSlash(root);
   const stripped = normalizedPath.startsWith(normalizedRoot)
     ? normalizedPath.slice(normalizedRoot.length)
     : normalizedPath;

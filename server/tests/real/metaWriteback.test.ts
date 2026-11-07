@@ -6,7 +6,7 @@ import { test, type TestContext } from "node:test";
 import { emptyDlsiteState } from "@mimimilli/shared";
 import { SourceChangedError, SourceConflictError } from "../../src/errors.ts";
 import { CatalogWorkRepository } from "../../src/adapters/real/catalogWorkRepository.ts";
-import { replaceWithRollback } from "../../src/adapters/real/meta.ts";
+import { replaceWithRollback } from "../../src/adapters/real/atomicFile.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 import { nts } from "../helpers/tag.ts";

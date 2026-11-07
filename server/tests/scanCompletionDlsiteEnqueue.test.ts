@@ -3,7 +3,7 @@
 // 実配線（ScanJobManager→完了コールバック→DlsiteJobManager.enqueue）を確認する。
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createApp } from "../src/app.ts";
+import { createApp } from "./helpers/testApp.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { pollUntil } from "./helpers/poll.ts";
 

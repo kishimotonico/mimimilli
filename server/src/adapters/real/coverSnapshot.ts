@@ -1,14 +1,12 @@
-import { stat } from "node:fs/promises";
 import { join } from "node:path";
-import { resolveWithin } from "./paths.ts";
+import { resolveRegularFileWithin } from "./paths.ts";
 import { thumbnailCacheNames } from "./thumbnailCache.ts";
 import type { ListSummariesResult } from "./workRowMapping.ts";
 
 export type CoverSnapshotGapReason =
   | "work-load-failed"
   | "cover-unmeasured"
-  | "cover-path-unresolved"
-  | "cover-stat-failed";
+  | "cover-path-unresolved";
 
 export interface CoverSnapshotGap {
   workId: string;
@@ -57,21 +55,13 @@ export async function buildCoverSnapshot(
     const placement = result.placements.get(work.id);
     if (!placement) throw new Error(`作品の配置がありません: ${work.id}`);
     const { mediaRoot } = placement;
-    const resolved = resolveWithin(mediaRoot, join(mediaRoot, work.cover.image));
-    if (!resolved) {
+    const file = resolveRegularFileWithin(mediaRoot, join(mediaRoot, work.cover.image));
+    if (!file) {
       gaps.push({ workId: work.id, reason: "cover-path-unresolved" });
       continue;
     }
-    try {
-      const sourceStat = await stat(resolved);
-      for (const name of thumbnailCacheNames(work.id, {
-        size: sourceStat.size,
-        mtimeMs: sourceStat.mtimeMs,
-      })) {
-        validNames.add(name);
-      }
-    } catch {
-      gaps.push({ workId: work.id, reason: "cover-stat-failed" });
+    for (const name of thumbnailCacheNames(work.id, file)) {
+      validNames.add(name);
     }
     checkpoint();
   }

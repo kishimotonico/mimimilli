@@ -3,26 +3,41 @@ import { z } from "zod";
 declare const workspacePathBrand: unique symbol;
 export type WorkspacePath = string & { readonly [workspacePathBrand]: "WorkspacePath" };
 
+export function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 0x2f) end -= 1;
+  return value.slice(0, end);
+}
+
+export function toSlashPathWithoutTrailingSlash(value: string): string {
+  return trimTrailingSlashes(value.replace(/\\/g, "/"));
+}
+
 export function workspacePath(value: string): WorkspacePath {
   if (/^(?:[\\/]|[A-Za-z]:)/.test(value)) throw new Error("WorkspacePath は絶対パスにできません");
-  const normalized = value.replace(/\\/g, "/").replace(/\/+$/g, "");
+  const normalized = toSlashPathWithoutTrailingSlash(value);
   if (normalized.split("/").some((part: string) => part === "." || part === "..")) {
     throw new Error("WorkspacePath は root 相対の正規化済みパスである必要があります");
   }
   return normalized as WorkspacePath;
 }
 
-export const workspacePathSchema = z.string().transform((value, ctx) => {
-  try {
-    return workspacePath(value);
-  } catch (error) {
-    ctx.addIssue({
-      code: "custom",
-      message: error instanceof Error ? error.message : "不正なWorkspacePathです",
-    });
-    return z.NEVER;
-  }
-});
+export const WORKSPACE_PATH_MAX_LENGTH = 4096;
+
+export const workspacePathSchema = z
+  .string()
+  .max(WORKSPACE_PATH_MAX_LENGTH)
+  .transform((value, ctx) => {
+    try {
+      return workspacePath(value);
+    } catch (error) {
+      ctx.addIssue({
+        code: "custom",
+        message: error instanceof Error ? error.message : "不正なWorkspacePathです",
+      });
+      return z.NEVER;
+    }
+  });
 
 export const mediaKindSchema = z.enum(["audio", "image", "pdf", "text", "video", "other"]);
 export type MediaKind = z.infer<typeof mediaKindSchema>;

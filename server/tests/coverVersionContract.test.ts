@@ -3,7 +3,7 @@ import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import sharp from "sharp";
-import { createApp } from "../src/app.ts";
+import { createApp } from "./helpers/testApp.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { deriveCoverVersion } from "../src/adapter/media.ts";
 import type { WorksPage } from "@mimimilli/shared";

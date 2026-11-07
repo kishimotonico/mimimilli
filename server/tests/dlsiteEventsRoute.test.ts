@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { Hono } from "hono";
 import type { DlsiteBulkResult } from "@mimimilli/shared";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
-import { createApp } from "../src/app.ts";
+import { createApp } from "./helpers/testApp.ts";
 import type { DataAdapter } from "../src/adapter/index.ts";
 import { DlsiteJobManager } from "../src/dlsiteJobManager.ts";
 import { dlsiteRoute } from "../src/routes/dlsite.ts";

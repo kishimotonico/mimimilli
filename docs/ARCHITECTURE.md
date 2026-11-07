@@ -95,6 +95,10 @@ oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメン
 ## 公開範囲と配布
 
 - サーバーの bind は `127.0.0.1` に固定している。LAN 内の別端末への公開は認証とセットで将来対応する
+- 全リクエストで `Host` を検証し、loopback（`localhost`・`127.0.0.1`・`[::1]`・`*.localhost`、ポートは不問）以外は 403 にする（DNSリバインディング対策）。`Host` が無い要求も 403 にする。GET/HEAD/OPTIONS 以外は `Origin` がloopbackでない場合と `Sec-Fetch-Site: cross-site` も 403 にする（CSRF対策）。どちらのヘッダーも無い要求は通す
+- JSON本文を読む route は、本文があって `Content-Type` が `application/json` でなければ 415 にする。CORS ヘッダーは出さない
+- カバー・音声・ワークスペースのファイルは、作品フォルダーまたはルート内に `realpath` で封じ込め、通常ファイルだけを扱う。DLsiteカバーは作品フォルダー内の一時ファイル経由で、revision照合の後に最終名へ確定する（symlinkを追従しない）
+- リクエスト本文の上限は64MiB。超過はBunが本文なしの413を返すため、ApiError形式にならない。workspace pathの長さ上限は4096
 - 開発serverと配布ランタイムはBunを使う。Windows配布物はsharpの外部資産を含むzipを前提とし、compile・実機smokeは配布タスクで整備する
 - システムトレイ常駐・インストーラー・コード署名も将来検討事項で、詳細設計は未着手
 

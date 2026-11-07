@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { dlsiteApplyMissingBodySchema } from "@mimimilli/shared";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
-import { createApp } from "../src/app.ts";
+import { createApp } from "./helpers/testApp.ts";
 
 const ENDPOINT = "/api/dlsite/apply-missing";
 const INVALID_MESSAGE = "workIds は文字列配列で指定してください";
@@ -13,7 +13,10 @@ async function postApplyMissing(
 ) {
   return app.request(ENDPOINT, {
     method: "POST",
-    headers: init?.headers,
+    headers:
+      init?.body === undefined
+        ? init?.headers
+        : { "Content-Type": "application/json", ...init.headers },
     body: init?.body,
   });
 }

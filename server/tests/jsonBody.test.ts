@@ -6,6 +6,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { readJsonBody, readOptionalJsonBody } from "../src/lib/jsonBody.ts";
 
+const JSON_HEADERS = { "Content-Type": "application/json" };
 const schema = z.object({ full: z.boolean().optional() });
 
 function buildApp() {
@@ -31,11 +32,19 @@ test("body省略は空オブジェクトとして検証する", async () => {
 
 test("不正なJSONは固定メッセージ、スキーマ不一致はroute指定のメッセージで400", async () => {
   const app = buildApp();
-  const malformed = await app.request("/", { method: "POST", body: "{full:" });
+  const malformed = await app.request("/", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: "{full:",
+  });
   assert.equal(await errorMessageOf(malformed), "リクエストの JSON が不正です");
-  const mismatch = await app.request("/", { method: "POST", body: JSON.stringify({ full: 1 }) });
+  const mismatch = await app.request("/", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ full: 1 }),
+  });
   assert.equal(await errorMessageOf(mismatch), "内容が不正です");
-  const array = await app.request("/", { method: "POST", body: "[]" });
+  const array = await app.request("/", { method: "POST", headers: JSON_HEADERS, body: "[]" });
   assert.equal(await errorMessageOf(array), "内容が不正です");
 });
 
@@ -43,8 +52,16 @@ test("必須ボディは本文なしでも不正JSONの固定メッセージで4
   const app = buildApp();
   const empty = await app.request("/required", { method: "POST" });
   assert.equal(await errorMessageOf(empty), "リクエストの JSON が不正です");
-  const mismatch = await app.request("/required", { method: "POST", body: "{}" });
+  const mismatch = await app.request("/required", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: "{}",
+  });
   assert.equal(mismatch.status, 200);
-  const invalid = await app.request("/required", { method: "POST", body: '{"full":1}' });
+  const invalid = await app.request("/required", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: '{"full":1}',
+  });
   assert.equal(await errorMessageOf(invalid), "内容が不正です");
 });

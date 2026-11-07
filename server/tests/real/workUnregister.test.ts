@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { test, type TestContext } from "node:test";
 import { META_FILE_NAME, workspacePath, type FsListing, type Work } from "@mimimilli/shared";
-import { createApp } from "../../src/app.ts";
+import { createApp } from "../helpers/testApp.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { unregisterWork } from "../../src/adapters/real/workRegister.ts";
 import { metaStagingPath } from "../../src/adapters/real/metaStaging.ts";

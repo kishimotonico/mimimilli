@@ -1,6 +1,6 @@
 // パス解決とトラバーサル対策。Rust 版（canonicalize + starts_with）と同水準。
 // /api/fs と /api/media/* のすべての物理パス解決はここを通すこと。
-import { realpathSync } from "node:fs";
+import { realpathSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, sep } from "node:path";
 import { isPathWithin } from "../../lib/path.ts";
 import {
@@ -153,6 +153,28 @@ export function resolveWithin(base: string, target: string): string | null {
     return null;
   }
   return isPathWithin(realBase, realTarget) ? realTarget : null;
+}
+
+export interface RegularFileWithin {
+  absolutePath: string;
+  size: number;
+  mtimeMs: number;
+}
+
+/**
+ * base 配下の通常ファイルに解決する。配下でない・存在しない・通常ファイルでない（FIFO・デバイス・ディレクトリ）場合は null。
+ * 解決後の実パスを stat するので、FIFO を open せずに弾ける。
+ */
+export function resolveRegularFileWithin(base: string, target: string): RegularFileWithin | null {
+  const absolutePath = resolveWithin(base, target);
+  if (absolutePath === null) return null;
+  try {
+    const stats = statSync(absolutePath);
+    if (!stats.isFile()) return null;
+    return { absolutePath, size: stats.size, mtimeMs: stats.mtimeMs };
+  } catch {
+    return null;
+  }
 }
 
 const MIME_BY_EXT: Record<string, string> = {

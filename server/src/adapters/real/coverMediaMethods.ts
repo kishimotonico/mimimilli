@@ -1,4 +1,3 @@
-import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { TEXT_PREVIEW_LIMIT_BYTES, type WorkspaceResourceRef } from "@mimimilli/shared";
 import type { FsListing } from "@mimimilli/shared";
@@ -10,7 +9,12 @@ import {
 } from "../../adapter/index.ts";
 import type { WorkspacePath } from "@mimimilli/shared";
 import { browseFs as browseFilesystem } from "./fsBrowse.ts";
-import { mimeOf, resolveWithin, workspaceMediaMetadata } from "./paths.ts";
+import {
+  mimeOf,
+  resolveRegularFileWithin,
+  resolveWithin,
+  workspaceMediaMetadata,
+} from "./paths.ts";
 import { ThumbnailCache } from "./thumbnailCache.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
@@ -28,17 +32,10 @@ export function createCoverMediaMethods(deps: {
     if (!work?.coverImage) return null;
 
     const { mediaRoot } = work.placement;
-    const sourceAbsolutePath = resolveWithin(mediaRoot, join(mediaRoot, work.coverImage));
-    if (!sourceAbsolutePath) return null;
-
-    let sourceStat: Awaited<ReturnType<typeof stat>>;
-    try {
-      sourceStat = await stat(sourceAbsolutePath);
-    } catch {
-      return null;
-    }
-    if (!sourceStat.isFile()) return null;
-    const source = { size: sourceStat.size, mtimeMs: sourceStat.mtimeMs };
+    const file = resolveRegularFileWithin(mediaRoot, join(mediaRoot, work.coverImage));
+    if (!file) return null;
+    const sourceAbsolutePath = file.absolutePath;
+    const source = { size: file.size, mtimeMs: file.mtimeMs };
     const validators = createCoverValidators(work.id, width, source);
 
     return {
@@ -71,25 +68,19 @@ export function createCoverMediaMethods(deps: {
   return {
     async locateWorkspaceMedia(ref: WorkspaceResourceRef) {
       const root = requireRoot();
-      const resolved = resolveWithin(root, join(root, ref.path));
-      if (!resolved) return null;
-      try {
-        const stats = await stat(resolved);
-        if (!stats.isFile()) return null;
-        const metadata = workspaceMediaMetadata(resolved, stats.size);
-        return {
-          location: {
-            type: "file" as const,
-            absolutePath: resolved,
-            mime: mimeOf(resolved),
-            size: stats.size,
-          },
-          ...metadata,
-          maxBytes: metadata.mediaKind === "text" ? TEXT_PREVIEW_LIMIT_BYTES : undefined,
-        };
-      } catch {
-        return null;
-      }
+      const file = resolveRegularFileWithin(root, join(root, ref.path));
+      if (!file) return null;
+      const metadata = workspaceMediaMetadata(file.absolutePath, file.size);
+      return {
+        location: {
+          type: "file" as const,
+          absolutePath: file.absolutePath,
+          mime: mimeOf(file.absolutePath),
+          size: file.size,
+        },
+        ...metadata,
+        maxBytes: metadata.mediaKind === "text" ? TEXT_PREVIEW_LIMIT_BYTES : undefined,
+      };
     },
 
     async locateMedia(
@@ -106,10 +97,10 @@ export function createCoverMediaMethods(deps: {
       if (kind === "audio" && !query.hasTrackFile(workId, rel)) return null;
 
       const { mediaRoot } = placement;
-      const resolved = resolveWithin(mediaRoot, join(mediaRoot, rel));
-      if (!resolved) return null;
+      const file = resolveRegularFileWithin(mediaRoot, join(mediaRoot, rel));
+      if (!file) return null;
 
-      return { type: "file", absolutePath: resolved, mime: mimeOf(resolved) };
+      return { type: "file", absolutePath: file.absolutePath, mime: mimeOf(file.absolutePath) };
     },
 
     async browseFs(path?: WorkspacePath): Promise<FsListing | null> {

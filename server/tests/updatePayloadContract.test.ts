@@ -1,7 +1,7 @@
 // 更新系 API の空 payload 拒否。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createApp } from "../src/app.ts";
+import { createApp } from "./helpers/testApp.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 
 function buildApp() {

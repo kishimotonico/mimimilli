@@ -3,10 +3,12 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ApiError } from "@mimimilli/shared";
-import { NotConfiguredError, RootReconfiguringError } from "./errors.ts";
+import { CoverSaveError, NotConfiguredError, RootReconfiguringError } from "./errors.ts";
+import { apiError } from "./lib/httpError.ts";
 import type { DataAdapter } from "./adapter/index.ts";
 import { formatError, getCategoryLogger } from "./lib/logger.ts";
 import { InFlightRequestGate } from "./lib/inFlightRequestGate.ts";
+import { requireLoopbackHost, requireSameMachineOrigin } from "./lib/requestOrigin.ts";
 import { createRootReconfigurationLockMiddleware } from "./lib/rootReconfigurationLockMiddleware.ts";
 import { axesRoute } from "./routes/axes.ts";
 import { dlsiteRoute } from "./routes/dlsite.ts";
@@ -64,6 +66,9 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
       httpLogger.debug("HTTPリクエストを処理しました", properties);
     }
   });
+
+  app.use("*", requireLoopbackHost);
+  app.use("*", requireSameMachineOrigin);
 
   const api = new Hono();
   const dlsiteJobs = new DlsiteJobManager(adapter);
@@ -143,6 +148,10 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
       httpLogger.warn("未設定のためリクエストを拒否しました", { requestId, path, status: 409 });
       const body: ApiError = { error: { code: "conflict", message: err.message } };
       return c.json(body, 409);
+    }
+    if (err instanceof CoverSaveError) {
+      httpLogger.warn("DLsiteカバーを保存できませんでした", { requestId, path, status: 502 });
+      return apiError("error", err.message).getResponse();
     }
     httpLogger.error("リクエスト処理中にエラーが発生しました", { requestId, ...formatError(err) });
     const body: ApiError = {

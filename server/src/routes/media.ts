@@ -25,6 +25,12 @@ function disableIdleTimeout(c: Context): void {
   }
 }
 
+/** Range判定で416等になりうる経路は、ストリーミング応答（200/206）が確定した場合にだけ idle timeout を無効化する。 */
+function disableIdleTimeoutForStream(c: Context, response: Response): Response {
+  if (response.status === 200 || response.status === 206) disableIdleTimeout(c);
+  return response;
+}
+
 /** node:stream/web と lib.dom の ReadableStream は型定義が噛み合わないため、Response に渡せる型への変換をここに閉じる。 */
 function fileBody(path: string, range?: { start: number; end: number }): ReadableStream {
   return Readable.toWeb(createReadStream(path, range)) as unknown as ReadableStream;
@@ -40,7 +46,6 @@ export function mediaRoute(adapter: DataAdapter, options: MediaRouteOptions = {}
   const chunkSizeBytes = options.chunkSizeBytes ?? DEFAULT_CHUNK_SIZE_BYTES;
 
   app.get("/media/cover/:id", async (c) => {
-    disableIdleTimeout(c);
     const parsed = coverQuerySchema.safeParse(c.req.query());
     if (!parsed.success) invalidRequest(`不正なクエリパラメータです: ${parsed.error.message}`);
     const width = parsed.data.w === undefined ? undefined : normalizeThumbnailWidth(parsed.data.w);
@@ -55,26 +60,31 @@ export function mediaRoute(adapter: DataAdapter, options: MediaRouteOptions = {}
     ) {
       return new Response(null, { status: 304, headers: cacheHeaders });
     }
+    disableIdleTimeout(c);
     const location = await descriptor.materialize();
     return streamWhole(location, cacheHeaders);
   });
 
   app.get("/media/workspace", async (c) => {
-    disableIdleTimeout(c);
     const parsed = workspaceMediaQuerySchema.safeParse(c.req.query());
     if (!parsed.success) invalidRequest(`不正なクエリパラメータです: ${parsed.error.message}`);
     const media = await adapter.locateWorkspaceMedia({ kind: "workspace", path: parsed.data.path });
     if (!media) notFound(`ファイルが見つかりません: ${parsed.data.path}`);
     if (media.preview.kind === "unavailable") notFound(`プレビューできません: ${parsed.data.path}`);
-    return streamWithRange(media.location, c.req.header("Range"), chunkSizeBytes, media.maxBytes);
+    return disableIdleTimeoutForStream(
+      c,
+      await streamWithRange(media.location, c.req.header("Range"), chunkSizeBytes, media.maxBytes),
+    );
   });
 
   app.get("/media/audio/:id/:path{.+}", async (c) => {
-    disableIdleTimeout(c);
     const location = await adapter.locateMedia("audio", c.req.param("id"), c.req.param("path"));
     if (!location)
       notFound(`音声ファイルが見つかりません: ${c.req.param("id")}/${c.req.param("path")}`);
-    return streamWithRange(location, c.req.header("Range"), chunkSizeBytes);
+    return disableIdleTimeoutForStream(
+      c,
+      await streamWithRange(location, c.req.header("Range"), chunkSizeBytes),
+    );
   });
 
   return app;

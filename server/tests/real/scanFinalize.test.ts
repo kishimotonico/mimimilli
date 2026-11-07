@@ -1,11 +1,9 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import * as fs from "node:fs/promises";
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
-import { spyOn } from "bun:test";
 import { THUMBNAIL_WIDTHS } from "@mimimilli/shared";
 import type { WorkSummary } from "@mimimilli/shared";
 import sharp from "sharp";
@@ -389,7 +387,7 @@ test("finalizeScan: 寸法未計測カバーでGCスキップ時も last_scan_ti
   assert.ok(scanStates.has(LAST_SCAN_TIME_KEY));
 });
 
-test("finalizeScan: カバーの stat 失敗がある場合は削除されない", async (t) => {
+test("finalizeScan: カバーを通常ファイルに解決できない場合は削除されない", async (t) => {
   const thumbnailCacheDir = setupCacheDir(t);
   mkdirSync(thumbnailCacheDir, { recursive: true });
   const cachedFile = join(thumbnailCacheDir, "orphan.webp");
@@ -399,15 +397,7 @@ test("finalizeScan: カバーの stat 失敗がある場合は削除されない
   t.after(workDirectory.cleanup);
   const workDir = workDirectory.path;
   const coverPath = join(workDir, "cover.jpg");
-  writeFileSync(coverPath, "cover");
-
-  const spy = spyOn(fs, "stat").mockImplementation((async (path) => {
-    if (String(path) === coverPath) {
-      throw new Error("stat failed");
-    }
-    return stat(path);
-  }) as typeof fs.stat);
-  t.after(() => spy.mockRestore());
+  mkdirSync(coverPath);
 
   await finalizeScan({
     query: {
@@ -415,7 +405,7 @@ test("finalizeScan: カバーの stat 失敗がある場合は削除されない
         folderSummariesResult({
           summaries: [
             makeSummary({
-              id: "work-stat-fail",
+              id: "work-unresolved-cover",
               physicalPath: workDir,
               cover: {
                 image: "cover.jpg",
