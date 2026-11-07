@@ -2,6 +2,7 @@ import { existsSync, realpathSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { Context, MiddlewareHandler } from "hono";
 import type { AppEnv } from "./app.ts";
+import { isPathWithin } from "./lib/path.ts";
 
 const IMMUTABLE_CACHE = "public, max-age=31536000, immutable";
 const NO_CACHE = "no-cache";
@@ -38,13 +39,9 @@ function cacheControlForPath(urlPath: string): string {
 function isResolvedPathInsideRoot(root: string, candidate: string): boolean {
   const resolvedRoot = resolve(root);
   const resolvedCandidate = resolve(candidate);
-  if (resolvedCandidate !== resolvedRoot && !resolvedCandidate.startsWith(`${resolvedRoot}/`)) {
-    return false;
-  }
+  if (!isPathWithin(resolvedRoot, resolvedCandidate)) return false;
   try {
-    const realRoot = realpathSync(resolvedRoot);
-    const realCandidate = realpathSync(resolvedCandidate);
-    return realCandidate === realRoot || realCandidate.startsWith(`${realRoot}/`);
+    return isPathWithin(realpathSync(resolvedRoot), realpathSync(resolvedCandidate));
   } catch {
     return false;
   }

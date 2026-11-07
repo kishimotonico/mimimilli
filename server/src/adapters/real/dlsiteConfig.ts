@@ -1,4 +1,4 @@
-export const DEFAULT_DLSITE_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) mimimilli/0.1";
+export const DEFAULT_DLSITE_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36";
 
 export interface DlsiteRequestConfig {
   offline: boolean;
