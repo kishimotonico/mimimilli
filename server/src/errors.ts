@@ -25,20 +25,23 @@ export class CoverSaveError extends Error {
 
 export class SourceChangedError extends Error {
   constructor() {
-    super("作品データが外部で変更されました。再読み込みしてから編集してください");
+    super("作品データが外部で変更されました。再読み込みしてからやり直してください");
     this.name = "SourceChangedError";
   }
 }
 
-export const SOURCE_FILE_MISSING_MESSAGE = "作品情報ファイルが見つからないため編集できません。";
+export const SOURCE_FILE_MISSING_MESSAGE = "作品情報ファイルが見つかりません。";
 export const SOURCE_FILE_BROKEN_MESSAGE =
-  "作品情報ファイルが壊れているため編集できません。表示は前回スキャン時点の内容です。";
-export const SOURCE_FORMAT_UNSUPPORTED_MESSAGE =
-  "この作品情報の形式には未対応のため編集できません。";
+  "作品情報ファイルが壊れています。表示は前回スキャン時点の内容です。";
+export const SOURCE_FORMAT_UNSUPPORTED_MESSAGE = "この作品情報の形式には未対応です。";
 export const SOURCE_IDENTITY_MISMATCH_MESSAGE =
   "作品情報の識別子が一致しないため、この操作は適用できません。";
 export const SOURCE_LOCATION_MISMATCH_MESSAGE =
   "作品の場所が一致しないため、この操作は適用できません。";
+
+export const SOURCE_RELOAD_FAILED_MESSAGE = "作品を一覧へ反映できませんでした。";
+export const SOURCE_RELOAD_UNRESOLVED_MESSAGE =
+  "作品情報ファイルを読み直しても、この作品の保存値を直せませんでした。";
 
 /** JSON 不正・スキーマ不正・formatVersion 非対応。HTTP は parse_error。 */
 export class SourceParseError extends Error {
@@ -48,7 +51,7 @@ export class SourceParseError extends Error {
   }
 }
 
-/** ファイル欠損・identity/location 不一致。HTTP は conflict。 */
+/** 作品情報ファイルが無い・identity/location 不一致。HTTP は conflict。 */
 export class SourceConflictError extends Error {
   constructor(message: string) {
     super(message);
@@ -93,8 +96,15 @@ export function descendantsRegisteredError(count: number): WorkRegisterError {
 export function restoreIdentityConflictError(): WorkRegisterError {
   return new WorkRegisterError(
     "identity_conflict",
-    "同じ Work ID が別の場所で登録済みです。移動の再接続なら先にスキャンしてください。複製なら Files で「別作品として取り込む」を使ってください",
+    "同じ Work ID が別の場所で登録済みです。移動の再接続なら先にスキャンしてください。複製なら Files で「別の作品として取り込む」を使ってください",
   );
+}
+
+export class DlsiteRefetchRequiredError extends Error {
+  constructor() {
+    super("DLsiteの取得結果が古くなりました。もう一度取得してから適用してください");
+    this.name = "DlsiteRefetchRequiredError";
+  }
 }
 
 export class DlsiteOfflineError extends Error {

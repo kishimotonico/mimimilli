@@ -1,13 +1,8 @@
 import {
   workspacePath,
   axisFacetItemSchema,
-  dlsiteApplyMissingPreviewSchema,
-  dlsiteBulkResultSchema,
-  dlsiteBulkSnapshotSchema,
   fsEntrySchema,
   fsListingSchema,
-  dlsiteBulkApplyMissingResultSchema,
-  dlsiteNotificationSummarySchema,
   scanCandidateSchema,
   scanCandidatesRegisterResponseSchema,
   resolvedPlaylistSchema,
@@ -18,8 +13,7 @@ import {
   scanDiagnosticsSchema,
   scanJobEventSchema,
   scanJobSnapshotSchema,
-  scanLastResultResponseSchema,
-  scanResultSchema,
+  scanRecordSchema,
   settingsSchema,
   smartFolderSchema,
   tagPrefixSchema,
@@ -28,17 +22,11 @@ import {
   workSchema,
   workSourceMutationResultSchema,
   type AxisFacetItem,
-  type DlsiteApplyMissingPreview,
-  type DlsiteBulkResult,
-  type DlsiteBulkSnapshot,
   type FsEntry,
   type FsListing,
-  type DlsiteBulkApplyMissingResult,
-  type DlsiteNotificationSummary,
   type DlsitePreview,
   type ScanDiagnostics,
-  type ScanLastResultResponse,
-  type ScanResult,
+  type ScanRecord,
   type Settings,
   type SmartFolder,
   type TagPrefix,
@@ -124,6 +112,7 @@ export function buildWorkSourceMutationResult(
 export function buildDlsitePreview(
   info: Partial<DlsitePreview["info"]> = {},
   sourceRevision = "rev-1",
+  extra: Partial<Pick<DlsitePreview, "infoRevision" | "cachedCover">> = {},
 ): DlsitePreview {
   return dlsitePreviewSchema.parse({
     info: {
@@ -137,6 +126,9 @@ export function buildDlsitePreview(
       url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501001.html",
       ...info,
     },
+    infoRevision: 1_700_000_000_000,
+    cachedCover: { key: "a".repeat(64), version: 1_700_000_000_000 },
+    ...extra,
     sourceRevision,
   });
 }
@@ -161,42 +153,16 @@ export function buildSmartFolder(overrides: Partial<SmartFolder> = {}): SmartFol
   });
 }
 
-export function buildDlsiteNotificationSummary(
-  overrides: Partial<DlsiteNotificationSummary> = {},
-): DlsiteNotificationSummary {
-  return dlsiteNotificationSummarySchema.parse({
-    rjCodeMissingCount: 0,
-    fetchFailedCount: 0,
-    parseErrorCount: 0,
-    parseErrorAlert: false,
-    unlinkedCount: 0,
-    ...overrides,
-  });
-}
-
 export function buildScanDiagnostics(overrides: Partial<ScanDiagnostics> = {}): ScanDiagnostics {
   return scanDiagnosticsSchema.parse({ identityConflicts: [], invalidMetaFiles: [], ...overrides });
 }
 
-export function buildScanResult(overrides: Partial<ScanResult> = {}): ScanResult {
-  return scanResultSchema.parse({
-    registered: 0,
-    insertedWorkIds: [],
-    updatedWorkIds: [],
-    errors: 0,
-    missing: 0,
-    skipped: 0,
-    coverErrors: 0,
-    ...overrides,
-  });
-}
-
-export function buildScanLastResult(
-  overrides: Partial<ScanLastResultResponse> = {},
-): ScanLastResultResponse {
-  return scanLastResultResponseSchema.parse({
-    result: buildScanResult(),
+export function buildScanRecord(overrides: Partial<ScanRecord> = {}): ScanRecord {
+  return scanRecordSchema.parse({
     finishedAt: "2026-01-01T00:00:00.000Z",
+    updatedWorks: [],
+    missingWorks: [],
+    unreadablePaths: [],
     ...overrides,
   });
 }
@@ -251,6 +217,9 @@ export function buildScanCandidate(
     audioFileCount: 1,
     audioBreakdown: [{ extension: "mp3", count: 1 }],
     rjCode: null,
+    rjCodeEdited: false,
+    dlsite: { state: "none" },
+    missingWorks: [],
     ...overrides,
     path: workspacePath(overrides.path),
   });
@@ -286,24 +255,6 @@ export function buildResolvedPlaylist(
       durationSec: 10,
       durationKind: "resolved",
     })),
-    ...overrides,
-  });
-}
-
-export function buildDlsiteApplyMissingPreview(
-  items: DlsiteApplyMissingPreview["items"] = [],
-): DlsiteApplyMissingPreview {
-  return dlsiteApplyMissingPreviewSchema.parse({ items });
-}
-
-export function buildDlsiteBulkApplyMissingResult(
-  overrides: Partial<DlsiteBulkApplyMissingResult> = {},
-): DlsiteBulkApplyMissingResult {
-  return dlsiteBulkApplyMissingResultSchema.parse({
-    applied: 0,
-    pending: 0,
-    skipped: 0,
-    failed: 0,
     ...overrides,
   });
 }
@@ -348,7 +299,6 @@ export function buildScanJobSnapshot(overrides: Partial<ScanJobSnapshot> = {}): 
     startedAt: "2026-01-01T00:00:00.001Z",
     finishedAt: null,
     progress: null,
-    result: null,
     error: null,
     ...overrides,
   });
@@ -356,20 +306,4 @@ export function buildScanJobSnapshot(overrides: Partial<ScanJobSnapshot> = {}): 
 
 export function buildScanJobEvent(event: ScanJobEvent): ScanJobEvent {
   return scanJobEventSchema.parse(event);
-}
-
-export function buildDlsiteBulkResult(overrides: Partial<DlsiteBulkResult> = {}): DlsiteBulkResult {
-  return dlsiteBulkResultSchema.parse({
-    fetched: 0,
-    failed: 0,
-    parseErrors: 0,
-    skipped: 0,
-    ...overrides,
-  });
-}
-
-export function buildDlsiteBulkSnapshot(
-  overrides: Partial<DlsiteBulkSnapshot> = {},
-): DlsiteBulkSnapshot {
-  return dlsiteBulkSnapshotSchema.parse({ current: null, lastTerminal: null, ...overrides });
 }

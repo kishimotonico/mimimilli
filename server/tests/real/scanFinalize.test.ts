@@ -9,7 +9,9 @@ import type { WorkSummary } from "@mimimilli/shared";
 import sharp from "sharp";
 import { finalizeScan, LAST_SCAN_TIME_KEY } from "../../src/adapters/real/scanFinalize.ts";
 import { captureLogs, recordMessage, scanRecords } from "../helpers/logCapture.ts";
-import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
+import { makeSampleLibrary, makeTestDirectory } from "../helpers/sampleLibrary.ts";
+import { createTestRealAdapter } from "../helpers/realAdapter.ts";
+import { configureRoot } from "../helpers/rootFolder.ts";
 import { folderSummariesResult } from "../helpers/workTestUtils.ts";
 
 function makeSummary(
@@ -65,7 +67,6 @@ test("finalizeScan: サムネイルGC後に last_scan_time を記録する", asy
     query,
     catalog,
     thumbnailCacheDir,
-    integrityLogContext: "scan-finalize-test",
   });
 
   assert.ok(scanStates.has(LAST_SCAN_TIME_KEY));
@@ -424,3 +425,33 @@ test("finalizeScan: カバーを通常ファイルに解決できない場合は
 
   assert.ok(existsSync(cachedFile));
 });
+
+for (const kind of ["memory", "files"] as const) {
+  test(`scan: DB種別 ${kind} でも同じ完了後処理（孤児サムネイルGC・生成中tmp保持・last_scan_time記録）を通る`, async (t) => {
+    const library = makeSampleLibrary();
+    t.after(library.cleanup);
+    const dataRoot = join(library.baseDir, "data");
+    const thumbnailCacheDir = join(dataRoot, "thumbnails");
+    const database =
+      kind === "memory"
+        ? ({ kind: "memory" } as const)
+        : ({
+            kind: "files",
+            catalogPath: join(dataRoot, "db", "catalog.sqlite"),
+            userPath: join(dataRoot, "db", "user.sqlite"),
+          } as const);
+    const adapter = library.own(createTestRealAdapter({ database, dataRoot, thumbnailCacheDir }));
+    await configureRoot(adapter, library.root);
+    mkdirSync(thumbnailCacheDir, { recursive: true });
+    const orphan = join(thumbnailCacheDir, "orphan.webp");
+    const writingTmp = join(thumbnailCacheDir, "inflight.webp.tmp-1-0");
+    writeFileSync(orphan, "orphan");
+    writeFileSync(writingTmp, "writing");
+
+    await adapter.scan();
+
+    assert.equal(existsSync(orphan), false);
+    assert.equal(existsSync(writingTmp), true);
+    assert.notEqual((await adapter.getSettings()).lastScanTime, null);
+  });
+}

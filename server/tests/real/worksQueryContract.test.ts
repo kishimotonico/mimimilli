@@ -317,55 +317,6 @@ test("複数サークルタグのcircleNameはsharedとrealでUTF-8 BINARY順の
   assert.equal(page.items[0]?.circleName, toWorkListItem(item, "/library").circleName);
 });
 
-test("realのDLsite通知集計とページは状態別に一覧契約を返す", (t) => {
-  const scope = makeTestScope();
-  t.after(scope.cleanup);
-  const db = scope.own(openDb({ kind: "memory" }));
-  const { query: queryRepo, catalog, user } = createWorkRepos(db);
-  const missing = fullWork({ ...dataset[0]!, dlsite: emptyDlsiteState() });
-  const failed = fullWork({
-    ...dataset[1]!,
-    dlsite: {
-      rjCode: "RJ123456",
-      status: "error",
-      lastAttemptAt: null,
-      error: "failed",
-      errorKind: null,
-      appliedTags: [],
-    },
-  });
-  const unlinked = fullWork({
-    ...dataset[2]!,
-    dlsite: {
-      rjCode: "RJ123457",
-      status: "none",
-      lastAttemptAt: null,
-      error: null,
-      errorKind: null,
-      appliedTags: [],
-    },
-  });
-  upsertTestWork(catalog, user, missing);
-  upsertTestWork(catalog, user, failed);
-  upsertTestWork(catalog, user, unlinked);
-
-  assert.deepEqual(queryRepo.getDlsiteNotificationSummary(), {
-    rjCodeMissingCount: 1,
-    fetchFailedCount: 1,
-    parseErrorCount: 0,
-    parseErrorAlert: false,
-    unlinkedCount: 1,
-  });
-  assert.deepEqual(queryRepo.queryDlsiteNotifications("rj-missing", { page: 1, limit: 10 }), {
-    items: [{ id: missing.id, title: missing.title, status: "none", rjCode: null }],
-    total: 1,
-  });
-  assert.deepEqual(queryRepo.queryDlsiteNotifications("fetch-failed", { page: 1, limit: 10 }), {
-    items: [{ id: failed.id, title: failed.title, status: "error", rjCode: null }],
-    total: 1,
-  });
-});
-
 test("core参照実装とreal SQLのファセット値・件数・順序が同値", (t) => {
   const scope = makeTestScope();
   t.after(scope.cleanup);

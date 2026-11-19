@@ -10,12 +10,11 @@ import {
   type UseMutationResult,
 } from "@tanstack/react-query";
 import type {
-  DlsiteApplyBody,
+  DlsiteApplyBodyInput,
   DlsitePreview,
   DlsiteStateUpdateBody,
   NormalizedTag,
-  ScanCandidateRegisterItem,
-  ScanCandidatesRegisterResponse,
+  DlsiteRegistrationApply,
   UnregisterMissingWorksResult,
   UrlEntry,
   WorkCreateBodyInput,
@@ -26,7 +25,6 @@ import type {
 import {
   addWorkTag,
   applyDlsiteInfo,
-  applyDlsiteMissing,
   createWork,
   deleteWork,
   fetchDlsiteInfo,
@@ -36,21 +34,23 @@ import {
   projectWorkSource,
   reassignIdentityConflict,
   registerScanCandidates,
+  reloadWork,
+  type ScanCandidatesRegisterOutcome,
   removeWorkTag,
   unregisterMissingWorks,
   updateDlsiteState,
 } from "../api";
 import {
   updateCachesAfterBookmark,
-  updateCachesAfterDlsiteBulkApply,
   updateCachesAfterDlsiteLinkageChange,
-  updateCachesAfterDlsitePreviewFetch,
+  updateCachesAfterDlsiteSyncFetch,
   updateCachesAfterIdentityReassign,
   updateCachesAfterMissingUnregistration,
   updateCachesAfterRegistration,
   updateCachesAfterSourceEdit,
   updateCachesAfterSourceEditFailure,
   updateCachesAfterUnregistration,
+  updateCachesAfterWorkReload,
 } from "./workCacheUpdates";
 
 /** 一括draft保存（ADR-0025）の変数。未変更のフィールドはキー自体を含めない */
@@ -159,9 +159,22 @@ export function useRegisterWorkMutation() {
 
 export function useRegisterScanCandidatesMutation() {
   const queryClient = useQueryClient();
-  return useMutation<ScanCandidatesRegisterResponse, Error, ScanCandidateRegisterItem[]>({
-    mutationFn: (items) => registerScanCandidates(items),
-    onSuccess: () => updateCachesAfterRegistration(queryClient),
+  return useMutation<
+    ScanCandidatesRegisterOutcome,
+    Error,
+    { paths: string[]; apply: DlsiteRegistrationApply }
+  >({
+    mutationFn: ({ paths, apply }) => registerScanCandidates(paths, apply),
+    onSuccess: (outcome) =>
+      outcome.registered.length > 0 ? updateCachesAfterRegistration(queryClient) : undefined,
+  });
+}
+
+export function useReloadWorkMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: (workId) => reloadWork(workId),
+    onSuccess: (_data, workId) => updateCachesAfterWorkReload(queryClient, workId),
   });
 }
 
@@ -203,24 +216,20 @@ export function useUpdateDlsiteLinkageMutation() {
 
 export function useFetchDlsitePreviewMutation() {
   const queryClient = useQueryClient();
-  return useMutation<DlsitePreview, Error, string>({
-    mutationFn: (workId) => fetchDlsiteInfo(workId),
-    onSettled: (_data, _error, workId) => updateCachesAfterDlsitePreviewFetch(queryClient, workId),
+  return useMutation<DlsitePreview, Error, { workId: string; rjCode: string }>({
+    mutationFn: ({ workId }) => fetchDlsiteInfo(workId),
+    onSettled: (_data, _error, { rjCode }) => updateCachesAfterDlsiteSyncFetch(queryClient, rjCode),
   });
 }
 
 export function useApplyDlsiteInfoMutation() {
   const queryClient = useQueryClient();
-  return useMutation<WorkSourceMutationResult, Error, { workId: string; body: DlsiteApplyBody }>({
+  return useMutation<
+    WorkSourceMutationResult,
+    Error,
+    { workId: string; body: DlsiteApplyBodyInput }
+  >({
     mutationFn: ({ workId, body }) => applyDlsiteInfo(workId, body),
     onSuccess: (result) => updateCachesAfterDlsiteLinkageChange(queryClient, result),
-  });
-}
-
-export function useApplyDlsiteMissingMutation() {
-  const queryClient = useQueryClient();
-  return useMutation<Awaited<ReturnType<typeof applyDlsiteMissing>>, Error, string[]>({
-    mutationFn: (workIds) => applyDlsiteMissing(workIds),
-    onSuccess: (_result, workIds) => updateCachesAfterDlsiteBulkApply(queryClient, workIds),
   });
 }

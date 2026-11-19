@@ -12,6 +12,7 @@ import {
   type FixtureAdapterOptions,
   type FixtureSeedWork,
 } from "../../src/adapters/fixture/index.ts";
+import type { RealAdapterOptions } from "../../src/adapters/real/index.ts";
 import { writeMetaFile } from "../../src/adapters/real/meta.ts";
 import { configureRoot } from "./rootFolder.ts";
 import { nts } from "./tag.ts";
@@ -33,6 +34,8 @@ export interface ContractLibrary {
   candidateFolders?: Array<{ path: string; audioFiles: string[] }>;
   /** fixture側の追加オプション（シナリオ等）。worksは指定できない */
   fixture?: Omit<FixtureAdapterOptions, "works">;
+  /** real側の追加オプション（DLsiteの通信モック等） */
+  real?: Omit<RealAdapterOptions, "database" | "dlsiteCache">;
 }
 
 export interface ContractHarness {
@@ -163,7 +166,9 @@ async function build(kind: AdapterKind, library: ContractLibrary): Promise<Built
     mkdirSync(dir, { recursive: true });
     for (const file of folder.audioFiles) writeFileSync(join(dir, file), Buffer.alloc(16));
   }
-  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  const adapter = directory.own(
+    createTestRealAdapter({ ...library.real, database: { kind: "memory" } }),
+  );
   await configureRoot(adapter, root);
   await adapter.scan();
   const app = createApp(adapter);

@@ -6,10 +6,13 @@ import { Database } from "bun:sqlite";
 import {
   DEFAULT_DLSITE_CACHE_TTLS_MS,
   RJ_CODE_PATTERN,
+  dlsiteWorkInfoSchema,
   type DlsiteCacheOutcome,
   type DlsiteCacheResolution,
+  type DlsiteCacheResolutionHead,
   type DlsiteFailureOutcome,
   type DlsiteHtmlOutcome,
+  type DlsiteWorkInfo,
 } from "@mimimilli/shared";
 import { applySqliteBusyTimeout } from "./sqliteConnection.ts";
 
@@ -17,6 +20,7 @@ export type {
   DlsiteCacheMissReason,
   DlsiteCacheOutcome,
   DlsiteCacheResolution,
+  DlsiteCacheResolutionHead,
 } from "@mimimilli/shared";
 export { DEFAULT_DLSITE_CACHE_TTLS_MS };
 
@@ -69,6 +73,19 @@ type SnapshotMetaRow = {
 type SnapshotBodyRow = {
   html_gzip: Uint8Array;
   html_size: number;
+};
+
+/** snapshotの取得時にパーサーが読んだ結果。content_fetched_at と版が一致する間だけ有効 */
+export interface DlsiteParsedEntry {
+  contentFetchedAt: number;
+  parserVersion: number;
+  info: DlsiteWorkInfo;
+}
+
+type ParsedRow = {
+  content_fetched_at: number;
+  parser_version: number;
+  info_json: string;
 };
 
 type FailureRow = {
@@ -192,6 +209,15 @@ export class DlsiteCache {
       );
       CREATE INDEX IF NOT EXISTS dlsite_fetch_failures_expires_at
         ON dlsite_fetch_failures(failure_expires_at);
+      CREATE TABLE IF NOT EXISTS dlsite_parsed_products (
+        store TEXT NOT NULL CHECK(store IN ('maniax', 'pro')),
+        product_code TEXT NOT NULL,
+        representation TEXT NOT NULL,
+        content_fetched_at INTEGER NOT NULL,
+        parser_version INTEGER NOT NULL,
+        info_json TEXT NOT NULL,
+        PRIMARY KEY (store, product_code, representation)
+      );
       CREATE TABLE IF NOT EXISTS dlsite_cover_entries (
         cache_key TEXT PRIMARY KEY,
         body BLOB NOT NULL,
@@ -222,13 +248,15 @@ export class DlsiteCache {
     };
   }
 
-  /** HTTP成功時（2xxでパースできてもできなくても）に呼ぶ。失敗記録は消す。 */
+  /** HTTP成功時（2xxでパースできてもできなくても）に呼ぶ。失敗記録は消す。
+   *  解析できたときは解析結果（parsed）もsnapshotと同じ書き込みで保存する。 */
   recordSuccess(
     input: DlsiteCacheKey & {
       outcome: DlsiteHtmlOutcome;
       contentType: string;
       html: string | Uint8Array;
       transferSize?: number;
+      parsed?: { parserVersion: number; info: DlsiteWorkInfo };
     },
   ): void {
     const key = normalizeKey(input);
@@ -275,8 +303,73 @@ export class DlsiteCache {
            WHERE store = ? AND product_code = ? AND representation = ?`,
         )
         .run(key.store, key.productCode, key.representation);
+      this.sqlite
+        .query(
+          `DELETE FROM dlsite_parsed_products
+           WHERE store = ? AND product_code = ? AND representation = ?`,
+        )
+        .run(key.store, key.productCode, key.representation);
+      if (input.parsed) this.writeParsedRow(key, fetchedAt, input.parsed);
     });
     write();
+  }
+
+  private writeParsedRow(
+    key: NormalizedKey,
+    contentFetchedAt: number,
+    parsed: { parserVersion: number; info: DlsiteWorkInfo },
+  ): void {
+    this.sqlite
+      .query(
+        `INSERT INTO dlsite_parsed_products
+          (store, product_code, representation, content_fetched_at, parser_version, info_json)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(store, product_code, representation) DO UPDATE SET
+           content_fetched_at = excluded.content_fetched_at,
+           parser_version = excluded.parser_version, info_json = excluded.info_json`,
+      )
+      .run(
+        key.store,
+        key.productCode,
+        key.representation,
+        contentFetchedAt,
+        parsed.parserVersion,
+        JSON.stringify(parsed.info),
+      );
+  }
+
+  /** 読み直して得た解析結果を、対応するsnapshotの取得時刻つきで保存する。 */
+  writeParsed(
+    keyInput: DlsiteCacheKey,
+    contentFetchedAt: number,
+    parsed: { parserVersion: number; info: DlsiteWorkInfo },
+  ): void {
+    this.writeParsedRow(normalizeKey(keyInput), contentFetchedAt, parsed);
+  }
+
+  /** 保存済みの解析結果。TTLは見ない（有効性は呼び出し側がresolveHeadのfetchedAtと突き合わせる）。 */
+  readParsed(keyInput: DlsiteCacheKey): DlsiteParsedEntry | null {
+    const key = normalizeKey(keyInput);
+    const row = this.sqlite
+      .query(
+        `SELECT content_fetched_at, parser_version, info_json FROM dlsite_parsed_products
+         WHERE store = ? AND product_code = ? AND representation = ?`,
+      )
+      .get(key.store, key.productCode, key.representation) as ParsedRow | null;
+    if (!row) return null;
+    let raw: unknown;
+    try {
+      raw = JSON.parse(row.info_json);
+    } catch {
+      return null;
+    }
+    const info = dlsiteWorkInfoSchema.safeParse(raw);
+    if (!info.success) return null;
+    return {
+      contentFetchedAt: row.content_fetched_at,
+      parserVersion: row.parser_version,
+      info: info.data,
+    };
   }
 
   /** HTTP失敗時に呼ぶ。既存のHTML snapshotは診断用に残したまま触らない。 */
@@ -341,11 +434,10 @@ export class DlsiteCache {
   }
 
   /**
-   * 通常取得の判断に使う。有効な失敗記録があればネットワークを抑制してそれを返し、
-   * なければ有効なHTML snapshotを、それもなければmissを返す。
-   * gzip本文はhit確定後にしか読まない（freshness判定だけならメタ行の読み取りで済む）。
+   * 通常取得の判断をメタ行の読み取りだけで返す。有効な失敗記録があればそれを、
+   * なければTTL内のHTML snapshotを、それもなければmissを返す。
    */
-  resolve(keyInput: DlsiteCacheKey): DlsiteCacheResolution {
+  resolveHead(keyInput: DlsiteCacheKey): DlsiteCacheResolutionHead {
     const key = normalizeKey(keyInput);
     const now = this.clock();
     const failure = this.readFailure(key);
@@ -360,20 +452,41 @@ export class DlsiteCache {
     const meta = this.readSnapshotMeta(key);
     if (!meta) return { kind: "miss", reason: "not_cached" };
     if (meta.content_expires_at <= now) return { kind: "miss", reason: "ttl_expired" };
-    const body = this.readSnapshotBody(key);
-    if (!body) return { kind: "miss", reason: "snapshot_body_missing" };
     return {
       kind: "html",
       outcome: meta.outcome,
       fetchedAt: meta.content_fetched_at,
       expiresAt: meta.content_expires_at,
-      html: this.decompressHtml(body),
     };
+  }
+
+  /** resolveHeadの判断に、hit確定後のgzip本文の展開を足す。 */
+  resolve(keyInput: DlsiteCacheKey): DlsiteCacheResolution {
+    const head = this.resolveHead(keyInput);
+    if (head.kind !== "html") return head;
+    const body = this.readSnapshotBody(normalizeKey(keyInput));
+    if (!body) return { kind: "miss", reason: "snapshot_body_missing" };
+    return { ...head, html: this.decompressHtml(body) };
   }
 
   /** cover URLの正規化済み表現を含むキー。画像は圧縮しない。 */
   static coverKey(normalizedUrl: string): string {
     return createHash("sha256").update(normalizedUrl).digest("hex");
+  }
+
+  /** カバーの有無と版（fetched_at）。本文は読まない。 */
+  coverVersionByKey(coverKey: string): number | null {
+    const row = this.sqlite
+      .query("SELECT fetched_at FROM dlsite_cover_entries WHERE cache_key = ?")
+      .get(coverKey) as { fetched_at: number } | null;
+    return row ? row.fetched_at : null;
+  }
+
+  getCoverByKey(coverKey: string): { body: Uint8Array; fetchedAt: number } | null {
+    const row = this.sqlite
+      .query("SELECT body, fetched_at FROM dlsite_cover_entries WHERE cache_key = ?")
+      .get(coverKey) as { body: Uint8Array; fetched_at: number } | null;
+    return row ? { body: new Uint8Array(row.body), fetchedAt: row.fetched_at } : null;
   }
 
   getCover(normalizedUrl: string): { body: Uint8Array } | null {
@@ -439,6 +552,15 @@ export class DlsiteCache {
     deleted += this.sqlite
       .query("DELETE FROM dlsite_fetch_failures WHERE failure_expires_at <= ?")
       .run(now).changes;
+    deleted += this.sqlite
+      .query(
+        `DELETE FROM dlsite_parsed_products WHERE NOT EXISTS (
+           SELECT 1 FROM dlsite_html_snapshots s
+           WHERE s.store = dlsite_parsed_products.store
+             AND s.product_code = dlsite_parsed_products.product_code
+             AND s.representation = dlsite_parsed_products.representation)`,
+      )
+      .run().changes;
     return deleted;
   }
 

@@ -1,8 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider } from "jotai";
 import { lazy, Suspense, type ReactNode } from "react";
-import DlsiteBulkRuntime from "../features/dlsite/ui/DlsiteBulkRuntime";
-import DlsiteBulkApplyRuntime from "../features/dlsite/ui/DlsiteBulkApplyRuntime";
+import DlsiteJobRuntime from "../features/dlsite/ui/DlsiteJobRuntime";
 import ScanRuntime from "../features/scan/ui/ScanRuntime";
 import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
 import { PlayerRuntimeProvider } from "../entities/player/model/PlayerRuntimeProvider";
@@ -48,9 +47,8 @@ export default function Providers({ children }: ProvidersProps) {
       <JotaiProvider>
         <NavigationHistorySync />
         <PlayerRuntimeProvider>
-          <DlsiteBulkRuntime />
-          <DlsiteBulkApplyRuntime />
           <ScanRuntime />
+          <DlsiteJobRuntime />
           {children}
           {ReactQueryDevtools && (
             <Suspense fallback={null}>

@@ -1,16 +1,23 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  computeDlsiteWorkDiff,
+  defaultDlsiteApplySelection,
   detectRjCode,
-  hasDlsiteUrl,
+  type DlsiteApplySelectionInput,
+  type DlsiteCoverChange,
   type DlsitePreview,
-  type Work,
+  type DlsiteUnavailableReason,
+  type DlsiteValueChange,
+  type DlsiteWorkCurrent,
+  type DlsiteWorkDiff,
   type WorkEditSnapshot,
   type WorkProjection,
 } from "@mimimilli/shared";
 import {
   dlsiteApplyErrorMessage,
   dlsiteFetchErrorMessage,
+  isDlsiteApplyStale,
 } from "../../../../entities/work/dlsiteFetchError";
 import Button from "../../../../shared/ui/Button";
 import TextInput from "../../../../shared/ui/TextInput";
@@ -29,12 +36,6 @@ import {
   useUpdateDlsiteLinkageMutation,
 } from "../../../../entities/work/model/workMutations";
 import { useToast } from "../../../../shared/ui/useToast";
-import {
-  buildDlsiteApplyBody,
-  computeDlsiteApplyDiff,
-  type DlsiteApplyDiff,
-  type DlsiteFieldDiff,
-} from "../../../../entities/work/dlsitePreview";
 
 function folderNameOf(physicalPath: string): string {
   const cut = Math.max(physicalPath.lastIndexOf("/"), physicalPath.lastIndexOf("\\"));
@@ -46,38 +47,75 @@ function initialRjCode(snapshot: WorkEditSnapshot): string {
   return detectRjCode([folderNameOf(snapshot.physicalPath), snapshot.title]) ?? "";
 }
 
+const UNAVAILABLE_REASON_LABEL: Record<DlsiteUnavailableReason, string> = {
+  no_title: "DLsiteにタイトルがありません",
+  no_url: "DLsiteにURLがありません",
+  no_cover: "DLsiteに画像がありません",
+  cover_not_cached: "画像を取得できていません",
+};
+
+/** ダイアログ1行の表示。before が現在値、after が反映後の値 */
+type DlsiteRowView =
+  | { kind: "change"; before: string; after: string }
+  | { kind: "same"; value: string }
+  | { kind: "unavailable"; before: string; reason: string };
+
+function valueRowView(change: DlsiteValueChange): DlsiteRowView {
+  switch (change.kind) {
+    case "fill":
+      return { kind: "change", before: "未設定", after: change.next };
+    case "replace":
+      return { kind: "change", before: change.current, after: change.next };
+    case "unchanged":
+      return { kind: "same", value: change.current };
+    case "unavailable":
+      return {
+        kind: "unavailable",
+        before: change.current ?? "未設定",
+        reason: UNAVAILABLE_REASON_LABEL[change.reason],
+      };
+  }
+}
+
+function coverRowView(change: DlsiteCoverChange, hasCover: boolean): DlsiteRowView {
+  const before = hasCover ? "設定済み" : "未設定";
+  if (change.kind === "unavailable") {
+    return { kind: "unavailable", before, reason: UNAVAILABLE_REASON_LABEL[change.reason] };
+  }
+  return { kind: "change", before, after: "DLsite画像" };
+}
+
 interface DlsiteDiffRowProps {
   label: string;
-  diff: DlsiteFieldDiff;
+  view: DlsiteRowView;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
 }
 
 /** 変更あり／変更なし／適用不可を見た目と操作で分ける1行 */
-function DlsiteDiffRow({ label, diff, checked, onCheckedChange }: DlsiteDiffRowProps) {
-  const current = diff.kind === "unchanged" ? diff.value : diff.current;
-  const stateWord =
-    diff.kind === "unchanged" ? "同一" : diff.kind === "unavailable" ? "対象外" : null;
-  const tooltip = diff.kind === "unavailable" ? diff.reason : undefined;
+function DlsiteDiffRow({ label, view, checked, onCheckedChange }: DlsiteDiffRowProps) {
+  const current = view.kind === "same" ? view.value : view.before;
+  const stateWord = view.kind === "same" ? "同一" : view.kind === "unavailable" ? "対象外" : null;
+  const tooltip = view.kind === "unavailable" ? view.reason : undefined;
   return (
     <label
       title={tooltip}
       className={`grid grid-cols-[18px_60px_minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-1.5 border-b border-line-soft py-2 ${
-        diff.kind === "changed" ? "" : "opacity-50"
+        view.kind === "change" ? "" : "opacity-50"
       }`}
     >
       <input
         type="checkbox"
-        checked={diff.kind === "changed" && checked}
-        disabled={diff.kind !== "changed"}
+        checked={view.kind === "change" && checked}
+        disabled={view.kind !== "change"}
         onChange={(event) => onCheckedChange(event.target.checked)}
       />
       <span>{label}</span>
       <span className="min-w-0 break-words text-ink-2">{current}</span>
-      <span className="text-ink-3">{diff.kind === "changed" ? "→" : ""}</span>
+      <span className="text-ink-3">{view.kind === "change" ? "→" : ""}</span>
       <span className="min-w-0 break-words">
-        {diff.kind === "changed" ? (
-          <span className="font-medium text-ink-0">{diff.next}</span>
+        {view.kind === "change" ? (
+          <span className="font-medium text-ink-0">{view.after}</span>
         ) : (
           stateWord
         )}
@@ -87,31 +125,21 @@ function DlsiteDiffRow({ label, diff, checked, onCheckedChange }: DlsiteDiffRowP
 }
 
 interface DlsiteApplyDialogProps {
-  diff: DlsiteApplyDiff;
+  diff: DlsiteWorkDiff;
+  hasCover: boolean;
   busy: boolean;
-  applyTitle: boolean;
-  applyCover: boolean;
-  applyUrl: boolean;
-  selectedTags: string[];
-  onApplyTitleChange: (checked: boolean) => void;
-  onApplyCoverChange: (checked: boolean) => void;
-  onApplyUrlChange: (checked: boolean) => void;
-  onSelectedTagsChange: (tags: string[]) => void;
+  selection: DlsiteApplySelectionInput;
+  onSelectionChange: (selection: DlsiteApplySelectionInput) => void;
   onApply: () => void;
   onClose: () => void;
 }
 
 function DlsiteApplyDialog({
   diff,
+  hasCover,
   busy,
-  applyTitle,
-  applyCover,
-  applyUrl,
-  selectedTags,
-  onApplyTitleChange,
-  onApplyCoverChange,
-  onApplyUrlChange,
-  onSelectedTagsChange,
+  selection,
+  onSelectionChange,
   onApply,
   onClose,
 }: DlsiteApplyDialogProps) {
@@ -131,50 +159,54 @@ function DlsiteApplyDialog({
       <div className="mll-selectable min-h-0 flex-1 overflow-y-auto px-[18px] py-3 text-secondary">
         <DlsiteDiffRow
           label="タイトル"
-          diff={diff.title}
-          checked={applyTitle}
-          onCheckedChange={onApplyTitleChange}
+          view={valueRowView(diff.title)}
+          checked={selection.title}
+          onCheckedChange={(title) => onSelectionChange({ ...selection, title })}
         />
         <DlsiteDiffRow
           label="URL"
-          diff={diff.url}
-          checked={applyUrl}
-          onCheckedChange={onApplyUrlChange}
+          view={valueRowView(diff.url)}
+          checked={selection.url}
+          onCheckedChange={(url) => onSelectionChange({ ...selection, url })}
         />
         <DlsiteDiffRow
           label="カバー"
-          diff={diff.cover}
-          checked={applyCover}
-          onCheckedChange={onApplyCoverChange}
+          view={coverRowView(diff.cover, hasCover)}
+          checked={selection.cover}
+          onCheckedChange={(cover) => onSelectionChange({ ...selection, cover })}
         />
-        {diff.newTags.length > 0 && (
+        {diff.tags.length > 0 && (
           <fieldset className="grid gap-1.5 py-2.5">
             <legend className="mb-1 font-sans font-medium">追加されるタグ</legend>
-            {diff.newTags.map((tag) => (
+            {diff.tags.map(({ tag, replaces }) => (
               <label key={tag} className="flex items-center gap-1.5">
                 <input
                   type="checkbox"
-                  checked={selectedTags.includes(tag)}
+                  checked={selection.tags.includes(tag)}
                   onChange={(event) =>
-                    onSelectedTagsChange(
-                      event.target.checked
-                        ? [...selectedTags, tag]
-                        : selectedTags.filter((item) => item !== tag),
-                    )
+                    onSelectionChange({
+                      ...selection,
+                      tags: event.target.checked
+                        ? [...selection.tags, tag]
+                        : selection.tags.filter((item) => item !== tag),
+                    })
                   }
                 />
                 <span>{tag}</span>
+                {replaces.length > 0 && (
+                  <span className="text-ink-3">（{replaces.join("、")} を置き換え）</span>
+                )}
               </label>
             ))}
           </fieldset>
         )}
-        {diff.appliedTags.length > 0 && (
+        {diff.presentTags.length > 0 && (
           <details className="py-2 text-ink-2">
             <summary className="cursor-pointer font-sans">
-              適用済みのタグ（{diff.appliedTags.length}）
+              適用済みのタグ（{diff.presentTags.length}）
             </summary>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {diff.appliedTags.map((tag) => (
+              {diff.presentTags.map((tag) => (
                 <span key={tag}>{tag}</span>
               ))}
             </div>
@@ -194,31 +226,33 @@ function DlsiteApplyDialog({
   );
 }
 
+function currentOf(snapshot: WorkEditSnapshot): DlsiteWorkCurrent {
+  return {
+    title: snapshot.title,
+    tags: snapshot.tags,
+    urls: snapshot.urls,
+    hasCover: snapshot.coverImage !== null,
+  };
+}
+
+interface FetchedDlsite {
+  preview: DlsitePreview;
+  diff: DlsiteWorkDiff;
+  hasCover: boolean;
+}
+
 export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: WorkEditSnapshot }) {
   const linkageMutation = useUpdateDlsiteLinkageMutation();
   const fetchPreviewMutation = useFetchDlsitePreviewMutation();
   const applyMutation = useApplyDlsiteInfoMutation();
   const toast = useToast();
   const [rjCode, setRjCode] = useState(initialRjCode(snapshot));
-  const [preview, setPreview] = useState<DlsitePreview | null>(null);
-  const [applyTitle, setApplyTitle] = useState(false);
-  const [applyCover, setApplyCover] = useState(true);
-  const [applyUrl, setApplyUrl] = useState(false);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [fetched, setFetched] = useState<FetchedDlsite | null>(null);
+  const [selection, setSelection] = useState<DlsiteApplySelectionInput | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [projection, setProjection] = useState<WorkProjection | null>(null);
   const rootFolder = useRootFolderOrNull();
-  const diffSource: Pick<Work, "title" | "tags" | "urls" | "coverKind" | "coverImage" | "cover"> = {
-    title: snapshot.title,
-    tags: snapshot.tags,
-    urls: snapshot.urls,
-    coverKind: snapshot.coverImage ? "unmeasured" : "none",
-    coverImage: snapshot.coverImage,
-    cover: null,
-  };
-  const diff = preview ? computeDlsiteApplyDiff(diffSource, preview.info) : null;
-
   // oxlint-disable-next-line react-hooks/exhaustive-deps -- 検出の再計算は作品切替と保存済みコードだけ
   useEffect(() => setRjCode(initialRjCode(snapshot)), [snapshot.id, snapshot.dlsite.rjCode]);
 
@@ -228,7 +262,7 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
     try {
       const result = await linkageMutation.mutateAsync({
         workId,
-        body: { sourceRevision: snapshot.sourceRevision, rjCode: rjCode.trim() || null },
+        body: { sourceRevision: snapshot.sourceRevision, rjCode: rjCode.trim() },
       });
       setProjection(result.projection);
     } catch (cause) {
@@ -242,27 +276,20 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
     setBusy(true);
     setError(null);
     try {
+      const code = rjCode.trim().toUpperCase();
       let current = snapshot;
-      if (rjCode.trim().toUpperCase() !== snapshot.dlsite.rjCode) {
+      if (code !== (snapshot.dlsite.rjCode ?? "")) {
         const updated = await linkageMutation.mutateAsync({
           workId,
-          body: { sourceRevision: snapshot.sourceRevision, rjCode: rjCode.trim() || null },
+          body: { sourceRevision: snapshot.sourceRevision, rjCode: code },
         });
         current = updated.snapshot;
       }
-      const nextPreview = await fetchPreviewMutation.mutateAsync(workId);
-      const nextDiff = computeDlsiteApplyDiff(
-        {
-          title: current.title,
-          tags: current.tags,
-          urls: current.urls,
-          coverKind: current.coverImage ? "unmeasured" : "none",
-          coverImage: current.coverImage,
-          cover: null,
-        },
-        nextPreview.info,
-      );
-      if (!nextDiff.hasChanges) {
+      const preview = await fetchPreviewMutation.mutateAsync({ workId, rjCode: code });
+      const diff = computeDlsiteWorkDiff(currentOf(current), preview.info, {
+        coverCached: preview.cachedCover !== null,
+      });
+      if (!diff.hasChanges) {
         toast.show({
           message: "DLsiteの情報は現在の内容と同じでした",
           variant: "info",
@@ -270,11 +297,8 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
         });
         return;
       }
-      setSelectedTags(nextDiff.newTags);
-      setApplyTitle(false);
-      setApplyCover(!current.coverImage && Boolean(nextPreview.info.coverUrl));
-      setApplyUrl(!hasDlsiteUrl(current.urls));
-      setPreview(nextPreview);
+      setSelection(defaultDlsiteApplySelection(diff));
+      setFetched({ preview, diff, hasCover: current.coverImage !== null });
     } catch (cause) {
       setError(dlsiteFetchErrorMessage(cause));
     } finally {
@@ -283,24 +307,23 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
   };
 
   const apply = async () => {
-    if (!preview) return;
+    if (!fetched || !selection) return;
     setBusy(true);
     setError(null);
     try {
       const result = await applyMutation.mutateAsync({
         workId,
-        body: buildDlsiteApplyBody(preview.info, {
-          sourceRevision: preview.sourceRevision,
-          applyTitle,
-          applyCover,
-          applyUrl,
-          applyTags: selectedTags,
-        }),
+        body: {
+          sourceRevision: fetched.preview.sourceRevision,
+          infoRevision: fetched.preview.infoRevision,
+          apply: selection,
+        },
       });
       setProjection(result.projection);
-      setPreview(null);
+      setFetched(null);
       toast.show({ message: "DLsite情報を適用しました", variant: "success", priority: "notice" });
     } catch (cause) {
+      if (isDlsiteApplyStale(cause)) setFetched(null);
       setError(dlsiteApplyErrorMessage(cause));
     } finally {
       setBusy(false);
@@ -383,20 +406,15 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
         path={rootFolder ? projectionWorkspacePath(snapshot, rootFolder) : null}
         onProjected={(result) => setProjection(result.projection)}
       />
-      {diff && (
+      {fetched && selection && (
         <DlsiteApplyDialog
-          diff={diff}
+          diff={fetched.diff}
+          hasCover={fetched.hasCover}
           busy={busy}
-          applyTitle={applyTitle}
-          applyCover={applyCover}
-          applyUrl={applyUrl}
-          selectedTags={selectedTags}
-          onApplyTitleChange={setApplyTitle}
-          onApplyCoverChange={setApplyCover}
-          onApplyUrlChange={setApplyUrl}
-          onSelectedTagsChange={setSelectedTags}
+          selection={selection}
+          onSelectionChange={setSelection}
           onApply={() => void apply()}
-          onClose={() => setPreview(null)}
+          onClose={() => setFetched(null)}
         />
       )}
     </section>

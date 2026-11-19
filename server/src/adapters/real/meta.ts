@@ -4,9 +4,17 @@
 import { closeSync, openSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { basename, dirname, join } from "node:path";
-import { errorMessage, META_FILE_NAME, metaFileSchema, type MetaFile } from "@mimimilli/shared";
+import { META_FILE_NAME, metaFileSchema, type MetaFile } from "@mimimilli/shared";
 import { SourceChangedError } from "../../errors.ts";
 import { installBytes } from "./atomicFile.ts";
+import {
+  describeMetaDiagnostic,
+  formatVersionDiagnostic,
+  jsonSyntaxDiagnostic,
+  schemaIssueDiagnostic,
+  type MetaDiagnostic,
+  type MetaDiagnosticKind,
+} from "./metaDiagnostics.ts";
 
 export { SourceChangedError } from "../../errors.ts";
 
@@ -18,23 +26,22 @@ export function isMetaFileName(name: string): boolean {
   return name === META_FILE_NAME || name.endsWith(META_SUFFIX);
 }
 
-export type MetaParseKind = "json" | "schema" | "formatVersion";
+export type { MetaDiagnostic };
 
 export class MetaParseError extends Error {
   readonly metaPath: string;
   readonly candidateId: string | null;
-  readonly kind: MetaParseKind;
+  readonly diagnostic: MetaDiagnostic;
 
-  constructor(
-    metaPath: string,
-    detail: string,
-    candidateId: string | null = null,
-    kind: MetaParseKind = "schema",
-  ) {
-    super(`メタファイルが不正です（${basename(metaPath)}）: ${detail}`);
+  constructor(metaPath: string, diagnostic: MetaDiagnostic, candidateId: string | null = null) {
+    super(describeMetaDiagnostic(basename(metaPath), diagnostic));
     this.metaPath = metaPath;
     this.candidateId = candidateId;
-    this.kind = kind;
+    this.diagnostic = diagnostic;
+  }
+
+  get kind(): MetaDiagnosticKind {
+    return this.diagnostic.kind;
   }
 }
 
@@ -50,8 +57,6 @@ export class MetaMutationReject {
     this.error = error;
   }
 }
-
-export type MetaDiagnostic = { kind: MetaParseKind; detail: string };
 
 /**
  * メタファイル1回分の読み込み結果。JSON不正・スキーマ違反も例外にせず診断として保持する。
@@ -81,13 +86,13 @@ export function inspectMetaBytes(bytes: Buffer): MetaInspection {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
-  } catch (error) {
+  } catch {
     return {
       ...base,
       declaredId: null,
       candidateId: rescueIdFromText(text),
       meta: null,
-      diagnostic: { kind: "json", detail: `JSON パースエラー: ${errorMessage(error)}` },
+      diagnostic: jsonSyntaxDiagnostic(text),
     };
   }
   const declaredId = declaredIdOf(raw);
@@ -104,15 +109,13 @@ export function inspectMetaBytes(bytes: Buffer): MetaInspection {
     "formatVersion" in raw &&
     (raw as { formatVersion: unknown }).formatVersion !== 1
   ) {
-    return invalid({ kind: "formatVersion", detail: "unsupported formatVersion" });
+    return invalid(
+      formatVersionDiagnostic(text, (raw as { formatVersion: unknown }).formatVersion),
+    );
   }
   const parsed = metaFileSchema.safeParse(raw);
   if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    return invalid({
-      kind: "schema",
-      detail: `${issue?.path.join(".") ?? ""} ${issue?.message ?? "不明"}`,
-    });
+    return invalid(schemaIssueDiagnostic(text, parsed.error.issues));
   }
   return { ...base, declaredId, candidateId: declaredId, meta: parsed.data, diagnostic: null };
 }
@@ -126,12 +129,7 @@ export function metaParseErrorOf(
   metaPath: string,
   inspection: MetaInspection & { diagnostic: MetaDiagnostic },
 ): MetaParseError {
-  return new MetaParseError(
-    metaPath,
-    inspection.diagnostic.detail,
-    inspection.candidateId,
-    inspection.diagnostic.kind,
-  );
+  return new MetaParseError(metaPath, inspection.diagnostic, inspection.candidateId);
 }
 
 function sourceOf(metaPath: string, inspection: MetaInspection): MetaSource {

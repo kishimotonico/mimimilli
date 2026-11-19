@@ -1,3 +1,4 @@
+import { NO_DLSITE } from "../helpers/scanLibrary.ts";
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -5,7 +6,6 @@ import { test, type TestContext } from "node:test";
 import { spyOn } from "bun:test";
 import { emptyDlsiteState, workspacePath } from "@mimimilli/shared";
 import { createApp } from "../helpers/testApp.ts";
-import { DlsiteJobManager } from "../../src/dlsiteJobManager.ts";
 import { CatalogWorkRepository } from "../../src/adapters/real/catalogWorkRepository.ts";
 import { DlsiteScheduler } from "../../src/adapters/real/dlsiteScheduler.ts";
 import { ScanUpsertBatch } from "../../src/adapters/real/scanUpsertBatch.ts";
@@ -65,18 +65,6 @@ function wrapUpsert(onCall: (work: { id: string; title: string }, metaPath: stri
     },
   );
   return spy;
-}
-
-function spyEnqueue(t: TestContext) {
-  const calls: Array<{ mode: string; workIds: string[] | undefined }> = [];
-  const spy = spyOn(DlsiteJobManager.prototype, "enqueue").mockImplementation(
-    function (mode, workIds) {
-      calls.push({ mode, workIds });
-      return "job-spy";
-    },
-  );
-  t.after(() => spy.mockRestore());
-  return calls;
 }
 
 function wrapBatchAdd(onCall: (metaPath: string) => void) {
@@ -170,7 +158,6 @@ test("PATCH中に正本が変わるとpending/source_changedになり再投影�
 });
 
 test("新規登録がunpublishedでも201になり同じpathの再投影でcatalogに出る", async (t) => {
-  spyEnqueue(t);
   const directory = makeTestDirectory("projection-register-unpublished");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");
@@ -195,7 +182,7 @@ test("新規登録がunpublishedでも201になり同じpathの再投影でcatal
   const created = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspacePath("new-work"), title: "登録タイトル" }),
+    body: JSON.stringify({ path: workspacePath("new-work"), title: "登録タイトル", ...NO_DLSITE }),
   });
   assert.equal(created.status, 201);
   const body = await created.json();
@@ -214,61 +201,6 @@ test("新規登録がunpublishedでも201になり同じpathの再投影でcatal
   assert.deepEqual(replayed.projection, { status: "published" });
   assert.equal(replayed.snapshot.title, "changed-during-project");
   assert.equal((await adapter.getWork(body.snapshot.id))?.title, "changed-during-project");
-});
-
-test("apply-missingは1件の投影例外をpendingに数え後続はappliedになる", async (t) => {
-  const directory = makeTestDirectory("projection-apply-missing-pending");
-  t.after(directory.cleanup);
-  const root = join(directory.path, "lib");
-  const firstId = "11111111-1111-4111-8111-111111111111";
-  const secondId = "22222222-2222-4222-8222-222222222222";
-  writeWork(join(root, "first"), firstId, "一件目");
-  writeWork(join(root, "second"), secondId, "二件目");
-  const firstMeta = JSON.parse(readFileSync(join(root, "first", "mimimilli.json"), "utf-8")) as {
-    dlsite: { rjCode: string | null };
-  };
-  firstMeta.dlsite.rjCode = "RJ900001";
-  writeFileSync(join(root, "first", "mimimilli.json"), `${JSON.stringify(firstMeta, null, 2)}\n`);
-  const secondMeta = JSON.parse(readFileSync(join(root, "second", "mimimilli.json"), "utf-8")) as {
-    dlsite: { rjCode: string | null };
-  };
-  secondMeta.dlsite.rjCode = "RJ900002";
-  writeFileSync(join(root, "second", "mimimilli.json"), `${JSON.stringify(secondMeta, null, 2)}\n`);
-
-  const { DEFAULT_DLSITE_REQUEST_CONFIG } = await import("../../src/adapters/real/dlsiteConfig.ts");
-  const { htmlResponse, mockDlsiteTransport, sampleWorkHtml } =
-    await import("../helpers/dlsiteTransport.ts");
-  const { createRealAdapter } = await import("../../src/adapters/real/index.ts");
-  const adapter = directory.own(
-    createRealAdapter({
-      database: { kind: "memory" },
-      dlsiteCache: { path: join(directory.path, "cache.sqlite") },
-      dlsiteRequestConfig: {
-        ...DEFAULT_DLSITE_REQUEST_CONFIG,
-        requestIntervalMs: 0,
-        retryCount: 0,
-      },
-      dlsiteSchedulerDependencies: mockDlsiteTransport({
-        html: (code) => htmlResponse(sampleWorkHtml(code, { title: "取得タイトル", cover: false })),
-      }),
-    }),
-  );
-  await configureRoot(adapter, root);
-  await adapter.scan({ full: true });
-  await adapter.runDlsiteBulk("existing", [firstId, secondId]);
-
-  const spy = wrapUpsert((work) => {
-    if (work.id === firstId) throw new Error("catalog write failed");
-  });
-  t.after(() => spy.mockRestore());
-
-  const result = await adapter.dlsiteApplyMissing([firstId, secondId]);
-  assert.deepEqual(result, { applied: 1, pending: 1, skipped: 0, failed: 0 });
-  assert.equal(
-    JSON.parse(readFileSync(join(root, "first", "mimimilli.json"), "utf-8")).dlsite.status,
-    "applied",
-  );
-  assert.ok((await adapter.getWork(secondId))?.tags.length);
 });
 
 test("POST /works/projection の path は root 外・不存在なら invalid_request", async (t) => {
@@ -321,8 +253,7 @@ test("投影先のWork IDが別pathのcatalogにあればidentity_conflictで既
   assert.deepEqual(conflict.paths, ["work", "work-copy"]);
 });
 
-test("登録がpendingで終わった作品はprojectionでpublishedになったときenqueueが1回呼ばれる", async (t) => {
-  const enqueued = spyEnqueue(t);
+test("登録がpendingで終わった作品がprojectionでpublishedになっても、DLsite取得ジョブは作られない", async (t) => {
   const directory = makeTestDirectory("projection-register-enqueue");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");
@@ -347,13 +278,11 @@ test("登録がpendingで終わった作品はprojectionでpublishedになった
   const created = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspacePath("new-work"), title: "登録タイトル" }),
+    body: JSON.stringify({ path: workspacePath("new-work"), title: "登録タイトル", ...NO_DLSITE }),
   });
   assert.equal(created.status, 201);
   const body = await created.json();
   assert.deepEqual(body.projection, { status: "pending", reason: "source_changed" });
-  assert.deepEqual(enqueued, []);
-
   const replay = await app.request("/api/works/projection", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -362,8 +291,6 @@ test("登録がpendingで終わった作品はprojectionでpublishedになった
   assert.equal(replay.status, 200);
   const replayed = await replay.json();
   assert.deepEqual(replayed.projection, { status: "published" });
-  assert.equal(replayed.catalogInserted, undefined);
-  assert.deepEqual(enqueued, [{ mode: "new", workIds: [body.snapshot.id] }]);
 
   const second = await app.request("/api/works/projection", {
     method: "POST",
@@ -372,20 +299,7 @@ test("登録がpendingで終わった作品はprojectionでpublishedになった
   });
   assert.equal(second.status, 200);
   assert.deepEqual((await second.json()).projection, { status: "published" });
-  assert.deepEqual(enqueued, [{ mode: "new", workIds: [body.snapshot.id] }]);
-});
-
-test("既存作品の再投影ではonWorkRegisteredを呼ばない", async (t) => {
-  const enqueued = spyEnqueue(t);
-  const { app } = await setupLibrary(t, "projection-existing-no-enqueue");
-  const res = await app.request("/api/works/projection", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: "work" }),
-  });
-  assert.equal(res.status, 200);
-  assert.deepEqual((await res.json()).projection, { status: "published" });
-  assert.deepEqual(enqueued, []);
+  assert.deepEqual(await (await app.request("/api/dlsite/jobs/current")).json(), { job: null });
 });
 
 test("projectionの再試行はDLsiteのHTTP取得を呼ばない", async (t) => {

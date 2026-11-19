@@ -131,6 +131,7 @@ export class RootReconfigurationWorkflow {
       await this.dlsiteJobs.cancelActiveAndAwait();
       if (signal.aborted) throw new Error("サーバーの終了処理中です");
       await this.adapter.beginRootReconfiguration(run.rootFolder);
+      this.scanJobs.record.reset();
     } catch (error) {
       this.finish(run);
       begun.reject(error);

@@ -18,7 +18,7 @@ export async function requestWorkPlayback(
   work: { id: string; status: Work["status"] },
   start: (prepared: Work) => void,
 ): Promise<void> {
-  // ファイル欠損・メタ読み込みエラーの作品は再生できない（UI側の無効化が第一線、これは防衛線）。
+  // 行方不明・メタ読み込みエラーの作品は再生できない（UI側の無効化が第一線、これは防衛線）。
   if (work.status !== "ok") return;
   const token = deps.guard.next();
   try {

@@ -86,7 +86,7 @@ smokeテストの注意:
 | `rootReconfiguration.ts` | ルートフォルダーの再設定ワークフロー（[ADR-0029](adr/0029-root-reconfiguration-workflow.md)） |
 | `scan.ts`                | スキャンジョブ（開始・取得・キャンセル・SSE）、候補プール・除外・登録、診断                   |
 | `works.ts`               | 作品の一覧・登録・正本編集・タグ編集・しおり・再生準備・resume・登録解除、`/tags`、`/export`  |
-| `dlsite.ts`              | DLsite の取得・適用・一括取得ジョブ（SSE）・通知（[dlsite.md](dlsite.md)）                    |
+| `dlsite.ts`              | DLsite の取得・適用・取得ジョブ（SSE）（[dlsite.md](dlsite.md)）                              |
 | `tagPrefixes.ts`         | prefix 定義の一覧・追加・変更・削除・並び替え・候補                                           |
 | `axes.ts`                | 軸ごとのファセット集計                                                                        |
 | `smartFolders.ts`        | スマートフォルダーの CRUD・プレビュー・評価結果                                               |
@@ -97,7 +97,7 @@ smokeテストの注意:
 
 - `GET /works` は常にページングエンベロープ `{ items, total }` を返す（page/limit 省略時は page=1, limit=200）
 - 作品の変更系（`PATCH /works/:id`、タグの追加・削除など）は応答に `{ snapshot, projection }` を返す。`PATCH` は `sourceRevision` を要求する
-- `POST /scan` は 202 で `{ job }` を即返し（`Location: /api/scan/:id`）、実行中の二重 POST は 409（`active` 付き）。`GET /scan/active` と `GET /scan/last` は該当なしのとき 204。進捗は `GET /scan/:id/events` の SSE（[ADR-0030](adr/0030-job-progress-sse-current-state.md)）。`GET /scan/last` はその実行のサマリー（件数・新規/更新作品ID・警告）だけを返し、要対応の現在状態は `GET /scan/diagnostics` の `{ identityConflicts, invalidMetaFiles }`、未登録候補は `GET /scan/candidates` から取る
+- `POST /scan` は 202 で `{ job }` を即返し（`Location: /api/scan/:id`）、実行中の二重 POST は 409（`active` 付き）。`GET /scan/active` は該当なしのとき 204。進捗は `GET /scan/:id/events` の SSE（[ADR-0030](adr/0030-job-progress-sse-current-state.md)）。`GET /scan/last` は常に200で直近のスキャンの記録（更新済み・新たな行方不明・読み取れなかったパス・データ不整合。未スキャンは空）を返し、新規作品・更新済みの作品本体は `GET /works?scanRecord=new|updated` から取る。ID重複・読み取り失敗は `GET /scan/diagnostics` の `{ identityConflicts, invalidMetaFiles }`、未登録候補は `GET /scan/candidates` から取る
 - `POST /works/:id/resume` は高頻度のため `PATCH /works/:id` と分離している
 - 音声は Range(206) 対応。カバーは `?w=128|256|512` でサムネイル（real は webp 化 + ディスクキャッシュ、fixture の SVG は原寸）
 
@@ -121,9 +121,10 @@ smokeテストの注意:
 - **Jotai atom**: API由来でない UI 操作状態。ナビゲーション（後述の AppRoute）、library 表示設定（`features/library/model/atoms.ts`: libraryViewMode/libraryTileSize/libraryGridLayoutMode/axisValueSort/randomSeed）、player（後述）
 - **TanStack Query**: サーバー状態。キーは `client/src/entities/<ドメイン>/queryKeys.ts` のファクトリで一元管理する（`WORK_QUERY_KEYS` / `TAG_QUERY_KEYS` / `SMART_FOLDER_QUERY_KEYS` / `SETTINGS_QUERY_KEYS` / `FILE_SYSTEM_QUERY_KEYS`）。広域 invalidate 用のプレフィックスキーも各ファクトリが持つ
 - **ナビゲーションとURL同期**: 画面mode・Libraryの軸/タグ/選択作品/sort/検索語・Filesの場所/選択・作品詳細IDは `entities/navigation/model/appRouteStore.ts` の AppRoute 1つが正本で、各entityの `navigationAtoms.ts` はそこからの読み取り専用の派生。書き込みは各操作の write atom（次のrouteとpush/replaceを計算する純粋関数＋`navigate`）と履歴からの適用だけ。URLとの同期は `Providers` 直下の `NavigationHistorySync`（汎用の `shared/model/useRouteHistorySync.ts` に codec を渡す）が常時マウントで受け持つ（[ADR-0031](adr/0031-app-route-navigation.md)）。AddressBar の戻る/進む・パンくずも本物
-- **scan / DLsite一括取得のジョブ追跡**: スナップショット・SSE接続・世代管理・終端検知は React 外の純 TS ストア（`entities/scan/model/scanJobStore.ts`、`entities/dlsite/model/dlsiteBulkStore.ts`）が持つ。同じ形で、`getState`/`subscribe`（状態）と `subscribeEvents`（終端などの一回きりの通知）、`start`/`cancel`/`attach`（サーバー上の実行中ジョブへの後乗り）/`reset`（ローカルの追跡だけを捨てる。サーバー側のジョブには触れない）を持つ。ストアは Jotai store ごとに1つ（`scanJobStoreAtom`/`dlsiteBulkStoreAtom`）で、操作は Runtime のマウントに依存しない。React からは `useScanJob`/`useDlsiteBulk` の `useStoreSelector` 経由の hook で読む。`ScanRuntime`/`DlsiteBulkRuntime` はイベントをトースト・キャッシュ更新へつなぐだけ
+- **scanのジョブ追跡**: スナップショット・SSE接続・世代管理・終端検知は React 外の純 TS ストア（`entities/scan/model/scanJobStore.ts`）が持つ。`getState`/`subscribe`（状態）と `subscribeEvents`（終端などの一回きりの通知）、`start`/`cancel`/`attach`（サーバー上の実行中ジョブへの後乗り）/`reset`（ローカルの追跡だけを捨てる。サーバー側のジョブには触れない）を持つ。ストアは Jotai store ごとに1つ（`scanJobStoreAtom`）で、操作は Runtime のマウントに依存しない。React からは `useScanJob` の `useStoreSelector` 経由の hook で読む。`ScanRuntime` はイベントをトースト・キャッシュ更新へつなぐだけ
+- **DLsite取得ジョブの追跡**: scanと同じ形の純 TS ストア（`entities/dlsite/model/dlsiteJobStore.ts`、`useDlsiteJob`）がSSE接続と現在のジョブ状態を持つ。`DlsiteJobRuntime` がコードの終端を候補一覧・作品キャッシュの更新とエラートーストへつなぐ。未登録タブの行の状態と上のバーの輪は、このストアから読む
 - **共通UIコンポーネント**: `client/src/shared/ui/` の `Button` / `IconButton` / `TagCombobox` を使う（CSSクラス直付けボタンは廃止済み。LeftNav と円形トランスポートだけ固有意匠のため例外）
-- `App.tsx` はランタイム状態も TanStack Query も購読しない。`libraryTotalQuery` / `lastScanQuery` のような画面固有の購読は、それを使う消費者（`ScanModal` / `NotificationBell`）が自分で行う。この境界は `.oxlintrc.json` の `**/App.tsx` override で機械的に強制されており、`features/**/model/**` の import は deny-by-default（型モジュールだけ否定 glob で許可。player の `usePlayerActions` は `entities/player/model` にあるため制限対象外）
+- `App.tsx` はランタイム状態も TanStack Query も購読しない。`libraryTotalQuery` やスキャンの記録（`GET /scan/last`、キー `["scan", "last"]`）のような画面固有の購読は、それを使う消費者（`ScanModal` / `TopBar` の `useScanEntryStatus`）が自分で行う。この境界は `.oxlintrc.json` の `**/App.tsx` override で機械的に強制されており、`features/**/model/**` の import は deny-by-default（型モジュールだけ否定 glob で許可。player の `usePlayerActions` は `entities/player/model` にあるため制限対象外）
 
 ## プレイヤーのアーキテクチャ
 

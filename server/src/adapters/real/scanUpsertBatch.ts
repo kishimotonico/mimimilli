@@ -94,6 +94,7 @@ export class ScanUpsertBatch {
   publishScanGeneration(input: {
     seenIds: string[];
     unverifiedIds: string[];
+    missingIds: string[];
     identityConflicts: IdentityConflict[];
     invalidMetaFiles: InvalidMetaFile[];
   }): void {
@@ -116,7 +117,7 @@ export class ScanUpsertBatch {
       }
       this.catalog.replaceIdentityConflicts(input.identityConflicts);
       this.catalog.replaceInvalidMetaFiles(input.invalidMetaFiles);
-      this.catalog.markMissingExcept(input.seenIds, input.unverifiedIds);
+      this.catalog.applyScanVerdict(input);
     });
   }
 }

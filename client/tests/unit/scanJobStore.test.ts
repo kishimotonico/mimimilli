@@ -24,23 +24,13 @@ const running: ScanJobSnapshot = {
   startedAt: "2026-01-01T00:00:00.001Z",
   finishedAt: null,
   progress: null,
-  result: null,
   error: null,
 };
-const result = {
-  registered: 1,
-  insertedWorkIds: [],
-  updatedWorkIds: [],
-  errors: 0,
-  missing: 0,
-  skipped: 0,
-  coverErrors: 0,
-};
+const finishedAt = "2026-01-01T00:00:01.000Z";
 const completed: ScanJobSnapshot = {
   ...running,
   status: "completed",
-  finishedAt: "2026-01-01T00:00:01.000Z",
-  result,
+  finishedAt,
 };
 const jobB: ScanJobSnapshot = { ...running, id: "job-2" };
 
@@ -98,9 +88,9 @@ describe("scanJobStore", () => {
     dispatch(source, { type: "state", snapshot: { ...running, status: "cancelling" } });
     expect(store.getState().job?.status).toBe("cancelling");
 
-    dispatch(source, { type: "completed", result });
+    dispatch(source, { type: "completed", finishedAt });
     await flush();
-    dispatch(source, { type: "completed", result });
+    dispatch(source, { type: "completed", finishedAt });
     await flush();
     expect(events.filter((event) => event.type === "terminal")).toHaveLength(1);
     expect(store.getState().job?.status).toBe("completed");
@@ -186,7 +176,7 @@ describe("scanJobStore", () => {
     const { store, sources } = createHarness({ getScanJob });
     await store.start();
     connectionError(sources[0]!);
-    dispatch(sources[0]!, { type: "completed", result });
+    dispatch(sources[0]!, { type: "completed", finishedAt });
     await flush();
     expect(store.getState().job?.status).toBe("completed");
 
@@ -248,7 +238,7 @@ describe("scanJobStore", () => {
       progress: { phase: "registering", processed: 3, total: 10 },
     });
     dispatch(sources[0]!, { type: "state", snapshot: completed });
-    dispatch(sources[0]!, { type: "completed", result });
+    dispatch(sources[0]!, { type: "completed", finishedAt });
     await flush();
 
     expect(store.getState().job).toEqual(jobB);
@@ -368,7 +358,7 @@ describe("scanJobStore", () => {
     await store.start();
     sources[0]!.dispatchEvent(
       new MessageEvent("completed", {
-        data: JSON.stringify({ type: "completed", result: "invalid" }),
+        data: JSON.stringify({ type: "completed", finishedAt: 1 }),
       }),
     );
     expect(store.getState()).toEqual({

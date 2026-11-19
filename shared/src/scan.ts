@@ -1,8 +1,45 @@
 // サーバー側スキャンジョブの HTTP / SSE 契約。
 import { z } from "zod";
-import { dataIntegrityWarningSchema } from "./dataIntegrity.ts";
-import { rjCodeFormatSchema } from "./dlsite.ts";
-import { workspacePathSchema } from "./media.ts";
+import { dataIntegrityWarningSchema, type DataIntegrityWarning } from "./dataIntegrity.ts";
+import {
+  dlsiteCachedCoverSchema,
+  dlsiteRegistrationApplySchema,
+  rjCodeFormatSchema,
+} from "./dlsite.ts";
+import { workspacePathSchema, type WorkspacePath } from "./media.ts";
+
+/** スキャンが見つけた候補フォルダー。DLsiteの状態は持たない（サーバーが候補一覧を返すときに導く） */
+export type ScanCandidateFolder = {
+  path: z.infer<typeof workspacePathSchema>;
+  inferredTitle: string;
+  audioFileCount: number;
+  audioBreakdown: { extension: string; count: number }[];
+  /** フォルダー名から検出したRJコード。未検出は null */
+  detectedRjCode: string | null;
+};
+
+export const scanCandidateDlsiteSchema = z.discriminatedUnion("state", [
+  /** 未取得（キャッシュに無い・TTL切れ・RJコードなし） */
+  z.object({ state: z.literal("none") }),
+  /** 取得ジョブで待機中または取得中 */
+  z.object({ state: z.literal("fetching") }),
+  z.object({
+    state: z.literal("fetched"),
+    title: z.string(),
+    /** null はカバーの先取りに失敗してキャッシュに無い */
+    cover: dlsiteCachedCoverSchema.nullable(),
+  }),
+  z.object({ state: z.literal("not_found") }),
+  z.object({ state: z.literal("failed") }),
+]);
+export type ScanCandidateDlsite = z.infer<typeof scanCandidateDlsiteSchema>;
+
+/** 同じRJコードを持つ、行方不明（catalogでmissing）の作品 */
+export const scanCandidateMissingWorkSchema = z.object({
+  workId: z.string(),
+  title: z.string(),
+});
+export type ScanCandidateMissingWork = z.infer<typeof scanCandidateMissingWorkSchema>;
 
 export const scanCandidateSchema = z.object({
   path: workspacePathSchema,
@@ -11,8 +48,13 @@ export const scanCandidateSchema = z.object({
   audioBreakdown: z.array(
     z.object({ extension: z.string().min(1), count: z.number().int().positive() }),
   ),
-  /** フォルダー名から検出したRJコード。未検出は null。 */
+  /** 直したRJコード、なければフォルダー名から検出したRJコード。どちらも無ければ null。 */
   rjCode: z.string().nullable(),
+  /** RJコードを直した上書きがある（コードなしに直した場合も含む） */
+  rjCodeEdited: z.boolean(),
+  /** rjCode が null のときは常に none */
+  dlsite: scanCandidateDlsiteSchema,
+  missingWorks: z.array(scanCandidateMissingWorkSchema),
 });
 export type ScanCandidate = z.infer<typeof scanCandidateSchema>;
 
@@ -29,20 +71,23 @@ export const scanCandidatesMutationSchema = z.object({
     .min(1)
     .refine((paths) => new Set(paths).size === paths.length, "候補パスが重複しています"),
 });
-export const scanCandidateRegisterItemSchema = z.object({
+/** 空文字はRJコードなしの明示。値ありは検証・正規化して候補一覧に保持する。 */
+export const scanCandidateRjCodeRequestSchema = z.object({
   path: workspacePathSchema,
-  /** 省略時はフォルダー名から自動検出。空文字はRJコードなしの明示。値ありは検証・正規化して mimimilli.json へ書き込む。 */
-  rjCode: z.union([z.literal(""), rjCodeFormatSchema]).optional(),
+  rjCode: z.union([z.literal(""), rjCodeFormatSchema]),
 });
+export const scanCandidateRjCodeResponseSchema = z.object({ candidate: scanCandidateSchema });
+/** 1リクエストで追加できる候補の上限。クライアントはこれごとに分割して送る */
+export const SCAN_CANDIDATE_REGISTER_MAX_PATHS = 20;
+/** RJコードとDLsite情報はサーバーが候補一覧とキャッシュから読む */
 export const scanCandidatesRegisterRequestSchema = z.object({
-  items: z
-    .array(scanCandidateRegisterItemSchema)
+  paths: z
+    .array(workspacePathSchema)
     .min(1)
-    .refine((items) => new Set(items.map((item) => item.path)).size === items.length, {
-      message: "候補パスが重複しています",
-    }),
+    .max(SCAN_CANDIDATE_REGISTER_MAX_PATHS)
+    .refine((paths) => new Set(paths).size === paths.length, "候補パスが重複しています"),
+  apply: dlsiteRegistrationApplySchema,
 });
-export type ScanCandidateRegisterItem = z.infer<typeof scanCandidateRegisterItemSchema>;
 export const scanCandidateExclusionsResponseSchema = z.object({
   paths: z.array(workspacePathSchema),
 });
@@ -60,30 +105,65 @@ export const scanCandidatesRegisterResponseSchema = z.object({
 });
 export type ScanCandidatesRegisterResponse = z.infer<typeof scanCandidatesRegisterResponseSchema>;
 
-export const scanResultSchema = z.object({
-  registered: z.number().int().nonnegative(),
-  /** 今回のスキャンでカタログへ新規挿入された Work ID（mimimilli.json の自動投影） */
-  insertedWorkIds: z.array(z.string()),
-  /** 今回のスキャンでメタファイル更新等により再投影された Work ID */
-  updatedWorkIds: z.array(z.string()),
-  errors: z.number().int().nonnegative(),
-  missing: z.number().int().nonnegative(),
-  /** 増分スキャンで fingerprint が一致し、プローブ・upsertWork を省略した作品数 */
-  skipped: z.number().int().nonnegative(),
-  /** カバー画像はあるが寸法を計測できなかった作品数（errors とは別枠。次回スキャンで再試行） */
-  coverErrors: z.number().int().nonnegative(),
-  /** 走査中に読み取れなかったサブツリーのディレクトリパス。ルート失敗時はスキャン自体がエラーになる */
-  unreadablePaths: z.array(z.string()).optional(),
-  /** finalize 時の listSummaries() でタグ等の不整合により除外した作品。その実行の警告で、サーバー再起動後は次のスキャンまで得られない */
-  dataIntegrityWarning: dataIntegrityWarningSchema.optional(),
+/** 既存作品に起きた変化の1つ。movedのfrom/toは作品フォルダー（単体音声作品は音声ファイル）のroot相対path。 */
+export const workChangeSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("moved"), from: workspacePathSchema, to: workspacePathSchema }),
+  z.object({ kind: z.literal("meta") }),
+  /** 音声・カバー等の増減や差し替え。audioDeltaは音声ファイル数の増減（差し替えのみなら0）。 */
+  z.object({ kind: z.literal("files"), audioDelta: z.number().int() }),
+]);
+export type WorkChange = z.infer<typeof workChangeSchema>;
+export const workChangeKindSchema = z.enum(["moved", "meta", "files"]);
+export type WorkChangeKind = z.infer<typeof workChangeKindSchema>;
+
+/** GET /works の scanRecord 絞り込みが指す、スキャンの記録の作品集合 */
+export const scanRecordKindSchema = z.enum(["new", "updated"]);
+export type ScanRecordKind = z.infer<typeof scanRecordKindSchema>;
+
+export const updatedWorkSchema = z.object({
+  workId: z.string(),
+  /** 1つ以上。種類ごとに高々1つ。 */
+  changes: z.array(workChangeSchema).min(1),
 });
-export type ScanResult = z.infer<typeof scanResultSchema>;
+export type UpdatedWork = z.infer<typeof updatedWorkSchema>;
+
+/** 今回のスキャンで新たに行方不明になった作品。以前から行方不明の作品は含まない */
+export const missingWorkSchema = z.object({
+  workId: z.string(),
+  title: z.string(),
+  /** 行方不明になる前の作品フォルダー（単体音声作品は音声ファイル）のroot相対path */
+  previousPath: workspacePathSchema,
+});
+export type MissingWork = z.infer<typeof missingWorkSchema>;
+
+/** adapter が返すスキャン1回分の結果。HTTPには出さず、サーバーの記録（ScanRecord）の元になる */
+export interface ScanResult {
+  registered: number;
+  /** 今回のスキャンでカタログへ新規挿入された Work ID（mimimilli.json の自動投影） */
+  insertedWorkIds: string[];
+  /** スキャン開始時点でカタログに作品が1件も無かった。true のとき記録の新規作品は空にする */
+  startedWithEmptyCatalog: boolean;
+  /** 今回のスキャンで新たに行方不明になった作品 */
+  missingWorks: MissingWork[];
+  /** 今回のスキャンで変化が見つかった既存作品。エラーからの復帰や全件読み直しで読み直しただけの作品は含まない */
+  updatedWorks: UpdatedWork[];
+  errors: number;
+  missing: number;
+  /** 増分スキャンで fingerprint が一致し、プローブ・upsertWork を省略した作品数 */
+  skipped: number;
+  /** カバー画像はあるが寸法を計測できなかった作品数（errors とは別枠。次回スキャンで再試行） */
+  coverErrors: number;
+  /** 走査中に読み取れなかったサブツリーのディレクトリのroot相対path。ルート失敗時はスキャン自体がエラーになる */
+  unreadablePaths: WorkspacePath[];
+  /** finalize 時の listSummaries() でタグ等の不整合により除外した作品。その実行の警告 */
+  dataIntegrityWarning?: DataIntegrityWarning;
+}
 
 /** 同じ Work ID を持つ mimimilli.json が複数見つかった診断。paths はroot相対・separator正規化済みのportable pathで、相互参照用に全件を含む。 */
 export const identityConflictSchema = z.object({
   kind: z.literal("identity_conflict"),
   workId: z.string(),
-  paths: z.array(z.string()).min(2),
+  paths: z.array(workspacePathSchema).min(2),
 });
 export type IdentityConflict = z.infer<typeof identityConflictSchema>;
 
@@ -132,7 +212,6 @@ export const scanJobSnapshotSchema = z.object({
   startedAt: z.string().nullable(),
   finishedAt: z.string().nullable(),
   progress: scanProgressSchema.nullable(),
-  result: scanResultSchema.nullable(),
   error: z.string().nullable(),
 });
 export type ScanJobSnapshot = z.infer<typeof scanJobSnapshotSchema>;
@@ -152,18 +231,23 @@ export const scanConflictResponseSchema = z.object({
 });
 export type ScanConflictResponse = z.infer<typeof scanConflictResponseSchema>;
 
-/** GET /scan/last の返却値。サーバー起動後に一度でも完了したスキャンの結果を保持する（ディスク永続化はしない）。 */
-export const scanLastResultResponseSchema = z.object({
-  result: scanResultSchema,
-  finishedAt: z.string(),
+/** GET /scan/last の返却値。直近のスキャンで見つかったものの現在の記録で、サーバーのメモリにだけ持つ。
+ *  寿命は次のスキャンかサーバー再起動まで。未スキャンのときは finishedAt が null の空の記録。
+ *  新規作品は件数が多くなりうるため含めず、GET /works?scanRecord=new で取る。 */
+export const scanRecordSchema = z.object({
+  finishedAt: z.string().nullable(),
+  updatedWorks: z.array(updatedWorkSchema),
+  missingWorks: z.array(missingWorkSchema),
+  unreadablePaths: z.array(workspacePathSchema),
+  dataIntegrityWarning: dataIntegrityWarningSchema.optional(),
 });
-export type ScanLastResultResponse = z.infer<typeof scanLastResultResponseSchema>;
+export type ScanRecord = z.infer<typeof scanRecordSchema>;
 
 /** 接続時は現在snapshotを`state`で1件送り、以後はliveのイベントを送る。 */
 export const scanJobEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("state"), snapshot: scanJobSnapshotSchema }),
   z.object({ type: z.literal("progress"), progress: scanProgressSchema }),
-  z.object({ type: z.literal("completed"), result: scanResultSchema }),
+  z.object({ type: z.literal("completed"), finishedAt: z.string() }),
   z.object({ type: z.literal("failed"), error: z.string() }),
   z.object({ type: z.literal("cancelled") }),
 ]);

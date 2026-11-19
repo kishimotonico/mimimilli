@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { normalizeTag } from "@mimimilli/shared";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { dlsiteInfoTags, normalizeTag, rjCodeFormatSchema } from "@mimimilli/shared";
 import type {
-  DlsiteRegistrationBody,
-  DlsiteWorkInfo,
+  DlsiteCachedCover,
   WorkCreateResponse,
   WorkRegisterPreview,
   WorkSourceMutationResult,
@@ -22,13 +21,13 @@ import { buildTagsWithAdded, buildTagsWithRemoved } from "../../../entities/work
 import Tag from "../../../entities/work/ui/Tag";
 import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
 import { tagPrefixDefinition } from "../../../entities/tag/tagPrefixDefinition";
-import { dlsiteInfoTags } from "@mimimilli/shared";
-import { buildDlsiteRegistrationBody } from "../../../entities/work/dlsitePreview";
 import { dlsiteFetchErrorMessage } from "../../../entities/work/dlsiteFetchError";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { sourceMutationErrorMessage } from "../../../entities/work/sourceMutation";
+import { getDlsiteCoverUrl } from "../../../entities/dlsite/dlsiteCoverUrl";
 import { fetchDlsiteInfoByCode } from "../api";
 import { useRegisterWorkMutation } from "../../../entities/work/model/workMutations";
+import { updateCachesAfterDlsiteSyncFetch } from "../../../entities/work/model/workCacheUpdates";
 
 interface RegisterWorkDialogProps {
   folderPath: string;
@@ -49,7 +48,10 @@ export default function RegisterWorkDialog({
   const [tags, setTags] = useState<string[]>(preview.tags);
   const [isTagInputOpen, setIsTagInputOpen] = useState(false);
   const [rjCode, setRjCode] = useState(preview.detectedRjCode ?? "");
-  const [dlsiteInfo, setDlsiteInfo] = useState<DlsiteWorkInfo | null>(null);
+  const [fetched, setFetched] = useState<{
+    rjCode: string;
+    cachedCover: DlsiteCachedCover | null;
+  } | null>(null);
   const [applyCover, setApplyCover] = useState(true);
   const [dlsiteValidationError, setDlsiteValidationError] = useState<string | null>(null);
 
@@ -57,36 +59,42 @@ export default function RegisterWorkDialog({
   const tagSuggestions = tagsQuery.data ?? [];
   const { tagPrefixes } = useTagPrefixes();
 
+  const queryClient = useQueryClient();
   const dlsiteMutation = useMutation({
     mutationFn: (code: string) => fetchDlsiteInfoByCode(code),
-    onSuccess: (info) => {
-      setDlsiteInfo(info);
+    onSettled: (_data, _error, code) => updateCachesAfterDlsiteSyncFetch(queryClient, code),
+    onSuccess: ({ info, cachedCover: cover }) => {
+      setFetched({ rjCode: info.rjCode, cachedCover: cover });
       setTitle(info.title);
       setTags((prev) => Array.from(new Set([...prev, ...dlsiteInfoTags(info)])));
-      setApplyCover(Boolean(info.coverUrl));
+      setApplyCover(cover !== null);
     },
   });
 
   const registerMutation = useRegisterWorkMutation();
+  const trimmedRjCode = rjCode.trim();
+  const parsedRjCode = trimmedRjCode === "" ? null : rjCodeFormatSchema.safeParse(trimmedRjCode);
+  const rjCodeInvalid = parsedRjCode !== null && !parsedRjCode.success;
+  const currentFetched =
+    fetched && parsedRjCode?.success && parsedRjCode.data === fetched.rjCode ? fetched : null;
+  const cachedCover = currentFetched?.cachedCover ?? null;
+
   const register = async () => {
-    const dlsiteAppliedTags = dlsiteInfo
-      ? dlsiteInfoTags(dlsiteInfo).filter((tag) => tags.includes(tag))
-      : [];
-    const dlsite: DlsiteRegistrationBody | undefined = dlsiteInfo
-      ? buildDlsiteRegistrationBody(dlsiteInfo, {
-          applyTitle: false,
-          applyCover,
-          applyUrl: true,
-          applyTags: dlsiteAppliedTags,
-        })
-      : undefined;
+    if (rjCodeInvalid) {
+      setDlsiteValidationError(
+        parsedRjCode.error.issues[0]?.message ?? "RJ/VJコードの形式が正しくありません",
+      );
+      return;
+    }
     let result: WorkCreateResponse;
     try {
       result = await registerMutation.mutateAsync({
         path: folderPath,
         title: title.trim(),
         tags,
-        dlsite,
+        rjCode: trimmedRjCode,
+        applyCover: cachedCover !== null && applyCover,
+        applyUrl: currentFetched !== null,
       });
     } catch {
       return;
@@ -100,16 +108,12 @@ export default function RegisterWorkDialog({
     setTags(preview.tags);
     setIsTagInputOpen(false);
     setRjCode(preview.detectedRjCode ?? "");
-    setDlsiteInfo(null);
+    setFetched(null);
     setApplyCover(true);
     setDlsiteValidationError(null);
     dlsiteMutation.reset();
     registerMutation.reset();
-
-    if (preview.detectedRjCode && !preview.orphanedMeta) {
-      dlsiteMutation.mutate(preview.detectedRjCode);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 開いた瞬間の自動取得はフォルダー・プレビュー単位で1回だけ行う
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 入力の初期化はフォルダー・プレビュー単位で1回だけ行う
   }, [folderPath, preview]);
 
   const submitBusy = registerMutation.isPending;
@@ -197,9 +201,9 @@ export default function RegisterWorkDialog({
           {dlsiteError && <p className="m-0 text-secondary text-[var(--r-coral)]">{dlsiteError}</p>}
 
           <div className="flex items-center gap-2.5">
-            {dlsiteInfo?.coverUrl ? (
+            {cachedCover ? (
               <img
-                src={dlsiteInfo.coverUrl}
+                src={getDlsiteCoverUrl(cachedCover)}
                 alt=""
                 className="h-[104px] w-[104px] shrink-0 rounded-[6px] border border-line-soft object-cover"
               />
@@ -210,12 +214,12 @@ export default function RegisterWorkDialog({
               </div>
             )}
             <label
-              className={`flex items-center gap-1.5 text-secondary ${dlsiteInfo?.coverUrl ? "text-ink-1" : "text-ink-4"}`}
+              className={`flex items-center gap-1.5 text-secondary ${cachedCover ? "text-ink-1" : "text-ink-4"}`}
             >
               <input
                 type="checkbox"
-                checked={Boolean(dlsiteInfo?.coverUrl) && applyCover}
-                disabled={!dlsiteInfo?.coverUrl}
+                checked={cachedCover !== null && applyCover}
+                disabled={cachedCover === null}
                 onChange={(event) => setApplyCover(event.target.checked)}
               />
               カバー画像を適用

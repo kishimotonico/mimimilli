@@ -1,12 +1,15 @@
+import type { ScanOptions } from "../../adapter/index.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import {
   buildCoverSnapshot,
   countCoverSnapshotGapsByReason,
   isCoverSnapshotComplete,
 } from "./coverSnapshot.ts";
-import { logDataIntegritySkips } from "./dataIntegrity.ts";
 import { gcThumbnailCache } from "./thumbnailCache.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
+import type { ScanExecutionResult } from "./scanTypes.ts";
+import type { ScannerAbortHooks } from "./scanWalk.ts";
+import type { Scanner } from "./scanner.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 
 const scanLogger = getCategoryLogger("scan");
@@ -18,20 +21,12 @@ export async function finalizeScan(deps: {
   catalog: Pick<CatalogWorkRepository, "setScanState">;
   thumbnailCacheDir: string;
   throwIfCancelled?: () => void;
-  integrityLogContext?: string;
 }): Promise<void> {
-  const {
-    query,
-    catalog,
-    thumbnailCacheDir,
-    throwIfCancelled,
-    integrityLogContext = "scan-finalize",
-  } = deps;
+  const { query, catalog, thumbnailCacheDir, throwIfCancelled } = deps;
   const checkAbort = () => throwIfCancelled?.();
 
   checkAbort();
   const result = query.listSummaries();
-  logDataIntegritySkips(scanLogger, integrityLogContext, result.skipped);
   const snapshot = await buildCoverSnapshot(result, { throwIfCancelled: checkAbort });
   checkAbort();
   if (isCoverSnapshotComplete(snapshot)) {
@@ -53,4 +48,21 @@ export async function finalizeScan(deps: {
   }
   checkAbort();
   catalog.setScanState(LAST_SCAN_TIME_KEY, new Date().toISOString());
+}
+
+/** スキャン本体と完了後処理（サムネイルGC・last_scan_time記録）を行う、全DB種別共通の経路。 */
+export async function scanAndFinalize(deps: {
+  scanner: Pick<Scanner, "scan">;
+  query: Pick<WorkQueryRepository, "listSummaries">;
+  catalog: Pick<CatalogWorkRepository, "setScanState">;
+  thumbnailCacheDir: string;
+  root: string;
+  options?: ScanOptions;
+  abortHooks?: ScannerAbortHooks;
+  throwIfCancelled: () => void;
+}): Promise<ScanExecutionResult> {
+  const { scanner, query, catalog, thumbnailCacheDir, throwIfCancelled } = deps;
+  const execution = await scanner.scan(deps.root, deps.options, deps.abortHooks);
+  await finalizeScan({ query, catalog, thumbnailCacheDir, throwIfCancelled });
+  return execution;
 }

@@ -16,39 +16,28 @@ import {
   workSchema,
   worksPageSchema,
   dlsitePreviewSchema,
-  dlsiteBulkStartResponseSchema,
-  dlsiteApplyMissingPreviewSchema,
-  dlsiteBulkApplyMissingResultSchema,
-  dlsiteBulkCancelResponseSchema,
-  dlsiteBulkSnapshotSchema,
   missingWorksCountSchema,
   workCreateResponseSchema,
   identityConflictReassignResponseSchema,
+  SCAN_CANDIDATE_REGISTER_MAX_PATHS,
   scanCandidatesRegisterRequestSchema,
   scanCandidatesRegisterResponseSchema,
-  type ScanCandidateRegisterItem,
+  type DlsiteRegistrationApply,
   type ScanCandidatesRegisterResponse,
   type WorkCreateBodyInput,
   type WorkCreateResponse,
   unregisterMissingWorksResultSchema,
-  createRandomSeed,
-  type DlsiteBulkSnapshot,
   type Work,
   workBookmarkResultSchema,
   workEditSnapshotSchema,
   workSourceMutationResultSchema,
-  dlsiteNotificationPageSchema,
-  dlsiteNotificationSummarySchema,
-  type DlsiteNotificationKind,
-  type DlsiteNotificationPage,
-  type DlsiteNotificationSummary,
   type WorkBookmarkPatch,
   type WorkBookmarkResult,
   type WorkEditSnapshot,
   type WorkSourceMutationResult,
   type WorkSourcePatchInput,
   type DlsitePreview,
-  type DlsiteApplyBody,
+  type DlsiteApplyBodyInput,
   type DlsiteStateUpdateBody,
   type ResumeBody,
   type UnregisterMissingWorksResult,
@@ -65,20 +54,10 @@ function appendTagsTagOp(
   if (filter.tagOp) params.set("tagOp", filter.tagOp);
 }
 
-/** クエリ文字列は「未指定」と「空配列」を区別できないため、ids:[] は空集合として
- *  リクエストせずに返す（core の filterByIds・real SQL と同じセマンティクス） */
-function emptyIdsPage(params: WorksQueryInput): WorksPage {
-  const stats = { trackCount: 0, durationSec: 0 };
-  if (params.sort !== "random") return { items: [], total: 0, stats };
-  const seed = params.seed === undefined ? createRandomSeed() : Number(params.seed);
-  return { items: [], total: 0, stats, seed };
-}
-
 export async function searchWorks(
   params: WorksQueryInput,
   options?: { signal?: AbortSignal },
 ): Promise<WorksPage> {
-  if (params.ids?.length === 0) return emptyIdsPage(params);
   const p = new URLSearchParams();
   if (params.q) p.set("q", params.q);
   appendTagsTagOp(p, params);
@@ -87,7 +66,8 @@ export async function searchWorks(
   if (params.seed !== undefined) p.set("seed", String(params.seed));
   if (params.page !== undefined) p.set("page", String(params.page));
   if (params.limit !== undefined) p.set("limit", String(params.limit));
-  for (const id of params.ids ?? []) p.append("ids", id);
+  if (params.scanRecord) p.set("scanRecord", params.scanRecord);
+  if (params.scanChange) p.set("scanChange", params.scanChange);
   const q = p.toString();
   return getParsed(worksPageSchema, `/works${q ? `?${q}` : ""}`, options);
 }
@@ -99,18 +79,6 @@ export async function getWork(id: string): Promise<Work> {
 
 export async function prepareWorkPlayback(id: string): Promise<Work> {
   return postParsed(workSchema, `/works/${encodeURIComponent(id)}/playback-preparation`);
-}
-
-export async function getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary> {
-  return getParsed(dlsiteNotificationSummarySchema, "/dlsite/notifications");
-}
-
-export async function queryDlsiteNotifications(
-  kind: DlsiteNotificationKind,
-  params: { page: number; limit: number },
-): Promise<DlsiteNotificationPage> {
-  const query = new URLSearchParams({ page: String(params.page), limit: String(params.limit) });
-  return getParsed(dlsiteNotificationPageSchema, `/dlsite/notifications/${kind}?${query}`);
 }
 
 export async function getWorkEditSnapshot(id: string): Promise<WorkEditSnapshot> {
@@ -165,14 +133,39 @@ export async function createWork(body: WorkCreateBodyInput): Promise<WorkCreateR
   return postParsed(workCreateResponseSchema, "/works", body);
 }
 
+export type ScanCandidatesRegisterOutcome = ScanCandidatesRegisterResponse & {
+  /** 途中で止まった原因。最後まで送れたらnull */
+  interruptedBy: Error | null;
+};
+
+/** 上限ごとに分けて順に送る。途中で失敗したらそこで止め、それまでに追加できた分は返す */
 export async function registerScanCandidates(
-  items: ScanCandidateRegisterItem[],
-): Promise<ScanCandidatesRegisterResponse> {
-  return postParsed(
-    scanCandidatesRegisterResponseSchema,
-    "/scan/candidates/register",
-    scanCandidatesRegisterRequestSchema.parse({ items }),
-  );
+  paths: string[],
+  apply: DlsiteRegistrationApply,
+): Promise<ScanCandidatesRegisterOutcome> {
+  const outcome: ScanCandidatesRegisterOutcome = {
+    registered: [],
+    failures: [],
+    interruptedBy: null,
+  };
+  for (let start = 0; start < paths.length; start += SCAN_CANDIDATE_REGISTER_MAX_PATHS) {
+    try {
+      const response = await postParsed(
+        scanCandidatesRegisterResponseSchema,
+        "/scan/candidates/register",
+        scanCandidatesRegisterRequestSchema.parse({
+          paths: paths.slice(start, start + SCAN_CANDIDATE_REGISTER_MAX_PATHS),
+          apply,
+        }),
+      );
+      outcome.registered.push(...response.registered);
+      outcome.failures.push(...response.failures);
+    } catch (error) {
+      outcome.interruptedBy = error instanceof Error ? error : new Error(String(error));
+      break;
+    }
+  }
+  return outcome;
 }
 
 export async function reassignIdentityConflict(
@@ -181,6 +174,11 @@ export async function reassignIdentityConflict(
   return postParsed(identityConflictReassignResponseSchema, "/works/identity-conflicts/reassign", {
     path,
   });
+}
+
+/** 作品情報ファイルからこの作品だけを読み直して一覧へ反映する */
+export async function reloadWork(workId: string): Promise<void> {
+  await postVoid(`/works/${encodeURIComponent(workId)}/reload`);
 }
 
 /** 作品登録を解除する（DB・メタファイルのみ。物理ファイルは残す） */
@@ -221,13 +219,14 @@ export async function saveResumePosition(workId: string, resume: ResumeBody): Pr
   await postVoid(`/works/${encodeURIComponent(workId)}/resume`, resume);
 }
 
+/** 結果を待って押す取り直しなので、失敗の記録を無視して取得する */
 export async function fetchDlsiteInfo(workId: string): Promise<DlsitePreview> {
-  return postParsed(dlsitePreviewSchema, `/dlsite/${encodeURIComponent(workId)}/fetch`);
+  return postParsed(dlsitePreviewSchema, `/dlsite/${encodeURIComponent(workId)}/fetch?force=true`);
 }
 
 export async function applyDlsiteInfo(
   workId: string,
-  body: DlsiteApplyBody,
+  body: DlsiteApplyBodyInput,
 ): Promise<WorkSourceMutationResult> {
   return postParsed(
     workSourceMutationResultSchema,
@@ -241,32 +240,4 @@ export async function updateDlsiteState(
   body: DlsiteStateUpdateBody,
 ): Promise<WorkSourceMutationResult> {
   return patchParsed(workSourceMutationResultSchema, `/dlsite/${encodeURIComponent(workId)}`, body);
-}
-
-export async function startDlsiteBulk(): Promise<string> {
-  return (await postParsed(dlsiteBulkStartResponseSchema, "/dlsite/bulk")).jobId;
-}
-
-export async function applyDlsiteMissing(workIds?: string[]) {
-  return postParsed(
-    dlsiteBulkApplyMissingResultSchema,
-    "/dlsite/apply-missing",
-    workIds ? { workIds } : undefined,
-  );
-}
-
-export async function previewDlsiteMissing(workIds?: string[]) {
-  return postParsed(
-    dlsiteApplyMissingPreviewSchema,
-    "/dlsite/apply-missing/preview",
-    workIds ? { workIds } : undefined,
-  );
-}
-
-export async function getDlsiteBulkStatus(): Promise<DlsiteBulkSnapshot> {
-  return getParsed(dlsiteBulkSnapshotSchema, "/dlsite/bulk");
-}
-
-export async function cancelDlsiteBulk(): Promise<void> {
-  await deleteParsed(dlsiteBulkCancelResponseSchema, "/dlsite/bulk");
 }

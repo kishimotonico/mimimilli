@@ -1,10 +1,5 @@
 import { apiNoContent, type ApiRoutes } from "./api";
-import {
-  buildDlsiteNotificationSummary,
-  buildScanDiagnostics,
-  buildSettings,
-  buildWorksPage,
-} from "./builders";
+import { buildScanDiagnostics, buildSettings, buildWorksPage } from "./builders";
 
 /** 空のライブラリでアプリ全体を描画したときに最初に呼ばれる読み取り系 API の既定応答 */
 export function appShellRoutes(overrides: ApiRoutes = {}): ApiRoutes {
@@ -15,8 +10,6 @@ export function appShellRoutes(overrides: ApiRoutes = {}): ApiRoutes {
     "GET /api/scan/candidates": { candidates: [] },
     "GET /api/scan/candidates/exclusions": { paths: [] },
     "GET /api/scan/diagnostics": buildScanDiagnostics(),
-    "GET /api/dlsite/notifications": buildDlsiteNotificationSummary(),
-    "GET /api/dlsite/bulk": { current: null, lastTerminal: null },
     "GET /api/works": buildWorksPage(),
     "GET /api/tags": [],
     "GET /api/tag-prefixes": [],

@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-09-25
-- 関連: [ADR-0025](0025-source-mutation-projection-read-separation.md)（正本変更と投影の分離）、[ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md)、[ADR-0027](0027-dlsite-meta-state-type-separation.md)、[ADR-0030](0030-job-progress-sse-current-state.md)（DLsite 一括取得完了時のキャッシュ更新を置き換え）、[ADR-0033](0033-dlsite-fetch-before-register.md)（DLsite 未設定項目の一括適用・一括取得完了・通知の更新を置き換え）、backlog TASK-465
+- 関連: [ADR-0025](0025-source-mutation-projection-read-separation.md)（正本変更と投影の分離）、[ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md)、[ADR-0027](0027-dlsite-meta-state-type-separation.md)、[ADR-0030](0030-job-progress-sse-current-state.md)（DLsite 一括取得完了時のキャッシュ更新を置き換え）、[ADR-0033](0033-dlsite-fetch-before-register.md)（DLsite 一括取得完了の更新を置き換え、未設定項目の一括適用と通知を廃止）、backlog TASK-465
 
 ## 文脈
 
@@ -102,8 +102,9 @@ mutation hook は `UseMutationResult` をそのまま返す。
 | `useUpdateDlsiteLinkageMutation()`    | `updateDlsiteState`                           | RJ コード保存、連携しない切替                        |
 | `useFetchDlsitePreviewMutation()`     | `fetchDlsiteInfo`                             | DLsite 情報の取得（取得キャッシュが更新される）      |
 | `useApplyDlsiteInfoMutation()`        | `applyDlsiteInfo`                             | DLsite 情報の単体適用                                |
-| `useApplyDlsiteMissingMutation()`     | `applyDlsiteMissing`                          | 未設定項目の一括適用                                 |
-| `updateCachesAfterDlsiteBulkFetch()`  | （一括取得ジョブの終端通知）                  | DLsite 一括取得の完了                                |
+| `updateCachesAfterWorkReload()`       | `reloadWork`                                  | 作品単位の読み直し（データ不整合の解消）             |
+| `updateCachesAfterDlsiteSyncFetch()`  | `fetchDlsiteInfo`・`fetchDlsiteInfoByCode`    | DLsite の同期取得（作品詳細の取得、Files の取得）    |
+| `updateCachesAfterDlsiteFetch()`      | （取得ジョブの終端通知）                      | DLsite 取得ジョブの終端                              |
 
 `useEditWorkSourceMutation`・`useRenameWorkMutation`・タグ追加/削除・`useBookmarkWorkMutation` は、失敗時に詳細（`["work", id]` 完全一致）を無効化する。
 
@@ -114,37 +115,38 @@ mutation hook は `UseMutationResult` をそのまま返す。
 - 詳細(id): `["work", id]` 完全一致。source: `["work", id, "source"]`。作品キャッシュ(id): `["work", id]` 前方一致（詳細と source）。全詳細: `["work"]` 前方一致
 - 一覧系: `["works"]` 前方一致（通常一覧、総件数、エラー件数、missing 件数、scan 結果の一覧）
 - 一覧: 一覧系のうち `WORK_QUERY_KEYS.list(params)` の形のもの、および `["smartFolderWorks"]` 前方一致
-- facet: `["axisFacets"]`。タグ: `["tags"]`。SF: `["smartFolderWorks"]`（件数プレビューを含む）。通知: `["dlsiteNotifications"]`。FS: `["fs"]`。診断: `["scan", "diagnostics"]`（ID重複と読み込めない作品情報ファイル）
+- facet: `["axisFacets"]`。タグ: `["tags"]`。SF: `["smartFolderWorks"]`（件数プレビューを含む）。FS: `["fs"]`。診断: `["scan", "diagnostics"]`（ID重複と読み込めない作品情報ファイル）。直近のスキャン結果: `["scan", "last"]`
+- 登録の集合: 一覧系・facet・タグ・SF・FS・診断・直近のスキャン結果を無効化する
 
-| 操作                                                                   | 必須更新                                                                                                    |
-| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| meta 編集（一括保存・タグ追加/削除・インラインタイトル・投影の再試行） | source へ応答の snapshot を書き戻す。詳細(id)・一覧系・facet・タグ・SF・通知を無効化                        |
-| 再生開始時の投影反映                                                   | 詳細(id) へ応答の Work を書き戻す。一覧系・facet・タグ・SF・通知を無効化                                    |
-| bookmark                                                               | 詳細(id) の `bookmarked` を応答値へ書き換える。一覧を無効化（画面が引き受けた key を除く）                  |
-| 登録（候補一括・Files 単体）                                           | 一覧系・facet・タグ・SF・通知・FS・診断を無効化                                                             |
-| スキャン完了                                                           | 登録の集合に加え、全詳細を無効化                                                                            |
-| 登録解除（単体）                                                       | 作品キャッシュ(id) を削除。一覧系・facet・タグ・SF・通知・FS・診断を無効化                                  |
-| 登録解除（missing 一括）                                               | 全詳細を無効化。一覧系・facet・タグ・SF・通知・FS・診断を無効化                                             |
-| ID 再採番                                                              | source(新 id) へ応答の snapshot を書き戻す。全詳細と、登録の集合を無効化                                    |
-| DLsite 単体（コード保存・連携しない切替・情報適用）                    | source へ応答の snapshot を書き戻す。詳細(id)・一覧系・facet・タグ・SF・通知を無効化                        |
-| DLsite 情報の取得                                                      | 成否にかかわらず詳細(id)・一覧系・facet・タグ・SF・通知を無効化                                             |
-| DLsite 未設定項目の一括適用                                            | 対象 id ごとに作品キャッシュ(id) を無効化。一覧系・facet・タグ・SF・通知を無効化                            |
-| DLsite 一括取得の完了                                                  | 処理対象 id ごとの詳細(id)、取りこぼしの可能性があれば全詳細を無効化。一覧系・facet・タグ・SF・通知を無効化 |
+| 操作                                                                   | 必須更新                                                                                                                                                               |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| meta 編集（一括保存・タグ追加/削除・インラインタイトル・投影の再試行） | source へ応答の snapshot を書き戻す。詳細(id)・一覧系・facet・タグ・SF を無効化                                                                                        |
+| 再生開始時の投影反映                                                   | 詳細(id) へ応答の Work を書き戻す。一覧系・facet・タグ・SF を無効化                                                                                                    |
+| bookmark                                                               | 詳細(id) の `bookmarked` を応答値へ書き換える。一覧を無効化（画面が引き受けた key を除く）                                                                             |
+| 登録（候補一括・Files 単体）                                           | 登録の集合を無効化                                                                                                                                                     |
+| スキャン完了                                                           | 登録の集合に加え、全詳細を無効化                                                                                                                                       |
+| 登録解除（単体）                                                       | 作品キャッシュ(id) を削除。登録の集合を無効化                                                                                                                          |
+| 登録解除（missing 一括）                                               | 全詳細を無効化。登録の集合を無効化                                                                                                                                     |
+| 作品単位の読み直し                                                     | 詳細(id)・source(id) を無効化。登録の集合を無効化                                                                                                                      |
+| ID 再採番                                                              | source(新 id) へ応答の snapshot を書き戻す。全詳細と、登録の集合を無効化                                                                                               |
+| DLsite 単体（コード保存・連携しない切替・情報適用）                    | source へ応答の snapshot を書き戻す。詳細(id)・一覧系・facet・タグ・SF を無効化                                                                                        |
+| DLsite の同期取得（作品詳細の取得・Files の取得）                      | 成否にかかわらず、同じ RJ コードの作品の詳細(id)・一覧系・facet・タグ・SF を無効化。キャッシュ済みの候補一覧にその RJ コードの候補があるときだけ未登録の候補を取り直す |
+| DLsite 取得ジョブの終端                                                | 取得した RJ コードの作品の詳細(id)、一覧系・facet・タグ・SF を無効化。未登録の候補（`["scan", "candidates"]`）を取り直す                                               |
 
-meta 編集と DLsite 単体適用では source を無効化しない。応答の snapshot が確定済みの編集基準であり（ADR-0025）、再取得すると編集中のダイアログの基準がずれる。一括適用は対象ごとの snapshot を返さないため、source ごと無効化する。
+meta 編集と DLsite 単体適用では source を無効化しない。応答の snapshot が確定済みの編集基準であり（ADR-0025）、再取得すると編集中のダイアログの基準がずれる。
 
-scan 候補（`["scan", "candidates"]`）は必須更新に含めない。候補は直近スキャンのスナップショットで、登録や解除では再計算されない。候補一括登録後の表示は、画面側の非表示集合で揃える。
+scan 候補（`["scan", "candidates"]`）は必須更新に含めない。候補は直近スキャンのスナップショットで、登録や解除では再計算されない。候補一括登録後の表示は、画面側の非表示集合で揃える。DLsite 取得ジョブの終端だけは、取得結果を候補の行へ反映するため候補を取り直す（[ADR-0033](0033-dlsite-fetch-before-register.md)）。
 
 必須更新は操作ごとの関数として `workCacheUpdates.ts` に定義する。共通部分は非公開の関数で組み立ててよいが、操作とキー集合の対応表をデータとして宣言する形にはしない。操作ごとに書き戻し・削除・無効化の組合せが異なり、表にすると例外の列が増えるためである。
 
 ### DLsite の無効化経路
 
-DLsite の必須更新は `entities/work/model` に置くため、Library の `DlsiteEditor` は共通モジュールを直接呼べる。`DlsiteBulkRuntime`（`features/dlsite`）も一括取得の完了時に `updateCachesAfterDlsiteBulkFetch` を直接呼ぶ。atom 越しに無効化関数を渡す `dlsiteInvalidateAtom` と `useDlsiteInvalidation` は利用者がいなくなるため削除する。一括取得ジョブの追跡と操作は `entities/dlsite` の `dlsiteBulkStore` が持つ。
+DLsite の必須更新は `entities/work/model` に置くため、Library の `DlsiteEditor` は共通モジュールを直接呼べる。`DlsiteJobRuntime`（`features/dlsite`）も取得ジョブの終端で `updateCachesAfterDlsiteFetch` を直接呼ぶ。atom 越しに無効化関数を渡す `dlsiteInvalidateAtom` と `useDlsiteInvalidation` は利用者がいなくなるため削除する。取得ジョブの追跡と操作は `entities/dlsite` の `dlsiteJobStore` が持つ。
 
 ## 帰結
 
 - 作品を変更する画面は、操作に対応する hook を呼ぶだけで必須更新を満たす。新しい集計や表示を足すときは、`workCacheUpdates.ts` の該当操作を直せば全入口に効く。
-- 文脈に挙げた更新漏れは、この一覧に揃えることで解消する。Library の登録解除で facet・タグ・SF・通知・FS・診断が、インラインタイトル編集で facet・タグ・SF・通知が、スキャン完了でタグと詳細が、それぞれ更新されるようになる。再取得の回数は増えるが、observer のない query は stale 化だけで再取得しない。
+- 文脈に挙げた更新漏れは、この一覧に揃えることで解消する。Library の登録解除で facet・タグ・SF・FS・診断が、インラインタイトル編集で facet・タグ・SF が、スキャン完了でタグと詳細が、それぞれ更新されるようになる。再取得の回数は増えるが、observer のない query は stale 化だけで再取得しない。
 - bookmark 以外の操作では、画面が一覧の再取得を省略できない。一覧の揺れを抑える最適化が必要になった場合は、その操作についてこの ADR の契約を拡張する。
 - `features/scan/model/libraryInvalidation.ts`、`features/dlsite/model/dlsiteInvalidation.ts`、`entities/work/invalidateWorkViewQueries.ts`、Library の `staleInactiveListCaches` は削除する。Library に残るのは、表示中の一覧 key を組み立てる処理と、パッチか reset かの選択だけである。
 - query key の階層は変えない。「一覧」の判定は `WORK_QUERY_KEYS.list(params)` の形と `["smartFolderWorks"]` 前方一致で行う。

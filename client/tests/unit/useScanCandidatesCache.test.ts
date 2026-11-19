@@ -5,7 +5,7 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { describe, expect, it } from "vitest";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import { scanCandidateHiddenPathsAtom } from "../../src/entities/scan/model/atoms";
-import { useUnregisteredCandidateCount } from "../../src/features/scan/model/useScanCandidatesCache";
+import { useScanCandidatesCache } from "../../src/features/scan/model/useScanCandidatesCache";
 
 const candidateA = {
   path: "候補A" as const,
@@ -26,7 +26,7 @@ const candidateB = {
 const scanCandidates = [candidateA, candidateB];
 
 function CountProbe() {
-  const count = useUnregisteredCandidateCount();
+  const count = useScanCandidatesCache().length;
   return createElement("span", { "data-testid": "count" }, String(count));
 }
 
@@ -45,7 +45,7 @@ async function expectCount(text: string) {
   await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent(text));
 }
 
-describe("useUnregisteredCandidateCount", () => {
+describe("useScanCandidatesCache", () => {
   it("候補キャッシュの件数を返す", async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },

@@ -1,9 +1,5 @@
 import type {
   DataIntegrityWarning,
-  DlsiteNotificationKind,
-  DlsiteNotificationPage,
-  DlsiteNotificationQuery,
-  DlsiteNotificationSummary,
   IdentityConflictReassignBody,
   NormalizedTag,
   ResumeBody,
@@ -17,33 +13,27 @@ import type {
   WorkSourcePatch,
   WorkspacePath,
   WorksPage,
+  UnregisterMissingWorksResult,
   WorksQuery,
 } from "@mimimilli/shared";
-
-/** 投影前に catalog 行が無く、今回 published になった新規登録の完了。HTTP 応答には載せない。 */
-export type WorkSourceProjectionResult = WorkSourceMutationResult & {
-  catalogInserted?: true;
-};
 
 export interface WorkAdapter {
   queryWorks(params: WorksQuery): Promise<WorksPage>;
   getWorkRegisterPreview(path: WorkspacePath): Promise<WorkRegisterPreview | null>;
   createWork(body: WorkCreateBody): Promise<WorkSourceMutationResult | null>;
+  /** replacedWorkId は、再採番で別IDに置き換わった（もう存在しない）作品のID。コピー側の再採番では null */
   reassignIdentityConflict(
     body: IdentityConflictReassignBody,
-  ): Promise<WorkSourceMutationResult | null>;
-  projectWorkSource(path: WorkspacePath): Promise<WorkSourceProjectionResult | null>;
+  ): Promise<(WorkSourceMutationResult & { replacedWorkId: string | null }) | null>;
+  projectWorkSource(path: WorkspacePath): Promise<WorkSourceMutationResult | null>;
+  /** 作品情報ファイルからこの作品だけを読み直して catalog を作り直す。存在しなければ false。直らないときは例外 */
+  reloadWork(id: string): Promise<boolean>;
   /** 作品を DB とメタファイルから削除する。物理ファイルは触らない。存在しなければ false */
   deleteWork(id: string): Promise<boolean>;
   /** status === "missing" の作品数 */
   countMissingWorks(): Promise<number>;
   /** status === "missing" の作品を全件登録解除する。一部失敗しても残りを続行する */
-  unregisterMissingWorks(): Promise<{ deletedCount: number; failedCount: number }>;
-  getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary>;
-  queryDlsiteNotifications(
-    kind: DlsiteNotificationKind,
-    query: Required<DlsiteNotificationQuery>,
-  ): Promise<DlsiteNotificationPage>;
+  unregisterMissingWorks(): Promise<UnregisterMissingWorksResult & { deletedWorkIds: string[] }>;
   getWork(id: string): Promise<Work | null>;
   /** 再生準備。対象作品を live probe し、総時間を catalog へ公開する。存在しなければ null */
   prepareWorkPlayback(id: string): Promise<Work | null>;

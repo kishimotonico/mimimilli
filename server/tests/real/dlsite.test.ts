@@ -1,18 +1,20 @@
+import { REGISTER_ALL } from "../helpers/scanLibrary.ts";
 // DLsite スクレイパーのテスト。ネットワークアクセスはしない:
 // パースは合成 HTML、apply はモック info（coverUrl: null でカバー DL をスキップ）。
 import assert from "node:assert/strict";
-import { chmodSync, cpSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { test } from "node:test";
 import { Database } from "bun:sqlite";
 import {
   detectRjCode,
-  dlsiteStatePatchSchema,
+  dlsiteStateUpdateBodySchema,
   dlsiteInfoTags,
+  isDlsiteFetchFailed,
+  isDlsiteParseFailed,
   normalizeDlsiteAgeRating,
   type DlsiteWorkInfo,
-  fillUnsetDlsiteTags,
   mergeAppliedDlsiteTags,
 } from "@mimimilli/shared";
 import {
@@ -27,6 +29,7 @@ import {
   DEFAULT_DLSITE_REQUEST_CONFIG,
   DEFAULT_DLSITE_USER_AGENT,
 } from "../../src/adapters/real/dlsiteConfig.ts";
+import { DlsiteOfflineError } from "../../src/errors.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import {
   htmlResponse,
@@ -38,6 +41,8 @@ import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { nts } from "../helpers/tag.ts";
 import { makeSampleLibrary, makeTestDirectory } from "../helpers/sampleLibrary.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
+import { fetchDlsiteOfWorks } from "../helpers/dlsiteFetch.ts";
+import { applyFetchedDlsite, fetchDlsiteForWork } from "../helpers/dlsiteApply.ts";
 
 const FAST_DLSITE_REQUEST_CONFIG = {
   ...DEFAULT_DLSITE_REQUEST_CONFIG,
@@ -256,8 +261,8 @@ test("DLsite: キャッシュ判定ログに理由を含める", async (t) => {
 
   logs.length = 0;
   await adapter.dlsiteFetch(lib.existingWorkId, true);
-  const forceMiss = logs.find((event) => event.event === "dlsite_cache_miss");
-  assert.equal(forceMiss?.reason, "force_refresh");
+  const forceHit = logs.find((event) => event.event === "dlsite_cache_hit");
+  assert.equal(forceHit?.reason, "ttl_valid");
 });
 
 test("fetchDlsiteHtml: HTTP 404 / 通信エラーを分類する", async (t) => {
@@ -362,41 +367,34 @@ test("dlsiteWorkUrl: RJコードはmaniax、VJコードはproのURLを組み立�
   );
 });
 
-test("dlsiteStatePatchSchema: RJ/VJコードの手動入力を受け付け、それ以外は拒否する", () => {
-  const rj = dlsiteStatePatchSchema.safeParse({ rjCode: "rj1234567" });
+test("dlsiteStateUpdateBodySchema: RJ/VJコードの手動入力を受け付け、それ以外は拒否する", () => {
+  const rj = dlsiteStateUpdateBodySchema.safeParse({ sourceRevision: "r1", rjCode: "rj1234567" });
   assert.equal(rj.success, true);
   if (rj.success) assert.equal(rj.data.rjCode, "RJ1234567");
 
-  const vj = dlsiteStatePatchSchema.safeParse({ rjCode: "vj014780" });
+  const vj = dlsiteStateUpdateBodySchema.safeParse({ sourceRevision: "r1", rjCode: "vj014780" });
   assert.equal(vj.success, true);
   if (vj.success) assert.equal(vj.data.rjCode, "VJ014780");
 
-  const tooShort = dlsiteStatePatchSchema.safeParse({ rjCode: "VJ123" });
+  const none = dlsiteStateUpdateBodySchema.safeParse({ sourceRevision: "r1", rjCode: "" });
+  assert.equal(none.success, true);
+  if (none.success) assert.equal(none.data.rjCode, "");
+  assert.equal(
+    dlsiteStateUpdateBodySchema.safeParse({ sourceRevision: "r1", rjCode: null }).success,
+    false,
+  );
+
+  const tooShort = dlsiteStateUpdateBodySchema.safeParse({ sourceRevision: "r1", rjCode: "VJ123" });
   assert.equal(tooShort.success, false);
 
-  const unknownPrefix = dlsiteStatePatchSchema.safeParse({ rjCode: "BJ123456" });
+  const unknownPrefix = dlsiteStateUpdateBodySchema.safeParse({
+    sourceRevision: "r1",
+    rjCode: "BJ123456",
+  });
   assert.equal(unknownPrefix.success, false);
 });
 
-test("fillUnsetDlsiteTags: 未設定prefixだけを新規タグとして返す", () => {
-  const info: DlsiteWorkInfo = {
-    rjCode: "RJ900002",
-    title: "x",
-    circle: "夜想曲",
-    cvs: ["水瀬なずな", "新CV"],
-    genreTags: ["耳かき"],
-    ageRating: null,
-    coverUrl: null,
-    url: "",
-  };
-  const added = fillUnsetDlsiteTags(
-    nts(["サークル/夜想曲", "cv/水瀬なずな", "バイノーラル"]),
-    info,
-  );
-  assert.deepEqual(added, nts(["cv/新CV", "genre/耳かき"]));
-});
-
-test("fillUnsetDlsiteTags: ratingタグを追加する", () => {
+test("dlsiteInfoTags: ageRating を rating タグにする", () => {
   const info: DlsiteWorkInfo = {
     rjCode: "RJ900002",
     title: "x",
@@ -408,21 +406,6 @@ test("fillUnsetDlsiteTags: ratingタグを追加する", () => {
     url: "",
   };
   assert.deepEqual(dlsiteInfoTags(info), nts(["rating/R18"]));
-  assert.deepEqual(fillUnsetDlsiteTags(nts(["genre/耳かき"]), info), nts(["rating/R18"]));
-});
-
-test("fillUnsetDlsiteTags: サークル・ratingは既存に同prefixの値があれば異なる値でも追加しない", () => {
-  const info: DlsiteWorkInfo = {
-    rjCode: "RJ900002",
-    title: "x",
-    circle: "満月堂",
-    cvs: [],
-    genreTags: [],
-    ageRating: "R15",
-    coverUrl: null,
-    url: "",
-  };
-  assert.deepEqual(fillUnsetDlsiteTags(nts(["サークル/夜想曲", "rating/R18"]), info), []);
 });
 
 test("mergeAppliedDlsiteTags: 複数値prefix（cv・genre）は加算する", () => {
@@ -442,27 +425,33 @@ test("mergeAppliedDlsiteTags: 単一値prefix（サークル・rating）は既�
 test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  const adapter = lib.own(
+    createTestRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) =>
+          htmlResponse(
+            sampleWorkHtml(code, {
+              title: "DLsite から取得したタイトル",
+              circle: "夜想曲",
+              cvs: ["水瀬なずな"],
+              genres: ["耳かき", "睡眠"],
+              cover: false,
+            }),
+          ),
+      }),
+    }),
+  );
   await configureRoot(adapter, lib.root);
   await adapter.scan();
 
-  const info: DlsiteWorkInfo = {
-    rjCode: "RJ900002",
-    title: "DLsite から取得したタイトル",
-    circle: "夜想曲",
-    cvs: ["水瀬なずな"],
-    genreTags: ["耳かき", "睡眠"],
-    ageRating: null,
-    coverUrl: null,
-    url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
-  };
-  const ok = await adapter.dlsiteApply(lib.existingWorkId, {
-    info,
-    applyTitle: true,
-    applyTags: nts(["サークル/夜想曲", "cv/水瀬なずな", "genre/耳かき", "genre/睡眠"]),
-    applyCover: false,
-    applyUrl: true,
-    sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
+  const fetched = await fetchDlsiteForWork(adapter, lib.existingWorkId, "RJ900002");
+  const info = fetched.info;
+  const ok = await applyFetchedDlsite(adapter, lib.existingWorkId, fetched, {
+    title: true,
+    tags: nts(["サークル/夜想曲", "cv/水瀬なずな", "genre/耳かき", "genre/睡眠"]),
+    url: true,
   });
   assert.ok(ok);
 
@@ -536,7 +525,7 @@ test("updateDlsiteState: 同じRJコードの再送信ではcache由来の取得
   await adapter.scan();
 
   // 一括取得を失敗させ、DLsiteキャッシュへ not_found を記録する。
-  const bulk = await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
+  const bulk = await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
   assert.equal(bulk.failed, 1);
   const before = await adapter.getWork(lib.existingWorkId);
   assert.equal(before?.dlsite.status, "not_found");
@@ -605,7 +594,7 @@ test("updateDlsiteState: RJコード変更で旧状態をリセットし一括�
   assert.equal(updated?.snapshot.dlsite.status, "none");
   assert.deepEqual(updated?.snapshot.dlsite.appliedTags, []);
 
-  const bulk = await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
+  const bulk = await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
   assert.equal(bulk.fetched, 1);
   assert.equal(bulk.skipped, 0);
 });
@@ -627,7 +616,7 @@ test("dlsiteFetch: 存在しない作品はnot_found", async (t) => {
   if (!generatedFree.ok) assert.equal(generatedFree.kind, "not_found");
 });
 
-test("bulk取得はタイトル・タグを自動適用せず、mimimilli.jsonのexact bytesとcatalogを維持する", async (t) => {
+test("DLsite取得はタイトル・タグを自動適用せず、mimimilli.jsonのexact bytesとcatalogを維持する", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
   const calls: number[] = [];
@@ -654,7 +643,8 @@ test("bulk取得はタイトル・タグを自動適用せず、mimimilli.json�
   await configureRoot(adapter, lib.root);
   await adapter.scan();
   const registered = await adapter.registerScanCandidates(
-    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    REGISTER_ALL,
   );
   const candidateId = registered.registered[0]!.workId;
   const beforeExisting = await adapter.getWork(lib.existingWorkId);
@@ -662,7 +652,7 @@ test("bulk取得はタイトル・タグを自動適用せず、mimimilli.json�
   const metaPath = join(beforeExisting!.physicalPath, "mimimilli.json");
   const beforeBytes = readFileSync(metaPath);
 
-  const result = await adapter.runDlsiteBulk("existing", undefined);
+  const result = await fetchDlsiteOfWorks(adapter, undefined);
   assert.equal(result.fetched, 2);
   assert.ok(calls[1]! - calls[0]! >= 35, `request interval: ${calls[1]! - calls[0]!}ms`);
 
@@ -675,7 +665,7 @@ test("bulk取得はタイトル・タグを自動適用せず、mimimilli.json�
   assert.deepEqual(generated?.tags, beforeCandidate?.tags);
 });
 
-test("bulk取得はcache TTLとskipped状態を利用し、mimimilli.jsonを変更しない", async (t) => {
+test("DLsite取得はcache TTLとskipped状態を利用し、mimimilli.jsonを変更しない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-bulk-target-ttl");
   t.after(lib.cleanup);
@@ -702,14 +692,15 @@ test("bulk取得はcache TTLとskipped状態を利用し、mimimilli.jsonを変�
   await configureRoot(adapter, lib.root);
   await adapter.scan();
   const registered = await adapter.registerScanCandidates(
-    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    REGISTER_ALL,
   );
   const candidateId = registered.registered[0]!.workId;
   await adapter.updateDlsiteState(candidateId!, {
     sourceRevision: (await adapter.getWorkEditSnapshot(candidateId!))!.sourceRevision,
     skipped: true,
   });
-  const first = await adapter.runDlsiteBulk("existing", undefined);
+  const first = await fetchDlsiteOfWorks(adapter, undefined);
   assert.equal(first.failed, 1);
   assert.equal(first.skipped, 1);
   assert.equal(calls, 1);
@@ -717,14 +708,14 @@ test("bulk取得はcache TTLとskipped状態を利用し、mimimilli.jsonを変�
   assert.equal(failedWork?.dlsite.status, "not_found");
 
   // TTL内の2回目はキャッシュされたnot_foundを返し、HTTPは発生しない。
-  const second = await adapter.runDlsiteBulk("existing", undefined);
+  const second = await fetchDlsiteOfWorks(adapter, undefined);
   assert.equal(second.fetched, 0);
   assert.equal(second.failed, 1);
   assert.equal(calls, 1);
 
   // TTL境界を超えたら再取得する。
   now += 31;
-  const third = await adapter.runDlsiteBulk("existing", undefined);
+  const third = await fetchDlsiteOfWorks(adapter, undefined);
   assert.equal(third.failed, 1);
   assert.equal(calls, 2);
 
@@ -733,14 +724,14 @@ test("bulk取得はcache TTLとskipped状態を利用し、mimimilli.jsonを変�
     "mimimilli.json",
   );
   const bytesBefore = readFileSync(metaPath);
-  const fourth = await adapter.runDlsiteBulk("existing", undefined);
+  const fourth = await fetchDlsiteOfWorks(adapter, undefined);
   assert.equal(fourth.failed, 1);
   assert.equal(fourth.skipped, 1);
   assert.equal(calls, 2);
   assert.deepEqual(readFileSync(metaPath), bytesBefore);
 });
 
-test("DLsite HTMLキャッシュ: 手動fetchはhitでHTTPせず、single-flightとforce refreshを扱う", async (t) => {
+test("DLsite HTMLキャッシュ: 手動fetchはhitでHTTPせず、single-flightを扱い、forceでもokのsnapshotは使う", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-cache-integration");
   t.after(lib.cleanup);
@@ -772,7 +763,7 @@ test("DLsite HTMLキャッシュ: 手動fetchはhitでHTTPせず、single-flight
   assert.equal((await adapter.dlsiteFetch(lib.existingWorkId)).ok, true);
   assert.equal(calls, 1);
   assert.equal((await adapter.dlsiteFetch(lib.existingWorkId, true)).ok, true);
-  assert.equal(calls, 2);
+  assert.equal(calls, 1);
 });
 
 test("offline結果はcache-onlyで、mimimilli.jsonのexact bytesを変更しない", async (t) => {
@@ -814,12 +805,10 @@ test("offline結果はcache-onlyで、mimimilli.jsonのexact bytesを変更し�
   assert.deepEqual(forced.ok, false);
   if (!forced.ok) assert.equal(forced.kind, "offline");
   assert.equal(calls, 0);
-  assert.deepEqual(await offline.runDlsiteBulk("existing", [lib.existingWorkId]), {
-    fetched: 0,
-    failed: 1,
-    skipped: 0,
-    parseErrors: 0,
-  });
+  await assert.rejects(
+    offline.fetchDlsiteProduct("RJ900002", { force: false }),
+    DlsiteOfflineError,
+  );
   assert.equal((await offline.getWork(lib.existingWorkId))?.dlsite.status, "none");
   assert.deepEqual(readFileSync(offlineMetaPath), offlineBytes);
   offline.close();
@@ -874,7 +863,7 @@ test("offline結果はcache-onlyで、mimimilli.jsonのexact bytesを変更し�
   assert.equal(calls, 1);
 });
 
-test("DLsite HTMLキャッシュ: hitでも保存HTMLを毎回パースする", async (t) => {
+test("DLsite HTMLキャッシュ: hitは取得時の解析結果を使い、解析結果が無いときだけ保存HTMLを解析する", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-parser-cache");
   t.after(lib.cleanup);
@@ -915,7 +904,15 @@ test("DLsite HTMLキャッシュ: hitでも保存HTMLを毎回パースする", 
 
   const second = await adapter.dlsiteFetch(lib.existingWorkId);
   assert.equal(httpCalls, 1);
-  assert.equal(second.ok && second.info.title, "キャッシュ差し替えタイトル");
+  assert.equal(second.ok && second.info.title, "耳元ささやきの夜");
+
+  const reopened = new Database(join(dir.path, "cache.sqlite"));
+  reopened.run("DELETE FROM dlsite_parsed_products WHERE product_code = ?", ["RJ900002"]);
+  reopened.close();
+
+  const third = await adapter.dlsiteFetch(lib.existingWorkId);
+  assert.equal(httpCalls, 1);
+  assert.equal(third.ok && third.info.title, "キャッシュ差し替えタイトル");
 });
 
 test("DLsite HTMLキャッシュ: parse_errorは同じHTTPをretryしない", async (t) => {
@@ -1018,8 +1015,8 @@ test("parse_errorはcacheに保存し、mimimilli.jsonへ状態を書かない",
     "mimimilli.json",
   );
   const bytesBefore = readFileSync(metaPath);
-  const result = await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
-  assert.deepEqual(result, { fetched: 0, failed: 1, parseErrors: 1, skipped: 0 });
+  const result = await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
+  assert.deepEqual(result, { fetched: 0, failed: 1, skipped: 0 });
   const work = await adapter.getWork(lib.existingWorkId);
   assert.equal(work?.dlsite.status, "error");
   assert.equal(work?.dlsite.errorKind, "parse_error");
@@ -1134,48 +1131,7 @@ test("DLsite HTMLキャッシュ: 相乗り中の後着abortはその呼び出�
   assert.equal((await promiseA).ok, true);
 });
 
-test("dlsiteApply: abort済みsignalではDB・メタを更新しない", async (t) => {
-  const lib = makeSampleLibrary();
-  t.after(lib.cleanup);
-  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await configureRoot(adapter, lib.root);
-  await adapter.scan();
-  const before = await adapter.getWork(lib.existingWorkId);
-  const metaPath = join(before!.physicalPath, "mimimilli.json");
-  const controller = new AbortController();
-  controller.abort();
-  const info: DlsiteWorkInfo = {
-    rjCode: "RJ900002",
-    title: "abort後に適用されないタイトル",
-    circle: null,
-    cvs: [],
-    genreTags: [],
-    ageRating: null,
-    coverUrl: null,
-    url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
-  };
-  await assert.rejects(
-    adapter.dlsiteApply(
-      lib.existingWorkId,
-      {
-        info,
-        applyTitle: true,
-        applyTags: [],
-        applyCover: false,
-        applyUrl: true,
-        sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
-      },
-      { signal: controller.signal },
-    ),
-    (error: unknown) => error instanceof DOMException && error.name === "AbortError",
-  );
-  const after = await adapter.getWork(lib.existingWorkId);
-  assert.equal(after?.title, before?.title);
-  const meta = JSON.parse(readFileSync(metaPath, "utf-8")) as { title: string };
-  assert.equal(meta.title, before?.title);
-});
-
-test("DLsite bulk: 2回目はHTML cache hitでHTTPしない", async (t) => {
+test("DLsite取得: 2回目はHTML cache hitでHTTPしない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-bulk-html-cache");
   t.after(lib.cleanup);
@@ -1204,12 +1160,12 @@ test("DLsite bulk: 2回目はHTML cache hitでHTTPしない", async (t) => {
   );
   await configureRoot(adapter, lib.root);
   await adapter.scan();
-  await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
-  await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
+  await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
+  await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
   assert.equal(httpCalls, 1);
 });
 
-test("DLsite bulk: 同一RJコードは同じ実行・別実行・adapter再オープン後もHTTPを1回に集約する", async (t) => {
+test("DLsite取得: 同一RJコードは同じ実行・別実行・adapter再オープン後もHTTPを1回に集約する", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-bulk-rj-dedup");
   t.after(lib.cleanup);
@@ -1246,19 +1202,14 @@ test("DLsite bulk: 同一RJコードは同じ実行・別実行・adapter再オ�
   await first.scan();
   const duplicateId = "22222222-2222-4222-8222-222222222222";
   const ids = [lib.existingWorkId, duplicateId];
-  assert.deepEqual(await first.runDlsiteBulk("existing", ids), {
-    fetched: 2,
-    failed: 0,
-    skipped: 0,
-    parseErrors: 0,
-  });
+  assert.deepEqual(await fetchDlsiteOfWorks(first, ids), { fetched: 2, failed: 0, skipped: 0 });
   assert.equal(httpCalls, 1);
-  await first.runDlsiteBulk("existing", ids);
+  await fetchDlsiteOfWorks(first, ids);
   assert.equal(httpCalls, 1);
   first.close();
 
   const reopened = makeAdapter();
-  await reopened.runDlsiteBulk("existing", ids);
+  await fetchDlsiteOfWorks(reopened, ids);
   assert.equal(httpCalls, 1);
   reopened.close();
 });
@@ -1282,38 +1233,24 @@ test("DLsiteカバー: キャッシュから各作品フォルダーへコピー
     createRealAdapter({
       database,
       dlsiteCache: { path: cachePath },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
       dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => htmlResponse(sampleWorkHtml(code, { cover: true })),
         cover: () => {
           coverHttpCalls += 1;
           return jpegResponse(coverBody);
         },
       }),
     });
-  const info: DlsiteWorkInfo = {
-    rjCode: "RJ900002",
-    title: "x",
-    circle: null,
-    cvs: [],
-    genreTags: [],
-    ageRating: null,
-    coverUrl: "https://img.dlsite.jp/modpub/images2/work/RJ900002_cover.jpg",
-    url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
-  };
 
   const first = makeAdapter();
   await configureRoot(first, lib.root);
   await first.scan();
+  const fetched = await fetchDlsiteForWork(first, lib.existingWorkId, "RJ900002");
+  assert.equal(coverHttpCalls, 1);
   assert.ok(
-    (
-      await first.dlsiteApply(lib.existingWorkId, {
-        info,
-        applyTitle: false,
-        applyTags: [],
-        applyCover: true,
-        applyUrl: true,
-        sourceRevision: (await first.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
-      })
-    )?.snapshot,
+    (await applyFetchedDlsite(first, lib.existingWorkId, fetched, { cover: true, url: true }))
+      ?.snapshot,
   );
   const applied = await first.getWork(lib.existingWorkId);
   assert.ok(applied?.cover);
@@ -1329,14 +1266,9 @@ test("DLsiteカバー: キャッシュから各作品フォルダーへコピー
   await reregistered.scan();
   assert.ok(
     (
-      await reregistered.dlsiteApply(lib.existingWorkId, {
-        info,
-        applyTitle: false,
-        applyTags: [],
-        applyCover: true,
-        applyUrl: true,
-        sourceRevision: (await reregistered.getWorkEditSnapshot(lib.existingWorkId))!
-          .sourceRevision,
+      await applyFetchedDlsite(reregistered, lib.existingWorkId, fetched, {
+        cover: true,
+        url: true,
       })
     )?.snapshot,
   );
@@ -1344,7 +1276,7 @@ test("DLsiteカバー: キャッシュから各作品フォルダーへコピー
   reregistered.close();
 });
 
-test("DLsite HTMLキャッシュ: fresh DBでmimimilli.jsonを削除して同じ作品を再登録してもHTTPしない", async (t) => {
+test("DLsite HTMLキャッシュ: fresh DBでmimimilli.jsonを削除して同じ作品を再登録してもHTTPせず、キャッシュのDLsite情報で登録される", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-html-reregister");
   t.after(lib.cleanup);
@@ -1371,7 +1303,7 @@ test("DLsite HTMLキャッシュ: fresh DBでmimimilli.jsonを削除して同じ
   const first = makeAdapter(firstDb);
   await configureRoot(first, lib.root);
   await first.scan();
-  await first.runDlsiteBulk("existing", [lib.existingWorkId]);
+  await fetchDlsiteOfWorks(first, [lib.existingWorkId]);
   assert.equal(htmlHttpCalls, 1);
   first.close();
 
@@ -1387,19 +1319,17 @@ test("DLsite HTMLキャッシュ: fresh DBでmimimilli.jsonを削除して同じ
   const registration = await second.registerScanCandidates(
     (await second.listScanCandidates())
       .filter((candidate) => candidate.path.endsWith("RJ900002_既存メタ"))
-      .map((candidate) => ({ path: candidate.path })),
+      .map((candidate) => candidate.path),
+    REGISTER_ALL,
   );
   const workIds = registration.registered.map((entry) => entry.workId);
   assert.equal(workIds.length, 1);
   const works = await Promise.all(workIds.map((id) => second.getWork(id)));
   const reregistered = works.find((work) => work?.physicalPath.endsWith("RJ900002_既存メタ"));
   assert.ok(reregistered);
-  assert.deepEqual(await second.runDlsiteBulk("existing", [reregistered!.id]), {
-    fetched: 1,
-    failed: 0,
-    skipped: 0,
-    parseErrors: 0,
-  });
+  assert.equal(reregistered.title, "耳元ささやきの夜");
+  assert.equal(reregistered.dlsite.status, "applied");
+  assert.equal(reregistered.dlsite.rjCode, "RJ900002");
   assert.equal(htmlHttpCalls, 1);
   second.close();
 });
@@ -1448,18 +1378,19 @@ test("DLsite HTMLキャッシュ: 期限切れの再取得失敗はstaleへ戻�
   assert.equal((await adapter.dlsiteFetch(lib.existingWorkId)).ok, false);
 });
 
-test("DLsite HTMLキャッシュ: forceが失敗しても次回の通常取得は抑制される", async (t) => {
+test("DLsite HTMLキャッシュ: forceはTTL内のokを使い、期限切れで失敗しても次回の通常取得は抑制される", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-force-failure-suppress");
   t.after(lib.cleanup);
   t.after(dir.cleanup);
   let calls = 0;
+  let now = 1_000;
   let succeed = true;
   const adapter = dir.own(
     createRealAdapter({
       database: { kind: "memory" },
       dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteCache: { path: join(dir.path, "cache.sqlite"), ttlsMs: { ok: 10 }, clock: () => now },
       dlsiteSchedulerDependencies: mockDlsiteTransport({
         html: () => {
           calls += 1;
@@ -1475,6 +1406,10 @@ test("DLsite HTMLキャッシュ: forceが失敗しても次回の通常取得�
   assert.equal(calls, 1);
 
   succeed = false;
+  assert.equal((await adapter.dlsiteFetch(lib.existingWorkId, true)).ok, true);
+  assert.equal(calls, 1);
+
+  now = 1_000 + 11;
   const forced = await adapter.dlsiteFetch(lib.existingWorkId, true);
   assert.equal(forced.ok, false);
   assert.equal(calls, 2);
@@ -1486,7 +1421,7 @@ test("DLsite HTMLキャッシュ: forceが失敗しても次回の通常取得�
   assert.equal(calls, 2);
 });
 
-test("bulk取得のlastAttemptAtはmimimilli.jsonへ保存しない", async (t) => {
+test("DLsite取得のlastAttemptAtはmimimilli.jsonへ保存しない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-bulk-no-op-write");
   t.after(lib.cleanup);
@@ -1503,18 +1438,18 @@ test("bulk取得のlastAttemptAtはmimimilli.jsonへ保存しない", async (t) 
   );
   await configureRoot(adapter, lib.root);
   await adapter.scan();
-  await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
+  await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
   const before = await adapter.getWork(lib.existingWorkId);
   const metaPath = join(before!.physicalPath, "mimimilli.json");
   const bytesBefore = readFileSync(metaPath);
 
-  await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
+  await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
   const after = await adapter.getWork(lib.existingWorkId);
   assert.deepEqual(readFileSync(metaPath), bytesBefore);
   assert.equal(after!.dlsite.lastAttemptAt, before!.dlsite.lastAttemptAt);
 });
 
-test("DLsiteカバー: 同じURLを2作品へ同時適用してもHTTPは1回で両方にファイルができる", async (t) => {
+test("DLsiteカバー: 先取りしたカバーを2作品へ同時適用しても、適用でHTTPせず両方にファイルができる", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-cover-concurrent-two-works");
   t.after(lib.cleanup);
@@ -1529,6 +1464,7 @@ test("DLsiteカバー: 同じURLを2作品へ同時適用してもHTTPは1回で
       dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
       dlsiteCache: { path: join(dir.path, "cache.sqlite") },
       dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => htmlResponse(sampleWorkHtml(code, { cover: true })),
         cover: () => {
           coverCalls += 1;
           return jpegResponse(coverBody);
@@ -1540,43 +1476,23 @@ test("DLsiteカバー: 同じURLを2作品へ同時適用してもHTTPは1回で
   await adapter.scan();
   const workAId = lib.existingWorkId;
   const registration = await adapter.registerScanCandidates(
-    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    REGISTER_ALL,
   );
   const registeredWorkBId = registration.registered[0]?.workId;
   assert.ok(registeredWorkBId);
   const workBId = registeredWorkBId;
-  const coverUrl = "https://img.dlsite.jp/modpub/images2/work/shared_cover.jpg";
-  const infoFor = (rjCode: string): DlsiteWorkInfo => ({
-    rjCode,
-    title: "x",
-    circle: null,
-    cvs: [],
-    genreTags: [],
-    ageRating: null,
-    coverUrl,
-    url: `https://www.dlsite.com/maniax/work/=/product_id/${rjCode}.html`,
-  });
+  const fetchedA = await fetchDlsiteForWork(adapter, workAId, "RJ900002");
+  const fetchedB = await fetchDlsiteForWork(adapter, workBId, "RJ900001");
+  const coverCallsBeforeApply = coverCalls;
+  assert.ok(coverCallsBeforeApply > 0);
   const [okA, okB] = await Promise.all([
-    adapter.dlsiteApply(workAId, {
-      info: infoFor("RJ900002"),
-      applyTitle: false,
-      applyTags: [],
-      applyCover: true,
-      applyUrl: true,
-      sourceRevision: (await adapter.getWorkEditSnapshot(workAId))!.sourceRevision,
-    }),
-    adapter.dlsiteApply(workBId, {
-      info: infoFor("RJ900001"),
-      applyTitle: false,
-      applyTags: [],
-      applyCover: true,
-      applyUrl: true,
-      sourceRevision: (await adapter.getWorkEditSnapshot(workBId))!.sourceRevision,
-    }),
+    applyFetchedDlsite(adapter, workAId, fetchedA, { cover: true, url: true }),
+    applyFetchedDlsite(adapter, workBId, fetchedB, { cover: true, url: true }),
   ]);
   assert.ok(okA?.snapshot);
   assert.ok(okB?.snapshot);
-  assert.equal(coverCalls, 1);
+  assert.equal(coverCalls, coverCallsBeforeApply);
   const workA = await adapter.getWork(workAId);
   const workB = await adapter.getWork(workBId);
   assert.ok(workA?.cover);
@@ -1702,7 +1618,7 @@ test("DLsite HTML: Content-Lengthが無い場合は実読込量がtransferMaxを
   );
 });
 
-test("DLsite apply: カバーはcache transportを通る", async (t) => {
+test("DLsite apply: カバーはキャッシュから読み、適用でHTTPしない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-apply-cover-cache");
   t.after(lib.cleanup);
@@ -1717,6 +1633,7 @@ test("DLsite apply: カバーはcache transportを通る", async (t) => {
       dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
       dlsiteCache: { path: join(dir.path, "cache.sqlite") },
       dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => htmlResponse(sampleWorkHtml(code, { cover: true })),
         cover: () => {
           coverCalls += 1;
           return jpegResponse(coverBody);
@@ -1726,28 +1643,17 @@ test("DLsite apply: カバーはcache transportを通る", async (t) => {
   );
   await configureRoot(adapter, lib.root);
   await adapter.scan();
-  const ok = await adapter.dlsiteApply(lib.existingWorkId, {
-    info: {
-      rjCode: "RJ900002",
-      title: "x",
-      circle: null,
-      cvs: [],
-      genreTags: [],
-      ageRating: null,
-      coverUrl: "https://img.dlsite.jp/modpub/images2/work/a.jpg",
-      url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
-    },
-    applyTitle: false,
-    applyTags: [],
-    applyCover: true,
-    applyUrl: true,
-    sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
+  const fetched = await fetchDlsiteForWork(adapter, lib.existingWorkId, "RJ900002");
+  assert.equal(coverCalls, 1);
+  const ok = await applyFetchedDlsite(adapter, lib.existingWorkId, fetched, {
+    cover: true,
+    url: true,
   });
   assert.ok(ok);
   assert.equal(coverCalls, 1);
 });
 
-test("bulk取得はカバーをダウンロードも適用もしない", async (t) => {
+test("DLsite取得はカバーをキャッシュへ先取りし、作品フォルダーへは適用しない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-bulk-cover-cache");
   t.after(lib.cleanup);
@@ -1772,12 +1678,18 @@ test("bulk取得はカバーをダウンロードも適用もしない", async (
   );
   await configureRoot(adapter, lib.root);
   await adapter.scan();
-  const result = await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
-  assert.deepEqual(result, { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 });
-  assert.equal(coverCalls, 0);
+  const result = await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
+  assert.deepEqual(result, { fetched: 1, failed: 0, skipped: 0 });
+  assert.equal(coverCalls, 1);
+  assert.equal(
+    existsSync(join((await adapter.getWork(lib.existingWorkId))!.physicalPath, "dlsite_cover.jpg")),
+    false,
+  );
+  await adapter.fetchDlsiteProduct("RJ900002", { force: true });
+  assert.equal(coverCalls, 1);
 });
 
-test("bulk取得はカバー失敗に依存せず、mimimilli.jsonを変更しない", async (t) => {
+test("DLsite取得はカバー失敗に依存せず、mimimilli.jsonを変更しない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-bulk-cover-failure");
   t.after(lib.cleanup);
@@ -1801,7 +1713,8 @@ test("bulk取得はカバー失敗に依存せず、mimimilli.jsonを変更し�
   await configureRoot(adapter, lib.root);
   await adapter.scan();
   await adapter.registerScanCandidates(
-    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    REGISTER_ALL,
   );
   const metaPath = join(
     (await adapter.getWork(lib.existingWorkId))!.physicalPath,
@@ -1809,14 +1722,14 @@ test("bulk取得はカバー失敗に依存せず、mimimilli.jsonを変更し�
   );
   const bytesBefore = readFileSync(metaPath);
 
-  const result = await adapter.runDlsiteBulk("existing", undefined);
+  const result = await fetchDlsiteOfWorks(adapter, undefined);
 
-  assert.deepEqual(result, { fetched: 2, failed: 0, parseErrors: 0, skipped: 0 });
-  assert.equal(coverCalls, 0);
+  assert.deepEqual(result, { fetched: 2, failed: 0, skipped: 0 });
+  assert.equal(coverCalls, 2);
   assert.deepEqual(readFileSync(metaPath), bytesBefore);
 });
 
-test("bulk取得はmimimilli.json書込み権限に依存しない", async (t) => {
+test("DLsite取得はmimimilli.json書込み権限に依存しない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-bulk-meta-write-failure");
   t.after(lib.cleanup);
@@ -1842,18 +1755,19 @@ test("bulk取得はmimimilli.json書込み権限に依存しない", async (t) =
   await configureRoot(adapter, lib.root);
   await adapter.scan();
   await adapter.registerScanCandidates(
-    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    REGISTER_ALL,
   );
 
   const failedMetaPath = join(lib.root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");
   chmodSync(failedMetaPath, 0o444);
 
-  const result = await adapter.runDlsiteBulk("existing", undefined);
+  const result = await fetchDlsiteOfWorks(adapter, undefined);
 
-  assert.deepEqual(result, { fetched: 2, failed: 0, parseErrors: 0, skipped: 0 });
+  assert.deepEqual(result, { fetched: 2, failed: 0, skipped: 0 });
 });
 
-test("bulkキャンセル後の再開はcache結果を使い、mimimilli.jsonを変更しない", async (t) => {
+test("取得の打ち切り後の再取得はcache結果を使い、mimimilli.jsonを変更しない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-bulk-cancel-resume");
   t.after(lib.cleanup);
@@ -1885,19 +1799,18 @@ test("bulkキャンセル後の再開はcache結果を使い、mimimilli.jsonを
   const duplicateId = "22222222-2222-4222-8222-222222222222";
   const ids = [lib.existingWorkId, duplicateId];
 
-  const partial = await adapter.runDlsiteBulk("existing", ids, {
-    signal: controller.signal,
-    onProgress: (event) => {
-      if (event.processed === 1) controller.abort();
-    },
-  });
-  assert.deepEqual(partial, { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 });
+  assert.equal(await adapter.fetchDlsiteProduct("RJ900002", { force: false }), "fetched");
+  assert.equal(httpCalls, 1);
+  controller.abort();
+  await assert.rejects(
+    adapter.fetchDlsiteProduct("RJ900003", { force: false, signal: controller.signal }),
+  );
   assert.equal(httpCalls, 1);
   const interrupted = await Promise.all(ids.map((id) => adapter.getWork(id)));
   assert.ok(interrupted.every((work) => work?.dlsite.status === "none"));
 
-  const resumed = await adapter.runDlsiteBulk("existing", ids);
-  assert.deepEqual(resumed, { fetched: 2, failed: 0, parseErrors: 0, skipped: 0 });
+  const resumed = await fetchDlsiteOfWorks(adapter, ids);
+  assert.deepEqual(resumed, { fetched: 2, failed: 0, skipped: 0 });
   assert.equal(httpCalls, 1);
   const completed = await Promise.all(ids.map((id) => adapter.getWork(id)));
   assert.ok(completed.every((work) => work?.dlsite.status === "none"));
@@ -1987,39 +1900,36 @@ test("dlsiteFetch: abortでDLsite HTTP取得が中断される", async (t) => {
   release();
 });
 
-test("DLsite通知: 適用後は未連携件数から外れる", async (t) => {
+test("DLsite適用後は作品のdlsite.statusがappliedになる", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  const adapter = lib.own(
+    createTestRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) =>
+          htmlResponse(sampleWorkHtml(code, { title: "適用タイトル", genres: ["耳かき"] })),
+      }),
+    }),
+  );
   await configureRoot(adapter, lib.root);
   await adapter.scan();
-  const before = await adapter.getDlsiteNotificationSummary();
   const work = await adapter.getWork(lib.existingWorkId);
-  const ok = await adapter.dlsiteApply(lib.existingWorkId, {
-    info: {
-      rjCode: "RJ900002",
-      title: "適用タイトル",
-      circle: "夜想曲",
-      cvs: ["水瀬なずな"],
-      genreTags: ["耳かき"],
-      ageRating: null,
-      coverUrl: null,
-      url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
-    },
-    applyTitle: true,
-    applyTags: nts(["genre/耳かき"]),
-    applyCover: false,
-    applyUrl: true,
-    sourceRevision: (await adapter.getWorkEditSnapshot(work!.id))!.sourceRevision,
+  assert.equal(work?.dlsite.status, "none");
+  const fetched = await fetchDlsiteForWork(adapter, lib.existingWorkId, "RJ900002");
+  const ok = await applyFetchedDlsite(adapter, lib.existingWorkId, fetched, {
+    title: true,
+    tags: nts(["genre/耳かき"]),
+    url: true,
   });
   assert.ok(ok);
-  const after = await adapter.getDlsiteNotificationSummary();
-  assert.equal(after.unlinkedCount, before.unlinkedCount - 1);
+  assert.equal((await adapter.getWork(lib.existingWorkId))?.dlsite.status, "applied");
 });
 
-test("DLsite通知: bulk失敗が取得失敗件数へ反映される", async (t) => {
+test("DLsiteの取得失敗は作品のdlsiteに取得失敗として残る", async (t) => {
   const lib = makeSampleLibrary();
-  const dir = makeTestDirectory("dlsite-notification-fetch-failed");
+  const dir = makeTestDirectory("dlsite-fetch-failed-state");
   t.after(lib.cleanup);
   t.after(dir.cleanup);
   const adapter = dir.own(
@@ -2034,30 +1944,18 @@ test("DLsite通知: bulk失敗が取得失敗件数へ反映される", async (t
   );
   await configureRoot(adapter, lib.root);
   await adapter.scan();
-  const before = await adapter.getDlsiteNotificationSummary();
-  await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
-  const after = await adapter.getDlsiteNotificationSummary();
-  assert.equal(after.fetchFailedCount, before.fetchFailedCount + 1);
+  const before = await adapter.getWork(lib.existingWorkId);
+  assert.equal(isDlsiteFetchFailed(before!.dlsite), false);
+  await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
+  const after = await adapter.getWork(lib.existingWorkId);
+  assert.equal(isDlsiteFetchFailed(after!.dlsite), true);
 });
 
-test("DLsite通知: parse_error 警報が実データの流れで発火する", async (t) => {
+test("DLsiteのパース失敗は作品のdlsiteにパース失敗として残る", async (t) => {
   const lib = makeSampleLibrary();
-  const dir = makeTestDirectory("dlsite-notification-parse-alert");
+  const dir = makeTestDirectory("dlsite-parse-failed-state");
   t.after(lib.cleanup);
   t.after(dir.cleanup);
-  const duplicateIds = [
-    "44444444-4444-4444-8444-444444444441",
-    "44444444-4444-4444-8444-444444444442",
-    "44444444-4444-4444-8444-444444444443",
-  ];
-  for (const [index, workId] of duplicateIds.entries()) {
-    const duplicateDir = join(lib.root, "dlsite", `RJ900002_複製${index + 1}`);
-    cpSync(join(lib.root, "dlsite", "RJ900002_既存メタ"), duplicateDir, { recursive: true });
-    const metaPath = join(duplicateDir, "mimimilli.json");
-    const meta = JSON.parse(readFileSync(metaPath, "utf-8")) as { id: string };
-    meta.id = workId;
-    writeFileSync(metaPath, JSON.stringify(meta, null, 2));
-  }
   const adapter = dir.own(
     createRealAdapter({
       database: { kind: "memory" },
@@ -2070,8 +1968,8 @@ test("DLsite通知: parse_error 警報が実データの流れで発火する", 
   );
   await configureRoot(adapter, lib.root);
   await adapter.scan();
-  await adapter.runDlsiteBulk("existing", undefined);
-  const summary = await adapter.getDlsiteNotificationSummary();
-  assert.ok(summary.parseErrorCount >= 3);
-  assert.equal(summary.parseErrorAlert, true);
+  await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
+  const work = await adapter.getWork(lib.existingWorkId);
+  assert.equal(isDlsiteParseFailed(work!.dlsite), true);
+  assert.equal(isDlsiteFetchFailed(work!.dlsite), false);
 });

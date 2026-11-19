@@ -1,3 +1,4 @@
+import { NO_DLSITE } from "../helpers/scanLibrary.ts";
 // トラックの解決済み durationSec（resolveTrackDurationSec）の契約検証。
 // end-start / end有start無 / start有end無 / 両無 / 同一ファイル複数区間 / デフォルト外playlist /
 // probe失敗 の組み合わせを実データでカバーする。
@@ -444,6 +445,7 @@ test("createWorkの応答取得は登録時の投影総時間を変えない", a
     path: workspacePath("RJ900015_登録総時間"),
     title: "登録総時間",
     tags: [],
+    ...NO_DLSITE,
   });
   assert.ok(created);
   assert.equal(created.projection.status, "published");

@@ -79,12 +79,14 @@ export type RawWorkListRow = {
 };
 
 export interface ScanWorkState {
+  title: string;
   metaPath: string;
   sourceRevision: string | null;
   projectionRevision: string | null;
   mediaRevision: string | null;
   status: Work["status"];
   physicalPath: string;
+  audioFileCount: number;
   addedAt: string;
   bookmarked: boolean;
   lastPlayedAt: string | null;

@@ -22,6 +22,8 @@ import type { WorkSummary } from "@mimimilli/shared";
 import { buildAxisFacets } from "../src/core/axisFacets.ts";
 import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
 import { tf } from "./helpers/tag.ts";
+import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../src/adapters/real/dlsiteConfig.ts";
+import { htmlResponse, mockDlsiteTransport, sampleWorkHtml } from "./helpers/dlsiteTransport.ts";
 import { buildTagPrefixCandidates } from "../src/core/tagPrefixCandidates.ts";
 import { nt, nts } from "./helpers/tag.ts";
 
@@ -270,24 +272,18 @@ const contract = defineContract({
     { key: "a", tags: ["ASMR", "mood/甘め", "mood/眠い"] },
     { key: "b", tags: ["mood/甘め", "ジャンル/耳かき"] },
   ],
+  real: {
+    dlsiteRequestConfig: { ...DEFAULT_DLSITE_REQUEST_CONFIG, requestIntervalMs: 0, retryCount: 0 },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: (code) => htmlResponse(sampleWorkHtml(code, { genres: ["テスト"], cover: false })),
+    }),
+  },
 });
 
-const applyBody = (sourceRevision: string, applyTags: string[]) => ({
-  info: {
-    rjCode: "RJ000001",
-    title: "テスト作品",
-    circle: null,
-    cvs: [],
-    genreTags: [],
-    ageRating: null,
-    coverUrl: null,
-    url: "https://www.dlsite.com/maniax/work/=/product_id/RJ000001.html",
-  },
-  applyTitle: false,
-  applyCover: false,
-  applyUrl: false,
+const applyBody = (sourceRevision: string, tags: string[], infoRevision = 1) => ({
   sourceRevision,
-  applyTags,
+  infoRevision,
+  apply: { title: false, cover: false, url: false, tags },
 });
 
 async function sourceRevisionOf(harness: ContractHarness, workId: string): Promise<string> {
@@ -335,20 +331,30 @@ contract(
   },
 );
 
-contract("POST /api/dlsite/:id/apply: applyTags を正規化して保存する", async (harness) => {
+contract("POST /api/dlsite/:id/apply: apply.tags を正規化して保存する", async (harness) => {
   const id = harness.workId("a");
+  await harness.send("PATCH", `/api/dlsite/${id}`, {
+    sourceRevision: await sourceRevisionOf(harness, id),
+    rjCode: "RJ000001",
+  });
+  const fetched = await harness.send("POST", `/api/dlsite/${id}/fetch`);
+  assert.equal(fetched.status, 200);
   const applied = await harness.send(
     "POST",
     `/api/dlsite/${id}/apply`,
-    applyBody(await sourceRevisionOf(harness, id), ["Genre/ 耳かき ", "genre/耳かき"]),
+    applyBody(
+      fetched.body.sourceRevision,
+      ["Genre/ テスト ", "genre/テスト"],
+      fetched.body.infoRevision,
+    ),
   );
   assert.equal(applied.status, 200);
   const work = await harness.json(`/api/works/${id}`);
-  assert.ok(work.body.tags.includes("genre/耳かき"));
+  assert.ok(work.body.tags.includes("genre/テスト"));
 });
 
 contract(
-  "POST /api/dlsite/:id/apply: 正規化後に空になる applyTags は400で拒否する",
+  "POST /api/dlsite/:id/apply: 正規化後に空になる apply.tags は400で拒否する",
   async (harness) => {
     const id = harness.workId("a");
     const applied = await harness.send(
@@ -361,7 +367,7 @@ contract(
 );
 
 contract(
-  "POST /api/dlsite/:id/apply: 予約文字 @ 始まりの applyTags は400で拒否する",
+  "POST /api/dlsite/:id/apply: 予約文字 @ 始まりの apply.tags は400で拒否する",
   async (harness) => {
     const id = harness.workId("a");
     const applied = await harness.send(

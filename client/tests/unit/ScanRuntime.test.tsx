@@ -13,7 +13,7 @@ import { toastRequestsAtom } from "../../src/shared/model/toastRequestsAtom";
 import type { ScanJobEvent } from "@mimimilli/shared";
 import { apiError, mockApi } from "../helpers/api";
 import { appShellRoutes } from "../helpers/appShellApi";
-import { buildScanJobEvent, buildScanJobSnapshot, buildScanResult } from "../helpers/builders";
+import { buildScanJobEvent, buildScanJobSnapshot } from "../helpers/builders";
 
 /** 現在表示中のerror variantトーストのメッセージ。無ければnull。 */
 function getErrorToastMessage(store: ReturnType<typeof createStore>): string | null {
@@ -106,7 +106,6 @@ describe("ScanRuntime", () => {
   });
 
   it("モーダルを開いたまま失敗→再試行→成功すると古いエラートーストが残らない", async () => {
-    const scanResult = buildScanResult({ registered: 1 });
     let scanCallCount = 0;
     mockApi({
       ...appShellRoutes(),
@@ -118,7 +117,6 @@ describe("ScanRuntime", () => {
             id: "job-2",
             status: "completed",
             finishedAt: "2026-01-01T00:00:02.000Z",
-            result: scanResult,
           }),
         };
       },
@@ -143,13 +141,11 @@ describe("ScanRuntime", () => {
     await waitFor(() => expect(screen.queryByText(message)).toBeNull());
   });
 
-  it("中止APIの失敗でエラーが出た直後にSSEで完了しても、完了トーストは消えずに残る", async () => {
-    const scanResult = buildScanResult({ registered: 1 });
+  it("中止APIの失敗でエラーが出た直後にSSEで完了すると、エラートーストは消え、完了トーストは出ない", async () => {
     const running = buildScanJobSnapshot();
     const completed = buildScanJobSnapshot({
       status: "completed",
       finishedAt: "2026-01-01T00:00:01.000Z",
-      result: scanResult,
     });
 
     FakeEventSource.instances = [];
@@ -162,7 +158,7 @@ describe("ScanRuntime", () => {
       "GET /api/scan/:id": completed,
     });
 
-    // scanModalOpenAtomは未設定（閉じている）。完了トーストが出る経路を検証する。
+    // scanModalOpenAtomは未設定（閉じている）。
     const { store } = renderRuntime();
 
     await act(async () => {
@@ -181,11 +177,11 @@ describe("ScanRuntime", () => {
 
     // その直後に同じジョブのSSEが完了を届ける。errorToast.dismiss()とonTerminalの完了トーストが
     // 同じバッチで走る経路（cancel()のHTTP失敗＋SSE生存）を再現する。
-    dispatch(source, { type: "completed", result: scanResult });
+    dispatch(source, { type: "completed", finishedAt: "2026-01-01T00:00:01.000Z" });
 
     await waitFor(() => expect(getErrorToastMessage(store)).toBeNull());
-    await waitFor(() => expect(screen.getByText(/^スキャン完了/)).toBeInTheDocument());
-    expect(screen.queryByText(errorMessage)).toBeNull();
+    await waitFor(() => expect(screen.queryByText(errorMessage)).toBeNull());
+    expect(screen.queryByText(/^スキャン完了/)).toBeNull();
   });
 
   it("reset()（root再設定突入時用）を呼ぶと実行中ジョブの追跡状態が初期化される", async () => {

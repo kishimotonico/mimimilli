@@ -36,7 +36,7 @@ describe("ErrorViewBulkUnregisterBanner", () => {
       ),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "欠損作品をまとめて登録解除" }));
+    fireEvent.click(screen.getByRole("button", { name: "まとめて登録解除" }));
     fireEvent.click(screen.getByRole("button", { name: "まとめて解除する" }));
     await waitFor(() => expect(workApi.unregisterMissingWorks).toHaveBeenCalled());
     view.unmount();

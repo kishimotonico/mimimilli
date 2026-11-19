@@ -17,8 +17,4 @@ export const WORK_QUERY_KEYS = {
   scopedFacets: (smartFolderId: string, axis: string, filterParams: object = {}) =>
     ["axisFacets", "smartFolder", smartFolderId, axis, filterParams] as const,
   allScopedFacets: (smartFolderId: string) => ["axisFacets", "smartFolder", smartFolderId] as const,
-  dlsiteNotifications: () => ["dlsiteNotifications"] as const,
-  dlsiteNotificationSummary: () => ["dlsiteNotifications", "summary"] as const,
-  dlsiteNotificationList: (kind: "rj-missing" | "fetch-failed" | "parse-failed") =>
-    ["dlsiteNotifications", kind] as const,
 } as const;

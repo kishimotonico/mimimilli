@@ -2,12 +2,19 @@
 // 変更の入口は workMutations.ts の hook か、ここの関数を直接呼ぶ。
 
 import { hashKey, type Query, type QueryClient, type QueryKey } from "@tanstack/react-query";
-import type { Work, WorkEditSnapshot, WorkSourceMutationResult } from "@mimimilli/shared";
+import {
+  canonicalDlsiteProductCode,
+  type ScanCandidate,
+  type Work,
+  type WorkEditSnapshot,
+  type WorkSourceMutationResult,
+} from "@mimimilli/shared";
 import { WORK_QUERY_KEYS } from "../queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../tag/queryKeys";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../file-system/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../scan/queryKeys";
+import { refreshScanCandidates, SCAN_CANDIDATES_QUERY_KEY } from "../../scan/scanCandidatesCache";
 
 async function invalidateLibraryViews(queryClient: QueryClient): Promise<void> {
   await Promise.all([
@@ -15,7 +22,6 @@ async function invalidateLibraryViews(queryClient: QueryClient): Promise<void> {
     queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() }),
     queryClient.invalidateQueries({ queryKey: TAG_QUERY_KEYS.all() }),
     queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() }),
-    queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.dlsiteNotifications() }),
   ]);
 }
 
@@ -24,6 +30,7 @@ async function invalidateRegistrationViews(queryClient: QueryClient): Promise<vo
     invalidateLibraryViews(queryClient),
     queryClient.invalidateQueries({ queryKey: FILE_SYSTEM_QUERY_KEYS.all() }),
     queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.diagnostics() }),
+    queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.last() }),
   ]);
 }
 
@@ -116,6 +123,18 @@ export async function updateCachesAfterUnregistration(
   queryClient.removeQueries({ queryKey: WORK_QUERY_KEYS.detail(workId) });
 }
 
+/** 作品単位の読み直し（データ不整合の解消）の成功後 */
+export async function updateCachesAfterWorkReload(
+  queryClient: QueryClient,
+  workId: string,
+): Promise<void> {
+  await Promise.all([
+    invalidateRegistrationViews(queryClient),
+    invalidateWorkDetail(queryClient, workId),
+    queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.source(workId), exact: true }),
+  ]);
+}
+
 export async function updateCachesAfterMissingUnregistration(
   queryClient: QueryClient,
 ): Promise<void> {
@@ -144,30 +163,44 @@ export function updateCachesAfterDlsiteLinkageChange(
   return updateCachesAfterSourceMutation(queryClient, result);
 }
 
-/** DLsite 情報の取得後。失敗時も取得キャッシュと通知が変わるため成否を問わず呼ぶ */
-export async function updateCachesAfterDlsitePreviewFetch(
+function isWorkDetailQuery(query: Query): boolean {
+  const key = query.queryKey;
+  return key[0] === WORK_QUERY_KEYS.allDetails()[0] && key.length === 2;
+}
+
+/** DLsite取得ジョブの終端後。同じRJコードの作品の詳細と、ライブラリ一覧（RJコードで絞れないので一式）を無効化する */
+export async function updateCachesAfterDlsiteFetch(
   queryClient: QueryClient,
-  workId: string,
+  productCodes: readonly string[],
 ): Promise<void> {
+  if (productCodes.length === 0) return;
+  const codes = new Set(productCodes.map(canonicalDlsiteProductCode));
   await Promise.all([
-    invalidateWorkDetail(queryClient, workId),
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        if (!isWorkDetailQuery(query)) return false;
+        const rjCode = (query.state.data as Work | undefined)?.dlsite?.rjCode;
+        return typeof rjCode === "string" && codes.has(canonicalDlsiteProductCode(rjCode));
+      },
+    }),
     invalidateLibraryViews(queryClient),
   ]);
 }
 
-export async function updateCachesAfterDlsiteBulkApply(
+/** DLsiteの同期取得（作品詳細の取得・Filesの取得）の終了後。成否にかかわらず、同じRJコードの作品を無効化し、
+ *  キャッシュ済みの候補一覧にそのRJコードの候補があるときだけ候補一覧を取り直す */
+export async function updateCachesAfterDlsiteSyncFetch(
   queryClient: QueryClient,
-  workIds: readonly string[],
+  rjCode: string,
 ): Promise<void> {
-  await Promise.all([
-    ...workIds.map((workId) =>
-      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(workId) }),
-    ),
-    invalidateLibraryViews(queryClient),
+  const code = canonicalDlsiteProductCode(rjCode);
+  const cached = queryClient.getQueryData<ScanCandidate[]>(SCAN_CANDIDATES_QUERY_KEY) ?? [];
+  const hasCandidate = cached.some(
+    (candidate) =>
+      candidate.rjCode !== null && canonicalDlsiteProductCode(candidate.rjCode) === code,
+  );
+  await Promise.allSettled([
+    hasCandidate ? refreshScanCandidates(queryClient) : Promise.resolve(),
+    updateCachesAfterDlsiteFetch(queryClient, [rjCode]),
   ]);
-}
-
-/** 一括取得の終端（結果不明を含む）。処理対象を問わず全詳細を無効化する */
-export async function updateCachesAfterDlsiteBulkFetch(queryClient: QueryClient): Promise<void> {
-  await Promise.all([invalidateAllWorkDetails(queryClient), invalidateLibraryViews(queryClient)]);
 }

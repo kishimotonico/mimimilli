@@ -10,6 +10,7 @@
 //                                   （デフォルト ./data/cache/thumbnails）
 //   MIMIMILLI_MOCK_SCENARIO … fixture アダプタのデータシナリオ
 //                             ("default" | "empty" | "new-work" | "errors"、省略時 "default")
+//   MIMIMILLI_MOCK_DLSITE_FETCH_DELAY_MS … fixture アダプタのDLsite取得の遅延（ミリ秒）
 //   MIMIMILLI_STATIC_DIR    … client/dist 等の静的配信ルート（未設定ならAPIのみ）
 import { resolve } from "node:path";
 import { createFixtureAdapter } from "./adapters/fixture/index.ts";
@@ -43,7 +44,10 @@ const serverLogger = getCategoryLogger("server");
 function createAdapter(config: ServerConfig): DataAdapter {
   switch (config.adapterKind) {
     case "fixture":
-      return createFixtureAdapter({ scenario: config.mockScenario });
+      return createFixtureAdapter({
+        scenario: config.mockScenario,
+        dlsiteFetchDelayMs: config.dlsiteFetchDelayMs,
+      });
     case "real": {
       if (!dataPaths) {
         throw new Error("real adapter requires dataPaths");

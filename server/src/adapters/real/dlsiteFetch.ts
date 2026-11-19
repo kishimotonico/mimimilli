@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
-import { join } from "node:path";
 import { errorMessage } from "@mimimilli/shared";
 import type { DlsiteFetchResult } from "@mimimilli/shared";
-import { CoverSaveError, DlsiteOfflineError } from "../../errors.ts";
+import { DlsiteOfflineError } from "../../errors.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import {
+  DLSITE_PARSER_VERSION,
   fetchDlsiteCover,
   fetchDlsiteHtml,
   listDlsiteMissingFields,
@@ -19,35 +19,18 @@ import {
 } from "./dlsiteCache.ts";
 import { type DlsiteRequestConfig } from "./dlsiteConfig.ts";
 import {
+  createDlsiteProductResolver,
+  dlsiteFetchResultOfProductResolution,
+  dlsiteFetchStateOfProductResolution,
+} from "./dlsiteProductResolve.ts";
+import {
   DlsiteScheduler,
   type DlsiteHttpLogContext,
   type DlsiteSchedulerDependencies,
 } from "./dlsiteScheduler.ts";
-import { commitTempFile, removeTempFile, writeTempFile } from "./atomicFile.ts";
-import { resolveWithin } from "./paths.ts";
 import { SharedFlightPool, throwIfAborted } from "./sharedFlight.ts";
-import { measureCoverDimensions } from "./thumbnailCache.ts";
-import type { CoverColumns } from "./workRowMapping.ts";
 
 const dlsiteLogger = getCategoryLogger("dlsite");
-
-const DLSITE_COVER_BASENAME = "dlsite_cover";
-const DLSITE_COVER_EXTENSIONS: ReadonlySet<string> = new Set(["jpg", "jpeg", "png", "webp", "gif"]);
-
-function coverExtensionOfUrl(url: string): string | null {
-  const lastSegment = new URL(url).pathname.split("/").pop() ?? "";
-  const dot = lastSegment.lastIndexOf(".");
-  if (dot < 0) return null;
-  const extension = lastSegment.slice(dot + 1).toLowerCase();
-  return DLSITE_COVER_EXTENSIONS.has(extension) ? extension : null;
-}
-
-export interface StagedCover {
-  fileName: string;
-  dimensions: NonNullable<CoverColumns["dimensions"]>;
-  commit(): void;
-  discard(): void;
-}
 
 export interface DlsiteFetchAttempt {
   result: DlsiteFetchResult;
@@ -129,6 +112,7 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
       dlsiteCoverMaximumBytes,
       dlsiteUserAgent,
     );
+  const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache);
   const dlsiteFlightPool = new SharedFlightPool<DlsiteFetchAttempt>();
   const dlsiteCoverFlightPool = new SharedFlightPool<{ body: Uint8Array; normalizedUrl: string }>();
 
@@ -137,7 +121,13 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     force: boolean,
   ): DlsiteFetchAttempt | null {
     const key = productCode.trim().toUpperCase();
-    if (force) {
+    const resolution = resolveDlsiteProduct(key);
+    if (
+      force &&
+      (resolution.kind === "failure" ||
+        (resolution.kind === "html" &&
+          dlsiteFetchStateOfProductResolution(resolution) === "failed"))
+    ) {
       logDlsiteEvent({
         event: "dlsite_cache_miss",
         resource: "html",
@@ -146,7 +136,6 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
       });
       return null;
     }
-    const resolution = dlsiteCache.resolve({ productCode: key });
     if (resolution.kind === "miss") {
       logDlsiteEvent({
         event: "dlsite_cache_miss",
@@ -156,27 +145,15 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
       });
       return null;
     }
-    const cacheReason = resolution.kind === "failure" ? "failure_ttl_valid" : "ttl_valid";
     logDlsiteEvent({
       event: "dlsite_cache_hit",
       resource: "html",
       key,
-      reason: cacheReason,
+      reason: resolution.kind === "failure" ? "failure_ttl_valid" : "ttl_valid",
       outcome: resolution.outcome,
     });
-    if (resolution.kind === "html") {
-      const parsed = parseDlsiteHtml(resolution.html, key);
-      logDlsiteParseResult(key, parsed, false);
-      return { result: parsed, httpAttempted: false };
-    }
-    return {
-      result: {
-        ok: false,
-        kind: resolution.outcome,
-        message: `DLsite取得キャッシュ: ${resolution.outcome}（${key}）`,
-      },
-      httpAttempted: false,
-    };
+    const result = dlsiteFetchResultOfProductResolution(resolution, key);
+    return result ? { result, httpAttempted: false } : null;
   }
 
   async function fetchDlsiteHtmlNetworkAttempt(
@@ -229,6 +206,9 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
           contentType: response.contentType ?? "",
           html: response.body,
           transferSize: response.transferSize,
+          parsed: parsed.ok
+            ? { parserVersion: DLSITE_PARSER_VERSION, info: parsed.info }
+            : undefined,
         });
         logDlsiteParseResult(key, parsed, true);
         return { result: parsed, httpAttempted: true };
@@ -252,7 +232,7 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     force = false,
     signal?: AbortSignal,
   ): Promise<DlsiteFetchAttempt> {
-    throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
+    throwIfAborted(signal, "DLsite取得は中止されました");
     const cached = resolveCachedDlsiteAttempt(productCode, force);
     if (cached) return cached;
     return fetchDlsiteHtmlNetworkAttempt(productCode, force, signal);
@@ -270,7 +250,7 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     coverUrl: string,
     signal?: AbortSignal,
   ): Promise<{ body: Uint8Array; normalizedUrl: string }> {
-    throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
+    throwIfAborted(signal, "DLsite取得は中止されました");
     const normalizedUrl = normalizeDlsiteCoverUrl(coverUrl);
     const key = `cover:${createHash("sha256").update(normalizedUrl).digest("hex")}`;
     const cached = dlsiteCache.getCover(normalizedUrl);
@@ -281,7 +261,7 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
         key: normalizedUrl,
         reason: "cached",
       });
-      throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
+      throwIfAborted(signal, "DLsite取得は中止されました");
       return { body: cached.body, normalizedUrl };
     }
     dlsiteScheduler.assertOnline();
@@ -312,7 +292,7 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
           return { body: fetched.body, normalizedUrl: finalUrl };
         });
       });
-      throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
+      throwIfAborted(signal, "DLsite取得は中止されました");
       return image;
     } finally {
       await dlsiteScheduler.drain();
@@ -320,46 +300,31 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
   }
 
   /**
-   * カバーを取得して作品フォルダー内の一時ファイルへ置く。最終名への確定は呼び出し側が
-   * commit() で行う。許可外の拡張子・ルート外の作品フォルダー・画像として読めない場合は null。
+   * 取得時にカバーをキャッシュへ先取りする。失敗は握り潰してログに出し、HTMLの取得結果には影響させない。
+   * 再送出するのは呼び出し元のsignalがabort済みのときだけ。deadlineMsを過ぎたらカバーなしで戻る。
    */
-  async function stageCover(
-    coverUrl: string,
-    workDir: string,
-    root: string,
-    signal?: AbortSignal,
-  ): Promise<StagedCover | null> {
-    const image = await fetchCoverImage(coverUrl, signal);
-    const extension = coverExtensionOfUrl(image.normalizedUrl);
-    if (!extension) return null;
-    const realWorkDir = resolveWithin(root, workDir);
-    if (!realWorkDir) return null;
-    const fileName = `${DLSITE_COVER_BASENAME}.${extension}`;
-    let tmpPath: string;
+  async function prefetchCover(
+    coverUrl: string | null,
+    options: { signal?: AbortSignal; deadlineMs?: number } = {},
+  ): Promise<void> {
+    if (!coverUrl) return;
+    const timeout =
+      options.deadlineMs === undefined
+        ? undefined
+        : AbortSignal.timeout(Math.max(0, options.deadlineMs - Date.now()));
+    const signals = [options.signal, timeout].filter(
+      (signal): signal is AbortSignal => signal !== undefined,
+    );
+    const signal = signals.length > 0 ? AbortSignal.any(signals) : undefined;
     try {
-      tmpPath = writeTempFile(realWorkDir, DLSITE_COVER_BASENAME, image.body);
+      await fetchCoverImage(coverUrl, signal);
     } catch (error) {
-      throw new CoverSaveError({ cause: error });
+      if (options.signal?.aborted) throw error;
+      dlsiteLogger.warn("DLsiteカバーの先取りに失敗しました", {
+        coverUrl,
+        message: errorMessage(error),
+      });
     }
-    let dimensions: CoverColumns["dimensions"] | null = null;
-    try {
-      dimensions = await measureCoverDimensions(tmpPath);
-    } finally {
-      if (!dimensions) removeTempFile(tmpPath);
-    }
-    if (!dimensions) return null;
-    return {
-      fileName,
-      dimensions,
-      commit: () => {
-        try {
-          commitTempFile(tmpPath, join(realWorkDir, fileName));
-        } catch (error) {
-          throw new CoverSaveError({ cause: error });
-        }
-      },
-      discard: () => removeTempFile(tmpPath),
-    };
   }
 
   return {
@@ -367,6 +332,6 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     dlsiteScheduler,
     fetchCachedDlsiteAttempt,
     fetchCachedDlsite,
-    stageCover,
+    prefetchCover,
   };
 }

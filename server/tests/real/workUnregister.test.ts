@@ -1,3 +1,4 @@
+import { NO_DLSITE } from "../helpers/scanLibrary.ts";
 // 作品登録解除 API（DELETE /works/:id）の結合テスト。
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -78,7 +79,7 @@ async function setupRegisteredWork(t: TestContext) {
   const createRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, folder), title: "解除テスト作品" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "解除テスト作品", ...NO_DLSITE }),
   });
   assert.equal(createRes.status, 201);
   const created = await createRes.json();
@@ -208,7 +209,7 @@ test("DELETE /works/:id: 解除後に同じフォルダーを再登録できる"
   const reRegRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, folder), title: "再登録作品" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "再登録作品", ...NO_DLSITE }),
   });
   assert.equal(reRegRes.status, 201);
   const reRegBody = await reRegRes.json();
@@ -262,7 +263,7 @@ test("unregisterWork: DB削除失敗時に退避したメタ正本を復元す�
   const createRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, folder), title: "DB失敗テスト" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "DB失敗テスト", ...NO_DLSITE }),
   });
   assert.equal(createRes.status, 201);
   const work = { id: (await createRes.json()).snapshot.id } as Work;
@@ -311,7 +312,11 @@ test("unregisterWork: catalog削除後のuser削除失敗時はメタを復元�
   const createRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, folder), title: "user削除失敗テスト" }),
+    body: JSON.stringify({
+      path: workspace(root, folder),
+      title: "user削除失敗テスト",
+      ...NO_DLSITE,
+    }),
   });
   assert.equal(createRes.status, 201);
   const work = { id: (await createRes.json()).snapshot.id } as Work;
@@ -380,7 +385,11 @@ test("unregisterWork: 退避済みメタのまま再実行するとDB削除後�
   const createRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, folder), title: "退避再実行テスト" }),
+    body: JSON.stringify({
+      path: workspace(root, folder),
+      title: "退避再実行テスト",
+      ...NO_DLSITE,
+    }),
   });
   assert.equal(createRes.status, 201);
   const work = { id: (await createRes.json()).snapshot.id } as Work;
@@ -422,7 +431,7 @@ test("スキャン: 退避のみ残存（catalogあり）でメタ正本を復�
   const createRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, folder), title: "退避復元テスト" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "退避復元テスト", ...NO_DLSITE }),
   });
   assert.equal(createRes.status, 201);
   const work = { id: (await createRes.json()).snapshot.id } as Work;
@@ -466,7 +475,7 @@ test("スキャン: 退避のみ残存（catalogなし）で孤児退避ファ�
   const createRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, folder), title: "孤児退避テスト" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "孤児退避テスト", ...NO_DLSITE }),
   });
   assert.equal(createRes.status, 201);
   const work = { id: (await createRes.json()).snapshot.id } as Work;
@@ -506,7 +515,7 @@ test("スキャン: 正本と退避の併存では退避を削除し、その後
   const createRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, folder), title: "併存退避テスト" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "併存退避テスト", ...NO_DLSITE }),
   });
   assert.equal(createRes.status, 201);
   const work = { id: (await createRes.json()).snapshot.id } as Work;
@@ -551,7 +560,11 @@ test(
     const createRes = await app.request("/api/works", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: workspace(root, folder), title: "回収fs失敗テスト" }),
+      body: JSON.stringify({
+        path: workspace(root, folder),
+        title: "回収fs失敗テスト",
+        ...NO_DLSITE,
+      }),
     });
     assert.equal(createRes.status, 201);
     const work = { id: (await createRes.json()).snapshot.id } as Work;

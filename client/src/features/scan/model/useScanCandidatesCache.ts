@@ -1,17 +1,16 @@
 import { useAtomValue } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import type { ScanCandidate } from "@mimimilli/shared";
-import { SCAN_QUERY_KEYS } from "../api";
-import { fetchScanCandidates } from "../../../entities/scan/scanCandidatesCache";
+import { scanCandidatesQueryOptions } from "../../../entities/scan/scanCandidatesCache";
 import { scanCandidateHiddenPathsAtom } from "../../../entities/scan/model/atoms";
 
 const EMPTY_SCAN_CANDIDATES: ScanCandidate[] = [];
 
-export function useScanCandidatesCache(): ScanCandidate[] {
+/** 候補のキャッシュと、まだ一度も読めていないかどうか。 */
+export function useScanCandidatesState(): { candidates: ScanCandidate[]; loaded: boolean } {
   // 明示的な refreshScanCandidates 呼び出し以外では取得しない（scanCandidatesCache 参照）。
   const candidatesQuery = useQuery({
-    queryKey: SCAN_QUERY_KEYS.candidates(),
-    queryFn: fetchScanCandidates,
+    ...scanCandidatesQueryOptions,
     enabled: false,
   });
 
@@ -19,11 +18,15 @@ export function useScanCandidatesCache(): ScanCandidate[] {
 
   const source = candidatesQuery.data ?? EMPTY_SCAN_CANDIDATES;
 
-  return hiddenPaths.size === 0
-    ? source
-    : source.filter((candidate) => !hiddenPaths.has(candidate.path));
+  return {
+    candidates:
+      hiddenPaths.size === 0
+        ? source
+        : source.filter((candidate) => !hiddenPaths.has(candidate.path)),
+    loaded: candidatesQuery.data !== undefined,
+  };
 }
 
-export function useUnregisteredCandidateCount(): number {
-  return useScanCandidatesCache().length;
+export function useScanCandidatesCache(): ScanCandidate[] {
+  return useScanCandidatesState().candidates;
 }

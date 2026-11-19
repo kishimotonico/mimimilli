@@ -19,9 +19,9 @@ test("Files: 単一ファイル形式のメタファイル行でID重複を再�
   await metaRow.click();
   const preview = page.locator(".mle-prv.is-files");
   await expect(preview.getByText("ID重複", { exact: true })).toBeVisible();
-  await preview.getByRole("button", { name: "別作品として取り込む" }).click();
+  await preview.getByRole("button", { name: "別の作品として取り込む" }).click();
 
-  const dialog = page.getByRole("alertdialog", { name: "別作品として取り込む" });
+  const dialog = page.getByRole("alertdialog", { name: "別の作品として取り込む" });
   await expect(dialog.getByText("copies/d00002.mimimilli.json")).toBeVisible();
   await dialog.getByRole("button", { name: "取り込む" }).click();
 

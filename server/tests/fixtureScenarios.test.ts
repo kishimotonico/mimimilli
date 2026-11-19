@@ -1,44 +1,23 @@
+import { REGISTER_ALL, NO_DLSITE } from "./helpers/scanLibrary.ts";
 // fixture アダプタのシナリオ機能（ADR-0002 / client/mocks/scenarios.ts からの移植）のテスト。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { scanCandidateSchema, workspacePath } from "@mimimilli/shared";
-import type { DataAdapter } from "../src/adapter/index.ts";
+import { workspacePath } from "@mimimilli/shared";
 import { createApp } from "./helpers/testApp.ts";
-import { pollUntil } from "./helpers/poll.ts";
-import { createClassificationMethods } from "../src/adapters/fixture/classification.ts";
-import { createCoverMediaMethods } from "../src/adapters/fixture/coverMedia.ts";
-import { createDlsiteMethods } from "../src/adapters/fixture/dlsiteMethods.ts";
-import { createFsMethods } from "../src/adapters/fixture/fsMethods.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
+import { CandidatePoolChangedError } from "../src/errors.ts";
 import {
   createFixtureScenario,
   LARGE_SCENARIO_WORK_COUNT,
   SCENARIO_IDS,
 } from "../src/adapters/fixture/scenarios.ts";
-import {
-  createSettingsScanMethods,
-  resolveRegisteredRjCode,
-} from "../src/adapters/fixture/settingsScan.ts";
+import { createSettingsScanMethods } from "../src/adapters/fixture/settingsScan.ts";
 import { createInitialState } from "../src/adapters/fixture/state.ts";
-import { createWorkMethods } from "../src/adapters/fixture/works.ts";
-import type { ScanCandidate } from "@mimimilli/shared";
+import type { ScanCandidateFolder } from "@mimimilli/shared";
+import { buildFixtureAdapterWithCandidates } from "./helpers/fixtureCandidates.ts";
 import { configureRoot } from "./helpers/rootFolder.ts";
 
 /** createFixtureAdapter同様の合成だが、候補一覧だけを差し替えられる（候補登録の契約テスト用） */
-function buildFixtureAdapterWithCandidates(candidates: ScanCandidate[]): DataAdapter {
-  const state = createInitialState({ scenario: "empty" });
-  state.rootFolder = "/library";
-  state.scanCandidates = candidates;
-  return {
-    ...createSettingsScanMethods(state),
-    ...createWorkMethods(state),
-    ...createClassificationMethods(state),
-    ...createFsMethods(state),
-    ...createCoverMediaMethods(state),
-    ...createDlsiteMethods(state),
-  };
-}
-
 function buildApp(scenario?: string) {
   return createApp(createFixtureAdapter({ scenario }));
 }
@@ -51,26 +30,39 @@ test("シナリオ省略時は default として動作する", async () => {
   assert.ok(body.items.length > 0);
 });
 
-test("new-work: スキャン結果に新規作品IDが含まれる", async () => {
-  const app = buildApp("new-work");
+test("new-work: スキャン結果に新規作品・新たな行方不明・読み取れなかったパスが含まれる", async () => {
+  const adapter = createFixtureAdapter({ scenario: "new-work" });
 
-  const started = await app.request("/api/scan", { method: "POST" });
-  assert.equal(started.status, 202);
-  const { job } = await started.json();
-  await pollUntil(async () => {
-    const state = await app.request(`/api/scan/${job.id}`);
-    const snapshot = await state.json();
-    return snapshot.status === "completed";
-  });
-  const state = await app.request(`/api/scan/${job.id}`);
-  const snapshot = await state.json();
-  assert.deepEqual(snapshot.result.insertedWorkIds, ["RJ501011", "RJ501001", "RJ501003"]);
+  const first = await adapter.scan();
+  assert.equal(first.startedWithEmptyCatalog, false);
+  assert.deepEqual(first.insertedWorkIds, ["RJ501011", "RJ501001", "RJ501003"]);
+  assert.deepEqual(
+    first.missingWorks.map((work) => work.workId),
+    ["RJ501008"],
+  );
+  assert.equal(first.missingWorks[0]?.title, "ツンデレ後輩との放課後トレーニング【ボイスドラマ】");
+  assert.equal(
+    first.missingWorks[0]?.previousPath,
+    "dlsite/月白製作所/RJ501008_ツンデレ後輩との放課後トレーニング",
+  );
+  assert.deepEqual(first.unreadablePaths, ["権限なし/フォルダー"]);
+  assert.equal((await adapter.getWork("RJ501008"))?.status, "missing");
+
+  // シナリオの結果は最初のスキャンだけ。2回目以降は今回の変化（なければ空）を返す
+  const second = await adapter.scan();
+  assert.deepEqual(second.missingWorks, []);
+  assert.deepEqual(second.insertedWorkIds, []);
+  assert.deepEqual(second.updatedWorks, []);
+  assert.deepEqual(second.unreadablePaths, []);
+  assert.equal(second.dataIntegrityWarning, undefined);
 
   // 新規作品自体は works 一覧に存在する（スキャンで見つかった扱い）
-  const worksRes = await app.request("/api/works");
-  const { items } = await worksRes.json();
-  const ids: string[] = items.map((w: { id: string }) => w.id);
-  assert.ok(ids.includes("RJ501011"));
+  assert.ok(await adapter.getWork("RJ501011"));
+});
+
+test("empty: 作品が1件もない状態で始めたスキャンは startedWithEmptyCatalog になる", async () => {
+  const adapter = createFixtureAdapter({ scenario: "empty" });
+  assert.equal((await adapter.scan()).startedWithEmptyCatalog, true);
 });
 
 test("new-work: Files用診断とscan確認用の候補・問題を独立して返す", async () => {
@@ -88,17 +80,28 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
     "copies/RJ501001_夜更けの図書室で囁き朗読",
   ]);
 
-  const registration = await adapter.registerScanCandidates([
-    { path: workspacePath("未登録作品") },
-    { path: workspacePath("消えた候補") },
-  ]);
+  await assert.rejects(
+    () =>
+      adapter.registerScanCandidates(
+        [workspacePath("未登録作品"), workspacePath("消えた候補")],
+        REGISTER_ALL,
+      ),
+    CandidatePoolChangedError,
+  );
+  assert.equal(
+    (await adapter.listScanCandidates()).some((candidate) => candidate.path === "未登録作品"),
+    true,
+  );
+
+  const registration = await adapter.registerScanCandidates(
+    [workspacePath("未登録作品")],
+    REGISTER_ALL,
+  );
   assert.deepEqual(
     registration.registered.map((entry) => entry.path),
     ["未登録作品"],
   );
-  assert.deepEqual(registration.failures, [
-    { path: "消えた候補", message: "候補が見つかりません" },
-  ]);
+  assert.deepEqual(registration.failures, []);
 
   // 候補承認はreal adapterのregisterCandidates（scanner.ts）と同じく、実際にcatalog
   // （fixtureではstate.works）へ行を増やす。新規登録済みタブはこのworksを介して
@@ -117,6 +120,10 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
 
   await adapter.excludeScanCandidates(["朗読/候補"]);
   assert.deepEqual(await adapter.listScanCandidates(), []);
+  await assert.rejects(
+    () => adapter.registerScanCandidates([workspacePath("朗読/候補")], REGISTER_ALL),
+    CandidatePoolChangedError,
+  );
 
   // 除外は可逆な扱い。restoreで戻すと一覧に復帰する（実装adapterは毎回ディスクを
   // 再走査するため自然に復帰するが、fixtureは静的リストを持つため個別に検証する）。
@@ -223,9 +230,6 @@ test("errors: dataIntegrityWarningがWorksPage・スキャン結果・エクス�
     limit: 50,
   });
   assert.deepEqual(smartFolderWorks?.dataIntegrityWarning, worksPage.dataIntegrityWarning);
-
-  const bulk = await adapter.runDlsiteBulk("existing", undefined);
-  assert.deepEqual(bulk.dataIntegrityWarning, worksPage.dataIntegrityWarning);
 });
 
 test("new-work・default: dataIntegrityWarningは付かない", async () => {
@@ -241,49 +245,39 @@ test("new-work・default: dataIntegrityWarningは付かない", async () => {
   }
 });
 
-test("fixture: rjCode省略・空文字・指定を区別する", () => {
-  // 省略=候補が検出した値を採用、空文字=明示的になし（real adapterと同じく""のまま）、値=そのまま採用（候補登録APIの規約）。
-  assert.equal(resolveRegisteredRjCode("RJ999999", undefined), "RJ999999");
-  assert.equal(resolveRegisteredRjCode("RJ999999", ""), "");
-  assert.equal(resolveRegisteredRjCode("RJ999999", "RJ111111"), "RJ111111");
-  assert.equal(resolveRegisteredRjCode(null, undefined), null);
-});
-
-test("候補登録APIはHTTP境界の正規化からfixture adapterの保存まで、rjCodeの3状態をモックを挟まず通す", async () => {
-  const candidates = [
-    scanCandidateSchema.parse({
-      path: "自動検出済み",
-      inferredTitle: "自動検出済み",
-      audioFileCount: 1,
-      audioBreakdown: [{ extension: "wav", count: 1 }],
-      rjCode: "RJ700001",
-    }),
-    scanCandidateSchema.parse({
-      path: "明示なし",
-      inferredTitle: "明示なし",
-      audioFileCount: 1,
-      audioBreakdown: [{ extension: "wav", count: 1 }],
-      rjCode: null,
-    }),
-    scanCandidateSchema.parse({
-      path: "値指定",
-      inferredTitle: "値指定",
-      audioFileCount: 1,
-      audioBreakdown: [{ extension: "wav", count: 1 }],
-      rjCode: null,
-    }),
-  ];
-  const app = createApp(buildFixtureAdapterWithCandidates(candidates));
+test("候補登録APIは、サーバーが持つ実効RJコード（検出値・直した値・なしの明示）で登録する", async () => {
+  const folder = (path: string, detectedRjCode: string | null): ScanCandidateFolder => ({
+    path: workspacePath(path),
+    inferredTitle: path,
+    audioFileCount: 1,
+    audioBreakdown: [{ extension: "wav", count: 1 }],
+    detectedRjCode,
+  });
+  const app = createApp(
+    buildFixtureAdapterWithCandidates([
+      folder("自動検出済み", "RJ700001"),
+      folder("明示なし", "RJ700002"),
+      folder("値指定", null),
+      folder("検出なし", null),
+    ]),
+  );
   try {
+    const setRjCode = async (path: string, rjCode: string) => {
+      const response = await app.request("/api/scan/candidates/rj-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path, rjCode }),
+      });
+      assert.equal(response.status, 200);
+    };
+    await setRjCode("明示なし", "");
+    await setRjCode("値指定", "rj1234567");
     const response = await app.request("/api/scan/candidates/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        items: [
-          { path: "自動検出済み" },
-          { path: "明示なし", rjCode: "" },
-          { path: "値指定", rjCode: "rj1234567" },
-        ],
+        paths: ["自動検出済み", "明示なし", "値指定", "検出なし"],
+        apply: { title: true, cover: true, tags: true, url: true },
       }),
     });
     assert.equal(response.status, 201);
@@ -302,6 +296,7 @@ test("候補登録APIはHTTP境界の正規化からfixture adapterの保存ま�
     assert.equal(await rjCodeOf("自動検出済み"), "RJ700001");
     assert.equal(await rjCodeOf("明示なし"), "");
     assert.equal(await rjCodeOf("値指定"), "RJ1234567");
+    assert.equal(await rjCodeOf("検出なし"), null);
   } finally {
     await app.shutdown();
   }
@@ -442,9 +437,7 @@ test("fixture: RJコード変更で旧状態をリセットし一括取得対象
   assert.equal(updated?.snapshot.dlsite.status, "none");
   assert.deepEqual(updated?.snapshot.dlsite.appliedTags, []);
 
-  const bulk = await adapter.runDlsiteBulk("existing", [workId]);
-  assert.equal(bulk.fetched, 1);
-  assert.equal(bulk.skipped, 0);
+  assert.equal(await adapter.fetchDlsiteProduct("RJ7654321", { force: false }), "fetched");
 });
 
 test("fixture: 単一音声ファイルのregister-previewと登録ができる", async () => {
@@ -459,7 +452,7 @@ test("fixture: 単一音声ファイルのregister-previewと登録ができる"
   const created = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: "fanza/d00001.mp3", title: "FANZA単一ファイル" }),
+    body: JSON.stringify({ path: "fanza/d00001.mp3", title: "FANZA単一ファイル", ...NO_DLSITE }),
   });
   assert.equal(created.status, 201);
   const createdBody = await created.json();
@@ -483,7 +476,7 @@ test("fixture: 単一音声ファイルのregister-previewと登録ができる"
   const again = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: "fanza/d00001.mp3", title: "再登録" }),
+    body: JSON.stringify({ path: "fanza/d00001.mp3", title: "再登録", ...NO_DLSITE }),
   });
   assert.equal(again.status, 409);
 });
@@ -518,4 +511,82 @@ test("fixture: 異なるrootへの変更で候補sessionを破棄し、次のsca
     ["未登録作品", "朗読/候補"],
   );
   assert.deepEqual(await paths(), ["未登録作品", "朗読/候補"]);
+});
+
+test("scan-review: 候補が取得状態ごとの表示になり、直した行だけ rjCodeEdited になる", async () => {
+  const app = buildApp("scan-review");
+  try {
+    const list = async () => {
+      const response = await app.request("/api/scan/candidates");
+      assert.equal(response.status, 200);
+      const { candidates } = await response.json();
+      return new Map<string, { rjCode: string | null; rjCodeEdited: boolean; dlsite: unknown }>(
+        candidates.map((entry: { rjCode: string | null }) => [entry.rjCode ?? "", entry as never]),
+      );
+    };
+    const before = await list();
+    assert.ok(before.has("RJ000402") && before.has("RJ000403") && before.has("RJ000404"));
+    assert.ok(before.has(""), "RJコードなしの候補がある");
+    assert.ok([...before.values()].every((entry) => !entry.rjCodeEdited));
+
+    const fetchCodes = async (productCodes: string[]) => {
+      const response = await app.request("/api/dlsite/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ origin: "bulk", productCodes }),
+      });
+      assert.equal(response.status, 202);
+    };
+    await fetchCodes(["RJ000401", "RJ000402", "RJ000403", "RJ000404"]);
+    for (let i = 0; i < 50; i++) {
+      const states = await list();
+      if (
+        states.get("RJ000404")?.dlsite &&
+        (states.get("RJ000404")!.dlsite as never as { state: string }).state !== "fetching"
+      )
+        break;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    const after = await list();
+    const stateOf = (code: string) => (after.get(code)!.dlsite as { state: string }).state;
+    assert.equal(stateOf("RJ000401"), "fetched");
+    assert.equal(stateOf("RJ000402"), "fetched");
+    assert.equal((after.get("RJ000402")!.dlsite as { cover: unknown }).cover, null);
+    assert.notEqual((after.get("RJ000401")!.dlsite as { cover: unknown }).cover, null);
+    assert.equal(stateOf("RJ000403"), "not_found");
+    assert.equal(stateOf("RJ000404"), "failed");
+
+    const edited = await app.request("/api/scan/candidates/rj-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "RJ000405_夜更けの朗読", rjCode: "" }),
+    });
+    assert.equal(edited.status, 200);
+    assert.equal((await edited.json()).candidate.rjCodeEdited, true);
+    assert.equal((await list()).get("")?.rjCodeEdited, true);
+  } finally {
+    await app.shutdown();
+  }
+});
+
+test("needs-attention: スキャン後に要対応の5種類が揃い、読み直しと登録解除で消える", async () => {
+  const adapter = createFixtureAdapter({ scenario: "needs-attention" });
+
+  const result = await adapter.scan();
+  assert.deepEqual(
+    result.missingWorks.map((work) => work.workId),
+    ["RJ501008"],
+  );
+  assert.deepEqual(result.unreadablePaths, [workspacePath("権限なし/フォルダー")]);
+  assert.deepEqual(result.dataIntegrityWarning?.skippedWorkIds, ["RJ501099"]);
+
+  const diagnostics = await adapter.listScanDiagnostics();
+  assert.equal(diagnostics.identityConflicts.length, 1);
+  assert.deepEqual(
+    diagnostics.invalidMetaFiles.map((file) => file.message),
+    ["mimimilli.json 4行目: カンマが足りない"],
+  );
+
+  assert.equal(await adapter.reloadWork("RJ501099"), true);
+  assert.equal((await adapter.scan()).dataIntegrityWarning, undefined);
 });

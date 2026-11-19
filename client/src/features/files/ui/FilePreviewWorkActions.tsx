@@ -63,7 +63,7 @@ function IdentityConflictSection({
         ))}
       </div>
       <Button variant="primary" disabled={reassignDisabled} onClick={onReassign}>
-        別作品として取り込む
+        別の作品として取り込む
       </Button>
     </section>
   );
@@ -94,42 +94,41 @@ export default function FilePreviewWorkActions({
   const unregisterMutation = useUnregisterWorkMutation();
   const unregister = async (workId: string) => {
     try {
-      await unregisterMutation.mutateAsync(workId, {
-        onSuccess: () => setShowUnregisterConfirm(false),
-      });
+      await unregisterMutation.mutateAsync(workId);
     } catch (cause) {
       toast.error(apiErrorMessage(cause, "作品登録の解除に失敗しました"));
       return;
     }
+    setShowUnregisterConfirm(false);
     await onWorkRegistered?.();
   };
 
   const reassignMutation = useReassignWorkIdentityMutation();
+  // 後続の画面操作は mutateAsync の完了を待って行う。呼び出し側の onSuccess は、
+  // 一覧の再取得でこの部品がアンマウントされると実行されない。
   const reassign = async (path: WorkspacePath) => {
+    let result: WorkSourceMutationResult;
     try {
-      await reassignMutation.mutateAsync(path, {
-        onSuccess: (result) => {
-          setShowReassignConfirm(false);
-          if (entry.isDir) {
-            setPendingProjection(result);
-            return;
-          }
-          // 再採番したメタファイルは一覧から消えるため、親フォルダーへ移って結果を通知で伝える
-          clearSelection();
-          const message = projectionNoticeMessage(result.projection);
-          if (message) {
-            toast.show({
-              message,
-              variant: "warning",
-              priority: "action",
-              dismissOnUnmount: false,
-            });
-          }
-        },
-      });
+      result = await reassignMutation.mutateAsync(path);
     } catch (cause) {
-      toast.error(sourceMutationErrorMessage(cause, "別作品としての取り込みに失敗しました"));
+      toast.error(sourceMutationErrorMessage(cause, "別の作品としての取り込みに失敗しました"));
       return;
+    }
+    setShowReassignConfirm(false);
+    if (entry.isDir) {
+      setPendingProjection(result);
+    } else {
+      // 再採番したメタファイルは一覧から消えるため、親フォルダーへ移って結果を通知で伝える
+      clearSelection();
+      const message = projectionNoticeMessage(result.projection);
+      if (message) {
+        toast.show({
+          message,
+          variant: "warning",
+          priority: "action",
+          dismissOnUnmount: false,
+        });
+      }
     }
     await onWorkRegistered?.();
   };
@@ -239,8 +238,8 @@ export default function FilePreviewWorkActions({
 
       {showReassignConfirm && (
         <ConfirmDialog
-          title="別作品として取り込む"
-          message={`「${entry.path}」のWork IDを新しくして、別作品として取り込みます。再生履歴やタグなどのユーザー状態は引き継ぎません。`}
+          title="別の作品として取り込む"
+          message={`「${entry.path}」のWork IDを新しくして、別の作品として取り込みます。再生履歴やタグなどのユーザー状態は引き継ぎません。`}
           confirmLabel="取り込む"
           onConfirm={() => void reassign(entry.path)}
           onCancel={() => setShowReassignConfirm(false)}

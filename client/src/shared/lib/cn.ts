@@ -11,7 +11,6 @@ export const FONT_SIZE_TOKENS = [
   "text-control",
   "text-label",
   "text-mono",
-  "text-badge",
 ] as const;
 
 const twMerge = extendTailwindMerge({

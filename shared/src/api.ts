@@ -13,8 +13,9 @@ import {
   workListItemSchema,
 } from "./work.ts";
 import { splitSelectedTags, type TagFilters } from "./pseudoTag.ts";
-import { dlsiteRegistrationBodySchema, dlsiteStatusSchema, rjCodeFormatSchema } from "./dlsite.ts";
+import { rjCodeFormatSchema } from "./dlsite.ts";
 import { workspacePathSchema } from "./media.ts";
+import { scanRecordKindSchema, workChangeKindSchema } from "./scan.ts";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
 
@@ -50,15 +51,19 @@ const worksQueryBaseSchema = z.object({
   seed: z.coerce.number().int().min(0).max(0x7fffffff).optional(),
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
-  /** 指定IDの作品だけに絞り込む（同名パラメータを繰り返して配列で受ける）。
-   *  他のフィルタ・ソート・ページングと組み合わせ可能な通常の絞り込み条件として扱う */
-  ids: z.array(z.string()).optional(),
+  /** 直近のスキャンの記録に入っている作品だけに絞り込む（new=新規作品、updated=更新済み）。
+   *  ID集合はサーバーが記録から引くので、件数に上限はない */
+  scanRecord: scanRecordKindSchema.optional(),
+  /** scanRecord=updated のとき、指定した変化の種類を持つ作品だけに絞る */
+  scanChange: workChangeKindSchema.optional(),
 });
 export const worksQuerySchema = worksQueryBaseSchema;
 /** HTTP クエリの入力型（.default 付きフィールドは省略可能） */
 export type WorksQueryInput = z.input<typeof worksQuerySchema>;
-/** パース後の正規化済みクエリ（サーバー adapter が受け取る型） */
-export type WorksQuery = z.output<typeof worksQuerySchema>;
+/** パース後の正規化済みクエリ（サーバー adapter が受け取る型）。scanRecord・scanChange はルートが記録から引いた ids に置き換えて渡す */
+export type WorksQuery = Omit<z.output<typeof worksQuerySchema>, "scanRecord" | "scanChange"> & {
+  ids?: string[];
+};
 
 /** 検索・フィルター後・ページング前の集合に対する集計。件数は total 側で持つため含まない。
  *  durationSec は totalDurationSec が未知（null）の作品を除いた合計。 */
@@ -124,46 +129,10 @@ export const axisFacetsQuerySchema = worksQueryBaseSchema
   });
 export type AxisFacetsQuery = z.infer<typeof axisFacetsQuerySchema>;
 
-// ── DLsite 通知 ─────────────────────────────────────────────
-
-/** 通知ベルが表示するDLsite状態の集計。通常の作品一覧とは独立して取得する。 */
-export const dlsiteNotificationSummarySchema = z.object({
-  rjCodeMissingCount: z.number().int().nonnegative(),
-  fetchFailedCount: z.number().int().nonnegative(),
-  parseErrorCount: z.number().int().nonnegative(),
-  parseErrorAlert: z.boolean(),
-  unlinkedCount: z.number().int().nonnegative(),
-});
-export type DlsiteNotificationSummary = z.infer<typeof dlsiteNotificationSummarySchema>;
-
-export const dlsiteNotificationKindSchema = z.enum(["rj-missing", "fetch-failed", "parse-failed"]);
-export type DlsiteNotificationKind = z.infer<typeof dlsiteNotificationKindSchema>;
-
-/** DLsite通知モーダルの最小行DTO。parse-failed 以外は rjCode は null。 */
-export const dlsiteNotificationItemSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  status: dlsiteStatusSchema,
-  rjCode: z.string().nullable(),
-});
-export type DlsiteNotificationItem = z.infer<typeof dlsiteNotificationItemSchema>;
-
-export const dlsiteNotificationPageSchema = z.object({
-  items: z.array(dlsiteNotificationItemSchema),
-  total: z.number().int().nonnegative(),
-});
-export type DlsiteNotificationPage = z.infer<typeof dlsiteNotificationPageSchema>;
-
-export const dlsiteNotificationQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).optional(),
-  limit: z.coerce.number().int().min(1).max(500).optional(),
-});
-export type DlsiteNotificationQuery = z.infer<typeof dlsiteNotificationQuerySchema>;
-
 /** GET /api/tags */
 export const tagListSchema = z.array(z.string());
 
-// ── 欠損作品の一括登録解除（GET /api/works/missing-count, POST /api/works/unregister-missing）──
+// ── 行方不明の作品の一括登録解除（GET /api/works/missing-count, POST /api/works/unregister-missing）──
 
 /** status === "missing" の作品数。一括登録解除の確認ダイアログが件数表示に使う */
 export const missingWorksCountSchema = z.object({
@@ -271,7 +240,10 @@ export const workCreateBodySchema = z.object({
     .array(tagSchema)
     .default([])
     .transform((tags) => dedupeTags(normalizeTags(tags))),
-  dlsite: dlsiteRegistrationBodySchema.optional(),
+  /** 空文字はRJコードなし */
+  rjCode: z.union([z.literal(""), rjCodeFormatSchema]),
+  applyCover: z.boolean(),
+  applyUrl: z.boolean(),
 });
 /** クライアントが送信するリクエストボディ（tags は正規化前の生 string[]） */
 export type WorkCreateBodyInput = z.input<typeof workCreateBodySchema>;
@@ -343,7 +315,7 @@ export type ExportResponse = z.infer<typeof exportResponseSchema>;
 
 // ── エラー形式 ───────────────────────────────────────────────
 // 4xx/5xx は常にこの形で返す。ステータスコードと code の対応:
-//   404 not_found / 400 invalid_request / 403 forbidden / 415 unsupported_media_type / 409 conflict|source_changed|root_reconfiguring
+//   404 not_found / 400 invalid_request / 403 forbidden / 415 unsupported_media_type / 409 conflict|source_changed|dlsite_refetch_required|root_reconfiguring
 //   / 502 parse_error|error / 503 offline / 500 internal
 // 本文サイズ超過の 413 は Bun が本文なしで返すため、この形式にならない
 
@@ -356,6 +328,7 @@ export const apiErrorSchema = z.object({
       "unsupported_media_type",
       "conflict",
       "source_changed",
+      "dlsite_refetch_required",
       "root_reconfiguring",
       "internal",
     ]),

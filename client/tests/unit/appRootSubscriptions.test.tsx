@@ -4,25 +4,20 @@ import { Provider as JotaiProvider, createStore, useAtomValue } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../../src/app/App";
-import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
+import DlsiteJobRuntime from "../../src/features/dlsite/ui/DlsiteJobRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import NavigationHistorySync from "../../src/features/navigation/ui/NavigationHistorySync";
 import { PlayerRuntimeProvider } from "../../src/entities/player/model/PlayerRuntimeProvider";
-import { dlsiteBulkStoreAtom } from "../../src/entities/dlsite/model/dlsiteBulkStore";
 import { PLAYER_CORE_INITIAL, playerCoreAtom } from "../../src/entities/player/model/atoms";
+import { dlsiteJobStoreAtom } from "../../src/entities/dlsite/model/dlsiteJobStore";
 import { scanJobStoreAtom } from "../../src/entities/scan/model/scanJobStore";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import type { WorkSummary } from "../../src/entities/work/model";
-import { createFakeDlsiteBulkStore, createFakeScanJobStore } from "../helpers/fakeJobStores";
+import { createFakeDlsiteJobStore, createFakeScanJobStore } from "../helpers/fakeJobStores";
 import { mockApi } from "../helpers/api";
-import {
-  buildDlsiteNotificationSummary,
-  buildScanLastResult,
-  buildScanResult,
-  buildSettings,
-} from "../helpers/builders";
+import { buildScanRecord, buildSettings } from "../helpers/builders";
 import { seedLibraryRoute } from "../helpers/route";
 
 let appShellCallCount = 0;
@@ -42,8 +37,6 @@ function JotaiSubscriptionProbe() {
   jotaiProbeRenderCount += 1;
   return null;
 }
-
-const summaryDefaults = buildDlsiteNotificationSummary();
 
 const work: WorkSummary = {
   id: "work-1",
@@ -83,9 +76,8 @@ function seedQueryCache(queryClient: QueryClient) {
     SETTINGS_QUERY_KEYS.all(),
     buildSettings({ rootFolder: "/test-library" }),
   );
-  queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanLastResult());
+  queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
   queryClient.setQueryData(WORK_QUERY_KEYS.total(), 0);
-  queryClient.setQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary(), summaryDefaults);
 }
 
 function createTestQueryClient() {
@@ -106,9 +98,9 @@ function renderApp() {
   const queryClient = createTestQueryClient();
   const store = createStore();
   const scanJob = createFakeScanJobStore();
-  const dlsiteBulk = createFakeDlsiteBulkStore();
   store.set(scanJobStoreAtom, scanJob);
-  store.set(dlsiteBulkStoreAtom, dlsiteBulk);
+  const dlsiteJob = createFakeDlsiteJobStore();
+  store.set(dlsiteJobStoreAtom, dlsiteJob);
 
   function Wrapper({ children }: { children: ReactNode }) {
     const client = useMemo(() => queryClient, []);
@@ -122,9 +114,9 @@ function renderApp() {
         createElement(
           PlayerRuntimeProvider,
           null,
-          createElement(DlsiteBulkRuntime),
           createElement(NavigationHistorySync),
           createElement(ScanRuntime),
+          createElement(DlsiteJobRuntime),
           createElement(JotaiSubscriptionProbe),
           children,
         ),
@@ -133,7 +125,7 @@ function renderApp() {
   }
 
   render(createElement(Wrapper, null, createElement(App)));
-  return { queryClient, store, scanJob, dlsiteBulk };
+  return { queryClient, store, scanJob, dlsiteJob };
 }
 
 async function waitForAppShellBaseline() {
@@ -239,27 +231,6 @@ describe("App root subscriptions", () => {
     });
   });
 
-  describe("notification summary", () => {
-    it("summary query の更新で App が再レンダリングされない", async () => {
-      const { queryClient } = renderApp();
-      const baseline = await waitForAppShellBaseline();
-
-      await act(async () => {
-        queryClient.setQueryData(
-          WORK_QUERY_KEYS.dlsiteNotificationSummary(),
-          buildDlsiteNotificationSummary({ rjCodeMissingCount: 5 }),
-        );
-      });
-
-      await waitFor(() =>
-        expect(
-          queryClient.getQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary())?.rjCodeMissingCount,
-        ).toBe(5),
-      );
-      expect(appShellCallCount).toBe(baseline);
-    });
-  });
-
   describe("library search query", () => {
     it("検索語の更新で App が再レンダリングされない", async () => {
       const { store } = renderApp();
@@ -283,7 +254,6 @@ describe("App root subscriptions", () => {
       startedAt: "2026-01-01T00:00:00.000Z",
       finishedAt: null,
       progress,
-      result: null,
       error: null,
     });
 
@@ -308,8 +278,30 @@ describe("App root subscriptions", () => {
     });
   });
 
+  describe("dlsite job progress", () => {
+    it("取得ジョブの進捗更新で App が再レンダリングされない", async () => {
+      const { dlsiteJob } = renderApp();
+      const baseline = await waitForAppShellBaseline();
+
+      const view = (processed: number) => ({
+        jobId: "job-1",
+        status: "running" as const,
+        codes: new Map([["RJ000001", { origin: "bulk" as const, state: "fetching" as const }]]),
+        bulk: { processed, total: 10 },
+      });
+      act(() => {
+        dlsiteJob.setState((state) => ({ ...state, job: view(1) }));
+      });
+      act(() => {
+        dlsiteJob.setState((state) => ({ ...state, job: view(5) }));
+      });
+
+      expect(appShellCallCount).toBe(baseline);
+    });
+  });
+
   describe("library total / last scan query", () => {
-    // libraryTotalQuery / lastScanQuery を ScanModal・NotificationBell が購読し、App は購読しないことのテスト。
+    // libraryTotalQuery / lastScanQuery を ScanModal・TopBar が購読し、App は購読しないことのテスト。
     // trackedProps が空の観測者は無条件通知にフォールバックする（TanStack Query v5）ため、
     // App がこれらの query を直接持つと fetchStatus 等の変化だけでも再レンダリングされてしまう。
     it("ライブラリ総件数クエリの更新で App が再レンダリングされない", async () => {
@@ -328,8 +320,8 @@ describe("App root subscriptions", () => {
       const { queryClient } = renderApp();
       const baseline = await waitForAppShellBaseline();
 
-      const nextResult = buildScanLastResult({
-        result: buildScanResult({ registered: 1, insertedWorkIds: ["work-1"] }),
+      const nextResult = buildScanRecord({
+        updatedWorks: [{ workId: "work-1", changes: [{ kind: "meta" }] }],
         finishedAt: "2026-01-02T00:00:00.000Z",
       });
       await act(async () => {
@@ -339,28 +331,6 @@ describe("App root subscriptions", () => {
       await waitFor(() =>
         expect(queryClient.getQueryData(SCAN_QUERY_KEYS.last())).toEqual(nextResult),
       );
-      expect(appShellCallCount).toBe(baseline);
-    });
-  });
-
-  describe("dlsite bulk progress", () => {
-    it("DLsite 一括取得の進捗更新で App が再レンダリングされない", async () => {
-      const { dlsiteBulk } = renderApp();
-      const baseline = await waitForAppShellBaseline();
-
-      act(() => {
-        dlsiteBulk.setState((state) => ({
-          ...state,
-          progress: { processed: 1, total: 10, work: null },
-        }));
-      });
-      act(() => {
-        dlsiteBulk.setState((state) => ({
-          ...state,
-          progress: { processed: 7, total: 10, work: null },
-        }));
-      });
-
       expect(appShellCallCount).toBe(baseline);
     });
   });

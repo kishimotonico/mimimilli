@@ -1,18 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { AnimatePresence, motion, useIsPresent } from "motion/react";
+import { useEffect, useRef, useState } from "react";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
-import { buttonClass } from "../../shared/ui/Button";
 import { useAtomValue, useSetAtom } from "jotai";
-import { useMotionVariants } from "../../shared/ui/useMotionVariants";
 import { activeModalAtom } from "../../shared/model/activeModalAtom";
-import {
-  useDlsiteBulkActive,
-  useDlsiteBulkCancelling,
-  useDlsiteBulkCurrentWorkLabel,
-  useDlsiteBulkProgressLabel,
-  useDlsiteBulkStore,
-} from "../../entities/dlsite/useDlsiteBulk";
 import {
   activeAxisAtom,
   librarySearchQueryAtom,
@@ -26,41 +16,12 @@ import {
   playingTrackTitleAtom,
 } from "../../entities/player/model/atoms";
 import { cn } from "../../shared/lib/cn";
-import { useScanning, useScanProgressLabel } from "../../entities/scan/useScanJob";
-import { useUnregisteredCandidateCount } from "../../features/scan/model/useScanCandidatesCache";
+import { useScanEntryStatus } from "../../features/scan/model/useScanEntryStatus";
+import ScanEntryButton from "./ScanEntryButton";
 
-interface TopBarProps {
-  notificationBell: ReactNode;
-}
-
-function DlsiteBulkCancelButton({ onClick }: { onClick: () => void }) {
-  const { fade } = useMotionVariants();
-  const isPresent = useIsPresent();
-  const v = fade();
-  return (
-    <motion.button
-      type="button"
-      inert={!isPresent}
-      {...v}
-      onClick={onClick}
-      className={buttonClass("danger-quiet", "sm", { className: "justify-center" })}
-    >
-      <I.x size={11} />
-      中止
-    </motion.button>
-  );
-}
-
-export default function TopBar({ notificationBell }: TopBarProps) {
+export default function TopBar() {
   const setActiveModal = useSetAtom(activeModalAtom);
-  const scanning = useScanning();
-  const scanProgressLabel = useScanProgressLabel();
-  const unregisteredCount = useUnregisteredCandidateCount();
-  const dlsiteBulkActive = useDlsiteBulkActive();
-  const dlsiteBulkProgressLabel = useDlsiteBulkProgressLabel();
-  const dlsiteBulkCurrentWorkLabel = useDlsiteBulkCurrentWorkLabel();
-  const dlsiteBulkCancelling = useDlsiteBulkCancelling();
-  const { cancel: onCancelDlsiteBulk } = useDlsiteBulkStore();
+  const { ring, unseen } = useScanEntryStatus();
   const mode = useAtomValue(appModeAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
   const searchQuery = useAtomValue(librarySearchQueryAtom);
@@ -202,56 +163,11 @@ export default function TopBar({ notificationBell }: TopBarProps) {
         </div>
       )}
 
-      {scanning && (
-        <span className="font-mono text-mono text-ink-2" aria-live="polite">
-          {scanProgressLabel ?? "スキャン中..."}
-        </span>
-      )}
-      <div className="relative">
-        <IconButton
-          size="md"
-          icon={I.refresh}
-          label={
-            scanning
-              ? (scanProgressLabel ?? "スキャン中...")
-              : unregisteredCount > 0
-                ? `スキャン（未登録${unregisteredCount}件）`
-                : "スキャン"
-          }
-          onClick={() => setActiveModal({ kind: "scan" })}
-          className={scanning ? "animate-spin" : undefined}
-        />
-        {!scanning && unregisteredCount > 0 && (
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute top-0 right-0 flex h-[15px] min-w-[15px] items-center justify-center rounded-pill px-[3px] font-mono text-badge font-bold text-paper-1"
-            style={{ background: "var(--acc)" }}
-          >
-            {unregisteredCount > 99 ? "99+" : unregisteredCount}
-          </span>
-        )}
-      </div>
-      {dlsiteBulkActive && (
-        <>
-          <span
-            className="flex min-w-0 items-center gap-1 text-caption text-ink-2"
-            aria-live="polite"
-          >
-            <span className="whitespace-nowrap font-mono">{dlsiteBulkProgressLabel}</span>
-            {dlsiteBulkCurrentWorkLabel && (
-              <span className="max-w-[220px] truncate" title={dlsiteBulkCurrentWorkLabel}>
-                — {dlsiteBulkCurrentWorkLabel}
-              </span>
-            )}
-          </span>
-          <AnimatePresence initial={false}>
-            {!dlsiteBulkCancelling && (
-              <DlsiteBulkCancelButton onClick={() => void onCancelDlsiteBulk()} />
-            )}
-          </AnimatePresence>
-        </>
-      )}
-      {notificationBell}
+      <ScanEntryButton
+        ring={ring}
+        unseen={unseen}
+        onOpen={() => setActiveModal({ kind: "scan" })}
+      />
       <IconButton
         size="md"
         icon={I.cog}

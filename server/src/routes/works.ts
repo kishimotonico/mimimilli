@@ -20,6 +20,7 @@ import { InvalidResumeError, WorkRegisterError } from "../errors.ts";
 import type { DataAdapter } from "../adapter/index.ts";
 import { conflict, invalidRequest, notFound, throwSourceCommandError } from "../lib/httpError.ts";
 import { readJsonBody } from "../lib/jsonBody.ts";
+import type { ScanRecordStore } from "../scanRecord.ts";
 
 function parseWorkTagPath(c: {
   req: { path: string; param: (name: string) => string };
@@ -41,25 +42,26 @@ function parseWorkTagPath(c: {
   return normalized;
 }
 
-export function worksRoute(
-  adapter: DataAdapter,
-  onWorkRegistered: (workId: string) => void = () => {},
-): Hono {
+export function worksRoute(adapter: DataAdapter, scanRecord: ScanRecordStore): Hono {
   const app = new Hono();
 
   app.get("/works", async (c) => {
     const parsed = worksQuerySchema.safeParse({
       ...c.req.query(),
       tags: c.req.queries("tags"),
-      ids: c.req.queries("ids"),
     });
     if (!parsed.success) {
       invalidRequest("works のクエリパラメータが不正です");
     }
+    const { scanRecord: recordKind, scanChange, ...query } = parsed.data;
+    if (scanChange !== undefined && recordKind !== "updated") {
+      invalidRequest("scanChange は scanRecord=updated のときだけ指定できます");
+    }
     // page/limit 未指定でもサーバー側デフォルトでページングする。
     // limit だけの指定は page=1 として扱う
     const page = await adapter.queryWorks({
-      ...parsed.data,
+      ...query,
+      ...(recordKind ? { ids: scanRecord.workIds(recordKind, scanChange) } : {}),
       page: parsed.data.page ?? 1,
       limit: parsed.data.limit ?? WORKS_DEFAULT_PAGE_SIZE,
     });
@@ -79,7 +81,6 @@ export function worksRoute(
     try {
       const result = await adapter.projectWorkSource(data.path);
       if (!result) invalidRequest("指定されたパスは存在しないか、ルート配下ではありません");
-      if (result.catalogInserted) onWorkRegistered(result.snapshot.id);
       return c.json(workSourceMutationResultSchema.parse(result));
     } catch (error) {
       throwSourceCommandError(error);
@@ -91,7 +92,6 @@ export function worksRoute(
     try {
       const result = await adapter.createWork(data);
       if (!result) notFound("指定されたパスは存在しないか、ルート配下ではありません");
-      if (result.projection.status === "published") onWorkRegistered(result.snapshot.id);
       return c.json(workSourceMutationResultSchema.parse(result), 201);
     } catch (error) {
       if (error instanceof WorkRegisterError) {
@@ -112,9 +112,10 @@ export function worksRoute(
       "再取り込み対象のパスが不正です",
     );
     try {
-      const result = await adapter.reassignIdentityConflict(data);
-      if (!result) notFound("指定されたパスはidentity_conflict診断の対象ではありません");
-      if (result.projection.status === "published") onWorkRegistered(result.snapshot.id);
+      const reassigned = await adapter.reassignIdentityConflict(data);
+      if (!reassigned) notFound("指定されたパスはidentity_conflict診断の対象ではありません");
+      const { replacedWorkId, ...result } = reassigned;
+      if (replacedWorkId !== null) scanRecord.forgetWork(replacedWorkId);
       return c.json(workSourceMutationResultSchema.parse(result), 201);
     } catch (error) {
       throwSourceCommandError(error);
@@ -128,7 +129,8 @@ export function worksRoute(
   });
 
   app.post("/works/unregister-missing", async (c) => {
-    const result = await adapter.unregisterMissingWorks();
+    const { deletedWorkIds, ...result } = await adapter.unregisterMissingWorks();
+    for (const workId of deletedWorkIds) scanRecord.forgetWork(workId);
     return c.json(result);
   });
 
@@ -198,8 +200,20 @@ export function worksRoute(
     }
   });
 
+  app.post("/works/:id/reload", async (c) => {
+    const workId = c.req.param("id");
+    try {
+      if (!(await adapter.reloadWork(workId))) notFound(`作品が見つかりません: ${workId}`);
+    } catch (error) {
+      throwSourceCommandError(error);
+    }
+    scanRecord.resolveDataIntegrity(workId);
+    return c.body(null, 204);
+  });
+
   app.delete("/works/:id", async (c) => {
     const ok = await adapter.deleteWork(c.req.param("id"));
+    if (ok) scanRecord.forgetWork(c.req.param("id"));
     if (!ok) notFound(`作品が見つかりません: ${c.req.param("id")}`);
     return c.body(null, 204);
   });

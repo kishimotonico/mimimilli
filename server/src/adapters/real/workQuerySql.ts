@@ -1,5 +1,5 @@
 import type { NormalizedTag } from "@mimimilli/shared";
-import type { DlsiteNotificationKind, SmartFolderRule, WorksQuery } from "@mimimilli/shared";
+import type { SmartFolderRule, WorksQuery } from "@mimimilli/shared";
 import { RECENT_VIEW_WINDOW_DAYS } from "@mimimilli/shared";
 import { parseSmartFolderMinLengthSec } from "../../core/smartFolder.ts";
 import { normalizeRjCode } from "../../core/worksQuery.ts";
@@ -275,60 +275,4 @@ export function smartFolderRulePredicates(rules: SmartFolderRule[]): {
     }
   }
   return { predicates, bindings };
-}
-
-// isRjCodeMissing (shared/dlsite.ts)
-export const DLSITE_RJ_MISSING_CASE =
-  "SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.rjCode') IS NULL " +
-  "AND COALESCE(json_extract(work_dlsite.state_json, '$.status'), 'none') != 'skipped' " +
-  "THEN 1 ELSE 0 END)";
-
-// isDlsiteFetchFailed (shared/dlsite.ts)
-export const DLSITE_FETCH_FAILED_CASE =
-  "SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.status') = 'not_found' " +
-  "OR (json_extract(work_dlsite.state_json, '$.status') = 'error' " +
-  "AND COALESCE(json_extract(work_dlsite.state_json, '$.errorKind'), '') != 'parse_error') " +
-  "THEN 1 ELSE 0 END)";
-
-// isDlsiteParseFailed (shared/dlsite.ts)
-export const DLSITE_PARSE_FAILED_CASE =
-  "SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.status') = 'error' " +
-  "AND json_extract(work_dlsite.state_json, '$.errorKind') = 'parse_error' " +
-  "THEN 1 ELSE 0 END)";
-
-export const DLSITE_PARSE_SUCCESS_CASE =
-  "SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.status') = 'applied' THEN 1 ELSE 0 END)";
-
-// isDlsiteUnlinked (shared/dlsite.ts)
-export const DLSITE_UNLINKED_CASE =
-  "SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.rjCode') IS NOT NULL " +
-  "AND json_extract(work_dlsite.state_json, '$.rjCode') != '' " +
-  "AND json_extract(work_dlsite.state_json, '$.status') = 'none' THEN 1 ELSE 0 END)";
-
-export const DLSITE_NOTIFICATION_SUMMARY_SELECT = `
-  SELECT
-    ${DLSITE_RJ_MISSING_CASE} AS rjCodeMissingCount,
-    ${DLSITE_FETCH_FAILED_CASE} AS fetchFailedCount,
-    ${DLSITE_PARSE_FAILED_CASE} AS parseErrorCount,
-    ${DLSITE_PARSE_SUCCESS_CASE} AS parseSuccessCount,
-    ${DLSITE_UNLINKED_CASE} AS unlinkedCount
-  FROM main.works AS works
-  LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id`;
-
-export function dlsiteNotificationWhere(kind: DlsiteNotificationKind): string {
-  switch (kind) {
-    case "rj-missing":
-      // isRjCodeMissing (shared/dlsite.ts)
-      return `json_extract(work_dlsite.state_json, '$.rjCode') IS NULL
-        AND COALESCE(json_extract(work_dlsite.state_json, '$.status'), 'none') != 'skipped'`;
-    case "fetch-failed":
-      // isDlsiteFetchFailed (shared/dlsite.ts)
-      return `(json_extract(work_dlsite.state_json, '$.status') = 'not_found'
-        OR (json_extract(work_dlsite.state_json, '$.status') = 'error'
-            AND COALESCE(json_extract(work_dlsite.state_json, '$.errorKind'), '') != 'parse_error'))`;
-    case "parse-failed":
-      // isDlsiteParseFailed (shared/dlsite.ts)
-      return `json_extract(work_dlsite.state_json, '$.status') = 'error'
-        AND json_extract(work_dlsite.state_json, '$.errorKind') = 'parse_error'`;
-  }
 }

@@ -4,14 +4,11 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../../src/app/App";
-import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
-import DlsiteBulkApplyRuntime from "../../src/features/dlsite/ui/DlsiteBulkApplyRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import NavigationHistorySync from "../../src/features/navigation/ui/NavigationHistorySync";
 import { PlayerRuntimeProvider } from "../../src/entities/player/model/PlayerRuntimeProvider";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
-import { dlsiteBulkApplyOpenAtom } from "../../src/entities/dlsite/model/bulkAtoms";
 import { appModeAtom, setAppModeAtom } from "../../src/entities/navigation/model/appRouteStore";
 import {
   filesRelPathAtom,
@@ -26,16 +23,14 @@ import {
 import type { Settings } from "@mimimilli/shared";
 import { mockApi, type ApiMock } from "../helpers/api";
 import { appShellRoutes } from "../helpers/appShellApi";
-import { buildScanLastResult, buildScanResult, buildSettings } from "../helpers/builders";
+import { buildScanRecord, buildSettings } from "../helpers/builders";
 
-const DLSITE_BULK_ROUTE = "GET /api/dlsite/bulk";
+const DLSITE_JOB_START_ROUTE = "POST /api/dlsite/jobs";
+const DLSITE_JOB_CURRENT_ROUTE = "GET /api/dlsite/jobs/current";
 const LAST_SCAN_ROUTE = "GET /api/scan/last";
-const PREVIEW_ROUTE = "POST /api/dlsite/apply-missing/preview";
 
 let api: ApiMock;
-let insertedWorkIds: string[];
 let serverSettings: Settings;
-let previewReply: () => unknown;
 
 function settingsOf(
   rootReconfiguration: Settings["rootReconfiguration"],
@@ -65,8 +60,6 @@ function renderAppWithSettings(settings: Settings) {
         createElement(
           PlayerRuntimeProvider,
           null,
-          createElement(DlsiteBulkRuntime),
-          createElement(DlsiteBulkApplyRuntime),
           createElement(NavigationHistorySync),
           createElement(ScanRuntime),
           createElement(App),
@@ -93,15 +86,11 @@ beforeEach(() => {
   vi.restoreAllMocks();
   sessionStorage.clear();
   history.replaceState(null, "", "/");
-  insertedWorkIds = [];
   serverSettings = settingsOf({ status: "idle", completedAt: null });
-  previewReply = () => new Promise(() => {});
   api = mockApi(
     appShellRoutes({
       "GET /api/settings": () => serverSettings,
-      [LAST_SCAN_ROUTE]: () =>
-        buildScanLastResult({ result: buildScanResult({ insertedWorkIds }) }),
-      [PREVIEW_ROUTE]: () => previewReply(),
+      [LAST_SCAN_ROUTE]: () => buildScanRecord(),
       "POST /api/root-reconfiguration": () => ({
         status: "running",
         rootFolder: "/new/root",
@@ -162,13 +151,8 @@ describe("root再設定中の画面", () => {
   });
 });
 
-describe("root再設定完了後のDLsite自動取得attach", () => {
-  // settings更新→reconfiguring突入検知effect→queryClient.fetchQuery→.then→attach()→
-  // DLsite一括取得の状態取得という多段の非同期チェーンを待つ。並列実行時の負荷でwaitFor既定の
-  // 1000msを超えうるため、明示的に長めのtimeoutを与えて安定させる。
-  it("新規作品があればDLsite一括取得の状態を取得してattachする", async () => {
-    insertedWorkIds = ["work-1"];
-
+describe("root再設定完了後のDLsite取得", () => {
+  it("DLsite取得を始めず、取得ジョブの状態も取りに行かない", async () => {
     const { queryClient } = renderAppWithSettings(
       settingsOf({ status: "running", rootFolder: "/audio/library", progress: null }),
     );
@@ -181,34 +165,11 @@ describe("root再設定完了後のDLsite自動取得attach", () => {
       settingsOf({ status: "idle", completedAt: null }),
     );
 
-    await waitFor(() => expect(api.requestsTo(DLSITE_BULK_ROUTE)).not.toHaveLength(0), {
-      timeout: 5000,
-    });
-  });
-
-  it("新規作品が無ければDLsite一括取得の状態を取得しない", async () => {
-    const { queryClient } = renderAppWithSettings(
-      settingsOf({ status: "running", rootFolder: "/audio/library", progress: null }),
-    );
-    await waitFor(() =>
-      expect(screen.getByText("ライブラリを再構築しています")).toBeInTheDocument(),
-    );
-
-    queryClient.setQueryData(
-      SETTINGS_QUERY_KEYS.all(),
-      settingsOf({ status: "idle", completedAt: null }),
-    );
-
-    // DLsite一括取得の状態が取得されないことの確認は「取得する経路自体は完了した」ことを
-    // 待ってから行う。そうしないと、まだチェーンの途中（直近スキャン結果が未解決）な
-    // だけで判定してしまい、偽陰性（取得されるはずが間に合わず未検出）になりうる。
-    await waitFor(() => expect(api.requestsTo(LAST_SCAN_ROUTE)).not.toHaveLength(0), {
-      timeout: 5000,
-    });
     await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument(), {
       timeout: 5000,
     });
-    expect(api.requestsTo(DLSITE_BULK_ROUTE)).toHaveLength(0);
+    expect(api.requestsTo(DLSITE_JOB_START_ROUTE)).toHaveLength(0);
+    expect(api.requestsTo(DLSITE_JOB_CURRENT_ROUTE)).toHaveLength(0);
   });
 });
 
@@ -244,19 +205,16 @@ describe("root再設定突入時のモーダル初期化", () => {
   });
 });
 
-describe("root再設定突入時のDLsite一括適用ダイアログ初期化", () => {
-  it("プレビューを開いたままreconfiguringに入ると閉じる", async () => {
-    // プレビュー取得を解決させないことで、dlsiteBulkApplyOpenAtomがopen中の
-    // 内部エフェクト（失敗時に自動でreset()する）に邪魔されず、突入リセットだけを縛れる。
-    previewReply = () => new Promise(() => {});
-
-    const { queryClient, store } = renderAppWithSettings(
+describe("root再設定突入時のスキャン入口の記憶", () => {
+  it("前回開いたときの記憶を捨てる", async () => {
+    localStorage.setItem(
+      "mimimilli:scanEntrySeen",
+      JSON.stringify({ candidates: ["a"], needsAttention: [] }),
+    );
+    const { queryClient } = renderAppWithSettings(
       settingsOf({ status: "idle", completedAt: null }),
     );
     await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
-
-    store.set(dlsiteBulkApplyOpenAtom, true);
-    expect(store.get(dlsiteBulkApplyOpenAtom)).toBe(true);
 
     queryClient.setQueryData(
       SETTINGS_QUERY_KEYS.all(),
@@ -266,12 +224,12 @@ describe("root再設定突入時のDLsite一括適用ダイアログ初期化", 
     await waitFor(() =>
       expect(screen.getByText("ライブラリを再構築しています")).toBeInTheDocument(),
     );
-    expect(store.get(dlsiteBulkApplyOpenAtom)).toBe(false);
+    expect(localStorage.getItem("mimimilli:scanEntrySeen")).toBeNull();
   });
 });
 
 describe("root再設定の高速完了（runningが描画されない）競合", () => {
-  it("settings再取得がidleを即座に返しても、突入側のクエリ破棄と離脱側のDLsite attachが行われる", async () => {
+  it("settings再取得がidleを即座に返しても、突入側のクエリ破棄が行われる", async () => {
     // invalidateSettings（GET /api/settings再取得）が即座にidleを返す競合を模す。
     // Reactが中間状態（running）の描画を挟まないケースでも、performEntryReset・
     // leavePendingは描画観測に依存せず必ず立つ想定。
@@ -280,7 +238,6 @@ describe("root再設定の高速完了（runningが描画されない）競合",
       lastScanTime: "2026-01-01T00:00:00.000Z",
       rootReconfiguration: { status: "idle", completedAt: null },
     });
-    insertedWorkIds = ["work-2"];
 
     const { queryClient } = renderAppWithSettings(
       settingsOf({ status: "idle", completedAt: null }),
@@ -298,10 +255,10 @@ describe("root再設定の高速完了（runningが描画されない）競合",
     });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
-    await waitFor(() => expect(api.requestsTo(DLSITE_BULK_ROUTE)).not.toHaveLength(0), {
-      timeout: 5000,
-    });
-    expect(queryClient.getQueryData(WORK_QUERY_KEYS.detail("work-1"))).toBeUndefined();
+    await waitFor(
+      () => expect(queryClient.getQueryData(WORK_QUERY_KEYS.detail("work-1"))).toBeUndefined(),
+      { timeout: 5000 },
+    );
   });
 });
 

@@ -1,4 +1,5 @@
-// 欠損作品の一括登録解除（GET /api/works/missing-count, POST /api/works/unregister-missing）
+import { NO_DLSITE } from "./helpers/scanLibrary.ts";
+// 行方不明の作品の一括登録解除（GET /api/works/missing-count, POST /api/works/unregister-missing）
 // の契約テスト。real/fixture 両アダプタを実際に通し、「missingのみが対象」「件数の意味論」を縛る。
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
@@ -100,7 +101,7 @@ test("POST /api/works/unregister-missing: realアダプタでmissingのみを一
     const res = await app.request("/api/works", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: workspace(root, folder), title: name }),
+      body: JSON.stringify({ path: workspace(root, folder), title: name, ...NO_DLSITE }),
     });
     assert.equal(res.status, 201);
     ids.push(((await res.json()) as { snapshot: { id: string } }).snapshot.id);

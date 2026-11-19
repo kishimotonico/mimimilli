@@ -9,10 +9,12 @@ export async function fetchScanCandidates(): Promise<ScanCandidate[]> {
   return candidates;
 }
 
-const scanCandidatesQueryOptions = {
+/** 購読者がいなくても一覧が消えないよう gcTime を無限にする（モーダルを閉じて開き直しても残す） */
+export const scanCandidatesQueryOptions = {
   queryKey: SCAN_CANDIDATES_QUERY_KEY,
   queryFn: fetchScanCandidates,
   staleTime: 0,
+  gcTime: Number.POSITIVE_INFINITY,
 } as const;
 
 /** サーバーから候補を明示的に取り直す。候補クエリは enabled:false のため、この呼び出し以外では
@@ -31,4 +33,11 @@ export async function refreshScanCandidates(queryClient: QueryClient): Promise<S
     }
     throw error;
   }
+}
+
+/** 1件の候補を、サーバーが返した最新の内容で置き換える。一覧に無ければ何もしない。 */
+export function replaceScanCandidate(queryClient: QueryClient, candidate: ScanCandidate): void {
+  queryClient.setQueryData<ScanCandidate[]>(SCAN_CANDIDATES_QUERY_KEY, (previous) =>
+    previous?.map((entry) => (entry.path === candidate.path ? candidate : entry)),
+  );
 }

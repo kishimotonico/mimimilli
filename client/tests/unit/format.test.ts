@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, formatFileSize, formatTime } from "../../src/shared/lib/format";
+import {
+  formatDuration,
+  formatFileSize,
+  formatScanDateTime,
+  formatTime,
+} from "../../src/shared/lib/format";
 
 describe("formatTime", () => {
   it.each([
@@ -32,5 +37,15 @@ describe("formatFileSize", () => {
     [2 * 1024 * 1024, "2.0 MB"],
   ])("%s byteを%sにする", (bytes, expected) => {
     expect(formatFileSize(bytes)).toBe(expected);
+  });
+});
+
+describe("formatScanDateTime", () => {
+  it("年入りでゼロ埋めする", () => {
+    expect(formatScanDateTime(new Date(2026, 0, 2, 3, 4).toISOString())).toBe("2026/01/02 03:04");
+  });
+
+  it("未実行は null で「未実行」", () => {
+    expect(formatScanDateTime(null)).toBe("未実行");
   });
 });

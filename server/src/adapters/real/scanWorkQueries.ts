@@ -8,12 +8,14 @@ export function getScanWorkMap(db: Db): Map<string, ScanWorkState> {
       `
           SELECT
             works.id AS id,
+            works.title AS title,
             works.source_revision AS sourceRevision,
             works.projection_revision AS projectionRevision,
             works.media_revision AS mediaRevision,
             works.status AS status,
             works.physical_path AS physicalPath,
             works.meta_path AS metaPath,
+            (SELECT COUNT(DISTINCT tracks.file) FROM main.tracks AS tracks WHERE tracks.work_id = works.id) AS audioFileCount,
             works.cover_image AS coverImage,
             works.cover_width AS coverWidth,
             works.cover_height AS coverHeight,
@@ -29,12 +31,14 @@ export function getScanWorkMap(db: Db): Map<string, ScanWorkState> {
     )
     .all() as Array<{
     id: string;
+    title: string;
     sourceRevision: string | null;
     projectionRevision: string | null;
     mediaRevision: string | null;
     status: Work["status"];
     physicalPath: string;
     metaPath: string;
+    audioFileCount: number;
     coverImage: string | null;
     coverWidth: number | null;
     coverHeight: number | null;
@@ -48,12 +52,14 @@ export function getScanWorkMap(db: Db): Map<string, ScanWorkState> {
   const map = new Map<string, ScanWorkState>();
   for (const row of rows) {
     map.set(row.id, {
+      title: row.title,
       metaPath: row.metaPath,
       sourceRevision: row.sourceRevision,
       projectionRevision: row.projectionRevision,
       mediaRevision: row.mediaRevision,
       status: row.status,
       physicalPath: row.physicalPath,
+      audioFileCount: row.audioFileCount,
       addedAt: row.addedAt,
       bookmarked: row.bookmarked !== 0,
       lastPlayedAt: row.lastPlayedAt,

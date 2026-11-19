@@ -15,12 +15,14 @@ const SIZE_CLASS = {
   680: "p-0 w-[min(680px,calc(100vw-32px))]",
   720: "p-0 w-[min(720px,calc(100vw-32px))]",
   740: "p-0 w-[min(740px,calc(100vw-32px))]",
+  960: "p-0 w-[min(960px,calc(100vw-32px))]",
 } as const;
 
 const HEIGHT_CLASS = {
   full: "max-h-[calc(100vh-32px)]",
   short: "max-h-[min(80vh,calc(100vh-32px))]",
   editor: "max-h-[min(760px,calc(100vh-32px))]",
+  fixed: "h-[min(720px,calc(100vh-32px))]",
 } as const;
 
 export type ModalSize = keyof typeof SIZE_CLASS;

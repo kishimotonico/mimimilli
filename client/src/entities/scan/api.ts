@@ -1,4 +1,4 @@
-// スキャンジョブの開始・取得・取消、直近のスキャン結果・現在の診断・候補除外の一覧と解除。features/scan・features/files・features/settings・app から参照される共通API。
+// スキャンジョブの開始・取得・取消、直近のスキャンの記録・現在の診断・候補除外の一覧と解除。features/scan・features/files・features/settings・app から参照される共通API。
 import {
   ApiRequestError,
   deleteParsed,
@@ -13,12 +13,12 @@ import {
   scanConflictResponseSchema,
   scanDiagnosticsSchema,
   scanJobSnapshotSchema,
-  scanLastResultResponseSchema,
+  scanRecordSchema,
   startScanRequestSchema,
   startScanResponseSchema,
   type ScanDiagnostics,
   type ScanJobSnapshot,
-  type ScanLastResultResponse,
+  type ScanRecord,
   type StartScanRequest,
 } from "@mimimilli/shared";
 import { SCAN_CANDIDATE_EXCLUSIONS_QUERY_KEY } from "./queryKeys";
@@ -40,9 +40,9 @@ export async function restoreScanCandidateExclusions(paths: string[]): Promise<v
   );
 }
 
-/** サーバー起動後に一度でも完了したスキャンの実行サマリー。一度も完了していなければnull。 */
-export async function getLastScanResult(): Promise<ScanLastResultResponse | null> {
-  return getParsed(scanLastResultResponseSchema, "/scan/last", { noContentAsNull: true });
+/** 直近のスキャンの記録。未スキャン（サーバー再起動後を含む）は finishedAt が null の空の記録。 */
+export async function getScanRecord(): Promise<ScanRecord> {
+  return getParsed(scanRecordSchema, "/scan/last");
 }
 
 /** 要対応の現在の診断（ID重複・読み込めない作品情報ファイル）。スキャン完了時点のスナップショットではない。 */

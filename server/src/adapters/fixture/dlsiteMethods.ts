@@ -1,52 +1,166 @@
 import {
+  DEFAULT_DLSITE_CACHE_TTLS_MS,
   applyDlsiteStatePatch,
-  buildDlsiteApplyPatch,
-  buildDlsiteMissingApplyPatch,
-  computeMissingDiff,
+  planDlsiteApply,
+  dlsiteProductFetchOutcomeOfResult,
   hasRjCode,
 } from "@mimimilli/shared";
+import { DlsiteRefetchRequiredError } from "../../errors.ts";
 import type {
-  DlsiteApplyMissingPreviewItem,
-  DlsiteBulkProgressSnapshot,
-  DlsiteBulkResult,
+  DlsiteApplyBody,
+  DlsiteCachedCover,
   DlsiteFetchResult,
+  DlsiteProductFetchOutcome,
   DlsiteStateUpdateBody,
+  DlsiteWorkFetchResult,
+  DlsiteWorkInfo,
   WorkSourceMutationResult,
 } from "@mimimilli/shared";
 import type { DlsiteAdapter } from "../../adapter/dlsite.ts";
-import { fixtureCoverFromColumns, type FixtureCoverColumns } from "./data.ts";
-import { composeWork, dlsiteLinkageOf, setDlsiteLinkage, type FixtureState } from "./state.ts";
+import {
+  applyFixtureCachedCover,
+  dlsiteFetchFailureFor,
+  fixtureDlsiteCoverCached,
+  fixtureDlsiteCoverKey,
+  fixtureUsableDlsite,
+  dlsiteLinkageOf,
+  normalizeDlsiteCacheKey,
+  setDlsiteLinkage,
+  type FixtureState,
+} from "./state.ts";
 import { fixtureSourceMutation, requireFixtureRevision } from "./works.ts";
 
 /** このRJコードを持つ作品は dlsiteFetchByCode が常に取得失敗を返す（real/fixture契約テスト用） */
 export const FIXTURE_DLSITE_FETCH_FAILURE_RJ_CODE = "RJ000404";
 
-export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
+/** このRJコードは取得すると該当なし（not_found）になる */
+export const FIXTURE_DLSITE_NOT_FOUND_RJ_CODE = "RJ000403";
+
+/** このRJコードは取得済みになるが、カバーはキャッシュに置かれない（カバーの先取り失敗相当） */
+export const FIXTURE_DLSITE_NO_COVER_RJ_CODE = "RJ000402";
+
+const FIXTURE_COVER_BACKGROUNDS = ["#3b6ea8", "#a8573b", "#4a8f5a", "#8a4fa0", "#b58a2d"];
+
+function fixtureCoverImage(rjCode: string): Uint8Array {
+  const background = FIXTURE_COVER_BACKGROUNDS[Number(rjCode.slice(-1)) % 5];
+  return new TextEncoder().encode(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400"><rect width="300" height="400" fill="${background}"/><text x="150" y="200" font-family="sans-serif" font-size="32" font-weight="700" fill="#fff" text-anchor="middle">${rjCode}</text></svg>`,
+  );
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("取得はキャンセルされました", "AbortError"));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException("取得はキャンセルされました", "AbortError"));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+export function createDlsiteMethods(
+  state: FixtureState,
+  options: { fetchDelayMs?: number } = {},
+): DlsiteAdapter {
+  const fetchDelayMs = options.fetchDelayMs ?? 0;
+
+  /** realのDlsiteCacheと同じく、失敗の記録→取得済み→通信の順に判断する。forceは失敗の記録を無視して取り直す */
+  async function fetchProduct(
+    rjCode: string,
+    force: boolean,
+    signal?: AbortSignal,
+  ): Promise<DlsiteFetchResult> {
+    const key = normalizeDlsiteCacheKey(rjCode);
+    if (!force) {
+      const failure = dlsiteFetchFailureFor(state, key);
+      if (failure?.kind === "failure") {
+        return {
+          ok: false,
+          kind: failure.outcome,
+          message: `fixture: キャッシュ済みの取得失敗（${key}）`,
+        };
+      }
+    }
+    const fetched = state.dlsiteFetched.get(key);
+    if (fetched && fetched.expiresAt > Date.now()) return { ok: true, info: fetched.info };
+    if (fetchDelayMs > 0) await sleep(fetchDelayMs, signal);
+    else if (signal?.aborted) throw new DOMException("取得はキャンセルされました", "AbortError");
+    const now = Date.now();
+    const failureOutcome =
+      key === FIXTURE_DLSITE_FETCH_FAILURE_RJ_CODE
+        ? "error"
+        : key === FIXTURE_DLSITE_NOT_FOUND_RJ_CODE
+          ? "not_found"
+          : null;
+    if (failureOutcome) {
+      state.dlsiteFetched.delete(key);
+      state.dlsiteFetchFailures.set(key, {
+        kind: "failure",
+        outcome: failureOutcome,
+        attemptedAt: now,
+        expiresAt: now + DEFAULT_DLSITE_CACHE_TTLS_MS[failureOutcome],
+      });
+      return {
+        ok: false,
+        kind: failureOutcome,
+        message: `fixture: 取得に失敗する作品（${key}）`,
+      };
+    }
+    const info: DlsiteWorkInfo = {
+      rjCode: key,
+      title: `（fixture）${key}`,
+      circle: "fixtureサークル",
+      cvs: ["fixture CV"],
+      genreTags: ["テスト"],
+      ageRating: "全年齢",
+      coverUrl: `https://img.dlsite.jp/fixture/${key}_img_main.jpg`,
+      url: `https://www.dlsite.com/maniax/work/=/product_id/${key}.html`,
+    };
+    state.dlsiteFetchFailures.delete(key);
+    state.dlsiteFetched.set(key, {
+      info,
+      fetchedAt: now,
+      expiresAt: now + DEFAULT_DLSITE_CACHE_TTLS_MS.ok,
+    });
+    if (key !== FIXTURE_DLSITE_NO_COVER_RJ_CODE) {
+      state.dlsiteCovers.set(fixtureDlsiteCoverKey(info.coverUrl!), {
+        body: fixtureCoverImage(key),
+        contentType: "image/svg+xml",
+        fetchedAt: now,
+      });
+    }
+    return { ok: true, info };
+  }
+
   async function dlsiteFetchByCode(
     rjCode: string,
-    _force?: boolean,
-    _options?: { signal?: AbortSignal },
+    force?: boolean,
+    options?: { signal?: AbortSignal },
   ): Promise<DlsiteFetchResult> {
-    if (rjCode === FIXTURE_DLSITE_FETCH_FAILURE_RJ_CODE) {
-      return { ok: false, kind: "error", message: `fixture: 取得に失敗する作品（${rjCode}）` };
-    }
-    return {
-      ok: true,
-      info: {
-        rjCode,
-        title: `（fixture）${rjCode}`,
-        circle: "fixtureサークル",
-        cvs: ["fixture CV"],
-        genreTags: ["テスト"],
-        ageRating: "全年齢",
-        coverUrl: null,
-        url: `https://www.dlsite.com/maniax/work/=/product_id/${rjCode}.html`,
-      },
-    };
+    return fetchProduct(rjCode, force ?? false, options?.signal);
+  }
+
+  function lookupDlsiteCachedCover(coverUrl: string | null): DlsiteCachedCover | null {
+    if (!coverUrl) return null;
+    const key = fixtureDlsiteCoverKey(coverUrl);
+    const cover = state.dlsiteCovers.get(key);
+    return cover ? { key, version: cover.fetchedAt } : null;
   }
 
   return {
-    async dlsiteFetch(workId: string, _force?: boolean, _options?: { signal?: AbortSignal }) {
+    async dlsiteFetch(
+      workId: string,
+      force?: boolean,
+      options?: { signal?: AbortSignal },
+    ): Promise<DlsiteWorkFetchResult> {
       const work = state.works.find((candidate) => candidate.id === workId);
       if (!work)
         return { ok: false, kind: "not_found", message: `作品が見つかりません: ${workId}` };
@@ -54,91 +168,70 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       if (!hasRjCode(linkage)) {
         return { ok: false, kind: "not_found", message: "RJコードが検出されていません" };
       }
-      return dlsiteFetchByCode(linkage.rjCode);
+      const result = await dlsiteFetchByCode(linkage.rjCode, force, options);
+      if (!result.ok) return result;
+      const usable = fixtureUsableDlsite(state, linkage.rjCode);
+      if (!usable) {
+        return { ok: false, kind: "error", message: "DLsite情報を読み出せませんでした" };
+      }
+      return {
+        ok: true,
+        info: result.info,
+        infoRevision: usable.revision,
+        cachedCover: lookupDlsiteCachedCover(result.info.coverUrl),
+      };
     },
 
     dlsiteFetchByCode,
 
-    async dlsiteApplyMissing(workIds) {
-      const candidates = state.works.filter((work) => !workIds || workIds.includes(work.id));
-      let applied = 0;
-      let pending = 0;
-      let skipped = 0;
-      let failed = 0;
-      for (const work of candidates) {
-        const linkage = dlsiteLinkageOf(state, work.id);
-        if (!hasRjCode(linkage) || linkage.status === "skipped") {
-          skipped += 1;
-          continue;
-        }
-        const fetched = await dlsiteFetchByCode(linkage.rjCode);
-        if (!fetched.ok) {
-          failed += 1;
-          continue;
-        }
-        const diff = computeMissingDiff(work, fetched.info);
-        const patch = buildDlsiteMissingApplyPatch(
-          { tags: work.tags, urls: work.urls, dlsite: linkage },
-          fetched.info,
-          diff,
-        );
-        if (!patch) {
-          skipped += 1;
-          continue;
-        }
-        if (patch.tags !== undefined) work.tags = patch.tags;
-        if (patch.urls !== undefined) work.urls = patch.urls;
-        setDlsiteLinkage(state, work.id, patch.dlsite);
-        applied += 1;
-      }
-      return { applied, pending, skipped, failed };
+    lookupDlsiteCachedCover,
+
+    getCachedDlsiteCover(coverKey: string) {
+      const cover = state.dlsiteCovers.get(coverKey);
+      return cover
+        ? { body: cover.body, contentType: cover.contentType, version: cover.fetchedAt }
+        : null;
     },
 
-    async dlsiteApplyMissingPreview(workIds) {
-      const candidates = state.works.filter((work) => !workIds || workIds.includes(work.id));
-      const items: DlsiteApplyMissingPreviewItem[] = [];
-      for (const work of candidates) {
-        const linkage = dlsiteLinkageOf(state, work.id);
-        if (!hasRjCode(linkage) || linkage.status === "skipped") continue;
-        const fetched = await dlsiteFetchByCode(linkage.rjCode);
-        if (!fetched.ok) continue;
-        const { newTags, applyCover, applyUrl } = computeMissingDiff(work, fetched.info);
-        if (newTags.length === 0 && !applyCover && !applyUrl) continue;
-        items.push({ workId: work.id, title: work.title, newTags, applyCover, applyUrl });
-      }
-      return { items };
+    isDlsiteOffline: () => false,
+
+    async fetchDlsiteProduct(
+      productCode: string,
+      fetchOptions: { force: boolean; signal?: AbortSignal },
+    ): Promise<DlsiteProductFetchOutcome> {
+      return dlsiteProductFetchOutcomeOfResult(
+        await fetchProduct(productCode, fetchOptions.force, fetchOptions.signal),
+      );
     },
 
     async dlsiteApply(
       workId: string,
-      body: import("@mimimilli/shared").DlsiteApplyBody,
-      _options?: { signal?: AbortSignal },
+      body: DlsiteApplyBody,
     ): Promise<WorkSourceMutationResult | null> {
       const work = state.works.find((w) => w.id === workId);
       if (!work) return null;
       requireFixtureRevision(state, workId, body.sourceRevision);
-      const patch = buildDlsiteApplyPatch(
+      const linkage = dlsiteLinkageOf(state, workId);
+      const usable = hasRjCode(linkage) ? fixtureUsableDlsite(state, linkage.rjCode) : null;
+      if (!usable || usable.revision !== body.infoRevision) throw new DlsiteRefetchRequiredError();
+      const { info } = usable;
+      const plan = planDlsiteApply(
         {
           title: work.title,
           tags: work.tags,
           urls: work.urls,
-          dlsite: dlsiteLinkageOf(state, workId),
+          hasCover: work.cover !== null,
+          dlsite: linkage,
         },
-        body,
+        info,
+        body.apply,
+        { coverCached: fixtureDlsiteCoverCached(state, info.coverUrl) },
       );
-      if (patch.title !== undefined) work.title = patch.title;
-      if (patch.tags !== undefined) work.tags = patch.tags;
-      if (patch.urls !== undefined) work.urls = patch.urls;
-      if (body.applyCover && body.info.coverUrl) {
-        const dimensions = work.cover?.dimensions ?? { width: 900, height: 900 };
-        const columns: FixtureCoverColumns = {
-          image: body.info.coverUrl,
-          dimensions,
-        };
-        state.coverColumns.set(workId, columns);
-        work.cover = fixtureCoverFromColumns(work, columns);
-      }
-      setDlsiteLinkage(state, workId, patch.dlsite);
+      if (plan.title !== undefined) work.title = plan.title;
+      if (plan.tags !== undefined) work.tags = plan.tags;
+      if (plan.urls !== undefined) work.urls = plan.urls;
+      if (plan.applyCover) applyFixtureCachedCover(state, work, info.coverUrl);
+      setDlsiteLinkage(state, workId, plan.dlsite);
       return fixtureSourceMutation(state, work);
     },
 
@@ -153,40 +246,6 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       const nextLinkage = applyDlsiteStatePatch(dlsiteLinkageOf(state, workId), patch);
       setDlsiteLinkage(state, workId, nextLinkage);
       return fixtureSourceMutation(state, work);
-    },
-
-    async runDlsiteBulk(_mode, workIds, options) {
-      const requested = workIds
-        ? state.works.filter((work) => workIds.includes(work.id))
-        : state.works;
-      const targets = requested.flatMap((work) => {
-        const composed = composeWork(state, work);
-        if (!hasRjCode(composed.dlsite)) return [];
-        if (composed.dlsite.status !== "none" && composed.dlsite.status !== "error") return [];
-        return [{ id: work.id, title: work.title, rjCode: composed.dlsite.rjCode }];
-      });
-      const result: DlsiteBulkResult = {
-        fetched: 0,
-        failed: 0,
-        parseErrors: 0,
-        skipped: requested.length - targets.length,
-        ...(state.dataIntegrityWarning ? { dataIntegrityWarning: state.dataIntegrityWarning } : {}),
-      };
-      const progressAt = (processed: number): DlsiteBulkProgressSnapshot => {
-        const next = targets[processed];
-        return {
-          processed,
-          total: targets.length,
-          work: next ? { id: next.id, rjCode: next.rjCode, title: next.title } : null,
-        };
-      };
-      options?.onProgress?.(progressAt(0));
-      for (let index = 0; index < targets.length; index++) {
-        if (options?.signal?.aborted) return result;
-        result.fetched += 1;
-        options?.onProgress?.(progressAt(index + 1));
-      }
-      return result;
     },
   };
 }

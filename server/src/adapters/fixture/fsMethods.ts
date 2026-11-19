@@ -70,6 +70,7 @@ export function createFsMethods(
         state.coverColumns,
         state.identityConflicts,
         state.invalidMetaFiles,
+        state.scanUnreadablePaths,
       );
       const dir = resolveFsDir(root, rootAbs, target);
       if (!dir) return null;
@@ -107,6 +108,7 @@ export function createFsMethods(
         state.coverColumns,
         state.identityConflicts,
         state.invalidMetaFiles,
+        state.scanUnreadablePaths,
       );
       const node = resolveFsPath(root, rootAbs, target);
       if (!node || node.isDir) return null;

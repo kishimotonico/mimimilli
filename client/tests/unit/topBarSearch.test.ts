@@ -12,6 +12,7 @@ import {
 } from "../../src/entities/library/model/navigationAtoms";
 import { appModeAtom } from "../../src/entities/navigation/model/appRouteStore";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
+import { buildScanDiagnostics, buildScanRecord } from "../helpers/builders";
 import { seedAppMode, seedLibraryRoute } from "../helpers/route";
 
 const PLACEHOLDER = /ライブラリを検索/;
@@ -25,18 +26,13 @@ function renderTopBar(initialQuery = "") {
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
   });
   queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), []);
-
+  queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
+  queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
   render(
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(
-        JotaiProvider,
-        { store },
-        createElement(TopBar, {
-          notificationBell: createElement("span", { "aria-label": "通知" }),
-        }),
-      ),
+      createElement(JotaiProvider, { store }, createElement(TopBar)),
     ),
   );
   return store;
@@ -150,6 +146,8 @@ describe("TopBar の検索入力", () => {
       defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
     });
     queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), []);
+    queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
+    queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
     render(
       createElement(
         QueryClientProvider,
@@ -176,6 +174,8 @@ describe("TopBar の検索入力", () => {
       defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
     });
     queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), []);
+    queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
+    queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
     render(
       createElement(
         QueryClientProvider,

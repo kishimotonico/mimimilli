@@ -1,17 +1,17 @@
 import { randomUUID } from "node:crypto";
 import type {
+  DlsiteRegistrationApply,
   ScanJobEvent,
   ScanJobSnapshot,
-  ScanLastResultResponse,
   ScanDiagnostics,
   ScanCandidate,
-  ScanCandidateRegisterItem,
   ScanCandidatesRegisterResponse,
   ScanProgressEvent,
   ScanResult,
 } from "@mimimilli/shared";
 import type { DataAdapter } from "./adapter/index.ts";
 import { formatError, getCategoryLogger } from "./lib/logger.ts";
+import { ScanRecordStore } from "./scanRecord.ts";
 
 const scanLogger = getCategoryLogger("scan");
 const UNREADABLE_PATH_LOG_SAMPLE_LIMIT = 10;
@@ -34,25 +34,27 @@ export class ActiveScanConflictError extends Error {
   }
 }
 
+export interface ScanJobManagerOptions {
+  terminalLimit?: number;
+  /** 候補のRJコードが取得ジョブで待機中・取得中かどうか */
+  dlsiteInFlightState?: (productCode: string) => "queued" | "fetching" | null;
+}
+
 export class ScanJobManager {
   private readonly adapter: DataAdapter;
   private readonly terminalLimit: number;
-  private readonly onCompleted: (insertedWorkIds: string[]) => void;
+  private readonly dlsiteInFlightState: NonNullable<ScanJobManagerOptions["dlsiteInFlightState"]>;
   private readonly jobs = new Map<string, Job>();
   private activeId: string | null = null;
   private runCompletion: Promise<void> | null = null;
   private shuttingDown = false;
-  // terminal job はpruneTerminalで消えるため、前回結果はディスク永続化せずここにだけ保持する。
-  private lastCompleted: ScanLastResultResponse | null = null;
+  /** 直近のスキャンの記録。ディスクには永続化せず、次のスキャンかサーバー再起動まで保持する。 */
+  readonly record = new ScanRecordStore();
 
-  constructor(
-    adapter: DataAdapter,
-    terminalLimit = 16,
-    onCompleted: (insertedWorkIds: string[]) => void = () => {},
-  ) {
+  constructor(adapter: DataAdapter, options: ScanJobManagerOptions = {}) {
     this.adapter = adapter;
-    this.terminalLimit = terminalLimit;
-    this.onCompleted = onCompleted;
+    this.terminalLimit = options.terminalLimit ?? 16;
+    this.dlsiteInFlightState = options.dlsiteInFlightState ?? (() => null);
   }
 
   start(options?: { full?: boolean }): ScanJobSnapshot {
@@ -67,7 +69,6 @@ export class ScanJobManager {
       startedAt: null,
       finishedAt: null,
       progress: null,
-      result: null,
       error: null,
     };
     const job: Job = {
@@ -106,14 +107,9 @@ export class ScanJobManager {
     return this.get(this.activeId);
   }
 
-  getLastCompleted(): ScanLastResultResponse | null {
-    return this.lastCompleted ? structuredClone(this.lastCompleted) : null;
-  }
-
-  /** ジョブ外で完了したスキャン（root再設定の構築）を、ジョブの完了と同じく直近完了結果として扱う。 */
+  /** ジョブ外で完了したスキャン（root再設定の構築）を、ジョブの完了と同じく記録へ反映する。 */
   recordCompleted(result: ScanResult): void {
-    this.lastCompleted = { result, finishedAt: new Date().toISOString() };
-    if (result.insertedWorkIds.length > 0) this.onCompleted(result.insertedWorkIds);
+    this.record.replace(result, new Date().toISOString());
   }
 
   async listDiagnostics(): Promise<ScanDiagnostics> {
@@ -121,14 +117,29 @@ export class ScanJobManager {
   }
 
   async listCandidates(): Promise<ScanCandidate[]> {
-    return this.adapter.listScanCandidates();
+    return (await this.adapter.listScanCandidates()).map((candidate) =>
+      this.withInFlightDlsite(candidate),
+    );
+  }
+
+  async setCandidateRjCode(path: string, rjCode: string | null): Promise<ScanCandidate> {
+    return this.withInFlightDlsite(await this.adapter.setScanCandidateRjCode(path, rjCode));
+  }
+
+  private withInFlightDlsite(candidate: ScanCandidate): ScanCandidate {
+    if (candidate.rjCode === null || this.dlsiteInFlightState(candidate.rjCode) === null) {
+      return candidate;
+    }
+    return { ...candidate, dlsite: { state: "fetching" } };
   }
 
   async registerCandidates(
-    items: ScanCandidateRegisterItem[],
-    onRegistered: (workId: string) => void,
+    paths: string[],
+    apply: DlsiteRegistrationApply,
   ): Promise<ScanCandidatesRegisterResponse> {
-    return this.adapter.registerScanCandidates(items, onRegistered);
+    const response = await this.adapter.registerScanCandidates(paths, apply);
+    this.record.addNewWorks(response.registered.map((entry) => entry.workId));
+    return response;
   }
 
   async excludeCandidates(paths: string[]): Promise<void> {
@@ -187,6 +198,7 @@ export class ScanJobManager {
     if (job.controller.signal.aborted) return this.finishCancelled(job);
     job.snapshot.status = "running";
     job.snapshot.startedAt = new Date().toISOString();
+    this.record.beginScan();
     this.emit(job, { type: "state", snapshot: this.copy(job.snapshot) });
     try {
       const settings = await this.adapter.getSettings();
@@ -231,14 +243,12 @@ export class ScanJobManager {
       return;
     }
     job.snapshot.status = "completed";
-    job.snapshot.result = result;
     job.snapshot.finishedAt = new Date().toISOString();
-    this.lastCompleted = { result, finishedAt: job.snapshot.finishedAt };
+    this.record.replace(result, job.snapshot.finishedAt);
     this.logScanCompleted(job, result);
-    this.emit(job, { type: "completed", result });
+    this.emit(job, { type: "completed", finishedAt: job.snapshot.finishedAt });
     this.deactivate(job);
     this.pruneTerminal();
-    if (result.insertedWorkIds.length > 0) this.onCompleted(result.insertedWorkIds);
   }
 
   private finishFailed(job: Job, error: unknown): void {
@@ -248,6 +258,7 @@ export class ScanJobManager {
       return;
     }
     const message = error instanceof Error ? error.message : "サーバー内部エラーが発生しました";
+    this.record.endScan();
     job.snapshot.status = "failed";
     job.snapshot.error = message;
     job.snapshot.finishedAt = new Date().toISOString();
@@ -263,6 +274,7 @@ export class ScanJobManager {
 
   private finishCancelled(job: Job): void {
     if (this.isTerminal(job)) return;
+    this.record.endScan();
     job.snapshot.status = "cancelled";
     job.snapshot.finishedAt = new Date().toISOString();
     scanLogger.info("スキャンを取り消しました", {
@@ -286,7 +298,7 @@ export class ScanJobManager {
       durationMs: this.durationMs(job),
       registered: result.registered,
       insertedWorkIdsCount: result.insertedWorkIds.length,
-      updatedWorkIdsCount: result.updatedWorkIds.length,
+      updatedWorksCount: result.updatedWorks.length,
       errors: result.errors,
       missing: result.missing,
       skipped: result.skipped,

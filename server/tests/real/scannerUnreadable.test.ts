@@ -1,6 +1,7 @@
 // スキャン中のディレクトリ読み取り失敗が missing 誤判定へ流れないことの検証。
 import assert from "node:assert/strict";
 import { chmodSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { workspacePath } from "@mimimilli/shared";
 import { join } from "node:path";
 import { test } from "node:test";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
@@ -111,7 +112,7 @@ test(
     t.after(() => chmodSync(blockedRoot, blockedMode));
     await withRestoredMode(blockedRoot, blockedMode, async () => {
       const { result } = await scanner.scan(root);
-      assert.ok(result.unreadablePaths?.includes(blockedRoot));
+      assert.ok(result.unreadablePaths.includes(workspacePath("blocked")));
       assert.equal((await getTestWork(db, blockedId))?.status, "ok");
       assert.equal((await getTestWork(db, accessibleId))?.status, "ok");
     })();
@@ -153,7 +154,7 @@ test(
     t.after(() => chmodSync(blockedDir, blockedMode));
     await withRestoredMode(blockedDir, blockedMode, async () => {
       const { result } = await scanner.scan(root);
-      assert.ok(result.unreadablePaths?.includes(blockedDir));
+      assert.ok(result.unreadablePaths.includes(workspacePath("blocked")));
       assert.equal((await getTestWork(db, blockedId))?.status, "ok");
       assert.equal((await getTestWork(db, removedId))?.status, "missing");
       assert.equal((await getTestWork(db, accessibleId))?.status, "ok");

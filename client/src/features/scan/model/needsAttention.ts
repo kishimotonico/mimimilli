@@ -1,94 +1,70 @@
-// 「要対応」の一元定義。通知ベルのバッジと要対応タブのバッジが
-// 同じ問題一覧・同じ件数を出すよう、両方がこのビルダーの結果だけを見る。
-// 件数は「問題の件数（行数）」で数える。ID重複は競合（workId）単位で1件。
-import type { DataIntegrityWarning, InvalidMetaFile, IdentityConflict } from "@mimimilli/shared";
+import type { MissingWork, ScanDiagnostics, ScanRecord, WorkspacePath } from "@mimimilli/shared";
 
 export interface NeedsAttentionSource {
-  identityConflicts: IdentityConflict[];
-  invalidMetaFiles: InvalidMetaFile[];
-  rjCodeMissingCount: number;
-  dlsiteFetchFailedCount: number;
-  dlsiteParseErrorCount: number;
-  dlsiteParseErrorAlert: boolean;
-  dataIntegrityWarning: DataIntegrityWarning | undefined;
+  diagnostics: ScanDiagnostics | undefined;
+  record: ScanRecord | undefined;
 }
 
 export type NeedsAttentionRow =
-  | { kind: "identityConflict"; key: string; workId: string; paths: string[] }
-  | { kind: "invalidMetaFile"; key: string; path: string; message: string }
-  | { kind: "rjCodeMissing"; key: string; count: number }
-  | { kind: "dlsiteFetchFailed"; key: string; count: number }
-  | { kind: "dlsiteParseFailed"; key: string; count: number }
-  | { kind: "dataIntegrity"; key: string; count: number };
+  | { kind: "identityConflict"; key: string; workId: string; paths: WorkspacePath[] }
+  | { kind: "invalidMetaFile"; key: string; path: WorkspacePath; message: string }
+  | { kind: "unreadablePath"; key: string; path: WorkspacePath }
+  | { kind: "dataIntegrity"; key: string; workId: string }
+  | ({ kind: "missingWork"; key: string } & MissingWork);
 
-export function buildNeedsAttentionRows(source: NeedsAttentionSource): NeedsAttentionRow[] {
-  const rows: NeedsAttentionRow[] = [];
+const collator = new Intl.Collator("ja", { numeric: true });
 
-  for (const conflict of source.identityConflicts) {
-    rows.push({
-      kind: "identityConflict",
-      key: `identity-${conflict.workId}`,
-      workId: conflict.workId,
-      paths: conflict.paths,
-    });
-  }
-
-  for (const metaFile of source.invalidMetaFiles) {
-    rows.push({
-      kind: "invalidMetaFile",
-      key: `meta-${metaFile.path}`,
-      path: metaFile.path,
-      message: metaFile.message,
-    });
-  }
-
-  if (source.rjCodeMissingCount > 0) {
-    rows.push({ kind: "rjCodeMissing", key: "rj-missing", count: source.rjCodeMissingCount });
-  }
-
-  if (source.dlsiteFetchFailedCount > 0) {
-    rows.push({
-      kind: "dlsiteFetchFailed",
-      key: "dlsite-fetch-failed",
-      count: source.dlsiteFetchFailedCount,
-    });
-  }
-
-  if (source.dlsiteParseErrorAlert) {
-    rows.push({
-      kind: "dlsiteParseFailed",
-      key: "dlsite-parse-failed",
-      count: source.dlsiteParseErrorCount,
-    });
-  }
-
-  if (source.dataIntegrityWarning) {
-    rows.push({
-      kind: "dataIntegrity",
-      key: "data-integrity",
-      count: source.dataIntegrityWarning.skippedCount,
-    });
-  }
-
-  return rows;
+function sortedBy<T>(items: readonly T[], keyOf: (item: T) => string): T[] {
+  return [...items].sort((a, b) => collator.compare(keyOf(a), keyOf(b)));
 }
 
-/** バッジ・タブ件数に足す重み。ID重複・読み取り失敗・データ不整合は
- *  「見つかった問題」単位で1件、それ以外は影響件数をそのまま使う。 */
-export function needsAttentionRowWeight(row: NeedsAttentionRow): number {
-  switch (row.kind) {
-    case "identityConflict":
-    case "invalidMetaFile":
-    case "dataIntegrity":
-      return 1;
-    case "rjCodeMissing":
-    case "dlsiteFetchFailed":
-    case "dlsiteParseFailed":
-      return row.count;
-  }
+/** 表示順は ID重複 → 読み取り失敗 → アクセス不可 → データ不整合 → 行方不明。種類の中は名前順 */
+export function buildNeedsAttentionRows({
+  diagnostics,
+  record,
+}: NeedsAttentionSource): NeedsAttentionRow[] {
+  return [
+    ...sortedBy(diagnostics?.identityConflicts ?? [], (c) => c.paths[0] ?? c.workId).map(
+      (conflict): NeedsAttentionRow => ({
+        kind: "identityConflict",
+        key: `identity:${conflict.workId}`,
+        workId: conflict.workId,
+        paths: conflict.paths,
+      }),
+    ),
+    ...sortedBy(diagnostics?.invalidMetaFiles ?? [], (f) => f.path).map(
+      (file): NeedsAttentionRow => ({
+        kind: "invalidMetaFile",
+        key: `invalid:${file.path}`,
+        path: file.path,
+        message: file.message,
+      }),
+    ),
+    ...sortedBy(record?.unreadablePaths ?? [], (path) => path).map(
+      (path): NeedsAttentionRow => ({ kind: "unreadablePath", key: `unreadable:${path}`, path }),
+    ),
+    ...sortedBy(record?.dataIntegrityWarning?.skippedWorkIds ?? [], (id) => id).map(
+      (workId): NeedsAttentionRow => ({
+        kind: "dataIntegrity",
+        key: `integrity:${workId}`,
+        workId,
+      }),
+    ),
+    ...sortedBy(record?.missingWorks ?? [], (work) => work.title).map(
+      (work): NeedsAttentionRow => ({
+        ...work,
+        kind: "missingWork",
+        key: `missing:${work.workId}`,
+      }),
+    ),
+  ];
 }
 
-/** 通知ベルのバッジと要対応タブが同じ件数を出すための唯一の集計関数。 */
-export function countNeedsAttention(rows: NeedsAttentionRow[]): number {
-  return rows.reduce((total, row) => total + needsAttentionRowWeight(row), 0);
+/** 行方不明は利用者が直すものではないので、サイドバーの件数には数えない */
+export function isFixable(row: NeedsAttentionRow): boolean {
+  return row.kind !== "missingWork";
+}
+
+export function countNeedsAttention(rows: readonly NeedsAttentionRow[]): number {
+  return rows.filter(isFixable).length;
 }

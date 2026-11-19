@@ -1,19 +1,16 @@
 import {
   applyDlsiteStatePatch,
-  buildDlsiteApplyPatch,
-  buildDlsiteMissingApplyPatch,
-  computeMissingDiff,
+  hasRjCode,
+  planDlsiteApply,
   workPlacementOf,
   type DlsiteApplyBody,
   type DlsiteStateUpdateBody,
-  type DlsiteWorkInfo,
   type MetaDlsiteState,
   type NormalizedTag,
   type WorkSourceMutationResult,
 } from "@mimimilli/shared";
 import { MetaMutationReject, encodeMetaRaw } from "./meta.ts";
-import { CoverSaveError, SourceChangedError } from "../../errors.ts";
-import { throwIfAborted } from "./sharedFlight.ts";
+import { DlsiteRefetchRequiredError, SourceChangedError } from "../../errors.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import {
   mutateVerifiedMetaSource,
@@ -21,19 +18,16 @@ import {
   readVerifiedEditSource,
 } from "./workEditSource.ts";
 import type { Scanner } from "./scanner.ts";
-import type { createDlsiteFetch } from "./dlsiteFetch.ts";
+import type { DlsiteCache } from "./dlsiteCache.ts";
+import { stageCachedDlsiteCover } from "./dlsiteCoverStaging.ts";
+import { readUsableDlsite, type DlsiteProductResolver } from "./dlsiteProductResolve.ts";
 
 export interface DlsiteApplyDeps {
   catalog: CatalogWorkRepository;
   scanner: Scanner;
-  fetch: ReturnType<typeof createDlsiteFetch>;
+  dlsiteCache: DlsiteCache;
+  resolve: DlsiteProductResolver;
   requireRoot: () => string;
-}
-
-function coverStub(coverImage: string | null) {
-  return coverImage
-    ? { image: coverImage, dimensions: { width: 1, height: 1 }, version: "source" }
-    : null;
 }
 
 function applyDlsiteMergeToRaw(
@@ -56,8 +50,7 @@ function applyDlsiteMergeToRaw(
 }
 
 export function createDlsiteApply(deps: DlsiteApplyDeps) {
-  const { catalog, scanner, fetch, requireRoot } = deps;
-  const { stageCover } = fetch;
+  const { catalog, scanner, dlsiteCache, resolve, requireRoot } = deps;
 
   async function persistVerified(
     verified: ReturnType<typeof mutateVerifiedMetaSource>,
@@ -70,106 +63,54 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
     async dlsiteApply(
       workId: string,
       body: DlsiteApplyBody,
-      options?: { signal?: AbortSignal },
     ): Promise<WorkSourceMutationResult | null> {
-      const signal = options?.signal;
-      throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
       const current = readVerifiedEditSource(catalog, workId);
       if (!current) return null;
 
-      const coverUrl = body.applyCover ? body.info.coverUrl : null;
-      const cover = coverUrl
-        ? await stageCover(
-            coverUrl,
-            workPlacementOf(current.metaPath).mediaRoot,
-            requireRoot(),
-            signal,
-          )
-        : null;
-      if (coverUrl && !cover) throw new CoverSaveError();
+      if (current.source.sourceRevision !== body.sourceRevision) throw new SourceChangedError();
+      const linkage = current.source.meta.dlsite;
+      const usable = hasRjCode(linkage) ? readUsableDlsite(resolve, linkage.rjCode) : null;
+      if (!usable || usable.revision !== body.infoRevision) throw new DlsiteRefetchRequiredError();
+      const { info } = usable;
+
+      const cover =
+        body.apply.cover && info.coverUrl
+          ? await stageCachedDlsiteCover(
+              dlsiteCache,
+              info.coverUrl,
+              workPlacementOf(current.metaPath).mediaRoot,
+              requireRoot(),
+            )
+          : null;
 
       try {
-        throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
         return await persistVerified(
           mutateVerifiedMetaSource(catalog, workId, (source) => {
             if (source.sourceRevision !== body.sourceRevision) {
               return new MetaMutationReject(new SourceChangedError());
             }
-            const patch = buildDlsiteApplyPatch(
+            const plan = planDlsiteApply(
               {
                 title: source.meta.title,
                 tags: source.meta.tags,
                 urls: source.meta.urls,
+                hasCover: Boolean(source.meta.coverImage),
                 dlsite: source.meta.dlsite,
               },
-              body,
+              info,
+              body.apply,
+              { coverCached: cover !== null },
             );
-            cover?.commit();
-            return applyDlsiteMergeToRaw(source.bytes, { ...patch, coverImage: cover?.fileName });
+            if (plan.applyCover) cover?.commit();
+            return applyDlsiteMergeToRaw(source.bytes, {
+              ...plan,
+              coverImage: plan.applyCover ? cover?.fileName : undefined,
+            });
           }),
         );
       } finally {
         cover?.discard();
       }
-    },
-
-    async applyDlsiteMissingItem(
-      workId: string,
-      info: DlsiteWorkInfo,
-    ): Promise<"applied" | "skipped" | "missing" | "pending"> {
-      const current = readVerifiedEditSource(catalog, workId);
-      if (!current) return "missing";
-      const planned = computeMissingDiff(
-        {
-          tags: current.source.meta.tags,
-          urls: current.source.meta.urls,
-          cover: coverStub(current.source.meta.coverImage ?? null),
-        },
-        info,
-      );
-      if (planned.newTags.length === 0 && !planned.applyCover && !planned.applyUrl) {
-        return "skipped";
-      }
-
-      const coverUrl = planned.applyCover ? info.coverUrl : null;
-      const cover = coverUrl
-        ? await stageCover(coverUrl, workPlacementOf(current.metaPath).mediaRoot, requireRoot())
-        : null;
-      if (coverUrl && !cover) return "skipped";
-
-      let wrote = false;
-      let verified: ReturnType<typeof mutateVerifiedMetaSource>;
-      try {
-        verified = mutateVerifiedMetaSource(catalog, workId, (source) => {
-          const diff = computeMissingDiff(
-            {
-              tags: source.meta.tags,
-              urls: source.meta.urls,
-              cover: coverStub(source.meta.coverImage ?? null),
-            },
-            info,
-          );
-          const patch = buildDlsiteMissingApplyPatch(
-            { tags: source.meta.tags, urls: source.meta.urls, dlsite: source.meta.dlsite },
-            info,
-            diff,
-          );
-          if (!patch) return source.bytes;
-          wrote = true;
-          const applied = diff.applyCover ? cover : null;
-          applied?.commit();
-          return applyDlsiteMergeToRaw(source.bytes, {
-            ...patch,
-            coverImage: applied?.fileName,
-          });
-        });
-      } finally {
-        cover?.discard();
-      }
-      if (!verified) return "missing";
-      if (!wrote) return "skipped";
-      const projected = await projectVerifiedSource(scanner, verified);
-      return projected.projection.status === "published" ? "applied" : "pending";
     },
 
     async updateDlsiteState(

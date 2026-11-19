@@ -163,7 +163,7 @@ export class ThumbnailCache {
     width: number,
     sourceAbsolutePath: string,
   ): Promise<Thumbnail> {
-    const tmpPath = `${cachedPath}.tmp-${process.pid}-${this.tmpFileCounter++}`;
+    const tmpPath = `${cachedPath}${TMP_MARKER}${process.pid}-${this.tmpFileCounter++}`;
     await this.semaphore.acquire();
     try {
       await this.transform({ sourceAbsolutePath, width, tmpPath });
@@ -244,22 +244,25 @@ export class ThumbnailCache {
   }
 }
 
+const TMP_MARKER = ".tmp-";
+
+/** 生成は数秒で終わるため、1時間を超えた一時ファイルは異常終了の残骸とみなす。 */
+export const STALE_TMP_AGE_MS = 60 * 60 * 1000;
+
 /**
  * サムネイルキャッシュのGC。cacheDir 配下で validNames に含まれないエントリを削除する。
  * 有効集合の構築（作品走査・カバー stat・不完全性の判定）は呼び出し側の責務であり、
  * 完全な CoverSnapshot のときだけ呼ぶこと。
  *
- * 生成中の一時ファイル（.tmp-プレフィックス、cacheFileName の命名規則に一致しない）は
- * 有効集合に入りようがないため、孤児として常に削除対象になる。GC実行のタイミングと
- * ちょうど同時にサムネイル生成中だった場合、その一時ファイルが削除されて rename が
- * ENOENT で失敗しうるが、GCはスキャン完了時のみで頻度が低く、失敗時は呼び出し元が
- * エラーを受け取って次のリクエストで再試行できるため許容する（隠蔽はしない）。
+ * 生成中の一時ファイル（名前に ".tmp-" を含む）はメインスレッドが書き込み中でありうるため、
+ * 有効集合に無くても削除せず、mtime が STALE_TMP_AGE_MS より古いものだけ（異常終了の残骸）削除する。
  */
 export async function gcThumbnailCache(
   cacheDir: string,
   validNames: ReadonlySet<string>,
   options: { throwIfCancelled?: () => void } = {},
 ): Promise<{ deleted: number; kept: number }> {
+  const now = Date.now();
   const checkpoint = options.throwIfCancelled ?? (() => {});
   checkpoint();
 
@@ -279,6 +282,13 @@ export async function gcThumbnailCache(
     if (validNames.has(name)) {
       kept++;
       continue;
+    }
+    if (name.includes(TMP_MARKER)) {
+      const info = await stat(join(cacheDir, name)).catch(() => null);
+      if (!info || now - info.mtimeMs <= STALE_TMP_AGE_MS) {
+        kept++;
+        continue;
+      }
     }
     await rm(join(cacheDir, name), { force: true });
     checkpoint();

@@ -1,19 +1,25 @@
+import { createHash } from "node:crypto";
 import { DEFAULT_TAG_PREFIXES, projectDlsiteState, toDlsiteLinkageStatus } from "@mimimilli/shared";
 import type {
+  DlsiteWorkInfo,
   DataIntegrityWarning,
   DlsiteCacheResolution,
+  DlsiteCacheResolutionHead,
   InvalidMetaFile,
   MetaDlsiteState,
   ResumeBody,
-  ScanCandidate,
+  ScanCandidateFolder,
+  UpdatedWork,
   IdentityConflict,
   SmartFolder,
   TagPrefix,
   WorkSummary,
+  WorkspacePath,
 } from "@mimimilli/shared";
 import {
   SEED_PLAYLIST_SPECS,
   fixtureCoverColumnsForWork,
+  fixtureCoverFromColumns,
   type FixtureCoverColumns,
   type FixtureWorkRecord,
   type SeedPlaylistSpec,
@@ -22,7 +28,7 @@ import { requireConfiguredRoot } from "../../core/rootFolder.ts";
 import { createFixtureScenario, type FixtureRootReconfiguration } from "./scenarios.ts";
 
 /** rjCodeをDLsite取得キャッシュのキーとして正規化する（realのnormalizeDlsiteProductCodeに合わせ大文字化）。 */
-function normalizeDlsiteCacheKey(rjCode: string): string {
+export function normalizeDlsiteCacheKey(rjCode: string): string {
   return rjCode.trim().toUpperCase();
 }
 
@@ -35,6 +41,18 @@ export interface PlaybackIds {
 
 export function requireFixtureRoot(state: FixtureState): string {
   return requireConfiguredRoot(state.rootFolder);
+}
+
+export interface FixtureDlsiteFetched {
+  info: DlsiteWorkInfo;
+  fetchedAt: number;
+  expiresAt: number;
+}
+
+export interface FixtureDlsiteCover {
+  body: Uint8Array;
+  contentType: string;
+  fetchedAt: number;
 }
 
 export interface FixtureState {
@@ -54,6 +72,10 @@ export interface FixtureState {
   dlsiteLinkages: Map<string, MetaDlsiteState>;
   /** rjCodeごとのDLsite取得キャッシュ相当。realのDlsiteCacheに対応する。 */
   dlsiteFetchFailures: Map<string, DlsiteCacheResolution>;
+  /** rjCodeごとの取得済み情報（realのDlsiteCacheのHTML snapshotと解析結果相当）。 */
+  dlsiteFetched: Map<string, FixtureDlsiteFetched>;
+  /** カバーキャッシュのキーごとのカバー画像（realのdlsite_cover_entries相当）。 */
+  dlsiteCovers: Map<string, FixtureDlsiteCover>;
   /** 編集用カバー列（表示用 cover と独立。unmeasured を表現する） */
   coverColumns: Map<string, FixtureCoverColumns>;
   tagPrefixes: TagPrefix[];
@@ -65,17 +87,23 @@ export interface FixtureState {
   playlistSpecs: Map<string, SeedPlaylistSpec[]>;
   /** scan() が insertedWorkIds として返す、未取り込みの新規作品ID（シナリオ "new-work" 用） */
   scanInsertedWorkIds: string[];
-  /** scan() が updatedWorkIds として返す作品ID */
-  scanUpdatedWorkIds: string[];
+  /** scan() が updatedWorks として返す、変化のあった既存作品 */
+  scanUpdatedWorks: UpdatedWork[];
+  scanNewlyMissingWorkIds: string[];
+  scanUnreadablePaths: WorkspacePath[];
+  /** シナリオが指定するスキャン結果（新規・更新・行方不明・読めないパス・データ不整合）を返し終えたか。返すのは最初のスキャンだけ */
+  scanScenarioDelivered: boolean;
   /** 永続化された候補除外パス */
   scanCandidateExclusions: string[];
   identityConflicts: IdentityConflict[];
   /** scan() が見つける候補。rootを変えても変わらない（fixtureには物理FSがない） */
-  scanCandidatePool: ScanCandidate[];
+  scanCandidatePool: ScanCandidateFolder[];
   /** 直近のscan以降に有効な候補session。root変更で破棄し、次のscanで作り直す */
-  scanCandidates: ScanCandidate[];
+  scanCandidates: ScanCandidateFolder[];
+  /** 候補のRJコードの直し。値がnullのエントリはRJコードなしの明示。scanで破棄する */
+  scanCandidateRjCodeOverrides: Map<string, string | null>;
   invalidMetaFiles: InvalidMetaFile[];
-  /** listSummaries でタグ等の不整合により除外した作品の報告（シナリオ errors のみ） */
+  /** listSummaries でタグ等の不整合により除外した作品の報告 */
   dataIntegrityWarning: DataIntegrityWarning | undefined;
   /** 編集 snapshot の CAS トークン（ファイルが無い fixture 用） */
   sourceRevisions: Map<string, string>;
@@ -130,6 +158,59 @@ export function dlsiteFetchFailureFor(
   return entry.expiresAt > Date.now() ? entry : null;
 }
 
+/** realのDlsiteCache.resolveHeadと同じ順（有効な失敗の記録→TTL内の取得済み→miss）で判断する。 */
+export function fixtureDlsiteResolutionHead(
+  state: FixtureState,
+  rjCode: string,
+): DlsiteCacheResolutionHead {
+  const key = normalizeDlsiteCacheKey(rjCode);
+  const failure = dlsiteFetchFailureFor(state, key);
+  if (failure) return failure;
+  const fetched = state.dlsiteFetched.get(key);
+  if (!fetched) return { kind: "miss", reason: "not_cached" };
+  if (fetched.expiresAt <= Date.now()) return { kind: "miss", reason: "ttl_expired" };
+  return {
+    kind: "html",
+    outcome: "ok",
+    fetchedAt: fetched.fetchedAt,
+    expiresAt: fetched.expiresAt,
+  };
+}
+
+/** realのreadUsableDlsiteと同じ判断。TTL内で取得済みのときだけ情報と版を返す */
+export function fixtureUsableDlsite(
+  state: FixtureState,
+  rjCode: string,
+): { info: DlsiteWorkInfo; revision: number } | null {
+  if (fixtureDlsiteResolutionHead(state, rjCode).kind !== "html") return null;
+  const fetched = state.dlsiteFetched.get(normalizeDlsiteCacheKey(rjCode));
+  return fetched ? { info: fetched.info, revision: fetched.fetchedAt } : null;
+}
+
+export function fixtureDlsiteCoverKey(coverUrl: string): string {
+  return createHash("sha256").update(coverUrl).digest("hex");
+}
+
+/** カバーキャッシュにあるか。DLsiteへは取りに行かない */
+export function fixtureDlsiteCoverCached(state: FixtureState, coverUrl: string | null): boolean {
+  return coverUrl !== null && state.dlsiteCovers.has(fixtureDlsiteCoverKey(coverUrl));
+}
+
+/** キャッシュ済みのカバーを作品のカバーにする。キャッシュに無ければ何もしない */
+export function applyFixtureCachedCover(
+  state: FixtureState,
+  work: FixtureWorkRecord,
+  coverUrl: string | null,
+): void {
+  if (coverUrl === null || !fixtureDlsiteCoverCached(state, coverUrl)) return;
+  const columns: FixtureCoverColumns = {
+    image: coverUrl,
+    dimensions: work.cover?.dimensions ?? { width: 900, height: 900 },
+  };
+  state.coverColumns.set(work.id, columns);
+  work.cover = fixtureCoverFromColumns(work, columns);
+}
+
 /** 作品レコードとlinkage・取得キャッシュから、API向けの合成済みWorkSummaryを読み出し時に組み立てる。
  *  合成結果はどこにも保存しない。 */
 export function composeWork(state: FixtureState, record: FixtureWorkRecord): WorkSummary {
@@ -145,9 +226,6 @@ export function composeWorks(state: FixtureState): WorkSummary[] {
   return state.works.map((record) => composeWork(state, record));
 }
 
-/** dataIntegrityWarning のダミー除外対象workId（実在の works には含めない） */
-const DATA_INTEGRITY_WARNING_SKIPPED_WORK_ID = "RJ501099";
-
 /** 契約テスト用の作品。fixture の作品レコードと同じく metaPath を持つ */
 export type FixtureSeedWork = WorkSummary & { metaPath: string };
 
@@ -156,6 +234,8 @@ export interface FixtureAdapterOptions {
   scenario?: string;
   /** 再設定の構築段階1ステップあたりの待ち時間。再設定中の状態と進捗を観測できるよう既定では長めにする */
   rootRebuildStepMs?: number;
+  /** DLsite取得1コードあたりの待ち時間。取得ジョブの進行を観測できるようにする（既定0）。 */
+  dlsiteFetchDelayMs?: number;
   /** 契約テスト用に差し替える作品一覧。省略時はscenarioのseedを使う。dlsiteはrjCode/status/appliedTags
    *  （linkage相当）だけを取り出して使い、lastAttemptAt/error/errorKindは読まない。 */
   works?: FixtureSeedWork[];
@@ -218,6 +298,8 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     detachedWorks,
     dlsiteLinkages,
     dlsiteFetchFailures,
+    dlsiteFetched: new Map(),
+    dlsiteCovers: new Map(),
     coverColumns,
     tagPrefixes: DEFAULT_TAG_PREFIXES.map((def) => ({ ...def })),
     smartFolders: scenario.smartFolders,
@@ -226,16 +308,17 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     playbackIds: new Map(),
     playlistSpecs: new Map(Object.entries({ ...SEED_PLAYLIST_SPECS, ...options.playlistSpecs })),
     scanInsertedWorkIds: scenario.scanInsertedWorkIds,
-    scanUpdatedWorkIds: scenario.scanUpdatedWorkIds,
+    scanUpdatedWorks: scenario.scanUpdatedWorks,
+    scanNewlyMissingWorkIds: scenario.scanNewlyMissingWorkIds,
+    scanUnreadablePaths: scenario.scanUnreadablePaths,
+    scanScenarioDelivered: false,
     scanCandidateExclusions: [],
     identityConflicts: options.identityConflicts ?? scenario.identityConflicts,
     scanCandidatePool: scenario.scanCandidates,
     scanCandidates: scenario.scanCandidates,
+    scanCandidateRjCodeOverrides: new Map(),
     invalidMetaFiles: scenario.invalidMetaFiles,
-    dataIntegrityWarning:
-      scenario.id === "errors"
-        ? { skippedCount: 1, skippedWorkIds: [DATA_INTEGRITY_WARNING_SKIPPED_WORK_ID] }
-        : undefined,
+    dataIntegrityWarning: scenario.dataIntegrityWarning,
     sourceRevisions: new Map([...works, ...detachedWorks].map((work) => [work.id, "fixture"])),
     sourceRevisionSeq: 0,
   };

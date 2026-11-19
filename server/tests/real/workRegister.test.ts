@@ -1,3 +1,4 @@
+import { NO_DLSITE } from "../helpers/scanLibrary.ts";
 // ファイルモードからの手動作品登録 API の結合テスト。
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -23,6 +24,7 @@ import { createApp } from "../helpers/testApp.ts";
 import { WorkRegisterError } from "../../src/errors.ts";
 import { writeMetaFile } from "../../src/adapters/real/meta.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
+import { htmlResponse, mockDlsiteTransport, sampleWorkHtml } from "../helpers/dlsiteTransport.ts";
 import { folderMetaPath } from "../helpers/workTestUtils.ts";
 import { nts } from "../helpers/tag.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
@@ -70,10 +72,17 @@ async function setupPlainLibrary(t: TestContext) {
   mkdirSync(parent, { recursive: true });
   writeWav(join(parent, "intro.wav"), 1);
 
-  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  const adapter = directory.own(
+    createTestRealAdapter({
+      database: { kind: "memory" },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => htmlResponse(sampleWorkHtml(code, { cover: false })),
+      }),
+    }),
+  );
   const app = createApp(adapter);
   await configureRoot(adapter, root);
-  return { app, root, parent };
+  return { app, adapter, root, parent };
 }
 
 async function setupLibraryWithChild(t: TestContext) {
@@ -96,7 +105,7 @@ async function setupLibraryWithChild(t: TestContext) {
   const childRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, child), title: "子作品" }),
+    body: JSON.stringify({ path: workspace(root, child), title: "子作品", ...NO_DLSITE }),
   });
   assert.equal(childRes.status, 201);
   const childWork = await childRes.json();
@@ -124,7 +133,7 @@ async function setupLibraryWithTwoChildren(t: TestContext) {
   const childARes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, childA), title: "子作品A" }),
+    body: JSON.stringify({ path: workspace(root, childA), title: "子作品A", ...NO_DLSITE }),
   });
   assert.equal(childARes.status, 201);
   const childAWork = await childARes.json();
@@ -132,7 +141,7 @@ async function setupLibraryWithTwoChildren(t: TestContext) {
   const childBRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, childB), title: "子作品B" }),
+    body: JSON.stringify({ path: workspace(root, childB), title: "子作品B", ...NO_DLSITE }),
   });
   assert.equal(childBRes.status, 201);
   const childBWork = await childBRes.json();
@@ -147,7 +156,7 @@ test("POST /works: 未登録フォルダーを作品として登録できる", a
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, parent), title: "親作品タイトル" }),
+    body: JSON.stringify({ path: workspace(root, parent), title: "親作品タイトル", ...NO_DLSITE }),
   });
   assert.equal(res.status, 201);
   const body = await res.json();
@@ -166,14 +175,14 @@ test("POST /works: 既に登録済みのフォルダへ再実行すると 409 (a
   const first = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, parent), title: "初回登録" }),
+    body: JSON.stringify({ path: workspace(root, parent), title: "初回登録", ...NO_DLSITE }),
   });
   assert.equal(first.status, 201);
 
   const second = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, parent), title: "再登録" }),
+    body: JSON.stringify({ path: workspace(root, parent), title: "再登録", ...NO_DLSITE }),
   });
   assert.equal(second.status, 409);
   const body = await second.json();
@@ -195,7 +204,7 @@ test("POST /works: 絶対パスとパストラバーサルを拒否する", asyn
     const res = await app.request("/api/works", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path, title: "外" }),
+      body: JSON.stringify({ path, title: "外", ...NO_DLSITE }),
     });
     assert.equal(res.status, 400);
   }
@@ -208,7 +217,7 @@ test("POST /works: 配下に子作品がある親の登録は拒否し、子を�
   const conflict = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, parent), title: "親作品" }),
+    body: JSON.stringify({ path: workspace(root, parent), title: "親作品", ...NO_DLSITE }),
   });
   assert.equal(conflict.status, 409);
   const conflictBody = await conflict.json();
@@ -233,7 +242,7 @@ test("POST /works: 配下に子作品がある親の登録は拒否し、子を�
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, parent), title: "親作品" }),
+    body: JSON.stringify({ path: workspace(root, parent), title: "親作品", ...NO_DLSITE }),
   });
   assert.equal(res.status, 201);
   assert.equal((await res.json()).snapshot.title, "親作品");
@@ -257,7 +266,7 @@ test("POST /works: 登録前後で音声等の物理ファイルは変更され�
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, folder), title: "プレーン" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "プレーン", ...NO_DLSITE }),
   });
   assert.equal(res.status, 201);
 
@@ -275,6 +284,7 @@ test("POST /works: フォームで入力したタグを登録する", async (t) 
     body: JSON.stringify({
       path: workspace(root, parent),
       title: "タグ付き作品",
+      ...NO_DLSITE,
       tags: ["voice", "ASMR"],
     }),
   });
@@ -332,7 +342,7 @@ test("POST /works: 孤立メタを復元登録し id を保持する", async (t)
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, parent), title: "復元後タイトル" }),
+    body: JSON.stringify({ path: workspace(root, parent), title: "復元後タイトル", ...NO_DLSITE }),
   });
   assert.equal(res.status, 201);
   const body = await res.json();
@@ -369,6 +379,7 @@ test("POST /works: 孤立メタ復元時、フォームで編集したタグを�
     body: JSON.stringify({
       path: workspace(root, parent),
       title: "復元後タイトル",
+      ...NO_DLSITE,
       tags: ["new-tag"],
     }),
   });
@@ -383,7 +394,8 @@ test("POST /works: 孤立メタ復元時、フォームで編集したタグを�
 });
 
 test("POST /works: 孤立メタ復元でDLsite URLの選択外は保持し、選択時だけ置換する", async (t) => {
-  const { app, root, parent } = await setupPlainLibrary(t);
+  const { app, adapter, root, parent } = await setupPlainLibrary(t);
+  assert.equal((await adapter.dlsiteFetchByCode("RJ900020")).ok, true);
   const orphanedId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
   const orphanedMeta: MetaFile & { customTopLevel: string } = {
     formatVersion: 1,
@@ -410,22 +422,9 @@ test("POST /works: 孤立メタ復元でDLsite URLの選択外は保持し、選
       body: JSON.stringify({
         path: workspace(root, folder),
         title: "復元後タイトル",
-        dlsite: {
-          info: {
-            rjCode: "RJ900020",
-            title: "DLsiteタイトル",
-            circle: null,
-            cvs: [],
-            genreTags: [],
-            ageRating: null,
-            coverUrl: null,
-            url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900020.html",
-          },
-          applyTitle: false,
-          applyTags: [],
-          applyCover: false,
-          applyUrl,
-        },
+        rjCode: "RJ900020",
+        applyCover: false,
+        applyUrl,
       }),
     });
 
@@ -472,7 +471,7 @@ test("POST /works: 壊れた孤立メタは invalid_meta エラー", async (t) =
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, parent), title: "復元試行" }),
+    body: JSON.stringify({ path: workspace(root, parent), title: "復元試行", ...NO_DLSITE }),
   });
   assert.equal(res.status, 409);
   const body = await res.json();
@@ -491,6 +490,7 @@ test("POST /works: 孤立メタが不正でも子がある親の登録は拒否�
     body: JSON.stringify({
       path: workspace(root, parent),
       title: "親作品",
+      ...NO_DLSITE,
     }),
   });
   assert.equal(res.status, 409);
@@ -511,7 +511,7 @@ test("POST /works: 別パスのライブ作品と同一IDの孤立メタ復元�
   const siblingRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, sibling), title: "既存作品" }),
+    body: JSON.stringify({ path: workspace(root, sibling), title: "既存作品", ...NO_DLSITE }),
   });
   assert.equal(siblingRes.status, 201);
   const createdSibling = await siblingRes.json();
@@ -560,7 +560,11 @@ test("POST /works: 別パスのライブ作品と同一IDの孤立メタ復元�
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, orphanDir), title: "復元後タイトル" }),
+    body: JSON.stringify({
+      path: workspace(root, orphanDir),
+      title: "復元後タイトル",
+      ...NO_DLSITE,
+    }),
   });
   assert.equal(res.status, 409);
   const body = await res.json();
@@ -590,7 +594,7 @@ test("POST /works: missing の同一IDを別パスから復元すると再接続
   const siblingRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, sibling), title: "移動前作品" }),
+    body: JSON.stringify({ path: workspace(root, sibling), title: "移動前作品", ...NO_DLSITE }),
   });
   assert.equal(siblingRes.status, 201);
   const existingWork = (await siblingRes.json()).snapshot;
@@ -615,7 +619,11 @@ test("POST /works: missing の同一IDを別パスから復元すると再接続
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, movedDir), title: "再接続タイトル" }),
+    body: JSON.stringify({
+      path: workspace(root, movedDir),
+      title: "再接続タイトル",
+      ...NO_DLSITE,
+    }),
   });
   assert.equal(res.status, 201);
   const restoredBody = await res.json();
@@ -674,7 +682,11 @@ test("POST /works: 孤立メタ復元時もスキーマ外フィールドを保�
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, orphanDir), title: "復元後タイトル" }),
+    body: JSON.stringify({
+      path: workspace(root, orphanDir),
+      title: "復元後タイトル",
+      ...NO_DLSITE,
+    }),
   });
   assert.equal(res.status, 201);
   const restored = (await res.json()).snapshot;
@@ -704,7 +716,7 @@ test("POST /works: 配下に子が2件ある親の登録は拒否し両方残る
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, parent), title: "親作品" }),
+    body: JSON.stringify({ path: workspace(root, parent), title: "親作品", ...NO_DLSITE }),
   });
   assert.equal(res.status, 409);
   const body = await res.json();
@@ -760,7 +772,11 @@ test("POST /works: 孤立メタ復元時も defaultPlaylist キーを保持す�
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, orphanDir), title: "復元後タイトル" }),
+    body: JSON.stringify({
+      path: workspace(root, orphanDir),
+      title: "復元後タイトル",
+      ...NO_DLSITE,
+    }),
   });
   assert.equal(res.status, 201);
   const restored = (await res.json()).snapshot;
@@ -810,7 +826,7 @@ test("POST /works: 未登録の音声ファイルを単一ファイル作品と�
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, audio), title: "単一ファイル作品" }),
+    body: JSON.stringify({ path: workspace(root, audio), title: "単一ファイル作品", ...NO_DLSITE }),
   });
   assert.equal(res.status, 201);
   const body = await res.json();
@@ -856,14 +872,14 @@ test("POST /works: 既に登録済みの音声ファイルへ再実行すると 
   const first = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, audio), title: "単一ファイル作品" }),
+    body: JSON.stringify({ path: workspace(root, audio), title: "単一ファイル作品", ...NO_DLSITE }),
   });
   assert.equal(first.status, 201);
 
   const second = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, audio), title: "再登録" }),
+    body: JSON.stringify({ path: workspace(root, audio), title: "再登録", ...NO_DLSITE }),
   });
   assert.equal(second.status, 409);
 
@@ -879,7 +895,7 @@ test("POST /works: 登録済みフォルダー配下の音声ファイルは 409
   const folderRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, parent), title: "親作品" }),
+    body: JSON.stringify({ path: workspace(root, parent), title: "親作品", ...NO_DLSITE }),
   });
   assert.equal(folderRes.status, 201);
 
@@ -889,6 +905,7 @@ test("POST /works: 登録済みフォルダー配下の音声ファイルは 409
     body: JSON.stringify({
       path: workspace(root, join(parent, "intro.wav")),
       title: "ファイル登録",
+      ...NO_DLSITE,
     }),
   });
   assert.equal(fileRes.status, 409);
@@ -906,7 +923,7 @@ test("GET /works/register-preview: 非音声ファイルは 404", async (t) => {
   const created = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, notes), title: "メモ" }),
+    body: JSON.stringify({ path: workspace(root, notes), title: "メモ", ...NO_DLSITE }),
   });
   assert.equal(created.status, 404);
 });
@@ -921,7 +938,12 @@ test("POST /works: 存在しないパスは invalid_path で拒否し、API は 
   const app = createApp(adapter);
   await configureRoot(adapter, root);
 
-  const body = { path: workspace(root, join(root, "missing")), title: "無い", tags: [] };
+  const body = {
+    path: workspace(root, join(root, "missing")),
+    title: "無い",
+    tags: [],
+    ...NO_DLSITE,
+  };
   await assert.rejects(
     adapter.createWork(body),
     (error) => error instanceof WorkRegisterError && error.code === "invalid_path",
@@ -946,6 +968,7 @@ test("POST /works: ルート未設定は他のAPIと同じ 409 を返す", async
     body: JSON.stringify({
       path: workspace(directory.path, join(directory.path, "x")),
       title: "x",
+      ...NO_DLSITE,
     }),
   });
   assert.equal(res.status, 409);
@@ -956,7 +979,7 @@ test("DELETE /works: 単一ファイル作品の解除はサイドカーだけ�
   const created = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspace(root, audio), title: "単一ファイル作品" }),
+    body: JSON.stringify({ path: workspace(root, audio), title: "単一ファイル作品", ...NO_DLSITE }),
   });
   assert.equal(created.status, 201);
   const work = await created.json();

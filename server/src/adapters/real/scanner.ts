@@ -4,11 +4,12 @@ import { basename, resolve } from "node:path";
 import type {
   IdentityConflict,
   MetaFile,
-  ScanCandidate,
+  MissingWork,
+  ScanCandidateFolder,
   ScanDiagnostics,
   ScanResult,
 } from "@mimimilli/shared";
-import { errorMessage, detectRjCode, emptyMetaDlsiteState, workspacePath } from "@mimimilli/shared";
+import { errorMessage, detectRjCode, workspacePath, type WorkspacePath } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import type { ScanOptions } from "../../adapter/index.ts";
 import { descendantsRegisteredError } from "../../errors.ts";
@@ -28,6 +29,7 @@ import { measureCoverDimensions, type CoverDimensions } from "./thumbnailCache.t
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
+import { classifyWorkChanges } from "../../core/workChanges.ts";
 import type { ScanWorkState } from "./workRowMapping.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
@@ -40,6 +42,7 @@ import {
   prepareMetaEntries,
   prepareSingleMeta,
   registerMetaFile,
+  type RegisteredWork,
   type RegisterMetaFileOptions,
 } from "./scanRegister.ts";
 import type {
@@ -80,11 +83,22 @@ function currentSourceRevision(metaPath: string): string | null {
   }
 }
 
-function emptyRegisterTracking(): Pick<
-  ScanResult,
-  "coverErrors" | "insertedWorkIds" | "updatedWorkIds"
-> {
-  return { coverErrors: 0, insertedWorkIds: [], updatedWorkIds: [] };
+function emptyRegisterTracking(): Pick<ScanResult, "coverErrors"> {
+  return { coverErrors: 0 };
+}
+
+function trackRegisteredWork(
+  result: Pick<ScanResult, "insertedWorkIds" | "updatedWorks">,
+  registered: RegisteredWork,
+  root: string,
+): void {
+  const { workId, previous, current } = registered;
+  if (!previous) {
+    result.insertedWorkIds.push(workId);
+    return;
+  }
+  const changes = classifyWorkChanges(previous, current, root);
+  if (changes.length > 0) result.updatedWorks.push({ workId, changes });
 }
 
 function inspectMetaFiles(
@@ -103,7 +117,7 @@ function findIdentityConflicts(
   root: string,
   inspections: ReadonlyMap<string, MetaInspection>,
 ): IdentityConflict[] {
-  const pathsByWorkId = new Map<string, string[]>();
+  const pathsByWorkId = new Map<string, WorkspacePath[]>();
   for (const [metaPath, { declaredId }] of inspections) {
     if (declaredId === null) continue;
     const paths = pathsByWorkId.get(declaredId) ?? [];
@@ -176,7 +190,10 @@ export class Scanner {
     const result: ScanResult = {
       registered: 0,
       insertedWorkIds: [],
-      updatedWorkIds: [],
+      startedWithEmptyCatalog: false,
+      missingWorks: [],
+      updatedWorks: [],
+      unreadablePaths: [],
       errors: 0,
       missing: 0,
       skipped: 0,
@@ -189,6 +206,7 @@ export class Scanner {
     checkAbort();
     const seenIds: SeenMetaIds = { work: new Set() };
     const existingWorks = this.query.getScanWorkMap();
+    result.startedWithEmptyCatalog = existingWorks.size === 0;
     const existingByMetaPath = new Map(
       [...existingWorks].map(([id, state]) => [state.metaPath, { id, state }]),
     );
@@ -214,6 +232,7 @@ export class Scanner {
 
     return {
       result: this.finalizePhase(
+        root,
         tree,
         seenIds,
         existingWorks,
@@ -327,6 +346,7 @@ export class Scanner {
             result.skipped += 1;
           } else {
             result.registered += 1;
+            trackRegisteredWork(result, outcome, root);
           }
         }
       } catch (e) {
@@ -360,7 +380,7 @@ export class Scanner {
 
   private async generatePhase(
     root: string,
-    candidates: ScanCandidate[],
+    candidates: ScanCandidateFolder[],
     emit: NonNullable<ScanOptions["onProgress"]>,
     checkAbort: () => void,
   ): Promise<void> {
@@ -383,7 +403,7 @@ export class Scanner {
     root: string,
     tree: WalkResult,
     options?: { filterExclusions?: boolean },
-  ): ScanCandidate[] {
+  ): ScanCandidateFolder[] {
     const workRoots = new Set<string>();
     for (const audioDir of tree.audioDirs) {
       if (isCoveredByMeta(audioDir, root, tree.metaDirs) || audioDir === root) continue;
@@ -408,7 +428,7 @@ export class Scanner {
           audioBreakdown: [...breakdown]
             .sort(([a], [b]) => naturalCompare(a, b))
             .map(([extension, count]) => ({ extension, count })),
-          rjCode: detectRjCode([folderName]),
+          detectedRjCode: detectRjCode([folderName]),
         };
       });
     if (options?.filterExclusions === false) return candidates;
@@ -416,6 +436,7 @@ export class Scanner {
   }
 
   private finalizePhase(
+    root: string,
     tree: WalkResult,
     seenIds: SeenMetaIds,
     existingWorks: Map<string, ScanWorkState>,
@@ -432,7 +453,9 @@ export class Scanner {
     checkAbort();
 
     if (tree.unreadablePaths.length > 0) {
-      result.unreadablePaths = tree.unreadablePaths;
+      result.unreadablePaths = tree.unreadablePaths.map((dir) =>
+        workspacePath(toPortableRelativePath(root, dir)),
+      );
       scanLogger.warn("読み取れなかったディレクトリがあります", {
         paths: tree.unreadablePaths,
       });
@@ -457,12 +480,30 @@ export class Scanner {
         }
       }
     }
+    // スキャン開始時にcatalogにあった作品のうち今回見つからなかったものだけを missing にする。
+    // スキャン中に登録された作品は existingWorks に無いので missing にならない
+    const missingIds: string[] = [];
+    const missingWorks: MissingWork[] = [];
+    for (const [workId, state] of existingWorks) {
+      if (seenIds.work.has(workId)) continue;
+      missingIds.push(workId);
+      if (state.status === "missing") continue;
+      // root外の作品は相対pathで示せないので、画面に出す行方不明の対象にしない
+      if (!isPathWithin(root, state.physicalPath)) continue;
+      missingWorks.push({
+        workId,
+        title: state.title,
+        previousPath: workspacePath(toPortableRelativePath(root, state.physicalPath)),
+      });
+    }
     batch.publishScanGeneration({
       seenIds: [...seenIds.work],
       unverifiedIds: [...unverifiedIds],
+      missingIds,
       identityConflicts: diagnostics.identityConflicts,
       invalidMetaFiles: diagnostics.invalidMetaFiles,
     });
+    result.missingWorks = missingWorks;
     result.missing = this.catalog.countByStatus("missing");
     const { skipped } = this.query.listSummaries();
     logDataIntegritySkips(scanLogger, "scan-finalize", skipped);
@@ -478,10 +519,10 @@ export class Scanner {
     probeCache: Map<string, ProbeCacheEntry>;
     batch: ScanUpsertBatch;
     existingWorks: Map<string, ScanWorkState>;
-    result: Pick<ScanResult, "coverErrors" | "insertedWorkIds" | "updatedWorkIds">;
+    result: Pick<ScanResult, "coverErrors">;
     options: RegisterMetaFileOptions;
     checkAbort?: () => void;
-  }): Promise<"skipped" | string> {
+  }): Promise<"skipped" | RegisteredWork> {
     return registerMetaFile(
       this.db,
       params.prepared,
@@ -601,24 +642,12 @@ export class Scanner {
       );
     }
 
-    let dlsite = options.dlsite;
-    if (dlsite === undefined) {
-      if (options.rjCode === undefined) {
-        const detected = detectRjCode([targetName(target), options.title]);
-        dlsite = detected
-          ? { ...emptyMetaDlsiteState(), rjCode: detected }
-          : emptyMetaDlsiteState();
-      } else {
-        dlsite = { ...emptyMetaDlsiteState(), rjCode: options.rjCode };
-      }
-    }
-
     const meta = this.draftMetaFor(target, {
       title: options.title,
       tags: options.tags,
       urls: options.urls,
       coverImage: options.coverImage,
-      dlsite,
+      dlsite: options.dlsite,
     });
     const snapshot = writeMetaFile(metaPath, meta);
     return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));

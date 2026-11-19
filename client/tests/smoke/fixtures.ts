@@ -134,13 +134,15 @@ interface WorkerServers {
 
 export const test = base.extend<
   { resetFixtureState: void },
-  { workerServers: WorkerServers; fixtureScenario: string }
+  { workerServers: WorkerServers; fixtureScenario: string; dlsiteFetchDelayMs: number }
 >({
   // spec側で test.use({ fixtureScenario }) するとworkerのサーバーがそのシナリオで起動する
   fixtureScenario: ["new-work", { scope: "worker", option: true }],
+  // 取得中の表示を観測したいspecだけ test.use({ dlsiteFetchDelayMs }) で遅延を足す
+  dlsiteFetchDelayMs: [0, { scope: "worker", option: true }],
 
   workerServers: [
-    async ({ fixtureScenario }, use) => {
+    async ({ fixtureScenario, dlsiteFetchDelayMs }, use) => {
       let bunProc: ChildProcess | undefined;
       let viteProc: ChildProcess | undefined;
 
@@ -151,6 +153,7 @@ export const test = base.extend<
             ...process.env,
             MIMIMILLI_ADAPTER: "fixture",
             MIMIMILLI_MOCK_SCENARIO: fixtureScenario,
+            MIMIMILLI_MOCK_DLSITE_FETCH_DELAY_MS: String(dlsiteFetchDelayMs),
             PORT: "0",
           },
         });

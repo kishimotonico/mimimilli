@@ -11,6 +11,7 @@ import { createTestRealAdapter } from "./helpers/realAdapter.ts";
 import { scanAndRegisterCandidates } from "./helpers/scanLibrary.ts";
 import { makeSampleLibrary, writeSampleCover } from "./helpers/sampleLibrary.ts";
 import { configureRoot } from "./helpers/rootFolder.ts";
+import { applyFetchedDlsite, fetchDlsiteForWork } from "./helpers/dlsiteApply.ts";
 
 test("fixture: measured cover DTO に version が付き、同一内容なら安定する", async () => {
   const adapter = createFixtureAdapter();
@@ -29,23 +30,8 @@ test("fixture: カバー内容が変わると version が変わる", async () =>
   assert.ok(before?.cover);
   const previousVersion = before.cover.version;
 
-  await adapter.dlsiteApply("RJ501001", {
-    applyTitle: true,
-    applyTags: [],
-    applyCover: false,
-    applyUrl: false,
-    sourceRevision: (await adapter.getWorkEditSnapshot("RJ501001"))!.sourceRevision,
-    info: {
-      rjCode: "RJ501001",
-      title: "カバー内容更新後タイトル",
-      circle: null,
-      cvs: [],
-      genreTags: [],
-      ageRating: null,
-      coverUrl: null,
-      url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501001.html",
-    },
-  });
+  const fetched = await fetchDlsiteForWork(adapter, "RJ501001", "RJ501001");
+  await applyFetchedDlsite(adapter, "RJ501001", fetched, { title: true, cover: true });
 
   const after = await adapter.getWork("RJ501001");
   assert.ok(after?.cover);

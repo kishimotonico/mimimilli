@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { mockApi } from "../helpers/api";
+import { buildScanCandidate } from "../helpers/builders";
+import { SCAN_CANDIDATES_QUERY_KEY } from "../../src/entities/scan/scanCandidatesCache";
 import { QueryClient, QueryObserver, type QueryKey } from "@tanstack/react-query";
 import {
   emptyDlsiteState,
@@ -13,10 +16,9 @@ import { FILE_SYSTEM_QUERY_KEYS } from "../../src/entities/file-system/queryKeys
 import { SCAN_QUERY_KEYS } from "../../src/entities/scan/queryKeys";
 import {
   updateCachesAfterBookmark,
-  updateCachesAfterDlsiteBulkApply,
-  updateCachesAfterDlsiteBulkFetch,
   updateCachesAfterDlsiteLinkageChange,
-  updateCachesAfterDlsitePreviewFetch,
+  updateCachesAfterDlsiteFetch,
+  updateCachesAfterDlsiteSyncFetch,
   updateCachesAfterIdentityReassign,
   updateCachesAfterLibraryScan,
   updateCachesAfterMissingUnregistration,
@@ -84,9 +86,9 @@ const KEYS = {
   tags: TAG_QUERY_KEYS.all(),
   smartWorks: SMART_FOLDER_QUERY_KEYS.works("sf-1"),
   smartPreview: SMART_FOLDER_QUERY_KEYS.preview([{ axis: "circle", op: "eq", value: "c" }]),
-  notifications: WORK_QUERY_KEYS.dlsiteNotificationSummary(),
   fs: FILE_SYSTEM_QUERY_KEYS.directory("dlsite"),
   diagnostics: SCAN_QUERY_KEYS.diagnostics(),
+  scanRecord: SCAN_QUERY_KEYS.last(),
   candidates: SCAN_QUERY_KEYS.candidates(),
 } satisfies Record<string, QueryKey>;
 
@@ -107,9 +109,9 @@ function seededClient(): QueryClient {
   queryClient.setQueryData(KEYS.tags, []);
   queryClient.setQueryData(KEYS.smartWorks, structuredClone(emptyPages));
   queryClient.setQueryData(KEYS.smartPreview, 3);
-  queryClient.setQueryData(KEYS.notifications, { rjMissing: 0 });
   queryClient.setQueryData(KEYS.fs, { entries: [] });
   queryClient.setQueryData(KEYS.diagnostics, { identityConflicts: [], invalidMetaFiles: [] });
+  queryClient.setQueryData(KEYS.scanRecord, { finishedAt: null });
   queryClient.setQueryData(KEYS.candidates, []);
   return queryClient;
 }
@@ -134,16 +136,15 @@ const LIBRARY_VIEWS: KeyName[] = [
   "tags",
   "smartWorks",
   "smartPreview",
-  "notifications",
 ];
-const REGISTRATION_VIEWS: KeyName[] = [...LIBRARY_VIEWS, "fs", "diagnostics"];
+const REGISTRATION_VIEWS: KeyName[] = [...LIBRARY_VIEWS, "fs", "diagnostics", "scanRecord"];
 
 function sorted(names: KeyName[]): KeyName[] {
   return [...names].sort();
 }
 
 describe("meta 編集の必須更新", () => {
-  it("source へ応答の snapshot を書き戻し、詳細・一覧系・facet・タグ・SF・通知を無効化する", async () => {
+  it("source へ応答の snapshot を書き戻し、詳細・一覧系・facet・タグ・SF を無効化する", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterSourceEdit(queryClient, mutationResult("w1"));
@@ -213,7 +214,7 @@ describe("bookmark の必須更新", () => {
 });
 
 describe("登録・スキャン完了の必須更新", () => {
-  it("登録は一覧系・facet・タグ・SF（件数プレビューを含む）・通知・FS・診断を無効化し、詳細と scan 候補は触らない", async () => {
+  it("登録は一覧系・facet・タグ・SF（件数プレビューを含む）・FS・診断・スキャンの記録を無効化し、詳細と scan 候補は触らない", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterRegistration(queryClient);
@@ -268,7 +269,7 @@ describe("ID 再採番の必須更新", () => {
 });
 
 describe("DLsite の必須更新", () => {
-  it("単体適用は source を書き戻して残し、詳細・一覧系・facet・タグ・SF・通知を無効化する", async () => {
+  it("単体適用は source を書き戻して残し、詳細・一覧系・facet・タグ・SF を無効化する", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterDlsiteLinkageChange(queryClient, mutationResult("w1"));
@@ -277,31 +278,50 @@ describe("DLsite の必須更新", () => {
     expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(["detail1", ...LIBRARY_VIEWS]));
   });
 
-  it("情報の取得は対象の詳細だけを無効化し、source は残す", async () => {
+  it("情報の取得は同じRJコードの詳細と一覧系を無効化し、別コードの詳細と source は残す", async () => {
     const queryClient = seededClient();
+    queryClient.setQueryData(
+      KEYS.detail1,
+      makeWork({ dlsite: { ...emptyDlsiteState(), rjCode: "RJ000001" } }),
+    );
+    queryClient.setQueryData(
+      KEYS.detail2,
+      makeWork({ id: "w2", dlsite: { ...emptyDlsiteState(), rjCode: "RJ000002" } }),
+    );
 
-    await updateCachesAfterDlsitePreviewFetch(queryClient, "w1");
+    await updateCachesAfterDlsiteFetch(queryClient, ["rj000001"]);
 
     expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(["detail1", ...LIBRARY_VIEWS]));
   });
 
-  it("未設定項目の一括適用は対象作品の詳細と source を無効化する", async () => {
-    const queryClient = seededClient();
+  describe("DLsiteの同期取得", () => {
+    it("同じRJコードの作品を無効化し、候補キャッシュに同じコードの候補が無ければ候補一覧は取り直さない", async () => {
+      const api = mockApi({ "GET /api/scan/candidates": { candidates: [] } });
+      const queryClient = seededClient();
+      queryClient.setQueryData(
+        KEYS.detail1,
+        makeWork({ dlsite: { ...emptyDlsiteState(), rjCode: "RJ000001" } }),
+      );
+      queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, [
+        buildScanCandidate({ path: "a", rjCode: "RJ000002" }),
+      ]);
 
-    await updateCachesAfterDlsiteBulkApply(queryClient, ["w1"]);
+      await updateCachesAfterDlsiteSyncFetch(queryClient, "RJ000001");
 
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(
-      sorted(["detail1", "source1", ...LIBRARY_VIEWS]),
-    );
-  });
+      expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(["detail1", ...LIBRARY_VIEWS]));
+      expect(api.requestsTo("GET /api/scan/candidates")).toHaveLength(0);
+    });
 
-  it("一括取得の終端は処理対象を問わず全詳細と一覧系を無効化する", async () => {
-    const queryClient = seededClient();
+    it("キャッシュ済みの候補一覧に同じRJコードの候補があるときだけ、候補一覧を取り直す", async () => {
+      const api = mockApi({ "GET /api/scan/candidates": { candidates: [] } });
+      const queryClient = seededClient();
+      queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, [
+        buildScanCandidate({ path: "a", rjCode: "rj000001" }),
+      ]);
 
-    await updateCachesAfterDlsiteBulkFetch(queryClient);
+      await updateCachesAfterDlsiteSyncFetch(queryClient, "RJ000001");
 
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(
-      sorted(["detail1", "source1", "detail2", "source2", ...LIBRARY_VIEWS]),
-    );
+      expect(api.requestsTo("GET /api/scan/candidates")).toHaveLength(1);
+    });
   });
 });

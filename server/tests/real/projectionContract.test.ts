@@ -1,3 +1,4 @@
+import { REGISTER_ALL } from "../helpers/scanLibrary.ts";
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -85,9 +86,10 @@ test("候補登録は検出コードを1回の正本書込みに含め、直後�
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
   await adapter.scan();
-  const registered = await adapter.registerScanCandidates([
-    { path: workspacePath("RJ123456_自動検出作品") },
-  ]);
+  const registered = await adapter.registerScanCandidates(
+    [workspacePath("RJ123456_自動検出作品")],
+    REGISTER_ALL,
+  );
   assert.equal(registered.registered.length, 1);
 
   const metaPath = join(workDir, "mimimilli.json");

@@ -3,9 +3,7 @@ import {
   META_FILE_NAME,
   isAudioFileName,
   isSidecarMetaFileName,
-  isDlsiteFetchFailed,
-  isDlsiteParseFailed,
-  isRjCodeMissing,
+  planDlsiteRegistration,
   sidecarMetaFileName,
   tagEquals,
   unresolvedWorkPhysicalPath,
@@ -14,12 +12,7 @@ import {
 } from "@mimimilli/shared";
 import type {
   DataIntegrityWarning,
-  DlsiteNotificationKind,
-  DlsiteNotificationPage,
-  DlsiteNotificationQuery,
-  DlsiteNotificationSummary,
   IdentityConflictReassignBody,
-  MetaDlsiteState,
   Work,
   WorkBookmarkPatch,
   WorkBookmarkResult,
@@ -30,13 +23,12 @@ import type {
   WorkSourcePatch,
   WorkspacePath,
   WorksPage,
+  UnregisterMissingWorksResult,
   WorksQuery,
 } from "@mimimilli/shared";
 import { SourceChangedError } from "../../errors.ts";
 import type { WorkAdapter } from "../../adapter/work.ts";
-import { summarizeDlsiteNotifications } from "../../core/dlsiteNotifications.ts";
 import { removeIdentityConflictPath } from "../../core/identityConflicts.ts";
-import { compareJapaneseSortKeys, compareUtf8Bytes } from "../../core/japaneseSortKey.ts";
 import { fileRegisterNaming, folderRegisterNaming } from "../../core/workRegisterPreview.ts";
 import { validateResumeRequest } from "../../core/resumeValidation.ts";
 import { assertRegistrationAllowed } from "../../core/workRegistrationGuard.ts";
@@ -46,9 +38,11 @@ import { buildFullWorkFromState, checkWorkPlacement } from "./playback.ts";
 import { normalizeFsPath } from "./fsResolve.ts";
 import {
   composeWorks,
+  applyFixtureCachedCover,
   copyWorkState,
   coverColumnsOf,
   dlsiteLinkageOf,
+  fixtureUsableDlsite,
   reassignWorkId,
   removeWorks,
   setDlsiteLinkage,
@@ -159,39 +153,6 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
 
     getWorkRegisterPreview,
 
-    async getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary> {
-      return summarizeDlsiteNotifications(composeWorks(state).map((work) => work.dlsite));
-    },
-
-    async queryDlsiteNotifications(
-      kind: DlsiteNotificationKind,
-      query: Required<DlsiteNotificationQuery>,
-    ): Promise<DlsiteNotificationPage> {
-      const predicate = (() => {
-        switch (kind) {
-          case "rj-missing":
-            return isRjCodeMissing;
-          case "fetch-failed":
-            return isDlsiteFetchFailed;
-          case "parse-failed":
-            return isDlsiteParseFailed;
-        }
-      })();
-      const matches = composeWorks(state)
-        .filter((work) => predicate(work.dlsite))
-        .sort((a, b) => compareJapaneseSortKeys(a.title, b.title) || compareUtf8Bytes(a.id, b.id));
-      const start = (query.page - 1) * query.limit;
-      return {
-        items: matches.slice(start, start + query.limit).map((work) => ({
-          id: work.id,
-          title: work.title,
-          status: work.dlsite.status,
-          rjCode: kind === "parse-failed" ? work.dlsite.rjCode : null,
-        })),
-        total: matches.length,
-      };
-    },
-
     async getWork(id: string): Promise<Work | null> {
       const work = state.works.find((w) => w.id === id);
       return work ? buildFullWorkFromState(state, work) : null;
@@ -215,7 +176,14 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
         kind: isFile ? "file" : "folder",
       });
       const now = new Date().toISOString();
-      const applyTags = body.dlsite?.applyTags ?? [];
+      const rjCode = body.rjCode === "" ? null : body.rjCode;
+      const plan = planDlsiteRegistration({
+        rjCode,
+        info: rjCode ? (fixtureUsableDlsite(state, rjCode)?.info ?? null) : null,
+        title: body.title,
+        tags: body.tags,
+        apply: { title: false, tags: false, cover: body.applyCover, url: body.applyUrl },
+      });
       const work: FixtureWorkRecord = {
         id: crypto.randomUUID(),
         title: body.title,
@@ -227,21 +195,16 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
         trackCount: isFile ? 1 : 0,
         addedAt: now,
         errorMessage: null,
-        urls:
-          body.dlsite?.info.url && body.dlsite.info.url.length > 0
-            ? [{ label: "DLsite", url: body.dlsite.info.url }]
-            : [],
-        tags: body.tags,
+        urls: plan.dlsiteUrl ? [plan.dlsiteUrl] : [],
+        tags: plan.tags,
         bookmarked: false,
         lastPlayedAt: null,
       };
+      applyFixtureCachedCover(state, work, plan.coverUrl);
       const registered = checkWorkPlacement(state, work);
       state.works.push(registered);
       state.sourceRevisions.set(work.id, "fixture");
-      const linkage: MetaDlsiteState = body.dlsite
-        ? { rjCode: body.dlsite.info.rjCode, status: "applied", appliedTags: applyTags }
-        : { rjCode: preview.detectedRjCode, status: "none", appliedTags: [] };
-      setDlsiteLinkage(state, work.id, linkage);
+      setDlsiteLinkage(state, work.id, plan.dlsite);
       return {
         snapshot: fixtureEditSnapshot(state, registered),
         projection: { status: "published" },
@@ -250,7 +213,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
 
     async reassignIdentityConflict(
       body: IdentityConflictReassignBody,
-    ): Promise<WorkSourceMutationResult | null> {
+    ): Promise<(WorkSourceMutationResult & { replacedWorkId: string | null }) | null> {
       const diagnostic = state.identityConflicts.find((candidate) =>
         candidate.paths.includes(body.path),
       );
@@ -264,6 +227,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
         : posix.join(target, META_FILE_NAME);
       const newId = crypto.randomUUID();
       let reassigned: FixtureWorkRecord;
+      const replacedWorkId = metaPath === owner.metaPath ? diagnostic.workId : null;
       if (metaPath === owner.metaPath) {
         owner.id = newId;
         owner.bookmarked = false;
@@ -296,6 +260,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       return {
         snapshot: fixtureEditSnapshot(state, reassigned),
         projection: { status: "published" },
+        replacedWorkId,
       };
     },
 
@@ -306,6 +271,18 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       const work = state.works.find((candidate) => candidate.physicalPath === target);
       if (!work) return null;
       return { snapshot: fixtureEditSnapshot(state, work), projection: { status: "published" } };
+    },
+
+    async reloadWork(id: string): Promise<boolean> {
+      const warning = state.dataIntegrityWarning;
+      if (warning?.skippedWorkIds.includes(id)) {
+        const rest = warning.skippedWorkIds.filter((skipped) => skipped !== id);
+        state.dataIntegrityWarning = rest.length
+          ? { skippedCount: rest.length, skippedWorkIds: rest }
+          : undefined;
+        return true;
+      }
+      return state.works.some((w) => w.id === id);
     },
 
     async deleteWork(id: string): Promise<boolean> {
@@ -319,13 +296,15 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       return state.works.filter((w) => w.status === "missing").length;
     },
 
-    async unregisterMissingWorks(): Promise<{ deletedCount: number; failedCount: number }> {
+    async unregisterMissingWorks(): Promise<
+      UnregisterMissingWorksResult & { deletedWorkIds: string[] }
+    > {
       const missingIds = new Set(
         state.works.filter((w) => w.status === "missing").map((w) => w.id),
       );
       for (const id of missingIds) removeIdentityConflictForWork(state, id);
       removeWorks(state, missingIds);
-      return { deletedCount: missingIds.size, failedCount: 0 };
+      return { deletedCount: missingIds.size, failedCount: 0, deletedWorkIds: [...missingIds] };
     },
 
     async getWorkEditSnapshot(id: string): Promise<WorkEditSnapshot | null> {

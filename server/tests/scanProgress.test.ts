@@ -9,7 +9,7 @@ import { ScanJobManager } from "../src/scanJobManager.ts";
 import { pollUntil } from "./helpers/poll.ts";
 
 function createScanJobManager(adapter: DataAdapter, terminalLimit?: number): ScanJobManager {
-  return new ScanJobManager(adapter, terminalLimit);
+  return new ScanJobManager(adapter, { terminalLimit });
 }
 
 type EmitProgress = (processed: number) => void;
@@ -58,10 +58,12 @@ async function readSseFrames(response: Response): Promise<Array<{ event: string;
 const emptyResult = {
   registered: 0,
   insertedWorkIds: [],
-  updatedWorkIds: [],
+  startedWithEmptyCatalog: false,
+  missingWorks: [],
+  updatedWorks: [],
+  unreadablePaths: [],
   errors: 0,
   missing: 0,
-  rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
   identityConflicts: [],
@@ -154,11 +156,7 @@ test("POST /scan は202とLocationを即時返し、完了状態はjobから取�
   assert.equal(location, `/api/scan/${id}`);
   const job = await waitForTerminal(app, id);
   assert.equal(job.status, "completed");
-  assert.deepEqual((job.result as { insertedWorkIds: string[] }).insertedWorkIds, [
-    "RJ501011",
-    "RJ501001",
-    "RJ501003",
-  ]);
+  assert.equal("result" in job, false);
 });
 
 test("active jobは409でsnapshotを返し、終了後はactiveが204になる", async () => {
@@ -171,17 +169,69 @@ test("active jobは409でsnapshotを返し、終了後はactiveが204になる",
   assert.equal((await app.request("/api/scan/active")).status, 204);
 });
 
-test("GET /scan/last は一度も完了していなければ204、完了後はディスク永続化なしで結果を返す", async () => {
+test("GET /scan/last は未スキャンなら finishedAt が null の空の記録、完了後は今回の記録を返す", async () => {
   const app = createApp(createFixtureAdapter({ scenario: "new-work" }));
-  assert.equal((await app.request("/api/scan/last")).status, 204);
+  const empty = await app.request("/api/scan/last");
+  assert.equal(empty.status, 200);
+  assert.deepEqual(await empty.json(), {
+    finishedAt: null,
+    updatedWorks: [],
+    missingWorks: [],
+    unreadablePaths: [],
+  });
+  assert.equal((await (await app.request("/api/works?scanRecord=new")).json()).total, 0);
 
   const { id } = await start(app);
   await waitForTerminal(app, id);
-  const last = await app.request("/api/scan/last");
-  assert.equal(last.status, 200);
-  const body = await last.json();
-  assert.deepEqual(body.result.insertedWorkIds, ["RJ501011", "RJ501001", "RJ501003"]);
+  const body = await (await app.request("/api/scan/last")).json();
   assert.equal(typeof body.finishedAt, "string");
+  assert.deepEqual(
+    body.updatedWorks.map((work: { workId: string }) => work.workId),
+    ["RJ501007", "RJ501002", "RJ501004"],
+  );
+  assert.deepEqual(
+    body.missingWorks.map((work: { workId: string }) => work.workId),
+    ["RJ501008"],
+  );
+  assert.deepEqual(body.unreadablePaths, ["権限なし/フォルダー"]);
+  const created = await (await app.request("/api/works?scanRecord=new&sort=id-asc")).json();
+  assert.deepEqual(
+    created.items.map((item: { id: string }) => item.id),
+    ["RJ501001", "RJ501003", "RJ501011"],
+  );
+});
+
+test("候補から追加した作品は、スキャンで自動登録された作品とともに記録の新規作品に入る", async () => {
+  const app = createApp(createFixtureAdapter({ scenario: "new-work" }));
+  await waitForTerminal(app, (await start(app)).id);
+  const registered = await app.request("/api/scan/candidates/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      paths: ["未登録作品"],
+      apply: { title: true, cover: true, tags: true, url: true },
+    }),
+  });
+  assert.equal(registered.status, 201);
+  const { registered: entries } = await registered.json();
+  const addedId = entries[0].workId as string;
+  const ids = async () =>
+    (await (await app.request("/api/works?scanRecord=new")).json()).items.map(
+      (item: { id: string }) => item.id,
+    );
+  assert.ok((await ids()).includes(addedId));
+  assert.ok((await ids()).includes("RJ501011"));
+});
+
+test("スキャン実行中に候補から追加した作品は、完了後の新規作品の記録にも残る", async () => {
+  const { adapter, progressReady, finishScan } = createGatedScanAdapter();
+  const manager = createScanJobManager(adapter);
+  const job = manager.start();
+  await progressReady;
+  manager.record.addNewWorks(["added-during-scan"]);
+  finishScan();
+  await pollUntil(() => manager.get(job.id)?.status === "completed");
+  assert.deepEqual(manager.record.workIds("new"), ["added-during-scan"]);
 });
 
 test("job scoped SSEは接続時に現在snapshotをstateで1件送り、以後のprogressとterminalをid無しで配信する", async () => {
@@ -413,4 +463,31 @@ test("進捗の無い区間でも一定間隔でpingを送り、完了時にハ�
     if (done) break;
   }
   assert.ok(Date.now() - closedAt < 10_000, "完了後は速やかにストリームが閉じること");
+});
+
+test("スキャンが中止されると、実行中に候補から追加した作品の引き継ぎ履歴は捨てられる", async () => {
+  const { adapter, progressReady, finishScan } = createGatedScanAdapter();
+  const manager = createScanJobManager(adapter);
+  const job = manager.start();
+  await progressReady;
+  manager.record.addNewWorks(["added-during-scan"]);
+  manager.cancel(job.id);
+  finishScan();
+  await pollUntil(() => manager.get(job.id)?.status === "cancelled");
+  manager.record.replace(
+    {
+      registered: 0,
+      insertedWorkIds: [],
+      startedWithEmptyCatalog: false,
+      missingWorks: [],
+      updatedWorks: [],
+      errors: 0,
+      missing: 0,
+      skipped: 0,
+      coverErrors: 0,
+      unreadablePaths: [],
+    },
+    "t",
+  );
+  assert.deepEqual(manager.record.workIds("new"), []);
 });

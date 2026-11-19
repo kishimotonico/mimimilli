@@ -1,3 +1,4 @@
+import { REGISTER_ALL } from "../helpers/scanLibrary.ts";
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -15,14 +16,15 @@ test("スキャン分類: 初回は新規挿入、変更なし再スキャンは
 
   const first = await adapter.scan();
   assert.deepEqual(first.insertedWorkIds, [lib.existingWorkId]);
-  assert.deepEqual(first.updatedWorkIds, []);
+  assert.deepEqual(first.updatedWorks, []);
   assert.equal(first.skipped, 0);
   assert.ok((await adapter.listScanCandidates()).length > 0);
   assert.equal((await adapter.listScanCandidates())[0]?.rjCode, "RJ900001");
 
+  writeWav(join(lib.root, "dlsite", "RJ900002_既存メタ", "missing.wav"), 1);
   const second = await adapter.scan();
   assert.deepEqual(second.insertedWorkIds, []);
-  assert.deepEqual(second.updatedWorkIds, [lib.existingWorkId]);
+  assert.deepEqual(second.updatedWorks, []);
   assert.equal(second.skipped, 0);
 
   const metaPath = join(lib.root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");
@@ -32,7 +34,9 @@ test("スキャン分類: 初回は新規挿入、変更なし再スキャンは
 
   const third = await adapter.scan();
   assert.deepEqual(third.insertedWorkIds, []);
-  assert.deepEqual(third.updatedWorkIds, [lib.existingWorkId]);
+  assert.deepEqual(third.updatedWorks, [
+    { workId: lib.existingWorkId, changes: [{ kind: "meta" }] },
+  ]);
 });
 
 test("候補登録: RJコード省略時はフォルダー名から自動検出する", async (t) => {
@@ -47,9 +51,10 @@ test("候補登録: RJコード省略時はフォルダー名から自動検出�
   await configureRoot(adapter, root);
   await adapter.scan();
 
-  const registered = await adapter.registerScanCandidates([
-    { path: workspacePath("RJ123456_自動検出作品") },
-  ]);
+  const registered = await adapter.registerScanCandidates(
+    [workspacePath("RJ123456_自動検出作品")],
+    REGISTER_ALL,
+  );
   assert.equal(registered.registered.length, 1);
 
   const meta = JSON.parse(readFileSync(join(workDir, "mimimilli.json"), "utf-8"));
@@ -68,9 +73,11 @@ test("候補登録: RJコード指定をmimimilli.jsonへ書き込む", async (t
   await configureRoot(adapter, root);
   await adapter.scan();
 
-  const registered = await adapter.registerScanCandidates([
-    { path: workspacePath("RJ123456_指定作品"), rjCode: "RJ999999" },
-  ]);
+  await adapter.setScanCandidateRjCode(workspacePath("RJ123456_指定作品"), "RJ999999");
+  const registered = await adapter.registerScanCandidates(
+    [workspacePath("RJ123456_指定作品")],
+    REGISTER_ALL,
+  );
   assert.equal(registered.registered.length, 1);
 
   const meta = JSON.parse(readFileSync(join(workDir, "mimimilli.json"), "utf-8"));
@@ -90,9 +97,11 @@ test("候補登録: RJコード空文字は自動検出せずRJコードなし�
   await adapter.scan();
   assert.equal((await adapter.listScanCandidates())[0]?.rjCode, "RJ123456");
 
-  const registered = await adapter.registerScanCandidates([
-    { path: workspacePath("RJ123456_誤検出を消す作品"), rjCode: "" },
-  ]);
+  await adapter.setScanCandidateRjCode(workspacePath("RJ123456_誤検出を消す作品"), null);
+  const registered = await adapter.registerScanCandidates(
+    [workspacePath("RJ123456_誤検出を消す作品")],
+    REGISTER_ALL,
+  );
   assert.equal(registered.registered.length, 1);
 
   const meta = JSON.parse(readFileSync(join(workDir, "mimimilli.json"), "utf-8"));
