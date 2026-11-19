@@ -1,4 +1,4 @@
-import { NO_DLSITE } from "../helpers/scanLibrary.ts";
+import { NO_DLSITE, runScan } from "../helpers/scanLibrary.ts";
 // ファイルモードからの手動作品登録 API の結合テスト。
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -607,7 +607,7 @@ test("POST /works: missing の同一IDを別パスから復元すると再接続
   assert.ok(before.lastPlayedAt);
 
   rmSync(sibling, { recursive: true, force: true });
-  await adapter.scan();
+  await runScan(adapter);
   const missing = await (await app.request(`/api/works/${existingWork.id}`)).json();
   assert.equal(missing.status, "missing");
 

@@ -31,6 +31,7 @@ import { configureRoot } from "./helpers/rootFolder.ts";
 import { makeTestDirectory, writeWav } from "./helpers/sampleLibrary.ts";
 import { createApp } from "./helpers/testApp.ts";
 import { folderFixtureWork } from "./helpers/workTestUtils.ts";
+import { runScan } from "./helpers/scanLibrary.ts";
 
 const TARGET = "未登録作品";
 const OK_CODE = "RJ000001";
@@ -80,6 +81,7 @@ async function createSubject(
       works: [folderFixtureWork(missingFixtureWork())],
       dlsiteFetchDelayMs: options.hold ? 150 : 0,
     });
+    await runScan(adapter);
     const app = createApp(adapter);
     return {
       kind,
@@ -145,7 +147,7 @@ async function createSubject(
   const db = openDb({ kind: "files", catalogPath, userPath });
   db.sqlite.run("UPDATE main.works SET status = 'missing' WHERE id = ?", [missingId]);
   db.close();
-  await adapter.scan();
+  await runScan(adapter);
   return {
     kind,
     adapter,

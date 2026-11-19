@@ -12,6 +12,7 @@ import {
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeSampleLibrary, SAMPLE_COVER_JPEG_BASE64 } from "../helpers/sampleLibrary.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
+import { runScan } from "../helpers/scanLibrary.ts";
 
 const FAST_REQUESTS = {
   ...DEFAULT_DLSITE_REQUEST_CONFIG,
@@ -48,7 +49,7 @@ test("同期取得は、カバー取得の後ろに積まれた別コードの�
     }),
   );
   await configureRoot(adapter, lib.root);
-  await adapter.scan();
+  await runScan(adapter);
   const snapshot = await adapter.getWorkEditSnapshot(lib.existingWorkId);
   await adapter.updateDlsiteState(lib.existingWorkId, {
     sourceRevision: snapshot!.sourceRevision,
@@ -91,7 +92,7 @@ async function openAdapterWithPendingCover(
     }),
   });
   await configureRoot(adapter, lib.root);
-  await adapter.scan();
+  await runScan(adapter);
   const snapshot = await adapter.getWorkEditSnapshot(lib.existingWorkId);
   await adapter.updateDlsiteState(lib.existingWorkId, {
     sourceRevision: snapshot!.sourceRevision,

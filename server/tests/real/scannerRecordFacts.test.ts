@@ -15,6 +15,7 @@ import {
 } from "../helpers/workTestUtils.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
+import { runScan } from "../helpers/scanLibrary.ts";
 
 function writeWork(root: string, folder: string, id: string, title: string): string {
   const dir = join(root, folder);
@@ -51,12 +52,12 @@ test("catalogが空で始まったスキャンだけ startedWithEmptyCatalog に
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
 
-  const first = await adapter.scan();
+  const first = await runScan(adapter);
   assert.equal(first.startedWithEmptyCatalog, true);
   assert.deepEqual(first.insertedWorkIds, [ID_A]);
 
   writeWork(root, "b", ID_B, "B");
-  const second = await adapter.scan();
+  const second = await runScan(adapter);
   assert.equal(second.startedWithEmptyCatalog, false);
   assert.deepEqual(second.insertedWorkIds, [ID_B]);
 });
@@ -70,25 +71,25 @@ test("missingWorks は今回新たに行方不明になった作品だけで、�
   writeWork(root, "c", ID_C, "作品C");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  const first = await adapter.scan();
+  const first = await runScan(adapter);
   assert.deepEqual(first.missingWorks, []);
 
   rmSync(join(root, "sub/a"), { recursive: true });
-  const second = await adapter.scan();
+  const second = await runScan(adapter);
   assert.deepEqual(second.missingWorks, [
     { workId: ID_A, title: "作品A", previousPath: workspacePath("sub/a") },
   ]);
   assert.equal(second.missing, 1);
 
   rmSync(join(root, "b"), { recursive: true });
-  const third = await adapter.scan();
+  const third = await runScan(adapter);
   assert.deepEqual(
     third.missingWorks.map((work) => work.workId),
     [ID_B],
   );
   assert.equal(third.missing, 2);
 
-  const fourth = await adapter.scan();
+  const fourth = await runScan(adapter);
   assert.deepEqual(fourth.missingWorks, []);
 });
 
@@ -131,7 +132,7 @@ async function scanRegisteringAtDepth(t: TestContext, depth: number) {
 
   let registration: Promise<string> | null = null;
   let registeredBeforeScanEnd = false;
-  const result = await adapter.scan({
+  const result = await runScan(adapter, {
     onProgress: (event) => {
       if (event.type !== "progress" || event.phase !== "walking" || event.processed !== 50) return;
       registration = (async () => {
@@ -174,5 +175,5 @@ test("走査がまだ通過していないフォルダーに走査中に登録�
   assert.equal(work?.status, "ok");
   assert.equal(work?.bookmarked, true);
   assert.equal(result.insertedWorkIds.filter((id) => id === workId).length <= 1, true);
-  assert.deepEqual((await adapter.scan()).insertedWorkIds, []);
+  assert.deepEqual((await runScan(adapter)).insertedWorkIds, []);
 });

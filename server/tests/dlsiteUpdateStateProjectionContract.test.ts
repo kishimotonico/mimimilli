@@ -15,6 +15,7 @@ import { makeTestDirectory, writeWav } from "./helpers/sampleLibrary.ts";
 import { configureRoot } from "./helpers/rootFolder.ts";
 import { folderFixtureWork } from "./helpers/workTestUtils.ts";
 import { fetchDlsiteOfWorks } from "./helpers/dlsiteFetch.ts";
+import { runScan } from "./helpers/scanLibrary.ts";
 
 const FAST_DLSITE_REQUEST_CONFIG = {
   ...DEFAULT_DLSITE_REQUEST_CONFIG,
@@ -152,7 +153,7 @@ async function setupRealWithCachedFailure(t: TestContext) {
     }),
   );
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
   const before = await adapter.getWork("11111111-1111-4111-8111-111111111111");
   const workId = before!.id;
   const bulk = await fetchDlsiteOfWorks(adapter, [workId]);

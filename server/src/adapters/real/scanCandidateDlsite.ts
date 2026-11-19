@@ -23,7 +23,7 @@ export function createCandidateDlsiteSource(
   return { resolve, coverVersion: (key) => cache.coverVersionByKey(key) };
 }
 
-/** 取得ジョブの待機中・取得中は含まない（サーバー層が上書きする） */
+/** 取得ジョブの待機中・取得中は含まない */
 export function deriveCandidateDlsite(
   source: CandidateDlsiteSource,
   rjCode: string | null,

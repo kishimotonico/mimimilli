@@ -10,6 +10,7 @@ import { pollUntil } from "../helpers/poll.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
 import { nts } from "../helpers/tag.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
+import { runScan } from "../helpers/scanLibrary.ts";
 
 const EXISTING_PLAYLIST_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const EXISTING_TRACK_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -29,7 +30,7 @@ async function setup(t: TestContext): Promise<{
   const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = lib.ownFn(createApp(adapter), (instance) => instance.shutdown());
   await configureRoot(adapter, lib.root);
-  await adapter.scan();
+  await runScan(adapter);
   return {
     app,
     existingWorkId: lib.existingWorkId,

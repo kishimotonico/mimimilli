@@ -130,8 +130,8 @@ export class RootReconfigurationWorkflow {
       await this.scanJobs.cancelActiveAndAwait();
       await this.dlsiteJobs.cancelActiveAndAwait();
       if (signal.aborted) throw new Error("サーバーの終了処理中です");
-      await this.adapter.beginRootReconfiguration(run.rootFolder);
-      this.scanJobs.record.reset();
+      const { rootChanged } = await this.adapter.beginRootReconfiguration(run.rootFolder);
+      this.scanJobs.session.beginRootReconfiguration(rootChanged);
     } catch (error) {
       this.finish(run);
       begun.reject(error);
@@ -140,7 +140,7 @@ export class RootReconfigurationWorkflow {
     begun.resolve();
     serverLogger.info("ルートフォルダーの再設定を開始しました", { rootFolder: run.rootFolder });
     try {
-      const result = await this.adapter.rebuildCatalogForRoot(run.rootFolder, {
+      const execution = await this.adapter.rebuildCatalogForRoot(run.rootFolder, {
         signal,
         onProgress: (event) => {
           if (!signal.aborted) run.progress = event;
@@ -151,11 +151,11 @@ export class RootReconfigurationWorkflow {
         return;
       }
       await this.adapter.completeRootReconfiguration();
-      this.scanJobs.recordCompleted(result);
+      this.scanJobs.session.publish(execution, new Date().toISOString());
       serverLogger.info("ルートフォルダーの再設定が完了しました", {
         rootFolder: run.rootFolder,
-        registered: result.registered,
-        insertedWorkIdsCount: result.insertedWorkIds.length,
+        registered: execution.result.registered,
+        insertedWorkIdsCount: execution.result.insertedWorkIds.length,
       });
     } catch (error) {
       if (signal.aborted) {

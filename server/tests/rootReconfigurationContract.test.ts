@@ -17,6 +17,7 @@ import { pollUntil } from "./helpers/poll.ts";
 import { createTestRealAdapter } from "./helpers/realAdapter.ts";
 import { configureRoot } from "./helpers/rootFolder.ts";
 import { makeTestDirectory, writeWav } from "./helpers/sampleLibrary.ts";
+import { runScan } from "./helpers/scanLibrary.ts";
 
 interface Harness {
   adapter: DataAdapter;
@@ -101,7 +102,7 @@ const realHarness: HarnessFactory = async (t) => {
     });
   const seed = openAdapter();
   await configureRoot(seed, oldRoot);
-  await seed.scan();
+  await runScan(seed);
   await seed.close();
 
   let adapter = openAdapter();

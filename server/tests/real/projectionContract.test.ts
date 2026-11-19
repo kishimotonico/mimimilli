@@ -1,4 +1,4 @@
-import { REGISTER_ALL } from "../helpers/scanLibrary.ts";
+import { REGISTER_ALL, registerCandidates, runScan } from "../helpers/scanLibrary.ts";
 import { prepareSingleMeta } from "../../src/adapters/real/scanRegister.ts";
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -88,8 +88,9 @@ test("候補登録は検出コードを1回の正本書込みに含め、直後�
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
-  const registered = await adapter.registerScanCandidates(
+  await runScan(adapter);
+  const registered = await registerCandidates(
+    adapter,
     [workspacePath("RJ123456_自動検出作品")],
     REGISTER_ALL,
   );
@@ -100,7 +101,7 @@ test("候補登録は検出コードを1回の正本書込みに含め、直後�
   assert.equal(meta.dlsite.rjCode, "RJ123456");
   const before = readFileSync(metaPath);
 
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
   assert.equal(readFileSync(metaPath).equals(before), true);
 });
 

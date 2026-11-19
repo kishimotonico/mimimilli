@@ -7,13 +7,16 @@ import { createFsMethods } from "../../src/adapters/fixture/fsMethods.ts";
 import { createInitialState } from "../../src/adapters/fixture/state.ts";
 import { createSettingsScanMethods } from "../../src/adapters/fixture/settingsScan.ts";
 import { createWorkMethods } from "../../src/adapters/fixture/works.ts";
+import { runScan } from "./scanLibrary.ts";
 
-/** 指定した候補フォルダーだけを持つ、作品ゼロのfixtureアダプタ */
-export function buildFixtureAdapterWithCandidates(candidates: ScanCandidateFolder[]): DataAdapter {
+/** 指定した候補フォルダーだけを見つける、作品ゼロのfixtureアダプタ。スキャン済みで、候補は一覧に出る */
+export async function buildFixtureAdapterWithCandidates(
+  candidates: ScanCandidateFolder[],
+): Promise<DataAdapter> {
   const state = createInitialState({ scenario: "empty" });
   state.rootFolder = "/library";
-  state.scanCandidates = candidates;
-  return {
+  state.scanCandidatePool = candidates;
+  const adapter: DataAdapter = {
     ...createSettingsScanMethods(state),
     ...createWorkMethods(state),
     ...createClassificationMethods(state),
@@ -21,4 +24,6 @@ export function buildFixtureAdapterWithCandidates(candidates: ScanCandidateFolde
     ...createCoverMediaMethods(state),
     ...createDlsiteMethods(state),
   };
+  await runScan(adapter);
+  return adapter;
 }

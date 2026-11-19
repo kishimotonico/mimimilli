@@ -102,10 +102,6 @@ export interface FixtureState {
   identityConflicts: IdentityConflict[];
   /** scan() が見つける候補。rootを変えても変わらない（fixtureには物理FSがない） */
   scanCandidatePool: ScanCandidateFolder[];
-  /** 直近のscan以降に有効な候補session。root変更で破棄し、次のscanで作り直す */
-  scanCandidates: ScanCandidateFolder[];
-  /** 候補のRJコードの直し。値がnullのエントリはRJコードなしの明示。scanで破棄する */
-  scanCandidateRjCodeOverrides: Map<string, string | null>;
   invalidMetaFiles: InvalidMetaFile[];
   /** listSummaries でタグ等の不整合により除外した作品の報告 */
   dataIntegrityWarning: DataIntegrityWarning | undefined;
@@ -335,8 +331,6 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     scanCandidateExclusions: [],
     identityConflicts: options.identityConflicts ?? scenario.identityConflicts,
     scanCandidatePool: scenario.scanCandidates,
-    scanCandidates: scenario.scanCandidates,
-    scanCandidateRjCodeOverrides: new Map(),
     invalidMetaFiles: scenario.invalidMetaFiles,
     dataIntegrityWarning: scenario.dataIntegrityWarning,
     sourceRevisions: new Map([...works, ...detachedWorks].map((work) => [work.id, "fixture"])),

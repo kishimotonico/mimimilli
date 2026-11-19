@@ -17,6 +17,7 @@ import { makeSampleLibrary, makeTestDirectory } from "../helpers/sampleLibrary.t
 import { configureRoot } from "../helpers/rootFolder.ts";
 import { cpSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { runScan } from "../helpers/scanLibrary.ts";
 
 const FAST_CONFIG = {
   ...DEFAULT_DLSITE_REQUEST_CONFIG,
@@ -122,7 +123,7 @@ test("取得は取得ジョブ・fetch-by-code・作品の取得の3経路で、
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
   await configureRoot(adapter, lib.root);
-  await adapter.scan();
+  await runScan(adapter);
 
   assert.equal(await adapter.fetchDlsiteProduct("RJ000001", { force: false }), "fetched");
   assert.ok(cache.getCover(coverUrlOf("RJ000001")));
@@ -201,7 +202,7 @@ test("取得は同じRJコードを持つ全作品の投影を更新する（3�
   duplicateMeta.id = "22222222-2222-4222-8222-222222222222";
   writeFileSync(duplicateMetaPath, JSON.stringify(duplicateMeta, null, 2));
   await configureRoot(adapter, lib.root);
-  await adapter.scan();
+  await runScan(adapter);
   const duplicateId = "22222222-2222-4222-8222-222222222222";
   const statusOf = async (id: string) => (await adapter.getWork(id))?.dlsite.status;
 
@@ -233,7 +234,7 @@ test("同じRJコードにmissingや壊れた作品が混ざっても、取得�
   copyMeta.id = brokenId;
   writeFileSync(copyMetaPath, JSON.stringify(copyMeta, null, 2));
   await configureRoot(adapter, lib.root);
-  await adapter.scan();
+  await runScan(adapter);
   writeFileSync(copyMetaPath, "{ broken");
 
   assert.equal(await adapter.fetchDlsiteProduct("RJ900002", { force: false }), "not_found");
@@ -241,7 +242,7 @@ test("同じRJコードにmissingや壊れた作品が混ざっても、取得�
   assert.equal((await adapter.dlsiteFetchByCode("RJ900002", true)).ok, false);
 
   rmSync(join(lib.root, "dlsite", "RJ900002_既存メタ"), { recursive: true });
-  await adapter.scan();
+  await runScan(adapter);
   assert.equal(await adapter.fetchDlsiteProduct("RJ900002", { force: true }), "not_found");
 });
 

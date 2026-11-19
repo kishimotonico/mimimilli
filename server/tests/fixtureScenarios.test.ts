@@ -1,4 +1,11 @@
-import { REGISTER_ALL, NO_DLSITE } from "./helpers/scanLibrary.ts";
+import {
+  NO_DLSITE,
+  REGISTER_ALL,
+  excludeCandidates,
+  listCandidates,
+  registerCandidates,
+  runScan,
+} from "./helpers/scanLibrary.ts";
 // fixture アダプタのシナリオ機能（ADR-0002 / client/mocks/scenarios.ts からの移植）のテスト。
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -33,7 +40,7 @@ test("シナリオ省略時は default として動作する", async () => {
 test("new-work: スキャン結果に新規作品・新たな行方不明・読み取れなかったパスが含まれる", async () => {
   const adapter = createFixtureAdapter({ scenario: "new-work" });
 
-  const first = await adapter.scan();
+  const first = await runScan(adapter);
   assert.equal(first.startedWithEmptyCatalog, false);
   assert.deepEqual(first.insertedWorkIds, ["RJ501011", "RJ501001", "RJ501003"]);
   assert.deepEqual(
@@ -49,7 +56,7 @@ test("new-work: スキャン結果に新規作品・新たな行方不明・読�
   assert.equal((await adapter.getWork("RJ501008"))?.status, "missing");
 
   // シナリオの結果は最初のスキャンだけ。2回目以降は今回の変化（なければ空）を返す
-  const second = await adapter.scan();
+  const second = await runScan(adapter);
   assert.deepEqual(second.missingWorks, []);
   assert.deepEqual(second.insertedWorkIds, []);
   assert.deepEqual(second.updatedWorks, []);
@@ -62,15 +69,15 @@ test("new-work: スキャン結果に新規作品・新たな行方不明・読�
 
 test("empty: 作品が1件もない状態で始めたスキャンは startedWithEmptyCatalog になる", async () => {
   const adapter = createFixtureAdapter({ scenario: "empty" });
-  assert.equal((await adapter.scan()).startedWithEmptyCatalog, true);
+  assert.equal((await runScan(adapter)).startedWithEmptyCatalog, true);
 });
 
 test("new-work: Files用診断とscan確認用の候補・問題を独立して返す", async () => {
   const adapter = createFixtureAdapter({ scenario: "new-work" });
 
-  await adapter.scan();
+  await runScan(adapter);
   assert.deepEqual(
-    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    (await listCandidates(adapter)).map((candidate) => candidate.path),
     ["未登録作品", "朗読/候補"],
   );
   const diagnostics = await adapter.listScanDiagnostics();
@@ -82,18 +89,20 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
 
   await assert.rejects(
     () =>
-      adapter.registerScanCandidates(
+      registerCandidates(
+        adapter,
         [workspacePath("未登録作品"), workspacePath("消えた候補")],
         REGISTER_ALL,
       ),
     CandidatePoolChangedError,
   );
   assert.equal(
-    (await adapter.listScanCandidates()).some((candidate) => candidate.path === "未登録作品"),
+    (await listCandidates(adapter)).some((candidate) => candidate.path === "未登録作品"),
     true,
   );
 
-  const registration = await adapter.registerScanCandidates(
+  const registration = await registerCandidates(
+    adapter,
     [workspacePath("未登録作品")],
     REGISTER_ALL,
   );
@@ -118,10 +127,10 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
   assert.equal(registeredWorksPage.items.length, 1);
   assert.equal(registeredWorksPage.items[0]?.title, "未登録作品");
 
-  await adapter.excludeScanCandidates(["朗読/候補"]);
-  assert.deepEqual(await adapter.listScanCandidates(), []);
+  await excludeCandidates(adapter, ["朗読/候補"]);
+  assert.deepEqual(await listCandidates(adapter), []);
   await assert.rejects(
-    () => adapter.registerScanCandidates([workspacePath("朗読/候補")], REGISTER_ALL),
+    () => registerCandidates(adapter, [workspacePath("朗読/候補")], REGISTER_ALL),
     CandidatePoolChangedError,
   );
 
@@ -129,7 +138,7 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
   // 再走査するため自然に復帰するが、fixtureは静的リストを持つため個別に検証する）。
   await adapter.restoreScanCandidateExclusions(["朗読/候補"]);
   assert.deepEqual(
-    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    (await listCandidates(adapter)).map((candidate) => candidate.path),
     ["朗読/候補"],
   );
 });
@@ -210,7 +219,7 @@ test("errors: dataIntegrityWarningがWorksPage・スキャン結果・エクス�
     skippedWorkIds: ["RJ501099"],
   });
 
-  const scanResult = await adapter.scan();
+  const scanResult = await runScan(adapter);
   assert.deepEqual(scanResult.dataIntegrityWarning, worksPage.dataIntegrityWarning);
 
   const exported = await adapter.exportLibrary();
@@ -254,7 +263,7 @@ test("候補登録APIは、サーバーが持つ実効RJコード（検出値・
     detectedRjCode,
   });
   const app = createApp(
-    buildFixtureAdapterWithCandidates([
+    await buildFixtureAdapterWithCandidates([
       folder("自動検出済み", "RJ700001"),
       folder("明示なし", "RJ700002"),
       folder("値指定", null),
@@ -497,24 +506,28 @@ test("fixture: 異なるrootへの変更で候補除外を破棄し、同一root
   assert.deepEqual(await listScanCandidateExclusions(), []);
 });
 
-test("fixture: 異なるrootへの変更で候補sessionを破棄し、次のscanで作り直す", async () => {
+test("fixture: 異なるrootへの変更で候補プールを破棄し、次のscanで作り直す", async () => {
   const adapter = createFixtureAdapter({ scenario: "new-work" });
-  const paths = async () => (await adapter.listScanCandidates()).map((c) => c.path);
+  const paths = async () => (await listCandidates(adapter)).map((c) => c.path);
+  assert.deepEqual(await paths(), []);
+  await runScan(adapter);
   assert.deepEqual(await paths(), ["未登録作品", "朗読/候補"]);
 
   await configureRoot(adapter, "/library/root-b");
   assert.deepEqual(await paths(), []);
 
-  await adapter.scan();
+  await runScan(adapter);
   assert.deepEqual(
-    (await adapter.listScanCandidates()).map((c) => c.path),
+    (await listCandidates(adapter)).map((c) => c.path),
     ["未登録作品", "朗読/候補"],
   );
   assert.deepEqual(await paths(), ["未登録作品", "朗読/候補"]);
 });
 
 test("scan-review: 候補が取得状態ごとの表示になり、直した行だけ rjCodeEdited になる", async () => {
-  const app = buildApp("scan-review");
+  const adapter = createFixtureAdapter({ scenario: "scan-review" });
+  await runScan(adapter);
+  const app = createApp(adapter);
   try {
     const list = async () => {
       const response = await app.request("/api/scan/candidates");
@@ -569,7 +582,7 @@ test("scan-review: 候補が取得状態ごとの表示になり、直した行�
 test("needs-attention: スキャン後に要対応の5種類が揃い、読み直しと登録解除で消える", async () => {
   const adapter = createFixtureAdapter({ scenario: "needs-attention" });
 
-  const result = await adapter.scan();
+  const result = await runScan(adapter);
   assert.deepEqual(
     result.missingWorks.map((work) => work.workId),
     ["RJ501008"],
@@ -585,5 +598,5 @@ test("needs-attention: スキャン後に要対応の5種類が揃い、読み�
   );
 
   assert.equal(await adapter.reloadWork("RJ501099"), true);
-  assert.equal((await adapter.scan()).dataIntegrityWarning, undefined);
+  assert.equal((await runScan(adapter)).dataIntegrityWarning, undefined);
 });

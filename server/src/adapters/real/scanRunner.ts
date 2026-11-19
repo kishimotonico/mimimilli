@@ -2,7 +2,7 @@ import type { ScanOptions } from "../../adapter/index.ts";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import type { DbLocation } from "./db.ts";
 import type { DlsiteCacheConfig } from "./dlsiteCache.ts";
-import type { ScanExecutionResult } from "./scanTypes.ts";
+import type { ScanExecutionResult } from "../../adapter/index.ts";
 import type { ScanWorkerOutboundMessage } from "./scanWorkerMessages.ts";
 
 const scanLogger = getCategoryLogger("scan");

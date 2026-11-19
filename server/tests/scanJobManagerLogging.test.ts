@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { workspacePath, type ScanResult } from "@mimimilli/shared";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
-import type { DataAdapter } from "../src/adapter/index.ts";
+import type { DataAdapter, ScanExecution } from "../src/adapter/index.ts";
 import { ScanJobManager } from "../src/scanJobManager.ts";
 import { captureLogs, scanRecords } from "./helpers/logCapture.ts";
+import { scanExecutionOf } from "./helpers/scanLibrary.ts";
 
 const emptyResult: ScanResult = {
   registered: 0,
@@ -76,7 +77,7 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
     dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["bad-work"] },
   };
   const adapter = withStubAdapter({
-    scan: () => Promise.resolve(result),
+    scan: () => Promise.resolve(scanExecutionOf(result)),
   });
 
   await captureLogs(async (records) => {
@@ -108,8 +109,8 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
 
 test("取消時に jobId と durationMs を INFO で1回記録する", async () => {
   let finishScan!: () => void;
-  const scanDone = new Promise<ScanResult>((resolve) => {
-    finishScan = () => resolve(emptyResult);
+  const scanDone = new Promise<ScanExecution>((resolve) => {
+    finishScan = () => resolve(scanExecutionOf(emptyResult));
   });
   const adapter = withStubAdapter({
     scan: () => scanDone,
@@ -174,7 +175,7 @@ test("getSettings の await 中に取消すると scan を呼ばず cancelled �
     },
     scan: async () => {
       scanCalled = true;
-      return emptyResult;
+      return scanExecutionOf(emptyResult);
     },
   });
 

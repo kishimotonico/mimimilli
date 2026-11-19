@@ -16,6 +16,7 @@ import { identityConflictMetaPath } from "../src/adapters/real/paths.ts";
 import { configureRoot } from "./helpers/rootFolder.ts";
 import { createTestRealAdapter } from "./helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "./helpers/sampleLibrary.ts";
+import { runScan } from "./helpers/scanLibrary.ts";
 
 interface PlacementCase {
   stem: string;
@@ -81,7 +82,7 @@ async function assertPlacementErrors(
   cases: Array<Pick<PlacementCase, "stem" | "expected">>,
   label: string,
 ): Promise<void> {
-  await adapter.scan();
+  await runScan(adapter);
   for (const { stem, expected } of cases) {
     const work = await adapter.getWork(workIdOf(stem));
     assert.ok(work, `${label}: ${stem}`);
@@ -190,7 +191,7 @@ test("ルート直下の単一ファイル形式の作品は、scanで整合し�
       },
     ],
   });
-  await adapter.scan();
+  await runScan(adapter);
   const work = await adapter.getWork(workIdOf("single"));
   assert.equal(work?.status, "ok");
   assert.equal(work?.errorMessage, null);
@@ -208,13 +209,13 @@ test("単一ファイル形式のメタが壊れると、既存の作品がerror
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
   const before = await adapter.getWork(workIdOf("single"));
   assert.equal(before?.status, "ok");
   assert.equal(before?.physicalPath, join(root, "single.wav"));
 
   writeFileSync(metaPath, "{ broken");
-  await adapter.scan();
+  await runScan(adapter);
   const after = await adapter.getWork(workIdOf("single"));
   assert.equal(after?.status, "error");
   assert.equal(after?.physicalPath, metaPath);
@@ -233,9 +234,9 @@ test("単一ファイル形式の壊れたメタのコピーはメタファイ�
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
   writeFileSync(join(root, "b", "single.mimimilli.json"), `{ "id": "${meta.id}", broken`);
-  await adapter.scan();
+  await runScan(adapter);
 
   assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, [
     {
@@ -261,7 +262,7 @@ test("音声拡張子で終わる名前のフォルダーはフォルダー作�
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
   const work = await adapter.getWork(meta.id);
   assert.equal(work?.status, "ok");
   assert.equal(work?.physicalPath, folder);
@@ -282,7 +283,7 @@ async function registerSingleFileWork(
   writeMetaFile(join(root, dirs[0]!, "single.mimimilli.json"), meta);
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
   return { root, meta, adapter, cleanup: directory.cleanup };
 }
 
@@ -302,7 +303,7 @@ test("単一ファイル形式の重複は、メタファイルのパスで再�
   t.after(cleanup);
   const copyPath = join(root, "b", "single.mimimilli.json");
   writeMetaFile(copyPath, meta);
-  await adapter.scan();
+  await runScan(adapter);
 
   const result = await adapter.reassignIdentityConflict({
     path: "b/single.mimimilli.json" as never,
@@ -321,7 +322,7 @@ test("再採番の前にメタが消えていても、単一ファイル形式�
   t.after(cleanup);
   const copyPath = join(root, "b", "single.mimimilli.json");
   writeMetaFile(copyPath, meta);
-  await adapter.scan();
+  await runScan(adapter);
   renameSync(copyPath, join(root, "b", "moved.json"));
   assert.equal(
     await adapter.reassignIdentityConflict({ path: "b/single.mimimilli.json" as never }),
@@ -348,7 +349,7 @@ test("壊れた単一ファイル形式のメタを直して反映すると、�
   const metaPath = join(root, "a", "single.mimimilli.json");
   const original = readFileSync(metaPath);
   writeFileSync(metaPath, "{ broken");
-  await adapter.scan();
+  await runScan(adapter);
   assert.equal((await adapter.getWork(meta.id))?.physicalPath, metaPath);
 
   writeFileSync(metaPath, original);
@@ -371,13 +372,13 @@ test("メタファイルを単一ファイル形式の名前に改名すると�
   writeMetaFile(join(folder, META_FILE_NAME), meta);
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
   assert.equal((await adapter.getWork(meta.id))?.status, "ok");
 
   const renamed = join(folder, "single.mimimilli.json");
   renameSync(join(folder, META_FILE_NAME), renamed);
   assert.ok(!existsSync(join(folder, META_FILE_NAME)));
-  await adapter.scan();
+  await runScan(adapter);
   const work = await adapter.getWork(meta.id);
   assert.equal(work?.status, "error");
   assert.equal(
@@ -416,9 +417,9 @@ async function realReassignHarness(layout: ReassignLayout): Promise<ReassignHarn
   place("a");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
   place("b");
-  await adapter.scan();
+  await runScan(adapter);
   assert.equal((await adapter.listScanDiagnostics()).identityConflicts.length, 1);
   return {
     adapter,

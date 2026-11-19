@@ -13,6 +13,7 @@ import { makeSampleLibrary, makeTestDirectory } from "../helpers/sampleLibrary.t
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
 import { folderSummariesResult } from "../helpers/workTestUtils.ts";
+import { runScan } from "../helpers/scanLibrary.ts";
 
 function makeSummary(
   overrides: Partial<WorkSummary> & Pick<WorkSummary, "id" | "physicalPath">,
@@ -448,7 +449,7 @@ for (const kind of ["memory", "files"] as const) {
     writeFileSync(orphan, "orphan");
     writeFileSync(writingTmp, "writing");
 
-    await adapter.scan();
+    await runScan(adapter);
 
     assert.equal(existsSync(orphan), false);
     assert.equal(existsSync(writingTmp), true);

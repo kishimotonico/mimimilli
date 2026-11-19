@@ -1,4 +1,11 @@
-import { REGISTER_ALL } from "../helpers/scanLibrary.ts";
+import {
+  REGISTER_ALL,
+  excludeCandidates,
+  listCandidates,
+  registerCandidates,
+  runScan,
+  setCandidateRjCode,
+} from "../helpers/scanLibrary.ts";
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -14,15 +21,15 @@ test("スキャン分類: 初回は新規挿入、変更なし再スキャンは
   const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, lib.root);
 
-  const first = await adapter.scan();
+  const first = await runScan(adapter);
   assert.deepEqual(first.insertedWorkIds, [lib.existingWorkId]);
   assert.deepEqual(first.updatedWorks, []);
   assert.equal(first.skipped, 0);
-  assert.ok((await adapter.listScanCandidates()).length > 0);
-  assert.equal((await adapter.listScanCandidates())[0]?.rjCode, "RJ900001");
+  assert.ok((await listCandidates(adapter)).length > 0);
+  assert.equal((await listCandidates(adapter))[0]?.rjCode, "RJ900001");
 
   writeWav(join(lib.root, "dlsite", "RJ900002_既存メタ", "missing.wav"), 1);
-  const second = await adapter.scan();
+  const second = await runScan(adapter);
   assert.deepEqual(second.insertedWorkIds, []);
   assert.deepEqual(second.updatedWorks, []);
   assert.equal(second.skipped, 0);
@@ -32,7 +39,7 @@ test("スキャン分類: 初回は新規挿入、変更なし再スキャンは
   meta.title = "外部編集後のタイトル";
   writeFileSync(metaPath, JSON.stringify(meta, null, 2));
 
-  const third = await adapter.scan();
+  const third = await runScan(adapter);
   assert.deepEqual(third.insertedWorkIds, []);
   assert.deepEqual(third.updatedWorks, [
     { workId: lib.existingWorkId, changes: [{ kind: "meta" }] },
@@ -49,9 +56,10 @@ test("候補登録: RJコード省略時はフォルダー名から自動検出�
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
 
-  const registered = await adapter.registerScanCandidates(
+  const registered = await registerCandidates(
+    adapter,
     [workspacePath("RJ123456_自動検出作品")],
     REGISTER_ALL,
   );
@@ -71,10 +79,11 @@ test("候補登録: RJコード指定をmimimilli.jsonへ書き込む", async (t
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
 
-  await adapter.setScanCandidateRjCode(workspacePath("RJ123456_指定作品"), "RJ999999");
-  const registered = await adapter.registerScanCandidates(
+  await setCandidateRjCode(adapter, workspacePath("RJ123456_指定作品"), "RJ999999");
+  const registered = await registerCandidates(
+    adapter,
     [workspacePath("RJ123456_指定作品")],
     REGISTER_ALL,
   );
@@ -94,11 +103,12 @@ test("候補登録: RJコード空文字は自動検出せずRJコードなし�
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
-  assert.equal((await adapter.listScanCandidates())[0]?.rjCode, "RJ123456");
+  await runScan(adapter);
+  assert.equal((await listCandidates(adapter))[0]?.rjCode, "RJ123456");
 
-  await adapter.setScanCandidateRjCode(workspacePath("RJ123456_誤検出を消す作品"), null);
-  const registered = await adapter.registerScanCandidates(
+  await setCandidateRjCode(adapter, workspacePath("RJ123456_誤検出を消す作品"), null);
+  const registered = await registerCandidates(
+    adapter,
     [workspacePath("RJ123456_誤検出を消す作品")],
     REGISTER_ALL,
   );
@@ -118,15 +128,15 @@ test("候補除外の一覧取得と解除で次回スキャンに候補が戻�
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
-  await adapter.excludeScanCandidates(["除外対象"]);
+  await runScan(adapter);
+  await excludeCandidates(adapter, ["除外対象"]);
   assert.deepEqual(await adapter.listScanCandidateExclusions(), ["除外対象"]);
-  assert.deepEqual(await adapter.listScanCandidates(), []);
+  assert.deepEqual(await listCandidates(adapter), []);
 
   await adapter.restoreScanCandidateExclusions(["除外対象"]);
   assert.deepEqual(await adapter.listScanCandidateExclusions(), []);
   assert.deepEqual(
-    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    (await listCandidates(adapter)).map((candidate) => candidate.path),
     ["除外対象"],
   );
 });

@@ -7,7 +7,7 @@ import type { WorksPage } from "@mimimilli/shared";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { WorkQueryRepository } from "../../src/adapters/real/workQueryRepository.ts";
 import { createApp } from "../helpers/testApp.ts";
-import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
+import { runScan, scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
 
@@ -151,7 +151,7 @@ test("メディア解決: getWork・probe cache問い合わせを伴わない", 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
 
   try {
     fetchWorkDetailCalls = 0;

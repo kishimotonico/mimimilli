@@ -1,4 +1,9 @@
-import { REGISTER_ALL } from "../helpers/scanLibrary.ts";
+import {
+  REGISTER_ALL,
+  listCandidates,
+  registerCandidates,
+  runScan,
+} from "../helpers/scanLibrary.ts";
 // 作品単位の読み直し: catalogの値が壊れて除外された作品を、作品情報ファイルから作り直して一覧へ戻す。
 import assert from "node:assert/strict";
 import { rmSync } from "node:fs";
@@ -23,9 +28,10 @@ async function setup(t: TestContext) {
   } as const;
   const adapter = lib.own(createTestRealAdapter({ database, dataRoot: lib.path }));
   await configureRoot(adapter, lib.root);
-  await adapter.scan();
-  const registered = await adapter.registerScanCandidates(
-    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+  await runScan(adapter);
+  const registered = await registerCandidates(
+    adapter,
+    (await listCandidates(adapter)).map((candidate) => candidate.path),
     REGISTER_ALL,
   );
   const otherId = registered.registered[0]!.workId;

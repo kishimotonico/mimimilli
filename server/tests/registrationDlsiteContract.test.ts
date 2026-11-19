@@ -36,6 +36,7 @@ import { createTestRealAdapter } from "./helpers/realAdapter.ts";
 import { configureRoot } from "./helpers/rootFolder.ts";
 import { makeTestDirectory, SAMPLE_COVER_JPEG_BASE64, writeWav } from "./helpers/sampleLibrary.ts";
 import { createApp } from "./helpers/testApp.ts";
+import { runScan } from "./helpers/scanLibrary.ts";
 
 const OK_CODE = "RJ000001";
 const FOLDER_TITLE = "未登録作品";
@@ -61,6 +62,7 @@ interface Subject {
 async function createSubject(kind: Subject["kind"]): Promise<Subject> {
   if (kind === "fixture") {
     const adapter: DataAdapter = createFixtureAdapter({ scenario: "new-work" });
+    await runScan(adapter);
     const app = createApp(adapter);
     return {
       kind,
@@ -115,7 +117,7 @@ async function createSubject(kind: Subject["kind"]): Promise<Subject> {
   );
   const app = createApp(adapter);
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
   return {
     kind,
     app,
@@ -450,7 +452,7 @@ for (const kind of ["fixture", "real"] as const) {
 test("fixtureの候補1000件を、上限ごとの分割で全件追加できる", async () => {
   const paths = Array.from({ length: 1000 }, (_, index) => `候補${index}`);
   const app = createApp(
-    buildFixtureAdapterWithCandidates(
+    await buildFixtureAdapterWithCandidates(
       paths.map((path) => ({
         path: workspacePath(path),
         inferredTitle: path,

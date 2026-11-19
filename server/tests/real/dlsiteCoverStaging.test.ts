@@ -42,6 +42,7 @@ import {
   SAMPLE_COVER_JPEG_BASE64,
   writeWav,
 } from "../helpers/sampleLibrary.ts";
+import { runScan } from "../helpers/scanLibrary.ts";
 
 const SENTINEL = Buffer.from("sentinel-not-an-image");
 const NOT_AN_IMAGE = new Uint8Array(Buffer.from("this-is-not-an-image"));
@@ -81,7 +82,7 @@ async function setup(t: TestContext, cover?: CoverTransport) {
     }),
   );
   await configureRoot(adapter, lib.root);
-  await adapter.scan();
+  await runScan(adapter);
   const workId = lib.existingWorkId;
   const workDir = (await adapter.getWork(workId))!.physicalPath;
   const rjCode = (await adapter.getWork(workId))!.dlsite.rjCode!;

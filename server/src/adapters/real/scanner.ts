@@ -11,7 +11,7 @@ import type {
 } from "@mimimilli/shared";
 import { errorMessage, detectRjCode, workspacePath, type WorkspacePath } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
-import type { ScanOptions } from "../../adapter/index.ts";
+import type { ScanExecutionResult, ScanOptions } from "../../adapter/index.ts";
 import { descendantsRegisteredError } from "../../errors.ts";
 import {
   MetaParseError,
@@ -51,7 +51,6 @@ import type {
   ProjectOutcome,
   RegisterWorkOptions,
   RestoreMetaPatch,
-  ScanExecutionResult,
 } from "./scanTypes.ts";
 import {
   assertNoIdentityConflict,

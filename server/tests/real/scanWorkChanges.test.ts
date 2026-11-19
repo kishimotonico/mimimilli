@@ -6,13 +6,14 @@ import { workspacePath } from "@mimimilli/shared";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeSampleLibrary, writeWav } from "../helpers/sampleLibrary.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
+import { runScan } from "../helpers/scanLibrary.ts";
 
 async function scannedLibrary(t: import("node:test").TestContext) {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
   const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, lib.root);
-  await adapter.scan();
+  await runScan(adapter);
   const workDir = join(lib.root, "dlsite", "RJ900002_既存メタ");
   return { lib, adapter, workDir, metaPath: join(workDir, "mimimilli.json") };
 }
@@ -20,7 +21,7 @@ async function scannedLibrary(t: import("node:test").TestContext) {
 async function healthyLibrary(t: import("node:test").TestContext) {
   const scanned = await scannedLibrary(t);
   writeWav(join(scanned.workDir, "missing.wav"), 1);
-  const recovered = await scanned.adapter.scan();
+  const recovered = await runScan(scanned.adapter);
   assert.deepEqual(recovered.updatedWorks, []);
   return scanned;
 }
@@ -28,10 +29,10 @@ async function healthyLibrary(t: import("node:test").TestContext) {
 test("変化の種類: エラー状態の再読み込みと全件読み直しは変化に入れない", async (t) => {
   const { adapter } = await scannedLibrary(t);
 
-  const incremental = await adapter.scan();
+  const incremental = await runScan(adapter);
   assert.deepEqual(incremental.updatedWorks, []);
 
-  const full = await adapter.scan({ full: true });
+  const full = await runScan(adapter, { full: true });
   assert.deepEqual(full.updatedWorks, []);
 });
 
@@ -40,7 +41,7 @@ test("変化の種類: フォルダー移動は旧パスと新パスを持つ", 
   mkdirSync(join(lib.root, "moved"), { recursive: true });
   renameSync(workDir, join(lib.root, "moved", "RJ900002_既存メタ"));
 
-  const result = await adapter.scan();
+  const result = await runScan(adapter);
   assert.deepEqual(result.updatedWorks, [
     {
       workId: lib.existingWorkId,
@@ -59,7 +60,7 @@ test("変化の種類: エラーからの復帰はファイルが復活しても
   const { adapter, workDir } = await scannedLibrary(t);
   writeWav(join(workDir, "missing.wav"), 1);
 
-  const result = await adapter.scan();
+  const result = await runScan(adapter);
   assert.deepEqual(result.updatedWorks, []);
 });
 
@@ -86,7 +87,7 @@ async function errorSingleAudioWork(t: import("node:test").TestContext) {
       defaultPlaylistId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     }),
   );
-  await adapter.scan();
+  await runScan(adapter);
   return { lib, adapter, dir };
 }
 
@@ -94,7 +95,7 @@ test("変化の種類: 単体音声作品のエラーからの復帰は移動に
   const { adapter, dir } = await errorSingleAudioWork(t);
   writeWav(join(dir, "single.wav"), 1);
 
-  const recovered = await adapter.scan();
+  const recovered = await runScan(adapter);
   assert.deepEqual(recovered.updatedWorks, []);
 });
 
@@ -102,11 +103,11 @@ test("変化の種類: エラーから行方不明を経て同じ場所に戻っ
   const { lib, adapter, dir } = await errorSingleAudioWork(t);
   const away = join(lib.baseDir, "away");
   renameSync(dir, away);
-  await adapter.scan();
+  await runScan(adapter);
   renameSync(away, dir);
   writeWav(join(dir, "single.wav"), 1);
 
-  const back = await adapter.scan();
+  const back = await runScan(adapter);
   const kinds = back.updatedWorks.flatMap((work) => work.changes.map((change) => change.kind));
   assert.deepEqual(kinds, ["files"]);
 });
@@ -115,12 +116,12 @@ test("変化の種類: エラーから行方不明を経て別の場所で見つ
   const { lib, adapter, dir } = await errorSingleAudioWork(t);
   const away = join(lib.baseDir, "away");
   renameSync(dir, away);
-  await adapter.scan();
+  await runScan(adapter);
   const elsewhere = join(lib.root, "elsewhere");
   renameSync(away, elsewhere);
   writeWav(join(elsewhere, "single.wav"), 1);
 
-  const found = await adapter.scan();
+  const found = await runScan(adapter);
   assert.equal(found.updatedWorks.length, 1);
   const [change] = found.updatedWorks[0]!.changes;
   assert.equal(change?.kind, "moved");
@@ -138,7 +139,7 @@ test("変化の種類: トラック追加は作品情報とファイル構成の
   });
   writeFileSync(metaPath, JSON.stringify(meta, null, 2));
 
-  const result = await adapter.scan();
+  const result = await runScan(adapter);
   assert.deepEqual(result.updatedWorks, [
     {
       workId: lib.existingWorkId,

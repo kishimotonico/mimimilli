@@ -2,7 +2,15 @@
 // ルーター・ドメインロジックは1系統だけ持ち、データの出どころをこのインターフェースで差し替える:
 //   - fixture アダプタ: インメモリ fixtures（開発・ビジュアルテスト用）
 //   - real アダプタ:    SQLite + 実ファイルシステム
-export type { ScanOptions, SettingsAdapter, StoredSettings } from "./settings.ts";
+export type {
+  CandidateAvailability,
+  CandidateDescriber,
+  ScanExecution,
+  ScanExecutionResult,
+  ScanOptions,
+  SettingsAdapter,
+  StoredSettings,
+} from "./settings.ts";
 export type {
   RootReconfigurationAdapter,
   RootReconfigurationRecord,

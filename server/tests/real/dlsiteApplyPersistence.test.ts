@@ -1,4 +1,9 @@
-import { REGISTER_ALL } from "../helpers/scanLibrary.ts";
+import {
+  REGISTER_ALL,
+  listCandidates,
+  registerCandidates,
+  runScan,
+} from "../helpers/scanLibrary.ts";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -45,7 +50,7 @@ test("title: 単発適用は applyTitle に従い、一括取得は作品情報�
     }),
   );
   await configureRoot(adapter, lib.root);
-  await adapter.scan();
+  await runScan(adapter);
 
   const customTitle = "ユーザー編集タイトル";
   const snap = await adapter.getWorkEditSnapshot(lib.existingWorkId);
@@ -74,8 +79,9 @@ test("title: 単発適用は applyTitle に従い、一括取得は作品情報�
   assert.equal(existingAfterApply?.title, applyTitle);
   assert.notEqual(applyTitle, customTitle);
 
-  const registration = await adapter.registerScanCandidates(
-    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+  const registration = await registerCandidates(
+    adapter,
+    (await listCandidates(adapter)).map((candidate) => candidate.path),
     REGISTER_ALL,
   );
   const generatedId = registration.registered[0]!.workId;
@@ -120,7 +126,7 @@ test("cover: 単発適用は先取りしたカバーを適用し、一括取得�
     }),
   );
   await configureRoot(adapter, lib.root);
-  await adapter.scan();
+  await runScan(adapter);
 
   const fetched = await fetchDlsiteForWork(adapter, lib.existingWorkId, "RJ900002");
   assert.equal(coverHttpCalls, 1);
@@ -231,7 +237,7 @@ test("取得はカバーをキャッシュへ先取りし、明示適用はキ�
     }),
   );
   await configureRoot(adapter, lib.root);
-  await adapter.scan();
+  await runScan(adapter);
 
   const fetched = await fetchDlsiteForWork(adapter, lib.existingWorkId, "RJ900002");
   assert.equal(coverHttpCalls, 1);
@@ -257,7 +263,7 @@ async function setupSampleAdapter(t: { after: (fn: () => void) => void }, html: 
     }),
   );
   await configureRoot(adapter, lib.root);
-  await adapter.scan();
+  await runScan(adapter);
   const work = await adapter.getWork(lib.existingWorkId);
   return {
     adapter,
@@ -344,7 +350,7 @@ test("パーサー版だけが変わった再起動後は、起動前に確認�
 
   const before = open(1);
   await configureRoot(before, lib.root);
-  await before.scan();
+  await runScan(before);
   const fetched = await fetchDlsiteForWork(before, lib.existingWorkId, "RJ900002");
   await before.close();
 
@@ -376,7 +382,7 @@ test("メタの書き込みが失敗する適用では、同名の旧カバー�
     }),
   );
   await configureRoot(adapter, lib.root);
-  await adapter.scan();
+  await runScan(adapter);
   const fetched = await fetchDlsiteForWork(adapter, lib.existingWorkId, "RJ900002");
   const workDir = (await adapter.getWork(lib.existingWorkId))!.physicalPath;
   const coverPath = join(workDir, "dlsite_cover.jpg");

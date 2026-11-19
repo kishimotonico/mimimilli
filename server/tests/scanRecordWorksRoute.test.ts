@@ -6,6 +6,7 @@ import { workspacePath, worksQuerySchema, type ScanResult } from "@mimimilli/sha
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { worksRoute } from "../src/routes/works.ts";
 import { ScanRecordStore } from "../src/scanRecord.ts";
+import { runScan } from "./helpers/scanLibrary.ts";
 
 function result(overrides: Partial<ScanResult>): ScanResult {
   return {
@@ -169,7 +170,7 @@ test("fixtureのスキャンは、登録解除した新規作品を次のスキ�
   const store = new ScanRecordStore();
   const app = new Hono().route("/api", worksRoute(adapter, store));
 
-  const first = await adapter.scan();
+  const first = await runScan(adapter);
   store.replace(first, "t1");
   assert.deepEqual(store.workIds("new"), first.insertedWorkIds);
   assert.ok(first.insertedWorkIds.length > 0);
@@ -177,7 +178,7 @@ test("fixtureのスキャンは、登録解除した新規作品を次のスキ�
   const removed = first.insertedWorkIds[0]!;
   assert.equal((await app.request(`/api/works/${removed}`, { method: "DELETE" })).status, 204);
 
-  const second = await adapter.scan();
+  const second = await runScan(adapter);
   store.replace(second, "t2");
   assert.deepEqual(store.workIds("new"), []);
   assert.deepEqual(store.snapshot().updatedWorks, []);
