@@ -548,3 +548,25 @@ test("scan-review: 候補が取得状態ごとの表示になり、直した行�
     await app.shutdown();
   }
 });
+
+test("needs-attention: スキャン後に要対応の5種類が揃い、読み直しと登録解除で消える", async () => {
+  const adapter = createFixtureAdapter({ scenario: "needs-attention" });
+
+  const result = await adapter.scan();
+  assert.deepEqual(
+    result.missingWorks.map((work) => work.workId),
+    ["RJ501008"],
+  );
+  assert.deepEqual(result.unreadablePaths, [workspacePath("権限なし/フォルダー")]);
+  assert.deepEqual(result.dataIntegrityWarning?.skippedWorkIds, ["RJ501099"]);
+
+  const diagnostics = await adapter.listScanDiagnostics();
+  assert.equal(diagnostics.identityConflicts.length, 1);
+  assert.deepEqual(
+    diagnostics.invalidMetaFiles.map((file) => file.message),
+    ["mimimilli.json 4行目: カンマが足りない"],
+  );
+
+  assert.equal(await adapter.reloadWork("RJ501099"), true);
+  assert.equal((await adapter.scan()).dataIntegrityWarning, undefined);
+});

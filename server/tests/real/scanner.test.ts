@@ -231,9 +231,9 @@ test("メタ不正: 壊れた JSON は errors にカウントされスキャン�
     (await adapter.listScanDiagnostics()).invalidMetaFiles[0]?.path,
     "broken-work/mimimilli.json",
   );
-  assert.match(
-    (await adapter.listScanDiagnostics()).invalidMetaFiles[0]?.message ?? "",
-    /メタファイルが不正です/,
+  assert.equal(
+    (await adapter.listScanDiagnostics()).invalidMetaFiles[0]?.message,
+    'mimimilli.json 1行目: 「"」で囲まれていない文字がある',
   );
 });
 
@@ -260,9 +260,9 @@ test("メタ不正: mimimilli.jsonのdlsite.statusに取得失敗の一時値（
     (await adapter.listScanDiagnostics()).invalidMetaFiles[0]?.path,
     "stale-dlsite-status/mimimilli.json",
   );
-  assert.match(
-    (await adapter.listScanDiagnostics()).invalidMetaFiles[0]?.message ?? "",
-    /メタファイルが不正です/,
+  assert.equal(
+    (await adapter.listScanDiagnostics()).invalidMetaFiles[0]?.message,
+    'mimimilli.json 1行目: dlsite.status が使えない値（"error"）',
   );
 });
 
@@ -316,7 +316,7 @@ test("登録済み作品のメタが壊れた場合は missing ではなく erro
   assert.equal(result.errors, 1);
   assert.equal(result.missing, 0);
   assert.equal(work?.status, "error");
-  assert.match(work?.errorMessage ?? "", /JSON パースエラー/);
+  assert.equal(work?.errorMessage, 'mimimilli.json 1行目: 「"」で囲まれていない文字がある');
 });
 
 // ── 増分スキャン ─────────────────────────────────────────────────
@@ -1067,7 +1067,7 @@ test("user先コミット後のcatalog失敗はuser孤児を残すがopenDbは�
   assert.equal(countWorkStates(reopened), 2);
 });
 
-test("formatVersionが未対応のmimimilli.jsonはinvalidMetaFilesにunsupported formatVersionで載る", async (t) => {
+test("formatVersionが未対応のmimimilli.jsonはinvalidMetaFilesに未対応として載る", async (t) => {
   const { adapter, existingWorkId, root } = await setup(t);
   const metaPath = join(root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");
   const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
@@ -1081,9 +1081,9 @@ test("formatVersionが未対応のmimimilli.jsonはinvalidMetaFilesにunsupporte
     (await adapter.listScanDiagnostics()).invalidMetaFiles[0]?.path,
     "dlsite/RJ900002_既存メタ/mimimilli.json",
   );
-  assert.match(
-    (await adapter.listScanDiagnostics()).invalidMetaFiles[0]?.message ?? "",
-    /unsupported formatVersion/,
+  assert.equal(
+    (await adapter.listScanDiagnostics()).invalidMetaFiles[0]?.message,
+    "mimimilli.json 2行目: formatVersion 2 には未対応",
   );
   assert.equal((await adapter.getWork(existingWorkId))?.status, "error");
 });

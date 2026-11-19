@@ -147,37 +147,47 @@ describe("NotificationBell", () => {
   });
 
   describe("要対応タブとの件数統一", () => {
-    it("ID重複はworkId単位で1件として数え、行クリックで要対応タブを開く", () => {
+    it("ID重複は競合1件として数え、要対応の行クリックで要対応タブを開く", () => {
       const { store } = renderBell({}, undefined, {
         identityConflicts: [
-          { kind: "identity_conflict", workId: "RJ501001", paths: ["a/1", "a/2"] },
+          {
+            kind: "identity_conflict",
+            workId: "RJ501001",
+            paths: [workspacePath("a/1"), workspacePath("a/2")],
+          },
         ],
       });
       expect(screen.getByRole("button", { name: "通知（要対応1件）" })).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole("button", { name: /通知/ }));
-      fireEvent.click(screen.getByRole("menuitem", { name: /ID重複/ }));
+      fireEvent.click(screen.getByRole("menuitem", { name: /要対応/ }));
 
       expect(store.get(activeModalAtom)).toEqual({ kind: "scan", tab: "needsAttention" });
       expect(screen.queryByRole("menu", { name: "通知" })).toBeNull();
     });
 
-    it("ID重複とRJコード未検出が両方あるとき、バッジは行の合算になる", () => {
+    it("ID重複とRJコード未検出が両方あるとき、バッジは合算になる", () => {
       renderBell({ rjCodeMissingCount: 2 }, undefined, {
         identityConflicts: [
-          { kind: "identity_conflict", workId: "RJ501001", paths: ["a/1", "a/2"] },
+          {
+            kind: "identity_conflict",
+            workId: "RJ501001",
+            paths: [workspacePath("a/1"), workspacePath("a/2")],
+          },
         ],
       });
       expect(screen.getByRole("button", { name: "通知（要対応3件）" })).toBeInTheDocument();
     });
 
-    it("読み取り失敗は現在の診断のinvalidMetaFilesから行を作る", () => {
-      const { store } = renderBell({}, undefined, {
-        invalidMetaFiles: [{ path: "a/1", message: "壊れています" }],
-      });
-      fireEvent.click(screen.getByRole("button", { name: /通知/ }));
-      fireEvent.click(screen.getByRole("menuitem", { name: /読み取り失敗/ }));
-      expect(store.get(activeModalAtom)).toEqual({ kind: "scan", tab: "needsAttention" });
+    it("読み取り失敗は診断から数え、行方不明はバッジに数えない", () => {
+      renderBell(
+        {},
+        buildScanRecord({
+          missingWorks: [{ workId: "m", title: "m", previousPath: workspacePath("m") }],
+        }),
+        { invalidMetaFiles: [{ path: workspacePath("a/1"), message: "壊れています" }] },
+      );
+      expect(screen.getByRole("button", { name: "通知（要対応1件）" })).toBeInTheDocument();
     });
   });
 });

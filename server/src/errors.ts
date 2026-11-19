@@ -96,7 +96,7 @@ export function descendantsRegisteredError(count: number): WorkRegisterError {
 export function restoreIdentityConflictError(): WorkRegisterError {
   return new WorkRegisterError(
     "identity_conflict",
-    "同じ Work ID が別の場所で登録済みです。移動の再接続なら先にスキャンしてください。複製なら Files で「別作品として取り込む」を使ってください",
+    "同じ Work ID が別の場所で登録済みです。移動の再接続なら先にスキャンしてください。複製なら Files で「別の作品として取り込む」を使ってください",
   );
 }
 

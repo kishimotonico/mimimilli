@@ -111,7 +111,7 @@ test("既存投影は競合pathの順序にかかわらず保持し、解消後�
   assert.equal(readFileSync(owner, "utf-8").includes(WORK_ID), true);
 });
 
-test("identity_conflictの指定pathだけを別作品として取り込み、Work ID以外を維持する", async (t) => {
+test("identity_conflictの指定pathだけを別の作品として取り込み、Work ID以外を維持する", async (t) => {
   const directory = makeTestDirectory("identity-conflict-reassign");
   t.after(directory.cleanup);
   const root = join(directory.path, "library");

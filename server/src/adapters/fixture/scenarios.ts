@@ -3,6 +3,7 @@
 import {
   workspacePath,
   type DlsiteCacheResolution,
+  type DataIntegrityWarning,
   type IdentityConflict,
   type InvalidMetaFile,
   type MetaDlsiteState,
@@ -31,6 +32,7 @@ export type FixtureScenarioId =
   | "errors"
   | "large"
   | "scan-review"
+  | "needs-attention"
   | "root-reconfiguration-failed";
 
 export const SCENARIO_IDS: readonly FixtureScenarioId[] = [
@@ -41,6 +43,7 @@ export const SCENARIO_IDS: readonly FixtureScenarioId[] = [
   "errors",
   "large",
   "scan-review",
+  "needs-attention",
   "root-reconfiguration-failed",
 ];
 
@@ -72,6 +75,8 @@ export interface FixtureScenario {
   scanCandidates: ScanCandidateFolder[];
   invalidMetaFiles: InvalidMetaFile[];
   identityConflicts: IdentityConflict[];
+  /** 一覧から除外した作品の報告。スキャン結果と作品一覧に付く */
+  dataIntegrityWarning?: DataIntegrityWarning;
   /** rootの配下にないためcatalogから外れている作品。rootを戻すと同じIDで一覧へ戻る */
   detachedWorks: FixtureWorkRecord[];
   rootReconfiguration: FixtureRootReconfiguration | null;
@@ -180,7 +185,10 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
         },
       ],
       invalidMetaFiles: [
-        { path: workspacePath("壊れた/mimimilli.json"), message: "メタファイルが不正です" },
+        {
+          path: workspacePath("壊れた/mimimilli.json"),
+          message: "mimimilli.json 4行目: カンマが足りない",
+        },
       ],
       identityConflicts: [
         {
@@ -266,6 +274,43 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanCandidates: [],
       invalidMetaFiles: [],
       identityConflicts: [],
+      dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["RJ501099"] },
+      detachedWorks: [],
+      rootReconfiguration: null,
+    };
+  }
+
+  if (id === "needs-attention") {
+    return {
+      id,
+      works: cloneWorks(SEED_WORKS),
+      dlsiteLinkages: cloneDlsiteLinkages(),
+      dlsiteFetchFailures: cloneDlsiteFailures(nowMs),
+      smartFolders: cloneSmartFolders(smartFolders),
+      rootFolder: "/library",
+      lastScanTime: now,
+      scanInsertedWorkIds: [],
+      scanUpdatedWorks: [],
+      scanNewlyMissingWorkIds: ["RJ501008"],
+      scanUnreadablePaths: [workspacePath("権限なし/フォルダー")],
+      scanCandidates: [],
+      invalidMetaFiles: [
+        {
+          path: workspacePath("壊れた/mimimilli.json"),
+          message: "mimimilli.json 4行目: カンマが足りない",
+        },
+      ],
+      identityConflicts: [
+        {
+          kind: "identity_conflict",
+          workId: "RJ501001",
+          paths: [
+            workspacePath("dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読"),
+            workspacePath("copies/RJ501001_夜更けの図書室で囁き朗読"),
+          ],
+        },
+      ],
+      dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["RJ501099"] },
       detachedWorks: [],
       rootReconfiguration: null,
     };
@@ -367,7 +412,10 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
         },
       ],
       invalidMetaFiles: [
-        { path: workspacePath("壊れた/mimimilli.json"), message: "メタファイルが不正です" },
+        {
+          path: workspacePath("壊れた/mimimilli.json"),
+          message: "mimimilli.json 4行目: カンマが足りない",
+        },
       ],
       identityConflicts: [],
       detachedWorks: [],

@@ -1,7 +1,7 @@
 // ScanModal のEsc/backdrop挙動のコンポーネントテスト。
 // happy-dom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
 import { createElement, Fragment } from "react";
-import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider, type InfiniteData } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
@@ -227,13 +227,6 @@ function seedScanQueries(
   if (queryClient.getQueryData(SCAN_QUERY_KEYS.diagnostics()) === undefined) {
     queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
   }
-  // 通知ベルと同じ要対応集計。未シードだと実fetchへ落ちるため既定値で固定する。
-  if (queryClient.getQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary()) === undefined) {
-    queryClient.setQueryData(
-      WORK_QUERY_KEYS.dlsiteNotificationSummary(),
-      buildDlsiteNotificationSummary(),
-    );
-  }
 }
 
 function openTab(name: string) {
@@ -414,6 +407,22 @@ describe("ScanModal", () => {
       "要対応",
       "更新済み",
     ]);
+  });
+
+  it("要対応の件数は直すものだけを数え、行方不明は数えない", () => {
+    const missing = { workId: "m1", title: "m1", previousPath: workspacePath("m1") };
+    renderModal({ record: buildScanRecord({ missingWorks: [missing] }) });
+    expect(screen.getByRole("tab", { name: "要対応" })).toBeInTheDocument();
+    cleanup();
+
+    renderModal({
+      record: buildScanRecord({
+        missingWorks: [missing],
+        unreadablePaths: [workspacePath("locked")],
+        dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["w1"] },
+      }),
+    });
+    expect(screen.getByRole("tab", { name: "要対応（2件）" })).toBeInTheDocument();
   });
 
   it("開いていないタブにだけ件数を出す", () => {

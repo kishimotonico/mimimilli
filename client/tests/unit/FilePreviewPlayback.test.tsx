@@ -116,7 +116,7 @@ describe("FilePreview ID重複（単一ファイル形式）", () => {
       await screen.findByText("同じWork IDを持つメタファイルがあります。"),
     ).toBeInTheDocument();
     expect(screen.getByText("a/single.mimimilli.json")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "別作品として取り込む" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "別の作品として取り込む" })).toBeInTheDocument();
   });
 
   it("メタファイル行の再採番に成功すると選択が外れ、親フォルダーのプレビューへ戻る", async () => {
@@ -126,7 +126,7 @@ describe("FilePreview ID重複（単一ファイル形式）", () => {
       [{ kind: "identity_conflict", workId: "w1", paths: ["a/single.mimimilli.json", metaPath] }],
     );
 
-    await userEvent.click(await screen.findByRole("button", { name: "別作品として取り込む" }));
+    await userEvent.click(await screen.findByRole("button", { name: "別の作品として取り込む" }));
     await userEvent.click(await screen.findByRole("button", { name: "取り込む" }));
 
     await waitFor(() => expect(store.get(filesSelectedPathAtom)).toBeNull());
@@ -168,11 +168,11 @@ describe("FilePreview ID重複（単一ファイル形式）", () => {
       createElement(SlowScanRecordObserver),
     );
 
-    await userEvent.click(await screen.findByRole("button", { name: "別作品として取り込む" }));
+    await userEvent.click(await screen.findByRole("button", { name: "別の作品として取り込む" }));
     await userEvent.click(await screen.findByRole("button", { name: "取り込む" }));
 
     await waitFor(() =>
-      expect(screen.queryByRole("button", { name: "別作品として取り込む" })).toBeNull(),
+      expect(screen.queryByRole("button", { name: "別の作品として取り込む" })).toBeNull(),
     );
     await waitFor(() => expect(store.get(filesSelectedPathAtom)).toBeNull());
   });

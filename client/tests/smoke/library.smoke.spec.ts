@@ -483,15 +483,13 @@ test("スキャン完了後に候補を選択登録でき、問題をFilesで確
 
   await dialog.getByRole("tab", { name: /^要対応/ }).click();
   const attention = dialog.getByRole("tabpanel", { name: "要対応" });
-  // ID重複はパスごとに1行（master同様）: 1件目がworkId表示、以降は競合相手表示。
-  const conflictRow = attention.getByRole("row", { name: /夜想曲スタジオ/ });
-  await expect(conflictRow.getByText("ID重複", { exact: true })).toBeVisible();
-  await expect(conflictRow.getByText(/workId: RJ501001/)).toBeVisible();
-  await expect(attention.getByText("競合相手")).toBeVisible();
-  await expect(attention.getByText(/copies\//)).toBeVisible();
+  const conflictRow = attention.getByRole("row", { name: /ID重複/ });
+  await expect(conflictRow.getByRole("button", { name: /copies\// })).toBeVisible();
   await expect(attention.getByText("読み取り失敗", { exact: true })).toBeVisible();
 
-  await conflictRow.getByRole("button", { name: "Filesで開く" }).click();
+  await conflictRow
+    .getByRole("button", { name: "dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読" })
+    .click();
   await expect(page.getByRole("button", { name: "ファイル", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -501,7 +499,7 @@ test("スキャン完了後に候補を選択登録でき、問題をFilesで確
   assertNoErrors(tracker);
 });
 
-test("FilesでID重複を表示し、確認して別作品として取り込める（解決後はスキャンの要対応からも消える）", async ({
+test("FilesでID重複を表示し、確認して別の作品として取り込める（解決後はスキャンの要対応からも消える）", async ({
   page,
 }) => {
   const tracker = trackErrors(page);
@@ -517,9 +515,9 @@ test("FilesでID重複を表示し、確認して別作品として取り込め�
   const preview = page.locator(".mle-prv.is-files");
   await expect(preview.getByText("ID重複", { exact: true })).toBeVisible();
   await expect(preview.getByText("copies/RJ501001_夜更けの図書室で囁き朗読")).toBeVisible();
-  await preview.getByRole("button", { name: "別作品として取り込む" }).click();
+  await preview.getByRole("button", { name: "別の作品として取り込む" }).click();
 
-  const dialog = page.getByRole("alertdialog", { name: "別作品として取り込む" });
+  const dialog = page.getByRole("alertdialog", { name: "別の作品として取り込む" });
   await expect(
     dialog.getByText("dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読"),
   ).toBeVisible();

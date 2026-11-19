@@ -102,7 +102,7 @@ export interface FixtureState {
   /** 候補のRJコードの直し。値がnullのエントリはRJコードなしの明示。scanで破棄する */
   scanCandidateRjCodeOverrides: Map<string, string | null>;
   invalidMetaFiles: InvalidMetaFile[];
-  /** listSummaries でタグ等の不整合により除外した作品の報告（シナリオ errors のみ） */
+  /** listSummaries でタグ等の不整合により除外した作品の報告 */
   dataIntegrityWarning: DataIntegrityWarning | undefined;
   /** 編集 snapshot の CAS トークン（ファイルが無い fixture 用） */
   sourceRevisions: Map<string, string>;
@@ -219,9 +219,6 @@ export function composeWorks(state: FixtureState): WorkSummary[] {
   return state.works.map((record) => composeWork(state, record));
 }
 
-/** dataIntegrityWarning のダミー除外対象workId（実在の works には含めない） */
-const DATA_INTEGRITY_WARNING_SKIPPED_WORK_ID = "RJ501099";
-
 /** 契約テスト用の作品。fixture の作品レコードと同じく metaPath を持つ */
 export type FixtureSeedWork = WorkSummary & { metaPath: string };
 
@@ -313,10 +310,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     scanCandidates: scenario.scanCandidates,
     scanCandidateRjCodeOverrides: new Map(),
     invalidMetaFiles: scenario.invalidMetaFiles,
-    dataIntegrityWarning:
-      scenario.id === "errors"
-        ? { skippedCount: 1, skippedWorkIds: [DATA_INTEGRITY_WARNING_SKIPPED_WORK_ID] }
-        : undefined,
+    dataIntegrityWarning: scenario.dataIntegrityWarning,
     sourceRevisions: new Map([...works, ...detachedWorks].map((work) => [work.id, "fixture"])),
     sourceRevisionSeq: 0,
   };

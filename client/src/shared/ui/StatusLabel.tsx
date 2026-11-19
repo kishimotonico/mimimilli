@@ -14,7 +14,7 @@ const TONE_CLASS: Record<StatusTone, string> = {
 
 interface StatusLabelProps {
   tone: StatusTone;
-  icon: IconFC;
+  icon?: IconFC;
   /** アイコンを回す（作業中の表現） */
   spinning?: boolean;
   children: ReactNode;
@@ -37,7 +37,7 @@ export default function StatusLabel({
         className,
       )}
     >
-      <Icon size={12} className={cn("shrink-0", spinning && "animate-spin")} />
+      {Icon && <Icon size={12} className={cn("shrink-0", spinning && "animate-spin")} />}
       {children}
     </span>
   );

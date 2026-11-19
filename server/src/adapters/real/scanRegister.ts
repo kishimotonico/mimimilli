@@ -72,7 +72,7 @@ function distinctAudioFileCount(meta: MetaFile): number {
 function assertUniqueMetaIds(metaPath: string, meta: MetaFile, seenIds: SeenMetaIds): void {
   const id = meta.id;
   if (seenIds.work.has(id)) {
-    throw new MetaParseError(metaPath, `Work IDが重複しています: ${id}`, id);
+    throw new MetaParseError(metaPath, { kind: "duplicateId", id }, id);
   }
   seenIds.work.add(id);
 }

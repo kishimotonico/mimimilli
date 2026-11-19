@@ -12,7 +12,6 @@ import {
   scanRecordQueryOptions,
 } from "../../../entities/scan/queryOptions";
 import { useScanCandidatesCache } from "../model/useScanCandidatesCache";
-import { useDlsiteNotificationSummary } from "../../../entities/dlsite/model/useDlsiteNotificationSummary";
 import ScanSidebar from "./scanModal/ScanSidebar";
 import UnregisteredTab from "./scanModal/unregistered/UnregisteredTab";
 import NeedsAttentionTab from "./scanModal/NeedsAttentionTab";
@@ -63,35 +62,18 @@ export default function ScanModal({
 
   // 直近のスキャンの記録（サーバーのメモリ。次のスキャンかサーバー再起動まで）。
   const scanRecordQuery = useQuery(scanRecordQueryOptions);
-  const scanRecord = scanRecordQuery.data ?? null;
 
   const candidates = useScanCandidatesCache();
 
   // 診断はFilesでの解決や登録解除を随時反映する必要があるため、スキャン時点のスナップショットではなく
   // 常に最新を購読する。作品変更後のキャッシュ更新が同じキーを無効化する。
   const diagnosticsQuery = useQuery(scanDiagnosticsQueryOptions);
-  const identityConflicts = diagnosticsQuery.data?.identityConflicts ?? [];
-  const invalidMetaFiles = diagnosticsQuery.data?.invalidMetaFiles ?? [];
-  const dataIntegrityWarning = scanRecord?.dataIntegrityWarning;
-  // 通知ベルと同じ「要対応」定義を使うため、RJコード未検出・DLsite取得/パース失敗は
-  // スキャン結果のスナップショットではなく通知ベルと同じ集計クエリを参照する。
-  const {
-    rjCodeMissingCount,
-    fetchFailedCount: dlsiteFetchFailedCount,
-    parseErrorCount: dlsiteParseErrorCount,
-    parseErrorAlert: dlsiteParseErrorAlert,
-  } = useDlsiteNotificationSummary();
 
   const { showCompletedHint } = useScanCompletionHint(scanning);
 
   const needsAttentionRows = buildNeedsAttentionRows({
-    identityConflicts,
-    invalidMetaFiles,
-    rjCodeMissingCount,
-    dlsiteFetchFailedCount,
-    dlsiteParseErrorCount,
-    dlsiteParseErrorAlert,
-    dataIntegrityWarning,
+    diagnostics: diagnosticsQuery.data,
+    record: scanRecordQuery.data,
   });
 
   const counts: Partial<Record<ScanTabKey, number>> = {
@@ -135,14 +117,15 @@ export default function ScanModal({
           )}
           {activeTab === "needsAttention" && (
             <NeedsAttentionTab
-              identityConflicts={identityConflicts}
-              invalidMetaFiles={invalidMetaFiles}
-              rjCodeMissingCount={rjCodeMissingCount}
-              dlsiteFetchFailedCount={dlsiteFetchFailedCount}
-              dlsiteParseErrorCount={dlsiteParseErrorCount}
-              dlsiteParseErrorAlert={dlsiteParseErrorAlert}
-              dataIntegrityWarning={dataIntegrityWarning}
+              rows={needsAttentionRows}
+              loading={diagnosticsQuery.isPending || scanRecordQuery.isPending}
+              error={diagnosticsQuery.isError || scanRecordQuery.isError}
+              onRetry={() => {
+                if (diagnosticsQuery.isError) void diagnosticsQuery.refetch();
+                if (scanRecordQuery.isError) void scanRecordQuery.refetch();
+              }}
               onOpenFiles={onOpenFiles}
+              onOpenWorkDetail={onOpenWorkDetail}
             />
           )}
           {activeTab === "newWorks" && (

@@ -14,8 +14,6 @@ import {
 import {
   buildNeedsAttentionRows,
   countNeedsAttention,
-  needsAttentionRowWeight,
-  type NeedsAttentionRow,
 } from "../../features/scan/model/needsAttention";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
@@ -44,17 +42,29 @@ export default function NotificationBell() {
   });
 
   // 要対応タブと同じ定義・同じ件数を使う。
-  const needsAttentionRows = buildNeedsAttentionRows({
-    identityConflicts: diagnosticsQuery.data?.identityConflicts ?? [],
-    invalidMetaFiles: diagnosticsQuery.data?.invalidMetaFiles ?? [],
-    rjCodeMissingCount,
-    dlsiteFetchFailedCount,
-    dlsiteParseErrorCount,
-    dlsiteParseErrorAlert,
-    dataIntegrityWarning: scanRecord?.dataIntegrityWarning,
-  });
-  const badgeCount = countNeedsAttention(needsAttentionRows);
-  const isEmpty = needsAttentionRows.length === 0 && !scanRecord;
+  const scanAttentionCount = countNeedsAttention(
+    buildNeedsAttentionRows({
+      diagnostics: diagnosticsQuery.data,
+      record: scanRecord ?? undefined,
+    }),
+  );
+  const dlsiteRows: DlsiteRow[] = [
+    { label: "RJコード未検出", count: rjCodeMissingCount, modal: "rj-missing", accent: "coral" },
+    {
+      label: "DLsite取得失敗",
+      count: dlsiteFetchFailedCount,
+      modal: "fetch-failed",
+      accent: "coral",
+    },
+    {
+      label: "DLsiteパース失敗",
+      count: dlsiteParseErrorAlert ? dlsiteParseErrorCount : 0,
+      modal: "parse-failed",
+      accent: "mustard",
+    },
+  ].filter((row) => row.count > 0) as DlsiteRow[];
+  const badgeCount = scanAttentionCount + dlsiteRows.reduce((total, row) => total + row.count, 0);
+  const isEmpty = badgeCount === 0 && !scanRecord;
 
   return (
     <div ref={rootRef} className="relative">
@@ -88,27 +98,25 @@ export default function NotificationBell() {
             </p>
           ) : (
             <div className="flex flex-col [&>*+*]:border-t [&>*+*]:border-line-soft">
-              {needsAttentionRows.map((row) => (
+              {scanAttentionCount > 0 && (
                 <NotifRow
-                  key={row.key}
-                  label={NEEDS_ATTENTION_LABEL[row.kind]}
-                  count={needsAttentionRowWeight(row)}
-                  accent={row.kind === "dlsiteParseFailed" ? "mustard" : "coral"}
+                  label="要対応"
+                  count={scanAttentionCount}
                   onClick={() => {
                     setIsOpen(false);
-                    switch (row.kind) {
-                      case "rjCodeMissing":
-                        setActiveModal({ kind: "rj-missing" });
-                        break;
-                      case "dlsiteFetchFailed":
-                        setActiveModal({ kind: "fetch-failed" });
-                        break;
-                      case "dlsiteParseFailed":
-                        setActiveModal({ kind: "parse-failed" });
-                        break;
-                      default:
-                        setActiveModal({ kind: "scan", tab: "needsAttention" });
-                    }
+                    setActiveModal({ kind: "scan", tab: "needsAttention" });
+                  }}
+                />
+              )}
+              {dlsiteRows.map((row) => (
+                <NotifRow
+                  key={row.modal}
+                  label={row.label}
+                  count={row.count}
+                  accent={row.accent}
+                  onClick={() => {
+                    setIsOpen(false);
+                    setActiveModal({ kind: row.modal });
                   }}
                 />
               ))}
@@ -138,14 +146,12 @@ export default function NotificationBell() {
   );
 }
 
-const NEEDS_ATTENTION_LABEL: Record<NeedsAttentionRow["kind"], string> = {
-  identityConflict: "ID重複",
-  invalidMetaFile: "読み取り失敗",
-  rjCodeMissing: "RJコード未検出",
-  dlsiteFetchFailed: "DLsite取得失敗",
-  dlsiteParseFailed: "DLsiteパース失敗",
-  dataIntegrity: "データ不整合",
-};
+interface DlsiteRow {
+  label: string;
+  count: number;
+  modal: "rj-missing" | "fetch-failed" | "parse-failed";
+  accent: "coral" | "mustard";
+}
 
 function NotifRow({
   label,

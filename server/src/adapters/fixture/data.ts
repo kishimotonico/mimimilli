@@ -18,6 +18,7 @@ import type {
   IdentityConflict,
   SmartFolder,
   WorkSummary,
+  WorkspacePath,
 } from "@mimimilli/shared";
 import { posix } from "node:path";
 import { isPathWithin } from "../../lib/path.ts";
@@ -622,13 +623,14 @@ function sidecarAudioFileName(sidecarName: string, work: FixtureWorkRecord): str
 
 /** /fs のルートツリーを構築する。works はその時点の最新状態を渡す。
  *  identityConflicts / invalidMetaFiles は、それぞれが指す重複コピーフォルダー・
- *  壊れたメタファイルを /fs ツリー上に実体化するために使う。 */
+ *  壊れたメタファイル・読み取れなかったフォルダーを /fs ツリー上に実体化するために使う。 */
 export function buildFsRoot(
   rootAbs: string,
   works: FixtureWorkRecord[],
   coverColumns: ReadonlyMap<string, FixtureCoverColumns>,
   identityConflicts: IdentityConflict[] = [],
   invalidMetaFiles: InvalidMetaFile[] = [],
+  unreadablePaths: readonly WorkspacePath[] = [],
 ): FsNode {
   const folderWorks = works.filter((work) => workPlacementOf(work.metaPath).kind === "folder");
   const fileWorks = works.filter((work) => workPlacementOf(work.metaPath).kind === "audio-file");
@@ -710,6 +712,10 @@ export function buildFsRoot(
     const name = segments.at(-1);
     if (name === undefined) continue;
     ensurePath(root, segments, () => fsFile(name, "text", 128));
+  }
+
+  for (const path of unreadablePaths) {
+    ensurePath(root, path.split("/").filter(Boolean), (name) => fsDir(name, []));
   }
 
   return root;

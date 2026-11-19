@@ -63,7 +63,7 @@ function IdentityConflictSection({
         ))}
       </div>
       <Button variant="primary" disabled={reassignDisabled} onClick={onReassign}>
-        別作品として取り込む
+        別の作品として取り込む
       </Button>
     </section>
   );
@@ -111,7 +111,7 @@ export default function FilePreviewWorkActions({
     try {
       result = await reassignMutation.mutateAsync(path);
     } catch (cause) {
-      toast.error(sourceMutationErrorMessage(cause, "別作品としての取り込みに失敗しました"));
+      toast.error(sourceMutationErrorMessage(cause, "別の作品としての取り込みに失敗しました"));
       return;
     }
     setShowReassignConfirm(false);
@@ -238,8 +238,8 @@ export default function FilePreviewWorkActions({
 
       {showReassignConfirm && (
         <ConfirmDialog
-          title="別作品として取り込む"
-          message={`「${entry.path}」のWork IDを新しくして、別作品として取り込みます。再生履歴やタグなどのユーザー状態は引き継ぎません。`}
+          title="別の作品として取り込む"
+          message={`「${entry.path}」のWork IDを新しくして、別の作品として取り込みます。再生履歴やタグなどのユーザー状態は引き継ぎません。`}
           confirmLabel="取り込む"
           onConfirm={() => void reassign(entry.path)}
           onCancel={() => setShowReassignConfirm(false)}
