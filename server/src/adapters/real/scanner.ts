@@ -539,46 +539,65 @@ export class Scanner {
 
   /** 書き込み済みのメタを対象作品だけcatalogへ投影する。失敗してもメタは残る */
   async projectPrepared(prepared: PreparedMeta): Promise<ProjectOutcome> {
-    const snapshot = {
-      meta: prepared.meta,
-      bytes: prepared.bytes,
-      sourceRevision: prepared.revisions.sourceRevision,
-    };
+    return (await this.projectPreparedBatch([prepared]))[0]!;
+  }
+
+  /**
+   * 複数のメタを1回の公開で投影する。async の前処理をすべて済ませてから、同じトランザクションで公開する。
+   * missingWorkIds は同じトランザクションで missing にする。結果は prepared と同じ順
+   */
+  async projectPreparedBatch(
+    prepared: readonly PreparedMeta[],
+    missingWorkIds: string[] = [],
+  ): Promise<ProjectOutcome[]> {
+    const snapshotOf = (entry: PreparedMeta) => ({
+      meta: entry.meta,
+      bytes: entry.bytes,
+      sourceRevision: entry.revisions.sourceRevision,
+    });
     try {
       const existingWorks = this.query.getScanWorkMap();
       const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, () => {});
       const scanResult = emptyRegisterTracking();
       const seenIds: SeenMetaIds = { work: new Set() };
-      await this.invokeRegisterMetaFile({
-        prepared,
-        seenIds,
-        probeCache: new Map(),
-        batch,
-        existingWorks,
-        result: scanResult,
-        options: { full: true, idsAlreadyRegistered: false },
+      for (const entry of prepared) {
+        await this.invokeRegisterMetaFile({
+          prepared: entry,
+          seenIds,
+          probeCache: new Map(),
+          batch,
+          existingWorks,
+          result: scanResult,
+          options: { full: true, idsAlreadyRegistered: false },
+        });
+      }
+      const changedIds = new Set(batch.publishWork(missingWorkIds));
+      return prepared.map((entry): ProjectOutcome => {
+        if (changedIds.has(entry.meta.id)) {
+          return {
+            status: "unpublished",
+            reason: "source_changed",
+            snapshot: snapshotOf(entry),
+            currentSourceRevision: currentSourceRevision(entry.metaPath),
+          };
+        }
+        if (this.resolveRoot) {
+          this.catalog.removeInvalidMetaFile(
+            toPortableRelativePath(this.resolveRoot(), entry.metaPath),
+          );
+        }
+        return { status: "published", snapshot: snapshotOf(entry) };
       });
-      const changedIds = batch.publishWork();
-      if (changedIds.includes(prepared.meta.id)) {
-        return {
-          status: "unpublished",
-          reason: "source_changed",
-          snapshot,
-          currentSourceRevision: currentSourceRevision(prepared.metaPath),
-        };
-      }
-      if (this.resolveRoot) {
-        this.catalog.removeInvalidMetaFile(
-          toPortableRelativePath(this.resolveRoot(), prepared.metaPath),
-        );
-      }
-      return { status: "published", snapshot };
     } catch (error) {
       scanLogger.error("作品の一覧反映に失敗しました", {
-        workId: prepared.meta.id,
+        workIds: prepared.map((entry) => entry.meta.id),
         error: errorMessage(error),
       });
-      return { status: "unpublished", reason: "error", snapshot };
+      return prepared.map((entry) => ({
+        status: "unpublished",
+        reason: "error",
+        snapshot: snapshotOf(entry),
+      }));
     }
   }
 

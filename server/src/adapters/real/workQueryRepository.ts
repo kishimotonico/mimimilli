@@ -591,6 +591,20 @@ export class WorkQueryRepository {
     return new Set(rows.map((row) => row.physicalPath));
   }
 
+  getWorkStatuses(ids: readonly string[]): Map<string, Work["status"]> {
+    return new Map(
+      chunk([...ids], SQLITE_IN_CHUNK_SIZE).flatMap((idsChunk) =>
+        (
+          this.db.sqlite
+            .query(
+              `SELECT id, status FROM main.works WHERE id IN (${inClausePlaceholders(idsChunk.length)})`,
+            )
+            .all(...idsChunk) as Array<{ id: string; status: Work["status"] }>
+        ).map((row) => [row.id, row.status] as const),
+      ),
+    );
+  }
+
   countWorksByStatus(status: Work["status"]): number {
     const row = this.db.sqlite
       .query(`SELECT COUNT(*) AS count FROM main.works WHERE status = ?`)

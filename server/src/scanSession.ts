@@ -3,6 +3,7 @@ import type {
   ScanCandidate,
   ScanCandidateFolder,
   ScanCandidatesRegisterResponse,
+  ScanRecord,
 } from "@mimimilli/shared";
 import type { DataAdapter, ScanExecution } from "./adapter/index.ts";
 import { CandidatePoolChangedError } from "./errors.ts";
@@ -14,6 +15,7 @@ type SessionAdapter = Pick<
   | "candidateAvailability"
   | "describeCandidates"
   | "registerCandidateFolder"
+  | "getWorkStatuses"
   | "excludeScanCandidates"
   | "listScanCandidateExclusions"
   | "restoreScanCandidateExclusions"
@@ -44,6 +46,13 @@ export class ScanSession {
       if (!this.pool.has(path)) this.rjCodeOverrides.delete(path);
     }
     this.record.replace(execution.result, finishedAt);
+  }
+
+  /** 直近のスキャンの記録。消えた作品はcatalogと照合して落とす */
+  async recordSnapshot(): Promise<ScanRecord> {
+    const captured = this.record.capture();
+    const existing = await this.adapter.getWorkStatuses(captured.snapshotWorkIds());
+    return captured.snapshot(existing);
   }
 
   /** root再設定の開始。rootが変わるなら候補を捨てる。記録は常に捨てる */

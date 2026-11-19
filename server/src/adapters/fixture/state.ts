@@ -139,14 +139,6 @@ export function copyWorkState(state: FixtureState, fromId: string, toId: string)
   if (cover) state.coverColumns.set(toId, cover);
 }
 
-/** workのidを付け替え、作品に紐づく状態も新idへ移す。 */
-export function reassignWorkId(state: FixtureState, oldId: string, newId: string): void {
-  copyWorkState(state, oldId, newId);
-  state.dlsiteLinkages.delete(oldId);
-  state.playlistSpecs.delete(oldId);
-  state.coverColumns.delete(oldId);
-}
-
 /** rjCodeに対応するDLsite取得キャッシュの解決結果。realのDlsiteCache.resolveと同じくTTL切れはmiss扱い。 */
 export function dlsiteFetchFailureFor(
   state: FixtureState,

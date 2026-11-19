@@ -88,7 +88,7 @@ test("root再設定の開始でスキャンの記録を空にし、構築の完�
 
   const workflow = new RootReconfigurationWorkflow(adapter, scanJobs, dlsiteJobs, async () => {});
   await workflow.start("/library/dlsite/夜想曲スタジオ");
-  assert.equal(scanJobs.session.record.snapshot().finishedAt, null);
+  assert.equal((await scanJobs.session.recordSnapshot()).finishedAt, null);
   await workflow.shutdown();
 
   scanJobs.session.publish(
@@ -107,5 +107,5 @@ test("root再設定の開始でスキャンの記録を空にし、構築の完�
     new Date().toISOString(),
   );
   assert.deepEqual(scanJobs.session.record.workIds("new"), []);
-  assert.equal(typeof scanJobs.session.record.snapshot().finishedAt, "string");
+  assert.equal(typeof (await scanJobs.session.recordSnapshot()).finishedAt, "string");
 });

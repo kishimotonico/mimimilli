@@ -63,8 +63,8 @@ export function scanRoute(
     return job ? c.json(job) : c.body(null, 204);
   });
 
-  app.get("/scan/last", (c) => {
-    return c.json(scanRecordSchema.parse(jobs.session.record.snapshot()));
+  app.get("/scan/last", async (c) => {
+    return c.json(scanRecordSchema.parse(await jobs.session.recordSnapshot()));
   });
 
   app.get("/scan/diagnostics", async (c) => {

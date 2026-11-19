@@ -68,7 +68,8 @@ export class ScanUpsertBatch {
     return changed;
   }
 
-  publishWork(): string[] {
+  /** missingIds は、同じトランザクションで missing にする作品 */
+  publishWork(missingIds: string[] = []): string[] {
     const changed = this.discardChangedSources();
     this.checkAbort();
     this.db.userTransaction(() => {
@@ -87,6 +88,7 @@ export class ScanUpsertBatch {
       for (const error of this.errors) {
         this.catalog.markWorkError(error.id, error.physicalPath, error.metaPath, error.message);
       }
+      this.catalog.markWorksMissing(missingIds);
     });
     return changed;
   }

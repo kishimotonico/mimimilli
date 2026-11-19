@@ -13,6 +13,7 @@ export async function configureRoot(
     | "candidateAvailability"
     | "describeCandidates"
     | "registerCandidateFolder"
+    | "getWorkStatuses"
     | "excludeScanCandidates"
     | "listScanCandidateExclusions"
     | "restoreScanCandidateExclusions"

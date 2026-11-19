@@ -46,6 +46,9 @@ function stubMaterials() {
     registerGate: null as Promise<void> | null,
     onRegisterEntered: (): void => {},
     registered: [] as string[],
+    workStatuses: new Map<string, "ok" | "missing">(),
+    getWorkStatuses: async (ids: readonly string[]): Promise<Map<string, "ok" | "missing">> =>
+      new Map([...state.workStatuses].filter(([id]) => ids.includes(id))),
   };
   const adapter = {
     candidateRootIdentity: async () => state.rootIdentity,
@@ -60,6 +63,7 @@ function stubMaterials() {
       state.registered.push(f.path);
       return { workId: `work-${f.path}`, coverSkipped: null };
     },
+    getWorkStatuses: (ids: readonly string[]) => state.getWorkStatuses(ids),
     excludeScanCandidates: async (paths: string[]) => {
       for (const path of paths) state.unavailable.add(path);
     },
@@ -197,9 +201,99 @@ test("公開したrootと現在のrootが違うと、候補の操作は Candidat
 test("公開でプールと記録がまとめて差し替わる", async () => {
   const { session } = stubMaterials();
   session.publish(execution(["A"]), "2026-01-01T00:00:00.000Z");
-  assert.equal(session.record.snapshot().finishedAt, "2026-01-01T00:00:00.000Z");
+  assert.equal((await session.recordSnapshot()).finishedAt, "2026-01-01T00:00:00.000Z");
   assert.deepEqual(
     (await session.listCandidates()).map((candidate) => candidate.path),
     ["A"],
+  );
+});
+
+test("記録は読むときにcatalogと照合し、スキャン中に消えた作品も、戻った作品の行方不明も落とす", async () => {
+  const { state, session } = stubMaterials();
+  session.publish(
+    {
+      ...execution(["A"]),
+      result: {
+        ...RESULT,
+        insertedWorkIds: ["gone", "kept"],
+        updatedWorks: [
+          { workId: "gone", changes: [{ kind: "meta" }] },
+          { workId: "kept", changes: [{ kind: "meta" }] },
+        ],
+        missingWorks: [
+          { workId: "gone", title: "g", previousPath: workspacePath("g") },
+          { workId: "restored", title: "r", previousPath: workspacePath("r") },
+          { workId: "still", title: "s", previousPath: workspacePath("s") },
+        ],
+        dataIntegrityWarning: { skippedCount: 2, skippedWorkIds: ["gone", "kept"] },
+      },
+    },
+    "t",
+  );
+  state.workStatuses = new Map([
+    ["kept", "ok"],
+    ["restored", "ok"],
+    ["still", "missing"],
+  ]);
+
+  const record = await session.recordSnapshot();
+
+  assert.deepEqual(
+    record.updatedWorks.map((work) => work.workId),
+    ["kept"],
+  );
+  assert.deepEqual(
+    record.missingWorks.map((work) => work.workId),
+    ["still"],
+  );
+  assert.deepEqual(record.dataIntegrityWarning, { skippedCount: 1, skippedWorkIds: ["kept"] });
+});
+
+test("記録の照合中にスキャンが完了しても、読み始めた時点の記録で答え、新しい記録は漏れずに次の読みへ出る", async () => {
+  const { state, session } = stubMaterials();
+  const withUpdated = (workId: string, finishedAt: string): void =>
+    session.publish(
+      {
+        ...execution(["A"]),
+        result: { ...RESULT, updatedWorks: [{ workId, changes: [{ kind: "meta" }] }] },
+      },
+      finishedAt,
+    );
+  withUpdated("old", "t1");
+  state.workStatuses = new Map([
+    ["old", "ok"],
+    ["new", "ok"],
+  ]);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let entered!: () => void;
+  const enteredLookup = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const lookup = state.getWorkStatuses;
+  state.getWorkStatuses = async (ids) => {
+    entered();
+    await gate;
+    return lookup(ids);
+  };
+
+  const reading = session.recordSnapshot();
+  await enteredLookup;
+  withUpdated("new", "t2");
+  release();
+  const first = await reading;
+
+  assert.equal(first.finishedAt, "t1");
+  assert.deepEqual(
+    first.updatedWorks.map((work) => work.workId),
+    ["old"],
+  );
+  const second = await session.recordSnapshot();
+  assert.equal(second.finishedAt, "t2");
+  assert.deepEqual(
+    second.updatedWorks.map((work) => work.workId),
+    ["new"],
   );
 });

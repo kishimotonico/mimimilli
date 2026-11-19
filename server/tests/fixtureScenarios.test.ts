@@ -18,6 +18,7 @@ import {
   LARGE_SCENARIO_WORK_COUNT,
   SCENARIO_IDS,
 } from "../src/adapters/fixture/scenarios.ts";
+import { createWorkMethods } from "../src/adapters/fixture/works.ts";
 import { createSettingsScanMethods } from "../src/adapters/fixture/settingsScan.ts";
 import { createInitialState } from "../src/adapters/fixture/state.ts";
 import type { ScanCandidateFolder } from "@mimimilli/shared";
@@ -492,7 +493,7 @@ test("fixture: 単一音声ファイルのregister-previewと登録ができる"
 
 test("fixture: 異なるrootへの変更で候補除外を破棄し、同一rootの再保存では破棄しない", async () => {
   const state = createInitialState({ scenario: "empty" });
-  const methods = createSettingsScanMethods(state);
+  const methods = { ...createSettingsScanMethods(state), ...createWorkMethods(state) };
   const { excludeScanCandidates, listScanCandidateExclusions } = methods;
 
   await configureRoot(methods, "/library/root-a");

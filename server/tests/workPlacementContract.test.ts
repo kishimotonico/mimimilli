@@ -401,7 +401,10 @@ interface ReassignHarness {
 
 const REASSIGN_OWNER_ID = workIdOf("single");
 
-async function realReassignHarness(layout: ReassignLayout): Promise<ReassignHarness> {
+async function realReassignHarness(
+  layout: ReassignLayout,
+  options: { remainingDeclarer?: boolean } = {},
+): Promise<ReassignHarness> {
   const directory = makeTestDirectory(`work-placement-reassign-both-${layout}`);
   const root = join(directory.path, "library");
   const meta =
@@ -421,6 +424,7 @@ async function realReassignHarness(layout: ReassignLayout): Promise<ReassignHarn
   place("b");
   await runScan(adapter);
   assert.equal((await adapter.listScanDiagnostics()).identityConflicts.length, 1);
+  if (options.remainingDeclarer === false) writeFileSync(join(root, "b", metaName), "{ broken");
   return {
     adapter,
     ownerId: meta.id,
@@ -430,7 +434,10 @@ async function realReassignHarness(layout: ReassignLayout): Promise<ReassignHarn
   };
 }
 
-function fixtureReassignHarness(layout: ReassignLayout): ReassignHarness {
+function fixtureReassignHarness(
+  layout: ReassignLayout,
+  options: { remainingDeclarer?: boolean } = {},
+): ReassignHarness {
   const metaName = layout === "file" ? "single.mimimilli.json" : META_FILE_NAME;
   const physicalPathOf = (dir: string) =>
     `/library/${dir}${layout === "file" ? "/single.wav" : ""}`;
@@ -474,7 +481,10 @@ function fixtureReassignHarness(layout: ReassignLayout): ReassignHarness {
       {
         kind: "identity_conflict",
         workId: REASSIGN_OWNER_ID,
-        paths: [conflictPathOf("a"), conflictPathOf("b")],
+        paths:
+          options.remainingDeclarer === false
+            ? [conflictPathOf("a")]
+            : [conflictPathOf("a"), conflictPathOf("b")],
       },
     ],
   });
@@ -492,12 +502,17 @@ for (const layout of ["folder", "file"] as const) {
       });
       assert.ok(result);
       assert.notEqual(result.snapshot.id, harness.ownerId);
-      assert.equal(result.replacedWorkId, harness.ownerId);
       assert.equal(result.snapshot.physicalPath, harness.physicalPathOf("a"));
       assert.deepEqual((await harness.adapter.listScanDiagnostics()).identityConflicts, []);
       const work = await harness.adapter.getWork(result.snapshot.id);
       assert.equal(work?.physicalPath, harness.physicalPathOf("a"));
       assert.equal(work?.playlists[0]?.tracks.length, 1);
+      const owner = await harness.adapter.getWork(harness.ownerId);
+      assert.equal(owner?.physicalPath, harness.physicalPathOf("b"));
+      assert.equal(
+        (await harness.adapter.getWorkStatuses([harness.ownerId, result.snapshot.id])).size,
+        2,
+      );
     });
 
     test(`ID重複はコピー側のパスでも再採番でき、登録側の作品は変わらない（${layout}・${adapterKind}）`, async (t) => {
@@ -509,7 +524,6 @@ for (const layout of ["folder", "file"] as const) {
       });
       assert.ok(result);
       assert.notEqual(result.snapshot.id, harness.ownerId);
-      assert.equal(result.replacedWorkId, null);
       assert.equal(result.snapshot.physicalPath, harness.physicalPathOf("b"));
       assert.deepEqual((await harness.adapter.listScanDiagnostics()).identityConflicts, []);
       const copy = await harness.adapter.getWork(result.snapshot.id);
@@ -517,6 +531,54 @@ for (const layout of ["folder", "file"] as const) {
       assert.equal(copy?.playlists[0]?.tracks.length, 1);
       const owner = await harness.adapter.getWork(harness.ownerId);
       assert.equal(owner?.physicalPath, harness.physicalPathOf("a"));
+    });
+  }
+}
+
+for (const layout of ["folder", "file"] as const) {
+  for (const adapterKind of ["real", "fixture"] as const) {
+    test(`登録側を再採番すると、ブックマークとレジュームは旧IDに残り、新IDは空で始まる（${layout}・${adapterKind}）`, async (t) => {
+      const harness =
+        adapterKind === "real" ? await realReassignHarness(layout) : fixtureReassignHarness(layout);
+      t.after(harness.cleanup);
+      const before = await harness.adapter.getWork(harness.ownerId);
+      const playlist = before!.playlists[0]!;
+      await harness.adapter.patchWorkBookmark(harness.ownerId, { bookmarked: true });
+      await harness.adapter.saveResume(harness.ownerId, {
+        playlistId: playlist.id,
+        trackId: playlist.tracks[0]!.id,
+        offsetSec: 0,
+      });
+
+      const result = await harness.adapter.reassignIdentityConflict({
+        path: harness.conflictPathOf("a") as never,
+      });
+
+      const owner = await harness.adapter.getWork(harness.ownerId);
+      assert.equal(owner?.bookmarked, true);
+      assert.ok(owner?.resume);
+      const created = await harness.adapter.getWork(result!.snapshot.id);
+      assert.equal(created?.bookmarked, false);
+      assert.equal(created?.resume, null);
+    });
+
+    test(`登録側を再採番して、旧IDを宣言する残りのメタファイルが無いと、旧IDの作品は行方不明になる（${layout}・${adapterKind}）`, async (t) => {
+      const options = { remainingDeclarer: false };
+      const harness =
+        adapterKind === "real"
+          ? await realReassignHarness(layout, options)
+          : fixtureReassignHarness(layout, options);
+      t.after(harness.cleanup);
+
+      const result = await harness.adapter.reassignIdentityConflict({
+        path: harness.conflictPathOf("a") as never,
+      });
+
+      assert.ok(result);
+      assert.equal((await harness.adapter.getWork(harness.ownerId))?.status, "missing");
+      const created = await harness.adapter.getWork(result.snapshot.id);
+      assert.equal(created?.status, "ok");
+      assert.equal(created?.physicalPath, harness.physicalPathOf("a"));
     });
   }
 }

@@ -115,9 +115,7 @@ export function worksRoute(adapter: DataAdapter, scanRecord: ScanRecordStore): H
     try {
       const reassigned = await adapter.reassignIdentityConflict(data);
       if (!reassigned) notFound("指定されたパスはidentity_conflict診断の対象ではありません");
-      const { replacedWorkId, ...result } = reassigned;
-      if (replacedWorkId !== null) scanRecord.forgetWork(replacedWorkId);
-      return c.json(workSourceMutationResultSchema.parse(result), 201);
+      return c.json(workSourceMutationResultSchema.parse(reassigned), 201);
     } catch (error) {
       throwSourceCommandError(error);
     }
@@ -130,9 +128,7 @@ export function worksRoute(adapter: DataAdapter, scanRecord: ScanRecordStore): H
   });
 
   app.post("/works/unregister-missing", async (c) => {
-    const { deletedWorkIds, ...result } = await adapter.unregisterMissingWorks();
-    for (const workId of deletedWorkIds) scanRecord.forgetWork(workId);
-    return c.json(result);
+    return c.json(await adapter.unregisterMissingWorks());
   });
 
   app.get("/works/:id/source", async (c) => {
@@ -214,7 +210,6 @@ export function worksRoute(adapter: DataAdapter, scanRecord: ScanRecordStore): H
 
   app.delete("/works/:id", async (c) => {
     const ok = await adapter.deleteWork(c.req.param("id"));
-    if (ok) scanRecord.forgetWork(c.req.param("id"));
     if (!ok) notFound(`作品が見つかりません: ${c.req.param("id")}`);
     return c.body(null, 204);
   });
