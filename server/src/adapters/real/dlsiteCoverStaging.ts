@@ -1,5 +1,4 @@
 import { join } from "node:path";
-import { dlsiteCoverBaseName, type WorkPlacement } from "@mimimilli/shared";
 import { CoverSaveError } from "../../errors.ts";
 import {
   commitTempFile,
@@ -8,7 +7,7 @@ import {
   setAsideFile,
   writeTempFile,
 } from "./atomicFile.ts";
-import { errorMessage } from "@mimimilli/shared";
+import { dlsiteCoverBaseName, errorMessage, type WorkPlacement } from "@mimimilli/shared";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { normalizeDlsiteCoverUrl } from "./dlsite.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";

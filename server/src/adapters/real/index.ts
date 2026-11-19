@@ -93,7 +93,7 @@ export function createRealAdapter(
     parser,
     runFileScanInWorker: assembly.runFileScanInWorker ?? runFileScanInWorker,
   });
-  const { settleDlsiteWork, ...dlsiteMethods } = createDlsiteMethods({
+  const { abortDlsiteWork, ...dlsiteMethods } = createDlsiteMethods({
     db,
     query,
     catalog,
@@ -132,7 +132,7 @@ export function createRealAdapter(
     ...coverMediaMethods,
     ...dlsiteMethods,
     async close(): Promise<void> {
-      await settleDlsiteWork();
+      await abortDlsiteWork();
       dlsiteCache.close();
       db.close();
     },

@@ -166,8 +166,8 @@ export function createDlsiteMethods(deps: {
       }
     },
 
-    /** DLsite通信とキャッシュ書き込みの完了を待つ。キャッシュとDBを閉じる前に呼ぶ */
-    settleDlsiteWork: fetch.settled,
+    /** 進行中のDLsite通信を中止する。キャッシュとDBを閉じる前に呼ぶ */
+    abortDlsiteWork: fetch.abortInFlight,
 
     ...apply,
   };

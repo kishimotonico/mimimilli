@@ -2,7 +2,9 @@ import { REGISTER_ALL, NO_DLSITE } from "../helpers/scanLibrary.ts";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { spyOn } from "bun:test";
 import { test } from "node:test";
+import { Scanner } from "../../src/adapters/real/scanner.ts";
 import { workspacePath } from "@mimimilli/shared";
 import { createApp } from "../helpers/testApp.ts";
 import { CandidatePoolChangedError } from "../../src/errors.ts";
@@ -290,4 +292,37 @@ test("スキャン候補の親登録は配下の子作品がある場合に失�
   assert.ok(await adapter.getWork(childWork.snapshot.id));
   assert.equal(existsSync(join(child, "mimimilli.json")), true);
   assert.equal(existsSync(join(parent, "mimimilli.json")), false);
+});
+
+test("メタは書けたが投影が済んでいない候補は、候補一覧に戻らない", async (t) => {
+  const directory = makeTestDirectory("scan-candidates-written-meta");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const folder = join(root, "投影待ち");
+  mkdirSync(folder, { recursive: true });
+  writeWav(join(folder, "track.wav"), 1);
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  await configureRoot(adapter, root);
+  await adapter.scan();
+  assert.deepEqual(
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    ["投影待ち"],
+  );
+
+  const projection = spyOn(Scanner.prototype, "projectPrepared").mockImplementation(
+    async (prepared) => ({
+      status: "unpublished",
+      reason: "error",
+      snapshot: {
+        meta: prepared.meta,
+        bytes: prepared.bytes,
+        sourceRevision: prepared.revisions.sourceRevision,
+      },
+    }),
+  );
+  t.after(() => projection.mockRestore());
+  const result = await adapter.registerScanCandidates(["投影待ち"], REGISTER_ALL);
+  assert.equal(result.registered.length, 1);
+  assert.ok(existsSync(join(folder, "mimimilli.json")));
+  assert.deepEqual(await adapter.listScanCandidates(), []);
 });

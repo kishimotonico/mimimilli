@@ -549,6 +549,28 @@ describe("dlsiteJobStore", () => {
       expect(store.getState().pendingSingles.size).toBe(0);
     });
 
+    it("POST 中に前のジョブで受けた状態は、応答でジョブが変わったあとの保留解除に使わない", async () => {
+      const gate = deferred<{ jobId: string }>();
+      const { store, last } = createHarness({
+        startJob: vi.fn(() => gate.promise),
+        getCurrent: vi.fn(async () => snapshot("job-1")),
+      });
+      await store.attach();
+      const pending = store.startSingle("RJ000001");
+      dispatch(last(), {
+        type: "code",
+        jobId: "job-1",
+        productCode: "RJ000001",
+        origin: "bulk",
+        state: "fetched",
+        bulk: { processed: 1, total: 1 },
+      });
+      gate.resolve({ jobId: "job-2" });
+      await pending;
+      expect(store.getState().job?.jobId).toBe("job-2");
+      expect(store.getState().pendingSingles.has("RJ000001")).toBe(true);
+    });
+
     it("開始より前に受け取った終端状態だけが残るコードは、応答後も取り直しの状態まで保留する", async () => {
       const gate = deferred<{ jobId: string }>();
       const { store, last } = createHarness({

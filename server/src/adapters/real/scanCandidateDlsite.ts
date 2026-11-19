@@ -6,7 +6,6 @@ import type {
 import { normalizeDlsiteCoverUrl } from "./dlsite.ts";
 import { DlsiteCache } from "./dlsiteCache.ts";
 import {
-  createDlsiteProductResolver,
   dlsiteFetchStateOfProductResolution,
   type DlsiteProductResolver,
 } from "./dlsiteProductResolve.ts";
@@ -19,7 +18,7 @@ export interface CandidateDlsiteSource {
 
 export function createCandidateDlsiteSource(
   cache: DlsiteCache,
-  resolve: DlsiteProductResolver = createDlsiteProductResolver(cache),
+  resolve: DlsiteProductResolver,
 ): CandidateDlsiteSource {
   return { resolve, coverVersion: (key) => cache.coverVersionByKey(key) };
 }

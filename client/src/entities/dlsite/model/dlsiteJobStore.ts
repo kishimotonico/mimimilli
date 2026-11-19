@@ -160,7 +160,7 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
   let lastSseAt = 0;
   /** 状態の受信・照会の発行・単発の開始に付ける通し番号 */
   let clock = 0;
-  /** コードごとに、最後に受け取った状態が反映している時点（SSEは受信時、照会は発行時） */
+  /** コードごとに、今のジョブで最後に受け取った状態が反映している時点（SSEは受信時、照会は発行時）。ジョブが変わると消す */
   const codeSeenAt = new Map<string, number>();
   let emptyReopens = 0;
   let bulkPosting = false;
@@ -330,6 +330,7 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
       return;
     }
     if (trackedJobId !== null && trackedJobId !== jobId) terminate(trackedJobId, true);
+    if (trackedJobId !== jobId) codeSeenAt.clear();
     terminalHandled.delete(jobId);
     trackedJobId = jobId;
     emptyReopens = 0;

@@ -117,8 +117,9 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
   const dlsiteFlightPool = new SharedFlightPool<DlsiteFetchAttempt>();
   const dlsiteCoverFlightPool = new SharedFlightPool<{ body: Uint8Array; normalizedUrl: string }>();
   const activeFlights = new Set<Promise<unknown>>();
+  const shutdown = new AbortController();
 
-  /** 購読者が全員中止して返った後も続くflightを、閉じる側が待てるよう控える */
+  /** 購読者が全員中止して返った後も続くflightを、閉じる側が中止できるよう控える */
   function runTracked<T>(
     pool: SharedFlightPool<T>,
     key: string,
@@ -126,7 +127,7 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     execute: (flightSignal: AbortSignal) => Promise<T>,
   ): Promise<T> {
     return pool.run(key, signal, (flightSignal) => {
-      const flight = execute(flightSignal);
+      const flight = execute(AbortSignal.any([flightSignal, shutdown.signal]));
       activeFlights.add(flight);
       const forget = () => void activeFlights.delete(flight);
       flight.then(forget, forget);
@@ -134,10 +135,13 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     });
   }
 
-  /** 進行中のflightと、キューに積まれたDLsite通信がすべて終わるまで待つ。キャッシュやDBを閉じる前に呼ぶ */
-  async function settled(): Promise<void> {
-    while (activeFlights.size > 0) await Promise.allSettled(activeFlights);
-    await dlsiteScheduler.drain();
+  /**
+   * 進行中のflightを中止し、巻き戻りを待つ。中止後のflightはキャッシュへ書かない。
+   * 中止に応えない通信を待つ上限は、終了処理の全体タイムアウトが持つ。
+   */
+  async function abortInFlight(): Promise<void> {
+    shutdown.abort();
+    await Promise.allSettled(activeFlights);
   }
 
   function resolveCachedDlsiteAttempt(
@@ -201,6 +205,7 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     return runTracked(dlsiteFlightPool, flightKey, signal, async (flightSignal) => {
       try {
         const response = await dlsiteHtmlFetcher(key, flightSignal);
+        throwIfAborted(flightSignal);
         if (response.status === 404) {
           dlsiteCache.recordFailure({ productCode: key, outcome: "not_found" });
           return {
@@ -305,6 +310,7 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
         reason: "not_cached",
       });
       return dlsiteCoverFetcher(normalizedUrl, flightSignal).then((fetched) => {
+        throwIfAborted(flightSignal);
         const finalUrl = normalizeDlsiteCoverUrl(fetched.finalUrl);
         dlsiteCache.putCover(finalUrl, fetched.body, fetched.contentType);
         if (finalUrl !== normalizedUrl) {
@@ -351,6 +357,6 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     fetchCachedDlsiteAttempt,
     fetchCachedDlsite,
     prefetchCover,
-    settled,
+    abortInFlight,
   };
 }

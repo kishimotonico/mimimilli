@@ -66,8 +66,6 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
-const FIXTURE_DLSITE_PARSER_VERSION = 1;
-
 export function createDlsiteMethods(
   state: FixtureState,
   options: { fetchDelayMs?: number } = {},
@@ -131,7 +129,6 @@ export function createDlsiteMethods(
       info,
       fetchedAt: now,
       expiresAt: now + DEFAULT_DLSITE_CACHE_TTLS_MS.ok,
-      parserVersion: FIXTURE_DLSITE_PARSER_VERSION,
     });
     if (key !== FIXTURE_DLSITE_NO_COVER_RJ_CODE) {
       state.dlsiteCovers.set(fixtureDlsiteCoverKey(info.coverUrl!), {

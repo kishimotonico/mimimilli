@@ -43,11 +43,13 @@ export function requireFixtureRoot(state: FixtureState): string {
   return requireConfiguredRoot(state.rootFolder);
 }
 
+/** fixtureのパーサー版。realと違い、取得ごとの記録も差し替えもない固定値 */
+const FIXTURE_DLSITE_PARSER_VERSION = 1;
+
 export interface FixtureDlsiteFetched {
   info: DlsiteWorkInfo;
   fetchedAt: number;
   expiresAt: number;
-  parserVersion: number;
 }
 
 export interface FixtureDlsiteCover {
@@ -186,7 +188,7 @@ export function fixtureUsableDlsite(
   if (fixtureDlsiteResolutionHead(state, rjCode).kind !== "html") return null;
   const fetched = state.dlsiteFetched.get(normalizeDlsiteCacheKey(rjCode));
   return fetched
-    ? { info: fetched.info, revision: `${fetched.fetchedAt}:${fetched.parserVersion}` }
+    ? { info: fetched.info, revision: `${fetched.fetchedAt}:${FIXTURE_DLSITE_PARSER_VERSION}` }
     : null;
 }
 

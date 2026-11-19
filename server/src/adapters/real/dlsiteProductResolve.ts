@@ -6,7 +6,7 @@ import {
   type DlsiteHtmlOutcome,
   type DlsiteWorkInfo,
 } from "@mimimilli/shared";
-import { DLSITE_PARSER, type DlsiteParser } from "./dlsite.ts";
+import type { DlsiteParser } from "./dlsite.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
 
 type NonHtmlResolution = Exclude<DlsiteCacheResolutionHead, { kind: "html" }>;
@@ -32,7 +32,7 @@ export type DlsiteProductResolver = (productCode: string) => DlsiteProductResolu
  */
 export function createDlsiteProductResolver(
   cache: DlsiteCache,
-  parser: DlsiteParser = DLSITE_PARSER,
+  parser: DlsiteParser,
 ): DlsiteProductResolver {
   return (productCode) => {
     const key = productCode.trim().toUpperCase();

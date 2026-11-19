@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import type { DlsiteWorkInfo } from "@mimimilli/shared";
 import {
+  DLSITE_PARSER,
   DLSITE_PARSER_VERSION,
   normalizeDlsiteCoverUrl,
   parseDlsiteHtml,
@@ -128,7 +129,10 @@ test("パーサーの版が違う解析結果は解析し直される", (t) => {
 test("snapshotが取り直されると、古い解析結果は使われず新しい内容を返す", (t) => {
   const { open, setClock } = setup(t);
   const cache = open();
-  const source = createCandidateDlsiteSource(cache);
+  const source = createCandidateDlsiteSource(
+    cache,
+    createDlsiteProductResolver(cache, DLSITE_PARSER),
+  );
   record(cache, { title: "前のタイトル" });
   assert.equal(deriveCandidateDlsite(source, CODE).state, "fetched");
   setClock(1_010);
@@ -143,7 +147,10 @@ test("snapshotが取り直されると、古い解析結果は使われず新し
 test("状態の導出: ok=取得済み、parse_error=失敗、失敗の記録、TTL切れ=未取得", (t) => {
   const { open, setClock } = setup(t);
   const cache = open();
-  const source = createCandidateDlsiteSource(cache);
+  const source = createCandidateDlsiteSource(
+    cache,
+    createDlsiteProductResolver(cache, DLSITE_PARSER),
+  );
   const stateOf = (code: string) => deriveCandidateDlsite(source, code).state;
 
   assert.equal(stateOf("RJ000009"), "none");
@@ -183,9 +190,15 @@ test("outcomeがokでも解析できなくなったsnapshotは失敗になる", 
     contentType: HTML_CONTENT_TYPE,
     html: "<html><body>タイトルなし</body></html>",
   });
-  const resolution = createDlsiteProductResolver(cache)(CODE);
+  const resolution = createDlsiteProductResolver(cache, DLSITE_PARSER)(CODE);
   assert.equal(dlsiteFetchStateOfProductResolution(resolution), "failed");
-  assert.equal(deriveCandidateDlsite(createCandidateDlsiteSource(cache), CODE).state, "failed");
+  assert.equal(
+    deriveCandidateDlsite(
+      createCandidateDlsiteSource(cache, createDlsiteProductResolver(cache, DLSITE_PARSER)),
+      CODE,
+    ).state,
+    "failed",
+  );
 });
 
 test("カバーはキャッシュにあれば版つきで載り、無ければnull、後から入れれば次の導出で載る", (t) => {
@@ -193,7 +206,10 @@ test("カバーはキャッシュにあれば版つきで載り、無ければnu
   const cache = open();
   const info = record(cache);
   const coverUrl = normalizeDlsiteCoverUrl(info.coverUrl!);
-  const source = createCandidateDlsiteSource(cache);
+  const source = createCandidateDlsiteSource(
+    cache,
+    createDlsiteProductResolver(cache, DLSITE_PARSER),
+  );
 
   assert.deepEqual(deriveCandidateDlsite(source, CODE), {
     state: "fetched",
@@ -211,7 +227,11 @@ test("カバーはキャッシュにあれば版つきで載り、無ければnu
 
 test("RJコードが無い候補は未取得", (t) => {
   const { open } = setup(t);
-  const source = createCandidateDlsiteSource(open());
+  const cache = open();
+  const source = createCandidateDlsiteSource(
+    cache,
+    createDlsiteProductResolver(cache, DLSITE_PARSER),
+  );
   assert.deepEqual(deriveCandidateDlsite(source, null), { state: "none" });
 });
 

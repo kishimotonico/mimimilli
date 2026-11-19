@@ -2,7 +2,9 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { spyOn } from "bun:test";
 import { test, type TestContext } from "node:test";
+import { Scanner } from "../../src/adapters/real/scanner.ts";
 import {
   emptyMetaDlsiteState,
   META_FILE_NAME,
@@ -367,7 +369,14 @@ test("候補の一括追加で一部が失敗しても、失敗した候補に�
   for (const code of ["RJ900201", "RJ900202"]) {
     assert.equal((await adapter.dlsiteFetchByCode(code)).ok, true);
   }
-  writeFileSync(join(root, "RJ900202_失敗", META_FILE_NAME), "occupied");
+  const original = Scanner.prototype.writeNewWorkMeta;
+  const writing = spyOn(Scanner.prototype, "writeNewWorkMeta").mockImplementation(
+    function (this: Scanner, target, options) {
+      if (target.physicalPath.endsWith("RJ900202_失敗")) throw new Error("メタを書けません");
+      return original.call(this, target, options);
+    },
+  );
+  t.after(() => writing.mockRestore());
 
   const result = await adapter.registerScanCandidates(
     (await adapter.listScanCandidates()).map((candidate) => candidate.path),
