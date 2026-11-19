@@ -4,7 +4,8 @@
 import { createElement, type ReactNode } from "react";
 import { render, screen, cleanup, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { scanRecordQueryOptions } from "../../src/entities/scan/queryOptions";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import FilePreview from "../../src/features/files/ui/FilePreview";
@@ -20,6 +21,7 @@ import {
   buildFsEntry,
   buildFsListing,
   buildScanDiagnostics,
+  buildScanRecord,
   buildSettings,
   buildWorkSourceMutationResult,
 } from "../helpers/builders";
@@ -40,6 +42,8 @@ function renderPreview(
   selectedPath: string | null,
   entries: FsEntry[],
   diagnostics: IdentityConflict[] = [],
+  routeOverrides: Parameters<typeof mockApi>[0] = {},
+  extra: ReactNode = null,
 ) {
   playFile.mockClear();
   const settings = buildSettings({ rootFolder: "/lib" });
@@ -48,6 +52,7 @@ function renderPreview(
     "GET /api/scan/diagnostics": buildScanDiagnostics({ identityConflicts: diagnostics }),
     "GET /api/settings": settings,
     "POST /api/works/identity-conflicts/reassign": buildWorkSourceMutationResult(),
+    ...routeOverrides,
   });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), settings);
@@ -57,7 +62,7 @@ function renderPreview(
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(JotaiProvider, { store }, children),
+      createElement(JotaiProvider, { store }, children, extra),
     );
   render(createElement(FilePreview), { wrapper });
   return { store };
@@ -128,6 +133,48 @@ describe("FilePreview ID重複（単一ファイル形式）", () => {
     expect(api.requestsTo("POST /api/works/identity-conflicts/reassign")[0]?.body).toEqual({
       path: metaPath,
     });
+  });
+
+  it("再採番後の再取得でプレビューがアンマウントされても、選択は外れる", async () => {
+    const conflict: IdentityConflict = {
+      kind: "identity_conflict",
+      workId: "w1",
+      paths: ["a/single.mimimilli.json", metaPath],
+    };
+    let reassigned = false;
+    // 再取得に時間のかかる購読者を置き、フック側の onSuccess の待ちを延ばす
+    // （プレビューは先にアンマウントされる）
+    function SlowScanRecordObserver() {
+      useQuery(scanRecordQueryOptions);
+      return null;
+    }
+    const { store } = renderPreview(
+      metaPath,
+      [metaEntry],
+      [conflict],
+      {
+        "GET /api/scan/last": async () => {
+          if (reassigned) await new Promise((resolve) => setTimeout(resolve, 400));
+          return buildScanRecord();
+        },
+        "POST /api/works/identity-conflicts/reassign": () => {
+          reassigned = true;
+          return buildWorkSourceMutationResult();
+        },
+        "GET /api/fs": () => buildFsListing(reassigned ? [] : [metaEntry]),
+        "GET /api/scan/diagnostics": () =>
+          buildScanDiagnostics({ identityConflicts: reassigned ? [] : [conflict] }),
+      },
+      createElement(SlowScanRecordObserver),
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: "別作品として取り込む" }));
+    await userEvent.click(await screen.findByRole("button", { name: "取り込む" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "別作品として取り込む" })).toBeNull(),
+    );
+    await waitFor(() => expect(store.get(filesSelectedPathAtom)).toBeNull());
   });
 
   it("重複対象でないファイルにはID重複セクションを出さない", async () => {
