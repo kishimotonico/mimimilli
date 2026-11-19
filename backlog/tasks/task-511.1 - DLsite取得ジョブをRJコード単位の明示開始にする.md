@@ -1,10 +1,10 @@
 ---
 id: TASK-511.1
 title: DLsite取得ジョブをRJコード単位の明示開始にする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-19 00:23'
-updated_date: '2026-11-19 00:48'
+updated_date: '2026-11-19 01:59'
 labels:
   - scan
   - dlsite
@@ -47,11 +47,17 @@ real/fixture両アダプタで同じ契約を満たすこと（adapter境界よ�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 スキャン完了、候補登録、作品登録（POST /works/projection・POST /works・POST /works/identity-conflicts/reassign）、root再設定後の構築のいずれでもDLsite取得が積まれないことをテストで縛っている
-- [ ] #2 取得ジョブはproduct codeの集合を受け取って開始し、開始時にジョブIDを返す。対象を指定しない全件取得の経路は無い
-- [ ] #3 取得ジョブは同時に1本で、実行中に受けた取得は実行中ジョブのキューへ合流する。起点（まとめて／単発）をproduct codeごとに持ち、再試行と修正後の取得は失敗の記録を無視して取り直す
-- [ ] #4 進捗SSEと再接続用のGETが、ジョブIDとproduct codeごとの起点と状態（取得中・取得済み・該当なし・失敗）を返し、SSEはscanと同じ15秒間隔のheartbeatを送る。中止は起点がまとめてで待機中のコードだけを取り除き、root再設定ではキューをすべて捨てる
-- [ ] #5 取得ジョブと同期の単発取得（POST /dlsite/fetch-by-code・POST /dlsite/:id/fetch）が、取得時にカバー画像もキャッシュへ保存する
-- [ ] #6 クライアントの全件取得の経路（DlsiteBulkRuntime・dlsiteBulkStore・ベルと設定の「まとめて取得」・上のバーの一括取得表示・スキャン完了時のattach）が無く、rg「DlsiteBulkRuntime|dlsiteBulkStore|useDlsiteBulk\b|useDlsiteBulkStore」で参照が残っていない
-- [ ] #7 real/fixture両アダプタで契約を満たし、library.smoke.spec.ts の自動一括取得の前提を書き直したうえで pnpm check・pnpm test・pnpm test:smoke が通る
+- [x] #1 スキャン完了、候補登録、作品登録（POST /works/projection・POST /works・POST /works/identity-conflicts/reassign）、root再設定後の構築のいずれでもDLsite取得が積まれないことをテストで縛っている
+- [x] #2 取得ジョブはproduct codeの集合を受け取って開始し、開始時にジョブIDを返す。対象を指定しない全件取得の経路は無い
+- [x] #3 取得ジョブは同時に1本で、実行中に受けた取得は実行中ジョブのキューへ合流する。起点（まとめて／単発）をproduct codeごとに持ち、再試行と修正後の取得は失敗の記録を無視して取り直す
+- [x] #4 進捗SSEと再接続用のGETが、ジョブIDとproduct codeごとの起点と状態（取得中・取得済み・該当なし・失敗）を返し、SSEはscanと同じ15秒間隔のheartbeatを送る。中止は起点がまとめてで待機中のコードだけを取り除き、root再設定ではキューをすべて捨てる
+- [x] #5 取得ジョブと同期の単発取得（POST /dlsite/fetch-by-code・POST /dlsite/:id/fetch）が、取得時にカバー画像もキャッシュへ保存する
+- [x] #6 クライアントの全件取得の経路（DlsiteBulkRuntime・dlsiteBulkStore・ベルと設定の「まとめて取得」・上のバーの一括取得表示・スキャン完了時のattach）が無く、rg「DlsiteBulkRuntime|dlsiteBulkStore|useDlsiteBulk\b|useDlsiteBulkStore」で参照が残っていない
+- [x] #7 real/fixture両アダプタで契約を満たし、library.smoke.spec.ts の自動一括取得の前提を書き直したうえで pnpm check・pnpm test・pnpm test:smoke が通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+DLsite取得をproduct code単位の明示開始ジョブ（同時に1本、合流、コードごとの起点、まとめての待機中だけ中止、打ち切りでキュー全破棄）に作り直した。API: POST /dlsite/jobs・GET /dlsite/jobs/current・GET /dlsite/jobs/events（共通SSEヘルパー、15秒ping）・DELETE /dlsite/jobs/:jobId/bulk。offlineは開始を拒否。取得本体fetchProductがカバー先取りと同じRJコードの全作品の投影更新（作品単位で隔離）を行い、ジョブ・fetch-by-code・/:id/fetchが共通で使う。暗黙の取得（スキャン完了・候補登録・作品登録・root再設定）を撤去し、クライアントの全件取得の経路を削除した。ADR-0033に昇格・再取得の規則を追記。クライアントの新しい追跡テストの性質は511.6、unlinkedCountの後始末は511.8へ申し送り。
+<!-- SECTION:FINAL_SUMMARY:END -->

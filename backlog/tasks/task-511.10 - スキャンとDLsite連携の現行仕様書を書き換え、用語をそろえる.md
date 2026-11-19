@@ -1,10 +1,10 @@
 ---
 id: TASK-511.10
 title: スキャンとDLsite連携の現行仕様書を書き換える
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-19 00:25'
-updated_date: '2026-11-19 00:42'
+updated_date: '2026-11-19 07:31'
 labels:
   - docs
 dependencies:
@@ -37,9 +37,15 @@ ADR-0033・ADR-0034は決定の記録で、現行仕様書は実装が終わる�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 docs/dlsite.md が登録前の明示取得・追加＝承認・作品詳細の差分確認の流れで書かれ、廃止した機能の記述が無い
-- [ ] #2 docs/requirements-v4.md の§4.4・§8.2ほかスキャン結果とDLsiteの記述が現在の仕様と合っている
-- [ ] #3 docs/ARCHITECTURE.md のスキャン・DLsiteのデータフローが現在の構造と合っている
-- [ ] #4 docs配下（adr/を除く）で rg「まとめて取得|apply-missing|未設定項目|通知ベル|NotificationBell|ファイル欠損」をしても旧仕様の記述が出ない
-- [ ] #5 pnpm check が通る
+- [x] #1 docs/dlsite.md が登録前の明示取得・追加＝承認・作品詳細の差分確認の流れで書かれ、廃止した機能の記述が無い
+- [x] #2 docs/requirements-v4.md の§4.4・§8.2ほかスキャン結果とDLsiteの記述が現在の仕様と合っている
+- [x] #3 docs/ARCHITECTURE.md のスキャン・DLsiteのデータフローが現在の構造と合っている
+- [x] #4 docs配下（adr/を除く）で rg「まとめて取得|apply-missing|未設定項目|通知ベル|NotificationBell|ファイル欠損」をしても旧仕様の記述が出ない
+- [x] #5 pnpm check が通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+requirements-v4.md（§4.4・§7・§8.2ほか）、ARCHITECTURE.md、HANDOFF.md、client-error-handling.md、dlsite.mdを現在の実装に合わせて書き換えた。最終レビューの是正でdlsite.mdのerrorKind・forceの記述、エンドポイント一覧、ADR-0028の表も現状に合わせた。ADRの本文は決定の記録として書き換えていない。
+<!-- SECTION:FINAL_SUMMARY:END -->

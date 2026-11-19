@@ -1,10 +1,10 @@
 ---
 id: TASK-448.3
 title: DLsite ジョブの SSE 配信ロジックを route から切り出す
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-11 08:19'
-updated_date: '2026-11-19 00:37'
+updated_date: '2026-11-19 05:15'
 labels:
   - refactor
   - triage
@@ -22,10 +22,10 @@ server/src/routes/dlsite.ts の GET /dlsite/events に、SSE イベントの直�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 GET /dlsite/events の route が購読の開始と委譲だけになり、直列化・購読解除・終端判定のロジックが route の外にある
-- [ ] #2 SSE の配信順序・リプレイ・切断時の後始末がテストで縛られている
-- [ ] #3 挙動は変わらず、既存テストの期待値を変えていない。pnpm check・pnpm test が通る
-- [ ] #4 DLsiteのSSEもscanと同じ間隔のheartbeatを送り、サーバーのidleTimeoutで切断されない
+- [x] #1 GET /dlsite/events の route が購読の開始と委譲だけになり、直列化・購読解除・終端判定のロジックが route の外にある
+- [x] #2 SSE の配信順序・リプレイ・切断時の後始末がテストで縛られている
+- [x] #3 挙動は変わらず、既存テストの期待値を変えていない。pnpm check・pnpm test が通る
+- [x] #4 DLsiteのSSEもscanと同じ間隔のheartbeatを送り、サーバーのidleTimeoutで切断されない
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -36,4 +36,12 @@ server/src/routes/dlsite.ts の GET /dlsite/events に、SSE イベントの直�
 2026-10-02構造点検（doc-6・doc-7）より: DLsiteのSSE（GET /dlsite/events）にはheartbeatが無く、scan側（15秒ping）と違って無音が続くとサーバーのidleTimeout（90秒）で切れる。ADR-0030は共通原則としてheartbeatを挙げている。切り出す共通SSEヘルパーにheartbeatを持たせる。AC#3の「挙動は変わらず」はheartbeat以外の挙動を指す（doc-6 jobs-2）。
 
 2026-11-19: DLsite SSEのheartbeat（AC#4）はTASK-511.1で吸収する（ADR-0033）。TASK-511.1でDLsiteジョブとSSEの契約が変わるため、route切り出しの残りはTASK-511.1の完了後に要否を判断する。
+
+2026-11-19（TASK-511.1の設計レビューより）: DLsiteのSSEはTASK-511.1で共通SSEヘルパー（直列化・購読解除・終端で閉じる・15秒ping）に載せ、パスは GET /dlsite/jobs/events に変わる。本タスクの残りはscan側をそのヘルパーへ移すことで、feat/scan-dlsite-redesign のmasterマージ前に行う。AC#3「既存テストの期待値を変えない」はscan側についてだけ読む。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+DLsite側はTASK-511.1で共通SSEヘルパー（server/src/lib/sseStream.ts、直列化・購読解除・終端で閉じる・15秒ping）に載せ済み。本タスクでscanのSSE（routes/scan.ts）もstreamJobEventsへ移し、routeを購読と委譲だけにした。scan側の既存テストの期待値は変えていない。
+<!-- SECTION:FINAL_SUMMARY:END -->

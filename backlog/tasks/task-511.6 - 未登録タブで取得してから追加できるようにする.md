@@ -1,10 +1,10 @@
 ---
 id: TASK-511.6
 title: 未登録タブで取得してから追加できるようにする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-19 00:24'
-updated_date: '2026-11-19 00:50'
+updated_date: '2026-11-19 05:15'
 labels:
   - scan
   - dlsite
@@ -42,11 +42,25 @@ ADR-0033・ADR-0034の未登録タブをクライアントに実装する。取�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 候補一覧は仮想リスト（client/src/shared/ui/useVirtualList.ts）で、1000件でも見えている行だけを描画する
-- [ ] #2 「DLsiteから取得」は選択中の候補のうちRJコードがあって未取得（TTL切れを含む）のものだけを対象にし、取得中は同じ枠が進捗と中止に入れ替わって一覧の位置が動かない。枠の件数と中止は起点がまとめてのコードだけを扱い、単発の取得では枠が変わらない
-- [ ] #3 DLsite列が空欄・取得中・取得済み・該当なし・失敗を出し分け、取得済みの行がDLsiteのタイトルとカバーを見せる。該当なしの「修正」と失敗の「再試行」が行の中だけで進む
-- [ ] #4 選択した候補をツールバーの「除外」で除外でき、行ごとの除外ボタンは無い。除外を元に戻す操作が今までどおり使える。行方不明の作品と同じRJコードの候補の行に注記が出る
-- [ ] #5 「N件を追加」が取得中の候補を除いて追加し、▾の「項目を選んで追加…」で反映項目を選べる。取得していないRJコードあり候補を含むときだけ「うちM件はDLsite情報なし」が出る
-- [ ] #6 追加すると新規作品タブに移り、モーダルを閉じて開き直しても、取得の進捗と結果が残っている
-- [ ] #7 pnpm test:smoke を含めて pnpm check・pnpm test が通る
+- [x] #1 候補一覧は仮想リスト（client/src/shared/ui/useVirtualList.ts）で、1000件でも見えている行だけを描画する
+- [x] #2 「DLsiteから取得」は選択中の候補のうちRJコードがあって未取得（TTL切れを含む）のものだけを対象にし、取得中は同じ枠が進捗と中止に入れ替わって一覧の位置が動かない。枠の件数と中止は起点がまとめてのコードだけを扱い、単発の取得では枠が変わらない
+- [x] #3 DLsite列が空欄・取得中・取得済み・該当なし・失敗を出し分け、取得済みの行がDLsiteのタイトルとカバーを見せる。該当なしの「修正」と失敗の「再試行」が行の中だけで進む
+- [x] #4 選択した候補をツールバーの「除外」で除外でき、行ごとの除外ボタンは無い。除外を元に戻す操作が今までどおり使える。行方不明の作品と同じRJコードの候補の行に注記が出る
+- [x] #5 「N件を追加」が取得中の候補を除いて追加し、▾の「項目を選んで追加…」で反映項目を選べる。取得していないRJコードあり候補を含むときだけ「うちM件はDLsite情報なし」が出る
+- [x] #6 追加すると新規作品タブに移り、モーダルを閉じて開き直しても、取得の進捗と結果が残っている
+- [x] #7 pnpm test:smoke を含めて pnpm check・pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-19（TASK-511.1の設計確定より）: 取得ジョブのAPIは POST /dlsite/jobs（productCodesは1〜1000件、上限はsharedの定数）、GET /dlsite/jobs/current、GET /dlsite/jobs/events、中止は DELETE /dlsite/jobs/:jobId/bulk。選択が上限を超えたら上限ごとに分割して連続POSTする（合流するので1本のジョブになる）。状態は queued|fetching|fetched|not_found|failed で、queuedとfetchingは画面では「取得中」に畳む。offlineのときPOSTは offline エラーで拒否される。行の更新はSSEのcodeイベントで行い、候補一覧の無効化は間引く（resolveがヒットのたびにHTMLをgunzipするため）。
+
+2026-11-19（TASK-511.1のレビューより）: 511.1で旧クライアントの一括取得の追跡（dlsiteBulkStore・DlsiteBulkRuntime）とそのテストを削除した。新しい追跡を作るとき、次の性質をテストで縛り直す: 多重startの抑止、応答待ち中のresetでSSEを開かない、二重completeの無視、アンマウント時のclose、切断からの復旧、不正なイベントで固着しない、追跡外jobIdのGETでの確定（打ち切り後の GET /dlsite/jobs/current は null を返すので、追跡中のジョブがnullなら終わったとみなす）、409 root_reconfiguring、取得の進捗でApp全体が再レンダリングされない（旧 appRootSubscriptions のテスト）、終端時のキャッシュ無効化（旧 updateCachesAfterDlsiteBulkFetch の相当。候補一覧と同じRJコードの作品の詳細・一覧）。取得の対象は「選択した候補のうちRJコードがあって未取得のもの」（ADR-0033）で、その選び方は本タスクで決めて縛る。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+DLsite取得ジョブのクライアント追跡（dlsiteJobStore・DlsiteJobRuntime）を作り、SSE購読・再接続時のGETでの確定（遅れたGETで巻き戻さない）・終端での候補一覧と同じRJコードの作品の無効化を行う。未登録タブを作り直し、ツールバー（すべて選択・除外・問題のある件だけ表示）、取得ボタンとまとめての進捗・中止を同じ枠で入れ替え、仮想リストの行でDLsite状態・カバー・タイトル・修正・再試行・行方不明の注記を出し、分割ボタンで取得中を除いて追加（▾で反映項目）。SplitButton・StatusLabelを追加、Modalに幅960・高さ固定。候補にrjCodeEdited。あわせてFilesの再採番・登録解除の後処理をmutateAsync完了後へ移し、アンマウントで選択が残る不具合（smokeの約20%失敗）を直した。
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,10 +1,10 @@
 ---
 id: TASK-511.5
 title: データ不整合の作品を作品単位で読み直せるようにする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-19 00:23'
-updated_date: '2026-11-19 00:50'
+updated_date: '2026-11-19 05:15'
 labels:
   - scan
 dependencies:
@@ -30,9 +30,15 @@ fixture: fixtureアダプタは dataIntegrityWarning のダミー（server/src/a
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Work IDを指定して、その作品だけを作品情報ファイルから読み直してcatalogを作り直すAPIがある
-- [ ] #2 realアダプタのテストで、catalogの値を壊して除外された作品が、読み直し後に作品一覧（GET /works）へ戻り、直近のスキャン結果（GET /scan/last。TASK-511.11で実行単位の項目を返す経路）の dataIntegrityWarning からも消えることを確認している
-- [ ] #3 作品情報ファイルが無い・読めないなど読み直しで直らないときはエラーを返し、ほかの作品のcatalogに影響しない
-- [ ] #4 fixtureアダプタで、データ不整合の作品を読み直すと GET /scan/last の dataIntegrityWarning から対象が消える
-- [ ] #5 pnpm check・pnpm test が通る
+- [x] #1 Work IDを指定して、その作品だけを作品情報ファイルから読み直してcatalogを作り直すAPIがある
+- [x] #2 realアダプタのテストで、catalogの値を壊して除外された作品が、読み直し後に作品一覧（GET /works）へ戻り、直近のスキャン結果（GET /scan/last。TASK-511.11で実行単位の項目を返す経路）の dataIntegrityWarning からも消えることを確認している
+- [x] #3 作品情報ファイルが無い・読めないなど読み直しで直らないときはエラーを返し、ほかの作品のcatalogに影響しない
+- [x] #4 fixtureアダプタで、データ不整合の作品を読み直すと GET /scan/last の dataIntegrityWarning から対象が消える
+- [x] #5 pnpm check・pnpm test が通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+POST /works/:id/reload を追加。catalogの作品情報ファイルのパスから読み直して投影し、データ不整合で除外された作品を戻す。投影後も一覧に戻らないとき（user DBの破損等）・ファイルが無い/読めないときはエラーで、記録のデータ不整合は成功時だけ消す。source_changedは既存の編集系と同じエラー。作品情報ファイル系のエラー文言を操作に依らない形にした。クライアントのreloadWork・useReloadWorkMutation・updateCachesAfterWorkReloadを用意（ボタンは511.12）。
+<!-- SECTION:FINAL_SUMMARY:END -->

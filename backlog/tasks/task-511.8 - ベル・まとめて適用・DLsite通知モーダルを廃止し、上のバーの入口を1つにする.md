@@ -1,10 +1,10 @@
 ---
 id: TASK-511.8
 title: ベル・まとめて適用・DLsite通知を廃止し、上のバーの入口を1つにする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-19 00:25'
-updated_date: '2026-11-19 00:51'
+updated_date: '2026-11-19 07:31'
 labels:
   - scan
   - dlsite
@@ -42,10 +42,22 @@ ADR-0028 の必須更新表の「DLsite 未設定項目の一括適用」行と�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 rg「NotificationBell|RjCodeMissingModal|DlsiteFetchFailedModal|DlsiteParseFailedModal|DlsiteNotificationModals|dlsiteNotifications|dlsite/notifications|DlsiteNotification」が client/・server/・shared/ で0件
-- [ ] #2 rg「apply-missing|applyMissing|ApplyMissing|DlsiteBulkApply|dlsiteBulkApply|useDlsiteBulkApplyActions」が client/・server/・shared/ で0件
-- [ ] #3 設定画面にDLsite節が無い
-- [ ] #4 上のバーのスキャン関連の入口が1つで件数を出さず、スキャン中とまとめての取得中は進捗の輪、前回開いてから新しい候補か要対応が出たときだけ点が付き、開くと消える（単発の取得では輪が出ない）
-- [ ] #5 削除した機能を参照していたunit・server・smokeテストが、期待値を緩めずに削除または新しい仕様で書き直されている
-- [ ] #6 pnpm test:smoke を含めて pnpm check・pnpm test が通る
+- [x] #1 rg「NotificationBell|RjCodeMissingModal|DlsiteFetchFailedModal|DlsiteParseFailedModal|DlsiteNotificationModals|dlsiteNotifications|dlsite/notifications|DlsiteNotification」が client/・server/・shared/ で0件
+- [x] #2 rg「apply-missing|applyMissing|ApplyMissing|DlsiteBulkApply|dlsiteBulkApply|useDlsiteBulkApplyActions」が client/・server/・shared/ で0件
+- [x] #3 設定画面にDLsite節が無い
+- [x] #4 上のバーのスキャン関連の入口が1つで件数を出さず、スキャン中とまとめての取得中は進捗の輪、前回開いてから新しい候補か要対応が出たときだけ点が付き、開くと消える（単発の取得では輪が出ない）
+- [x] #5 削除した機能を参照していたunit・server・smokeテストが、期待値を緩めずに削除または新しい仕様で書き直されている
+- [x] #6 pnpm test:smoke を含めて pnpm check・pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-19（TASK-511.1のレビューより）: 511.1でベルの「DLsite未連携」行を削除した結果、unlinkedCount（client useDlsiteNotificationSummary から shared/api・server core/dlsiteNotifications・workQuerySql の DLSITE_UNLINKED_CASE・isDlsiteUnlinked まで）の消費者がなくなった。GET /dlsite/notifications の廃止とあわせて、使われなくなる経路を消す。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+上のバーのスキャン関連の入口を1つにし（件数なし、スキャン中は回る弧・まとめての取得中は割合の輪、前回開いてから新しい候補・要対応が出たときだけ点、記憶はlocalStorageでroot再設定時に消す）、ベル・DLsite通知モーダル3つ・GET /dlsite/notifications・まとめて適用（apply-missing 2本とダイアログ）・設定のDLsite節・通知用SQLと述語・未設定項目の4関数・text-badgeトークンを削除した。ADR-0028を現在の経路に合わせ、ADR-0033にADR-0008の例外の廃止を追記。作品詳細の警告が使う述語のテストを足した。
+<!-- SECTION:FINAL_SUMMARY:END -->

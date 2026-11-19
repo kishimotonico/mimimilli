@@ -1,10 +1,10 @@
 ---
 id: TASK-511.4
 title: スキャン結果に作品ごとの変化の種類を持たせる
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-19 00:23'
-updated_date: '2026-11-19 00:39'
+updated_date: '2026-11-19 01:35'
 labels:
   - scan
 dependencies:
@@ -32,8 +32,14 @@ ADR-0034の「スキャン結果は作品ごとに変化の種類を返す」の
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 既存作品ごとに、移動（旧パス付き）・作品情報・ファイル構成（音声の増減数付き）の種類を返し、1作品が複数の種類を持てる
-- [ ] #2 エラーからの復帰や「すべて読み直す」で読み直しただけの作品は、変化として返らない
-- [ ] #3 変化の種類の判定がcoreの関数に抽出され、種類ごとと複合の場合を単体テストで縛っている
-- [ ] #4 real/fixture両アダプタで契約を満たし、既存クライアントの呼び出し元が追随していて、pnpm check・pnpm test が通る
+- [x] #1 既存作品ごとに、移動（旧パス付き）・作品情報・ファイル構成（音声の増減数付き）の種類を返し、1作品が複数の種類を持てる
+- [x] #2 エラーからの復帰や「すべて読み直す」で読み直しただけの作品は、変化として返らない
+- [x] #3 変化の種類の判定がcoreの関数に抽出され、種類ごとと複合の場合を単体テストで縛っている
+- [x] #4 real/fixture両アダプタで契約を満たし、既存クライアントの呼び出し元が追随していて、pnpm check・pnpm test が通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+ScanResult.updatedWorkIdsをupdatedWorks（workId・changes）に置き換え、変化の種類（moved: from/to root相対、meta、files: audioDelta）を返す。判定はserver/src/core/workChanges.tsのclassifyWorkChangesに抽出（移動はmetaPath差、metaはsourceRevision差、filesはmediaRevision差、前回か今回がerrorなら変化なし）し、core・realの両方でテストした。mtimeが変わる移動でfiles(0)が出うる点は許容（Windowsのエクスプローラーは更新日時を保つ。同サイズの差し替え検出にmtimeが要る）。DRAFT-72は判断ロジックのcore抽出の第一弾として本タスクで変化の種類判定を扱った。分類・重複判定・メタ差分マージ等は残るので、DRAFT-72は残す。
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,10 +1,10 @@
 ---
 id: TASK-511
 title: スキャン画面とDLsite連携を作り直す
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-19 00:23'
-updated_date: '2026-11-19 00:50'
+updated_date: '2026-11-19 07:31'
 labels:
   - scan
   - dlsite
@@ -45,12 +45,22 @@ ordinal: 569000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 子タスクがすべて完了している
-- [ ] #2 統合ブランチ全体の最終レビューを通し、masterへ--no-ffでマージしている
+- [x] #1 子タスクがすべて完了している
+- [x] #2 統合ブランチ全体の最終レビューを通し、masterへ--no-ffでマージしている
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 行方不明の作品と同じRJコードの候補を引き継ぐ操作は契約が未決のため DRAFT-77 に分けた（ADR-0034）。決まったら子タスクを追加する。
+
+2026-11-19: DRAFT-72はTASK-511.4で変化の種類判定をcore（server/src/core/workChanges.ts）へ抽出して単体テスト化した。分類・重複判定・メタ差分マージ等の残りがあるため、ドラフトは残す。
+
+2026-11-19（TASK-511.9のレビューより）: 作品情報ファイルの書き込み（patchWorkSource・updateDlsiteState・作品詳細の適用など、mutateMetaSource 経由の全経路）は catalog の metaPath を root で封じ込めないので、登録後に作品フォルダーをルート外を指すsymlinkへ差し替えると、その先の mimimilli.json を書き換える。スキャンはsymlinkのディレクトリを追従せず、Filesの登録も resolveWithin で弾くため、成立にはユーザー自身のローカル操作が要る。TASK-510 と同じ根拠（影響がローカル操作に閉じる）で対応なしとした。511.9以前は applyCover=true のときだけカバー確定の resolveWithin が偶然弾いていた。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+子タスク12本（511.1〜511.12）とTASK-448.3・448.4を feat/scan-dlsite-redesign に集約し、最終レビュー（Fable）の是正を経て master へ --no-ff でマージした（b2438b8c）。DLsite取得は登録前の明示ジョブ、追加が承認、作品詳細は差分確認で適用、DLsite情報はサーバーがキャッシュから読む。スキャン画面は未登録・新規作品・要対応・更新済みの4タブで今回のスキャン結果だけを扱い、ベル・通知・まとめて適用を廃止した。作品情報ファイルの書き込みがルート外symlinkを封じ込めない既存の穴は対応なし（notesに根拠）。
+<!-- SECTION:FINAL_SUMMARY:END -->
