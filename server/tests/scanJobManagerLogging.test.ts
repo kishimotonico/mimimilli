@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { ScanResult } from "@mimimilli/shared";
+import { workspacePath, type ScanResult } from "@mimimilli/shared";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import type { DataAdapter } from "../src/adapter/index.ts";
 import { ScanJobManager } from "../src/scanJobManager.ts";
@@ -9,7 +9,10 @@ import { captureLogs, scanRecords } from "./helpers/logCapture.ts";
 const emptyResult: ScanResult = {
   registered: 0,
   insertedWorkIds: [],
+  startedWithEmptyCatalog: false,
+  missingWorks: [],
   updatedWorks: [],
+  unreadablePaths: [],
   errors: 0,
   missing: 0,
   skipped: 0,
@@ -56,10 +59,14 @@ function recordMessage(record: { message: readonly unknown[] }): string {
 }
 
 test("完了時に scan カテゴリの INFO 要約ログを1回記録する", async () => {
-  const unreadablePaths = Array.from({ length: 12 }, (_, index) => `/blocked/${index}`);
+  const unreadablePaths = Array.from({ length: 12 }, (_, index) =>
+    workspacePath(`blocked/${index}`),
+  );
   const result: ScanResult = {
     registered: 4,
     insertedWorkIds: ["RJ501011", "RJ501012"],
+    startedWithEmptyCatalog: false,
+    missingWorks: [],
     updatedWorks: [],
     errors: 1,
     missing: 3,

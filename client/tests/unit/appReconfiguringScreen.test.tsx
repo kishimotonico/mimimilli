@@ -25,7 +25,7 @@ import {
 import type { Settings } from "@mimimilli/shared";
 import { mockApi, type ApiMock } from "../helpers/api";
 import { appShellRoutes } from "../helpers/appShellApi";
-import { buildScanLastResult, buildScanResult, buildSettings } from "../helpers/builders";
+import { buildScanRecord, buildSettings } from "../helpers/builders";
 
 const DLSITE_JOB_START_ROUTE = "POST /api/dlsite/jobs";
 const DLSITE_JOB_CURRENT_ROUTE = "GET /api/dlsite/jobs/current";
@@ -33,7 +33,6 @@ const LAST_SCAN_ROUTE = "GET /api/scan/last";
 const PREVIEW_ROUTE = "POST /api/dlsite/apply-missing/preview";
 
 let api: ApiMock;
-let insertedWorkIds: string[];
 let serverSettings: Settings;
 let previewReply: () => unknown;
 
@@ -92,14 +91,12 @@ beforeEach(() => {
   vi.restoreAllMocks();
   sessionStorage.clear();
   history.replaceState(null, "", "/");
-  insertedWorkIds = [];
   serverSettings = settingsOf({ status: "idle", completedAt: null });
   previewReply = () => new Promise(() => {});
   api = mockApi(
     appShellRoutes({
       "GET /api/settings": () => serverSettings,
-      [LAST_SCAN_ROUTE]: () =>
-        buildScanLastResult({ result: buildScanResult({ insertedWorkIds }) }),
+      [LAST_SCAN_ROUTE]: () => buildScanRecord(),
       [PREVIEW_ROUTE]: () => previewReply(),
       "POST /api/root-reconfiguration": () => ({
         status: "running",
@@ -162,9 +159,7 @@ describe("root再設定中の画面", () => {
 });
 
 describe("root再設定完了後のDLsite取得", () => {
-  it("新規作品があってもDLsite取得を始めず、取得ジョブの状態も取りに行かない", async () => {
-    insertedWorkIds = ["work-1"];
-
+  it("DLsite取得を始めず、取得ジョブの状態も取りに行かない", async () => {
     const { queryClient } = renderAppWithSettings(
       settingsOf({ status: "running", rootFolder: "/audio/library", progress: null }),
     );
@@ -253,7 +248,6 @@ describe("root再設定の高速完了（runningが描画されない）競合",
       lastScanTime: "2026-01-01T00:00:00.000Z",
       rootReconfiguration: { status: "idle", completedAt: null },
     });
-    insertedWorkIds = ["work-2"];
 
     const { queryClient } = renderAppWithSettings(
       settingsOf({ status: "idle", completedAt: null }),

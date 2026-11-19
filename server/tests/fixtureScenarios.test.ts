@@ -4,7 +4,6 @@ import assert from "node:assert/strict";
 import { workspacePath } from "@mimimilli/shared";
 import type { DataAdapter } from "../src/adapter/index.ts";
 import { createApp } from "./helpers/testApp.ts";
-import { pollUntil } from "./helpers/poll.ts";
 import { createClassificationMethods } from "../src/adapters/fixture/classification.ts";
 import { createCoverMediaMethods } from "../src/adapters/fixture/coverMedia.ts";
 import { createDlsiteMethods } from "../src/adapters/fixture/dlsiteMethods.ts";
@@ -48,26 +47,35 @@ test("シナリオ省略時は default として動作する", async () => {
   assert.ok(body.items.length > 0);
 });
 
-test("new-work: スキャン結果に新規作品IDが含まれる", async () => {
-  const app = buildApp("new-work");
+test("new-work: スキャン結果に新規作品・新たな行方不明・読み取れなかったパスが含まれる", async () => {
+  const adapter = createFixtureAdapter({ scenario: "new-work" });
 
-  const started = await app.request("/api/scan", { method: "POST" });
-  assert.equal(started.status, 202);
-  const { job } = await started.json();
-  await pollUntil(async () => {
-    const state = await app.request(`/api/scan/${job.id}`);
-    const snapshot = await state.json();
-    return snapshot.status === "completed";
-  });
-  const state = await app.request(`/api/scan/${job.id}`);
-  const snapshot = await state.json();
-  assert.deepEqual(snapshot.result.insertedWorkIds, ["RJ501011", "RJ501001", "RJ501003"]);
+  const first = await adapter.scan();
+  assert.equal(first.startedWithEmptyCatalog, false);
+  assert.deepEqual(first.insertedWorkIds, ["RJ501011", "RJ501001", "RJ501003"]);
+  assert.deepEqual(
+    first.missingWorks.map((work) => work.workId),
+    ["RJ501008"],
+  );
+  assert.equal(first.missingWorks[0]?.title, "ツンデレ後輩との放課後トレーニング【ボイスドラマ】");
+  assert.equal(
+    first.missingWorks[0]?.previousPath,
+    "dlsite/月白製作所/RJ501008_ツンデレ後輩との放課後トレーニング",
+  );
+  assert.deepEqual(first.unreadablePaths, ["権限なし/フォルダー"]);
+  assert.equal((await adapter.getWork("RJ501008"))?.status, "missing");
+
+  // 以前から行方不明の作品は、次のスキャンでは新たな行方不明に含めない
+  const second = await adapter.scan();
+  assert.deepEqual(second.missingWorks, []);
 
   // 新規作品自体は works 一覧に存在する（スキャンで見つかった扱い）
-  const worksRes = await app.request("/api/works");
-  const { items } = await worksRes.json();
-  const ids: string[] = items.map((w: { id: string }) => w.id);
-  assert.ok(ids.includes("RJ501011"));
+  assert.ok(await adapter.getWork("RJ501011"));
+});
+
+test("empty: 作品が1件もない状態で始めたスキャンは startedWithEmptyCatalog になる", async () => {
+  const adapter = createFixtureAdapter({ scenario: "empty" });
+  assert.equal((await adapter.scan()).startedWithEmptyCatalog, true);
 });
 
 test("new-work: Files用診断とscan確認用の候補・問題を独立して返す", async () => {

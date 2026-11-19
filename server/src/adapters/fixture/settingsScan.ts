@@ -1,5 +1,11 @@
-import { META_FILE_NAME, dlsiteFetchStateOfResolution, workspacePath } from "@mimimilli/shared";
+import {
+  META_FILE_NAME,
+  dlsiteFetchStateOfResolution,
+  relativeToRoot,
+  workspacePath,
+} from "@mimimilli/shared";
 import type {
+  MissingWork,
   ScanCandidate,
   ScanCandidateDlsite,
   ScanCandidateFolder,
@@ -83,6 +89,23 @@ function visibleFolders(state: FixtureState): ScanCandidateFolder[] {
   return state.scanCandidates.filter((folder) => !excluded.has(folder.path));
 }
 
+/** シナリオが指定した作品を行方不明にし、今回新たに行方不明になった作品として返す。 */
+function markScenarioMissingWorks(state: FixtureState): MissingWork[] {
+  const rootAbs = normalizeFsPath(requireFixtureRoot(state));
+  const missingWorks: MissingWork[] = [];
+  for (const work of state.works) {
+    if (!state.scanNewlyMissingWorkIds.includes(work.id) || work.status === "missing") continue;
+    missingWorks.push({
+      workId: work.id,
+      title: work.title,
+      previousPath: relativeToRoot(work.physicalPath, rootAbs),
+    });
+    work.status = "missing";
+    work.errorMessage = null;
+  }
+  return missingWorks;
+}
+
 async function runPseudoScan(
   state: FixtureState,
   options: ScanOptions,
@@ -94,6 +117,7 @@ async function runPseudoScan(
       throw new DOMException("スキャンはキャンセルされました", "AbortError");
   };
   const pseudoSteps = 4;
+  const startedWithEmptyCatalog = state.works.length === 0;
 
   checkAbort();
   emit({ type: "progress", phase: "walking", processed: 0, total: 0 });
@@ -109,6 +133,7 @@ async function runPseudoScan(
   checkAbort();
   emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
 
+  const missingWorks = markScenarioMissingWorks(state);
   state.works = state.works.map((work) => checkWorkPlacement(state, work));
   state.lastScanTime = new Date().toISOString();
   state.scanCandidates = [...state.scanCandidatePool];
@@ -116,12 +141,14 @@ async function runPseudoScan(
   return {
     registered: state.works.length,
     insertedWorkIds: state.scanInsertedWorkIds,
+    startedWithEmptyCatalog,
+    missingWorks,
     updatedWorks: state.scanUpdatedWorks,
     errors: state.works.filter((w) => w.status === "error").length,
     missing: state.works.filter((w) => w.status === "missing").length,
     skipped: 0,
     coverErrors: 0,
-    unreadablePaths: [],
+    unreadablePaths: state.scanUnreadablePaths,
     ...(state.dataIntegrityWarning ? { dataIntegrityWarning: state.dataIntegrityWarning } : {}),
   };
 }

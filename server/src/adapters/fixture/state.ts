@@ -13,6 +13,7 @@ import type {
   SmartFolder,
   TagPrefix,
   WorkSummary,
+  WorkspacePath,
 } from "@mimimilli/shared";
 import {
   SEED_PLAYLIST_SPECS,
@@ -86,6 +87,8 @@ export interface FixtureState {
   scanInsertedWorkIds: string[];
   /** scan() が updatedWorks として返す、変化のあった既存作品 */
   scanUpdatedWorks: UpdatedWork[];
+  scanNewlyMissingWorkIds: string[];
+  scanUnreadablePaths: WorkspacePath[];
   /** 永続化された候補除外パス */
   scanCandidateExclusions: string[];
   identityConflicts: IdentityConflict[];
@@ -271,6 +274,8 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     playlistSpecs: new Map(Object.entries({ ...SEED_PLAYLIST_SPECS, ...options.playlistSpecs })),
     scanInsertedWorkIds: scenario.scanInsertedWorkIds,
     scanUpdatedWorks: scenario.scanUpdatedWorks,
+    scanNewlyMissingWorkIds: scenario.scanNewlyMissingWorkIds,
+    scanUnreadablePaths: scenario.scanUnreadablePaths,
     scanCandidateExclusions: [],
     identityConflicts: options.identityConflicts ?? scenario.identityConflicts,
     scanCandidatePool: scenario.scanCandidates,

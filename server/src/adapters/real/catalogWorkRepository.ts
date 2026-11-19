@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
   parseTag,
   probeResultFromCache,
@@ -306,56 +306,30 @@ export class CatalogWorkRepository {
     );
   }
 
-  markMissingExcept(foundIds: string[], unverifiedIds: string[] = []): void {
-    const set = { status: "missing", errorMessage: null } as const;
-    if (foundIds.length === 0) {
-      if (unverifiedIds.length === 0) {
-        this.db.catalog
-          .update(works)
-          .set({ ...set, verificationStatus: "verified" })
-          .run();
-      } else {
-        this.db.catalog
-          .update(works)
-          .set({ verificationStatus: "unverified" })
-          .where(inArray(works.id, unverifiedIds))
-          .run();
-        this.db.sqlite.exec(
-          "UPDATE main.works SET status = 'missing', error_message = NULL, verification_status = 'verified' " +
-            "WHERE id NOT IN (SELECT id FROM main.works WHERE verification_status = 'unverified')",
-        );
-      }
-      return;
-    }
-    const sqlite = this.db.sqlite;
-    sqlite.exec("DROP TABLE IF EXISTS temp.scan_seen_ids");
-    sqlite.exec("CREATE TEMP TABLE scan_seen_ids (id TEXT PRIMARY KEY)");
-    try {
-      const insert = sqlite.prepare("INSERT INTO temp.scan_seen_ids (id) VALUES (?)");
-      for (const id of foundIds) insert.run(id);
-      const insertUnverified = sqlite.prepare(
-        "INSERT OR IGNORE INTO temp.scan_seen_ids (id) VALUES (?)",
-      );
-      for (const id of unverifiedIds) insertUnverified.run(id);
-      if (unverifiedIds.length > 0) {
-        const placeholders = unverifiedIds.map(() => "?").join(",");
-        sqlite
-          .query(
-            `UPDATE main.works SET verification_status = 'unverified' WHERE id IN (${placeholders})`,
-          )
-          .run(...unverifiedIds);
-      }
-      sqlite.exec(
-        "UPDATE main.works SET status = 'missing', error_message = NULL, verification_status = 'verified' " +
-          "WHERE id NOT IN (SELECT id FROM temp.scan_seen_ids)",
-      );
-      sqlite.exec(
-        "UPDATE main.works SET verification_status = 'verified' " +
-          "WHERE id IN (SELECT id FROM temp.scan_seen_ids) AND verification_status <> 'unverified'",
-      );
-    } finally {
-      sqlite.exec("DROP TABLE IF EXISTS temp.scan_seen_ids");
-    }
+  /** スキャンの判定を反映する。missingIds だけを missing にし、スキャン中に登録された作品など、それ以外には触れない。 */
+  applyScanVerdict(input: {
+    seenIds: string[];
+    unverifiedIds: string[];
+    missingIds: string[];
+  }): void {
+    const run = (sql: string, ids: string[]): void => {
+      if (ids.length === 0) return;
+      this.db.sqlite.query(sql).run(JSON.stringify(ids));
+    };
+    run(
+      "UPDATE main.works SET verification_status = 'unverified' WHERE id IN (SELECT value FROM json_each(?))",
+      input.unverifiedIds,
+    );
+    run(
+      "UPDATE main.works SET verification_status = 'verified' " +
+        "WHERE id IN (SELECT value FROM json_each(?)) AND verification_status <> 'unverified'",
+      input.seenIds,
+    );
+    run(
+      "UPDATE main.works SET status = 'missing', error_message = NULL, verification_status = 'verified' " +
+        "WHERE id IN (SELECT value FROM json_each(?))",
+      input.missingIds,
+    );
   }
 
   countByStatus(status: string): number {

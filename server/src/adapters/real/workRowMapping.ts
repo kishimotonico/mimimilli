@@ -79,6 +79,7 @@ export type RawWorkListRow = {
 };
 
 export interface ScanWorkState {
+  title: string;
   metaPath: string;
   sourceRevision: string | null;
   projectionRevision: string | null;

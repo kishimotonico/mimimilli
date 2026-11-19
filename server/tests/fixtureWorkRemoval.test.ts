@@ -52,7 +52,7 @@ test("unregisterMissingWorksはmissingな作品のdlsiteLinkagesエントリだ�
   const adapter = createWorkMethods(state);
 
   const result = await adapter.unregisterMissingWorks();
-  assert.deepEqual(result, { deletedCount: 1, failedCount: 0 });
+  assert.deepEqual(result, { deletedCount: 1, failedCount: 0, deletedWorkIds: ["w1"] });
   assert.equal(state.dlsiteLinkages.has("w1"), false);
   assert.ok(state.dlsiteLinkages.has("w2"));
 });
@@ -89,7 +89,7 @@ test("unregisterMissingWorksはmissingな作品のpathをidentity_conflict診断
   const adapter = createWorkMethods(state);
 
   const result = await adapter.unregisterMissingWorks();
-  assert.deepEqual(result, { deletedCount: 1, failedCount: 0 });
+  assert.deepEqual(result, { deletedCount: 1, failedCount: 0, deletedWorkIds: ["w1"] });
   assert.deepEqual(state.identityConflicts, []);
 });
 

@@ -3,6 +3,7 @@ import { streamSSE } from "hono/streaming";
 import {
   scanConflictResponseSchema,
   scanDiagnosticsSchema,
+  scanRecordSchema,
   scanCandidatesMutationSchema,
   scanCandidatesRegisterRequestSchema,
   scanCandidatesRegisterResponseSchema,
@@ -76,8 +77,7 @@ export function scanRoute(
   });
 
   app.get("/scan/last", (c) => {
-    const last = jobs.getLastCompleted();
-    return last ? c.json(last) : c.body(null, 204);
+    return c.json(scanRecordSchema.parse(jobs.record.snapshot()));
   });
 
   app.get("/scan/diagnostics", async (c) => {

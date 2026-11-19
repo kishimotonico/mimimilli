@@ -63,3 +63,45 @@ test("root再設定の開始は、DLsite取得ジョブのキューを起点を�
   assert.equal(dlsiteJobs.getSnapshot(), null);
   await workflow.shutdown();
 });
+
+test("root再設定の開始でスキャンの記録を空にし、構築の完了で構築結果の記録に置き換わる（開始時にcatalogが空なら新規作品は空）", async () => {
+  const adapter = createFixtureAdapter({ scenario: "new-work", rootRebuildStepMs: 200 });
+  const scanJobs = new ScanJobManager(adapter);
+  const dlsiteJobs = new DlsiteJobManager(adapter);
+  scanJobs.record.addNewWorks(["stale"]);
+  scanJobs.record.replace(
+    {
+      registered: 0,
+      insertedWorkIds: ["stale"],
+      startedWithEmptyCatalog: false,
+      missingWorks: [],
+      updatedWorks: [{ workId: "stale", changes: [{ kind: "meta" }] }],
+      errors: 0,
+      missing: 0,
+      skipped: 0,
+      coverErrors: 0,
+      unreadablePaths: [],
+    },
+    "2026-01-01T00:00:00.000Z",
+  );
+
+  const workflow = new RootReconfigurationWorkflow(adapter, scanJobs, dlsiteJobs, async () => {});
+  await workflow.start("/library/dlsite/夜想曲スタジオ");
+  assert.equal(scanJobs.record.snapshot().finishedAt, null);
+  await workflow.shutdown();
+
+  scanJobs.recordCompleted({
+    registered: 1,
+    insertedWorkIds: ["all-new-on-first-build"],
+    startedWithEmptyCatalog: true,
+    missingWorks: [],
+    updatedWorks: [],
+    errors: 0,
+    missing: 0,
+    skipped: 0,
+    coverErrors: 0,
+    unreadablePaths: [],
+  });
+  assert.deepEqual(scanJobs.record.workIds("new"), []);
+  assert.equal(typeof scanJobs.record.snapshot().finishedAt, "string");
+});

@@ -90,7 +90,7 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
   api.route("/", settingsRoute(adapter, rootReconfiguration));
   api.route("/", rootReconfigurationRoute(rootReconfiguration));
   api.route("/", scanRoute(scanJobs));
-  api.route("/", worksRoute(adapter));
+  api.route("/", worksRoute(adapter, scanJobs.record));
   api.route("/", axesRoute(adapter));
   api.route("/", tagPrefixesRoute(adapter));
   api.route("/", smartFoldersRoute(adapter));
@@ -104,6 +104,7 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
       await rootReconfiguration.cancelActiveAndAwait();
       await scanJobs.cancelActiveAndAwait();
       await dlsiteJobs.cancelActiveAndAwait();
+      scanJobs.record.reset();
       resetFixtureState();
       return c.json({ ok: true });
     });

@@ -17,8 +17,7 @@ import { createFakeScanJobStore } from "../helpers/fakeJobStores";
 import { mockApi } from "../helpers/api";
 import {
   buildDlsiteNotificationSummary,
-  buildScanLastResult,
-  buildScanResult,
+  buildScanRecord,
   buildSettings,
 } from "../helpers/builders";
 import { seedLibraryRoute } from "../helpers/route";
@@ -81,7 +80,7 @@ function seedQueryCache(queryClient: QueryClient) {
     SETTINGS_QUERY_KEYS.all(),
     buildSettings({ rootFolder: "/test-library" }),
   );
-  queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanLastResult());
+  queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
   queryClient.setQueryData(WORK_QUERY_KEYS.total(), 0);
   queryClient.setQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary(), summaryDefaults);
 }
@@ -278,7 +277,6 @@ describe("App root subscriptions", () => {
       startedAt: "2026-01-01T00:00:00.000Z",
       finishedAt: null,
       progress,
-      result: null,
       error: null,
     });
 
@@ -323,8 +321,8 @@ describe("App root subscriptions", () => {
       const { queryClient } = renderApp();
       const baseline = await waitForAppShellBaseline();
 
-      const nextResult = buildScanLastResult({
-        result: buildScanResult({ registered: 1, insertedWorkIds: ["work-1"] }),
+      const nextResult = buildScanRecord({
+        updatedWorks: [{ workId: "work-1", changes: [{ kind: "meta" }] }],
         finishedAt: "2026-01-02T00:00:00.000Z",
       });
       await act(async () => {

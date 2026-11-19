@@ -4,39 +4,45 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
-import type { DlsiteNotificationSummary, ScanDiagnostics, ScanResult } from "@mimimilli/shared";
+import { workspacePath } from "@mimimilli/shared";
+import type { DlsiteNotificationSummary, ScanDiagnostics, ScanRecord } from "@mimimilli/shared";
 import NotificationBell from "../../src/app/ui/NotificationBell";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
-import { mockApi, apiNoContent } from "../helpers/api";
+import { mockApi } from "../helpers/api";
 import {
   buildDlsiteNotificationSummary,
   buildScanDiagnostics,
-  buildScanLastResult,
-  buildScanResult,
+  buildScanRecord,
 } from "../helpers/builders";
 
-const scanResult: ScanResult = buildScanResult({
-  registered: 12,
-  insertedWorkIds: ["a", "b", "c"],
-  errors: 1,
+const scanRecord: ScanRecord = buildScanRecord({
+  updatedWorks: [
+    { workId: "a", changes: [{ kind: "meta" }] },
+    { workId: "b", changes: [{ kind: "files", audioDelta: 1 }] },
+    { workId: "c", changes: [{ kind: "meta" }] },
+  ],
+  missingWorks: [
+    { workId: "d", title: "d", previousPath: workspacePath("d") },
+    { workId: "e", title: "e", previousPath: workspacePath("e") },
+  ],
 });
 
 function renderBell(
   summaryOverrides: Partial<DlsiteNotificationSummary> = {},
-  scanResultOverride?: ScanResult | null,
+  scanRecordOverride?: ScanRecord,
   diagnostics: Partial<ScanDiagnostics> = {},
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   const summary = buildDlsiteNotificationSummary(summaryOverrides);
-  const lastScan = scanResultOverride ? buildScanLastResult({ result: scanResultOverride }) : null;
+  const lastScan = scanRecordOverride ?? buildScanRecord({ finishedAt: null });
   const scanDiagnostics = buildScanDiagnostics(diagnostics);
   mockApi({
     "GET /api/dlsite/notifications": summary,
-    "GET /api/scan/last": () => lastScan ?? apiNoContent(),
+    "GET /api/scan/last": lastScan,
     "GET /api/scan/diagnostics": scanDiagnostics,
   });
   queryClient.setQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary(), summary);
@@ -132,12 +138,12 @@ describe("NotificationBell", () => {
     expect(store.get(activeModalAtom)).toEqual({ kind: "parse-failed" });
   });
 
-  it("scanResultがあれば直近のスキャン結果サマリを表示する", () => {
-    renderBell({}, scanResult);
+  it("スキャンの記録があれば更新済みと行方不明の件数を表示する", () => {
+    renderBell({}, scanRecord);
     fireEvent.click(screen.getByRole("button", { name: /通知/ }));
     expect(screen.getByText("直近のスキャン結果")).toBeInTheDocument();
-    expect(screen.getByText("12")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
   });
 
   describe("要対応タブとの件数統一", () => {

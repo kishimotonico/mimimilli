@@ -92,10 +92,7 @@ test("スキャン完了・候補登録・作品登録3経路・root再設定の
   await configureRoot(adapter, root);
 
   await scanToCompletion(app);
-  assert.equal(
-    (await (await app.request("/api/scan/last")).json()).result.insertedWorkIds.length,
-    1,
-  );
+  assert.equal(typeof (await (await app.request("/api/scan/last")).json()).finishedAt, "string");
   assert.equal(httpCalls, 0);
   await assertNoDlsiteJob(app);
 
@@ -153,7 +150,7 @@ test("スキャン完了・root再設定でDLsite取得ジョブが作られな�
   t.after(() => app.shutdown());
 
   await scanToCompletion(app);
-  assert.ok((await (await app.request("/api/scan/last")).json()).result.insertedWorkIds.length > 0);
+  assert.ok((await (await app.request("/api/works?scanRecord=new")).json()).total > 0);
   await assertNoDlsiteJob(app);
 
   const reconfigured = await post(app, "/api/root-reconfiguration", {

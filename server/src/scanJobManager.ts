@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import type {
   ScanJobEvent,
   ScanJobSnapshot,
-  ScanLastResultResponse,
   ScanDiagnostics,
   ScanCandidate,
   ScanCandidateRegisterItem,
@@ -12,6 +11,7 @@ import type {
 } from "@mimimilli/shared";
 import type { DataAdapter } from "./adapter/index.ts";
 import { formatError, getCategoryLogger } from "./lib/logger.ts";
+import { ScanRecordStore } from "./scanRecord.ts";
 
 const scanLogger = getCategoryLogger("scan");
 const UNREADABLE_PATH_LOG_SAMPLE_LIMIT = 10;
@@ -48,8 +48,8 @@ export class ScanJobManager {
   private activeId: string | null = null;
   private runCompletion: Promise<void> | null = null;
   private shuttingDown = false;
-  // terminal job はpruneTerminalで消えるため、前回結果はディスク永続化せずここにだけ保持する。
-  private lastCompleted: ScanLastResultResponse | null = null;
+  /** 直近のスキャンの記録。ディスクには永続化せず、次のスキャンかサーバー再起動まで保持する。 */
+  readonly record = new ScanRecordStore();
 
   constructor(adapter: DataAdapter, options: ScanJobManagerOptions = {}) {
     this.adapter = adapter;
@@ -69,7 +69,6 @@ export class ScanJobManager {
       startedAt: null,
       finishedAt: null,
       progress: null,
-      result: null,
       error: null,
     };
     const job: Job = {
@@ -108,13 +107,9 @@ export class ScanJobManager {
     return this.get(this.activeId);
   }
 
-  getLastCompleted(): ScanLastResultResponse | null {
-    return this.lastCompleted ? structuredClone(this.lastCompleted) : null;
-  }
-
-  /** ジョブ外で完了したスキャン（root再設定の構築）を、ジョブの完了と同じく直近完了結果として扱う。 */
+  /** ジョブ外で完了したスキャン（root再設定の構築）を、ジョブの完了と同じく記録へ反映する。 */
   recordCompleted(result: ScanResult): void {
-    this.lastCompleted = { result, finishedAt: new Date().toISOString() };
+    this.record.replace(result, new Date().toISOString());
   }
 
   async listDiagnostics(): Promise<ScanDiagnostics> {
@@ -141,7 +136,9 @@ export class ScanJobManager {
   async registerCandidates(
     items: ScanCandidateRegisterItem[],
   ): Promise<ScanCandidatesRegisterResponse> {
-    return this.adapter.registerScanCandidates(items);
+    const response = await this.adapter.registerScanCandidates(items);
+    this.record.addNewWorks(response.registered.map((entry) => entry.workId));
+    return response;
   }
 
   async excludeCandidates(paths: string[]): Promise<void> {
@@ -200,6 +197,7 @@ export class ScanJobManager {
     if (job.controller.signal.aborted) return this.finishCancelled(job);
     job.snapshot.status = "running";
     job.snapshot.startedAt = new Date().toISOString();
+    this.record.beginScan();
     this.emit(job, { type: "state", snapshot: this.copy(job.snapshot) });
     try {
       const settings = await this.adapter.getSettings();
@@ -244,11 +242,10 @@ export class ScanJobManager {
       return;
     }
     job.snapshot.status = "completed";
-    job.snapshot.result = result;
     job.snapshot.finishedAt = new Date().toISOString();
-    this.lastCompleted = { result, finishedAt: job.snapshot.finishedAt };
+    this.record.replace(result, job.snapshot.finishedAt);
     this.logScanCompleted(job, result);
-    this.emit(job, { type: "completed", result });
+    this.emit(job, { type: "completed", finishedAt: job.snapshot.finishedAt });
     this.deactivate(job);
     this.pruneTerminal();
   }
@@ -260,6 +257,7 @@ export class ScanJobManager {
       return;
     }
     const message = error instanceof Error ? error.message : "サーバー内部エラーが発生しました";
+    this.record.endScan();
     job.snapshot.status = "failed";
     job.snapshot.error = message;
     job.snapshot.finishedAt = new Date().toISOString();
@@ -275,6 +273,7 @@ export class ScanJobManager {
 
   private finishCancelled(job: Job): void {
     if (this.isTerminal(job)) return;
+    this.record.endScan();
     job.snapshot.status = "cancelled";
     job.snapshot.finishedAt = new Date().toISOString();
     scanLogger.info("スキャンを取り消しました", {

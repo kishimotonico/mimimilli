@@ -330,10 +330,8 @@ export class WorkQueryRepository {
     const bindings: Array<string | number> = [];
 
     if (params.ids !== undefined) {
-      conditions.push(
-        params.ids.length > 0 ? `works.id IN (${inClausePlaceholders(params.ids.length)})` : "0",
-      );
-      bindings.push(...params.ids);
+      conditions.push("works.id IN (SELECT value FROM json_each(?))");
+      bindings.push(JSON.stringify(params.ids));
     }
 
     if (params.q) {

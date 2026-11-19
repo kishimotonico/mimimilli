@@ -111,7 +111,12 @@ export const workChangeSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("files"), audioDelta: z.number().int() }),
 ]);
 export type WorkChange = z.infer<typeof workChangeSchema>;
-export type WorkChangeKind = WorkChange["kind"];
+export const workChangeKindSchema = z.enum(["moved", "meta", "files"]);
+export type WorkChangeKind = z.infer<typeof workChangeKindSchema>;
+
+/** GET /works の scanRecord 絞り込みが指す、スキャンの記録の作品集合 */
+export const scanRecordKindSchema = z.enum(["new", "updated"]);
+export type ScanRecordKind = z.infer<typeof scanRecordKindSchema>;
 
 export const updatedWorkSchema = z.object({
   workId: z.string(),
@@ -120,10 +125,24 @@ export const updatedWorkSchema = z.object({
 });
 export type UpdatedWork = z.infer<typeof updatedWorkSchema>;
 
+/** 今回のスキャンで新たに行方不明になった作品。以前から行方不明の作品は含まない */
+export const missingWorkSchema = z.object({
+  workId: z.string(),
+  title: z.string(),
+  /** 行方不明になる前の作品フォルダー（単体音声作品は音声ファイル）のroot相対path */
+  previousPath: workspacePathSchema,
+});
+export type MissingWork = z.infer<typeof missingWorkSchema>;
+
+/** adapter が返すスキャン1回分の結果。HTTPには出さず、サーバーの記録（ScanRecord）の元になる */
 export const scanResultSchema = z.object({
   registered: z.number().int().nonnegative(),
   /** 今回のスキャンでカタログへ新規挿入された Work ID（mimimilli.json の自動投影） */
   insertedWorkIds: z.array(z.string()),
+  /** スキャン開始時点でカタログに作品が1件も無かった。true のとき記録の新規作品は空にする */
+  startedWithEmptyCatalog: z.boolean(),
+  /** 今回のスキャンで新たに行方不明になった作品 */
+  missingWorks: z.array(missingWorkSchema),
   /** 今回のスキャンで変化が見つかった既存作品。エラーからの復帰や全件読み直しで読み直しただけの作品は含まない */
   updatedWorks: z.array(updatedWorkSchema),
   errors: z.number().int().nonnegative(),
@@ -132,9 +151,9 @@ export const scanResultSchema = z.object({
   skipped: z.number().int().nonnegative(),
   /** カバー画像はあるが寸法を計測できなかった作品数（errors とは別枠。次回スキャンで再試行） */
   coverErrors: z.number().int().nonnegative(),
-  /** 走査中に読み取れなかったサブツリーのディレクトリパス。ルート失敗時はスキャン自体がエラーになる */
-  unreadablePaths: z.array(z.string()).optional(),
-  /** finalize 時の listSummaries() でタグ等の不整合により除外した作品。その実行の警告で、サーバー再起動後は次のスキャンまで得られない */
+  /** 走査中に読み取れなかったサブツリーのディレクトリのroot相対path。ルート失敗時はスキャン自体がエラーになる */
+  unreadablePaths: z.array(workspacePathSchema),
+  /** finalize 時の listSummaries() でタグ等の不整合により除外した作品。その実行の警告 */
   dataIntegrityWarning: dataIntegrityWarningSchema.optional(),
 });
 export type ScanResult = z.infer<typeof scanResultSchema>;
@@ -192,7 +211,6 @@ export const scanJobSnapshotSchema = z.object({
   startedAt: z.string().nullable(),
   finishedAt: z.string().nullable(),
   progress: scanProgressSchema.nullable(),
-  result: scanResultSchema.nullable(),
   error: z.string().nullable(),
 });
 export type ScanJobSnapshot = z.infer<typeof scanJobSnapshotSchema>;
@@ -212,18 +230,23 @@ export const scanConflictResponseSchema = z.object({
 });
 export type ScanConflictResponse = z.infer<typeof scanConflictResponseSchema>;
 
-/** GET /scan/last の返却値。サーバー起動後に一度でも完了したスキャンの結果を保持する（ディスク永続化はしない）。 */
-export const scanLastResultResponseSchema = z.object({
-  result: scanResultSchema,
-  finishedAt: z.string(),
+/** GET /scan/last の返却値。直近のスキャンで見つかったものの現在の記録で、サーバーのメモリにだけ持つ。
+ *  寿命は次のスキャンかサーバー再起動まで。未スキャンのときは finishedAt が null の空の記録。
+ *  新規作品は件数が多くなりうるため含めず、GET /works?scanRecord=new で取る。 */
+export const scanRecordSchema = z.object({
+  finishedAt: z.string().nullable(),
+  updatedWorks: z.array(updatedWorkSchema),
+  missingWorks: z.array(missingWorkSchema),
+  unreadablePaths: z.array(workspacePathSchema),
+  dataIntegrityWarning: dataIntegrityWarningSchema.optional(),
 });
-export type ScanLastResultResponse = z.infer<typeof scanLastResultResponseSchema>;
+export type ScanRecord = z.infer<typeof scanRecordSchema>;
 
 /** 接続時は現在snapshotを`state`で1件送り、以後はliveのイベントを送る。 */
 export const scanJobEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("state"), snapshot: scanJobSnapshotSchema }),
   z.object({ type: z.literal("progress"), progress: scanProgressSchema }),
-  z.object({ type: z.literal("completed"), result: scanResultSchema }),
+  z.object({ type: z.literal("completed"), finishedAt: z.string() }),
   z.object({ type: z.literal("failed"), error: z.string() }),
   z.object({ type: z.literal("cancelled") }),
 ]);

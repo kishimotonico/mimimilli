@@ -1,15 +1,10 @@
 import ScanResultWorksTable from "./ScanResultWorksTable";
 import { useInlineTitleEdit } from "./useInlineTitleEdit";
-import { useScanResultWorks } from "./useScanResultWorks";
+import { useScanRecordWorks } from "./useScanRecordWorks";
 
-export interface UpdatedWorksTabProps {
-  /** メタファイル更新で再投影された作品ID */
-  workIds: string[];
-}
-
-export default function UpdatedWorksTab({ workIds }: UpdatedWorksTabProps) {
-  const { works, error, truncatedTotal } = useScanResultWorks(
-    workIds,
+export default function UpdatedWorksTab() {
+  const { works, total, loading, error } = useScanRecordWorks(
+    "updated",
     "更新された作品の読み込みに失敗しました",
   );
   const edit = useInlineTitleEdit();
@@ -24,8 +19,8 @@ export default function UpdatedWorksTab({ workIds }: UpdatedWorksTabProps) {
         caption="更新された作品"
         emptyMessage="今回更新された作品はありません。"
         errorMessage={error}
-        truncatedTotal={truncatedTotal}
-        totalIds={workIds.length}
+        total={total}
+        loading={loading}
         edit={edit}
       />
     </div>

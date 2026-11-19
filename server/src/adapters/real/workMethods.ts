@@ -20,6 +20,7 @@ import type {
   WorkSourcePatch,
   WorkspacePath,
   WorksPage,
+  UnregisterMissingWorksResult,
   WorksQuery,
 } from "@mimimilli/shared";
 import { errorMessage, resolveWorkPlacement, tagEquals } from "@mimimilli/shared";
@@ -232,20 +233,22 @@ export function createWorkMethods(deps: {
       return query.countWorksByStatus("missing");
     },
 
-    async unregisterMissingWorks(): Promise<{ deletedCount: number; failedCount: number }> {
+    async unregisterMissingWorks(): Promise<
+      UnregisterMissingWorksResult & { deletedWorkIds: string[] }
+    > {
       const ids = query.listWorkIdsByStatus("missing");
       const root = requireRoot();
-      let deletedCount = 0;
+      const deletedWorkIds: string[] = [];
       let failedCount = 0;
       for (const id of ids) {
         try {
-          if (unregisterWork(catalog, user, root, id)) deletedCount++;
+          if (unregisterWork(catalog, user, root, id)) deletedWorkIds.push(id);
           else failedCount++;
         } catch {
           failedCount++;
         }
       }
-      return { deletedCount, failedCount };
+      return { deletedCount: deletedWorkIds.length, failedCount, deletedWorkIds };
     },
 
     async patchWorkSource(

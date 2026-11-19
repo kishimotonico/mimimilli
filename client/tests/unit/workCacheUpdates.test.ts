@@ -86,6 +86,7 @@ const KEYS = {
   notifications: WORK_QUERY_KEYS.dlsiteNotificationSummary(),
   fs: FILE_SYSTEM_QUERY_KEYS.directory("dlsite"),
   diagnostics: SCAN_QUERY_KEYS.diagnostics(),
+  scanRecord: SCAN_QUERY_KEYS.last(),
   candidates: SCAN_QUERY_KEYS.candidates(),
 } satisfies Record<string, QueryKey>;
 
@@ -109,6 +110,7 @@ function seededClient(): QueryClient {
   queryClient.setQueryData(KEYS.notifications, { rjMissing: 0 });
   queryClient.setQueryData(KEYS.fs, { entries: [] });
   queryClient.setQueryData(KEYS.diagnostics, { identityConflicts: [], invalidMetaFiles: [] });
+  queryClient.setQueryData(KEYS.scanRecord, { finishedAt: null });
   queryClient.setQueryData(KEYS.candidates, []);
   return queryClient;
 }
@@ -135,7 +137,7 @@ const LIBRARY_VIEWS: KeyName[] = [
   "smartPreview",
   "notifications",
 ];
-const REGISTRATION_VIEWS: KeyName[] = [...LIBRARY_VIEWS, "fs", "diagnostics"];
+const REGISTRATION_VIEWS: KeyName[] = [...LIBRARY_VIEWS, "fs", "diagnostics", "scanRecord"];
 
 function sorted(names: KeyName[]): KeyName[] {
   return [...names].sort();
@@ -212,7 +214,7 @@ describe("bookmark の必須更新", () => {
 });
 
 describe("登録・スキャン完了の必須更新", () => {
-  it("登録は一覧系・facet・タグ・SF（件数プレビューを含む）・通知・FS・診断を無効化し、詳細と scan 候補は触らない", async () => {
+  it("登録は一覧系・facet・タグ・SF（件数プレビューを含む）・通知・FS・診断・スキャンの記録を無効化し、詳細と scan 候補は触らない", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterRegistration(queryClient);

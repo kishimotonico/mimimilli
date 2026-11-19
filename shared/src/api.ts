@@ -15,6 +15,7 @@ import {
 import { splitSelectedTags, type TagFilters } from "./pseudoTag.ts";
 import { dlsiteRegistrationBodySchema, dlsiteStatusSchema, rjCodeFormatSchema } from "./dlsite.ts";
 import { workspacePathSchema } from "./media.ts";
+import { scanRecordKindSchema, workChangeKindSchema } from "./scan.ts";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
 
@@ -50,15 +51,19 @@ const worksQueryBaseSchema = z.object({
   seed: z.coerce.number().int().min(0).max(0x7fffffff).optional(),
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
-  /** 指定IDの作品だけに絞り込む（同名パラメータを繰り返して配列で受ける）。
-   *  他のフィルタ・ソート・ページングと組み合わせ可能な通常の絞り込み条件として扱う */
-  ids: z.array(z.string()).optional(),
+  /** 直近のスキャンの記録に入っている作品だけに絞り込む（new=新規作品、updated=更新済み）。
+   *  ID集合はサーバーが記録から引くので、件数に上限はない */
+  scanRecord: scanRecordKindSchema.optional(),
+  /** scanRecord=updated のとき、指定した変化の種類を持つ作品だけに絞る */
+  scanChange: workChangeKindSchema.optional(),
 });
 export const worksQuerySchema = worksQueryBaseSchema;
 /** HTTP クエリの入力型（.default 付きフィールドは省略可能） */
 export type WorksQueryInput = z.input<typeof worksQuerySchema>;
-/** パース後の正規化済みクエリ（サーバー adapter が受け取る型） */
-export type WorksQuery = z.output<typeof worksQuerySchema>;
+/** パース後の正規化済みクエリ（サーバー adapter が受け取る型）。scanRecord・scanChange はルートが記録から引いた ids に置き換えて渡す */
+export type WorksQuery = Omit<z.output<typeof worksQuerySchema>, "scanRecord" | "scanChange"> & {
+  ids?: string[];
+};
 
 /** 検索・フィルター後・ページング前の集合に対する集計。件数は total 側で持つため含まない。
  *  durationSec は totalDurationSec が未知（null）の作品を除いた合計。 */

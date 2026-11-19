@@ -17,6 +17,7 @@ import type {
   WorkSourcePatch,
   WorkspacePath,
   WorksPage,
+  UnregisterMissingWorksResult,
   WorksQuery,
 } from "@mimimilli/shared";
 
@@ -33,7 +34,7 @@ export interface WorkAdapter {
   /** status === "missing" の作品数 */
   countMissingWorks(): Promise<number>;
   /** status === "missing" の作品を全件登録解除する。一部失敗しても残りを続行する */
-  unregisterMissingWorks(): Promise<{ deletedCount: number; failedCount: number }>;
+  unregisterMissingWorks(): Promise<UnregisterMissingWorksResult & { deletedWorkIds: string[] }>;
   getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary>;
   queryDlsiteNotifications(
     kind: DlsiteNotificationKind,

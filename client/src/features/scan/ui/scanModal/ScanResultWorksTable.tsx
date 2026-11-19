@@ -1,4 +1,4 @@
-// 新規登録済み・更新された作品タブ共通のテーブル本体。
+// 新規作品・更新済みタブ共通のテーブル本体。
 import type { WorkListItem } from "@mimimilli/shared";
 import { dlsiteLinkDisplayStatus, hasRjCode } from "@mimimilli/shared";
 import { cn } from "../../../../shared/lib/cn";
@@ -13,8 +13,8 @@ export interface ScanResultWorksTableProps {
   caption: string;
   emptyMessage: string;
   errorMessage: string | null;
-  truncatedTotal: number | null;
-  totalIds: number;
+  total: number;
+  loading: boolean;
   edit: InlineTitleEdit;
 }
 
@@ -23,8 +23,8 @@ export default function ScanResultWorksTable({
   caption,
   emptyMessage,
   errorMessage,
-  truncatedTotal,
-  totalIds,
+  total,
+  loading,
   edit,
 }: ScanResultWorksTableProps) {
   if (errorMessage) {
@@ -35,7 +35,7 @@ export default function ScanResultWorksTable({
     );
   }
 
-  if (totalIds === 0) {
+  if (total === 0 && !loading) {
     return <p className="font-jp text-body text-ink-2">{emptyMessage}</p>;
   }
 
@@ -51,7 +51,9 @@ export default function ScanResultWorksTable({
           {caption}
         </p>
         <span className="font-mono text-caption text-ink-4 tabular-nums">
-          {truncatedTotal !== null ? `${totalIds}件中${works.length}件を表示` : `${totalIds}件`}
+          {loading && works.length < total
+            ? `${total}件中${works.length}件を読み込み済み`
+            : `${total}件`}
         </span>
       </div>
       <table className="w-full table-fixed border-collapse text-secondary">

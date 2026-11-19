@@ -3,17 +3,10 @@ import { render, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { workspacePath, type ScanJobEvent, type ScanJobSnapshot } from "@mimimilli/shared";
+import { type ScanJobEvent, type ScanJobSnapshot } from "@mimimilli/shared";
 import { createApiHandler } from "../helpers/api";
 import { appShellRoutes } from "../helpers/appShellApi";
-import {
-  buildDlsiteNotificationSummary,
-  buildScanCandidate,
-  buildScanDiagnostics,
-  buildScanJobEvent,
-  buildScanJobSnapshot,
-  buildScanResult,
-} from "../helpers/builders";
+import { buildScanCandidate, buildScanJobEvent, buildScanJobSnapshot } from "../helpers/builders";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import { scanJobStoreAtom } from "../../src/entities/scan/model/scanJobStore";
@@ -63,19 +56,14 @@ class FakeEventSource extends EventTarget {
 
 const running: ScanJobSnapshot = buildScanJobSnapshot({ startedAt: "2026-01-01T00:00:01.000Z" });
 
-const scanResult = buildScanResult({ registered: 1 });
+const finishedAt = "2026-01-01T00:00:02.000Z";
 
 const candidate = buildScanCandidate({ path: "未登録作品", inferredTitle: "未登録作品" });
-
-const noNeedsAttentionDiagnostics = buildScanDiagnostics();
-const dlsiteSummary = (rjCodeMissingCount: number) =>
-  buildDlsiteNotificationSummary({ rjCodeMissingCount });
 
 const completedJob: ScanJobSnapshot = buildScanJobSnapshot({
   ...running,
   status: "completed",
-  finishedAt: "2026-01-01T00:00:02.000Z",
-  result: scanResult,
+  finishedAt,
 });
 
 /** 検証対象外の付随リクエスト（設定・候補・通知など）に空ライブラリの既定応答を返す */
@@ -191,31 +179,28 @@ describe("ScanRuntime EventSource ownership", () => {
     );
 
     const { queryClient } = renderRuntime(createElement(ScanRuntime));
-    const setQueryData = vi.spyOn(queryClient, "setQueryData");
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
 
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
     const completed = {
       type: "completed" as const,
-      result: scanResult,
+      finishedAt,
     };
     dispatchScan(source, completed);
     dispatchScan(source, completed);
 
     await waitFor(() =>
-      expect(setQueryData).toHaveBeenCalledWith(
-        SCAN_QUERY_KEYS.last(),
-        expect.objectContaining({ result: scanResult }),
-      ),
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: SCAN_QUERY_KEYS.last() }),
     );
-    // 候補の再取得は queryClient.fetchQuery 経由のため、setQueryData のスパイではなく
+    // 候補の再取得は queryClient.fetchQuery 経由のため、invalidate のスパイではなく
     // 反映後のキャッシュ内容そのものを見る。
     await waitFor(() =>
       expect(queryClient.getQueryData(SCAN_QUERY_KEYS.candidates())).toEqual([candidate]),
     );
     expect(
-      setQueryData.mock.calls.filter(
-        ([queryKey]) => JSON.stringify(queryKey) === JSON.stringify(SCAN_QUERY_KEYS.last()),
+      invalidate.mock.calls.filter(
+        ([filters]) => JSON.stringify(filters?.queryKey) === JSON.stringify(SCAN_QUERY_KEYS.last()),
       ),
     ).toHaveLength(1);
   });
@@ -262,7 +247,7 @@ describe("ScanRuntime EventSource ownership", () => {
 
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
-    const completed = { type: "completed" as const, result: scanResult };
+    const completed = { type: "completed" as const, finishedAt };
     dispatchScan(source, completed);
 
     // 完了処理が確定する前に、ユーザーが候補を登録して非表示化したと想定する。
@@ -313,139 +298,31 @@ describe("ScanRuntime EventSource ownership", () => {
     const source = FakeEventSource.instances[0]!;
 
     await expectNoUnhandledRejection(async () => {
-      dispatchScan(source, { type: "completed", result: scanResult });
+      dispatchScan(source, { type: "completed", finishedAt });
       await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
     });
   });
 });
 
 describe("ScanRuntime: 完了・中止トースト", () => {
-  it("スキャンモーダルが閉じていれば完了・中止トーストを出す", async () => {
+  it("スキャンモーダルが閉じていても、完了では件数つきのトーストを出さない", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(completedJob);
-        if (url.endsWith("/scan/diagnostics")) return response(noNeedsAttentionDiagnostics);
-        if (url.endsWith("/dlsite/notifications")) return response(dlsiteSummary(0));
         return shell(input, init);
       }),
     );
 
     const { store } = renderRuntime(createElement(ScanRuntime));
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
-    const source = FakeEventSource.instances[0]!;
-
-    dispatchScan(source, { type: "completed", result: scanResult });
+    dispatchScan(FakeEventSource.instances[0]!, { type: "completed", finishedAt });
     await waitFor(() =>
-      expect(latestToastRequest(store)?.message).toBe(
-        "スキャン完了: 登録 1件・新規 0件・エラー 0件・行方不明 0件",
-      ),
+      expect(store.get(scanJobStoreAtom).getState().job?.status).toBe("completed"),
     );
-    // 要対応が無ければアクションは付けない
-    expect(latestToastRequest(store)?.actionLabel).toBeUndefined();
-  });
-
-  it("要対応があれば「要対応を見る」アクションを付け、押すとactiveModalAtomを書き換えてトーストを閉じる", async () => {
-    const needsAttentionResult = scanResult;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input);
-        if (url.endsWith("/scan/active")) return response(running);
-        if (url.endsWith("/scan/job-1"))
-          return response(buildScanJobSnapshot({ ...completedJob, result: needsAttentionResult }));
-        if (url.endsWith("/scan/diagnostics")) return response(noNeedsAttentionDiagnostics);
-        if (url.endsWith("/dlsite/notifications")) return response(dlsiteSummary(1));
-        return shell(input, init);
-      }),
-    );
-
-    const { store } = renderRuntime(createElement(ScanRuntime));
-    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
-    const source = FakeEventSource.instances[0]!;
-
-    dispatchScan(source, { type: "completed", result: needsAttentionResult });
-    await waitFor(() => expect(latestToastRequest(store)?.actionLabel).toBe("要対応を見る"));
-
-    latestToastRequest(store)!.onAction!();
-
-    expect(store.get(activeModalAtom)).toEqual({ kind: "scan", tab: "needsAttention" });
     expect(latestToastRequest(store)).toBeUndefined();
-  });
-
-  it("完了時点の診断に読み込めない作品情報ファイルがあれば、実行結果に関わらず「要対応を見る」を付ける", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input);
-        if (url.endsWith("/scan/active")) return response(running);
-        if (url.endsWith("/scan/job-1")) return response(completedJob);
-        if (url.endsWith("/scan/diagnostics")) {
-          return response(
-            buildScanDiagnostics({
-              invalidMetaFiles: [
-                { path: workspacePath("壊れた/mimimilli.json"), message: "不正です" },
-              ],
-            }),
-          );
-        }
-        if (url.endsWith("/dlsite/notifications")) return response(dlsiteSummary(0));
-        return shell(input, init);
-      }),
-    );
-
-    const { store } = renderRuntime(createElement(ScanRuntime));
-    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
-
-    dispatchScan(FakeEventSource.instances[0]!, { type: "completed", result: scanResult });
-    await waitFor(() => expect(latestToastRequest(store)?.actionLabel).toBe("要対応を見る"));
-  });
-
-  it("完了直後の診断の取得に失敗したら、要対応リンクは付けずに完了トーストだけ出す", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input);
-        if (url.endsWith("/scan/active")) return response(running);
-        if (url.endsWith("/scan/job-1")) return response(completedJob);
-        if (url.endsWith("/scan/diagnostics")) return response({ message: "失敗" }, 500);
-        if (url.endsWith("/dlsite/notifications")) return response(dlsiteSummary(1));
-        return shell(input, init);
-      }),
-    );
-
-    const { store } = renderRuntime(createElement(ScanRuntime));
-    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
-
-    dispatchScan(FakeEventSource.instances[0]!, { type: "completed", result: scanResult });
-    await waitFor(() => expect(latestToastRequest(store)?.message).toContain("スキャン完了"));
-    expect(latestToastRequest(store)?.actionLabel).toBeUndefined();
-  });
-
-  it("診断の取得に失敗しても、実行結果のdataIntegrityWarningがあれば要対応リンクを付ける", async () => {
-    const warned = buildScanResult({
-      ...scanResult,
-      dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["bad"] },
-    });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input);
-        if (url.endsWith("/scan/active")) return response(running);
-        if (url.endsWith("/scan/job-1"))
-          return response(buildScanJobSnapshot({ ...completedJob, result: warned }));
-        if (url.endsWith("/scan/diagnostics")) return response({ message: "失敗" }, 500);
-        return shell(input, init);
-      }),
-    );
-
-    const { store } = renderRuntime(createElement(ScanRuntime));
-    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
-
-    dispatchScan(FakeEventSource.instances[0]!, { type: "completed", result: warned });
-    await waitFor(() => expect(latestToastRequest(store)?.actionLabel).toBe("要対応を見る"));
   });
 
   it("中止時は「スキャンを中止しました」トーストを出す", async () => {
@@ -487,7 +364,7 @@ describe("ScanRuntime: 完了・中止トースト", () => {
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
 
-    dispatchScan(source, { type: "completed", result: scanResult });
+    dispatchScan(source, { type: "completed", finishedAt });
     await waitFor(() =>
       expect(store.get(scanJobStoreAtom).getState().job?.status).toBe("completed"),
     );

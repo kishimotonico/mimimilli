@@ -101,7 +101,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     const registeredPaths = new Set(response.registered.map((entry) => entry.path));
     setHiddenPaths((previous) => new Set([...previous, ...registeredPaths]));
     onRegistered({
-      registeredWorkIds: response.registered.map((entry) => entry.workId),
+      registeredCount: response.registered.length,
       failedCount: response.failures.length,
       remainingCount: candidateCount - registeredPaths.size,
     });

@@ -28,7 +28,6 @@ import {
   type WorkCreateBodyInput,
   type WorkCreateResponse,
   unregisterMissingWorksResultSchema,
-  createRandomSeed,
   type Work,
   workBookmarkResultSchema,
   workEditSnapshotSchema,
@@ -61,20 +60,10 @@ function appendTagsTagOp(
   if (filter.tagOp) params.set("tagOp", filter.tagOp);
 }
 
-/** クエリ文字列は「未指定」と「空配列」を区別できないため、ids:[] は空集合として
- *  リクエストせずに返す（core の filterByIds・real SQL と同じセマンティクス） */
-function emptyIdsPage(params: WorksQueryInput): WorksPage {
-  const stats = { trackCount: 0, durationSec: 0 };
-  if (params.sort !== "random") return { items: [], total: 0, stats };
-  const seed = params.seed === undefined ? createRandomSeed() : Number(params.seed);
-  return { items: [], total: 0, stats, seed };
-}
-
 export async function searchWorks(
   params: WorksQueryInput,
   options?: { signal?: AbortSignal },
 ): Promise<WorksPage> {
-  if (params.ids?.length === 0) return emptyIdsPage(params);
   const p = new URLSearchParams();
   if (params.q) p.set("q", params.q);
   appendTagsTagOp(p, params);
@@ -83,7 +72,8 @@ export async function searchWorks(
   if (params.seed !== undefined) p.set("seed", String(params.seed));
   if (params.page !== undefined) p.set("page", String(params.page));
   if (params.limit !== undefined) p.set("limit", String(params.limit));
-  for (const id of params.ids ?? []) p.append("ids", id);
+  if (params.scanRecord) p.set("scanRecord", params.scanRecord);
+  if (params.scanChange) p.set("scanChange", params.scanChange);
   const q = p.toString();
   return getParsed(worksPageSchema, `/works${q ? `?${q}` : ""}`, options);
 }

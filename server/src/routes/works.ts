@@ -20,6 +20,7 @@ import { InvalidResumeError, WorkRegisterError } from "../errors.ts";
 import type { DataAdapter } from "../adapter/index.ts";
 import { conflict, invalidRequest, notFound, throwSourceCommandError } from "../lib/httpError.ts";
 import { readJsonBody } from "../lib/jsonBody.ts";
+import type { ScanRecordStore } from "../scanRecord.ts";
 
 function parseWorkTagPath(c: {
   req: { path: string; param: (name: string) => string };
@@ -41,22 +42,26 @@ function parseWorkTagPath(c: {
   return normalized;
 }
 
-export function worksRoute(adapter: DataAdapter): Hono {
+export function worksRoute(adapter: DataAdapter, scanRecord: ScanRecordStore): Hono {
   const app = new Hono();
 
   app.get("/works", async (c) => {
     const parsed = worksQuerySchema.safeParse({
       ...c.req.query(),
       tags: c.req.queries("tags"),
-      ids: c.req.queries("ids"),
     });
     if (!parsed.success) {
       invalidRequest("works のクエリパラメータが不正です");
     }
+    const { scanRecord: recordKind, scanChange, ...query } = parsed.data;
+    if (scanChange !== undefined && recordKind !== "updated") {
+      invalidRequest("scanChange は scanRecord=updated のときだけ指定できます");
+    }
     // page/limit 未指定でもサーバー側デフォルトでページングする。
     // limit だけの指定は page=1 として扱う
     const page = await adapter.queryWorks({
-      ...parsed.data,
+      ...query,
+      ...(recordKind ? { ids: scanRecord.workIds(recordKind, scanChange) } : {}),
       page: parsed.data.page ?? 1,
       limit: parsed.data.limit ?? WORKS_DEFAULT_PAGE_SIZE,
     });
@@ -122,7 +127,8 @@ export function worksRoute(adapter: DataAdapter): Hono {
   });
 
   app.post("/works/unregister-missing", async (c) => {
-    const result = await adapter.unregisterMissingWorks();
+    const { deletedWorkIds, ...result } = await adapter.unregisterMissingWorks();
+    for (const workId of deletedWorkIds) scanRecord.forgetWork(workId);
     return c.json(result);
   });
 
@@ -194,6 +200,7 @@ export function worksRoute(adapter: DataAdapter): Hono {
 
   app.delete("/works/:id", async (c) => {
     const ok = await adapter.deleteWork(c.req.param("id"));
+    if (ok) scanRecord.forgetWork(c.req.param("id"));
     if (!ok) notFound(`作品が見つかりません: ${c.req.param("id")}`);
     return c.body(null, 204);
   });

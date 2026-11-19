@@ -17,7 +17,10 @@ import { serveFixtureTransport } from "./helpers.ts";
 const emptyScanResult = {
   registered: 0,
   insertedWorkIds: [] as string[],
+  startedWithEmptyCatalog: false,
+  missingWorks: [],
   updatedWorks: [],
+  unreadablePaths: [],
   errors: 0,
   missing: 0,
   rjCodeMissingCount: 0,

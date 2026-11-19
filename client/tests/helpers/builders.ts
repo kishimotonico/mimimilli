@@ -16,8 +16,7 @@ import {
   scanDiagnosticsSchema,
   scanJobEventSchema,
   scanJobSnapshotSchema,
-  scanLastResultResponseSchema,
-  scanResultSchema,
+  scanRecordSchema,
   settingsSchema,
   smartFolderSchema,
   tagPrefixSchema,
@@ -33,8 +32,7 @@ import {
   type DlsiteNotificationSummary,
   type DlsitePreview,
   type ScanDiagnostics,
-  type ScanLastResultResponse,
-  type ScanResult,
+  type ScanRecord,
   type Settings,
   type SmartFolder,
   type TagPrefix,
@@ -174,25 +172,12 @@ export function buildScanDiagnostics(overrides: Partial<ScanDiagnostics> = {}): 
   return scanDiagnosticsSchema.parse({ identityConflicts: [], invalidMetaFiles: [], ...overrides });
 }
 
-export function buildScanResult(overrides: Partial<ScanResult> = {}): ScanResult {
-  return scanResultSchema.parse({
-    registered: 0,
-    insertedWorkIds: [],
-    updatedWorks: [],
-    errors: 0,
-    missing: 0,
-    skipped: 0,
-    coverErrors: 0,
-    ...overrides,
-  });
-}
-
-export function buildScanLastResult(
-  overrides: Partial<ScanLastResultResponse> = {},
-): ScanLastResultResponse {
-  return scanLastResultResponseSchema.parse({
-    result: buildScanResult(),
+export function buildScanRecord(overrides: Partial<ScanRecord> = {}): ScanRecord {
+  return scanRecordSchema.parse({
     finishedAt: "2026-01-01T00:00:00.000Z",
+    updatedWorks: [],
+    missingWorks: [],
+    unreadablePaths: [],
     ...overrides,
   });
 }
@@ -346,7 +331,6 @@ export function buildScanJobSnapshot(overrides: Partial<ScanJobSnapshot> = {}): 
     startedAt: "2026-01-01T00:00:00.001Z",
     finishedAt: null,
     progress: null,
-    result: null,
     error: null,
     ...overrides,
   });

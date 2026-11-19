@@ -1,15 +1,10 @@
 import ScanResultWorksTable from "./ScanResultWorksTable";
 import { useInlineTitleEdit } from "./useInlineTitleEdit";
-import { useScanResultWorks } from "./useScanResultWorks";
+import { useScanRecordWorks } from "./useScanRecordWorks";
 
-export interface NewlyRegisteredTabProps {
-  /** 今回ライブラリへ入った作品ID（自動登録分・候補承認分を集約済み） */
-  workIds: string[];
-}
-
-export default function NewlyRegisteredTab({ workIds }: NewlyRegisteredTabProps) {
-  const { works, error, truncatedTotal } = useScanResultWorks(
-    workIds,
+export default function NewlyRegisteredTab() {
+  const { works, total, loading, error } = useScanRecordWorks(
+    "new",
     "新規作品の読み込みに失敗しました",
   );
   const edit = useInlineTitleEdit();
@@ -24,8 +19,8 @@ export default function NewlyRegisteredTab({ workIds }: NewlyRegisteredTabProps)
         caption="新規登録済みの作品"
         emptyMessage="新規に登録した作品はありません。"
         errorMessage={error}
-        truncatedTotal={truncatedTotal}
-        totalIds={workIds.length}
+        total={total}
+        loading={loading}
         edit={edit}
       />
     </div>

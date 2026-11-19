@@ -1,10 +1,10 @@
 import { queryOptions } from "@tanstack/react-query";
-import { getLastScanResult, getScanDiagnostics } from "./api";
+import { getScanRecord, getScanDiagnostics } from "./api";
 import { SCAN_QUERY_KEYS } from "./queryKeys";
 
-export const scanLastResultQueryOptions = queryOptions({
+export const scanRecordQueryOptions = queryOptions({
   queryKey: SCAN_QUERY_KEYS.last(),
-  queryFn: () => getLastScanResult(),
+  queryFn: () => getScanRecord(),
 });
 
 export const scanDiagnosticsQueryOptions = queryOptions({

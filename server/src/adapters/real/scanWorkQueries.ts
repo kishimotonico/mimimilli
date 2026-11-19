@@ -8,6 +8,7 @@ export function getScanWorkMap(db: Db): Map<string, ScanWorkState> {
       `
           SELECT
             works.id AS id,
+            works.title AS title,
             works.source_revision AS sourceRevision,
             works.projection_revision AS projectionRevision,
             works.media_revision AS mediaRevision,
@@ -30,6 +31,7 @@ export function getScanWorkMap(db: Db): Map<string, ScanWorkState> {
     )
     .all() as Array<{
     id: string;
+    title: string;
     sourceRevision: string | null;
     projectionRevision: string | null;
     mediaRevision: string | null;
@@ -50,6 +52,7 @@ export function getScanWorkMap(db: Db): Map<string, ScanWorkState> {
   const map = new Map<string, ScanWorkState>();
   for (const row of rows) {
     map.set(row.id, {
+      title: row.title,
       metaPath: row.metaPath,
       sourceRevision: row.sourceRevision,
       projectionRevision: row.projectionRevision,

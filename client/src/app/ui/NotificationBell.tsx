@@ -9,7 +9,7 @@ import { activeModalAtom } from "../../shared/model/activeModalAtom";
 import { useDlsiteNotificationSummary } from "../../entities/dlsite/model/useDlsiteNotificationSummary";
 import {
   scanDiagnosticsQueryOptions,
-  scanLastResultQueryOptions,
+  scanRecordQueryOptions,
 } from "../../entities/scan/queryOptions";
 import {
   buildNeedsAttentionRows,
@@ -23,9 +23,9 @@ import { usePopoverDismissal } from "../../shared/ui/usePopoverDismissal";
 
 export default function NotificationBell() {
   const setActiveModal = useSetAtom(activeModalAtom);
-  // 前回スキャン結果（ディスク永続化なし）。購読する。
-  const lastScanQuery = useQuery(scanLastResultQueryOptions);
-  const scanResult = lastScanQuery.data?.result ?? null;
+  // 直近のスキャンの記録（サーバーのメモリ）。購読する。
+  const scanRecordQuery = useQuery(scanRecordQueryOptions);
+  const scanRecord = scanRecordQuery.data?.finishedAt ? scanRecordQuery.data : null;
   // 診断はスキャン時点のスナップショットではなく常に最新を見る（要対応タブと同じクエリ）。
   const diagnosticsQuery = useQuery(scanDiagnosticsQueryOptions);
   const {
@@ -51,10 +51,10 @@ export default function NotificationBell() {
     dlsiteFetchFailedCount,
     dlsiteParseErrorCount,
     dlsiteParseErrorAlert,
-    dataIntegrityWarning: scanResult?.dataIntegrityWarning,
+    dataIntegrityWarning: scanRecord?.dataIntegrityWarning,
   });
   const badgeCount = countNeedsAttention(needsAttentionRows);
-  const isEmpty = needsAttentionRows.length === 0 && !scanResult;
+  const isEmpty = needsAttentionRows.length === 0 && !scanRecord;
 
   return (
     <div ref={rootRef} className="relative">
@@ -112,7 +112,7 @@ export default function NotificationBell() {
                   }}
                 />
               ))}
-              {scanResult && (
+              {scanRecord && (
                 <button
                   type="button"
                   className="block w-full px-3.5 py-2.5 text-left hover:bg-paper-2 focus-visible:-outline-offset-2"
@@ -125,10 +125,8 @@ export default function NotificationBell() {
                     直近のスキャン結果
                   </p>
                   <dl className="grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-mono">
-                    <ScanStat label="登録済み" value={scanResult.registered} />
-                    <ScanStat label="新規" value={scanResult.insertedWorkIds.length} />
-                    <ScanStat label="エラー" value={scanResult.errors} />
-                    <ScanStat label="行方不明" value={scanResult.missing} />
+                    <ScanStat label="更新済み" value={scanRecord.updatedWorks.length} />
+                    <ScanStat label="行方不明" value={scanRecord.missingWorks.length} />
                   </dl>
                 </button>
               )}

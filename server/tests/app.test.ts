@@ -3,6 +3,7 @@
 // fixture ベースで adapter メソッドを差し替えて検証する。
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { worksQuerySchema } from "@mimimilli/shared";
 import { compareJapaneseSortKeys } from "../src/core/japaneseSortKey.ts";
 import { createApp } from "./helpers/testApp.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
@@ -84,24 +85,54 @@ contract(
   },
 );
 
-contract("GET /api/works は ids を複数指定すると該当作品のみへ絞り込む", async (harness) => {
-  const { status, body } = await harness.json(
-    `/api/works?ids=${harness.workId("a")}&ids=${harness.workId("c")}`,
-  );
-  assert.equal(status, 200);
-  assert.deepEqual(sortedIds(body.items), idsOf(harness, ["a", "c"]));
-  assert.equal(body.total, 2);
+contract(
+  "adapterのqueryWorksは ids で該当作品のみへ絞り込み、他のフィルタ・ページングと組み合わせられる",
+  async (harness) => {
+    const base = worksQuerySchema.parse({});
+    const subset = await harness.adapter.queryWorks({
+      ...base,
+      page: 1,
+      limit: 10,
+      ids: [harness.workId("a"), harness.workId("c")],
+    });
+    assert.deepEqual(sortedIds(subset.items), idsOf(harness, ["a", "c"]));
+    assert.equal(subset.total, 2);
+
+    const paged = await harness.adapter.queryWorks({
+      ...base,
+      sort: "id-asc",
+      page: 1,
+      limit: 1,
+      ids: ["a", "b", "c"].map((key) => harness.workId(key)),
+    });
+    assert.deepEqual(
+      paged.items.map((item) => item.id),
+      [idsOf(harness, ["a", "b", "c"])[0]],
+    );
+    assert.equal(paged.total, 3);
+  },
+);
+
+contract("adapterのqueryWorksは数万件のidsを渡しても束縛数の上限に当たらない", async (harness) => {
+  const unknown = Array.from({ length: 40000 }, (_, index) => `unknown-${index}`);
+  const page = await harness.adapter.queryWorks({
+    ...worksQuerySchema.parse({}),
+    page: 1,
+    limit: 10,
+    ids: [...unknown, harness.workId("b")],
+  });
+  assert.deepEqual(sortedIds(page.items), idsOf(harness, ["b"]));
+  assert.equal(page.total, 1);
 });
 
-contract("GET /api/works は ids に他のフィルタ・ページングを組み合わせられる", async (harness) => {
-  const ids = ["a", "b", "c"].map((key) => `ids=${harness.workId(key)}`).join("&");
-  const { status, body } = await harness.json(`/api/works?${ids}&limit=1&page=1&sort=id-asc`);
-  assert.equal(status, 200);
-  assert.deepEqual(
-    body.items.map((item: { id: string }) => item.id),
-    [idsOf(harness, ["a", "b", "c"])[0]],
-  );
-  assert.equal(body.total, 3);
+contract("adapterのqueryWorksは空のidsを空集合として扱う", async (harness) => {
+  const page = await harness.adapter.queryWorks({
+    ...worksQuerySchema.parse({}),
+    page: 1,
+    limit: 10,
+    ids: [],
+  });
+  assert.equal(page.total, 0);
 });
 
 contract("GET /api/works/:id 存在しないIDは404 + apiErrorSchema形式", async (harness) => {

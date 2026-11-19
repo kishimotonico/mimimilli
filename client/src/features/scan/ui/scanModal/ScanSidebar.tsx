@@ -8,8 +8,7 @@ import { SCAN_TAB_LABEL, SCAN_TAB_ORDER, type ScanTabKey } from "./types";
 interface ScanSidebarProps {
   active: ScanTabKey;
   onSelect: (tab: ScanTabKey) => void;
-  counts: Record<ScanTabKey, number>;
-  skippedCount: number | null;
+  counts: Partial<Record<ScanTabKey, number>>;
   libraryTotal: number | null;
   scanning: boolean;
   progress: ScanProgress | null;
@@ -21,7 +20,6 @@ export default function ScanSidebar({
   active,
   onSelect,
   counts,
-  skippedCount,
   libraryTotal,
   scanning,
   progress,
@@ -52,7 +50,6 @@ export default function ScanSidebar({
       </div>
 
       <div className="flex flex-col gap-1 border-t border-line-soft pt-2.5">
-        <SidebarSummaryRow label="更新なし" value={skippedCount} />
         <SidebarSummaryRow label="ライブラリ全体" value={libraryTotal} />
       </div>
 
@@ -82,7 +79,7 @@ function ScanSidebarTab({
 }: {
   tab: ScanTabKey;
   selected: boolean;
-  count: number;
+  count: number | undefined;
   onSelect: (tab: ScanTabKey) => void;
 }) {
   const label = SCAN_TAB_LABEL[tab];
@@ -93,7 +90,7 @@ function ScanSidebarTab({
       id={`scan-tab-${tab}`}
       aria-selected={selected}
       aria-controls={`scan-tabpanel-${tab}`}
-      aria-label={`${label}（${count}件）`}
+      aria-label={count === undefined ? label : `${label}（${count}件）`}
       onClick={() => onSelect(tab)}
       className={cn(
         "flex items-center justify-between gap-2 rounded-[6px] px-2 py-1.5 text-left font-jp text-control transition-colors",
@@ -103,17 +100,19 @@ function ScanSidebarTab({
       <span aria-hidden="true" className="truncate">
         {label}
       </span>
-      <span
-        aria-hidden="true"
-        className={cn(
-          "shrink-0 rounded-pill px-1.5 py-0.5 font-mono text-caption font-semibold tabular-nums",
-          tab === "needsAttention" && count > 0
-            ? "bg-[color-mix(in_oklch,var(--r-coral)_20%,transparent)] text-[var(--r-coral)]"
-            : "bg-paper-3 text-ink-2",
-        )}
-      >
-        {count}
-      </span>
+      {count !== undefined && (
+        <span
+          aria-hidden="true"
+          className={cn(
+            "shrink-0 rounded-pill px-1.5 py-0.5 font-mono text-caption font-semibold tabular-nums",
+            tab === "needsAttention" && count > 0
+              ? "bg-[color-mix(in_oklch,var(--r-coral)_20%,transparent)] text-[var(--r-coral)]"
+              : "bg-paper-3 text-ink-2",
+          )}
+        >
+          {count}
+        </span>
+      )}
     </button>
   );
 }

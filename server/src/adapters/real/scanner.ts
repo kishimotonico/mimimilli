@@ -4,6 +4,7 @@ import { basename, resolve } from "node:path";
 import type {
   IdentityConflict,
   MetaFile,
+  MissingWork,
   ScanCandidateFolder,
   ScanDiagnostics,
   ScanResult,
@@ -189,7 +190,10 @@ export class Scanner {
     const result: ScanResult = {
       registered: 0,
       insertedWorkIds: [],
+      startedWithEmptyCatalog: false,
+      missingWorks: [],
       updatedWorks: [],
+      unreadablePaths: [],
       errors: 0,
       missing: 0,
       skipped: 0,
@@ -202,6 +206,7 @@ export class Scanner {
     checkAbort();
     const seenIds: SeenMetaIds = { work: new Set() };
     const existingWorks = this.query.getScanWorkMap();
+    result.startedWithEmptyCatalog = existingWorks.size === 0;
     const existingByMetaPath = new Map(
       [...existingWorks].map(([id, state]) => [state.metaPath, { id, state }]),
     );
@@ -227,6 +232,7 @@ export class Scanner {
 
     return {
       result: this.finalizePhase(
+        root,
         tree,
         seenIds,
         existingWorks,
@@ -430,6 +436,7 @@ export class Scanner {
   }
 
   private finalizePhase(
+    root: string,
     tree: WalkResult,
     seenIds: SeenMetaIds,
     existingWorks: Map<string, ScanWorkState>,
@@ -446,7 +453,9 @@ export class Scanner {
     checkAbort();
 
     if (tree.unreadablePaths.length > 0) {
-      result.unreadablePaths = tree.unreadablePaths;
+      result.unreadablePaths = tree.unreadablePaths.map((dir) =>
+        workspacePath(toPortableRelativePath(root, dir)),
+      );
       scanLogger.warn("読み取れなかったディレクトリがあります", {
         paths: tree.unreadablePaths,
       });
@@ -471,12 +480,30 @@ export class Scanner {
         }
       }
     }
+    // スキャン開始時にcatalogにあった作品のうち今回見つからなかったものだけを missing にする。
+    // スキャン中に登録された作品は existingWorks に無いので missing にならない
+    const missingIds: string[] = [];
+    const missingWorks: MissingWork[] = [];
+    for (const [workId, state] of existingWorks) {
+      if (seenIds.work.has(workId)) continue;
+      missingIds.push(workId);
+      if (state.status === "missing") continue;
+      // root外の作品は相対pathで示せないので、画面に出す行方不明の対象にしない
+      if (!isPathWithin(root, state.physicalPath)) continue;
+      missingWorks.push({
+        workId,
+        title: state.title,
+        previousPath: workspacePath(toPortableRelativePath(root, state.physicalPath)),
+      });
+    }
     batch.publishScanGeneration({
       seenIds: [...seenIds.work],
       unverifiedIds: [...unverifiedIds],
+      missingIds,
       identityConflicts: diagnostics.identityConflicts,
       invalidMetaFiles: diagnostics.invalidMetaFiles,
     });
+    result.missingWorks = missingWorks;
     result.missing = this.catalog.countByStatus("missing");
     const { skipped } = this.query.listSummaries();
     logDataIntegritySkips(scanLogger, "scan-finalize", skipped);

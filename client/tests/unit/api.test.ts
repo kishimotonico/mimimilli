@@ -149,7 +149,6 @@ describe("scan api", () => {
         startedAt: "2026-01-01T00:00:00.000Z",
         finishedAt: null,
         progress: null,
-        result: null,
         error: null,
       },
     };
@@ -171,7 +170,6 @@ describe("scan api", () => {
         startedAt: "2026-01-01T00:00:00.000Z",
         finishedAt: null,
         progress: null,
-        result: null,
         error: null,
       },
     };
@@ -194,7 +192,6 @@ describe("scan api", () => {
       startedAt: "2026-01-01T00:00:00.000Z",
       finishedAt: null,
       progress: null,
-      result: null,
       error: null,
     };
     mockFetch.mockResolvedValue(
@@ -227,13 +224,11 @@ describe("scan api", () => {
     await expect(scanEntityApi.getActiveScan()).resolves.toBeNull();
   });
 
-  it("getLastScanResult: 204はnullを返す", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 204,
-      json: () => Promise.reject(new Error("no body")),
-    } as Response);
-    await expect(scanEntityApi.getLastScanResult()).resolves.toBeNull();
+  it("getScanRecord: 未スキャンの空の記録を返す", async () => {
+    const empty = { finishedAt: null, updatedWorks: [], missingWorks: [], unreadablePaths: [] };
+    mockFetch.mockResolvedValue(makeResponse(empty));
+    await expect(scanEntityApi.getScanRecord()).resolves.toEqual(empty);
+    expect(mockFetch).toHaveBeenCalledWith("/api/scan/last");
   });
 
   it("getScanJob: 404はサーバーのcode/messageをApiRequestErrorとして保持する", async () => {
@@ -422,21 +417,14 @@ describe("library api", () => {
     expect(result.total).toBe(42);
   });
 
-  it("searchWorks: ids:[]はサーバーへリクエストせず0件を返す（core・realと同じ空集合セマンティクス）", async () => {
-    const result = await workApi.searchWorks({ ids: [] });
-    expect(mockFetch).not.toHaveBeenCalled();
-    expect(result).toEqual({ items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } });
-  });
-
-  it("searchWorks: ids:[]かつsort:randomでもリクエストせずseedを発行する", async () => {
-    const result = await workApi.searchWorks({ ids: [], sort: "random", seed: 777 });
-    expect(mockFetch).not.toHaveBeenCalled();
-    expect(result).toEqual({
-      items: [],
-      total: 0,
-      stats: { trackCount: 0, durationSec: 0 },
-      seed: 777,
-    });
+  it("searchWorks: scanRecord と scanChange をクエリへ載せ、idsは送らない", async () => {
+    mockFetch.mockResolvedValue(
+      makeResponse({ items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } }),
+    );
+    await workApi.searchWorks({ scanRecord: "updated", scanChange: "moved", limit: 200 });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/works?limit=200&scanRecord=updated&scanChange=moved",
+    );
   });
 
   it("randomのレスポンスseedを次ページへ送り、ページ間の重複・欠落を防げる", async () => {

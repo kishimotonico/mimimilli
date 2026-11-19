@@ -314,7 +314,7 @@ describe("UnregisteredTab 登録中のアンマウント", () => {
 
     await waitFor(() =>
       expect(onRegistered).toHaveBeenCalledWith({
-        registeredWorkIds: ["w-a"],
+        registeredCount: 1,
         failedCount: 1,
         remainingCount: 1,
       }),

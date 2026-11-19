@@ -8,6 +8,7 @@ import {
   type MetaDlsiteState,
   type ScanCandidateFolder,
   type UpdatedWork,
+  type WorkspacePath,
   type SmartFolder,
 } from "@mimimilli/shared";
 import type { RootReconfigurationRecord } from "../../adapter/index.ts";
@@ -64,6 +65,10 @@ export interface FixtureScenario {
   /** scan() が insertedWorkIds として返す、新規に見つかった作品ID */
   scanInsertedWorkIds: string[];
   scanUpdatedWorks: UpdatedWork[];
+  /** scan() が新たに行方不明にする作品ID */
+  scanNewlyMissingWorkIds: string[];
+  /** scan() が読み取れなかったとして返すroot相対path */
+  scanUnreadablePaths: WorkspacePath[];
   scanCandidates: ScanCandidateFolder[];
   invalidMetaFiles: InvalidMetaFile[];
   identityConflicts: IdentityConflict[];
@@ -119,6 +124,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       lastScanTime: now,
       scanInsertedWorkIds: [],
       scanUpdatedWorks: [],
+      scanNewlyMissingWorkIds: [],
+      scanUnreadablePaths: [],
       scanCandidates: [],
       invalidMetaFiles: [],
       identityConflicts: [],
@@ -154,6 +161,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
         { workId: "RJ501002", changes: [{ kind: "files", audioDelta: 3 }] },
         { workId: "RJ501004", changes: [{ kind: "meta" }, { kind: "files", audioDelta: 0 }] },
       ],
+      scanNewlyMissingWorkIds: ["RJ501008"],
+      scanUnreadablePaths: [workspacePath("権限なし/フォルダー")],
       scanCandidates: [
         {
           path: workspacePath("未登録作品"),
@@ -199,6 +208,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       lastScanTime: now,
       scanInsertedWorkIds: [],
       scanUpdatedWorks: [],
+      scanNewlyMissingWorkIds: [],
+      scanUnreadablePaths: [],
       scanCandidates: [],
       invalidMetaFiles: [],
       identityConflicts: [
@@ -228,6 +239,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       lastScanTime: now,
       scanInsertedWorkIds: [],
       scanUpdatedWorks: [],
+      scanNewlyMissingWorkIds: [],
+      scanUnreadablePaths: [],
       scanCandidates: [],
       invalidMetaFiles: [],
       identityConflicts: [],
@@ -248,6 +261,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       lastScanTime: now,
       scanInsertedWorkIds: [],
       scanUpdatedWorks: [],
+      scanNewlyMissingWorkIds: [],
+      scanUnreadablePaths: [],
       scanCandidates: [],
       invalidMetaFiles: [],
       identityConflicts: [],
@@ -267,6 +282,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       lastScanTime: now,
       scanInsertedWorkIds: [],
       scanUpdatedWorks: [],
+      scanNewlyMissingWorkIds: [],
+      scanUnreadablePaths: [],
       scanCandidates: [],
       invalidMetaFiles: [],
       identityConflicts: [],
@@ -289,6 +306,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       lastScanTime: now,
       scanInsertedWorkIds: [],
       scanUpdatedWorks: [],
+      scanNewlyMissingWorkIds: [],
+      scanUnreadablePaths: [],
       scanCandidates: [
         {
           path: workspacePath("未登録作品"),
@@ -324,6 +343,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
     lastScanTime: now,
     scanInsertedWorkIds: [],
     scanUpdatedWorks: [],
+    scanNewlyMissingWorkIds: [],
+    scanUnreadablePaths: [],
     scanCandidates: [],
     invalidMetaFiles: [],
     identityConflicts: [],

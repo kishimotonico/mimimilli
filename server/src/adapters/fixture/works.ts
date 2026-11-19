@@ -30,6 +30,7 @@ import type {
   WorkSourcePatch,
   WorkspacePath,
   WorksPage,
+  UnregisterMissingWorksResult,
   WorksQuery,
 } from "@mimimilli/shared";
 import { SourceChangedError } from "../../errors.ts";
@@ -319,13 +320,15 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       return state.works.filter((w) => w.status === "missing").length;
     },
 
-    async unregisterMissingWorks(): Promise<{ deletedCount: number; failedCount: number }> {
+    async unregisterMissingWorks(): Promise<
+      UnregisterMissingWorksResult & { deletedWorkIds: string[] }
+    > {
       const missingIds = new Set(
         state.works.filter((w) => w.status === "missing").map((w) => w.id),
       );
       for (const id of missingIds) removeIdentityConflictForWork(state, id);
       removeWorks(state, missingIds);
-      return { deletedCount: missingIds.size, failedCount: 0 };
+      return { deletedCount: missingIds.size, failedCount: 0, deletedWorkIds: [...missingIds] };
     },
 
     async getWorkEditSnapshot(id: string): Promise<WorkEditSnapshot | null> {

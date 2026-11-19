@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
 import Modal, { ModalHeader } from "../../../shared/ui/Modal";
@@ -9,7 +9,7 @@ import { useToast } from "../../../shared/ui/useToast";
 import { useScanJobStore, useScanProgress, useScanning } from "../../../entities/scan/useScanJob";
 import {
   scanDiagnosticsQueryOptions,
-  scanLastResultQueryOptions,
+  scanRecordQueryOptions,
 } from "../../../entities/scan/queryOptions";
 import { useScanCandidatesCache } from "../model/useScanCandidatesCache";
 import { useDlsiteNotificationSummary } from "../../../entities/dlsite/model/useDlsiteNotificationSummary";
@@ -19,7 +19,6 @@ import NeedsAttentionTab from "./scanModal/NeedsAttentionTab";
 import NewlyRegisteredTab from "./scanModal/NewlyRegisteredTab";
 import UpdatedWorksTab from "./scanModal/UpdatedWorksTab";
 import ScanFooter from "./scanModal/ScanFooter";
-import { dedupeIds } from "./scanModal/scanResultWorkIds";
 import { useScanCompletionHint } from "./scanModal/useScanCompletionHint";
 import { buildNeedsAttentionRows, countNeedsAttention } from "../model/needsAttention";
 import type { CandidatesRegisteredResult, ScanTabKey } from "./scanModal/types";
@@ -32,8 +31,6 @@ interface ScanModalProps {
   onOpenFiles: (path: string) => void;
 }
 
-const EMPTY_WORK_IDS: string[] = [];
-
 export default function ScanModal({
   lastScanTime,
   onClose,
@@ -45,22 +42,17 @@ export default function ScanModal({
   const { start, cancel } = useScanJobStore();
   const [activeTab, setActiveTab] = useState<ScanTabKey>(initialTab);
   const toast = useToast();
-  // 候補承認で登録された作品ID（このモーダル表示中に蓄積しクライアント側で集約する）。
-  // insertedWorkIds（スキャン時点の自動登録分）とは別経路のため、ここで結合する。
-  const [approvedWorkIds, setApprovedWorkIds] = useState<string[]>([]);
 
   const handleUnregisteredRegistered = ({
-    registeredWorkIds,
+    registeredCount,
     failedCount,
     remainingCount,
   }: CandidatesRegisteredResult) => {
-    // 承認分、先頭＝直近。
-    setApprovedWorkIds((previous) => dedupeIds(registeredWorkIds, previous));
     toast.show({
       message:
         failedCount > 0
-          ? `${registeredWorkIds.length}件をライブラリに追加しました。${failedCount}件は追加できませんでした。`
-          : `${registeredWorkIds.length}件をライブラリに追加しました`,
+          ? `${registeredCount}件をライブラリに追加しました。${failedCount}件は追加できませんでした。`
+          : `${registeredCount}件をライブラリに追加しました`,
       variant: failedCount > 0 ? "warning" : "success",
       actionLabel: "新規登録済みを見る",
       onAction: () => setActiveTab("newlyRegistered"),
@@ -69,10 +61,9 @@ export default function ScanModal({
     if (remainingCount === 0) setActiveTab("newlyRegistered");
   };
 
-  // 前回スキャンの実行サマリー（ディスク永続化なし）。サーバー起動後に一度でも完了していれば
-  // GET /api/scan/last から取得でき、リロードをまたいでスキャンモーダルに表示できる。
-  const lastScanQuery = useQuery(scanLastResultQueryOptions);
-  const lastResult = lastScanQuery.data?.result ?? null;
+  // 直近のスキャンの記録（サーバーのメモリ。次のスキャンかサーバー再起動まで）。
+  const scanRecordQuery = useQuery(scanRecordQueryOptions);
+  const scanRecord = scanRecordQuery.data ?? null;
 
   const candidates = useScanCandidatesCache();
 
@@ -81,7 +72,7 @@ export default function ScanModal({
   const diagnosticsQuery = useQuery(scanDiagnosticsQueryOptions);
   const identityConflicts = diagnosticsQuery.data?.identityConflicts ?? [];
   const invalidMetaFiles = diagnosticsQuery.data?.invalidMetaFiles ?? [];
-  const dataIntegrityWarning = lastResult?.dataIntegrityWarning;
+  const dataIntegrityWarning = scanRecord?.dataIntegrityWarning;
   // 通知ベルと同じ「要対応」定義を使うため、RJコード未検出・DLsite取得/パース失敗は
   // スキャン結果のスナップショットではなく通知ベルと同じ集計クエリを参照する。
   const {
@@ -91,17 +82,7 @@ export default function ScanModal({
     parseErrorAlert: dlsiteParseErrorAlert,
   } = useDlsiteNotificationSummary();
 
-  const insertedWorkIds = lastResult?.insertedWorkIds ?? EMPTY_WORK_IDS;
-  const updatedWorks = lastResult?.updatedWorks;
-  const updatedWorkIds = useMemo(
-    () => (updatedWorks ? updatedWorks.map((work) => work.workId) : EMPTY_WORK_IDS),
-    [updatedWorks],
-  );
-  // 承認分（直近が先頭）→ 自動登録分の順で重複排除して結合する。
-  const newlyRegisteredWorkIds = useMemo(
-    () => dedupeIds(approvedWorkIds, insertedWorkIds),
-    [approvedWorkIds, insertedWorkIds],
-  );
+  const updatedCount = scanRecord?.updatedWorks.length ?? 0;
 
   // ライブラリ総件数（サイドバーの「ライブラリ N 件」と同じ既存クエリキーを共有する）。
   const libraryTotalQuery = useQuery(libraryTotalQueryOptions);
@@ -119,11 +100,10 @@ export default function ScanModal({
     dataIntegrityWarning,
   });
 
-  const counts: Record<ScanTabKey, number> = {
+  const counts: Partial<Record<ScanTabKey, number>> = {
     unregistered: candidates.length,
     needsAttention: countNeedsAttention(needsAttentionRows),
-    newlyRegistered: newlyRegisteredWorkIds.length,
-    updated: updatedWorkIds.length,
+    updated: updatedCount,
   };
 
   // スキャン実行中でも閉じられる。スキャン自体はバックグラウンドで継続する。
@@ -143,7 +123,6 @@ export default function ScanModal({
           active={activeTab}
           onSelect={setActiveTab}
           counts={counts}
-          skippedCount={lastResult?.skipped ?? null}
           libraryTotal={libraryTotal}
           scanning={scanning}
           progress={progress}
@@ -171,16 +150,14 @@ export default function ScanModal({
               onOpenFiles={onOpenFiles}
             />
           )}
-          {activeTab === "newlyRegistered" && (
-            <NewlyRegisteredTab workIds={newlyRegisteredWorkIds} />
-          )}
-          {activeTab === "updated" && <UpdatedWorksTab workIds={updatedWorkIds} />}
+          {activeTab === "newlyRegistered" && <NewlyRegisteredTab />}
+          {activeTab === "updated" && <UpdatedWorksTab />}
         </div>
       </div>
 
       <ScanFooter
         scanning={scanning}
-        hasResult={lastResult !== null}
+        hasResult={scanRecord?.finishedAt != null}
         onCancel={() => void cancel()}
         onFullScan={() => void start({ full: true })}
         onStart={() => void start()}
