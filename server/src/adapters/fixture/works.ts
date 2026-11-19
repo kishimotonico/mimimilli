@@ -19,6 +19,7 @@ import type {
   WorkCreateBody,
   WorkEditSnapshot,
   WorkRegisterPreview,
+  WorkCreateResponse,
   WorkSourceMutationResult,
   WorkSourcePatch,
   WorkspacePath,
@@ -163,7 +164,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       return work ? buildFullWorkFromState(state, work) : null;
     },
 
-    async createWork(body: WorkCreateBody): Promise<WorkSourceMutationResult | null> {
+    async createWork(body: WorkCreateBody): Promise<WorkCreateResponse | null> {
       const preview = await getWorkRegisterPreview(body.path);
       if (!preview) return null;
       const rootAbs = normalizeFsPath(requireFixtureRoot(state));
@@ -200,7 +201,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
         bookmarked: false,
         lastPlayedAt: null,
       };
-      applyFixtureCachedCover(state, work, plan.coverUrl);
+      const coverSkipped = applyFixtureCachedCover(state, work, plan.coverUrl);
       const registered = checkWorkPlacement(state, work);
       state.works.push(registered);
       state.sourceRevisions.set(work.id, "fixture");
@@ -208,6 +209,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       return {
         snapshot: fixtureEditSnapshot(state, registered),
         projection: { status: "published" },
+        coverSkipped,
       };
     },
 

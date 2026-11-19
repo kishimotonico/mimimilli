@@ -3,10 +3,12 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { UnregisterMissingWorksResult } from "@mimimilli/shared";
+import { mockApi } from "../helpers/api";
 import * as workApi from "../../src/entities/work/api";
 import { ErrorViewBulkUnregisterBanner } from "../../src/features/library/ui/ErrorViewBulkUnregisterBanner";
 
 beforeEach(() => {
+  mockApi({ "GET /api/scan/candidates": { candidates: [] } });
   HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
     this.open = true;
   });

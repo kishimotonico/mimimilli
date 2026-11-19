@@ -12,11 +12,9 @@ import * as scanApi from "../../src/features/scan/api";
 import * as workApi from "../../src/entities/work/api";
 import * as scanEntityApi from "../../src/entities/scan/api";
 import * as scanCandidatesCache from "../../src/entities/scan/scanCandidatesCache";
-import {
-  scanCandidateDeselectedPathsAtom,
-  scanCandidateHiddenPathsAtom,
-} from "../../src/entities/scan/model/atoms";
+import { scanCandidateDeselectedPathsAtom } from "../../src/entities/scan/model/atoms";
 import { dlsiteJobStoreAtom } from "../../src/entities/dlsite/model/dlsiteJobStore";
+import { mockApi } from "../helpers/api";
 import { buildScanCandidate } from "../helpers/builders";
 import { createFakeDlsiteJobStore } from "../helpers/fakeJobStores";
 import { clearResizeObservers } from "./setup";
@@ -28,6 +26,7 @@ import {
 let restoreSize: () => void;
 beforeEach(() => {
   restoreSize = mockUnregisteredListSize();
+  mockApi({ "GET /api/scan/candidates": { candidates: [] } });
 });
 
 afterEach(() => {
@@ -162,7 +161,7 @@ describe("UnregisteredTab RJコード編集", () => {
 
   it("1行のRJコードが不正でも、正常な行だけを選んで追加できる", async () => {
     const registerSpy = vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
-      registered: [{ path: candidateB.path, workId: "w2" }],
+      registered: [{ path: candidateB.path, workId: "w2", coverSkipped: null }],
       failures: [],
       interruptedBy: null,
     });
@@ -494,7 +493,7 @@ describe("UnregisteredTab 追加", () => {
       rjCode: "RJ000001",
     });
     const registerSpy = vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
-      registered: [{ path: candidateB.path, workId: "w" }],
+      registered: [{ path: candidateB.path, workId: "w", coverSkipped: null }],
       failures: [],
       interruptedBy: null,
     });
@@ -524,7 +523,7 @@ describe("UnregisteredTab 追加", () => {
 
   it("項目を選んで追加では、外した項目がfalseで送られる", async () => {
     const registerSpy = vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
-      registered: [{ path: candidateA.path, workId: "w" }],
+      registered: [{ path: candidateA.path, workId: "w", coverSkipped: null }],
       failures: [],
       interruptedBy: null,
     });
@@ -556,7 +555,7 @@ describe("UnregisteredTab 追加", () => {
 
   it("途中で候補変更が起きても、追加できた分はonRegisteredへ渡す", async () => {
     vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
-      registered: [{ path: candidateA.path, workId: "w-a" }],
+      registered: [{ path: candidateA.path, workId: "w-a", coverSkipped: null }],
       failures: [],
       interruptedBy: new ApiRequestError(409, "conflict", "候補が更新されました"),
     });
@@ -571,11 +570,12 @@ describe("UnregisteredTab 追加", () => {
     expect(onRegistered).toHaveBeenCalledWith({
       registeredCount: 1,
       failedCount: 0,
+      coverSkippedCount: 0,
       interrupted: true,
     });
   });
 
-  it("1件も追加できないまま止まったときはonRegisteredを呼ばず、失敗を表示する", async () => {
+  it("1件も追加できないまま止まったときは失敗を表示し、0件の結果をonRegisteredへ渡す", async () => {
     vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
       registered: [],
       failures: [],
@@ -586,33 +586,119 @@ describe("UnregisteredTab 追加", () => {
     await waitFor(() =>
       expect(screen.getByText(/通信エラー|ライブラリへの追加に失敗/)).not.toBeNull(),
     );
-    expect(onRegistered).not.toHaveBeenCalled();
+    expect(onRegistered).toHaveBeenCalledWith({
+      registeredCount: 0,
+      failedCount: 0,
+      coverSkippedCount: 0,
+      interrupted: true,
+    });
   });
 
-  it("追加リクエスト中にタブがアンマウントされても、非表示集合とonRegisteredへ結果が届く", async () => {
+  it("中断なしで全件失敗しても、失敗理由を表示し、0件の結果をonRegisteredへ渡す", async () => {
+    vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
+      registered: [],
+      failures: [{ path: candidateA.path, message: "配下に登録済み作品が1件あります" }],
+      interruptedBy: null,
+    });
+    const { onRegistered } = await renderTab([candidateA]);
+    fireEvent.click(screen.getByRole("button", { name: "1件を追加" }));
+    await waitFor(() => expect(screen.getByText("配下に登録済み作品が1件あります")).not.toBeNull());
+    expect(onRegistered).toHaveBeenCalledWith({
+      registeredCount: 0,
+      failedCount: 1,
+      coverSkippedCount: 0,
+      interrupted: false,
+    });
+  });
+
+  it("カバーを適用できなかった件数をonRegisteredへ渡す", async () => {
+    vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
+      registered: [
+        { path: candidateA.path, workId: "w-a", coverSkipped: "not_cached" },
+        { path: candidateB.path, workId: "w-b", coverSkipped: null },
+      ],
+      failures: [],
+      interruptedBy: null,
+    });
+    const { onRegistered } = await renderTab([candidateA, candidateB]);
+    fireEvent.click(screen.getByRole("button", { name: "2件を追加" }));
+    await waitFor(() =>
+      expect(onRegistered).toHaveBeenCalledWith({
+        registeredCount: 2,
+        failedCount: 0,
+        coverSkippedCount: 1,
+        interrupted: false,
+      }),
+    );
+  });
+
+  it("追加後は、候補が取り直されて行が消えるまで操作中のままになる", async () => {
+    vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
+      registered: [{ path: candidateA.path, workId: "w-a", coverSkipped: null }],
+      failures: [],
+      interruptedBy: null,
+    });
+    let releaseRefresh!: () => void;
+    const refreshGate = new Promise<void>((resolve) => {
+      releaseRefresh = resolve;
+    });
+    const api = mockApi({
+      "GET /api/scan/candidates": async () => {
+        await refreshGate;
+        return { candidates: [candidateB] };
+      },
+    });
+    const key = scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY;
+    const { queryClient, rerenderWith } = await renderTab([candidateA, candidateB]);
+    queryClient.setQueryData(key, [candidateA, candidateB]);
+    queryClient.getQueryCache().subscribe(() => {
+      rerenderWith(queryClient.getQueryData<ScanCandidate[]>(key) ?? []);
+    });
+    const addButton = () => screen.getByRole("button", { name: /件を追加/ });
+    fireEvent.click(addButton());
+
+    await waitFor(() => expect(api.requestsTo("GET /api/scan/candidates")).toHaveLength(1));
+    expect(addButton()).toBeDisabled();
+    expect(screen.getByText(candidateA.inferredTitle)).toBeInTheDocument();
+
+    releaseRefresh();
+    await waitFor(() => expect(screen.queryByText(candidateA.inferredTitle)).toBeNull());
+    await waitFor(() => expect(addButton()).toBeEnabled());
+  });
+
+  it("追加リクエスト中にタブがアンマウントされても、候補が取り直されonRegisteredへ結果が届く", async () => {
     let resolveRegister!: (response: ScanCandidatesRegisterOutcome) => void;
     vi.spyOn(workApi, "registerScanCandidates").mockReturnValue(
       new Promise((resolve) => {
         resolveRegister = resolve;
       }),
     );
-    const { onRegistered, unmount, store } = await renderTab([candidateA, candidateB]);
+    const api = mockApi({ "GET /api/scan/candidates": { candidates: [candidateB] } });
+    const { onRegistered, unmount, queryClient } = await renderTab([candidateA, candidateB]);
+    queryClient.setQueryData(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY, [
+      candidateA,
+      candidateB,
+    ]);
     fireEvent.click(screen.getByRole("button", { name: "2件を追加" }));
     await waitFor(() => expect(workApi.registerScanCandidates).toHaveBeenCalled());
     unmount();
     resolveRegister({
       interruptedBy: null,
-      registered: [{ path: candidateA.path, workId: "w-a" }],
+      registered: [{ path: candidateA.path, workId: "w-a", coverSkipped: null }],
       failures: [{ path: candidateB.path, message: "失敗" }],
     });
     await waitFor(() =>
       expect(onRegistered).toHaveBeenCalledWith({
         registeredCount: 1,
         failedCount: 1,
+        coverSkippedCount: 0,
         interrupted: false,
       }),
     );
-    expect(store.get(scanCandidateHiddenPathsAtom)).toEqual(new Set([candidateA.path]));
+    expect(api.requestsTo("GET /api/scan/candidates")).toHaveLength(1);
+    expect(queryClient.getQueryData(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY)).toEqual([
+      candidateB,
+    ]);
   });
 });
 

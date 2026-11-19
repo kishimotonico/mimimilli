@@ -11,6 +11,7 @@ import {
   dlsiteFetchByCodeBodySchema,
   dlsiteFetchByCodeResponseSchema,
   dlsiteStateUpdateBodySchema,
+  dlsiteApplyResponseSchema,
   workSourceMutationResultSchema,
 } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter/index.ts";
@@ -109,7 +110,7 @@ export function dlsiteRoute(
       throwSourceCommandError(error);
     }
     if (!result) notFound(`作品が見つかりません: ${workId}`);
-    return c.json(workSourceMutationResultSchema.parse(result));
+    return c.json(dlsiteApplyResponseSchema.parse(result));
   });
 
   app.patch("/dlsite/:id", async (c) => {

@@ -1,8 +1,6 @@
-import { useAtomValue } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import type { ScanCandidate } from "@mimimilli/shared";
 import { scanCandidatesQueryOptions } from "../../../entities/scan/scanCandidatesCache";
-import { scanCandidateHiddenPathsAtom } from "../../../entities/scan/model/atoms";
 
 const EMPTY_SCAN_CANDIDATES: ScanCandidate[] = [];
 
@@ -14,15 +12,8 @@ export function useScanCandidatesState(): { candidates: ScanCandidate[]; loaded:
     enabled: false,
   });
 
-  const hiddenPaths = useAtomValue(scanCandidateHiddenPathsAtom);
-
-  const source = candidatesQuery.data ?? EMPTY_SCAN_CANDIDATES;
-
   return {
-    candidates:
-      hiddenPaths.size === 0
-        ? source
-        : source.filter((candidate) => !hiddenPaths.has(candidate.path)),
+    candidates: candidatesQuery.data ?? EMPTY_SCAN_CANDIDATES,
     loaded: candidatesQuery.data !== undefined,
   };
 }

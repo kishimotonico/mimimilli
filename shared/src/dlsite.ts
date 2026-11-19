@@ -231,6 +231,10 @@ export function normalizeDlsiteAgeRating(raw: string): DlsiteAgeRating | null {
   return null;
 }
 
+/** 選んだDLsiteカバーを適用しなかった理由。カバーを選んでいない・DLsiteにカバーが無いときは理由を持たない */
+export const dlsiteCoverSkipReasonSchema = z.enum(["outside_root", "unreadable", "not_cached"]);
+export type DlsiteCoverSkipReason = z.infer<typeof dlsiteCoverSkipReasonSchema>;
+
 /** RJ/VJコードの形式。DLsiteキャッシュが受け付ける形式（`^(RJ|VJ)\d{6,8}$`）と一致させる。 */
 export const RJ_CODE_PATTERN = /^(RJ|VJ)\d{6,8}$/i;
 

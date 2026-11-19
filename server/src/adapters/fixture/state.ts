@@ -5,6 +5,7 @@ import type {
   DataIntegrityWarning,
   DlsiteCacheResolution,
   DlsiteCacheResolutionHead,
+  DlsiteCoverSkipReason,
   InvalidMetaFile,
   MetaDlsiteState,
   ResumeBody,
@@ -196,24 +197,38 @@ export function fixtureDlsiteCoverKey(coverUrl: string): string {
   return createHash("sha256").update(coverUrl).digest("hex");
 }
 
-/** カバーキャッシュにあるか。DLsiteへは取りに行かない */
-export function fixtureDlsiteCoverCached(state: FixtureState, coverUrl: string | null): boolean {
-  return coverUrl !== null && state.dlsiteCovers.has(fixtureDlsiteCoverKey(coverUrl));
+/** 選んだカバーを適用できない理由。適用できる・カバーが無いときは null。画像として読めないものは contentType が image/ でないキャッシュ */
+export function fixtureCoverSkipReason(
+  state: FixtureState,
+  coverUrl: string | null,
+): DlsiteCoverSkipReason | null {
+  if (coverUrl === null) return null;
+  const cached = state.dlsiteCovers.get(fixtureDlsiteCoverKey(coverUrl));
+  if (!cached) return "not_cached";
+  return cached.contentType.startsWith("image/") ? null : "unreadable";
 }
 
-/** キャッシュ済みのカバーを作品のカバーにする。キャッシュに無ければ何もしない */
+/** 適用できるカバーがキャッシュにあるか。DLsiteへは取りに行かない */
+export function fixtureDlsiteCoverCached(state: FixtureState, coverUrl: string | null): boolean {
+  return coverUrl !== null && fixtureCoverSkipReason(state, coverUrl) === null;
+}
+
+/** キャッシュ済みのカバーを作品のカバーにして、適用できなかった理由を返す。適用した・カバーが無いときは null */
 export function applyFixtureCachedCover(
   state: FixtureState,
   work: FixtureWorkRecord,
   coverUrl: string | null,
-): void {
-  if (coverUrl === null || !fixtureDlsiteCoverCached(state, coverUrl)) return;
+): DlsiteCoverSkipReason | null {
+  if (coverUrl === null) return null;
+  const skipped = fixtureCoverSkipReason(state, coverUrl);
+  if (skipped) return skipped;
   const columns: FixtureCoverColumns = {
     image: coverUrl,
     dimensions: work.cover?.dimensions ?? { width: 900, height: 900 },
   };
   state.coverColumns.set(work.id, columns);
   work.cover = fixtureCoverFromColumns(work, columns);
+  return null;
 }
 
 /** 作品レコードとlinkage・取得キャッシュから、API向けの合成済みWorkSummaryを読み出し時に組み立てる。

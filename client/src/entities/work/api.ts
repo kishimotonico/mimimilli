@@ -17,11 +17,13 @@ import {
   worksPageSchema,
   dlsitePreviewSchema,
   missingWorksCountSchema,
+  dlsiteApplyResponseSchema,
   workCreateResponseSchema,
   identityConflictReassignResponseSchema,
   SCAN_CANDIDATE_REGISTER_MAX_PATHS,
   scanCandidatesRegisterRequestSchema,
   scanCandidatesRegisterResponseSchema,
+  type DlsiteApplyResponse,
   type DlsiteRegistrationApply,
   type ScanCandidatesRegisterResponse,
   type WorkCreateBodyInput,
@@ -227,12 +229,8 @@ export async function fetchDlsiteInfo(workId: string): Promise<DlsitePreview> {
 export async function applyDlsiteInfo(
   workId: string,
   body: DlsiteApplyBodyInput,
-): Promise<WorkSourceMutationResult> {
-  return postParsed(
-    workSourceMutationResultSchema,
-    `/dlsite/${encodeURIComponent(workId)}/apply`,
-    body,
-  );
+): Promise<DlsiteApplyResponse> {
+  return postParsed(dlsiteApplyResponseSchema, `/dlsite/${encodeURIComponent(workId)}/apply`, body);
 }
 
 export async function updateDlsiteState(

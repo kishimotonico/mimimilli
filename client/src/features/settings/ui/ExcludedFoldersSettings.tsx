@@ -2,7 +2,6 @@
 // スキャンの未登録タブで「候補から外す」と user DB へ永続化され、二度と候補に出てこなくなる。
 // 後から気づいた場合の唯一の救済手段として、一覧と解除をここに置く。
 import { useState } from "react";
-import { useSetAtom } from "jotai";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getScanCandidateExclusions,
@@ -10,7 +9,6 @@ import {
   SCAN_CANDIDATE_EXCLUSIONS_QUERY_KEY,
 } from "../../../entities/scan/api";
 import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
-import { scanCandidateHiddenPathsAtom } from "../../../entities/scan/model/atoms";
 import Button from "../../../shared/ui/Button";
 import { useToast } from "../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
@@ -20,7 +18,6 @@ const SECTION_LABEL_CLASS =
 
 export default function ExcludedFoldersSettings() {
   const queryClient = useQueryClient();
-  const setHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const toast = useToast();
 
@@ -39,13 +36,7 @@ export default function ExcludedFoldersSettings() {
         variant: "success",
         priority: "action",
       });
-      setHiddenPaths((previous) => {
-        if (!previous.has(path)) return previous;
-        const next = new Set(previous);
-        next.delete(path);
-        return next;
-      });
-      await refreshScanCandidates(queryClient);
+      await refreshScanCandidates(queryClient).catch(() => {});
     },
     onError: (error: unknown) => setErrorMessage(apiErrorMessage(error, "解除に失敗しました")),
   });

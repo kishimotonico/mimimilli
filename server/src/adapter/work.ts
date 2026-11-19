@@ -7,6 +7,7 @@ import type {
   WorkBookmarkPatch,
   WorkBookmarkResult,
   WorkCreateBody,
+  WorkCreateResponse,
   WorkEditSnapshot,
   WorkRegisterPreview,
   WorkSourceMutationResult,
@@ -20,7 +21,7 @@ import type {
 export interface WorkAdapter {
   queryWorks(params: WorksQuery): Promise<WorksPage>;
   getWorkRegisterPreview(path: WorkspacePath): Promise<WorkRegisterPreview | null>;
-  createWork(body: WorkCreateBody): Promise<WorkSourceMutationResult | null>;
+  createWork(body: WorkCreateBody): Promise<WorkCreateResponse | null>;
   /** replacedWorkId は、再採番で別IDに置き換わった（もう存在しない）作品のID。コピー側の再採番では null */
   reassignIdentityConflict(
     body: IdentityConflictReassignBody,

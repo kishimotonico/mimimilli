@@ -7,7 +7,12 @@ import {
   setAsideFile,
   writeTempFile,
 } from "./atomicFile.ts";
-import { dlsiteCoverBaseName, errorMessage, type WorkPlacement } from "@mimimilli/shared";
+import {
+  dlsiteCoverBaseName,
+  errorMessage,
+  type DlsiteCoverSkipReason,
+  type WorkPlacement,
+} from "@mimimilli/shared";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { normalizeDlsiteCoverUrl } from "./dlsite.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
@@ -48,7 +53,8 @@ export function sniffImageContentType(body: Uint8Array): string | null {
  * キャッシュにあるカバーを作品の配置に沿った名前で保存する共通手順。
  * ステージ → persist 内の place() で配置 → persist 失敗時は旧カバーへ戻す → 後始末。
  * persist は、メタの保存まで含めて成否を決める処理。DLsiteへは取りに行かない。
- * キャッシュに無い・画像形式を判定できない・ルート外の作品フォルダー・画像として読めないときは cover=null で persist を呼ぶ。
+ * キャッシュに無い・画像形式を判定できない・ルート外の作品フォルダー・画像として読めないときは cover=null で persist を呼び、
+ * 選んだカバーを適用しなかった理由を coverSkipped に返す。coverUrl が無いときは理由を持たない。
  */
 export async function saveWithDlsiteCover<T>(
   source: {
@@ -60,12 +66,16 @@ export async function saveWithDlsiteCover<T>(
   placement: WorkPlacement,
   root: string,
   persist: (cover: StagedCover | null) => T | Promise<T>,
-): Promise<T> {
-  const staged = source.coverUrl ? await stageCachedDlsiteCover(source, placement, root) : null;
+): Promise<{ value: T; coverSkipped: DlsiteCoverSkipReason | null }> {
+  const outcome = source.coverUrl
+    ? await stageCachedDlsiteCover(source, source.coverUrl, placement, root)
+    : null;
+  const staged = outcome?.kind === "staged" ? outcome.handle : null;
+  const coverSkipped = outcome?.kind === "skipped" ? outcome.reason : null;
   try {
-    const result = await persist(staged?.cover ?? null);
+    const value = await persist(staged?.cover ?? null);
     staged?.settle();
-    return result;
+    return { value, coverSkipped };
   } catch (error) {
     try {
       staged?.revert();
@@ -80,6 +90,17 @@ export async function saveWithDlsiteCover<T>(
   }
 }
 
+type StagingOutcome =
+  | { kind: "staged"; handle: StagingHandle }
+  | { kind: "skipped"; reason: DlsiteCoverSkipReason };
+
+function skipped(reason: DlsiteCoverSkipReason, mediaRoot?: string): StagingOutcome {
+  if (reason !== "not_cached") {
+    dlsiteLogger.warn("DLsiteカバーを反映しませんでした", { reason, mediaRoot });
+  }
+  return { kind: "skipped", reason };
+}
+
 interface StagingHandle {
   cover: StagedCover;
   /** 保存に成功したので退避した旧カバーを消す */
@@ -90,24 +111,24 @@ interface StagingHandle {
 }
 
 async function stageCachedDlsiteCover(
-  { cache, coverUrl, previousCoverImage }: Parameters<typeof saveWithDlsiteCover>[0],
+  { cache, previousCoverImage }: Parameters<typeof saveWithDlsiteCover>[0],
+  coverUrl: string,
   placement: WorkPlacement,
   root: string,
-): Promise<StagingHandle | null> {
-  if (!coverUrl) return null;
+): Promise<StagingOutcome> {
   let normalizedUrl: string;
   try {
     normalizedUrl = normalizeDlsiteCoverUrl(coverUrl);
   } catch {
-    return null;
+    return skipped("not_cached");
   }
   const cached = cache.getCover(normalizedUrl);
-  if (!cached) return null;
+  if (!cached) return skipped("not_cached");
   const contentType = sniffImageContentType(cached.body);
   const extension = contentType ? COVER_EXTENSION_BY_CONTENT_TYPE[contentType] : undefined;
-  if (!extension) return null;
+  if (!extension) return skipped("unreadable", placement.mediaRoot);
   const realWorkDir = resolveWithin(root, placement.mediaRoot);
-  if (!realWorkDir) return null;
+  if (!realWorkDir) return skipped("outside_root", placement.mediaRoot);
   const baseName = dlsiteCoverBaseName(placement);
   const fileName = `${baseName}.${extension}`;
   let tmpPath: string;
@@ -122,11 +143,11 @@ async function stageCachedDlsiteCover(
   } finally {
     if (!dimensions) removeTempFile(tmpPath);
   }
-  if (!dimensions) return null;
+  if (!dimensions) return skipped("unreadable", placement.mediaRoot);
   const finalPath = join(realWorkDir, fileName);
   let placed = false;
   let aside: string | null = null;
-  return {
+  const handle: StagingHandle = {
     cover: {
       fileName,
       dimensions,
@@ -158,4 +179,5 @@ async function stageCachedDlsiteCover(
     },
     discard: () => removeTempFile(tmpPath),
   };
+  return { kind: "staged", handle };
 }

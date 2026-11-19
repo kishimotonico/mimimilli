@@ -83,6 +83,22 @@ contract("候補を登録すると作品一覧に加わり、候補一覧から�
   assert.equal(hasTarget(await listCandidates(harness)), false);
 });
 
+contract("候補から追加した作品を登録解除すると、再スキャンなしで候補に戻る", async (harness) => {
+  const registered = await harness.send("POST", "/api/scan/candidates/register", {
+    paths: ["未登録作品"],
+    apply: { title: true, cover: true, tags: true, url: true },
+  });
+  assert.equal(registered.status, 201);
+  assert.equal(hasTarget(await listCandidates(harness)), false);
+
+  const removed = await harness.send(
+    "DELETE",
+    `/api/works/${registered.body.registered[0].workId}`,
+  );
+  assert.equal(removed.status, 204);
+  assert.equal(hasTarget(await listCandidates(harness)), true);
+});
+
 contract("候補の除外は一覧から隠し、除外解除で戻る", async (harness) => {
   const excluded = await harness.send("POST", "/api/scan/candidates/exclude", {
     paths: ["未登録作品"],
@@ -240,8 +256,8 @@ test("候補登録はDLsite取得ジョブを作らない", async () => {
     registerScanCandidates: async () =>
       scanCandidatesRegisterResponseSchema.parse({
         registered: [
-          { path: "候補作品", workId: "work-a" },
-          { path: "候補作品-2", workId: "work-b" },
+          { path: "候補作品", workId: "work-a", coverSkipped: null },
+          { path: "候補作品-2", workId: "work-b", coverSkipped: null },
         ],
         failures: [],
       }),
@@ -270,7 +286,7 @@ test("候補登録APIは部分失敗と全失敗を201で返す", async () => {
     ...fixture,
     registerScanCandidates: async () =>
       scanCandidatesRegisterResponseSchema.parse({
-        registered: [{ path: "候補作品", workId: "work-ok" }],
+        registered: [{ path: "候補作品", workId: "work-ok", coverSkipped: null }],
         failures: [{ path: "失敗作品", message: "catalogの投影に失敗しました" }],
       }),
   });
@@ -285,7 +301,7 @@ test("候補登録APIは部分失敗と全失敗を201で返す", async () => {
     });
     assert.equal(partial.status, 201);
     assert.deepEqual(await partial.json(), {
-      registered: [{ path: "候補作品", workId: "work-ok" }],
+      registered: [{ path: "候補作品", workId: "work-ok", coverSkipped: null }],
       failures: [{ path: "失敗作品", message: "catalogの投影に失敗しました" }],
     });
   } finally {

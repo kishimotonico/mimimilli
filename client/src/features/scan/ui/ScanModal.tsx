@@ -43,17 +43,30 @@ export default function ScanModal({
   const handleUnregisteredRegistered = ({
     registeredCount,
     failedCount,
+    coverSkippedCount,
     interrupted,
   }: CandidatesRegisteredResult) => {
+    if (registeredCount === 0) return;
+    const coverNote =
+      coverSkippedCount > 0 ? `うち${coverSkippedCount}件はカバーを適用できませんでした。` : "";
     if (failedCount > 0 || interrupted) {
       toast.show({
-        message: interrupted
-          ? `${registeredCount}件を追加して止まりました。`
-          : `${registeredCount}件を追加しました。${failedCount}件は追加できず、未登録タブに残っています。`,
+        message:
+          (interrupted
+            ? `${registeredCount}件を追加して止まりました。`
+            : `${registeredCount}件を追加しました。${failedCount}件は追加できず、未登録タブに残っています。`) +
+          coverNote,
         variant: "warning",
         priority: "notice",
       });
       return;
+    }
+    if (coverNote) {
+      toast.show({
+        message: `${registeredCount}件を追加しました。${coverNote}`,
+        variant: "warning",
+        priority: "notice",
+      });
     }
     setActiveTab("newWorks");
   };

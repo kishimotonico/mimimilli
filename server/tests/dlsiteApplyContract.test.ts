@@ -1,7 +1,11 @@
 // 作品詳細のDLsite適用の契約。DLsite情報はキャッシュから読み、クライアントのinfoは受け付けない（ADR-0033）。
 import assert from "node:assert/strict";
 import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../src/adapters/real/dlsiteConfig.ts";
-import { FIXTURE_DLSITE_NO_COVER_RJ_CODE } from "../src/adapters/fixture/dlsiteMethods.ts";
+import {
+  FIXTURE_DLSITE_COVERLESS_RJ_CODE,
+  FIXTURE_DLSITE_NO_COVER_RJ_CODE,
+  FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE,
+} from "../src/adapters/fixture/dlsiteMethods.ts";
 import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
 import {
   coverUrlFromRequest,
@@ -28,11 +32,20 @@ const contract = defineContract({
     },
     dlsiteSchedulerDependencies: mockDlsiteTransport({
       html: (code) =>
-        code === FIXTURE_DLSITE_NO_COVER_RJ_CODE
-          ? htmlResponse(sampleWorkHtml(code, { title: `タイトル${code}`, cover: false }))
-          : htmlResponse(sampleWorkHtml(code, { title: `タイトル${code}` })),
-      cover: (url) =>
-        coverUrlFromRequest(url) ? jpegResponse(SAMPLE_COVER) : htmlResponse("", 404),
+        htmlResponse(
+          sampleWorkHtml(code, {
+            title: `タイトル${code}`,
+            cover: code !== FIXTURE_DLSITE_COVERLESS_RJ_CODE,
+          }),
+        ),
+      cover: (url) => {
+        if (!coverUrlFromRequest(url)) return htmlResponse("", 404);
+        if (url.includes(`${FIXTURE_DLSITE_NO_COVER_RJ_CODE}_img`)) return htmlResponse("", 404);
+        if (url.includes(`${FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE}_img`)) {
+          return jpegResponse(new TextEncoder().encode("not an image"));
+        }
+        return jpegResponse(SAMPLE_COVER);
+      },
     }),
   },
 });
@@ -86,6 +99,7 @@ contract("適用は選んだ項目だけを、キャッシュのDLsite情報か�
     apply: { title: true, cover: true, url: true, tags: [genre] },
   });
   assert.equal(res.status, 200);
+  assert.equal(res.body.coverSkipped, null);
   const work = await h.adapter.getWork(id);
   assert.equal(work!.title, fetched.info.title);
   assert.deepEqual(work!.urls, [{ label: "DLsite", url: fetched.info.url }]);
@@ -190,19 +204,41 @@ contract("取得していないコードの適用は409 dlsite_refetch_required"
   assert.equal(res.body.error.code, "dlsite_refetch_required");
 });
 
-contract("カバーがキャッシュに無いときは、カバーだけ反映せず適用が成功する", async (h) => {
+for (const [name, code, reason] of [
+  ["キャッシュに無い", FIXTURE_DLSITE_NO_COVER_RJ_CODE, "not_cached"],
+  ["画像として読めない", FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE, "unreadable"],
+  ["DLsiteにカバーが無い", FIXTURE_DLSITE_COVERLESS_RJ_CODE, null],
+] as const) {
+  contract(
+    `カバーが${name}ときは、カバーだけ適用せず成功し、理由は ${reason ?? "null"} を返す`,
+    async (h) => {
+      const id = h.workId("existing");
+      const fetched = await fetchFor(h, id, code);
+      const res = await apply(h, id, {
+        sourceRevision: fetched.sourceRevision,
+        infoRevision: fetched.infoRevision,
+        apply: { title: true, cover: true, url: true, tags: [] },
+      });
+      assert.equal(res.status, 200);
+      assert.equal(res.body.coverSkipped, reason);
+      const work = await h.adapter.getWork(id);
+      assert.equal(work!.title, fetched.info.title);
+      assert.equal(work!.cover, null);
+      assert.equal(work!.dlsite.status, "applied");
+    },
+  );
+}
+
+contract("カバーを選ばない適用は、キャッシュに無くても理由を返さない", async (h) => {
   const id = h.workId("existing");
   const fetched = await fetchFor(h, id, FIXTURE_DLSITE_NO_COVER_RJ_CODE);
   const res = await apply(h, id, {
     sourceRevision: fetched.sourceRevision,
     infoRevision: fetched.infoRevision,
-    apply: { title: true, cover: true, url: true, tags: [] },
+    apply: { title: true, cover: false, url: true, tags: [] },
   });
   assert.equal(res.status, 200);
-  const work = await h.adapter.getWork(id);
-  assert.equal(work!.title, fetched.info.title);
-  assert.equal(work!.cover, null);
-  assert.equal(work!.dlsite.status, "applied");
+  assert.equal(res.body.coverSkipped, null);
 });
 
 contract("info・applyTitleを含むbodyは400", async (h) => {

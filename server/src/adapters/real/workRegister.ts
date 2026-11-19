@@ -6,6 +6,7 @@ import type {
   MetaFile,
   WorkCreateBody,
   WorkRegisterPreview,
+  WorkCreateResponse,
   WorkSourceMutationResult,
 } from "@mimimilli/shared";
 import { isDlsiteUrl, planDlsiteRegistration } from "@mimimilli/shared";
@@ -215,7 +216,7 @@ export async function createWorkFromPath(
   root: string,
   body: WorkCreateBody,
   dlsiteDeps: WorkRegisterDlsite,
-): Promise<WorkSourceMutationResult> {
+): Promise<WorkCreateResponse> {
   const { query } = repos;
   const path = resolveWithin(root, join(root, body.path));
   const target = path ? registrationTargetOfPath(path) : null;
@@ -248,7 +249,7 @@ export async function createWorkFromPath(
     if (body.title !== meta.title) metaPatch.title = body.title;
     metaPatch.tags = body.tags;
 
-    const prepared = await saveWithDlsiteCover(
+    const { value: prepared, coverSkipped } = await saveWithDlsiteCover(
       {
         cache: dlsiteDeps.dlsiteCache,
         coverUrl: info ? plan.coverUrl : null,
@@ -271,13 +272,16 @@ export async function createWorkFromPath(
         return scanner.writeRestoredWorkMeta(target, metaPatch);
       },
     );
-    return mutationResultFromProjectOutcome(
-      await scanner.projectPrepared(prepared),
-      target.physicalPath,
-    );
+    return {
+      ...mutationResultFromProjectOutcome(
+        await scanner.projectPrepared(prepared),
+        target.physicalPath,
+      ),
+      coverSkipped,
+    };
   }
 
-  const prepared = await saveWithDlsiteCover(
+  const { value: prepared, coverSkipped } = await saveWithDlsiteCover(
     { cache: dlsiteDeps.dlsiteCache, coverUrl: plan.coverUrl },
     target.placement,
     root,
@@ -292,8 +296,11 @@ export async function createWorkFromPath(
       });
     },
   );
-  return mutationResultFromProjectOutcome(
-    await scanner.projectPrepared(prepared),
-    target.physicalPath,
-  );
+  return {
+    ...mutationResultFromProjectOutcome(
+      await scanner.projectPrepared(prepared),
+      target.physicalPath,
+    ),
+    coverSkipped,
+  };
 }

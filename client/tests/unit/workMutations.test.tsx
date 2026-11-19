@@ -3,6 +3,7 @@ import { act, renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { emptyDlsiteState, type Work } from "@mimimilli/shared";
+import { mockApi } from "../helpers/api";
 import * as workApi from "../../src/entities/work/api";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
@@ -117,6 +118,7 @@ describe("正本変更の失敗", () => {
 describe("画面の後処理の順序", () => {
   it("mutate 単位の onSuccess は必須更新の完了後に呼ばれる", async () => {
     vi.spyOn(workApi, "deleteWork").mockResolvedValue(undefined);
+    mockApi({ "GET /api/scan/candidates": { candidates: [] } });
     const { queryClient, wrapper, isInvalidated } = setup();
     const { result } = renderHook(() => useUnregisterWorkMutation(), { wrapper });
     const observed: { detailRemoved: boolean; listInvalidated: boolean }[] = [];

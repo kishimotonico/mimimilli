@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-query";
 import type {
   DlsiteApplyBodyInput,
+  DlsiteApplyResponse,
   DlsitePreview,
   DlsiteStateUpdateBody,
   NormalizedTag,
@@ -224,11 +225,7 @@ export function useFetchDlsitePreviewMutation() {
 
 export function useApplyDlsiteInfoMutation() {
   const queryClient = useQueryClient();
-  return useMutation<
-    WorkSourceMutationResult,
-    Error,
-    { workId: string; body: DlsiteApplyBodyInput }
-  >({
+  return useMutation<DlsiteApplyResponse, Error, { workId: string; body: DlsiteApplyBodyInput }>({
     mutationFn: ({ workId, body }) => applyDlsiteInfo(workId, body),
     onSuccess: (result) => updateCachesAfterDlsiteLinkageChange(queryClient, result),
   });

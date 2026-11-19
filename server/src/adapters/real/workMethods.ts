@@ -11,6 +11,7 @@ import type {
   WorkBookmarkPatch,
   WorkBookmarkResult,
   WorkCreateBody,
+  WorkCreateResponse,
   WorkEditSnapshot,
   WorkRegisterPreview,
   WorkSourceMutationResult,
@@ -140,7 +141,7 @@ export function createWorkMethods(deps: {
       }
     },
 
-    async createWork(body: WorkCreateBody): Promise<WorkSourceMutationResult | null> {
+    async createWork(body: WorkCreateBody): Promise<WorkCreateResponse | null> {
       const root = requireRoot();
       return await createWorkFromPath({ db, query, catalog, user }, scanner, root, body, {
         dlsiteCache,

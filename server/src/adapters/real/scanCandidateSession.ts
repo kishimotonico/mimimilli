@@ -187,7 +187,7 @@ export class ScanCandidateSession {
           tags: [],
           apply,
         });
-        const prepared = await saveWithDlsiteCover(
+        const { value: prepared, coverSkipped } = await saveWithDlsiteCover(
           { cache: deps.dlsiteCache, coverUrl: plan.coverUrl },
           target.placement,
           root,
@@ -203,7 +203,7 @@ export class ScanCandidateSession {
           },
         );
         const outcome = await deps.scanner.projectPrepared(prepared);
-        registered.push({ path: folder.path, workId: outcome.snapshot.meta.id });
+        registered.push({ path: folder.path, workId: outcome.snapshot.meta.id, coverSkipped });
       } catch (error) {
         failures.push({
           path: folder.path,

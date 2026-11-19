@@ -47,6 +47,7 @@ let worksByIdFails = false;
 let patchWorkSourceReply: (request: ApiRequest) => unknown;
 let registerReply: unknown;
 let serverCandidates: ScanCandidate[] = [];
+let excludedCandidates: ScanCandidate[] = [];
 const updatedFixture: ScanRecord["updatedWorks"] = [
   {
     workId: "u1",
@@ -112,6 +113,7 @@ beforeEach(() => {
   patchWorkSourceReply = saveTitleReply;
   registerReply = buildScanCandidatesRegisterResponse();
   serverCandidates = [];
+  excludedCandidates = [];
   api = mockApi({
     "GET /api/works": ({ url }) => {
       if (url.searchParams.get("scanRecord") === "updated") {
@@ -140,8 +142,21 @@ beforeEach(() => {
       const base = serverCandidates.find((candidate) => candidate.path === path);
       return { candidate: { ...base, rjCode: rjCode === "" ? null : rjCode } };
     },
-    "POST /api/scan/candidates/exclude": () => apiNoContent(),
-    "POST /api/scan/candidates/exclusions/restore": () => apiNoContent(),
+    "POST /api/scan/candidates/exclude": ({ body }) => {
+      const { paths } = body as { paths: string[] };
+      excludedCandidates.push(...serverCandidates.filter((entry) => paths.includes(entry.path)));
+      serverCandidates = serverCandidates.filter((entry) => !paths.includes(entry.path));
+      return apiNoContent();
+    },
+    "POST /api/scan/candidates/exclusions/restore": ({ body }) => {
+      const { paths } = body as { paths: string[] };
+      serverCandidates = [
+        ...serverCandidates,
+        ...excludedCandidates.filter((entry) => paths.includes(entry.path)),
+      ];
+      excludedCandidates = excludedCandidates.filter((entry) => !paths.includes(entry.path));
+      return apiNoContent();
+    },
     "GET /api/scan/candidates": () => ({ candidates: serverCandidates }),
     "GET /api/scan/candidates/exclusions": { paths: [] },
     "GET /api/scan/last": () => apiNoContent(),
@@ -606,8 +621,8 @@ describe("ScanModal", () => {
   it("登録リクエストは候補のパスだけを送り（RJコードはサーバーが持つ）、全件登録で新規作品へ自動遷移する", async () => {
     registerReply = buildScanCandidatesRegisterResponse({
       registered: [
-        { path: candidateDetected.path, workId: "w-detected" },
-        { path: candidateUndetected.path, workId: "w-undetected" },
+        { path: candidateDetected.path, workId: "w-detected", coverSkipped: null },
+        { path: candidateUndetected.path, workId: "w-undetected", coverSkipped: null },
       ],
     });
     renderModal({
@@ -635,7 +650,7 @@ describe("ScanModal", () => {
 
   it("全件追加に成功したときは警告トーストを出さない", async () => {
     registerReply = buildScanCandidatesRegisterResponse({
-      registered: [{ path: candidateDetected.path, workId: "w-detected" }],
+      registered: [{ path: candidateDetected.path, workId: "w-detected", coverSkipped: null }],
     });
     renderModal({ candidates: [candidateDetected] });
     await showUnregisteredList();
@@ -647,9 +662,65 @@ describe("ScanModal", () => {
     expect(screen.queryByText(/追加できず|止まりました/)).toBeNull();
   });
 
+  it("全件追加に成功してもカバーを適用できなかった作品があれば、新規作品へ移りつつ件数つきの警告トーストを出す", async () => {
+    registerReply = buildScanCandidatesRegisterResponse({
+      registered: [
+        { path: candidateDetected.path, workId: "w-detected", coverSkipped: "not_cached" },
+        { path: candidateUndetected.path, workId: "w-undetected", coverSkipped: null },
+      ],
+    });
+    renderModal({ candidates: [candidateDetected, candidateUndetected] });
+    await showUnregisteredList();
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    fireEvent.click(within(unregistered).getByRole("button", { name: "2件を追加" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText("2件を追加しました。うち1件はカバーを適用できませんでした。"),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("tabpanel", { name: /^新規作品/ })).toBeInTheDocument();
+  });
+
+  it("一部失敗の通知には、カバーを適用できなかった件数を添える", async () => {
+    registerReply = buildScanCandidatesRegisterResponse({
+      registered: [
+        { path: candidateDetected.path, workId: "w-detected", coverSkipped: "unreadable" },
+      ],
+      failures: [{ path: candidateUndetected.path, message: "失敗" }],
+    });
+    renderModal({ candidates: [candidateDetected, candidateUndetected] });
+    await showUnregisteredList();
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    fireEvent.click(within(unregistered).getByRole("button", { name: "2件を追加" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "1件を追加しました。1件は追加できず、未登録タブに残っています。うち1件はカバーを適用できませんでした。",
+        ),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("tabpanel", { name: /^新規作品/ })).toBeNull();
+  });
+
+  it("1件も追加できなかったときは、中断でも全件失敗でも通知を出さず移動もしない", async () => {
+    const registerSpy = vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
+      registered: [],
+      failures: [],
+      interruptedBy: new Error("通信エラー"),
+    });
+    onTestFinished(() => registerSpy.mockRestore());
+    renderModal({ candidates: [candidateDetected] });
+    await showUnregisteredList();
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    fireEvent.click(within(unregistered).getByRole("button", { name: "1件を追加" }));
+    await waitFor(() => expect(within(unregistered).getByRole("alert")).toBeInTheDocument());
+    expect(screen.queryByText(/追加しました|追加して止まりました/)).toBeNull();
+    expect(screen.queryByRole("tabpanel", { name: /^新規作品/ })).toBeNull();
+  });
+
   it("途中で止まったときは追加できた件数つきの警告トーストを出して未登録タブにとどまる", async () => {
     const registerSpy = vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
-      registered: [{ path: candidateDetected.path, workId: "w-detected" }],
+      registered: [{ path: candidateDetected.path, workId: "w-detected", coverSkipped: null }],
       failures: [],
       interruptedBy: new Error("通信エラー"),
     });
@@ -667,7 +738,7 @@ describe("ScanModal", () => {
 
   it("候補登録に成功すると作品一覧・軸件数・DLsite通知・スマートフォルダーのクエリを無効化する", async () => {
     registerReply = buildScanCandidatesRegisterResponse({
-      registered: [{ path: candidateDetected.path, workId: "w-detected" }],
+      registered: [{ path: candidateDetected.path, workId: "w-detected", coverSkipped: null }],
     });
     const { queryClient } = renderModal({
       candidates: [candidateDetected],
@@ -687,7 +758,7 @@ describe("ScanModal", () => {
 
   it("候補登録が部分失敗しても、成功分がある限り作品一覧等を無効化する", async () => {
     registerReply = buildScanCandidatesRegisterResponse({
-      registered: [{ path: candidateDetected.path, workId: "w-detected" }],
+      registered: [{ path: candidateDetected.path, workId: "w-detected", coverSkipped: null }],
       failures: [{ path: candidateUndetected.path, message: "失敗" }],
     });
     const { queryClient } = renderModal({
@@ -751,7 +822,7 @@ describe("ScanModal", () => {
 
   it("未検出のRJコードをクリックで編集するとサーバーで直り、行の表示が更新され、登録はパスだけを送る", async () => {
     registerReply = buildScanCandidatesRegisterResponse({
-      registered: [{ path: candidateUndetected.path, workId: "w-undetected" }],
+      registered: [{ path: candidateUndetected.path, workId: "w-undetected", coverSkipped: null }],
     });
     renderModal({
       candidates: [candidateDetected, candidateUndetected],

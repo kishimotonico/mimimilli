@@ -241,6 +241,7 @@ export function createSettingsScanMethods(
       };
     },
     async listScanCandidates(): Promise<ScanCandidate[]> {
+      if (!state.rootFolder) return [];
       return visibleFolders(state).map((folder) => toCandidate(state, folder));
     },
     async setScanCandidateRjCode(path, rjCode): Promise<ScanCandidate> {
@@ -290,10 +291,10 @@ export function createSettingsScanMethods(
           bookmarked: false,
           lastPlayedAt: null,
         };
-        applyFixtureCachedCover(state, work, plan.coverUrl);
+        const coverSkipped = applyFixtureCachedCover(state, work, plan.coverUrl);
         state.works.push(work);
         setDlsiteLinkage(state, work.id, plan.dlsite);
-        return [{ path: candidate.path, workId: work.id }];
+        return [{ path: candidate.path, workId: work.id, coverSkipped }];
       });
       for (const { path } of registered) state.scanCandidateRjCodeOverrides.delete(path);
       return { registered, failures: [] };

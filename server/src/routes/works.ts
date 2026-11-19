@@ -12,6 +12,7 @@ import {
   identityConflictReassignBodySchema,
   workRegisterPreviewQuerySchema,
   workProjectionBodySchema,
+  workCreateResponseSchema,
   workSourceMutationResultSchema,
   workSourcePatchSchema,
   worksQuerySchema,
@@ -92,7 +93,7 @@ export function worksRoute(adapter: DataAdapter, scanRecord: ScanRecordStore): H
     try {
       const result = await adapter.createWork(data);
       if (!result) notFound("指定されたパスは存在しないか、ルート配下ではありません");
-      return c.json(workSourceMutationResultSchema.parse(result), 201);
+      return c.json(workCreateResponseSchema.parse(result), 201);
     } catch (error) {
       if (error instanceof WorkRegisterError) {
         if (error.code === "already_registered") conflict(error.message);

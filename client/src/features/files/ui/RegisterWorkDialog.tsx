@@ -2,12 +2,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { dlsiteInfoTags, normalizeTag, rjCodeFormatSchema } from "@mimimilli/shared";
-import type {
-  DlsiteCachedCover,
-  WorkCreateResponse,
-  WorkRegisterPreview,
-  WorkSourceMutationResult,
-} from "@mimimilli/shared";
+import type { DlsiteCachedCover, WorkCreateResponse, WorkRegisterPreview } from "@mimimilli/shared";
 import { ApiRequestError } from "../../../shared/api/http";
 import Button from "../../../shared/ui/Button";
 import IconButton from "../../../shared/ui/IconButton";
@@ -33,7 +28,7 @@ interface RegisterWorkDialogProps {
   folderPath: string;
   targetKind?: "folder" | "file";
   preview: WorkRegisterPreview;
-  onRegistered: (result: WorkSourceMutationResult) => void;
+  onRegistered: (result: WorkCreateResponse) => void;
   onClose: () => void;
 }
 

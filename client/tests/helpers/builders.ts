@@ -21,6 +21,8 @@ import {
   workEditSnapshotSchema,
   workSchema,
   workSourceMutationResultSchema,
+  dlsiteApplyResponseSchema,
+  type DlsiteApplyResponse,
   type AxisFacetItem,
   type FsEntry,
   type FsListing,
@@ -107,6 +109,17 @@ export function buildWorkSourceMutationResult(
   projection: WorkSourceMutationResult["projection"] = { status: "published" },
 ): WorkSourceMutationResult {
   return workSourceMutationResultSchema.parse({ snapshot, projection });
+}
+
+export function buildDlsiteApplyResponse(
+  snapshot: WorkEditSnapshot = buildWorkEditSnapshot(),
+  coverSkipped: DlsiteApplyResponse["coverSkipped"] = null,
+): DlsiteApplyResponse {
+  return dlsiteApplyResponseSchema.parse({
+    snapshot,
+    projection: { status: "published" },
+    coverSkipped,
+  });
 }
 
 export function buildDlsitePreview(

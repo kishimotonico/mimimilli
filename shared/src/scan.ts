@@ -3,6 +3,7 @@ import { z } from "zod";
 import { dataIntegrityWarningSchema, type DataIntegrityWarning } from "./dataIntegrity.ts";
 import {
   dlsiteCachedCoverSchema,
+  dlsiteCoverSkipReasonSchema,
   dlsiteRegistrationApplySchema,
   rjCodeFormatSchema,
 } from "./dlsite.ts";
@@ -92,6 +93,7 @@ export const scanCandidateExclusionsResponseSchema = z.object({
 export const scanCandidateRegistrationSchema = z.object({
   path: workspacePathSchema,
   workId: z.string(),
+  coverSkipped: dlsiteCoverSkipReasonSchema.nullable(),
 });
 export const scanCandidateRegistrationFailureSchema = z.object({
   path: workspacePathSchema,

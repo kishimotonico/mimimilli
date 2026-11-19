@@ -27,6 +27,8 @@ export const SCAN_TAB_WITH_COUNT: ReadonlySet<ScanTabKey> = new Set([
 export interface CandidatesRegisteredResult {
   registeredCount: number;
   failedCount: number;
+  /** 追加できた作品のうち、選んだカバーを適用できなかった件数 */
+  coverSkippedCount: number;
   /** 途中で止まったか（候補の変更など） */
   interrupted: boolean;
 }

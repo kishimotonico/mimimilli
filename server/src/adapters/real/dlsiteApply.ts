@@ -4,6 +4,7 @@ import {
   planDlsiteApply,
   workPlacementOf,
   type DlsiteApplyBody,
+  type DlsiteApplyResponse,
   type DlsiteStateUpdateBody,
   type MetaDlsiteState,
   type NormalizedTag,
@@ -60,10 +61,7 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
   }
 
   return {
-    async dlsiteApply(
-      workId: string,
-      body: DlsiteApplyBody,
-    ): Promise<WorkSourceMutationResult | null> {
+    async dlsiteApply(workId: string, body: DlsiteApplyBody): Promise<DlsiteApplyResponse | null> {
       const current = readVerifiedEditSource(catalog, workId);
       if (!current) return null;
 
@@ -73,7 +71,7 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
       if (!usable || usable.revision !== body.infoRevision) throw new DlsiteRefetchRequiredError();
       const { info } = usable;
 
-      const verified = await saveWithDlsiteCover(
+      const { value: verified, coverSkipped } = await saveWithDlsiteCover(
         {
           cache: dlsiteCache,
           coverUrl: body.apply.cover ? info.coverUrl : null,
@@ -105,7 +103,8 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
             });
           }),
       );
-      return persistVerified(verified);
+      const result = await persistVerified(verified);
+      return result && { ...result, coverSkipped };
     },
 
     async updateDlsiteState(

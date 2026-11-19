@@ -233,11 +233,9 @@ export function createSettingsScanMethods(deps: {
       };
     },
     async listScanCandidates(): Promise<ScanCandidate[]> {
-      return candidateSession.listCandidates(
-        requireRoot(),
-        candidateStores,
-        candidateListContext(),
-      );
+      const root = user.getUserSetting(KEY_ROOT_FOLDER);
+      if (!root) return [];
+      return candidateSession.listCandidates(root, candidateStores, candidateListContext());
     },
     async setScanCandidateRjCode(path: string, rjCode: string | null): Promise<ScanCandidate> {
       return candidateSession.setRjCode(

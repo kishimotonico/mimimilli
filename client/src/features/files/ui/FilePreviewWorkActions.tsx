@@ -211,6 +211,14 @@ export default function FilePreviewWorkActions({
           preview={registerPreview}
           onRegistered={(result) => {
             setPendingProjection(result);
+            if (result.coverSkipped !== null) {
+              toast.show({
+                message: "作品を登録しました。カバーは適用できませんでした",
+                variant: "warning",
+                priority: "action",
+                dismissOnUnmount: false,
+              });
+            }
             void onWorkRegistered?.();
           }}
           onClose={() => {

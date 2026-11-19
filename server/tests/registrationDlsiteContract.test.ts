@@ -8,6 +8,7 @@ import {
   dlsiteInfoTags,
   SCAN_CANDIDATE_REGISTER_MAX_PATHS,
   workspacePath,
+  type DlsiteCoverSkipReason,
   type DlsiteFetchByCodeResponse,
   type DlsiteRegistrationApply,
   type DlsiteWorkInfo,
@@ -16,6 +17,8 @@ import {
 import type { DataAdapter } from "../src/adapter/index.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import {
+  FIXTURE_DLSITE_COVERLESS_RJ_CODE,
+  FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE,
   FIXTURE_DLSITE_FETCH_FAILURE_RJ_CODE,
   FIXTURE_DLSITE_NOT_FOUND_RJ_CODE,
   FIXTURE_DLSITE_NO_COVER_RJ_CODE,
@@ -48,6 +51,8 @@ interface Subject {
   /** Filesの作品登録の対象 */
   filesPath: string;
   noCoverCode: string;
+  unreadableCoverCode: string;
+  coverlessCode: string;
   notFoundCode: string;
   errorCode: string;
   dispose(): Promise<void>;
@@ -63,6 +68,8 @@ async function createSubject(kind: Subject["kind"]): Promise<Subject> {
       candidatePath: FOLDER_TITLE,
       filesPath: "未登録作品",
       noCoverCode: FIXTURE_DLSITE_NO_COVER_RJ_CODE,
+      unreadableCoverCode: FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE,
+      coverlessCode: FIXTURE_DLSITE_COVERLESS_RJ_CODE,
       notFoundCode: FIXTURE_DLSITE_NOT_FOUND_RJ_CODE,
       errorCode: FIXTURE_DLSITE_FETCH_FAILURE_RJ_CODE,
       dispose: () => app.shutdown(),
@@ -88,11 +95,21 @@ async function createSubject(kind: Subject["kind"]): Promise<Subject> {
         html: (code) => {
           if (code === "RJ000403") return htmlResponse("gone", 404);
           if (code === "RJ000404") return htmlResponse("error", 500);
-          if (code === "RJ000402") return htmlResponse(sampleWorkHtml(code, { cover: false }));
-          return htmlResponse(sampleWorkHtml(code, { title: `タイトル${code}` }));
+          return htmlResponse(
+            sampleWorkHtml(code, {
+              title: `タイトル${code}`,
+              cover: code !== FIXTURE_DLSITE_COVERLESS_RJ_CODE,
+            }),
+          );
         },
-        cover: (url) =>
-          coverUrlFromRequest(url) ? jpegResponse(SAMPLE_COVER) : htmlResponse("", 404),
+        cover: (url) => {
+          if (!coverUrlFromRequest(url)) return htmlResponse("", 404);
+          if (url.includes(`${FIXTURE_DLSITE_NO_COVER_RJ_CODE}_img`)) return htmlResponse("", 404);
+          if (url.includes(`${FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE}_img`)) {
+            return jpegResponse(new TextEncoder().encode("not an image"));
+          }
+          return jpegResponse(SAMPLE_COVER);
+        },
       }),
     }),
   );
@@ -104,7 +121,9 @@ async function createSubject(kind: Subject["kind"]): Promise<Subject> {
     app,
     candidatePath: FOLDER_TITLE,
     filesPath: "Files作品",
-    noCoverCode: "RJ000402",
+    noCoverCode: FIXTURE_DLSITE_NO_COVER_RJ_CODE,
+    unreadableCoverCode: FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE,
+    coverlessCode: FIXTURE_DLSITE_COVERLESS_RJ_CODE,
     notFoundCode: "RJ000403",
     errorCode: "RJ000404",
     dispose: async () => {
@@ -144,12 +163,15 @@ async function registerCandidate(subject: Subject, apply: DlsiteRegistrationAppl
   });
   assert.equal(response.status, 201);
   const { registered, failures } = (await response.json()) as {
-    registered: Array<{ workId: string }>;
+    registered: Array<{ workId: string; coverSkipped: DlsiteCoverSkipReason | null }>;
     failures: unknown[];
   };
   assert.deepEqual(failures, []);
   assert.equal(registered.length, 1);
-  return getWork(subject, registered[0]!.workId);
+  return {
+    ...(await getWork(subject, registered[0]!.workId)),
+    coverSkipped: registered[0]!.coverSkipped,
+  };
 }
 
 async function registerFiles(
@@ -165,8 +187,11 @@ async function registerFiles(
     ...body,
   });
   assert.equal(response.status, 201);
-  const created = (await response.json()) as { snapshot: { id: string } };
-  return getWork(subject, created.snapshot.id);
+  const created = (await response.json()) as {
+    snapshot: { id: string };
+    coverSkipped: DlsiteCoverSkipReason | null;
+  };
+  return { ...(await getWork(subject, created.snapshot.id)), coverSkipped: created.coverSkipped };
 }
 
 interface RegisteredWork extends WorkSummary {
@@ -232,8 +257,46 @@ for (const kind of ["fixture", "real"] as const) {
     const work = await registerCandidate(subject, ALL);
     assert.equal(work.title, info.title);
     assert.equal(work.cover ?? null, null);
+    assert.equal(work.coverSkipped, "not_cached");
     assert.equal(work.dlsite.status, "applied");
     assert.equal(dlsiteUrls(work).length, 1);
+  });
+
+  contract(
+    "候補の追加で、カバーが読めないと unreadable、DLsiteに無いと null を返す",
+    async (subject) => {
+      for (const [code, reason] of [
+        [subject.unreadableCoverCode, "unreadable"],
+        [subject.coverlessCode, null],
+      ] as const) {
+        const fresh = await createSubject(subject.kind);
+        try {
+          assert.ok(await cacheDlsite(fresh, code));
+          await setCandidateRjCode(fresh, code);
+          const work = await registerCandidate(fresh, ALL);
+          assert.equal(work.coverSkipped, reason, code);
+          assert.equal(work.cover ?? null, null, code);
+        } finally {
+          await fresh.dispose();
+        }
+      }
+    },
+  );
+
+  contract("カバーが適用できたときは null、選ばないときは理由を返さない", async (subject) => {
+    assert.ok(await cacheDlsite(subject, OK_CODE));
+    await setCandidateRjCode(subject, OK_CODE);
+    assert.equal((await registerCandidate(subject, ALL)).coverSkipped, null);
+
+    const fresh = await createSubject(subject.kind);
+    try {
+      assert.ok(await cacheDlsite(fresh, fresh.noCoverCode));
+      await setCandidateRjCode(fresh, fresh.noCoverCode);
+      const work = await registerCandidate(fresh, { ...ALL, cover: false });
+      assert.equal(work.coverSkipped, null);
+    } finally {
+      await fresh.dispose();
+    }
   });
 
   contract(
@@ -313,6 +376,7 @@ for (const kind of ["fixture", "real"] as const) {
       assert.deepEqual(new Set(work.tags), new Set([...picked, "手入力"]));
       assert.deepEqual(dlsiteUrls(work), [{ label: "DLsite", url: info.url }]);
       assert.ok(work.cover);
+      assert.equal(work.coverSkipped, null);
       assert.equal(work.dlsite.status, "applied");
       assert.deepEqual(work.dlsite.appliedTags, picked);
     },
@@ -354,9 +418,20 @@ for (const kind of ["fixture", "real"] as const) {
         applyUrl: true,
       });
       assert.equal(work.cover ?? null, null);
+      assert.equal(work.coverSkipped, "not_cached");
       assert.deepEqual(dlsiteUrls(work), [{ label: "DLsite", url: info.url }]);
     },
   );
+
+  contract("Filesの作品登録は、カバーを選ばなければ理由を返さない", async (subject) => {
+    assert.ok(await cacheDlsite(subject, subject.noCoverCode));
+    const work = await registerFiles(subject, {
+      rjCode: subject.noCoverCode,
+      applyCover: false,
+      applyUrl: true,
+    });
+    assert.equal(work.coverSkipped, null);
+  });
 
   contract("Filesの作品登録は、bodyのinfoを使わない", async (subject) => {
     const info = await cacheDlsite(subject, OK_CODE);

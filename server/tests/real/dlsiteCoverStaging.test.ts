@@ -138,6 +138,7 @@ test("作品フォルダーがルート外を指すsymlinkなら、ルート外�
   const result = await adapter.dlsiteApply(workId, await applyBody());
   assert.ok(result);
   assert.equal(result.snapshot.coverImage, null);
+  assert.equal(result.coverSkipped, "outside_root");
   assert.deepEqual(coverFilesIn(moved), []);
 });
 
@@ -147,6 +148,7 @@ test("画像として判定できないキャッシュのカバーは書かず�
   assert.ok(result);
   assert.equal(result.snapshot.coverImage, null);
   assert.equal(result.snapshot.dlsite.status, "applied");
+  assert.equal(result.coverSkipped, "unreadable");
   assert.deepEqual(coverFilesIn(workDir), []);
 });
 
@@ -160,6 +162,7 @@ test("カバーの拡張子はURLではなく画像の中身で決まる", async
   const result = await adapter.dlsiteApply(workId, await applyBody());
   assert.ok(result);
   assert.equal(result.snapshot.coverImage, "dlsite_cover.png");
+  assert.equal(result.coverSkipped, null);
   assert.ok(existsSync(join(workDir, "dlsite_cover.png")));
   assert.deepEqual(coverFilesIn(workDir), ["dlsite_cover.png"]);
 });
@@ -259,7 +262,9 @@ test("カバーがキャッシュに無いとき、登録も適用もカバー�
   const { folder, register } = await setupRegistration(t, "fail");
   const res = await register();
   assert.equal(res.status, 201);
-  assert.equal((await res.json()).snapshot.coverImage, null);
+  const registered = await res.json();
+  assert.equal(registered.snapshot.coverImage, null);
+  assert.equal(registered.coverSkipped, "not_cached");
   assert.deepEqual(coverFilesIn(folder), []);
 
   const { adapter, workId, workDir, applyBody } = await setup(t, "fail");
@@ -269,7 +274,8 @@ test("カバーがキャッシュに無いとき、登録も適用もカバー�
     body: JSON.stringify(await applyBody()),
   });
   assert.equal(apply.status, 200);
-  const { snapshot } = await apply.json();
+  const { snapshot, coverSkipped } = await apply.json();
+  assert.equal(coverSkipped, "not_cached");
   assert.equal(snapshot.coverImage, null);
   assert.equal(snapshot.dlsite.status, "applied");
   assert.equal(snapshot.urls.length, 1);

@@ -48,7 +48,7 @@ describe("rootReconfigurationController", () => {
     });
   });
 
-  it("突入で再生停止・モーダル閉・scanのreset・既定画面へ遷移・hiddenPaths破棄を行う", () => {
+  it("突入で再生停止・モーダル閉・scanのreset・既定画面へ遷移・候補の選択状態の破棄を行う", () => {
     const { controller, calls } = setup();
 
     controller.enter();

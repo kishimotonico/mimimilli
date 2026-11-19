@@ -1,6 +1,7 @@
 import type {
   DlsiteCachedCover,
   DlsiteApplyBody,
+  DlsiteApplyResponse,
   DlsiteProductFetchOutcome,
   DlsiteFetchResult,
   DlsiteStateUpdateBody,
@@ -22,7 +23,7 @@ export interface DlsiteAdapter {
     options?: { signal?: AbortSignal },
   ): Promise<DlsiteFetchResult>;
   /** キャッシュ済みのDLsite情報を適用する。DLsiteへは通信しない。使えるキャッシュが無い・版が違うときは DlsiteRefetchRequiredError */
-  dlsiteApply(workId: string, body: DlsiteApplyBody): Promise<WorkSourceMutationResult | null>;
+  dlsiteApply(workId: string, body: DlsiteApplyBody): Promise<DlsiteApplyResponse | null>;
   updateDlsiteState(
     workId: string,
     body: DlsiteStateUpdateBody,
