@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-09-25
-- 関連: [ADR-0028](0028-work-management-mutation-ownership.md)（作品変更後のキャッシュ更新）、[ADR-0029](0029-root-reconfiguration-workflow.md)（root再設定。ジョブの取消と409ロック）、backlog TASK-470・470.1・470.2
+- 関連: [ADR-0028](0028-work-management-mutation-ownership.md)（作品変更後のキャッシュ更新）、[ADR-0029](0029-root-reconfiguration-workflow.md)（root再設定。ジョブの取消と409ロック）、[ADR-0033](0033-dlsite-fetch-before-register.md)（DLsiteの契約と一括取得終端のキャッシュ更新を置き換え、通知APIを廃止）、[ADR-0034](0034-scan-modal-restructure.md)（scanの完了結果の中身を拡張）、backlog TASK-470・470.1・470.2
 
 ## 文脈
 

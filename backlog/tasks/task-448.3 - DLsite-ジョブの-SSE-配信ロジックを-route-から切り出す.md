@@ -4,7 +4,7 @@ title: DLsite ジョブの SSE 配信ロジックを route から切り出す
 status: To Do
 assignee: []
 created_date: '2026-09-11 08:19'
-updated_date: '2026-10-02 11:50'
+updated_date: '2026-11-19 00:37'
 labels:
   - refactor
   - triage
@@ -34,4 +34,6 @@ server/src/routes/dlsite.ts の GET /dlsite/events に、SSE イベントの直�
 2026-10-02点検: SSEのwriteChain/writeSerialized・stop/done・pingはserver/src/routes/scan.ts:156付近にもdlsite.ts:183と同一実装がある。切り出しはscan側も含めて共通化する範囲で検討する。
 
 2026-10-02構造点検（doc-6・doc-7）より: DLsiteのSSE（GET /dlsite/events）にはheartbeatが無く、scan側（15秒ping）と違って無音が続くとサーバーのidleTimeout（90秒）で切れる。ADR-0030は共通原則としてheartbeatを挙げている。切り出す共通SSEヘルパーにheartbeatを持たせる。AC#3の「挙動は変わらず」はheartbeat以外の挙動を指す（doc-6 jobs-2）。
+
+2026-11-19: DLsite SSEのheartbeat（AC#4）はTASK-511.1で吸収する（ADR-0033）。TASK-511.1でDLsiteジョブとSSEの契約が変わるため、route切り出しの残りはTASK-511.1の完了後に要否を判断する。
 <!-- SECTION:NOTES:END -->

@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-09-25
-- 関連: [ADR-0002](0002-mock-as-fixture-adapter.md)（fixtureアダプタ）、[ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md)（catalog/user DBの分離）、[ADR-0017](0017-meta-source-projection-and-work-identity.md)（Work UUIDとuser状態）、backlog TASK-469・469.1・469.2
+- 関連: [ADR-0002](0002-mock-as-fixture-adapter.md)（fixtureアダプタ）、[ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md)（catalog/user DBの分離）、[ADR-0017](0017-meta-source-projection-and-work-identity.md)（Work UUIDとuser状態）、[ADR-0033](0033-dlsite-fetch-before-register.md)（再設定後の新規作品をDLsite取得へ渡す手順を廃止）、[ADR-0034](0034-scan-modal-restructure.md)（再設定後のスキャン結果の新規作品の扱い）、backlog TASK-469・469.1・469.2
 
 ## 文脈
 

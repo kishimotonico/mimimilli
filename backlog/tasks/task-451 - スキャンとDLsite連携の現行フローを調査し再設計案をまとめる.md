@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-09-20 22:51'
-updated_date: '2026-09-23 17:49'
+updated_date: '2026-11-19 00:22'
 labels: []
 dependencies: []
 documentation:
@@ -56,6 +56,8 @@ fixture実操作（専用worktree .worktrees/task-451 / new-work / task-451-dlsi
 2026-09-23追記: ユーザー指摘の「別途決める」6件は DRAFT-74「DLsite連携の残る利用者向け詳細仕様を決める」に集約した。1 登録時取得選択の初期値/前回記憶、2 専用管理ビューの入口/配置/レイアウト、4 server再起動後の扱い、5 直近取得結果の保持上限、6 一括承認の選択粒度/対象集合を未決として記録する。3 は差分確認後の明示適用＋一括承認を採用し、未設定のみの自動補完と過去値への自動追随を不採用とする決定済み。DRAFT-47は作品編集の保存モデル、DRAFT-63は一括取得結果API/refresh運用、TASK-460は最終取得失敗の寿命、TASK-461はDRAFT-63/66の前提修正を担当する。TASK-451のDoneは調査完了のまま維持し、仕様全決定・実装完了とは扱わない。
 
 2026-09-24追記: DRAFT74の旧記述の読替: TASK-460=最終取得失敗の表示寿命、TASK-463=user DB単独復元時のcatalog整合。
+
+2026-11-19: 2026-09-22の方針は ADR-0033（DLsite情報は登録前に明示取得し、追加を承認とする）と ADR-0034（スキャン画面の再構成）で一部変更・具体化した。DRAFT-74はアーカイブ済み。
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
