@@ -1,15 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
-import {
-  updateCachesAfterDlsiteFetch,
-  updateCachesAfterDlsiteJobLost,
-} from "../../../entities/work/model/workCacheUpdates";
+import { updateCachesAfterDlsiteFetch } from "../../../entities/work/model/workCacheUpdates";
 import { useDlsiteJobState, useDlsiteJobStore } from "../../../entities/dlsite/useDlsiteJob";
 import { useToast } from "../../../shared/ui/useToast";
-
-/** コードが終端に達するたびの候補一覧の取り直しを間引く間隔（末尾実行） */
-export const DLSITE_CANDIDATES_REFRESH_INTERVAL_MS = 3000;
 
 // DLsite取得ジョブの追跡（dlsiteJobStore）を、キャッシュ更新とエラートーストへつなぐ。
 // 状態は購読しない（進捗でAppを再描画しない）。
@@ -20,38 +14,27 @@ export default function DlsiteJobRuntime() {
   const error = useDlsiteJobState((state) => state.error);
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const clearTimer = () => {
-      if (timer !== null) clearTimeout(timer);
-      timer = null;
-    };
+    /** まとめてのコードは、取得中の一覧を取り直し続けないよう、ジョブの終わりでまとめて無効化する */
+    const pendingBulk = new Set<string>();
+    const invalidate = (codes: readonly string[]) =>
+      void updateCachesAfterDlsiteFetch(queryClient, codes).catch(() => {});
     const unsubscribe = dlsiteJob.subscribeEvents((event) => {
-      if (event.type === "codesTerminal") {
-        if (event.origin === "single") {
-          void updateCachesAfterDlsiteFetch(queryClient, event.productCodes).catch(() => {});
-        }
-        if (timer !== null) return;
-        timer = setTimeout(() => {
-          timer = null;
-          void refreshScanCandidates(queryClient).catch(() => {});
-        }, DLSITE_CANDIDATES_REFRESH_INTERVAL_MS);
+      if (event.type === "jobEnded") {
+        if (pendingBulk.size > 0) invalidate([...pendingBulk]);
+        pendingBulk.clear();
         return;
       }
-      clearTimer();
-      void (
-        event.affected.kind === "unknown"
-          ? updateCachesAfterDlsiteJobLost(queryClient)
-          : updateCachesAfterDlsiteFetch(queryClient, event.affected.productCodes)
-      ).catch(() => {});
-      void refreshScanCandidates(queryClient).then(
-        () => dlsiteJob.markSettled(event.jobId),
-        () => {},
-      );
+      const single: string[] = [];
+      for (const { code, origin } of event.codes) {
+        if (origin === "single") single.push(code);
+        else pendingBulk.add(code);
+      }
+      if (single.length > 0) invalidate(single);
+      if (event.codes.some(({ known }) => !known)) {
+        void refreshScanCandidates(queryClient).catch(() => {});
+      }
     });
-    return () => {
-      unsubscribe();
-      clearTimer();
-    };
+    return unsubscribe;
   }, [dlsiteJob, queryClient]);
 
   useEffect(() => {

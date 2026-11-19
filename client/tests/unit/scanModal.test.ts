@@ -140,7 +140,11 @@ beforeEach(() => {
     "POST /api/scan/candidates/rj-code": ({ body }) => {
       const { path, rjCode } = body as { path: string; rjCode: string };
       const base = serverCandidates.find((candidate) => candidate.path === path);
-      return { candidate: { ...base, rjCode: rjCode === "" ? null : rjCode } };
+      const candidate = { ...base, rjCode: rjCode === "" ? null : rjCode };
+      serverCandidates = serverCandidates.map((entry) =>
+        entry.path === path ? (candidate as ScanCandidate) : entry,
+      );
+      return { candidate };
     },
     "POST /api/scan/candidates/exclude": ({ body }) => {
       const { paths } = body as { paths: string[] };

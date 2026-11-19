@@ -50,6 +50,8 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 
 未登録の候補一覧（`GET /scan/candidates`）の `dlsite` はキャッシュ由来の状態（`none` / `fetched` / `not_found` / `failed`）だけで、取得中は含めない。取得中の行はクライアントがジョブのsnapshotとSSEから出す。
 
+**新旧の判定**: ジョブの状態には単調増加の `revision` が付く（プロセス全体で1つ。`max(前の値 + 1, 現在時刻)` で、クライアントに見える変化の直前に進める）。ジョブの終端は、候補と同じ導出関数（`deriveDlsiteProductSummary`）でキャッシュから導いた取得結果 `dlsite` を運ぶ。候補GETと `POST /scan/candidates/rj-code` の応答は、候補を組み立てる前に読んだ revision を各候補の `dlsiteRevision` に持つ。クライアントはサーバー状態を revision が進むものだけ取り込み、行の表示は候補の値と終端の結果のうち revision が大きい方（同じなら候補）を出す。ジョブの終端で候補を取り直さない。想定外の例外とオフラインで `failed` になった取得はキャッシュを書き換えないので、次の候補GETで表示がキャッシュの状態に戻る（[ADR-0038](adr/0038-dlsite-job-state-revision.md)）。
+
 `work.dlsite.appliedTags` は、手動適用でこの作品へ反映したタグを `mimimilli.json` に記録したもの。
 
 ## 作品ごとの状態
@@ -215,7 +217,7 @@ importはHTML snapshotを成功記録として書き直すため、取り込ん�
 - `GET /media/dlsite-cover/:key` — DLsiteカバーキャッシュの配信。クライアントは応答の `cachedCover`（`key`・`version`）からURLを作る
 - `POST /dlsite/:id/apply` — 取得したDLsite情報のうち選択した項目を、キャッシュから読んで適用。`dlsite_refetch_required`（409）は再取得を促す
 - `PATCH /dlsite/:id` — RJコードの手動設定（空文字は「コードなし」の明示、`null` は受け付けない）、または `skipped` の切り替え
-- `POST /dlsite/jobs` — 取得ジョブを開始し、202 `{ jobId }` を返す。実行中ジョブがあればそのキューへ合流し、そのジョブIDを返す。body は `{ origin: "bulk", productCodes }`（1〜1000件）か `{ origin: "single", productCode }`（失敗の記録を無視して取り直す）。オフライン設定では `offline`、サーバーの終了処理中は409（`conflict`）で拒否する
-- `GET /dlsite/jobs/current` — 常に200で `{ job }`。`job` は `jobId`・`status`（`running` / `finished`）・コードごとの `origin` と `state`（`queued` / `fetching` / `fetched` / `not_found` / `failed`）・まとめての進捗 `bulk`。終了したジョブは次のジョブ開始まで残る。無ければ `null`
+- `POST /dlsite/jobs` — 取得ジョブを開始し、202 `{ revision, job }`（受け付けた直後の状態。`GET /dlsite/jobs/current` と同じ形）を返す。実行中ジョブがあればそのキューへ合流する。body は `{ origin: "bulk", productCodes }`（1〜1000件）か `{ origin: "single", productCode }`（失敗の記録を無視して取り直す）。オフライン設定では `offline`、サーバーの終了処理中は409（`conflict`）で拒否する
+- `GET /dlsite/jobs/current` — 常に200で `{ revision, job }`。`revision` はプロセス全体で単調に増える状態の新旧の値。`job` は `jobId`・`status`（`running` / `finished`）・コードごとの `origin`・`state`（`queued` / `fetching` / `fetched` / `not_found` / `failed`）・`revision`（そのコードが最後に変化した時点の値）・まとめての進捗 `bulk`。終端のコードは取得結果 `dlsite`（`fetched` はタイトルとカバー）も持つ。終了したジョブは次のジョブ開始まで残る。無ければ `job: null`
 - `DELETE /dlsite/jobs/:jobId/bulk` — 起点がまとめてで待機中のコードをキューから外し `{ removed }` を返す。IDが現在のジョブと違う・対象なしは `removed: 0`
-- `GET /dlsite/jobs/events` — 取得ジョブの進捗SSE。接続直後に `snapshot`（現在のジョブ、無ければ `job: null`）を送り、実行中なら以後 `code`（コードの現在状態）・`removed`（中止で外れたコード）・`finished`（`complete` / `aborted`）をlive配信して `finished` で閉じる。15秒間隔で `ping` を送る
+- `GET /dlsite/jobs/events` — 取得ジョブの進捗SSE。接続直後に `snapshot`（`revision` と現在のジョブ、無ければ `job: null`）を送り、実行中なら以後 `code`（コードの現在状態。終端なら `dlsite` を含む）・`removed`（中止で外れたコード）・`finished`（`complete` / `aborted`）をlive配信して `finished` で閉じる。すべてのイベントが `revision` を持つ。15秒間隔で `ping` を送る

@@ -381,6 +381,21 @@ test("時計が止まっていてもrevisionは進み、新しいマネージャ
   assert.ok(second.manager.revision > last);
 });
 
+test("短時間に大量に進んでも、1ミリ秒後に作った新しいマネージャーの初期値は前の最後の値を超える", async () => {
+  const clock = 1_700_000_000_000;
+  const first = controlled(() => clock);
+  first.manager.start({
+    origin: "bulk",
+    productCodes: Array.from({ length: 500 }, (_, index) => `RJ${String(100000 + index)}`),
+  });
+  const last = first.manager.revision;
+  assert.ok(last > clock * 1000 + 400);
+  assert.ok(last < Number.MAX_SAFE_INTEGER);
+  const second = controlled(() => clock + 1);
+  assert.ok(second.manager.revision > last);
+  await first.manager.cancelActiveAndAwait();
+});
+
 test("終端イベントとsnapshotはコードごとのrevisionと取得結果を運ぶ", async () => {
   const { manager, calls, events } = controlled();
   manager.start({ origin: "bulk", productCodes: ["RJ000001", "RJ000002"] });

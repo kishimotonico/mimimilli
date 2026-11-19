@@ -6,7 +6,8 @@ const EMPTY_SCAN_CANDIDATES: ScanCandidate[] = [];
 
 /** 候補のキャッシュと、まだ一度も読めていないかどうか。 */
 export function useScanCandidatesState(): { candidates: ScanCandidate[]; loaded: boolean } {
-  // 明示的な refreshScanCandidates 呼び出し以外では取得しない（scanCandidatesCache 参照）。
+  // 候補の取得は、打ち切りと待ち合わせのある refreshScanCandidates だけを通す。
+  // 自動取得（マウント・invalidate・フォーカス復帰）はその手順を通らず、RJコードの差し替えや登録後の待ち合わせを壊す。
   const candidatesQuery = useQuery({
     ...scanCandidatesQueryOptions,
     enabled: false,

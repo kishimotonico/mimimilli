@@ -42,7 +42,6 @@ export function createFakeDlsiteJobStore(initial: Partial<DlsiteJobState> = {}) 
     startSingle: vi.fn(async () => ({ ok: true as const })),
     cancelBulk: vi.fn(async () => ({ ok: true as const })),
     attach: vi.fn(async () => {}),
-    markSettled: vi.fn(),
     clearError: vi.fn(),
     reset: vi.fn(),
     setState: store.setState,

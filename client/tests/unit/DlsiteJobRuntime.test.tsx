@@ -3,9 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import DlsiteJobRuntime, {
-  DLSITE_CANDIDATES_REFRESH_INTERVAL_MS,
-} from "../../src/features/dlsite/ui/DlsiteJobRuntime";
+import DlsiteJobRuntime from "../../src/features/dlsite/ui/DlsiteJobRuntime";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import {
   createDlsiteJobStore,
@@ -68,77 +66,11 @@ describe("DlsiteJobRuntime", () => {
     expect(dlsiteJob.reset).toHaveBeenCalledTimes(1);
   });
 
-  it("3000ms 以内の codesTerminal 5回で候補一覧の取得は1回", async () => {
-    const { dlsiteJob } = renderRuntime();
-    await act(async () => {});
-    const baseline = candidateRequests;
-    for (let index = 0; index < 5; index += 1) {
-      act(() =>
-        dlsiteJob.emit({
-          type: "codesTerminal",
-          jobId: "job-1",
-          origin: "bulk",
-          productCodes: ["RJ000001"],
-        }),
-      );
-    }
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(DLSITE_CANDIDATES_REFRESH_INTERVAL_MS + 10);
-    });
-    expect(candidateRequests - baseline).toBe(1);
-  });
-
-  it("finished で即時に取り直し、一致する詳細とライブラリ一覧だけ無効化して markSettled する", async () => {
-    const { dlsiteJob, queryClient } = renderRuntime();
-    queryClient.setQueryData(WORK_QUERY_KEYS.detail("w1"), detail("w1", "rj000001"));
-    queryClient.setQueryData(WORK_QUERY_KEYS.detail("w2"), detail("w2", "RJ999999"));
-    queryClient.setQueryData(WORK_QUERY_KEYS.list({ q: "" }), { items: [] });
-    await act(async () => {});
-    const baseline = candidateRequests;
-    act(() =>
-      dlsiteJob.emit({
-        type: "finished",
-        jobId: "job-1",
-        affected: { kind: "codes", productCodes: ["RJ000001"] },
-      }),
-    );
-    await waitFor(() => expect(dlsiteJob.markSettled).toHaveBeenCalledWith("job-1"));
-    expect(candidateRequests - baseline).toBe(1);
-    expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w1"))?.isInvalidated).toBe(true);
-    expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w2"))?.isInvalidated).toBe(false);
-    expect(queryClient.getQueryState(WORK_QUERY_KEYS.list({ q: "" }))?.isInvalidated).toBe(true);
-  });
-
-  it("終わりを受け取れなかったジョブの終端では、コードに関わらず作品の詳細と一覧を無効化する", async () => {
-    const { dlsiteJob, queryClient } = renderRuntime();
-    queryClient.setQueryData(WORK_QUERY_KEYS.detail("w1"), detail("w1", "RJ000001"));
-    queryClient.setQueryData(WORK_QUERY_KEYS.detail("w2"), detail("w2", "RJ999999"));
-    queryClient.setQueryData(WORK_QUERY_KEYS.list({ q: "" }), { items: [] });
-    await act(async () => {});
-    act(() => dlsiteJob.emit({ type: "finished", jobId: "job-1", affected: { kind: "unknown" } }));
-    await waitFor(() =>
-      expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w2"))?.isInvalidated).toBe(true),
-    );
-    expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w1"))?.isInvalidated).toBe(true);
-    expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w2"))?.isInvalidated).toBe(true);
-    expect(queryClient.getQueryState(WORK_QUERY_KEYS.list({ q: "" }))?.isInvalidated).toBe(true);
-  });
-
-  it("終端後の候補一覧の取得に失敗したら markSettled しない", async () => {
-    const { dlsiteJob } = renderRuntime();
-    await act(async () => {});
-    mockApi({ "GET /api/scan/candidates": () => new Response("{}", { status: 500 }) });
-    act(() =>
-      dlsiteJob.emit({
-        type: "finished",
-        jobId: "job-1",
-        affected: { kind: "codes", productCodes: ["RJ000001"] },
-      }),
-    );
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(50);
-    });
-    expect(dlsiteJob.markSettled).not.toHaveBeenCalled();
+  const settledEvent = (
+    codes: Array<{ code: string; origin: "bulk" | "single"; known?: boolean }>,
+  ): Parameters<ReturnType<typeof createFakeDlsiteJobStore>["emit"]>[0] => ({
+    type: "codesSettled",
+    codes: codes.map(({ known = true, ...rest }) => ({ ...rest, known })),
   });
 
   it("起点がsingleのコードが終端すると、ジョブの終端を待たず同じRJコードの作品を無効化する", async () => {
@@ -146,60 +78,62 @@ describe("DlsiteJobRuntime", () => {
     queryClient.setQueryData(WORK_QUERY_KEYS.detail("w1"), detail("w1", "RJ000001"));
     queryClient.setQueryData(WORK_QUERY_KEYS.detail("w2"), detail("w2", "RJ999999"));
     await act(async () => {});
-    act(() =>
-      dlsiteJob.emit({
-        type: "codesTerminal",
-        jobId: "job-1",
-        origin: "single",
-        productCodes: ["RJ000001"],
-      }),
-    );
+    act(() => dlsiteJob.emit(settledEvent([{ code: "RJ000001", origin: "single" }])));
     await waitFor(() =>
       expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w1"))?.isInvalidated).toBe(true),
     );
     expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w2"))?.isInvalidated).toBe(false);
   });
 
-  it("起点がbulkのコードが終端しても、ジョブの終端までは作品を無効化しない", async () => {
+  it("起点がbulkのコードは、ジョブの終わりまで作品を無効化せず、終わりでまとめて無効化する", async () => {
     const { dlsiteJob, queryClient } = renderRuntime();
-    queryClient.setQueryData(WORK_QUERY_KEYS.detail("w1"), detail("w1", "RJ000001"));
+    queryClient.setQueryData(WORK_QUERY_KEYS.detail("w1"), detail("w1", "rj000001"));
+    queryClient.setQueryData(WORK_QUERY_KEYS.detail("w2"), detail("w2", "RJ999999"));
+    queryClient.setQueryData(WORK_QUERY_KEYS.list({ q: "" }), { items: [] });
     await act(async () => {});
-    act(() =>
-      dlsiteJob.emit({
-        type: "codesTerminal",
-        jobId: "job-1",
-        origin: "bulk",
-        productCodes: ["RJ000001"],
-      }),
-    );
+    act(() => dlsiteJob.emit(settledEvent([{ code: "RJ000001", origin: "bulk" }])));
     await act(async () => {});
     expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w1"))?.isInvalidated).toBe(false);
+    act(() => dlsiteJob.emit({ type: "jobEnded", jobId: "job-1" }));
+    await waitFor(() =>
+      expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w1"))?.isInvalidated).toBe(true),
+    );
+    expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w2"))?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(WORK_QUERY_KEYS.list({ q: "" }))?.isInvalidated).toBe(true);
   });
 
-  it("finished で保留中の間引きを捨てる", async () => {
+  it("ジョブの終端では候補一覧を取り直さない", async () => {
     const { dlsiteJob } = renderRuntime();
     await act(async () => {});
+    const baseline = candidateRequests;
+    act(() => dlsiteJob.emit(settledEvent([{ code: "RJ000001", origin: "bulk" }])));
+    act(() => dlsiteJob.emit({ type: "jobEnded", jobId: "job-1" }));
+    await act(async () => {});
+    expect(candidateRequests).toBe(baseline);
+  });
+
+  it("結果が不明なコードは、起点ごとの無効化に加えて候補一覧を1回取り直す", async () => {
+    const { dlsiteJob, queryClient } = renderRuntime();
+    queryClient.setQueryData(WORK_QUERY_KEYS.detail("w1"), detail("w1", "RJ000001"));
+    queryClient.setQueryData(WORK_QUERY_KEYS.detail("w2"), detail("w2", "RJ000002"));
+    queryClient.setQueryData(WORK_QUERY_KEYS.detail("w3"), detail("w3", "RJ999999"));
+    await act(async () => {});
+    const baseline = candidateRequests;
     act(() =>
-      dlsiteJob.emit({
-        type: "codesTerminal",
-        jobId: "job-1",
-        origin: "bulk",
-        productCodes: ["RJ000001"],
-      }),
+      dlsiteJob.emit(
+        settledEvent([
+          { code: "RJ000001", origin: "single", known: false },
+          { code: "RJ000002", origin: "bulk", known: false },
+        ]),
+      ),
     );
-    act(() =>
-      dlsiteJob.emit({
-        type: "finished",
-        jobId: "job-1",
-        affected: { kind: "codes", productCodes: [] },
-      }),
-    );
-    await waitFor(() => expect(dlsiteJob.markSettled).toHaveBeenCalled());
-    const afterFinish = candidateRequests;
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(DLSITE_CANDIDATES_REFRESH_INTERVAL_MS + 10);
+    act(() => dlsiteJob.emit({ type: "jobEnded", jobId: "job-1" }));
+    await waitFor(() => expect(candidateRequests - baseline).toBe(1));
+    await waitFor(() => {
+      expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w1"))?.isInvalidated).toBe(true);
+      expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w2"))?.isInvalidated).toBe(true);
     });
-    expect(candidateRequests).toBe(afterFinish);
+    expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w3"))?.isInvalidated).toBe(false);
   });
 
   it("error をトーストに出し、閉じると clearError を呼ぶ", async () => {
@@ -215,10 +149,13 @@ describe("DlsiteJobRuntime", () => {
       startJob: vi.fn(),
       cancelBulk: vi.fn(),
       getCurrent: vi.fn(async () => ({
-        jobId: "job-1",
-        status: "running" as const,
-        codes: [],
-        bulk: { processed: 0, total: 0 },
+        revision: 5,
+        job: {
+          jobId: "job-1",
+          status: "running" as const,
+          codes: [],
+          bulk: { processed: 0, total: 0 },
+        },
       })),
       connect: () => ({ source, close: () => closes.push(true) }),
     });
@@ -237,5 +174,56 @@ describe("DlsiteJobRuntime", () => {
     view.unmount();
     expect(closes.length).toBeGreaterThan(0);
     expect(store.getState().job).toBeNull();
+  });
+});
+
+describe("DlsiteJobRuntime と実ストア", () => {
+  it("再接続のスナップショットで単発の終端を知っても、同じRJコードの作品の詳細を無効化する", async () => {
+    mockApi({ "GET /api/scan/candidates": () => ({ candidates: [] }) });
+    const source = new EventTarget() as unknown as EventSource;
+    const running = (revision: number) => ({
+      revision,
+      job: {
+        jobId: "job-1",
+        status: "running" as const,
+        codes: [
+          {
+            productCode: "RJ000001",
+            origin: "single" as const,
+            state: "fetched" as const,
+            revision,
+            dlsite: { state: "fetched" as const, title: "題", cover: null },
+          },
+        ],
+        bulk: { processed: 0, total: 0 },
+      },
+    });
+    const store = createDlsiteJobStore({
+      startJob: vi.fn(),
+      cancelBulk: vi.fn(),
+      getCurrent: vi.fn(async () => running(30)),
+      connect: () => ({ source, close: () => {} }),
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(WORK_QUERY_KEYS.detail("w1"), detail("w1", "RJ000001"));
+    const jotai = createStore();
+    jotai.set(dlsiteJobStoreAtom, store);
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(JotaiProvider, { store: jotai }, createElement(DlsiteJobRuntime)),
+      ),
+    );
+    await waitFor(() => expect(store.getState().revision).toBe(30));
+    expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w1"))?.isInvalidated).toBe(false);
+
+    const snapshotEvent = new MessageEvent("snapshot", {
+      data: JSON.stringify({ type: "snapshot", ...running(42) }),
+    });
+    act(() => source.dispatchEvent(snapshotEvent));
+    await waitFor(() =>
+      expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w1"))?.isInvalidated).toBe(true),
+    );
   });
 });

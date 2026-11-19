@@ -68,19 +68,19 @@ export class DlsiteJobManager {
   ) {
     this.adapter = adapter;
     this.now = options.now ?? Date.now;
-    this.current = this.now();
+    this.current = this.now() * 1000;
   }
 
   /**
    * クライアントに見える最新の状態の revision。プロセス全体で1つ数え、ジョブをまたいで単調に増える。
-   * 時計の分だけ先へ進めるのは、再起動をまたいでも前のプロセスの値を下回らないようにするため
+   * 現在時刻のマイクロ秒を下限にするのは、再起動をまたいでも前のプロセスの値を下回らないようにするため
    */
   get revision(): number {
     return this.current;
   }
 
   private bump(): number {
-    this.current = Math.max(this.current + 1, this.now());
+    this.current = Math.max(this.current + 1, this.now() * 1000);
     return this.current;
   }
 

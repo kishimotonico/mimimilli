@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ScanCandidate } from "@mimimilli/shared";
+import type { DlsiteJobCodeState, ScanCandidate } from "@mimimilli/shared";
 import type {
   DlsiteJobCodeView,
   DlsiteJobState,
@@ -12,7 +12,11 @@ import {
 
 const cover = { key: "k", version: "v" } as never;
 
-function candidate(rjCode: string | null, dlsite: ScanCandidate["dlsite"]): ScanCandidate {
+function candidate(
+  rjCode: string | null,
+  dlsite: ScanCandidate["dlsite"],
+  dlsiteRevision = 0,
+): ScanCandidate {
   return {
     path: "a/b",
     inferredTitle: "t",
@@ -20,12 +24,29 @@ function candidate(rjCode: string | null, dlsite: ScanCandidate["dlsite"]): Scan
     audioBreakdown: [{ extension: "wav", count: 1 }],
     rjCode,
     dlsite,
+    dlsiteRevision,
     missingWorks: [],
   } as ScanCandidate;
 }
 
+type CodeInput = { origin: "bulk" | "single"; state: DlsiteJobCodeState; revision?: number };
+
+function view(input: CodeInput): DlsiteJobCodeView {
+  const base = { origin: input.origin, revision: input.revision ?? 1 };
+  switch (input.state) {
+    case "queued":
+    case "fetching":
+      return { ...base, state: input.state };
+    case "fetched":
+      return { ...base, state: "fetched", dlsite: { state: "fetched", title: "題", cover: null } };
+    case "not_found":
+    case "failed":
+      return { ...base, state: input.state, dlsite: { state: input.state } };
+  }
+}
+
 function jobState(
-  codes: Record<string, DlsiteJobCodeView>,
+  codes: Record<string, CodeInput>,
   overrides: Partial<DlsiteJobState> & {
     status?: "running" | "finished";
     bulk?: { processed: number; total: number };
@@ -33,18 +54,24 @@ function jobState(
 ): DlsiteJobState {
   const { status = "running", bulk = { processed: 0, total: 0 }, ...rest } = overrides;
   return {
-    job: { jobId: "j", status, codes: new Map(Object.entries(codes)), bulk },
+    revision: 1,
+    job: {
+      jobId: "j",
+      status,
+      codes: new Map(Object.entries(codes).map(([code, input]) => [code, view(input)])),
+      bulk,
+    },
+    results: new Map(),
     startingBulk: null,
     pendingSingles: new Set(),
     cancelling: false,
-    settled: false,
     error: null,
     ...rest,
   };
 }
 
 const noJob = jobState({}, {});
-const empty: DlsiteJobState = { ...noJob, job: null, settled: true };
+const empty: DlsiteJobState = { ...noJob, job: null };
 
 describe("candidateDlsiteDisplay", () => {
   it("1. rjCode が無ければ none", () => {
@@ -72,47 +99,50 @@ describe("candidateDlsiteDisplay", () => {
     }
   });
 
-  it("4. 終端状態は settled の前だけ重ね、後は候補一覧に従う", () => {
-    const failed = jobState({ RJ000001: { origin: "single", state: "failed" } });
-    expect(candidateDlsiteDisplay(candidate("RJ000001", { state: "none" }), failed)).toEqual({
-      state: "failed",
-    });
-    expect(
-      candidateDlsiteDisplay(candidate("RJ000001", { state: "none" }), {
-        ...failed,
-        settled: true,
-      }),
-    ).toEqual({ state: "none" });
-    const notFound = jobState(
-      { RJ000001: { origin: "bulk", state: "not_found" } },
+  it("3. 終わったジョブに待機中のまま残ったコードは fetching にしない", () => {
+    const state = jobState(
+      { RJ000001: { origin: "bulk", state: "queued" } },
       { status: "finished" },
     );
-    expect(candidateDlsiteDisplay(candidate("RJ000001", { state: "none" }), notFound)).toEqual({
-      state: "not_found",
+    expect(candidateDlsiteDisplay(candidate("RJ000001", { state: "none" }), state)).toEqual({
+      state: "none",
     });
   });
 
-  it("4. fetched は候補一覧が追いつくまで title・cover が null", () => {
-    const state = jobState({ RJ000001: { origin: "bulk", state: "fetched" } });
-    expect(candidateDlsiteDisplay(candidate("RJ000001", { state: "none" }), state)).toEqual({
-      state: "fetched",
-      title: null,
-      cover: null,
+  it("4. 結果の revision が候補より大きければ結果、等しい・小さければ候補を出す", () => {
+    const results = new Map([["RJ000001", { dlsite: { state: "failed" as const }, revision: 30 }]]);
+    const state = { ...empty, results };
+    expect(candidateDlsiteDisplay(candidate("RJ000001", { state: "none" }, 5), state)).toEqual({
+      state: "failed",
     });
+    const newer = { state: "fetched" as const, title: "新しい", cover };
+    expect(candidateDlsiteDisplay(candidate("RJ000001", newer, 40), state)).toEqual({
+      state: "fetched",
+      title: "新しい",
+      cover,
+    });
+    expect(candidateDlsiteDisplay(candidate("RJ000001", newer, 30), state)).toEqual({
+      state: "fetched",
+      title: "新しい",
+      cover,
+    });
+  });
+
+  it("4. fetched の結果はタイトルとカバーを運ぶ", () => {
+    const results = new Map([
+      ["RJ000001", { dlsite: { state: "fetched" as const, title: "題", cover }, revision: 9 }],
+    ]);
     expect(
-      candidateDlsiteDisplay(
-        candidate("RJ000001", { state: "fetched", title: "題", cover }),
-        state,
-      ),
+      candidateDlsiteDisplay(candidate("RJ000001", { state: "none" }, 1), { ...empty, results }),
     ).toEqual({ state: "fetched", title: "題", cover });
   });
 
-  it("5. ジョブにないコードは候補一覧をそのまま出す", () => {
+  it("5. 結果が無いコードは候補をそのまま出す", () => {
     expect(
       candidateDlsiteDisplay(candidate("RJ000009", { state: "not_found" }), jobState({})),
     ).toEqual({ state: "not_found" });
-    expect(candidateDlsiteDisplay(candidate("RJ000009", { state: "fetching" }), empty)).toEqual({
-      state: "fetching",
+    expect(candidateDlsiteDisplay(candidate("RJ000009", { state: "none" }), empty)).toEqual({
+      state: "none",
     });
     expect(
       candidateDlsiteDisplay(

@@ -12,10 +12,7 @@ import { useToast } from "../../../../../shared/ui/useToast";
 import { useVirtualList } from "../../../../../shared/ui/useVirtualList";
 import { excludeScanCandidates, setScanCandidateRjCode, SCAN_QUERY_KEYS } from "../../../api";
 import { restoreScanCandidateExclusions } from "../../../../../entities/scan/api";
-import {
-  refreshScanCandidates,
-  replaceScanCandidate,
-} from "../../../../../entities/scan/scanCandidatesCache";
+import { refreshScanCandidates } from "../../../../../entities/scan/scanCandidatesCache";
 import { useRegisterScanCandidatesMutation } from "../../../../../entities/work/model/workMutations";
 import { scanCandidateDeselectedPathsAtom } from "../../../../../entities/scan/model/atoms";
 import { useDlsiteJobState, useDlsiteJobStore } from "../../../../../entities/dlsite/useDlsiteJob";
@@ -61,15 +58,6 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const toast = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const { job, settled } = jobStore.getState();
-    if (job?.status !== "finished" || settled) return;
-    void refreshScanCandidates(queryClient).then(
-      () => jobStore.markSettled(job.jobId),
-      () => {},
-    );
-  }, [jobStore, queryClient]);
 
   const allRows = useMemo<CandidateRowModel[]>(
     () =>
@@ -163,7 +151,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     mutationFn: ({ path, rjCode }: { path: ScanCandidate["path"]; rjCode: string }) =>
       setScanCandidateRjCode(path, rjCode),
     onSuccess: (candidate) => {
-      replaceScanCandidate(queryClient, candidate);
+      void refreshScanCandidates(queryClient, { replace: candidate }).catch(() => {});
       clearFieldError(candidate.path);
       setEditingPath(null);
       setErrorMessage(null);

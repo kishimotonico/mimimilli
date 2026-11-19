@@ -15,6 +15,7 @@ import * as scanCandidatesCache from "../../src/entities/scan/scanCandidatesCach
 import { scanCandidateDeselectedPathsAtom } from "../../src/entities/scan/model/atoms";
 import { dlsiteJobStoreAtom } from "../../src/entities/dlsite/model/dlsiteJobStore";
 import { mockApi } from "../helpers/api";
+import { useScanCandidatesCache } from "../../src/features/scan/model/useScanCandidatesCache";
 import { buildScanCandidate } from "../helpers/builders";
 import { createFakeDlsiteJobStore } from "../helpers/fakeJobStores";
 import { clearResizeObservers } from "./setup";
@@ -185,6 +186,7 @@ describe("UnregisteredTab RJコード編集", () => {
   it("正しい値を確定すると修正APIを呼び、応答の候補で一覧キャッシュの行を置き換える", async () => {
     const fixed: ScanCandidate = { ...candidateA, rjCode: "RJ200002" };
     const setSpy = vi.spyOn(scanApi, "setScanCandidateRjCode").mockResolvedValue(fixed);
+    const refreshSpy = vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue([]);
     const { queryClient } = await renderTab([candidateA, candidateB]);
     queryClient.setQueryData(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY, [
       candidateA,
@@ -198,9 +200,7 @@ describe("UnregisteredTab RJコード編集", () => {
 
     await waitFor(() => expect(setSpy).toHaveBeenCalledWith(candidateA.path, "RJ200002"));
     await waitFor(() => expect(screen.queryByPlaceholderText("RJコード")).toBeNull());
-    expect(
-      queryClient.getQueryData<ScanCandidate[]>(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY),
-    ).toEqual([fixed, candidateB]);
+    expect(refreshSpy).toHaveBeenCalledWith(queryClient, { replace: fixed });
   });
 
   it("RJコードを空にして確定すると、空文字で修正APIを呼ぶ", async () => {
@@ -702,40 +702,91 @@ describe("UnregisteredTab 追加", () => {
   });
 });
 
-describe("UnregisteredTab 終端表示の同期", () => {
-  const finishedJob = {
-    job: {
-      jobId: "job-1",
-      status: "finished" as const,
-      codes: new Map(),
-      bulk: { processed: 0, total: 0 },
-    },
-    settled: false,
-  };
-
-  it("未同期のまま終わったジョブがある状態で開くと候補を取り直し、成功したら同期済みにする", async () => {
+describe("UnregisteredTab 終端表示", () => {
+  it("終わったジョブがある状態で開いても候補を取り直さない", async () => {
     const refreshSpy = vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue([]);
-    const { job } = await renderTab([candidateB], finishedJob);
-    await waitFor(() => expect(job.markSettled).toHaveBeenCalledWith("job-1"));
-    expect(refreshSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it("取り直しに失敗したら同期済みにしない", async () => {
-    const refreshSpy = vi
-      .spyOn(scanCandidatesCache, "refreshScanCandidates")
-      .mockRejectedValue(new Error("通信エラー"));
-    const { job } = await renderTab([candidateB], finishedJob);
-    await waitFor(() => expect(refreshSpy).toHaveBeenCalledTimes(1));
-    expect(job.markSettled).not.toHaveBeenCalled();
-  });
-
-  it("同期済み、またはジョブが実行中なら取り直さない", async () => {
-    const refreshSpy = vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue([]);
-    await renderTab([candidateB], { ...finishedJob, settled: true });
     await renderTab([candidateB], {
-      job: { ...finishedJob.job, status: "running" },
-      settled: false,
+      job: {
+        jobId: "job-1",
+        status: "finished" as const,
+        codes: new Map(),
+        bulk: { processed: 0, total: 0 },
+      },
     });
     expect(refreshSpy).not.toHaveBeenCalled();
+  });
+
+  it("候補を取り直さなくても、ジョブで見た終端の結果が候補より新しければ行に出す", async () => {
+    const refreshSpy = vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue([]);
+    const candidate = { ...candidateB, rjCode: "RJ000777", dlsiteRevision: 5 };
+    await renderTab([candidate], {
+      results: new Map([
+        [
+          "RJ000777",
+          {
+            dlsite: { state: "fetched" as const, title: "取得したタイトル", cover: null },
+            revision: 30,
+          },
+        ],
+      ]),
+    });
+    expect(await screen.findByText("取得したタイトル")).toBeInTheDocument();
+    expect(refreshSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("UnregisteredTab 取り直し中のRJコード修正", () => {
+  it("スキャン完了後の取り直しが出ている間にRJコードを確定しても、遅れて返った古い応答で表示が戻らない", async () => {
+    const fixed: ScanCandidate = { ...candidateA, rjCode: "RJ200002", rjCodeEdited: true };
+    const firstGate = Promise.withResolvers<void>();
+    let calls = 0;
+    mockApi({
+      "GET /api/scan/candidates": async () => {
+        calls += 1;
+        if (calls === 1) {
+          await firstGate.promise;
+          return { candidates: [candidateA] };
+        }
+        return { candidates: [fixed] };
+      },
+    });
+    vi.spyOn(scanApi, "setScanCandidateRjCode").mockResolvedValue(fixed);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY, [candidateA]);
+    const store = createStore();
+    store.set(dlsiteJobStoreAtom, createFakeDlsiteJobStore());
+    function Connected() {
+      return createElement(UnregisteredTab, {
+        candidates: useScanCandidatesCache(),
+        onRegistered: () => {},
+      });
+    }
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(JotaiProvider, { store }, createElement(Connected)),
+      ),
+    );
+    await act(async () => {
+      flushUnregisteredListSize();
+    });
+
+    const refreshing = scanCandidatesCache.refreshScanCandidates(queryClient);
+    await waitFor(() => expect(calls).toBe(1));
+
+    fireEvent.click(screen.getByTitle("クリックしてRJコードを編集"));
+    const input = screen.getByPlaceholderText("RJコード");
+    fireEvent.change(input, { target: { value: "RJ200002" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(screen.getByText("RJ200002")).toBeInTheDocument());
+
+    firstGate.resolve();
+    await refreshing;
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(screen.getByText("RJ200002")).toBeInTheDocument();
+    expect(calls).toBe(2);
   });
 });
