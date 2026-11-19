@@ -58,7 +58,7 @@ async function readSseFrames(response: Response): Promise<Array<{ event: string;
 const emptyResult = {
   registered: 0,
   insertedWorkIds: [],
-  updatedWorkIds: [],
+  updatedWorks: [],
   errors: 0,
   missing: 0,
   rjCodeMissingCount: 0,

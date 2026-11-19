@@ -6,6 +6,7 @@ import type {
   MetaDlsiteState,
   ResumeBody,
   ScanCandidate,
+  UpdatedWork,
   IdentityConflict,
   SmartFolder,
   TagPrefix,
@@ -65,8 +66,8 @@ export interface FixtureState {
   playlistSpecs: Map<string, SeedPlaylistSpec[]>;
   /** scan() が insertedWorkIds として返す、未取り込みの新規作品ID（シナリオ "new-work" 用） */
   scanInsertedWorkIds: string[];
-  /** scan() が updatedWorkIds として返す作品ID */
-  scanUpdatedWorkIds: string[];
+  /** scan() が updatedWorks として返す、変化のあった既存作品 */
+  scanUpdatedWorks: UpdatedWork[];
   /** 永続化された候補除外パス */
   scanCandidateExclusions: string[];
   identityConflicts: IdentityConflict[];
@@ -226,7 +227,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     playbackIds: new Map(),
     playlistSpecs: new Map(Object.entries({ ...SEED_PLAYLIST_SPECS, ...options.playlistSpecs })),
     scanInsertedWorkIds: scenario.scanInsertedWorkIds,
-    scanUpdatedWorkIds: scenario.scanUpdatedWorkIds,
+    scanUpdatedWorks: scenario.scanUpdatedWorks,
     scanCandidateExclusions: [],
     identityConflicts: options.identityConflicts ?? scenario.identityConflicts,
     scanCandidatePool: scenario.scanCandidates,

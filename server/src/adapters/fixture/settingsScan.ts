@@ -61,7 +61,7 @@ async function runPseudoScan(
   return {
     registered: state.works.length,
     insertedWorkIds: state.scanInsertedWorkIds,
-    updatedWorkIds: state.scanUpdatedWorkIds,
+    updatedWorks: state.scanUpdatedWorks,
     errors: state.works.filter((w) => w.status === "error").length,
     missing: state.works.filter((w) => w.status === "missing").length,
     skipped: 0,

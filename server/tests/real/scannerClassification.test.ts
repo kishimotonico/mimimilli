@@ -15,14 +15,15 @@ test("スキャン分類: 初回は新規挿入、変更なし再スキャンは
 
   const first = await adapter.scan();
   assert.deepEqual(first.insertedWorkIds, [lib.existingWorkId]);
-  assert.deepEqual(first.updatedWorkIds, []);
+  assert.deepEqual(first.updatedWorks, []);
   assert.equal(first.skipped, 0);
   assert.ok((await adapter.listScanCandidates()).length > 0);
   assert.equal((await adapter.listScanCandidates())[0]?.rjCode, "RJ900001");
 
+  writeWav(join(lib.root, "dlsite", "RJ900002_既存メタ", "missing.wav"), 1);
   const second = await adapter.scan();
   assert.deepEqual(second.insertedWorkIds, []);
-  assert.deepEqual(second.updatedWorkIds, [lib.existingWorkId]);
+  assert.deepEqual(second.updatedWorks, []);
   assert.equal(second.skipped, 0);
 
   const metaPath = join(lib.root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");
@@ -32,7 +33,9 @@ test("スキャン分類: 初回は新規挿入、変更なし再スキャンは
 
   const third = await adapter.scan();
   assert.deepEqual(third.insertedWorkIds, []);
-  assert.deepEqual(third.updatedWorkIds, [lib.existingWorkId]);
+  assert.deepEqual(third.updatedWorks, [
+    { workId: lib.existingWorkId, changes: [{ kind: "meta" }] },
+  ]);
 });
 
 test("候補登録: RJコード省略時はフォルダー名から自動検出する", async (t) => {

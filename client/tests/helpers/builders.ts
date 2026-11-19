@@ -182,7 +182,7 @@ export function buildScanResult(overrides: Partial<ScanResult> = {}): ScanResult
   return scanResultSchema.parse({
     registered: 0,
     insertedWorkIds: [],
-    updatedWorkIds: [],
+    updatedWorks: [],
     errors: 0,
     missing: 0,
     skipped: 0,

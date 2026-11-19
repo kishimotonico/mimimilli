@@ -28,6 +28,7 @@ import { measureCoverDimensions, type CoverDimensions } from "./thumbnailCache.t
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
+import { classifyWorkChanges } from "../../core/workChanges.ts";
 import type { ScanWorkState } from "./workRowMapping.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
@@ -40,6 +41,7 @@ import {
   prepareMetaEntries,
   prepareSingleMeta,
   registerMetaFile,
+  type RegisteredWork,
   type RegisterMetaFileOptions,
 } from "./scanRegister.ts";
 import type {
@@ -80,11 +82,22 @@ function currentSourceRevision(metaPath: string): string | null {
   }
 }
 
-function emptyRegisterTracking(): Pick<
-  ScanResult,
-  "coverErrors" | "insertedWorkIds" | "updatedWorkIds"
-> {
-  return { coverErrors: 0, insertedWorkIds: [], updatedWorkIds: [] };
+function emptyRegisterTracking(): Pick<ScanResult, "coverErrors"> {
+  return { coverErrors: 0 };
+}
+
+function trackRegisteredWork(
+  result: Pick<ScanResult, "insertedWorkIds" | "updatedWorks">,
+  registered: RegisteredWork,
+  root: string,
+): void {
+  const { workId, previous, current } = registered;
+  if (!previous) {
+    result.insertedWorkIds.push(workId);
+    return;
+  }
+  const changes = classifyWorkChanges(previous, current, root);
+  if (changes.length > 0) result.updatedWorks.push({ workId, changes });
 }
 
 function inspectMetaFiles(
@@ -176,7 +189,7 @@ export class Scanner {
     const result: ScanResult = {
       registered: 0,
       insertedWorkIds: [],
-      updatedWorkIds: [],
+      updatedWorks: [],
       errors: 0,
       missing: 0,
       skipped: 0,
@@ -327,6 +340,7 @@ export class Scanner {
             result.skipped += 1;
           } else {
             result.registered += 1;
+            trackRegisteredWork(result, outcome, root);
           }
         }
       } catch (e) {
@@ -478,10 +492,10 @@ export class Scanner {
     probeCache: Map<string, ProbeCacheEntry>;
     batch: ScanUpsertBatch;
     existingWorks: Map<string, ScanWorkState>;
-    result: Pick<ScanResult, "coverErrors" | "insertedWorkIds" | "updatedWorkIds">;
+    result: Pick<ScanResult, "coverErrors">;
     options: RegisterMetaFileOptions;
     checkAbort?: () => void;
-  }): Promise<"skipped" | string> {
+  }): Promise<"skipped" | RegisteredWork> {
     return registerMetaFile(
       this.db,
       params.prepared,

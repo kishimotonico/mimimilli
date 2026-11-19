@@ -30,7 +30,7 @@ const running: ScanJobSnapshot = {
 const result = {
   registered: 1,
   insertedWorkIds: [],
-  updatedWorkIds: [],
+  updatedWorks: [],
   errors: 0,
   missing: 0,
   skipped: 0,

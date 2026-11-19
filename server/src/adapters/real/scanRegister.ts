@@ -19,6 +19,7 @@ import type {
 } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import { computeWorkRevisions } from "./fingerprint.ts";
+import type { WorkSnapshot } from "../../core/workChanges.ts";
 import { MetaParseError, metaParseErrorOf, type MetaInspection } from "./meta.ts";
 import type { SeenMetaIds } from "./duplicateMetaIdRepair.ts";
 import type { ProbeCacheEntry } from "./probe.ts";
@@ -43,12 +44,29 @@ import { isPathWithin } from "../../lib/path.ts";
 
 const scanLogger = getCategoryLogger("scan");
 
-type ScanUpsertTracking = Pick<ScanResult, "coverErrors" | "insertedWorkIds" | "updatedWorkIds">;
-type ScanErrorTracking = ScanUpsertTracking & Pick<ScanResult, "errors">;
+type ScanUpsertTracking = Pick<ScanResult, "coverErrors">;
+type ScanErrorTracking = Pick<ScanResult, "errors">;
 
-function trackUpsertedWork(result: ScanUpsertTracking, workId: string, isNew: boolean): void {
-  if (isNew) result.insertedWorkIds.push(workId);
-  else result.updatedWorkIds.push(workId);
+/** 登録した作品。previousは既存作品の前回記録で、新規作品では null。 */
+export interface RegisteredWork {
+  workId: string;
+  previous: WorkSnapshot | null;
+  current: WorkSnapshot;
+}
+
+function snapshotOfState(state: ScanWorkState): WorkSnapshot {
+  return {
+    status: state.status,
+    metaPath: state.metaPath,
+    physicalPath: state.physicalPath,
+    sourceRevision: state.sourceRevision,
+    mediaRevision: state.mediaRevision,
+    audioFileCount: state.audioFileCount,
+  };
+}
+
+function distinctAudioFileCount(meta: MetaFile): number {
+  return new Set(meta.playlists.flatMap((p) => p.tracks.map((t) => t.file))).size;
 }
 
 function assertUniqueMetaIds(metaPath: string, meta: MetaFile, seenIds: SeenMetaIds): void {
@@ -312,7 +330,6 @@ export function handleMetaParseError(
       error.message,
     );
     seenIds.work.add(existing.id);
-    trackUpsertedWork(result, existing.id, false);
     result.errors += 1;
     return;
   }
@@ -372,7 +389,7 @@ export async function registerMetaFile(
   measureCover: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>,
   checkAbort: () => void = () => {},
   dlsiteCache?: DlsiteCache | null,
-): Promise<"skipped" | string> {
+): Promise<"skipped" | RegisteredWork> {
   const { full, idsAlreadyRegistered } = options;
   const {
     metaPath,
@@ -420,7 +437,6 @@ export async function registerMetaFile(
   const totalDurationSec = totalDurationFromResolved(resolvedPlaylists, meta.defaultPlaylistId);
 
   const existing = existingWorks.get(id);
-  const isNew = existing === undefined;
   const { assembled, coverErrors } = await assembleWorkForUpsert(
     prepared,
     existing,
@@ -437,6 +453,16 @@ export async function registerMetaFile(
 
   checkAbort();
   batch.add(assembled.work, assembled.revisions, assembled.cover, metaPath);
-  trackUpsertedWork(result, id, isNew);
-  return id;
+  return {
+    workId: id,
+    previous: existing ? snapshotOfState(existing) : null,
+    current: {
+      status: assembled.work.status,
+      metaPath,
+      physicalPath: placement.physicalPath,
+      sourceRevision: revisions.sourceRevision,
+      mediaRevision: revisions.mediaRevision,
+      audioFileCount: distinctAudioFileCount(meta),
+    },
+  };
 }

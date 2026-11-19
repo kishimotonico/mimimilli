@@ -10,7 +10,7 @@ import { ScanJobManager } from "../src/scanJobManager.ts";
 const emptyResult: ScanResult = {
   registered: 0,
   insertedWorkIds: [],
-  updatedWorkIds: [],
+  updatedWorks: [],
   errors: 0,
   missing: 0,
   skipped: 0,

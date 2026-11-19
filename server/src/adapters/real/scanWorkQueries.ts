@@ -14,6 +14,7 @@ export function getScanWorkMap(db: Db): Map<string, ScanWorkState> {
             works.status AS status,
             works.physical_path AS physicalPath,
             works.meta_path AS metaPath,
+            (SELECT COUNT(DISTINCT tracks.file) FROM main.tracks AS tracks WHERE tracks.work_id = works.id) AS audioFileCount,
             works.cover_image AS coverImage,
             works.cover_width AS coverWidth,
             works.cover_height AS coverHeight,
@@ -35,6 +36,7 @@ export function getScanWorkMap(db: Db): Map<string, ScanWorkState> {
     status: Work["status"];
     physicalPath: string;
     metaPath: string;
+    audioFileCount: number;
     coverImage: string | null;
     coverWidth: number | null;
     coverHeight: number | null;
@@ -54,6 +56,7 @@ export function getScanWorkMap(db: Db): Map<string, ScanWorkState> {
       mediaRevision: row.mediaRevision,
       status: row.status,
       physicalPath: row.physicalPath,
+      audioFileCount: row.audioFileCount,
       addedAt: row.addedAt,
       bookmarked: row.bookmarked !== 0,
       lastPlayedAt: row.lastPlayedAt,

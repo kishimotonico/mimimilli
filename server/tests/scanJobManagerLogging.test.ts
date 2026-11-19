@@ -9,7 +9,7 @@ import { captureLogs, scanRecords } from "./helpers/logCapture.ts";
 const emptyResult: ScanResult = {
   registered: 0,
   insertedWorkIds: [],
-  updatedWorkIds: [],
+  updatedWorks: [],
   errors: 0,
   missing: 0,
   skipped: 0,
@@ -60,7 +60,7 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
   const result: ScanResult = {
     registered: 4,
     insertedWorkIds: ["RJ501011", "RJ501012"],
-    updatedWorkIds: [],
+    updatedWorks: [],
     errors: 1,
     missing: 3,
     skipped: 6,
@@ -87,7 +87,7 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
     assert.equal(typeof properties.durationMs, "number");
     assert.equal(properties.registered, 4);
     assert.equal(properties.insertedWorkIdsCount, 2);
-    assert.equal(properties.updatedWorkIdsCount, 0);
+    assert.equal(properties.updatedWorksCount, 0);
     assert.equal(properties.errors, 1);
     assert.equal(properties.missing, 3);
     assert.equal(properties.skipped, 6);

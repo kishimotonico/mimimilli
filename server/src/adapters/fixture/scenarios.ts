@@ -7,6 +7,7 @@ import {
   type InvalidMetaFile,
   type MetaDlsiteState,
   type ScanCandidate,
+  type UpdatedWork,
   type SmartFolder,
 } from "@mimimilli/shared";
 import type { RootReconfigurationRecord } from "../../adapter/index.ts";
@@ -62,7 +63,7 @@ export interface FixtureScenario {
   lastScanTime: string;
   /** scan() が insertedWorkIds として返す、新規に見つかった作品ID */
   scanInsertedWorkIds: string[];
-  scanUpdatedWorkIds: string[];
+  scanUpdatedWorks: UpdatedWork[];
   scanCandidates: ScanCandidate[];
   invalidMetaFiles: InvalidMetaFile[];
   identityConflicts: IdentityConflict[];
@@ -117,7 +118,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       rootFolder: "/library/empty-library",
       lastScanTime: now,
       scanInsertedWorkIds: [],
-      scanUpdatedWorkIds: [],
+      scanUpdatedWorks: [],
       scanCandidates: [],
       invalidMetaFiles: [],
       identityConflicts: [],
@@ -138,7 +139,21 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       // 外部連携列の状態を一通り確認できるよう、取得待ち(RJ501011)・連携済み(RJ501001)・
       // 失敗(RJ501003)を新規登録済みに、スキップ(RJ501007)を更新された作品に含める
       scanInsertedWorkIds: ["RJ501011", "RJ501001", "RJ501003"],
-      scanUpdatedWorkIds: ["RJ501007"],
+      scanUpdatedWorks: [
+        {
+          workId: "RJ501007",
+          changes: [
+            {
+              kind: "moved",
+              from: workspacePath("旧フォルダー/RJ501007"),
+              to: workspacePath("RJ501007"),
+            },
+            { kind: "meta" },
+          ],
+        },
+        { workId: "RJ501002", changes: [{ kind: "files", audioDelta: 3 }] },
+        { workId: "RJ501004", changes: [{ kind: "meta" }, { kind: "files", audioDelta: 0 }] },
+      ],
       scanCandidates: [
         {
           path: workspacePath("未登録作品"),
@@ -183,7 +198,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       rootFolder: "/library",
       lastScanTime: now,
       scanInsertedWorkIds: [],
-      scanUpdatedWorkIds: [],
+      scanUpdatedWorks: [],
       scanCandidates: [],
       invalidMetaFiles: [],
       identityConflicts: [
@@ -212,7 +227,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       rootFolder: "/library",
       lastScanTime: now,
       scanInsertedWorkIds: [],
-      scanUpdatedWorkIds: [],
+      scanUpdatedWorks: [],
       scanCandidates: [],
       invalidMetaFiles: [],
       identityConflicts: [],
@@ -232,7 +247,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       rootFolder: "/library",
       lastScanTime: now,
       scanInsertedWorkIds: [],
-      scanUpdatedWorkIds: [],
+      scanUpdatedWorks: [],
       scanCandidates: [],
       invalidMetaFiles: [],
       identityConflicts: [],
@@ -251,7 +266,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       rootFolder: FIXTURE_UNREADABLE_ROOT,
       lastScanTime: now,
       scanInsertedWorkIds: [],
-      scanUpdatedWorkIds: [],
+      scanUpdatedWorks: [],
       scanCandidates: [],
       invalidMetaFiles: [],
       identityConflicts: [],
@@ -273,7 +288,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       rootFolder: "/library",
       lastScanTime: now,
       scanInsertedWorkIds: [],
-      scanUpdatedWorkIds: [],
+      scanUpdatedWorks: [],
       scanCandidates: [
         {
           path: workspacePath("未登録作品"),
@@ -308,7 +323,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
     rootFolder: "/library",
     lastScanTime: now,
     scanInsertedWorkIds: [],
-    scanUpdatedWorkIds: [],
+    scanUpdatedWorks: [],
     scanCandidates: [],
     invalidMetaFiles: [],
     identityConflicts: [],

@@ -92,7 +92,11 @@ export default function ScanModal({
   } = useDlsiteNotificationSummary();
 
   const insertedWorkIds = lastResult?.insertedWorkIds ?? EMPTY_WORK_IDS;
-  const updatedWorkIds = lastResult?.updatedWorkIds ?? EMPTY_WORK_IDS;
+  const updatedWorks = lastResult?.updatedWorks;
+  const updatedWorkIds = useMemo(
+    () => (updatedWorks ? updatedWorks.map((work) => work.workId) : EMPTY_WORK_IDS),
+    [updatedWorks],
+  );
   // 承認分（直近が先頭）→ 自動登録分の順で重複排除して結合する。
   const newlyRegisteredWorkIds = useMemo(
     () => dedupeIds(approvedWorkIds, insertedWorkIds),

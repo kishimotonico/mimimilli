@@ -60,12 +60,29 @@ export const scanCandidatesRegisterResponseSchema = z.object({
 });
 export type ScanCandidatesRegisterResponse = z.infer<typeof scanCandidatesRegisterResponseSchema>;
 
+/** 既存作品に起きた変化の1つ。movedのfrom/toは作品フォルダー（単体音声作品は音声ファイル）のroot相対path。 */
+export const workChangeSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("moved"), from: workspacePathSchema, to: workspacePathSchema }),
+  z.object({ kind: z.literal("meta") }),
+  /** 音声・カバー等の増減や差し替え。audioDeltaは音声ファイル数の増減（差し替えのみなら0）。 */
+  z.object({ kind: z.literal("files"), audioDelta: z.number().int() }),
+]);
+export type WorkChange = z.infer<typeof workChangeSchema>;
+export type WorkChangeKind = WorkChange["kind"];
+
+export const updatedWorkSchema = z.object({
+  workId: z.string(),
+  /** 1つ以上。種類ごとに高々1つ。 */
+  changes: z.array(workChangeSchema).min(1),
+});
+export type UpdatedWork = z.infer<typeof updatedWorkSchema>;
+
 export const scanResultSchema = z.object({
   registered: z.number().int().nonnegative(),
   /** 今回のスキャンでカタログへ新規挿入された Work ID（mimimilli.json の自動投影） */
   insertedWorkIds: z.array(z.string()),
-  /** 今回のスキャンでメタファイル更新等により再投影された Work ID */
-  updatedWorkIds: z.array(z.string()),
+  /** 今回のスキャンで変化が見つかった既存作品。エラーからの復帰や全件読み直しで読み直しただけの作品は含まない */
+  updatedWorks: z.array(updatedWorkSchema),
   errors: z.number().int().nonnegative(),
   missing: z.number().int().nonnegative(),
   /** 増分スキャンで fingerprint が一致し、プローブ・upsertWork を省略した作品数 */

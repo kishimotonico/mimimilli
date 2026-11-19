@@ -390,7 +390,7 @@ describe("ScanModal", () => {
 
   it("蔵書が0件でもライブラリ全体の0件が表示される", () => {
     renderModal({
-      lastResult: { ...scanResult, registered: 0, insertedWorkIds: [], updatedWorkIds: [] },
+      lastResult: { ...scanResult, registered: 0, insertedWorkIds: [], updatedWorks: [] },
       libraryTotal: 0,
     });
 

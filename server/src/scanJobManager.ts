@@ -286,7 +286,7 @@ export class ScanJobManager {
       durationMs: this.durationMs(job),
       registered: result.registered,
       insertedWorkIdsCount: result.insertedWorkIds.length,
-      updatedWorkIdsCount: result.updatedWorkIds.length,
+      updatedWorksCount: result.updatedWorks.length,
       errors: result.errors,
       missing: result.missing,
       skipped: result.skipped,

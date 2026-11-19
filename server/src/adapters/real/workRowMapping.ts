@@ -85,6 +85,7 @@ export interface ScanWorkState {
   mediaRevision: string | null;
   status: Work["status"];
   physicalPath: string;
+  audioFileCount: number;
   addedAt: string;
   bookmarked: boolean;
   lastPlayedAt: string | null;
