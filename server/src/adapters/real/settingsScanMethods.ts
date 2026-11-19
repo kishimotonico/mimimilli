@@ -19,7 +19,7 @@ import { type DbLocation } from "./db.ts";
 import type { DlsiteCacheConfig } from "./dlsiteCache.ts";
 import { Scanner } from "./scanner.ts";
 import { ScanCandidateSession } from "./scanCandidateSession.ts";
-import { finalizeScan, LAST_SCAN_TIME_KEY } from "./scanFinalize.ts";
+import { LAST_SCAN_TIME_KEY, scanAndFinalize } from "./scanFinalize.ts";
 import type { ScanExecutionResult } from "./scanTypes.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
@@ -101,21 +101,20 @@ export function createSettingsScanMethods(deps: {
       candidateSession = ScanCandidateSession.fromPool(execution.candidatePool, root);
       return execution.result;
     }
-    const execution = await scanner.scan(root, normalized);
-    candidateSession = ScanCandidateSession.fromPool(execution.candidatePool, root);
-    const checkAbort = () => {
-      if (normalized.signal?.aborted) {
-        throw new DOMException("スキャンはキャンセルされました", "AbortError");
-      }
-    };
-    await finalizeScan({
+    const execution = await scanAndFinalize({
+      scanner,
       query,
       catalog,
       thumbnailCacheDir,
-      throwIfCancelled: checkAbort,
-      integrityLogContext: "scan-thumbnail-gc",
+      root,
+      options: normalized,
+      throwIfCancelled: () => {
+        if (normalized.signal?.aborted) {
+          throw new DOMException("スキャンはキャンセルされました", "AbortError");
+        }
+      },
     });
-
+    candidateSession = ScanCandidateSession.fromPool(execution.candidatePool, root);
     return execution.result;
   };
   return {

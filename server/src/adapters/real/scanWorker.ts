@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import type { ScanProgressEvent } from "@mimimilli/shared";
 import { openDb, type Db, type DbLocation } from "./db.ts";
 import { Scanner } from "./scanner.ts";
-import { finalizeScan } from "./scanFinalize.ts";
+import { scanAndFinalize } from "./scanFinalize.ts";
 import { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import { WorkQueryRepository } from "./workQueryRepository.ts";
@@ -57,35 +57,26 @@ async function run(input: WorkerInput): Promise<void> {
     const user = new UserWorkStateRepository(db);
     dlsiteCache = existsSync(input.dlsiteCache.path) ? new DlsiteCache(input.dlsiteCache) : null;
     const scanner = new Scanner(db, { query, catalog, user }, { dlsiteCache });
-    const execution = await scanner.scan(
-      input.root,
-      {
+    const throwIfCancelled = () => {
+      if (cancelled(token)) throw new Error("スキャンはキャンセルされました");
+    };
+    const execution = await scanAndFinalize({
+      scanner,
+      query,
+      catalog,
+      thumbnailCacheDir: input.thumbnailCacheDir,
+      root: input.root,
+      options: {
         full: input.full ?? false,
         onProgress: (progress: ScanProgressEvent) => post({ type: "progress", progress }),
       },
-      {
+      abortHooks: {
         abortToken: token,
         beforeFinalize: input.testGateStage === "before-finalize" ? waitAtTestGate : undefined,
       },
-    );
-    if (cancelled(token)) {
-      terminal = { type: "cancelled" };
-    } else {
-      await finalizeScan({
-        query,
-        catalog,
-        thumbnailCacheDir: input.thumbnailCacheDir,
-        throwIfCancelled: () => {
-          if (cancelled(token)) throw new Error("スキャンはキャンセルされました");
-        },
-        integrityLogContext: "scan-worker-thumbnail-gc",
-      });
-      if (cancelled(token)) {
-        terminal = { type: "cancelled" };
-      } else {
-        terminal = { type: "completed", ...execution };
-      }
-    }
+      throwIfCancelled,
+    });
+    terminal = cancelled(token) ? { type: "cancelled" } : { type: "completed", ...execution };
   } catch (error) {
     terminal = cancelled(token)
       ? { type: "cancelled" }

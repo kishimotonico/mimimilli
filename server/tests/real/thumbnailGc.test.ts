@@ -1,6 +1,6 @@
 // サムネイルキャッシュのGC: validNames に含まれないエントリを削除することを検証する。
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
@@ -8,6 +8,7 @@ import { THUMBNAIL_WIDTHS } from "@mimimilli/shared";
 import sharp from "sharp";
 import {
   gcThumbnailCache,
+  STALE_TMP_AGE_MS,
   ThumbnailCache,
   thumbnailCacheNames,
 } from "../../src/adapters/real/thumbnailCache.ts";
@@ -80,18 +81,24 @@ test("旧mtimeキーのキャッシュファイルは新しい validNames で削
   for (const p of oldThumbnailPaths) assert.ok(!existsSync(p), "旧キーのファイルは削除済み");
 });
 
-test("孤児の .webp と .tmp- ファイルは削除される", async (t) => {
+test("孤児の .webp は削除され、生成中の .tmp- は残り、古い .tmp- だけ削除される", async (t) => {
   const { cacheDir } = setup(t);
   mkdirSync(cacheDir, { recursive: true });
-  const orphanTmp = join(cacheDir, "deadbeef.webp.tmp-123-0");
+  const freshTmp = join(cacheDir, "deadbeef.webp.tmp-123-0");
+  const staleTmp = join(cacheDir, "deadbeef.webp.tmp-123-1");
   const orphanWebp = join(cacheDir, "orphan.webp");
-  writeFileSync(orphanTmp, "orphan");
+  writeFileSync(freshTmp, "writing");
+  writeFileSync(staleTmp, "stale");
   writeFileSync(orphanWebp, "orphan");
+  const old = new Date(Date.now() - STALE_TMP_AGE_MS - 60_000);
+  utimesSync(staleTmp, old, old);
 
   const result = await gcThumbnailCache(cacheDir, new Set());
 
   assert.equal(result.deleted, 2);
-  assert.ok(!existsSync(orphanTmp));
+  assert.equal(result.kept, 1);
+  assert.ok(existsSync(freshTmp));
+  assert.ok(!existsSync(staleTmp));
   assert.ok(!existsSync(orphanWebp));
 });
 
