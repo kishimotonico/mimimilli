@@ -125,7 +125,7 @@ test("別接続が書き込みロックを保持中でもbusy_timeoutにより�
   const seed = openDb({ kind: "files", catalogPath, userPath });
   const { catalog, user } = createWorkRepos(seed);
   upsertTestWork(catalog, user, sampleWork());
-  seed.close();
+  await seed.close();
 
   const result = await runContendedWrite(input);
 

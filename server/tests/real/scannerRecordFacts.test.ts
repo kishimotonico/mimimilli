@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { test } from "node:test";
+import { test, type TestContext } from "node:test";
 import { workspacePath } from "@mimimilli/shared";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { Scanner } from "../../src/adapters/real/scanner.ts";
@@ -110,4 +110,69 @@ test("スキャン中に登録された作品は missing にならず、missingW
 
   assert.equal((await getTestWork(db, registeredDuringScan))?.status, "ok");
   assert.deepEqual(result.missingWorks, []);
+});
+
+const CHAIN_LENGTH = 130;
+
+/**
+ * 1ディレクトリずつ辿る鎖を作り、鎖の `depth` 番目のフォルダーを50個目のdirを辿った時点で登録する。
+ * 浅い depth は走査が通過済み、深い depth は未通過のフォルダーを登録することになる。
+ */
+async function scanRegisteringAtDepth(t: TestContext, depth: number) {
+  const directory = makeTestDirectory("scan-register-during-walk");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const segments = Array.from({ length: CHAIN_LENGTH }, (_, index) => `c${index}`);
+  mkdirSync(join(root, ...segments), { recursive: true });
+  const target = segments.slice(0, depth);
+  writeWav(join(root, ...target, "track.wav"), 1);
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  await configureRoot(adapter, root);
+
+  let registration: Promise<string> | null = null;
+  let registeredBeforeScanEnd = false;
+  const result = await adapter.scan({
+    onProgress: (event) => {
+      if (event.type !== "progress" || event.phase !== "walking" || event.processed !== 50) return;
+      registration = (async () => {
+        const created = await adapter.createWork({
+          path: workspacePath(target.join("/")),
+          title: "走査中に登録",
+          tags: [],
+          rjCode: "",
+          applyCover: false,
+          applyUrl: false,
+        });
+        const workId = created!.snapshot.id;
+        await adapter.patchWorkBookmark(workId, { bookmarked: true });
+        registeredBeforeScanEnd = true;
+        return workId;
+      })();
+    },
+  });
+  assert.ok(registration, "走査中に登録が始まっている");
+  const workId = await registration;
+  assert.equal(registeredBeforeScanEnd, true, "登録は走査の終了前に完了している");
+  return { adapter, result, workId };
+}
+
+test("走査が通過した後のフォルダーに走査中に登録した作品は、行方不明にならず、開始時の空判定も崩れない", async (t) => {
+  const { adapter, result, workId } = await scanRegisteringAtDepth(t, 1);
+  assert.deepEqual(result.missingWorks, []);
+  assert.equal(result.missing, 0);
+  assert.equal(result.startedWithEmptyCatalog, true);
+  const work = await adapter.getWork(workId);
+  assert.equal(work?.status, "ok");
+  assert.equal(work?.bookmarked, true);
+});
+
+test("走査がまだ通過していないフォルダーに走査中に登録した作品は、重複行・競合・状態の初期化を起こさない", async (t) => {
+  const { adapter, result, workId } = await scanRegisteringAtDepth(t, CHAIN_LENGTH - 2);
+  assert.deepEqual(result.missingWorks, []);
+  assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, []);
+  const work = await adapter.getWork(workId);
+  assert.equal(work?.status, "ok");
+  assert.equal(work?.bookmarked, true);
+  assert.equal(result.insertedWorkIds.filter((id) => id === workId).length <= 1, true);
+  assert.deepEqual((await adapter.scan()).insertedWorkIds, []);
 });

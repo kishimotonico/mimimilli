@@ -17,6 +17,7 @@ import { z } from "zod";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import { type DbLocation } from "./db.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
+import type { DlsiteParser } from "./dlsite.ts";
 import { createDlsiteProductResolver, readUsableDlsite } from "./dlsiteProductResolve.ts";
 import { Scanner } from "./scanner.ts";
 import { createCandidateDlsiteSource, groupMissingWorksByRjCode } from "./scanCandidateDlsite.ts";
@@ -40,7 +41,10 @@ type StoredRootReconfiguration = z.infer<typeof storedRootReconfigurationSchema>
 
 export function createSettingsScanMethods(deps: {
   database: DbLocation;
-  query: Pick<WorkQueryRepository, "listSummaries" | "listMissingWorksWithRjCode">;
+  query: Pick<
+    WorkQueryRepository,
+    "listSummaries" | "listMissingWorksWithRjCode" | "listWorkPhysicalPaths"
+  >;
   catalog: Pick<
     CatalogWorkRepository,
     | "getScanState"
@@ -63,6 +67,7 @@ export function createSettingsScanMethods(deps: {
   scanner: Scanner;
   thumbnailCacheDir: string;
   dlsiteCache: DlsiteCache;
+  parser: DlsiteParser;
   runFileScanInWorker: (
     database: Extract<DbLocation, { kind: "files" }>,
     root: string,
@@ -82,10 +87,11 @@ export function createSettingsScanMethods(deps: {
     runFileScanInWorker,
   } = deps;
   let candidateSession = ScanCandidateSession.empty();
-  const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache);
+  const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache, deps.parser);
   const candidateDlsite = createCandidateDlsiteSource(dlsiteCache, resolveDlsiteProduct);
   const readUsableInfo = (productCode: string) =>
     readUsableDlsite(resolveDlsiteProduct, productCode)?.info ?? null;
+  const candidateStores = { user, query };
   const candidateListContext = (): CandidateListContext => ({
     dlsite: candidateDlsite,
     missingWorksByRjCode: groupMissingWorksByRjCode(query.listMissingWorksWithRjCode()),
@@ -227,10 +233,20 @@ export function createSettingsScanMethods(deps: {
       };
     },
     async listScanCandidates(): Promise<ScanCandidate[]> {
-      return candidateSession.listCandidates(user, candidateListContext());
+      return candidateSession.listCandidates(
+        requireRoot(),
+        candidateStores,
+        candidateListContext(),
+      );
     },
     async setScanCandidateRjCode(path: string, rjCode: string | null): Promise<ScanCandidate> {
-      return candidateSession.setRjCode(requireRoot(), path, rjCode, user, candidateListContext());
+      return candidateSession.setRjCode(
+        requireRoot(),
+        path,
+        rjCode,
+        candidateStores,
+        candidateListContext(),
+      );
     },
     async registerScanCandidates(
       paths: string[],
@@ -238,13 +254,13 @@ export function createSettingsScanMethods(deps: {
     ): Promise<ScanCandidatesRegisterResponse> {
       return candidateSession.registerCandidates(requireRoot(), paths, apply, {
         scanner,
-        user,
+        stores: candidateStores,
         dlsiteCache,
         readUsableInfo,
       });
     },
     async excludeScanCandidates(paths: string[]): Promise<void> {
-      await candidateSession.excludeCandidates(requireRoot(), paths, user);
+      await candidateSession.excludeCandidates(requireRoot(), paths, candidateStores, user);
     },
     async listScanCandidateExclusions(): Promise<string[]> {
       return candidateSession.listExcludedCandidates(user);

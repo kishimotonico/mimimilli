@@ -586,6 +586,11 @@ export class WorkQueryRepository {
     return row ?? null;
   }
 
+  listWorkPhysicalPaths(): Set<string> {
+    const rows = this.db.catalog.select({ physicalPath: works.physicalPath }).from(works).all();
+    return new Set(rows.map((row) => row.physicalPath));
+  }
+
   countWorksByStatus(status: Work["status"]): number {
     const row = this.db.sqlite
       .query(`SELECT COUNT(*) AS count FROM main.works WHERE status = ?`)

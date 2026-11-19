@@ -41,7 +41,7 @@ const NOTHING = { title: false, cover: false, url: false, tags: [] as string[] }
 
 interface Fetched {
   info: { title: string; url: string; circle: string | null; genreTags: string[] };
-  infoRevision: number;
+  infoRevision: string;
   cachedCover: { key: string; version: number } | null;
   sourceRevision: string;
 }
@@ -69,7 +69,7 @@ function apply(h: ContractHarness, id: string, body: unknown) {
 contract("取得の応答に版とカバーのキャッシュ有無が付く", async (h) => {
   const id = h.workId("existing");
   const fetched = await fetchFor(h, id, OK_CODE);
-  assert.equal(typeof fetched.infoRevision, "number");
+  assert.equal(typeof fetched.infoRevision, "string");
   assert.ok(fetched.cachedCover);
   const noCover = await fetchFor(h, id, FIXTURE_DLSITE_NO_COVER_RJ_CODE);
   assert.equal(noCover.cachedCover, null);
@@ -160,19 +160,22 @@ contract("sourceRevisionが違う適用は409 source_changedで、メタを変�
   assert.deepEqual(await h.adapter.getWorkEditSnapshot(id), before);
 });
 
-contract("infoRevisionが違う適用は409 dlsite_refetch_requiredで、メタを変えない", async (h) => {
-  const id = h.workId("existing");
-  const fetched = await fetchFor(h, id, OK_CODE);
-  const before = await h.adapter.getWorkEditSnapshot(id);
-  const res = await apply(h, id, {
-    sourceRevision: fetched.sourceRevision,
-    infoRevision: fetched.infoRevision + 1,
-    apply: { ...NOTHING, title: true },
-  });
-  assert.equal(res.status, 409);
-  assert.equal(res.body.error.code, "dlsite_refetch_required");
-  assert.deepEqual(await h.adapter.getWorkEditSnapshot(id), before);
-});
+contract(
+  "取得時と別のinfoRevisionでの適用は409 dlsite_refetch_requiredで、メタを変えない",
+  async (h) => {
+    const id = h.workId("existing");
+    const fetched = await fetchFor(h, id, OK_CODE);
+    const before = await h.adapter.getWorkEditSnapshot(id);
+    const res = await apply(h, id, {
+      sourceRevision: fetched.sourceRevision,
+      infoRevision: `${fetched.infoRevision}-other`,
+      apply: { ...NOTHING, title: true },
+    });
+    assert.equal(res.status, 409);
+    assert.equal(res.body.error.code, "dlsite_refetch_required");
+    assert.deepEqual(await h.adapter.getWorkEditSnapshot(id), before);
+  },
+);
 
 contract("取得していないコードの適用は409 dlsite_refetch_required", async (h) => {
   const id = h.workId("existing");
@@ -180,7 +183,7 @@ contract("取得していないコードの適用は409 dlsite_refetch_required"
   const snapshot = await h.adapter.getWorkEditSnapshot(id);
   const res = await apply(h, id, {
     sourceRevision: snapshot!.sourceRevision,
-    infoRevision: 1,
+    infoRevision: "1:1",
     apply: { ...NOTHING, title: true },
   });
   assert.equal(res.status, 409);

@@ -1,11 +1,14 @@
 import { REGISTER_ALL } from "../helpers/scanLibrary.ts";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { mock } from "bun:test";
 import { test } from "node:test";
 import { META_FILE_NAME } from "@mimimilli/shared";
 import { createApp } from "../helpers/testApp.ts";
+import { DlsiteRefetchRequiredError } from "../../src/errors.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
+import { DLSITE_PARSER } from "../../src/adapters/real/dlsite.ts";
 import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../../src/adapters/real/dlsiteConfig.ts";
 import {
   htmlResponse,
@@ -315,4 +318,91 @@ test("単体適用: 作品情報ファイルのidが食い違えばエラーに�
   await assert.rejects(adapter.dlsiteApply(id, body));
 
   assert.equal(readFileSync(metaPath, "utf-8"), mismatched);
+});
+
+test("パーサー版だけが変わった再起動後は、起動前に確認した版での適用がdlsite_refetch_requiredになる", async (t) => {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
+  const dir = makeTestDirectory("dlsite-parser-version");
+  t.after(dir.cleanup);
+  const database = {
+    kind: "files",
+    catalogPath: join(dir.path, "catalog.db"),
+    userPath: join(dir.path, "user.db"),
+  } as const;
+  const dlsiteCachePath = join(dir.path, "cache.sqlite");
+  const open = (version: number) =>
+    createTestRealAdapter({
+      database,
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteCache: { path: dlsiteCachePath },
+      dlsiteParser: { ...DLSITE_PARSER, version },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => htmlResponse(sampleWorkHtml(code, { cover: false })),
+      }),
+    });
+
+  const before = open(1);
+  await configureRoot(before, lib.root);
+  await before.scan();
+  const fetched = await fetchDlsiteForWork(before, lib.existingWorkId, "RJ900002");
+  await before.close();
+
+  const after = open(2);
+  t.after(() => after.close());
+  await assert.rejects(
+    () => applyFetchedDlsite(after, lib.existingWorkId, fetched, { title: true }),
+    DlsiteRefetchRequiredError,
+  );
+  const refetched = await fetchDlsiteForWork(after, lib.existingWorkId, "RJ900002");
+  assert.notEqual(refetched.infoRevision, fetched.infoRevision);
+  assert.ok(await applyFetchedDlsite(after, lib.existingWorkId, refetched, { title: true }));
+});
+
+test("メタの書き込みが失敗する適用では、同名の旧カバーの内容が残り、退避ファイルも残らない", async (t) => {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
+  const coverBody = new Uint8Array(
+    readFileSync(join(lib.root, "dlsite", "RJ900001_テスト作品", "cover.jpg")),
+  );
+  const adapter = lib.own(
+    createTestRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => htmlResponse(sampleWorkHtml(code, { cover: true })),
+        cover: () => jpegResponse(coverBody),
+      }),
+    }),
+  );
+  await configureRoot(adapter, lib.root);
+  await adapter.scan();
+  const fetched = await fetchDlsiteForWork(adapter, lib.existingWorkId, "RJ900002");
+  const workDir = (await adapter.getWork(lib.existingWorkId))!.physicalPath;
+  const coverPath = join(workDir, "dlsite_cover.jpg");
+  const sentinel = Buffer.from("old-cover");
+  writeFileSync(coverPath, sentinel);
+  const filesBefore = readdirSync(workDir).sort();
+
+  // mock.module はプロセス全体に効く。ファイルごとにプロセスを分ける bun test の --parallel（--isolate）前提で、終了時に元へ戻す
+  const atomicFile = await import("../../src/adapters/real/atomicFile.ts");
+  const original = { ...atomicFile };
+  let failMetaInstall = true;
+  mock.module("../../src/adapters/real/atomicFile.ts", () => ({
+    ...original,
+    installBytes: (filePath: string, bytes: Uint8Array) => {
+      if (failMetaInstall) throw new Error("meta install failed");
+      original.installBytes(filePath, bytes);
+    },
+  }));
+  t.after(() => mock.module("../../src/adapters/real/atomicFile.ts", () => original));
+
+  await assert.rejects(
+    () => applyFetchedDlsite(adapter, lib.existingWorkId, fetched, { cover: true }),
+    /meta install failed/,
+  );
+  failMetaInstall = false;
+  assert.deepEqual(readFileSync(coverPath), sentinel);
+  assert.deepEqual(readdirSync(workDir).sort(), filesBefore);
+  assert.equal((await adapter.getWorkEditSnapshot(lib.existingWorkId))!.coverImage, null);
 });

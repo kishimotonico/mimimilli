@@ -46,6 +46,26 @@ contract("候補一覧は未登録フォルダーの推定タイトルと音声�
   });
 });
 
+contract(
+  "候補フローの外で登録したパスは、候補一覧にも再スキャン後の候補にも出ない",
+  async (harness) => {
+    assert.equal(hasTarget(await listCandidates(harness)), true);
+    const created = await harness.send("POST", "/api/works", {
+      path: "未登録作品",
+      title: "候補の外で登録",
+      rjCode: "",
+      applyCover: false,
+      applyUrl: false,
+    });
+    assert.equal(created.status, 201);
+    assert.equal(hasTarget(await listCandidates(harness)), false);
+
+    assert.equal((await harness.send("POST", "/api/scan")).status, 202);
+    await pollUntil(async () => (await harness.json("/api/scan")).body.status !== "running");
+    assert.equal(hasTarget(await listCandidates(harness)), false);
+  },
+);
+
 contract("候補を登録すると作品一覧に加わり、候補一覧から消える", async (harness) => {
   const registered = await harness.send("POST", "/api/scan/candidates/register", {
     paths: ["未登録作品"],

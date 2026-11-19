@@ -176,7 +176,7 @@ async function build(kind: AdapterKind, library: ContractLibrary): Promise<Built
     harness: wrap(kind, adapter, app),
     dispose: async () => {
       await app.shutdown();
-      directory.cleanup();
+      await directory.cleanup();
     },
   };
 }

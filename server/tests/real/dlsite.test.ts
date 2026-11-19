@@ -284,7 +284,7 @@ test("fetchDlsiteHtml: HTTP 404 / 通信エラーを分類する", async (t) => 
   const notFound = await notFoundAdapter.dlsiteFetch(lib.existingWorkId);
   assert.equal(notFound.ok, false);
   if (!notFound.ok) assert.equal(notFound.kind, "not_found");
-  notFoundAdapter.close();
+  await notFoundAdapter.close();
 
   const networkAdapter = createTestRealAdapter({
     database: { kind: "memory" },
@@ -301,7 +301,7 @@ test("fetchDlsiteHtml: HTTP 404 / 通信エラーを分類する", async (t) => 
   const networkError = await networkAdapter.dlsiteFetch(lib.existingWorkId);
   assert.equal(networkError.ok, false);
   if (!networkError.ok) assert.equal(networkError.kind, "error");
-  networkAdapter.close();
+  await networkAdapter.close();
 });
 
 test("fetchDlsiteHtml / fetchDlsiteCover: User-Agentを指定・既定値で切り替える", async () => {
@@ -811,7 +811,7 @@ test("offline結果はcache-onlyで、mimimilli.jsonのexact bytesを変更し�
   );
   assert.equal((await offline.getWork(lib.existingWorkId))?.dlsite.status, "none");
   assert.deepEqual(readFileSync(offlineMetaPath), offlineBytes);
-  offline.close();
+  await offline.close();
 
   const online = createRealAdapter({
     database: { kind: "memory" },
@@ -835,7 +835,7 @@ test("offline結果はcache-onlyで、mimimilli.jsonのexact bytesを変更し�
   await online.scan();
   assert.equal((await online.dlsiteFetch(lib.existingWorkId)).ok, true);
   assert.equal(calls, 1);
-  online.close();
+  await online.close();
 
   const cachedOffline = dir.own(
     createRealAdapter({
@@ -908,7 +908,7 @@ test("DLsite HTMLキャッシュ: hitは取得時の解析結果を使い、解�
 
   const reopened = new Database(join(dir.path, "cache.sqlite"));
   reopened.run("DELETE FROM dlsite_parsed_products WHERE product_code = ?", ["RJ900002"]);
-  reopened.close();
+  await reopened.close();
 
   const third = await adapter.dlsiteFetch(lib.existingWorkId);
   assert.equal(httpCalls, 1);
@@ -1206,12 +1206,12 @@ test("DLsite取得: 同一RJコードは同じ実行・別実行・adapter再オ
   assert.equal(httpCalls, 1);
   await fetchDlsiteOfWorks(first, ids);
   assert.equal(httpCalls, 1);
-  first.close();
+  await first.close();
 
   const reopened = makeAdapter();
   await fetchDlsiteOfWorks(reopened, ids);
   assert.equal(httpCalls, 1);
-  reopened.close();
+  await reopened.close();
 });
 
 test("DLsiteカバー: キャッシュから各作品フォルダーへコピーし、catalog再登録後もHTTPしない", async (t) => {
@@ -1259,7 +1259,7 @@ test("DLsiteカバー: キャッシュから各作品フォルダーへコピー
     Buffer.from(coverBody),
   );
   assert.equal(coverHttpCalls, 1);
-  first.close();
+  await first.close();
 
   rmSync(database.catalogPath);
   const reregistered = makeAdapter();
@@ -1273,7 +1273,7 @@ test("DLsiteカバー: キャッシュから各作品フォルダーへコピー
     )?.snapshot,
   );
   assert.equal(coverHttpCalls, 1);
-  reregistered.close();
+  await reregistered.close();
 });
 
 test("DLsite HTMLキャッシュ: fresh DBでmimimilli.jsonを削除して同じ作品を再登録してもHTTPせず、キャッシュのDLsite情報で登録される", async (t) => {
@@ -1305,7 +1305,7 @@ test("DLsite HTMLキャッシュ: fresh DBでmimimilli.jsonを削除して同じ
   await first.scan();
   await fetchDlsiteOfWorks(first, [lib.existingWorkId]);
   assert.equal(htmlHttpCalls, 1);
-  first.close();
+  await first.close();
 
   rmSync(join(lib.root, "dlsite", "RJ900002_既存メタ", "mimimilli.json"));
   const secondDb = {
@@ -1331,7 +1331,7 @@ test("DLsite HTMLキャッシュ: fresh DBでmimimilli.jsonを削除して同じ
   assert.equal(reregistered.dlsite.status, "applied");
   assert.equal(reregistered.dlsite.rjCode, "RJ900002");
   assert.equal(htmlHttpCalls, 1);
-  second.close();
+  await second.close();
 });
 
 test("DLsite HTMLキャッシュ: 期限切れの再取得失敗はstaleへ戻さず、force失敗はokを保持する", async (t) => {

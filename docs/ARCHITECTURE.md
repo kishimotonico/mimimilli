@@ -86,7 +86,7 @@ oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメン
 - スキャン: `POST /api/scan` はジョブを開始して 202 とスナップショットを即返す（`Location: /api/scan/:id`）。同時実行は1件のみで、実行中の二重POSTは409。進捗は `GET /api/scan/:id/events` の SSE で配信する。接続時に現在スナップショットを `state` で1件送り、以後は live のイベントだけを送る（履歴の再生はしない。[ADR-0030](adr/0030-job-progress-sse-current-state.md)）。進捗無音区間は15秒間隔の `ping` で接続を維持。`GET /api/scan/active` で実行中ジョブを取得、`GET /api/scan/last` で直近のスキャンの記録（更新済み・新たな行方不明・読み取れなかったパス・データ不整合。メモリ保持で次のスキャンかサーバー再起動まで）を常に200で取得する（未スキャンは `finishedAt` が null の空の記録）。新規作品・更新済みの作品本体は `GET /api/works?scanRecord=new|updated`（更新済みは `scanChange` で変化の種類を絞れる）から取る。ID重複・読み取り失敗は `GET /api/scan/diagnostics`、未登録候補は `GET /api/scan/candidates` から取る。ジョブの完了結果（SSEの `completed`・スナップショット）は結果を持たず完了時刻だけを運ぶ
 - DLsite: 取得は `POST /api/dlsite/jobs`（`DlsiteJobManager`）が始める。スキャン・登録・root再設定は取得しない。ジョブは作品ページとカバーを `DlsiteCache` へ記録し、同じRJコードを持つ作品の `work_dlsite.state_json` を再投影する（作品の正本とタイトル・タグ・カバーは変えない）。進捗は `GET /api/dlsite/jobs/events` のSSE（接続時に現在のジョブを `snapshot` で送る。[ADR-0030](adr/0030-job-progress-sse-current-state.md)）。候補の追加（`POST /api/scan/candidates/register`）、Filesの作品登録、作品詳細の適用（`POST /api/dlsite/:id/apply`）はクライアントからDLsite情報を受け取らず、サーバーがキャッシュを読み、`shared/src/dlsite.ts` の `planDlsiteRegistration`・`planDlsiteApply` で書く内容を決める。この3つはDLsiteへHTTPを出さない（[ADR-0033](adr/0033-dlsite-fetch-before-register.md)、[dlsite.md](dlsite.md)）
 - root再設定: root変更と初回設定は `POST /api/root-reconfiguration` だけで行う。実行中のscan・DLsite取得ジョブを取り消してから `root_folder` と再設定中状態を user DB へ同時に確定し、202 を返したあと、新rootの配下にない作品のcatalog行を削除してフルスキャンでcatalogと候補を作り直す。再設定中と失敗中は `app.ts` のmiddlewareが許可リスト以外の `/api` を409 `root_reconfiguring` で拒否する。状態は `GET /api/root-reconfiguration` と `GET /api/settings` の `rootReconfiguration` で取得する（[ADR-0029](adr/0029-root-reconfiguration-workflow.md)）
-- ファイルDB経路のフルスキャンは `scanWorker.ts` の Worker スレッドで実行し、メインスレッドのイベントループを塞がない。完了時の `ScanExecutionResult`（`ScanResult` + 候補プール）を `ScanCandidateSession` へ丸ごと置き換えて、候補の参照・登録・除外はメインスレッド常駐のセッションが担う
+- ファイルDB経路のフルスキャンは `scanWorker.ts` の Worker スレッドで実行し、メインスレッドのイベントループを塞がない。完了時の `ScanExecutionResult`（`ScanResult` + 候補プール）を `ScanCandidateSession` へ丸ごと置き換えて、候補の参照・登録・除外はメインスレッド常駐のセッションが担う。候補として返すときは、登録済み（自分自身か祖先フォルダー）をcatalogから除く
 - メディア配信: client がメディア URL を組み立て（`entities/work/api.ts`）、`/api/media/*` ルートが `DataAdapter.locateMedia()` 経由でアダプタ（実ファイル or fixture の合成メディア）から実体を取得して配信する
 
 ## ファイルシステムと配信の安全性
@@ -98,7 +98,7 @@ oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメン
 - サーバーの bind は `127.0.0.1` に固定している。LAN 内の別端末への公開は認証とセットで将来対応する
 - 全リクエストで `Host` を検証し、loopback（`localhost`・`127.0.0.1`・`[::1]`・`*.localhost`、ポートは不問）以外は 403 にする（DNSリバインディング対策）。`Host` が無い要求も 403 にする。GET/HEAD/OPTIONS 以外は `Origin` がloopbackでない場合と `Sec-Fetch-Site: cross-site` も 403 にする（CSRF対策）。どちらのヘッダーも無い要求は通す
 - JSON本文を読む route は、本文があって `Content-Type` が `application/json` でなければ 415 にする。CORS ヘッダーは出さない
-- カバー・音声・ワークスペースのファイルは、作品フォルダーまたはルート内に `realpath` で封じ込め、通常ファイルだけを扱う。DLsiteカバーは作品フォルダー内の一時ファイル経由で、revision照合の後に最終名へ確定する（symlinkを追従しない）
+- カバー・音声・ワークスペースのファイルは、作品フォルダーまたはルート内に `realpath` で封じ込め、通常ファイルだけを扱う。DLsiteカバーは作品フォルダー内の一時ファイル経由で、revision照合の後に作品の配置から導いた名前へ確定する（symlinkを追従しない。[ADR-0035](adr/0035-dlsite-cover-name-from-placement.md)）
 - リクエスト本文の上限は64MiB。超過はBunが本文なしの413を返すため、ApiError形式にならない。workspace pathの長さ上限は4096
 - 開発serverと配布ランタイムはBunを使う。Windows配布物はsharpの外部資産を含むzipを前提とし、compile・実機smokeは配布タスクで整備する
 - システムトレイ常駐・インストーラー・コード署名も将来検討事項で、詳細設計は未着手

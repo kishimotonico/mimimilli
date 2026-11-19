@@ -514,8 +514,8 @@ export type DlsiteFetchResult = z.infer<typeof dlsiteFetchResultSchema>;
 /** 作品ごとの取得結果確認に使う。sourceRevision・infoRevision は適用時のCASトークン。 */
 export const dlsitePreviewSchema = z.object({
   info: dlsiteWorkInfoSchema,
-  /** キャッシュのsnapshotの取得時刻（ms）。確認したDLsite情報の版 */
-  infoRevision: z.number().int().positive(),
+  /** 確認したDLsite情報の版。解析結果の取得時刻とパーサー版の組を表す不透明な文字列 */
+  infoRevision: z.string().min(1),
   cachedCover: dlsiteCachedCoverSchema.nullable(),
   sourceRevision: z.string().min(1),
 });
@@ -523,12 +523,12 @@ export type DlsitePreview = z.infer<typeof dlsitePreviewSchema>;
 
 /** 作品単位の取得（dlsiteFetch）の結果。成功時はキャッシュの版とカバーの有無を持つ */
 export type DlsiteWorkFetchResult =
-  | { ok: true; info: DlsiteWorkInfo; infoRevision: number; cachedCover: DlsiteCachedCover | null }
+  | { ok: true; info: DlsiteWorkInfo; infoRevision: string; cachedCover: DlsiteCachedCover | null }
   | Extract<DlsiteFetchResult, { ok: false }>;
 
 export const dlsiteApplyBodySchema = z.object({
   sourceRevision: z.string().min(1),
-  infoRevision: z.number().int().positive(),
+  infoRevision: z.string().min(1),
   apply: dlsiteApplySelectionSchema,
 });
 export type DlsiteApplyBodyInput = z.input<typeof dlsiteApplyBodySchema>;

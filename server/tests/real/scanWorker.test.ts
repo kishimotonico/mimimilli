@@ -43,7 +43,7 @@ test("file scan Workerの同期停止中もworks/Range mediaへ応答し、cance
   await configureRoot(seed, library.root);
   await scanAndRegisterCandidates(seed);
   const settingsBeforeCancel = await seed.getSettings();
-  seed.close();
+  await seed.close();
 
   const gateBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
   const gate = new Int32Array(gateBuffer);
@@ -132,7 +132,7 @@ test("app shutdown は同期停止中のfile scan Workerを終了まで待機す
   });
   await configureRoot(seed, library.root);
   await scanAndRegisterCandidates(seed);
-  seed.close();
+  await seed.close();
 
   const gateBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
   let ready!: () => void;
@@ -171,7 +171,7 @@ test("terminateScanWorkersはエラーログなしでAbortErrorとしてscanを�
   const thumbnailCacheDir = join(dataRoot, "thumbnails");
   const seed = createTestRealAdapter({ database, dataRoot, thumbnailCacheDir });
   await configureRoot(seed, library.root);
-  seed.close();
+  await seed.close();
 
   const gateBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
   let ready!: () => void;

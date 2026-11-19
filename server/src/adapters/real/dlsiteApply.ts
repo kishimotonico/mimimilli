@@ -19,7 +19,7 @@ import {
 } from "./workEditSource.ts";
 import type { Scanner } from "./scanner.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
-import { stageCachedDlsiteCover } from "./dlsiteCoverStaging.ts";
+import { saveWithDlsiteCover } from "./dlsiteCoverStaging.ts";
 import { readUsableDlsite, type DlsiteProductResolver } from "./dlsiteProductResolve.ts";
 
 export interface DlsiteApplyDeps {
@@ -73,18 +73,15 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
       if (!usable || usable.revision !== body.infoRevision) throw new DlsiteRefetchRequiredError();
       const { info } = usable;
 
-      const cover =
-        body.apply.cover && info.coverUrl
-          ? await stageCachedDlsiteCover(
-              dlsiteCache,
-              info.coverUrl,
-              workPlacementOf(current.metaPath).mediaRoot,
-              requireRoot(),
-            )
-          : null;
-
-      try {
-        return await persistVerified(
+      const verified = await saveWithDlsiteCover(
+        {
+          cache: dlsiteCache,
+          coverUrl: body.apply.cover ? info.coverUrl : null,
+          previousCoverImage: current.source.meta.coverImage,
+        },
+        workPlacementOf(current.metaPath),
+        requireRoot(),
+        (cover) =>
           mutateVerifiedMetaSource(catalog, workId, (source) => {
             if (source.sourceRevision !== body.sourceRevision) {
               return new MetaMutationReject(new SourceChangedError());
@@ -101,16 +98,14 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
               body.apply,
               { coverCached: cover !== null },
             );
-            if (plan.applyCover) cover?.commit();
+            if (plan.applyCover) cover?.place();
             return applyDlsiteMergeToRaw(source.bytes, {
               ...plan,
               coverImage: plan.applyCover ? cover?.fileName : undefined,
             });
           }),
-        );
-      } finally {
-        cover?.discard();
-      }
+      );
+      return persistVerified(verified);
     },
 
     async updateDlsiteState(

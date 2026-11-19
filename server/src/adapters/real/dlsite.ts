@@ -98,6 +98,12 @@ export function listDlsiteMissingFields(info: DlsiteWorkInfo): DlsiteOptionalFie
 /** parseDlsiteHtml の出力を変えたら上げる。キャッシュ済みの解析結果はこの版が違うと読み直される */
 export const DLSITE_PARSER_VERSION = 1;
 
+/** 解析結果の版と、その版を作る解析。キャッシュ済みの解析結果の有効性と適用の照合値はこの版で決まる */
+export interface DlsiteParser {
+  version: number;
+  parse: (html: string, rjCode: string) => DlsiteFetchResult;
+}
+
 /** DLsite 作品ページの HTML から作品情報を抽出する（pure） */
 export function parseDlsiteHtml(html: string, rjCode: string): DlsiteFetchResult {
   const $ = load(html);
@@ -221,3 +227,8 @@ export async function fetchDlsiteCover(
     finalUrl: currentUrl,
   };
 }
+
+export const DLSITE_PARSER: DlsiteParser = {
+  version: DLSITE_PARSER_VERSION,
+  parse: parseDlsiteHtml,
+};

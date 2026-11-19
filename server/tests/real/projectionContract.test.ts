@@ -1,4 +1,5 @@
 import { REGISTER_ALL } from "../helpers/scanLibrary.ts";
+import { prepareSingleMeta } from "../../src/adapters/real/scanRegister.ts";
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -69,7 +70,9 @@ test("単作品投影はmimimilli.jsonのbytesを変えない", async (t) => {
   await scanner.scan(root);
   const before = readFileSync(metaPath);
 
-  const outcome = await scanner.projectMetaFile(metaPath, readMetaSource(metaPath));
+  const outcome = await scanner.projectPrepared(
+    prepareSingleMeta(metaPath, readMetaSource(metaPath)),
+  );
   assert.equal(outcome.status, "published");
   assert.equal(readFileSync(metaPath).equals(before), true);
   assert.equal((await getTestWork(db, id))?.dlsite.rjCode, null);
@@ -140,7 +143,7 @@ test("単作品投影は公開前にsourceが変わったらunpublishedで旧cat
     },
   });
   const snapshot = readMetaSource(metaPath);
-  const outcome = await scanner.projectMetaFile(metaPath, snapshot);
+  const outcome = await scanner.projectPrepared(prepareSingleMeta(metaPath, snapshot));
 
   assert.equal(outcome.status, "unpublished");
   if (outcome.status !== "unpublished") return;

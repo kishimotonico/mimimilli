@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { prepareSingleMeta } from "./scanRegister.ts";
 import { join } from "node:path";
 import type {
   DataIntegrityWarning,
@@ -22,6 +23,7 @@ import type {
 import { errorMessage, resolveWorkPlacement, tagEquals } from "@mimimilli/shared";
 import { type Db } from "./db.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
+import type { DlsiteParser } from "./dlsite.ts";
 import { createDlsiteProductResolver, readUsableDlsite } from "./dlsiteProductResolve.ts";
 import { MetaMutationReject, encodeMetaRaw, patchMetaFileCas, readMetaSource } from "./meta.ts";
 import {
@@ -63,9 +65,10 @@ export function createWorkMethods(deps: {
   scanner: Scanner;
   requireRoot: () => string;
   dlsiteCache: DlsiteCache;
+  parser: DlsiteParser;
 }) {
   const { db, query, catalog, user, scanner, requireRoot, dlsiteCache } = deps;
-  const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache);
+  const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache, deps.parser);
   const readUsableInfo = (productCode: string) =>
     readUsableDlsite(resolveDlsiteProduct, productCode)?.info ?? null;
 
@@ -173,7 +176,7 @@ export function createWorkMethods(deps: {
         id: crypto.randomUUID(),
       });
       const physicalPath = resolveWorkPlacement(metaPath, updated.meta).physicalPath;
-      const outcome = await scanner.projectMetaFile(metaPath, updated);
+      const outcome = await scanner.projectPrepared(prepareSingleMeta(metaPath, updated));
       catalog.replaceIdentityConflicts(
         removeIdentityConflictPath(catalog.listIdentityConflicts(), diagnostic.workId, body.path),
       );
@@ -205,7 +208,7 @@ export function createWorkMethods(deps: {
         };
       }
       try {
-        const outcome = await scanner.projectMetaFile(metaPath, source);
+        const outcome = await scanner.projectPrepared(prepareSingleMeta(metaPath, source));
         return mutationResultFromOutcome(toEditSnapshot(source, physicalPath), outcome);
       } catch (error) {
         scanLogger.error("作品の一覧反映に失敗しました", {
@@ -229,7 +232,7 @@ export function createWorkMethods(deps: {
         mapMetaReadError(error);
       }
       if (source.meta.id !== id) throw new SourceConflictError(SOURCE_IDENTITY_MISMATCH_MESSAGE);
-      const outcome = await scanner.projectMetaFile(location.metaPath, source);
+      const outcome = await scanner.projectPrepared(prepareSingleMeta(location.metaPath, source));
       if (outcome.status === "unpublished" && outcome.reason === "source_changed") {
         throw new SourceChangedError();
       }

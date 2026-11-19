@@ -3,6 +3,7 @@ import { REGISTER_ALL } from "../helpers/scanLibrary.ts";
 // サンプルライブラリ構成（tests/helpers/sampleLibrary.ts）:
 //   dlsite/RJ900001_テスト作品/ … メタなし（mp3/ に 2秒+3秒 の WAV、cover.jpg）→ 自動生成対象
 //   dlsite/RJ900002_既存メタ/   … mimimilli.json あり、トラック1本欠損 → status "error"
+import { prepareSingleMeta } from "../../src/adapters/real/scanRegister.ts";
 import assert from "node:assert/strict";
 import {
   existsSync,
@@ -972,7 +973,7 @@ test("単一作品再投影は他作品のpresenceとidentity conflict診断を�
   source.title = "a updated";
   writeFileSync(join(workA, "mimimilli.json"), JSON.stringify(source));
   const metaPath = join(workA, "mimimilli.json");
-  await scanner.projectMetaFile(metaPath, readMetaSource(metaPath));
+  await scanner.projectPrepared(prepareSingleMeta(metaPath, readMetaSource(metaPath)));
   assert.equal((await getTestWork(db, idB))?.status, "ok");
   assert.deepEqual(repos.catalog.listIdentityConflicts(), [
     { kind: "identity_conflict", workId: idB, paths: ["b", "copy"] },

@@ -109,7 +109,7 @@ async function createSubject(kind: Subject["kind"]): Promise<Subject> {
     errorCode: "RJ000404",
     dispose: async () => {
       await app.shutdown();
-      directory.cleanup();
+      await directory.cleanup();
     },
   };
 }

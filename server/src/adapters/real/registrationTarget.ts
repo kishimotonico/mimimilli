@@ -49,14 +49,15 @@ export function targetName(target: RegistrationTarget): string {
   return basename(target.physicalPath);
 }
 
-function ancestorFolderIsRegistered(
-  query: WorkQueryRepository,
-  audioPath: string,
+/** `path` の祖先フォルダー（root まで）に登録済みの作品があるか */
+export function ancestorFolderIsRegistered(
+  isRegistered: (physicalPath: string) => boolean,
+  path: string,
   root: string,
 ): boolean {
-  let current = dirname(audioPath);
+  let current = dirname(path);
   while (true) {
-    if (query.getWorkByPhysicalPathSync(current) !== null) return true;
+    if (isRegistered(current)) return true;
     if (current === root) break;
     const parent = dirname(current);
     if (parent === current) break;
@@ -80,7 +81,13 @@ export function registrationConflictCheck(
     };
   }
   return {
-    alreadyRegistered: registered || ancestorFolderIsRegistered(query, target.physicalPath, root),
+    alreadyRegistered:
+      registered ||
+      ancestorFolderIsRegistered(
+        (path) => query.getWorkByPhysicalPathSync(path) !== null,
+        target.physicalPath,
+        root,
+      ),
     descendantWorkCount: 0,
     kind: "file",
   };

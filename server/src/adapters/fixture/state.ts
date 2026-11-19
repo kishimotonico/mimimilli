@@ -47,6 +47,7 @@ export interface FixtureDlsiteFetched {
   info: DlsiteWorkInfo;
   fetchedAt: number;
   expiresAt: number;
+  parserVersion: number;
 }
 
 export interface FixtureDlsiteCover {
@@ -181,10 +182,12 @@ export function fixtureDlsiteResolutionHead(
 export function fixtureUsableDlsite(
   state: FixtureState,
   rjCode: string,
-): { info: DlsiteWorkInfo; revision: number } | null {
+): { info: DlsiteWorkInfo; revision: string } | null {
   if (fixtureDlsiteResolutionHead(state, rjCode).kind !== "html") return null;
   const fetched = state.dlsiteFetched.get(normalizeDlsiteCacheKey(rjCode));
-  return fetched ? { info: fetched.info, revision: fetched.fetchedAt } : null;
+  return fetched
+    ? { info: fetched.info, revision: `${fetched.fetchedAt}:${fetched.parserVersion}` }
+    : null;
 }
 
 export function fixtureDlsiteCoverKey(coverUrl: string): string {

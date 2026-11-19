@@ -126,7 +126,7 @@ describe("DlsiteEditor", () => {
     await waitFor(() => expect(applyDlsiteInfo).toHaveBeenCalledTimes(1));
     expect(applyDlsiteInfo.mock.calls[0]![0].body).toEqual({
       sourceRevision: "rev-1",
-      infoRevision: 1_700_000_000_000,
+      infoRevision: "1700000000000:1",
       apply: { title: false, cover: true, url: true, tags: ["cv/新CV"] },
     });
   });

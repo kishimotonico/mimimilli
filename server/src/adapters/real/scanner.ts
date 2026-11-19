@@ -201,12 +201,12 @@ export class Scanner {
     };
     const diagnostics: ScanDiagnostics = { identityConflicts: [], invalidMetaFiles: [] };
 
+    const existingWorks = this.query.getScanWorkMap();
+    result.startedWithEmptyCatalog = existingWorks.size === 0;
     const tree = await this.walkPhase(root, emit, signal, abortToken, checkAbort);
     recoverStagedMetaFiles(root, tree, this.catalog);
     checkAbort();
     const seenIds: SeenMetaIds = { work: new Set() };
-    const existingWorks = this.query.getScanWorkMap();
-    result.startedWithEmptyCatalog = existingWorks.size === 0;
     const existingByMetaPath = new Map(
       [...existingWorks].map(([id, state]) => [state.metaPath, { id, state }]),
     );
@@ -480,8 +480,8 @@ export class Scanner {
         }
       }
     }
-    // スキャン開始時にcatalogにあった作品のうち今回見つからなかったものだけを missing にする。
-    // スキャン中に登録された作品は existingWorks に無いので missing にならない
+    // 走査前にcatalogにあった作品のうち今回見つからなかったものだけを missing にする。
+    // 走査中に登録された作品は existingWorks に無いので missing にならない
     const missingIds: string[] = [];
     const missingWorks: MissingWork[] = [];
     for (const [workId, state] of existingWorks) {
@@ -538,7 +538,8 @@ export class Scanner {
     );
   }
 
-  private async registerSingleWorkFromPrepared(prepared: PreparedMeta): Promise<ProjectOutcome> {
+  /** 書き込み済みのメタを対象作品だけcatalogへ投影する。失敗してもメタは残る */
+  async projectPrepared(prepared: PreparedMeta): Promise<ProjectOutcome> {
     const snapshot = {
       meta: prepared.meta,
       bytes: prepared.bytes,
@@ -628,10 +629,8 @@ export class Scanner {
     });
   }
 
-  async registerWork(
-    target: RegistrationTarget,
-    options: RegisterWorkOptions,
-  ): Promise<ProjectOutcome> {
+  /** 新しい作品のメタを書く。投影は projectPrepared で行う */
+  writeNewWorkMeta(target: RegistrationTarget, options: RegisterWorkOptions): PreparedMeta {
     if (target.placement.kind === "folder") this.assertNoRegisteredDescendants(target.physicalPath);
     const { metaPath } = target.placement;
     if (existsSync(metaPath)) {
@@ -650,21 +649,14 @@ export class Scanner {
       dlsite: options.dlsite,
     });
     const snapshot = writeMetaFile(metaPath, meta);
-    return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
+    return prepareSingleMeta(metaPath, snapshot);
   }
 
-  /** 確定済みmimimilli.jsonを入力に、対象作品だけをcatalogへ投影する。 */
-  async projectMetaFile(
-    metaPath: string,
-    snapshot: { meta: MetaFile; bytes: Buffer; sourceRevision: string },
-  ): Promise<ProjectOutcome> {
-    return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
-  }
-
-  async restoreWork(target: RegistrationTarget, patch: RestoreMetaPatch): Promise<ProjectOutcome> {
+  /** 孤立メタを復元用に更新する。投影は projectPrepared で行う */
+  writeRestoredWorkMeta(target: RegistrationTarget, patch: RestoreMetaPatch): PreparedMeta {
     if (target.placement.kind === "folder") this.assertNoRegisteredDescendants(target.physicalPath);
     const { metaPath } = target.placement;
     const snapshot = this.snapshotForRestore(target, patch);
-    return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
+    return prepareSingleMeta(metaPath, snapshot);
   }
 }

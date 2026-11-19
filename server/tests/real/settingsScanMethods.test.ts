@@ -1,3 +1,4 @@
+import { DLSITE_PARSER } from "../../src/adapters/real/dlsite.ts";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -44,6 +45,7 @@ test("resolveRootFolder / beginRootReconfiguration は receiver なしで呼び�
       placements: new Map(),
     }),
     listMissingWorksWithRjCode: () => [],
+    listWorkPhysicalPaths: () => new Set<string>(),
   };
 
   try {
@@ -59,6 +61,7 @@ test("resolveRootFolder / beginRootReconfiguration は receiver なしで呼び�
       user,
       scanner: undefined as unknown as Scanner,
       thumbnailCacheDir: rootDir,
+      parser: DLSITE_PARSER,
       dlsiteCache,
       runFileScanInWorker: async () => {
         throw new Error("scan はこのテストで呼び出されません");

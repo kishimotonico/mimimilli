@@ -87,9 +87,16 @@ function toCandidate(state: FixtureState, folder: ScanCandidateFolder): ScanCand
   };
 }
 
+/** 除外と、登録済み作品（自分自身か祖先フォルダー）の候補を除く。登録状況の正は作品一覧 */
 function visibleFolders(state: FixtureState): ScanCandidateFolder[] {
   const excluded = new Set(state.scanCandidateExclusions);
-  return state.scanCandidates.filter((folder) => !excluded.has(folder.path));
+  const rootAbs = normalizeFsPath(requireFixtureRoot(state));
+  const workPaths = state.works.map((work) => normalizeFsPath(work.physicalPath));
+  return state.scanCandidates.filter((folder) => {
+    if (excluded.has(folder.path)) return false;
+    const folderAbs = normalizeFsPath(`${rootAbs}/${folder.path}`);
+    return !workPaths.some((workPath) => isFsPathWithin(workPath, folderAbs));
+  });
 }
 
 /** シナリオが指定した作品を行方不明にし、今回新たに行方不明になった作品として返す。 */
@@ -288,11 +295,7 @@ export function createSettingsScanMethods(
         setDlsiteLinkage(state, work.id, plan.dlsite);
         return [{ path: candidate.path, workId: work.id }];
       });
-      const registeredPaths = new Set(registered.map((candidate) => candidate.path));
-      const unregistered = (candidate: ScanCandidateFolder) => !registeredPaths.has(candidate.path);
-      for (const path of registeredPaths) state.scanCandidateRjCodeOverrides.delete(path);
-      state.scanCandidatePool = state.scanCandidatePool.filter(unregistered);
-      state.scanCandidates = state.scanCandidates.filter(unregistered);
+      for (const { path } of registered) state.scanCandidateRjCodeOverrides.delete(path);
       return { registered, failures: [] };
     },
     async excludeScanCandidates(paths): Promise<void> {

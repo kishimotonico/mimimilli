@@ -244,7 +244,7 @@ test("候補除外はuser DBを再オープンしても保持される", async (
   await configureRoot(first, root);
   await first.scan();
   await first.excludeScanCandidates(["除外対象"]);
-  first.close();
+  await first.close();
 
   const reopened = directory.own(createTestRealAdapter(options));
   assert.deepEqual(await reopened.listScanCandidates(), []);

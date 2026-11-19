@@ -126,7 +126,7 @@ export function buildDlsitePreview(
       url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501001.html",
       ...info,
     },
-    infoRevision: 1_700_000_000_000,
+    infoRevision: "1700000000000:1",
     cachedCover: { key: "a".repeat(64), version: 1_700_000_000_000 },
     ...extra,
     sourceRevision,

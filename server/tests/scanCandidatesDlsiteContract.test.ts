@@ -157,7 +157,7 @@ async function createSubject(
     dispose: async () => {
       gate.resolve();
       await app.shutdown();
-      directory.cleanup();
+      await directory.cleanup();
     },
   };
 }

@@ -1,6 +1,7 @@
 // 作品の配置形式。正本は metaPath のファイル名（ADR-0032）。
 import {
   META_FILE_NAME,
+  META_SIDECAR_SUFFIX,
   isAudioFileName,
   isSidecarMetaFileName,
   sidecarMetaFileName,
@@ -41,6 +42,12 @@ export function workPlacementOf(metaPath: string): WorkPlacement {
   if (name === META_FILE_NAME) return { kind: "folder", metaPath, mediaRoot };
   if (isSidecarMetaFileName(name)) return { kind: "audio-file", metaPath, mediaRoot };
   throw new Error(`メタファイル名ではありません: ${metaPath}`);
+}
+
+/** DLsiteカバーの保存名（拡張子なし）。同じフォルダーの別作品と重ならないよう、メタファイル名から導く */
+export function dlsiteCoverBaseName(placement: WorkPlacement): string {
+  if (placement.kind === "folder") return "dlsite_cover";
+  return `${pathBaseName(placement.metaPath).slice(0, -META_SIDECAR_SUFFIX.length)}.dlsite_cover`;
 }
 
 /** メタの中身から音声ファイルを特定できないときの physicalPath */

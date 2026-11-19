@@ -68,7 +68,10 @@ test("取得時に解析結果を保存すると、候補の導出は何度で�
   const info = record(first);
   const { state, parse } = countingParse();
 
-  const source = createCandidateDlsiteSource(first, createDlsiteProductResolver(first, parse));
+  const source = createCandidateDlsiteSource(
+    first,
+    createDlsiteProductResolver(first, { version: DLSITE_PARSER_VERSION, parse }),
+  );
   const expected = { state: "fetched", title: info.title, cover: null };
   assert.deepEqual(deriveCandidateDlsite(source, CODE), expected);
   assert.deepEqual(deriveCandidateDlsite(source, CODE), expected);
@@ -78,7 +81,7 @@ test("取得時に解析結果を保存すると、候補の導出は何度で�
   const restarted = open();
   const restartedSource = createCandidateDlsiteSource(
     restarted,
-    createDlsiteProductResolver(restarted, parse),
+    createDlsiteProductResolver(restarted, { version: DLSITE_PARSER_VERSION, parse }),
   );
   assert.deepEqual(deriveCandidateDlsite(restartedSource, CODE), expected);
   assert.equal(state.calls, 0);
@@ -89,7 +92,7 @@ test("解析結果が無いsnapshotは1回だけ解析して書き戻し、以�
   const cache = open();
   const info = record(cache, { withParsed: false });
   const { state, parse } = countingParse();
-  const resolve = createDlsiteProductResolver(cache, parse);
+  const resolve = createDlsiteProductResolver(cache, { version: DLSITE_PARSER_VERSION, parse });
 
   for (let i = 0; i < 3; i++) {
     const resolution = resolve(CODE);
@@ -110,7 +113,7 @@ test("パーサーの版が違う解析結果は解析し直される", (t) => {
     info: { ...info, title: "古い解析結果" },
   });
   const { state, parse } = countingParse();
-  const resolve = createDlsiteProductResolver(cache, parse);
+  const resolve = createDlsiteProductResolver(cache, { version: DLSITE_PARSER_VERSION, parse });
 
   const resolution = resolve(CODE);
   assert.equal(

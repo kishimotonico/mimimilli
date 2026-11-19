@@ -143,7 +143,7 @@ test("smartFolderが解決できない場合はnullを返す（ルートが404�
     });
     assert.equal(realResult, null);
   } finally {
-    real.cleanup();
+    await real.cleanup();
   }
 });
 

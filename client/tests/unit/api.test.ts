@@ -353,7 +353,7 @@ describe("work api", () => {
     };
     const preview = {
       info: mockInfo,
-      infoRevision: 1_700_000_000_000,
+      infoRevision: "1700000000000:1",
       cachedCover: null,
       sourceRevision: "revision-1",
     };

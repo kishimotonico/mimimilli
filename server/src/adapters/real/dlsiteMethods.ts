@@ -16,6 +16,7 @@ import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import type { Scanner } from "./scanner.ts";
 import { getWorkFromCatalog } from "./workRefresh.ts";
+import type { DlsiteParser } from "./dlsite.ts";
 import { createDlsiteFetch } from "./dlsiteFetch.ts";
 import { cachedCoverOf } from "./scanCandidateDlsite.ts";
 import { createDlsiteApply } from "./dlsiteApply.ts";
@@ -37,10 +38,11 @@ export function createDlsiteMethods(deps: {
   dlsiteScheduler: DlsiteScheduler;
   schedulerDependencies?: DlsiteSchedulerDependencies;
   requireRoot: () => string;
+  parser: DlsiteParser;
 }) {
   const { query, catalog, dlsiteCache } = deps;
   const fetch = createDlsiteFetch(deps);
-  const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache);
+  const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache, deps.parser);
   const apply = createDlsiteApply({
     catalog,
     scanner: deps.scanner,
@@ -163,6 +165,9 @@ export function createDlsiteMethods(deps: {
         if (options.signal?.aborted) await fetch.dlsiteScheduler.drain();
       }
     },
+
+    /** DLsite通信とキャッシュ書き込みの完了を待つ。キャッシュとDBを閉じる前に呼ぶ */
+    settleDlsiteWork: fetch.settled,
 
     ...apply,
   };
