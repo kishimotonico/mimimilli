@@ -15,7 +15,22 @@ export function dlsiteFetchErrorMessage(error: unknown): string {
   return "DLsiteとの通信に失敗しました。時間をおいて再試行してください。";
 }
 
+function dlsiteRefetchRequiredMessage(): string {
+  return "DLsiteの取得結果が古くなりました。もう一度取得してください。";
+}
+
+/** 適用を取り直さないと進められないエラー。ダイアログを閉じて取得からやり直す */
+export function isDlsiteApplyStale(error: unknown): boolean {
+  return (
+    error instanceof ApiRequestError &&
+    (error.code === "source_changed" || error.code === "dlsite_refetch_required")
+  );
+}
+
 export function dlsiteApplyErrorMessage(error: unknown): string {
+  if (error instanceof ApiRequestError && error.code === "dlsite_refetch_required") {
+    return dlsiteRefetchRequiredMessage();
+  }
   if (error instanceof ApiRequestError && error.code === "source_changed") {
     return dlsiteSourceChangedMessage();
   }

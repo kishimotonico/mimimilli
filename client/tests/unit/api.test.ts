@@ -351,7 +351,12 @@ describe("work api", () => {
       coverUrl: null,
       url: "",
     };
-    const preview = { info: mockInfo, sourceRevision: "revision-1" };
+    const preview = {
+      info: mockInfo,
+      infoRevision: 1_700_000_000_000,
+      cachedCover: null,
+      sourceRevision: "revision-1",
+    };
     mockFetch.mockResolvedValue(makeResponse(preview));
     const result = await workApi.fetchDlsiteInfo("work-1");
     expect(mockFetch).toHaveBeenCalledWith(

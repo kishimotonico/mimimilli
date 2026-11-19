@@ -4,6 +4,7 @@ import type {
   DlsiteProductFetchOutcome,
   DlsiteFetchResult,
   DlsiteStateUpdateBody,
+  DlsiteWorkFetchResult,
   WorkSourceMutationResult,
 } from "@mimimilli/shared";
 
@@ -13,18 +14,15 @@ export interface DlsiteAdapter {
     workId: string,
     force?: boolean,
     options?: { signal?: AbortSignal },
-  ): Promise<DlsiteFetchResult>;
+  ): Promise<DlsiteWorkFetchResult>;
   /** 作品未登録時のプレビュー用。RJ/VJコードを直接指定して取得する。 */
   dlsiteFetchByCode(
     rjCode: string,
     force?: boolean,
     options?: { signal?: AbortSignal },
   ): Promise<DlsiteFetchResult>;
-  dlsiteApply(
-    workId: string,
-    body: DlsiteApplyBody,
-    options?: { signal?: AbortSignal },
-  ): Promise<WorkSourceMutationResult | null>;
+  /** キャッシュ済みのDLsite情報を適用する。DLsiteへは通信しない。使えるキャッシュが無い・版が違うときは DlsiteRefetchRequiredError */
+  dlsiteApply(workId: string, body: DlsiteApplyBody): Promise<WorkSourceMutationResult | null>;
   updateDlsiteState(
     workId: string,
     body: DlsiteStateUpdateBody,

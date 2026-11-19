@@ -4,7 +4,6 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { META_FILE_NAME } from "@mimimilli/shared";
-import { CoverSaveError } from "../../src/errors.ts";
 import { createApp } from "../helpers/testApp.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../../src/adapters/real/dlsiteConfig.ts";
@@ -18,6 +17,8 @@ import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
 import { fetchDlsiteOfWorks } from "../helpers/dlsiteFetch.ts";
+import { applyFetchedDlsite, fetchDlsiteForWork } from "../helpers/dlsiteApply.ts";
+import { nts } from "../helpers/tag.ts";
 
 const FAST_DLSITE_REQUEST_CONFIG = {
   ...DEFAULT_DLSITE_REQUEST_CONFIG,
@@ -60,26 +61,15 @@ test("title: 単発適用は applyTitle に従い、一括取得は作品情報�
   assert.deepEqual(readFileSync(existingMetaPath), existingBytesBeforeBulk);
   assert.deepEqual(existingAfterBulk?.tags, existingBeforeBulk?.tags);
 
-  const applyTitle = "単発適用タイトル";
-  await adapter.dlsiteApply(lib.existingWorkId, {
-    info: {
-      rjCode: "RJ900002",
-      title: applyTitle,
-      circle: null,
-      cvs: [],
-      genreTags: [],
-      ageRating: null,
-      coverUrl: null,
-      url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
-    },
-    applyTitle: true,
-    applyTags: [],
-    applyCover: false,
-    applyUrl: true,
-    sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
+  const fetchedExisting = await fetchDlsiteForWork(adapter, lib.existingWorkId, "RJ900002");
+  const applyTitle = fetchedExisting.info.title;
+  await applyFetchedDlsite(adapter, lib.existingWorkId, fetchedExisting, {
+    title: true,
+    url: true,
   });
   const existingAfterApply = await adapter.getWork(lib.existingWorkId);
   assert.equal(existingAfterApply?.title, applyTitle);
+  assert.notEqual(applyTitle, customTitle);
 
   const registration = await adapter.registerScanCandidates(
     (await adapter.listScanCandidates()).map((candidate) => candidate.path),
@@ -91,23 +81,12 @@ test("title: 単発適用は applyTitle に従い、一括取得は作品情報�
   const generatedAfterBulk = await adapter.getWork(generatedId);
   assert.equal(generatedAfterBulk?.title, generatedBefore?.title);
 
-  await adapter.dlsiteApply(generatedId, {
-    info: {
-      rjCode: generatedBefore!.dlsite.rjCode!,
-      title: "単発では上書きしない",
-      circle: null,
-      cvs: [],
-      genreTags: [],
-      ageRating: null,
-      coverUrl: null,
-      url: `https://www.dlsite.com/maniax/work/=/product_id/${generatedBefore!.dlsite.rjCode}.html`,
-    },
-    applyTitle: false,
-    applyTags: [],
-    applyCover: false,
-    applyUrl: true,
-    sourceRevision: (await adapter.getWorkEditSnapshot(generatedId))!.sourceRevision,
-  });
+  const fetchedGenerated = await fetchDlsiteForWork(
+    adapter,
+    generatedId,
+    generatedBefore!.dlsite.rjCode!,
+  );
+  await applyFetchedDlsite(adapter, generatedId, fetchedGenerated, { title: false, url: true });
   const generatedAfterApply = await adapter.getWork(generatedId);
   assert.equal(generatedAfterApply?.title, generatedAfterBulk?.title);
 });
@@ -128,9 +107,11 @@ test("cover: 単発適用は先取りしたカバーを適用し、一括取得�
       dlsiteCache: { path: join(dir.path, "cache.sqlite") },
       dlsiteSchedulerDependencies: mockDlsiteTransport({
         html: (code) => htmlResponse(sampleWorkHtml(code, { title: `取得 ${code}`, cover: true })),
-        cover: () => {
+        cover: (url) => {
           coverHttpCalls += 1;
-          return jpegResponse(coverBody);
+          return url.includes("RJ900003")
+            ? new Response("error", { status: 500 })
+            : jpegResponse(coverBody);
         },
       }),
     }),
@@ -138,21 +119,11 @@ test("cover: 単発適用は先取りしたカバーを適用し、一括取得�
   await configureRoot(adapter, lib.root);
   await adapter.scan();
 
-  const fetched = await adapter.dlsiteFetchByCode("RJ900002");
-  assert.equal(fetched.ok, true);
-  const info = (fetched as Extract<typeof fetched, { ok: true }>).info;
+  const fetched = await fetchDlsiteForWork(adapter, lib.existingWorkId, "RJ900002");
   assert.equal(coverHttpCalls, 1);
   assert.ok(
-    (
-      await adapter.dlsiteApply(lib.existingWorkId, {
-        info,
-        applyTitle: false,
-        applyTags: [],
-        applyCover: true,
-        applyUrl: true,
-        sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
-      })
-    )?.snapshot,
+    (await applyFetchedDlsite(adapter, lib.existingWorkId, fetched, { cover: true, url: true }))
+      ?.snapshot,
   );
   assert.equal(coverHttpCalls, 1);
   const withCover = await adapter.getWork(lib.existingWorkId);
@@ -164,19 +135,16 @@ test("cover: 単発適用は先取りしたカバーを適用し、一括取得�
   const afterBulk = await adapter.getWork(lib.existingWorkId);
   assert.equal(afterBulk?.cover?.image, firstCoverImage);
 
-  await assert.rejects(
-    async () =>
-      adapter.dlsiteApply(lib.existingWorkId, {
-        info: { ...info, coverUrl: "https://img.dlsite.jp/modpub/images2/work/b.jpg" },
-        applyTitle: false,
-        applyTags: [],
-        applyCover: true,
-        applyUrl: true,
-        sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
-      }),
-    CoverSaveError,
-  );
-  assert.equal(coverHttpCalls, 1);
+  const uncached = await fetchDlsiteForWork(adapter, lib.existingWorkId, "RJ900003");
+  assert.equal(uncached.cachedCover, null);
+  const coverCallsBeforeApply = coverHttpCalls;
+  const result = await applyFetchedDlsite(adapter, lib.existingWorkId, uncached, {
+    cover: true,
+    url: true,
+  });
+  assert.ok(result?.snapshot);
+  assert.equal(coverHttpCalls, coverCallsBeforeApply);
+  assert.equal((await adapter.getWork(lib.existingWorkId))?.cover?.image, firstCoverImage);
 });
 
 test("Filesの作品登録はキャッシュのDLsite情報を使い、タイトルは入力のまま、bodyのinfoは使わない", async (t) => {
@@ -245,8 +213,6 @@ test("取得はカバーをキャッシュへ先取りし、明示適用はキ�
   const coverBody = new Uint8Array(
     readFileSync(join(lib.root, "dlsite", "RJ900001_テスト作品", "cover.jpg")),
   );
-  const bulkCoverUrl =
-    "https://img.dlsite.jp/modpub/images2/work/doujin/RJ900000/RJ900002_img_main.jpg";
   const adapter = dir.own(
     createRealAdapter({
       database: { kind: "memory" },
@@ -264,28 +230,12 @@ test("取得はカバーをキャッシュへ先取りし、明示適用はキ�
   await configureRoot(adapter, lib.root);
   await adapter.scan();
 
-  await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
+  const fetched = await fetchDlsiteForWork(adapter, lib.existingWorkId, "RJ900002");
   assert.equal(coverHttpCalls, 1);
   const workDir = (await adapter.getWork(lib.existingWorkId))!.physicalPath;
   assert.equal(existsSync(join(workDir, "dlsite_cover.jpg")), false);
 
-  await adapter.dlsiteApply(lib.existingWorkId, {
-    info: {
-      rjCode: "RJ900002",
-      title: "x",
-      circle: null,
-      cvs: [],
-      genreTags: [],
-      ageRating: null,
-      coverUrl: bulkCoverUrl,
-      url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
-    },
-    applyTitle: false,
-    applyTags: [],
-    applyCover: true,
-    applyUrl: true,
-    sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
-  });
+  await applyFetchedDlsite(adapter, lib.existingWorkId, fetched, { cover: true, url: true });
   assert.equal(coverHttpCalls, 1);
   assert.equal(existsSync(join(workDir, "dlsite_cover.jpg")), true);
 });
@@ -332,22 +282,11 @@ async function applyBodyOf(
   adapter: Awaited<ReturnType<typeof setupSampleAdapter>>["adapter"],
   id: string,
 ) {
+  const fetched = await fetchDlsiteForWork(adapter, id, "RJ900002");
   return {
-    info: {
-      rjCode: "RJ900002",
-      title: "適用タイトル",
-      circle: "夜想曲",
-      cvs: [],
-      genreTags: ["耳かき"],
-      ageRating: null,
-      coverUrl: null,
-      url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
-    },
-    applyTitle: true,
-    applyTags: ["genre/耳かき"] as never,
-    applyCover: false,
-    applyUrl: true,
     sourceRevision: (await adapter.getWorkEditSnapshot(id))!.sourceRevision,
+    infoRevision: fetched.infoRevision,
+    apply: { title: true, cover: false, url: true, tags: nts(["genre/耳かき"]) },
   };
 }
 

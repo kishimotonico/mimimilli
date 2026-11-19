@@ -4,11 +4,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { emptyDlsiteState, type Work } from "@mimimilli/shared";
+import { SCAN_CANDIDATES_QUERY_KEY } from "../../src/entities/scan/scanCandidatesCache";
 import { DlsiteEditor } from "../../src/features/library/ui/preview/DlsiteEditor";
 import GlobalToast from "../../src/app/ui/GlobalToast";
-import { mockApi } from "../helpers/api";
+import { apiError, mockApi, type ApiRequest } from "../helpers/api";
 import {
   buildDlsitePreview,
+  buildScanCandidate,
   buildSettings,
   buildWork,
   buildWorkEditSnapshotOf,
@@ -16,8 +18,9 @@ import {
 } from "../helpers/builders";
 
 const fetchDlsiteInfo = vi.fn();
-const applyDlsiteInfo = vi.fn();
-const updateDlsiteState = vi.fn();
+const applyDlsiteInfo = vi.fn<(request: ApiRequest) => unknown>();
+let api: ReturnType<typeof mockApi>;
+const updateDlsiteState = vi.fn<(request: ApiRequest) => unknown>();
 
 function makeWork(overrides: Partial<Work> = {}): Work {
   return buildWork({
@@ -51,6 +54,7 @@ function renderEditor(work: Work) {
   );
   return {
     store,
+    queryClient,
     rerender(next: Work) {
       view.rerender(
         <>
@@ -67,11 +71,12 @@ describe("DlsiteEditor", () => {
     fetchDlsiteInfo.mockReset();
     applyDlsiteInfo.mockReset();
     updateDlsiteState.mockReset();
-    mockApi({
+    api = mockApi({
       "POST /api/dlsite/:id/fetch": () => fetchDlsiteInfo() as unknown,
-      "POST /api/dlsite/:id/apply": () => applyDlsiteInfo() as unknown,
-      "PATCH /api/dlsite/:id": () => updateDlsiteState() as unknown,
+      "POST /api/dlsite/:id/apply": (request) => applyDlsiteInfo(request),
+      "PATCH /api/dlsite/:id": (request) => updateDlsiteState(request),
       "GET /api/settings": buildSettings(),
+      "GET /api/scan/candidates": [],
     });
     HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
       this.open = true;
@@ -101,6 +106,66 @@ describe("DlsiteEditor", () => {
     await waitFor(() => expect(screen.queryByText("DLsite情報の適用")).not.toBeInTheDocument());
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("DLsite情報を適用しました")).toBeInTheDocument());
+  });
+
+  it("適用で送る内容は版と選択だけで、既定は未設定の項目とタグの追加だけを選ぶ", async () => {
+    const work = makeWork({ tags: ["サークル/旧サークル", "cv/既存"] });
+    fetchDlsiteInfo.mockReturnValue(
+      buildDlsitePreview({ title: "取得タイトル", circle: "夜想曲", cvs: ["既存", "新CV"] }),
+    );
+    applyDlsiteInfo.mockReturnValue(buildWorkSourceMutationResult(makeSnapshot(work)));
+
+    renderEditor(work);
+    fireEvent.click(screen.getByRole("button", { name: "取得結果を確認" }));
+    await waitFor(() => expect(screen.getByText("DLsite情報の適用")).toBeInTheDocument());
+
+    expect(screen.getByLabelText(/^サークル\/夜想曲/)).not.toBeChecked();
+    expect(screen.getByLabelText("cv/新CV")).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "選択内容を適用" }));
+
+    await waitFor(() => expect(applyDlsiteInfo).toHaveBeenCalledTimes(1));
+    expect(applyDlsiteInfo.mock.calls[0]![0].body).toEqual({
+      sourceRevision: "rev-1",
+      infoRevision: 1_700_000_000_000,
+      apply: { title: false, cover: true, url: true, tags: ["cv/新CV"] },
+    });
+  });
+
+  it.each(["source_changed", "dlsite_refetch_required"])(
+    "適用が %s で失敗したらダイアログを閉じて欄にメッセージを出す",
+    async (code) => {
+      fetchDlsiteInfo.mockReturnValue(buildDlsitePreview());
+      applyDlsiteInfo.mockReturnValue(apiError(409, code));
+
+      renderEditor(makeWork());
+      fireEvent.click(screen.getByRole("button", { name: "取得結果を確認" }));
+      await waitFor(() => expect(screen.getByText("DLsite情報の適用")).toBeInTheDocument());
+      fireEvent.click(screen.getByRole("button", { name: "選択内容を適用" }));
+
+      await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+      expect(screen.queryByText("DLsite情報の適用")).not.toBeInTheDocument();
+    },
+  );
+
+  it("RJコードを空にして保存すると空文字を送り、入力欄は空のまま", async () => {
+    const work = makeWork();
+    updateDlsiteState.mockReturnValue(
+      buildWorkSourceMutationResult(
+        makeSnapshot({ ...work, dlsite: { ...emptyDlsiteState(), rjCode: "" } }),
+      ),
+    );
+
+    renderEditor(work);
+    const input = screen.getByLabelText("DLsite RJ/VJコード");
+    fireEvent.change(input, { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "コードを保存" }));
+
+    await waitFor(() => expect(updateDlsiteState).toHaveBeenCalledTimes(1));
+    expect(updateDlsiteState.mock.calls[0]![0].body).toEqual({
+      sourceRevision: "rev-1",
+      rjCode: "",
+    });
+    expect(input).toHaveValue("");
   });
 
   it("失敗: 適用が例外を投げても生のエラーメッセージを画面に出さない", async () => {
@@ -142,6 +207,36 @@ describe("DlsiteEditor", () => {
       "DLsiteに画像がありません",
     );
     expect(screen.getByText("同一")).toBeInTheDocument();
+  });
+
+  it("カバーがキャッシュに無いとき、カバー行は理由つきで対象外になる", async () => {
+    const work = makeWork();
+    fetchDlsiteInfo.mockReturnValue(buildDlsitePreview({}, "rev-1", { cachedCover: null }));
+
+    renderEditor(work);
+    fireEvent.click(screen.getByRole("button", { name: "取得結果を確認" }));
+    await waitFor(() => expect(screen.getByText("DLsite情報の適用")).toBeInTheDocument());
+
+    expect(screen.getByText("対象外").closest("label")).toHaveAttribute(
+      "title",
+      "画像を取得できていません",
+    );
+  });
+
+  it.each([
+    { name: "同じRJコードの候補がキャッシュにあるとき", rjCode: "RJ501001", refetched: 1 },
+    { name: "同じRJコードの候補がキャッシュに無いとき", rjCode: "RJ999999", refetched: 0 },
+  ])("取得後の候補一覧の取り直し: $name", async ({ rjCode, refetched }) => {
+    fetchDlsiteInfo.mockReturnValue(buildDlsitePreview());
+    const { queryClient } = renderEditor(makeWork());
+    queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, [
+      buildScanCandidate({ path: "候補", rjCode }),
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "取得結果を確認" }));
+    await waitFor(() => expect(screen.getByText("DLsite情報の適用")).toBeInTheDocument());
+
+    expect(api.requestsTo("GET /api/scan/candidates")).toHaveLength(refetched);
   });
 
   it("差分0件: 確認ダイアログを開かず結果をトーストで通知する", async () => {

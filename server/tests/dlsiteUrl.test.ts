@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  buildDlsiteApplyPatch,
   emptyMetaDlsiteState,
   hasDlsiteUrl,
   isDlsiteUrl,
-  type DlsiteApplyBody,
+  planDlsiteApply,
 } from "@mimimilli/shared";
 
 test("isDlsiteUrl: dlsite.com 本体とサブドメインだけを true にする", () => {
@@ -29,7 +28,7 @@ test("hasDlsiteUrl: 別ホストだけの一覧は false", () => {
   );
 });
 
-test("buildDlsiteApplyPatch: dlsite.com を含む別ホストのURLは保持し、DLsite URLを末尾に足す", () => {
+test("planDlsiteApply: dlsite.com を含む別ホストのURLは保持し、DLsite URLを末尾に足す", () => {
   const other = { label: "他", url: "https://notdlsite.com/work/1" };
   const oldDlsite = { label: "DLsite", url: "https://www.dlsite.com/old" };
   const info = {
@@ -42,17 +41,17 @@ test("buildDlsiteApplyPatch: dlsite.com を含む別ホストのURLは保持し�
     coverUrl: null,
     url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900001.html",
   };
-  const body: DlsiteApplyBody = {
+  const plan = planDlsiteApply(
+    {
+      title: "t",
+      tags: [],
+      urls: [other, oldDlsite],
+      hasCover: false,
+      dlsite: emptyMetaDlsiteState(),
+    },
     info,
-    sourceRevision: "r",
-    applyTitle: false,
-    applyTags: [],
-    applyCover: false,
-    applyUrl: true,
-  };
-  const patch = buildDlsiteApplyPatch(
-    { title: "t", tags: [], urls: [other, oldDlsite], dlsite: emptyMetaDlsiteState() },
-    body,
+    { title: false, cover: false, url: true, tags: [] },
+    { coverCached: false },
   );
-  assert.deepEqual(patch.urls, [other, { label: "DLsite", url: info.url }]);
+  assert.deepEqual(plan.urls, [other, { label: "DLsite", url: info.url }]);
 });

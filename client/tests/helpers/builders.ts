@@ -112,6 +112,7 @@ export function buildWorkSourceMutationResult(
 export function buildDlsitePreview(
   info: Partial<DlsitePreview["info"]> = {},
   sourceRevision = "rev-1",
+  extra: Partial<Pick<DlsitePreview, "infoRevision" | "cachedCover">> = {},
 ): DlsitePreview {
   return dlsitePreviewSchema.parse({
     info: {
@@ -125,6 +126,9 @@ export function buildDlsitePreview(
       url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501001.html",
       ...info,
     },
+    infoRevision: 1_700_000_000_000,
+    cachedCover: { key: "a".repeat(64), version: 1_700_000_000_000 },
+    ...extra,
     sourceRevision,
   });
 }

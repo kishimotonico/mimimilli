@@ -314,59 +314,9 @@ function tagPrefixOf(tag: string): string {
   return tag.split("/", 1)[0] ?? "";
 }
 
-/** dlsiteApply（単体適用）のパッチ。cover は非同期I/Oを伴うため呼び出し側が別途解決し、
- *  パッチには含めない。title/tags/urls は未変更なら undefined。 */
-export interface DlsiteApplyPatch {
-  title?: string;
-  tags?: NormalizedTag[];
-  urls?: { label: string; url: string }[];
-  dlsite: MetaDlsiteState;
-}
-
-interface DlsiteApplyCurrent {
-  tags: readonly NormalizedTag[];
-  urls: readonly { label: string; url: string }[];
-  dlsite: MetaDlsiteState;
-}
-
-/** 単体適用の tags/urls/linkage の組み立て。linkage は status: "applied" にする */
-function buildDlsiteTagsUrlsPatch(
-  current: DlsiteApplyCurrent,
-  info: DlsiteWorkInfo,
-  applyTags: readonly NormalizedTag[],
-  applyUrl: boolean,
-): Omit<DlsiteApplyPatch, "title"> {
-  return {
-    tags: applyTags.length > 0 ? mergeAppliedDlsiteTags(current.tags, applyTags) : undefined,
-    urls:
-      applyUrl && info.url
-        ? [
-            ...current.urls.filter((entry) => !isDlsiteUrl(entry.url)),
-            { label: "DLsite", url: info.url },
-          ]
-        : undefined,
-    dlsite: {
-      rjCode: info.rjCode,
-      status: "applied",
-      appliedTags: dedupeTags([...current.dlsite.appliedTags, ...applyTags]),
-    },
-  };
-}
-
 /** タイトルを反映するときに使うDLsiteのタイトル。反映しない・DLsite側が空のときはundefined */
 export function dlsiteTitleToApply(info: DlsiteWorkInfo, applyTitle: boolean): string | undefined {
   return applyTitle && info.title !== "" ? info.title : undefined;
-}
-
-/** dlsiteApply（単体適用）のtitle/tags/urlsパッチを組み立てる。real/fixture 両adapterが共有する。 */
-export function buildDlsiteApplyPatch(
-  current: DlsiteApplyCurrent & { title: string },
-  body: DlsiteApplyBody,
-): DlsiteApplyPatch {
-  return {
-    title: dlsiteTitleToApply(body.info, body.applyTitle),
-    ...buildDlsiteTagsUrlsPatch(current, body.info, body.applyTags, body.applyUrl),
-  };
 }
 
 /** 単体適用（replace）: ユーザーが明示的に選んだタグ（applyTags）を既存タグへ反映する。
@@ -388,12 +338,172 @@ export function mergeAppliedDlsiteTags(
   return dedupeTags([...kept, ...added]);
 }
 
-/** 作品ごとの取得結果確認に使う。sourceRevision は適用時のCASトークン。 */
-export const dlsitePreviewSchema = z.object({
-  info: dlsiteWorkInfoSchema,
-  sourceRevision: z.string().min(1),
+/** 作品詳細の適用で、作品側の現在値 */
+export interface DlsiteWorkCurrent {
+  title: string;
+  tags: readonly NormalizedTag[];
+  urls: readonly { label: string; url: string }[];
+  hasCover: boolean;
+}
+
+export type DlsiteUnavailableReason = "no_title" | "no_url" | "no_cover" | "cover_not_cached";
+
+/** 1項目の差分。fill は作品側が未設定、replace は既存の値を置き換える */
+export type DlsiteValueChange =
+  | { kind: "unchanged"; current: string }
+  | { kind: "fill"; next: string }
+  | { kind: "replace"; current: string; next: string }
+  | { kind: "unavailable"; current: string | null; reason: DlsiteUnavailableReason };
+
+export type DlsiteCoverChange =
+  | { kind: "fill" }
+  | { kind: "replace" }
+  | { kind: "unavailable"; reason: "no_cover" | "cover_not_cached" };
+
+/** 作品に無いDLsiteのタグ1つ。replaces は反映すると外れる既存タグ（単一値prefixの置き換え） */
+export interface DlsiteTagChange {
+  tag: NormalizedTag;
+  replaces: NormalizedTag[];
+}
+
+export interface DlsiteWorkDiff {
+  title: DlsiteValueChange;
+  url: DlsiteValueChange;
+  cover: DlsiteCoverChange;
+  /** 作品に無いDLsiteのタグ（dlsiteInfoTags の順） */
+  tags: DlsiteTagChange[];
+  /** すでに作品に付いているDLsiteのタグ */
+  presentTags: NormalizedTag[];
+  hasChanges: boolean;
+}
+
+function currentDlsiteUrl(urls: readonly { url: string }[]): string | null {
+  return urls.find((entry) => isDlsiteUrl(entry.url))?.url ?? null;
+}
+
+/** 作品詳細の適用の差分。クライアントの確認ダイアログとサーバーの適用が同じ関数を使う */
+export function computeDlsiteWorkDiff(
+  current: DlsiteWorkCurrent,
+  info: DlsiteWorkInfo,
+  availability: { coverCached: boolean },
+): DlsiteWorkDiff {
+  const nextTitle = dlsiteTitleToApply(info, true);
+  const title: DlsiteValueChange =
+    nextTitle === undefined
+      ? { kind: "unavailable", current: current.title, reason: "no_title" }
+      : nextTitle === current.title
+        ? { kind: "unchanged", current: current.title }
+        : { kind: "replace", current: current.title, next: nextTitle };
+
+  const currentUrl = currentDlsiteUrl(current.urls);
+  const url: DlsiteValueChange =
+    info.url === ""
+      ? { kind: "unavailable", current: currentUrl, reason: "no_url" }
+      : currentUrl === null
+        ? { kind: "fill", next: info.url }
+        : currentUrl === info.url
+          ? { kind: "unchanged", current: currentUrl }
+          : { kind: "replace", current: currentUrl, next: info.url };
+
+  const cover: DlsiteCoverChange =
+    info.coverUrl === null
+      ? { kind: "unavailable", reason: "no_cover" }
+      : !availability.coverCached
+        ? { kind: "unavailable", reason: "cover_not_cached" }
+        : current.hasCover
+          ? { kind: "replace" }
+          : { kind: "fill" };
+
+  const existing = new Set<string>(current.tags);
+  const tags: DlsiteTagChange[] = [];
+  const presentTags: NormalizedTag[] = [];
+  for (const tag of dlsiteInfoTags(info)) {
+    if (existing.has(tag)) {
+      presentTags.push(tag);
+      continue;
+    }
+    const prefix = tagPrefixOf(tag);
+    tags.push({
+      tag,
+      replaces: SINGLE_VALUE_DLSITE_PREFIXES.has(prefix)
+        ? current.tags.filter((currentTag) => tagPrefixOf(currentTag) === prefix)
+        : [],
+    });
+  }
+
+  return {
+    title,
+    url,
+    cover,
+    tags,
+    presentTags,
+    hasChanges:
+      title.kind === "replace" ||
+      url.kind === "fill" ||
+      url.kind === "replace" ||
+      cover.kind === "fill" ||
+      cover.kind === "replace" ||
+      tags.length > 0,
+  };
+}
+
+export const dlsiteApplySelectionSchema = z.object({
+  title: z.boolean(),
+  cover: z.boolean(),
+  url: z.boolean(),
+  tags: normalizedTagInputArraySchema,
 });
-export type DlsitePreview = z.infer<typeof dlsitePreviewSchema>;
+export type DlsiteApplySelectionInput = z.input<typeof dlsiteApplySelectionSchema>;
+export type DlsiteApplySelection = z.output<typeof dlsiteApplySelectionSchema>;
+
+/** 確認ダイアログの既定の選択。未設定の項目だけを選び、既存の値を置き換えるものは選ばない */
+export function defaultDlsiteApplySelection(diff: DlsiteWorkDiff): DlsiteApplySelectionInput {
+  return {
+    title: false,
+    cover: diff.cover.kind === "fill",
+    url: diff.url.kind === "fill",
+    tags: diff.tags.filter((change) => change.replaces.length === 0).map((change) => change.tag),
+  };
+}
+
+export interface DlsiteApplyPlan {
+  title?: string;
+  tags?: NormalizedTag[];
+  urls?: { label: string; url: string }[];
+  /** true のときだけ呼び出し側が一時ファイル化したカバーを確定する */
+  applyCover: boolean;
+  dlsite: MetaDlsiteState;
+}
+
+/** 作品詳細の適用でメタに書く内容を決める。選ばれていて差分のある項目だけを書く。real/fixture が共有する */
+export function planDlsiteApply(
+  current: DlsiteWorkCurrent & { dlsite: MetaDlsiteState },
+  info: DlsiteWorkInfo,
+  selection: DlsiteApplySelection,
+  availability: { coverCached: boolean },
+): DlsiteApplyPlan {
+  const diff = computeDlsiteWorkDiff(current, info, availability);
+  const writes = (change: DlsiteValueChange) => change.kind === "fill" || change.kind === "replace";
+  const selectable = new Set<string>(diff.tags.map((change) => change.tag));
+  const applyTags = selection.tags.filter((tag) => selectable.has(tag));
+  return {
+    title: selection.title && diff.title.kind === "replace" ? diff.title.next : undefined,
+    tags: applyTags.length > 0 ? mergeAppliedDlsiteTags(current.tags, applyTags) : undefined,
+    urls:
+      selection.url && writes(diff.url)
+        ? [
+            ...current.urls.filter((entry) => !isDlsiteUrl(entry.url)),
+            { label: "DLsite", url: info.url },
+          ]
+        : undefined,
+    applyCover: selection.cover && (diff.cover.kind === "fill" || diff.cover.kind === "replace"),
+    dlsite: {
+      rjCode: info.rjCode,
+      status: "applied",
+      appliedTags: dedupeTags([...current.dlsite.appliedTags, ...applyTags]),
+    },
+  };
+}
 
 export const dlsiteFetchResultSchema = z.discriminatedUnion("ok", [
   z.object({ ok: z.literal(true), info: dlsiteWorkInfoSchema }),
@@ -405,17 +515,27 @@ export const dlsiteFetchResultSchema = z.discriminatedUnion("ok", [
 ]);
 export type DlsiteFetchResult = z.infer<typeof dlsiteFetchResultSchema>;
 
-export const dlsiteApplyBodySchema = z.object({
+/** 作品ごとの取得結果確認に使う。sourceRevision・infoRevision は適用時のCASトークン。 */
+export const dlsitePreviewSchema = z.object({
   info: dlsiteWorkInfoSchema,
+  /** キャッシュのsnapshotの取得時刻（ms）。確認したDLsite情報の版 */
+  infoRevision: z.number().int().positive(),
+  cachedCover: dlsiteCachedCoverSchema.nullable(),
   sourceRevision: z.string().min(1),
-  applyTitle: z.boolean(),
-  applyTags: normalizedTagInputArraySchema,
-  applyCover: z.boolean(),
-  applyUrl: z.boolean(),
 });
-/** クライアントが送信するリクエストボディ（applyTags は正規化前の生 string[]） */
+export type DlsitePreview = z.infer<typeof dlsitePreviewSchema>;
+
+/** 作品単位の取得（dlsiteFetch）の結果。成功時はキャッシュの版とカバーの有無を持つ */
+export type DlsiteWorkFetchResult =
+  | { ok: true; info: DlsiteWorkInfo; infoRevision: number; cachedCover: DlsiteCachedCover | null }
+  | Extract<DlsiteFetchResult, { ok: false }>;
+
+export const dlsiteApplyBodySchema = z.object({
+  sourceRevision: z.string().min(1),
+  infoRevision: z.number().int().positive(),
+  apply: dlsiteApplySelectionSchema,
+});
 export type DlsiteApplyBodyInput = z.input<typeof dlsiteApplyBodySchema>;
-/** サーバーがパース後に扱う型（applyTags は正規化済み NormalizedTag[]） */
 export type DlsiteApplyBody = z.output<typeof dlsiteApplyBodySchema>;
 
 /** 追加で反映するDLsiteの項目。DLsite情報が使えない作品では無視される */
@@ -473,9 +593,12 @@ export function planDlsiteRegistration(input: {
   };
 }
 
+/** 作品詳細で入力できるRJコード。空文字はコードなしの明示 */
+const dlsiteRjCodeInputSchema = z.union([z.literal(""), rjCodeFormatSchema]);
+
 export const dlsiteStatePatchSchema = z
   .object({
-    rjCode: rjCodeFormatSchema.nullable().optional(),
+    rjCode: dlsiteRjCodeInputSchema.optional(),
     skipped: z.boolean().optional(),
   })
   .refine((patch) => patch.rjCode !== undefined || patch.skipped !== undefined);
@@ -485,7 +608,7 @@ export type DlsiteStatePatch = z.infer<typeof dlsiteStatePatchSchema>;
 export const dlsiteStateUpdateBodySchema = z
   .object({
     sourceRevision: z.string().min(1),
-    rjCode: rjCodeFormatSchema.nullable().optional(),
+    rjCode: dlsiteRjCodeInputSchema.optional(),
     skipped: z.boolean().optional(),
   })
   .refine((patch) => patch.rjCode !== undefined || patch.skipped !== undefined);

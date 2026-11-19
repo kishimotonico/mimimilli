@@ -13,8 +13,8 @@ import {
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import sharp from "sharp";
-import { emptyMetaDlsiteState, META_FILE_NAME, type DlsiteApplyBody } from "@mimimilli/shared";
-import { CoverSaveError, SourceChangedError } from "../../src/errors.ts";
+import { emptyMetaDlsiteState, META_FILE_NAME, type DlsiteApplyBodyInput } from "@mimimilli/shared";
+import { SourceChangedError } from "../../src/errors.ts";
 import { createApp } from "../helpers/testApp.ts";
 import { writeMetaFile } from "../../src/adapters/real/meta.ts";
 import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../../src/adapters/real/dlsiteConfig.ts";
@@ -26,6 +26,7 @@ import {
 } from "../helpers/dlsiteTransport.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { nts } from "../helpers/tag.ts";
+import { fetchDlsiteForWork } from "../helpers/dlsiteApply.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
 import {
   makeSampleLibrary,
@@ -76,18 +77,14 @@ async function setup(t: TestContext, cover?: CoverTransport) {
   const workId = lib.existingWorkId;
   const workDir = (await adapter.getWork(workId))!.physicalPath;
   const rjCode = (await adapter.getWork(workId))!.dlsite.rjCode!;
-  const fetched = await adapter.dlsiteFetchByCode(rjCode);
-  assert.equal(fetched.ok, true);
+  const fetched = await fetchDlsiteForWork(adapter, workId, rjCode);
 
   const applyBody = async () =>
     ({
-      info: (fetched as Extract<typeof fetched, { ok: true }>).info,
-      applyTitle: false,
-      applyTags: [],
-      applyCover: true,
-      applyUrl: true,
       sourceRevision: (await adapter.getWorkEditSnapshot(workId))!.sourceRevision,
-    }) satisfies DlsiteApplyBody;
+      infoRevision: fetched.infoRevision,
+      apply: { title: false, cover: true, url: true, tags: [] },
+    }) satisfies DlsiteApplyBodyInput;
 
   return { adapter, workId, workDir, outside, coverBody, applyBody };
 }
@@ -124,19 +121,24 @@ test("最終名がルート外を指すsymlinkでも、外部ファイルは変�
   assert.deepEqual(coverFilesIn(workDir), ["dlsite_cover.jpg"]);
 });
 
-test("作品フォルダーがルート外を指すsymlinkなら、カバーを書かない", async (t) => {
+test("作品フォルダーがルート外を指すsymlinkなら、ルート外にカバーを書かない", async (t) => {
   const { adapter, workId, workDir, outside, applyBody } = await setup(t);
   const moved = join(outside.path, "moved-work");
   renameSync(workDir, moved);
   symlinkSync(moved, workDir);
 
-  await assert.rejects(async () => adapter.dlsiteApply(workId, await applyBody()), CoverSaveError);
+  const result = await adapter.dlsiteApply(workId, await applyBody());
+  assert.ok(result);
+  assert.equal(result.snapshot.coverImage, null);
   assert.deepEqual(coverFilesIn(moved), []);
 });
 
-test("画像として判定できないキャッシュのカバーは書かない", async (t) => {
+test("画像として判定できないキャッシュのカバーは書かず、ほかの項目は反映する", async (t) => {
   const { adapter, workId, workDir, applyBody } = await setup(t, NOT_AN_IMAGE);
-  await assert.rejects(async () => adapter.dlsiteApply(workId, await applyBody()), CoverSaveError);
+  const result = await adapter.dlsiteApply(workId, await applyBody());
+  assert.ok(result);
+  assert.equal(result.snapshot.coverImage, null);
+  assert.equal(result.snapshot.dlsite.status, "applied");
   assert.deepEqual(coverFilesIn(workDir), []);
 });
 
@@ -245,21 +247,25 @@ test("登録が失敗しても一時ファイルは残らない", async (t) => {
   assert.ok(lstatSync(join(blocked.folder, "dlsite_cover.jpg")).isDirectory());
 });
 
-test("カバーがキャッシュに無いとき、登録はカバーなしで成功し、適用は取り直さず502 errorになる", async (t) => {
+test("カバーがキャッシュに無いとき、登録も適用もカバーなしで成功し、適用はほかの項目を反映する", async (t) => {
   const { folder, register } = await setupRegistration(t, "fail");
   const res = await register();
   assert.equal(res.status, 201);
   assert.equal((await res.json()).snapshot.coverImage, null);
   assert.deepEqual(coverFilesIn(folder), []);
 
-  const { adapter, workId, applyBody } = await setup(t, "fail");
+  const { adapter, workId, workDir, applyBody } = await setup(t, "fail");
   const apply = await createApp(adapter).request(`/api/dlsite/${workId}/apply`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(await applyBody()),
   });
-  assert.equal(apply.status, 502);
-  assert.equal((await apply.json()).error.code, "error");
+  assert.equal(apply.status, 200);
+  const { snapshot } = await apply.json();
+  assert.equal(snapshot.coverImage, null);
+  assert.equal(snapshot.dlsite.status, "applied");
+  assert.equal(snapshot.urls.length, 1);
+  assert.deepEqual(coverFilesIn(workDir), []);
 });
 
 const canDenyWrites = process.platform !== "win32" && process.getuid?.() !== 0;

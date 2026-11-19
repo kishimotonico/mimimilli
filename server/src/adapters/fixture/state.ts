@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import { DEFAULT_TAG_PREFIXES, projectDlsiteState, toDlsiteLinkageStatus } from "@mimimilli/shared";
 import type {
-  DlsiteRegistrationPlan,
   DlsiteWorkInfo,
   DataIntegrityWarning,
   DlsiteCacheResolution,
@@ -176,29 +175,35 @@ export function fixtureDlsiteResolutionHead(
   };
 }
 
-/** realのreadUsableDlsiteInfoと同じ判断。TTL内で取得済みのときだけ情報を返す */
-export function fixtureUsableDlsiteInfo(
+/** realのreadUsableDlsiteと同じ判断。TTL内で取得済みのときだけ情報と版を返す */
+export function fixtureUsableDlsite(
   state: FixtureState,
   rjCode: string,
-): DlsiteWorkInfo | null {
+): { info: DlsiteWorkInfo; revision: number } | null {
   if (fixtureDlsiteResolutionHead(state, rjCode).kind !== "html") return null;
-  return state.dlsiteFetched.get(normalizeDlsiteCacheKey(rjCode))?.info ?? null;
+  const fetched = state.dlsiteFetched.get(normalizeDlsiteCacheKey(rjCode));
+  return fetched ? { info: fetched.info, revision: fetched.fetchedAt } : null;
 }
 
 export function fixtureDlsiteCoverKey(coverUrl: string): string {
   return createHash("sha256").update(coverUrl).digest("hex");
 }
 
-/** 追加のカバー。カバーキャッシュにあるときだけ反映する（DLsiteへは取りに行かない） */
-export function applyFixtureRegistrationCover(
+/** カバーキャッシュにあるか。DLsiteへは取りに行かない */
+export function fixtureDlsiteCoverCached(state: FixtureState, coverUrl: string | null): boolean {
+  return coverUrl !== null && state.dlsiteCovers.has(fixtureDlsiteCoverKey(coverUrl));
+}
+
+/** キャッシュ済みのカバーを作品のカバーにする。キャッシュに無ければ何もしない */
+export function applyFixtureCachedCover(
   state: FixtureState,
   work: FixtureWorkRecord,
-  plan: DlsiteRegistrationPlan,
+  coverUrl: string | null,
 ): void {
-  if (!plan.coverUrl || !state.dlsiteCovers.has(fixtureDlsiteCoverKey(plan.coverUrl))) return;
+  if (coverUrl === null || !fixtureDlsiteCoverCached(state, coverUrl)) return;
   const columns: FixtureCoverColumns = {
-    image: plan.coverUrl,
-    dimensions: { width: 900, height: 900 },
+    image: coverUrl,
+    dimensions: work.cover?.dimensions ?? { width: 900, height: 900 },
   };
   state.coverColumns.set(work.id, columns);
   work.cover = fixtureCoverFromColumns(work, columns);

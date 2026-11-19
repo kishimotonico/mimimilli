@@ -14,7 +14,7 @@ import { SCAN_QUERY_KEYS } from "../../src/entities/scan/queryKeys";
 import {
   updateCachesAfterBookmark,
   updateCachesAfterDlsiteLinkageChange,
-  updateCachesAfterDlsitePreviewFetch,
+  updateCachesAfterDlsiteFetch,
   updateCachesAfterIdentityReassign,
   updateCachesAfterLibraryScan,
   updateCachesAfterMissingUnregistration,
@@ -274,10 +274,18 @@ describe("DLsite の必須更新", () => {
     expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(["detail1", ...LIBRARY_VIEWS]));
   });
 
-  it("情報の取得は対象の詳細だけを無効化し、source は残す", async () => {
+  it("情報の取得は同じRJコードの詳細と一覧系を無効化し、別コードの詳細と source は残す", async () => {
     const queryClient = seededClient();
+    queryClient.setQueryData(
+      KEYS.detail1,
+      makeWork({ dlsite: { ...emptyDlsiteState(), rjCode: "RJ000001" } }),
+    );
+    queryClient.setQueryData(
+      KEYS.detail2,
+      makeWork({ id: "w2", dlsite: { ...emptyDlsiteState(), rjCode: "RJ000002" } }),
+    );
 
-    await updateCachesAfterDlsitePreviewFetch(queryClient, "w1");
+    await updateCachesAfterDlsiteFetch(queryClient, ["rj000001"]);
 
     expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(["detail1", ...LIBRARY_VIEWS]));
   });

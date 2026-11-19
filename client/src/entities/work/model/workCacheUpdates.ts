@@ -161,17 +161,6 @@ export function updateCachesAfterDlsiteLinkageChange(
   return updateCachesAfterSourceMutation(queryClient, result);
 }
 
-/** DLsite 情報の取得後。失敗時も取得キャッシュが変わるため成否を問わず呼ぶ */
-export async function updateCachesAfterDlsitePreviewFetch(
-  queryClient: QueryClient,
-  workId: string,
-): Promise<void> {
-  await Promise.all([
-    invalidateWorkDetail(queryClient, workId),
-    invalidateLibraryViews(queryClient),
-  ]);
-}
-
 function isWorkDetailQuery(query: Query): boolean {
   const key = query.queryKey;
   return key[0] === WORK_QUERY_KEYS.allDetails()[0] && key.length === 2;

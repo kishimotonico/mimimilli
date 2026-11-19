@@ -1,10 +1,10 @@
-import { basename } from "node:path";
 import {
-  detectRjCode,
+  hasRjCode,
   dlsiteProductFetchOutcomeOfResult,
   errorMessage,
   type DlsiteFetchResult,
   type DlsiteProductFetchOutcome,
+  type DlsiteWorkFetchResult,
 } from "@mimimilli/shared";
 import { DlsiteCache } from "./dlsiteCache.ts";
 import type { DlsiteCacheOptions } from "./dlsiteCache.ts";
@@ -19,6 +19,7 @@ import { getWorkFromCatalog } from "./workRefresh.ts";
 import { createDlsiteFetch } from "./dlsiteFetch.ts";
 import { cachedCoverOf } from "./scanCandidateDlsite.ts";
 import { createDlsiteApply } from "./dlsiteApply.ts";
+import { createDlsiteProductResolver, readUsableDlsite } from "./dlsiteProductResolve.ts";
 import { sniffImageContentType } from "./dlsiteCoverStaging.ts";
 import {
   refreshWorkDlsiteProjection,
@@ -39,10 +40,12 @@ export function createDlsiteMethods(deps: {
 }) {
   const { query, catalog, dlsiteCache } = deps;
   const fetch = createDlsiteFetch(deps);
+  const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache);
   const apply = createDlsiteApply({
     catalog,
     scanner: deps.scanner,
     dlsiteCache,
+    resolve: resolveDlsiteProduct,
     requireRoot: deps.requireRoot,
   });
   const fetchTimeoutMs = deps.dlsiteRequestConfig.timeoutMs;
@@ -99,15 +102,35 @@ export function createDlsiteMethods(deps: {
       workId: string,
       force = false,
       options?: { signal?: AbortSignal },
-    ): Promise<DlsiteFetchResult> {
+    ): Promise<DlsiteWorkFetchResult> {
       const work = getWorkFromCatalog(query, workId);
       if (!work)
         return { ok: false, kind: "not_found", message: `作品が見つかりません: ${workId}` };
-      const rjCode = work.dlsite.rjCode ?? detectRjCode([basename(work.physicalPath), work.title]);
-      if (!rjCode) {
+      if (!hasRjCode(work.dlsite)) {
         return { ok: false, kind: "not_found", message: "RJコードが検出されていません" };
       }
-      return fetchProduct(rjCode, force, { signal: options?.signal, synchronous: true });
+      const rjCode = work.dlsite.rjCode;
+      const result = await fetchProduct(rjCode, force, {
+        signal: options?.signal,
+        synchronous: true,
+      });
+      if (!result.ok) return result;
+      const usable = readUsableDlsite(resolveDlsiteProduct, rjCode);
+      if (!usable) {
+        return {
+          ok: false,
+          kind: "error",
+          message: `DLsite情報を読み出せませんでした（${rjCode}）`,
+        };
+      }
+      return {
+        ok: true,
+        info: usable.info,
+        infoRevision: usable.revision,
+        cachedCover: cachedCoverOf(usable.info.coverUrl, (key) =>
+          dlsiteCache.coverVersionByKey(key),
+        ),
+      };
     },
 
     async dlsiteFetchByCode(

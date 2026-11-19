@@ -42,6 +42,7 @@ import { nts } from "../helpers/tag.ts";
 import { makeSampleLibrary, makeTestDirectory } from "../helpers/sampleLibrary.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
 import { fetchDlsiteOfWorks } from "../helpers/dlsiteFetch.ts";
+import { applyFetchedDlsite, fetchDlsiteForWork } from "../helpers/dlsiteApply.ts";
 
 const FAST_DLSITE_REQUEST_CONFIG = {
   ...DEFAULT_DLSITE_REQUEST_CONFIG,
@@ -375,6 +376,11 @@ test("dlsiteStatePatchSchema: RJ/VJコードの手動入力を受け付け、そ
   assert.equal(vj.success, true);
   if (vj.success) assert.equal(vj.data.rjCode, "VJ014780");
 
+  const none = dlsiteStatePatchSchema.safeParse({ rjCode: "" });
+  assert.equal(none.success, true);
+  if (none.success) assert.equal(none.data.rjCode, "");
+  assert.equal(dlsiteStatePatchSchema.safeParse({ rjCode: null }).success, false);
+
   const tooShort = dlsiteStatePatchSchema.safeParse({ rjCode: "VJ123" });
   assert.equal(tooShort.success, false);
 
@@ -413,27 +419,33 @@ test("mergeAppliedDlsiteTags: 単一値prefix（サークル・rating）は既�
 test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  const adapter = lib.own(
+    createTestRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) =>
+          htmlResponse(
+            sampleWorkHtml(code, {
+              title: "DLsite から取得したタイトル",
+              circle: "夜想曲",
+              cvs: ["水瀬なずな"],
+              genres: ["耳かき", "睡眠"],
+              cover: false,
+            }),
+          ),
+      }),
+    }),
+  );
   await configureRoot(adapter, lib.root);
   await adapter.scan();
 
-  const info: DlsiteWorkInfo = {
-    rjCode: "RJ900002",
-    title: "DLsite から取得したタイトル",
-    circle: "夜想曲",
-    cvs: ["水瀬なずな"],
-    genreTags: ["耳かき", "睡眠"],
-    ageRating: null,
-    coverUrl: null,
-    url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
-  };
-  const ok = await adapter.dlsiteApply(lib.existingWorkId, {
-    info,
-    applyTitle: true,
-    applyTags: nts(["サークル/夜想曲", "cv/水瀬なずな", "genre/耳かき", "genre/睡眠"]),
-    applyCover: false,
-    applyUrl: true,
-    sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
+  const fetched = await fetchDlsiteForWork(adapter, lib.existingWorkId, "RJ900002");
+  const info = fetched.info;
+  const ok = await applyFetchedDlsite(adapter, lib.existingWorkId, fetched, {
+    title: true,
+    tags: nts(["サークル/夜想曲", "cv/水瀬なずな", "genre/耳かき", "genre/睡眠"]),
+    url: true,
   });
   assert.ok(ok);
 
@@ -1113,47 +1125,6 @@ test("DLsite HTMLキャッシュ: 相乗り中の後着abortはその呼び出�
   assert.equal((await promiseA).ok, true);
 });
 
-test("dlsiteApply: abort済みsignalではDB・メタを更新しない", async (t) => {
-  const lib = makeSampleLibrary();
-  t.after(lib.cleanup);
-  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await configureRoot(adapter, lib.root);
-  await adapter.scan();
-  const before = await adapter.getWork(lib.existingWorkId);
-  const metaPath = join(before!.physicalPath, "mimimilli.json");
-  const controller = new AbortController();
-  controller.abort();
-  const info: DlsiteWorkInfo = {
-    rjCode: "RJ900002",
-    title: "abort後に適用されないタイトル",
-    circle: null,
-    cvs: [],
-    genreTags: [],
-    ageRating: null,
-    coverUrl: null,
-    url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
-  };
-  await assert.rejects(
-    adapter.dlsiteApply(
-      lib.existingWorkId,
-      {
-        info,
-        applyTitle: true,
-        applyTags: [],
-        applyCover: false,
-        applyUrl: true,
-        sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
-      },
-      { signal: controller.signal },
-    ),
-    (error: unknown) => error instanceof DOMException && error.name === "AbortError",
-  );
-  const after = await adapter.getWork(lib.existingWorkId);
-  assert.equal(after?.title, before?.title);
-  const meta = JSON.parse(readFileSync(metaPath, "utf-8")) as { title: string };
-  assert.equal(meta.title, before?.title);
-});
-
 test("DLsite取得: 2回目はHTML cache hitでHTTPしない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-bulk-html-cache");
@@ -1269,21 +1240,11 @@ test("DLsiteカバー: キャッシュから各作品フォルダーへコピー
   const first = makeAdapter();
   await configureRoot(first, lib.root);
   await first.scan();
-  const fetched = await first.dlsiteFetchByCode("RJ900002");
-  assert.equal(fetched.ok, true);
-  const info = (fetched as Extract<typeof fetched, { ok: true }>).info;
+  const fetched = await fetchDlsiteForWork(first, lib.existingWorkId, "RJ900002");
   assert.equal(coverHttpCalls, 1);
   assert.ok(
-    (
-      await first.dlsiteApply(lib.existingWorkId, {
-        info,
-        applyTitle: false,
-        applyTags: [],
-        applyCover: true,
-        applyUrl: true,
-        sourceRevision: (await first.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
-      })
-    )?.snapshot,
+    (await applyFetchedDlsite(first, lib.existingWorkId, fetched, { cover: true, url: true }))
+      ?.snapshot,
   );
   const applied = await first.getWork(lib.existingWorkId);
   assert.ok(applied?.cover);
@@ -1299,14 +1260,9 @@ test("DLsiteカバー: キャッシュから各作品フォルダーへコピー
   await reregistered.scan();
   assert.ok(
     (
-      await reregistered.dlsiteApply(lib.existingWorkId, {
-        info,
-        applyTitle: false,
-        applyTags: [],
-        applyCover: true,
-        applyUrl: true,
-        sourceRevision: (await reregistered.getWorkEditSnapshot(lib.existingWorkId))!
-          .sourceRevision,
+      await applyFetchedDlsite(reregistered, lib.existingWorkId, fetched, {
+        cover: true,
+        url: true,
       })
     )?.snapshot,
   );
@@ -1507,9 +1463,6 @@ test("DLsiteカバー: 先取りしたカバーを2作品へ同時適用して�
   );
   await configureRoot(adapter, lib.root);
   await adapter.scan();
-  const prefetched = await adapter.dlsiteFetchByCode("RJ900002");
-  assert.equal(prefetched.ok, true);
-  assert.equal(coverCalls, 1);
   const workAId = lib.existingWorkId;
   const registration = await adapter.registerScanCandidates(
     (await adapter.listScanCandidates()).map((candidate) => candidate.path),
@@ -1518,38 +1471,17 @@ test("DLsiteカバー: 先取りしたカバーを2作品へ同時適用して�
   const registeredWorkBId = registration.registered[0]?.workId;
   assert.ok(registeredWorkBId);
   const workBId = registeredWorkBId;
-  const coverUrl = (prefetched as Extract<typeof prefetched, { ok: true }>).info.coverUrl!;
-  const infoFor = (rjCode: string): DlsiteWorkInfo => ({
-    rjCode,
-    title: "x",
-    circle: null,
-    cvs: [],
-    genreTags: [],
-    ageRating: null,
-    coverUrl,
-    url: `https://www.dlsite.com/maniax/work/=/product_id/${rjCode}.html`,
-  });
+  const fetchedA = await fetchDlsiteForWork(adapter, workAId, "RJ900002");
+  const fetchedB = await fetchDlsiteForWork(adapter, workBId, "RJ900001");
+  const coverCallsBeforeApply = coverCalls;
+  assert.ok(coverCallsBeforeApply > 0);
   const [okA, okB] = await Promise.all([
-    adapter.dlsiteApply(workAId, {
-      info: infoFor("RJ900002"),
-      applyTitle: false,
-      applyTags: [],
-      applyCover: true,
-      applyUrl: true,
-      sourceRevision: (await adapter.getWorkEditSnapshot(workAId))!.sourceRevision,
-    }),
-    adapter.dlsiteApply(workBId, {
-      info: infoFor("RJ900001"),
-      applyTitle: false,
-      applyTags: [],
-      applyCover: true,
-      applyUrl: true,
-      sourceRevision: (await adapter.getWorkEditSnapshot(workBId))!.sourceRevision,
-    }),
+    applyFetchedDlsite(adapter, workAId, fetchedA, { cover: true, url: true }),
+    applyFetchedDlsite(adapter, workBId, fetchedB, { cover: true, url: true }),
   ]);
   assert.ok(okA?.snapshot);
   assert.ok(okB?.snapshot);
-  assert.equal(coverCalls, 1);
+  assert.equal(coverCalls, coverCallsBeforeApply);
   const workA = await adapter.getWork(workAId);
   const workB = await adapter.getWork(workBId);
   assert.ok(workA?.cover);
@@ -1700,16 +1632,11 @@ test("DLsite apply: カバーはキャッシュから読み、適用でHTTPし�
   );
   await configureRoot(adapter, lib.root);
   await adapter.scan();
-  const fetched = await adapter.dlsiteFetchByCode("RJ900002");
-  assert.equal(fetched.ok, true);
+  const fetched = await fetchDlsiteForWork(adapter, lib.existingWorkId, "RJ900002");
   assert.equal(coverCalls, 1);
-  const ok = await adapter.dlsiteApply(lib.existingWorkId, {
-    info: (fetched as Extract<typeof fetched, { ok: true }>).info,
-    applyTitle: false,
-    applyTags: [],
-    applyCover: true,
-    applyUrl: true,
-    sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
+  const ok = await applyFetchedDlsite(adapter, lib.existingWorkId, fetched, {
+    cover: true,
+    url: true,
   });
   assert.ok(ok);
   assert.equal(coverCalls, 1);
@@ -1965,27 +1892,25 @@ test("dlsiteFetch: abortでDLsite HTTP取得が中断される", async (t) => {
 test("DLsite適用後は作品のdlsite.statusがappliedになる", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  const adapter = lib.own(
+    createTestRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) =>
+          htmlResponse(sampleWorkHtml(code, { title: "適用タイトル", genres: ["耳かき"] })),
+      }),
+    }),
+  );
   await configureRoot(adapter, lib.root);
   await adapter.scan();
   const work = await adapter.getWork(lib.existingWorkId);
   assert.equal(work?.dlsite.status, "none");
-  const ok = await adapter.dlsiteApply(lib.existingWorkId, {
-    info: {
-      rjCode: "RJ900002",
-      title: "適用タイトル",
-      circle: "夜想曲",
-      cvs: ["水瀬なずな"],
-      genreTags: ["耳かき"],
-      ageRating: null,
-      coverUrl: null,
-      url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
-    },
-    applyTitle: true,
-    applyTags: nts(["genre/耳かき"]),
-    applyCover: false,
-    applyUrl: true,
-    sourceRevision: (await adapter.getWorkEditSnapshot(work!.id))!.sourceRevision,
+  const fetched = await fetchDlsiteForWork(adapter, lib.existingWorkId, "RJ900002");
+  const ok = await applyFetchedDlsite(adapter, lib.existingWorkId, fetched, {
+    title: true,
+    tags: nts(["genre/耳かき"]),
+    url: true,
   });
   assert.ok(ok);
   assert.equal((await adapter.getWork(lib.existingWorkId))?.dlsite.status, "applied");

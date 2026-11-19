@@ -38,7 +38,7 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 
 作品への反映経路は2つある。取得ジョブは反映せず、取得結果とカバーをキャッシュへ記録するだけ（後述）。
 
-**手動プレビュー→適用**: `POST /dlsite/:id/fetch` で取得結果をプレビューし、ユーザーが選んだ項目だけを `POST /dlsite/:id/apply`（`DlsiteApplyBody`）で反映する。タイトル・タグ・カバーそれぞれに適用可否のフラグがあり、ユーザーが個別に選べる。
+**作品詳細の取得→差分確認→適用**: `POST /dlsite/:id/fetch` で作品の正本にあるRJコードを取得し、応答の `info`・`cachedCover`・`infoRevision`（キャッシュのsnapshotの取得時刻）・`sourceRevision`（作品の版）から、クライアントが `computeDlsiteWorkDiff`（`shared/src/dlsite.ts`）で差分を作って確認ダイアログに出す。既定の選択（`defaultDlsiteApplySelection`）は未設定の項目だけで、既存の値を置き換えるタグ（サークル・rating）は外れ、置き換えられる既存タグが行に出る。ユーザーが選んだ項目は `POST /dlsite/:id/apply`（`{ sourceRevision, infoRevision, apply: { title, cover, url, tags } }`）で反映する。サーバーは `info` を受け取らず、正本のRJコードでキャッシュを読み直し、`planDlsiteApply`（同じ差分計算を使う）で書く内容を決める。タイトルを使う条件は候補の追加と同じ `dlsiteTitleToApply`。キャッシュが使えない（TTL切れ・失敗・解析失敗）、または `infoRevision` が取得時と違うときは409 `dlsite_refetch_required` で、再取得を促す。`sourceRevision` が違うときは409 `source_changed`。`apply.tags` のうちDLsiteのタグでないものは無視する。カバーはカバーキャッシュ（`stageCachedDlsiteCover`）にあるときだけ反映し、無ければカバーだけ外して続行する。適用の処理はDLsiteへHTTPを出さない。
 
 **追加（候補の追加・Filesの作品登録）**: 未登録の候補は `POST /scan/candidates/register`（候補のパスと反映項目のフラグ。1リクエストの上限は `SCAN_CANDIDATE_REGISTER_MAX_PATHS`、クライアントが分割して送る）、Filesは `POST /works`（rjCode・title・tags・applyCover・applyUrl）で追加する。どちらもクライアントからDLsiteの取得結果は受け取らず、サーバーがRJコード（候補は候補一覧の値、Filesは入力）でキャッシュを引く。使うのはTTL内でoutcomeが `ok` のsnapshotを解析できたときだけで、TTL切れ・キャッシュに無い・該当なし・失敗・`parse_error`・RJコードなしはDLsite情報なしとしてフォルダー名・入力のまま追加する。組み立ては `planDlsiteRegistration`（`shared/src/dlsite.ts`）を2つのアダプタと2入口が共有し、`appliedTags` は「DLsiteのタグ」と「最終的なタグ」の共通部分になる。カバーはカバーキャッシュ（`stageCachedDlsiteCover`）だけから作品フォルダーへ置き、キャッシュに無ければカバーだけ反映せず続行する。追加の処理はDLsiteへHTTPを出さない。
 
@@ -206,9 +206,9 @@ importはHTML snapshotを成功記録として書き直すため、取り込ん�
 
 `server/src/routes/dlsite.ts` に実装がある。進捗SSEの契約は [ADR-0030](adr/0030-job-progress-sse-current-state.md)。
 
-- `POST /dlsite/:id/fetch` — 1作品分の取得プレビュー。`?force=true` でキャッシュを無視
-- `POST /dlsite/:id/apply` — プレビュー結果のうち選択した項目を適用
-- `PATCH /dlsite/:id` — RJコードの手動設定、または `skipped` の切り替え
+- `POST /dlsite/:id/fetch` — 1作品分の取得プレビュー（`info`・`infoRevision`・`cachedCover`・`sourceRevision`）。`?force=true` でキャッシュを無視
+- `POST /dlsite/:id/apply` — 取得したDLsite情報のうち選択した項目を、キャッシュから読んで適用。`dlsite_refetch_required`（409）は再取得を促す
+- `PATCH /dlsite/:id` — RJコードの手動設定（空文字は「コードなし」の明示、`null` は受け付けない）、または `skipped` の切り替え
 - `POST /dlsite/jobs` — 取得ジョブを開始し、202 `{ jobId }` を返す。実行中ジョブがあればそのキューへ合流し、そのジョブIDを返す。body は `{ origin: "bulk", productCodes }`（1〜1000件）か `{ origin: "single", productCode }`（失敗の記録を無視して取り直す）。オフライン設定では `offline`、サーバーの終了処理中は409（`conflict`）で拒否する
 - `GET /dlsite/jobs/current` — 常に200で `{ job }`。`job` は `jobId`・`status`（`running` / `finished`）・コードごとの `origin` と `state`（`queued` / `fetching` / `fetched` / `not_found` / `failed`）・まとめての進捗 `bulk`。終了したジョブは次のジョブ開始まで残る。無ければ `null`
 - `DELETE /dlsite/jobs/:jobId/bulk` — 起点がまとめてで待機中のコードをキューから外し `{ removed }` を返す。IDが現在のジョブと違う・対象なしは `removed: 0`

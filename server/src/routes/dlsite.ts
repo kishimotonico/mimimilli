@@ -6,13 +6,13 @@ import {
   dlsiteJobCurrentResponseSchema,
   dlsiteJobStartBodySchema,
   dlsiteJobStartResponseSchema,
+  dlsitePreviewSchema,
   type DlsiteJobEvent,
   dlsiteFetchByCodeBodySchema,
   dlsiteFetchByCodeResponseSchema,
   dlsiteStateUpdateBodySchema,
   workSourceMutationResultSchema,
 } from "@mimimilli/shared";
-import { DlsiteOfflineError } from "../errors.ts";
 import type { DataAdapter } from "../adapter/index.ts";
 import { apiError, invalidRequest, notFound, throwSourceCommandError } from "../lib/httpError.ts";
 import { readJsonBody } from "../lib/jsonBody.ts";
@@ -79,7 +79,14 @@ export function dlsiteRoute(
       try {
         const snapshot = await adapter.getWorkEditSnapshot(workId);
         if (!snapshot) notFound(`作品が見つかりません: ${workId}`);
-        return c.json({ info: result.info, sourceRevision: snapshot.sourceRevision });
+        return c.json(
+          dlsitePreviewSchema.parse({
+            info: result.info,
+            infoRevision: result.infoRevision,
+            cachedCover: result.cachedCover,
+            sourceRevision: snapshot.sourceRevision,
+          }),
+        );
       } catch (error) {
         throwSourceCommandError(error);
       }
@@ -97,13 +104,8 @@ export function dlsiteRoute(
     const workId = c.req.param("id");
     let result;
     try {
-      result = await adapter.dlsiteApply(workId, data, { signal: c.req.raw.signal });
+      result = await adapter.dlsiteApply(workId, data);
     } catch (error) {
-      if (isClientAbort(error)) {
-        dlsiteLogger.info("クライアント切断によりDLsite適用を中断しました", { workId });
-        return;
-      }
-      if (error instanceof DlsiteOfflineError) throw apiError("offline", error.message);
       throwSourceCommandError(error);
     }
     if (!result) notFound(`作品が見つかりません: ${workId}`);

@@ -27,10 +27,10 @@ import { checkWorkPlacement } from "./playback.ts";
 import { FIXTURE_UNREADABLE_ROOT } from "./scenarios.ts";
 import {
   dlsiteLinkageOf,
-  applyFixtureRegistrationCover,
+  applyFixtureCachedCover,
   fixtureDlsiteCoverKey,
   fixtureDlsiteResolutionHead,
-  fixtureUsableDlsiteInfo,
+  fixtureUsableDlsite,
   requireFixtureRoot,
   setDlsiteLinkage,
   type FixtureState,
@@ -257,7 +257,7 @@ export function createSettingsScanMethods(
           : candidate.detectedRjCode;
         const plan = planDlsiteRegistration({
           rjCode,
-          info: rjCode ? fixtureUsableDlsiteInfo(state, rjCode) : null,
+          info: rjCode ? (fixtureUsableDlsite(state, rjCode)?.info ?? null) : null,
           title: candidate.inferredTitle,
           tags: [],
           apply,
@@ -279,7 +279,7 @@ export function createSettingsScanMethods(
           bookmarked: false,
           lastPlayedAt: null,
         };
-        applyFixtureRegistrationCover(state, work, plan);
+        applyFixtureCachedCover(state, work, plan.coverUrl);
         state.works.push(work);
         setDlsiteLinkage(state, work.id, plan.dlsite);
         return [{ path: candidate.path, workId: work.id }];

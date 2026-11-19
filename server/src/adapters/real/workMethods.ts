@@ -22,7 +22,7 @@ import type {
 import { errorMessage, resolveWorkPlacement, tagEquals } from "@mimimilli/shared";
 import { type Db } from "./db.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
-import { createDlsiteProductResolver, readUsableDlsiteInfo } from "./dlsiteProductResolve.ts";
+import { createDlsiteProductResolver, readUsableDlsite } from "./dlsiteProductResolve.ts";
 import { MetaMutationReject, encodeMetaRaw, patchMetaFileCas, readMetaSource } from "./meta.ts";
 import {
   SOURCE_IDENTITY_MISMATCH_MESSAGE,
@@ -67,7 +67,7 @@ export function createWorkMethods(deps: {
   const { db, query, catalog, user, scanner, requireRoot, dlsiteCache } = deps;
   const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache);
   const readUsableInfo = (productCode: string) =>
-    readUsableDlsiteInfo(resolveDlsiteProduct, productCode);
+    readUsableDlsite(resolveDlsiteProduct, productCode)?.info ?? null;
 
   function recordIdentityConflict(workId: string, ownerMetaPath: string, conflictMetaPath: string) {
     const root = requireRoot();

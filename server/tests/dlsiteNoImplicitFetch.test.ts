@@ -1,20 +1,26 @@
 // スキャン完了・候補登録・作品登録・root再設定のどれもDLsiteへ通信せず、取得ジョブも作らないことを縛る（ADR-0033）。
 // 通信回数はrealアダプタのスケジューラのtransportで数える。
 import assert from "node:assert/strict";
-import { cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { workspacePath } from "@mimimilli/shared";
 import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../src/adapters/real/dlsiteConfig.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { configureRoot } from "./helpers/rootFolder.ts";
-import { htmlResponse, mockDlsiteTransport, sampleWorkHtml } from "./helpers/dlsiteTransport.ts";
+import {
+  htmlResponse,
+  jpegResponse,
+  mockDlsiteTransport,
+  sampleWorkHtml,
+} from "./helpers/dlsiteTransport.ts";
 import { NO_DLSITE } from "./helpers/scanLibrary.ts";
 import { pollUntil } from "./helpers/poll.ts";
 import { createTestRealAdapter } from "./helpers/realAdapter.ts";
-import { makeTestDirectory, writeWav } from "./helpers/sampleLibrary.ts";
+import { makeTestDirectory, SAMPLE_COVER_JPEG_BASE64, writeWav } from "./helpers/sampleLibrary.ts";
 import { createApp } from "./helpers/testApp.ts";
 
+const SAMPLE_COVER = new Uint8Array(Buffer.from(SAMPLE_COVER_JPEG_BASE64, "base64"));
 const OWNER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const PLAYLIST_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const TRACK_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -165,4 +171,94 @@ test("スキャン完了・root再設定でDLsite取得ジョブが作られな�
       (await (await app.request("/api/root-reconfiguration")).json()).status !== "running",
   );
   await assertNoDlsiteJob(app);
+});
+
+async function setupApplyAdapter(
+  t: { after: (fn: () => void) => void },
+  options: { coverFails?: boolean; clock?: () => number } = {},
+) {
+  const directory = makeTestDirectory("dlsite-apply-no-http");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  writeMetaWork(join(root, "owned"));
+  const calls = { html: 0, cover: 0 };
+  const adapter = directory.own(
+    createTestRealAdapter({
+      database: { kind: "memory" },
+      dlsiteCache: { path: join(directory.path, "cache.sqlite"), clock: options.clock },
+      dlsiteRequestConfig: {
+        ...DEFAULT_DLSITE_REQUEST_CONFIG,
+        requestIntervalMs: 0,
+        retryCount: 0,
+        timeoutMs: 1_000,
+      },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => {
+          calls.html += 1;
+          return htmlResponse(sampleWorkHtml(code, { title: "キャッシュのタイトル" }));
+        },
+        cover: () => {
+          calls.cover += 1;
+          return options.coverFails
+            ? new Response("error", { status: 500 })
+            : jpegResponse(SAMPLE_COVER);
+        },
+      }),
+    }),
+  );
+  const app = createApp(adapter);
+  await configureRoot(adapter, root);
+  await scanToCompletion(app);
+  return { app, adapter, calls, root };
+}
+
+async function fetchThenApplyBody(app: ReturnType<typeof createApp>) {
+  const fetched = await (await post(app, `/api/dlsite/${OWNER_ID}/fetch`)).json();
+  return {
+    sourceRevision: fetched.sourceRevision,
+    infoRevision: fetched.infoRevision,
+    apply: { title: true, cover: true, url: true, tags: [] },
+  };
+}
+
+test("作品詳細の適用はキャッシュから読み、DLsiteへ通信しない（real）", async (t) => {
+  const { app, calls } = await setupApplyAdapter(t);
+  const body = await fetchThenApplyBody(app);
+  const callsAfterFetch = { ...calls };
+  assert.ok(callsAfterFetch.html > 0 && callsAfterFetch.cover > 0);
+
+  const applied = await post(app, `/api/dlsite/${OWNER_ID}/apply`, body);
+  assert.equal(applied.status, 200);
+  const { snapshot } = await applied.json();
+  assert.equal(snapshot.title, "キャッシュのタイトル");
+  assert.equal(snapshot.coverImage, "dlsite_cover.jpg");
+  assert.deepEqual(calls, callsAfterFetch);
+});
+
+test("カバーの先取りに失敗していても適用は成功し、カバー以外を反映して通信しない（real）", async (t) => {
+  const { app, calls, root } = await setupApplyAdapter(t, { coverFails: true });
+  const body = await fetchThenApplyBody(app);
+  const callsAfterFetch = { ...calls };
+
+  const applied = await post(app, `/api/dlsite/${OWNER_ID}/apply`, body);
+  assert.equal(applied.status, 200);
+  const { snapshot } = await applied.json();
+  assert.equal(snapshot.title, "キャッシュのタイトル");
+  assert.equal(snapshot.coverImage, null);
+  assert.equal(snapshot.urls.length, 1);
+  assert.equal(existsSync(join(root, "owned", "dlsite_cover.jpg")), false);
+  assert.deepEqual(calls, callsAfterFetch);
+});
+
+test("キャッシュのTTLが切れた適用は409 dlsite_refetch_requiredで、通信しない（real）", async (t) => {
+  let now = Date.now();
+  const { app, calls } = await setupApplyAdapter(t, { clock: () => now });
+  const body = await fetchThenApplyBody(app);
+  const callsAfterFetch = { ...calls };
+  now += 365 * 24 * 60 * 60 * 1000;
+
+  const applied = await post(app, `/api/dlsite/${OWNER_ID}/apply`, body);
+  assert.equal(applied.status, 409);
+  assert.equal((await applied.json()).error.code, "dlsite_refetch_required");
+  assert.deepEqual(calls, callsAfterFetch);
 });

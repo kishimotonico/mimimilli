@@ -38,11 +38,11 @@ import { buildFullWorkFromState, checkWorkPlacement } from "./playback.ts";
 import { normalizeFsPath } from "./fsResolve.ts";
 import {
   composeWorks,
-  applyFixtureRegistrationCover,
+  applyFixtureCachedCover,
   copyWorkState,
   coverColumnsOf,
   dlsiteLinkageOf,
-  fixtureUsableDlsiteInfo,
+  fixtureUsableDlsite,
   reassignWorkId,
   removeWorks,
   setDlsiteLinkage,
@@ -179,7 +179,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       const rjCode = body.rjCode === "" ? null : body.rjCode;
       const plan = planDlsiteRegistration({
         rjCode,
-        info: rjCode ? fixtureUsableDlsiteInfo(state, rjCode) : null,
+        info: rjCode ? (fixtureUsableDlsite(state, rjCode)?.info ?? null) : null,
         title: body.title,
         tags: body.tags,
         apply: { title: false, tags: false, cover: body.applyCover, url: body.applyUrl },
@@ -200,7 +200,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
         bookmarked: false,
         lastPlayedAt: null,
       };
-      applyFixtureRegistrationCover(state, work, plan);
+      applyFixtureCachedCover(state, work, plan.coverUrl);
       const registered = checkWorkPlacement(state, work);
       state.works.push(registered);
       state.sourceRevisions.set(work.id, "fixture");

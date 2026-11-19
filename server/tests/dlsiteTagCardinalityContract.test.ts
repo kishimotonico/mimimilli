@@ -4,7 +4,6 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
-import type { DlsiteWorkInfo } from "@mimimilli/shared";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { createRealAdapter } from "../src/adapters/real/index.ts";
 import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../src/adapters/real/dlsiteConfig.ts";
@@ -12,6 +11,7 @@ import { htmlResponse, mockDlsiteTransport, sampleWorkHtml } from "./helpers/dls
 import { makeSampleLibrary, makeTestDirectory } from "./helpers/sampleLibrary.ts";
 import { nt, nts } from "./helpers/tag.ts";
 import { configureRoot } from "./helpers/rootFolder.ts";
+import { applyFetchedDlsite, fetchDlsiteForWork } from "./helpers/dlsiteApply.ts";
 
 const FAST_DLSITE_REQUEST_CONFIG = {
   ...DEFAULT_DLSITE_REQUEST_CONFIG,
@@ -26,24 +26,10 @@ function countCircleTags(tags: readonly string[]): number {
 }
 
 test("replace: 単体適用で明示的に選んだサークルは既存の同prefixタグを置き換える（real/fixture契約）", async (t) => {
-  const fixtureInfo: DlsiteWorkInfo = {
-    rjCode: "RJ501011",
-    title: "x",
-    circle: "fixtureサークル",
-    cvs: [],
-    genreTags: [],
-    ageRating: null,
-    coverUrl: null,
-    url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501011.html",
-  };
   const fixtureAdapter = createFixtureAdapter();
-  const fixtureApplied = await fixtureAdapter.dlsiteApply("RJ501011", {
-    info: fixtureInfo,
-    sourceRevision: "fixture",
-    applyTitle: false,
-    applyTags: nts(["サークル/fixtureサークル"]),
-    applyCover: false,
-    applyUrl: false,
+  const fixtureFetched = await fetchDlsiteForWork(fixtureAdapter, "RJ501011", "RJ501011");
+  const fixtureApplied = await applyFetchedDlsite(fixtureAdapter, "RJ501011", fixtureFetched, {
+    tags: nts(["サークル/fixtureサークル"]),
   });
   assert.ok(fixtureApplied?.snapshot);
   const fixtureWork = await fixtureAdapter.getWork("RJ501011");
@@ -67,23 +53,9 @@ test("replace: 単体適用で明示的に選んだサークルは既存の同pr
   );
   await configureRoot(realAdapter, lib.root);
   await realAdapter.scan();
-  const realInfo: DlsiteWorkInfo = {
-    rjCode: "RJ900002",
-    title: "x",
-    circle: "満月堂",
-    cvs: [],
-    genreTags: [],
-    ageRating: null,
-    coverUrl: null,
-    url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
-  };
-  const realApplied = await realAdapter.dlsiteApply(lib.existingWorkId, {
-    info: realInfo,
-    sourceRevision: (await realAdapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
-    applyTitle: false,
-    applyTags: nts(["サークル/満月堂"]),
-    applyCover: false,
-    applyUrl: false,
+  const realFetched = await fetchDlsiteForWork(realAdapter, lib.existingWorkId, "RJ900002");
+  const realApplied = await applyFetchedDlsite(realAdapter, lib.existingWorkId, realFetched, {
+    tags: nts(["サークル/満月堂"]),
   });
   assert.ok(realApplied?.snapshot);
   const realWork = await realAdapter.getWork(lib.existingWorkId);

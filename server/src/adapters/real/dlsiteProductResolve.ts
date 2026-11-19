@@ -92,14 +92,15 @@ export function dlsiteFetchResultOfProductResolution(
   return resolution.result;
 }
 
-/** 追加で使えるDLsite情報。TTL内でoutcomeがokのsnapshotを解析できたときだけ返す */
-export function readUsableDlsiteInfo(
+/** 追加・適用で使えるDLsite情報。TTL内でoutcomeがokのsnapshotを解析できたときだけ返す。
+ *  revision はsnapshotの取得時刻（ms） */
+export function readUsableDlsite(
   resolve: DlsiteProductResolver,
   productCode: string,
-): DlsiteWorkInfo | null {
+): { info: DlsiteWorkInfo; revision: number } | null {
   const resolution = resolve(productCode);
   if (resolution.kind !== "html" || !resolution.result.ok) return null;
   return dlsiteFetchStateOfProductResolution(resolution) === "fetched"
-    ? resolution.result.info
+    ? { info: resolution.result.info, revision: resolution.fetchedAt }
     : null;
 }

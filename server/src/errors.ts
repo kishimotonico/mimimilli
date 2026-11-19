@@ -100,6 +100,13 @@ export function restoreIdentityConflictError(): WorkRegisterError {
   );
 }
 
+export class DlsiteRefetchRequiredError extends Error {
+  constructor() {
+    super("DLsiteの取得結果が古くなりました。もう一度取得してから適用してください");
+    this.name = "DlsiteRefetchRequiredError";
+  }
+}
+
 export class DlsiteOfflineError extends Error {
   constructor() {
     super("DLsiteはオフライン設定のため取得しませんでした");

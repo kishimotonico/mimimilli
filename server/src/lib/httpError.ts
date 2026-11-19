@@ -2,7 +2,12 @@
 // shared の apiErrorSchema 形式 `{error: {code, message}}` で常に返す。
 import type { ApiError } from "@mimimilli/shared";
 import { HTTPException } from "hono/http-exception";
-import { SourceChangedError, SourceConflictError, SourceParseError } from "../errors.ts";
+import {
+  DlsiteRefetchRequiredError,
+  SourceChangedError,
+  SourceConflictError,
+  SourceParseError,
+} from "../errors.ts";
 
 const STATUS_BY_CODE = {
   not_found: 404,
@@ -14,6 +19,7 @@ const STATUS_BY_CODE = {
   unsupported_media_type: 415,
   conflict: 409,
   source_changed: 409,
+  dlsite_refetch_required: 409,
   root_reconfiguring: 409,
   internal: 500,
 } as const;
@@ -46,6 +52,9 @@ export function conflict(message: string): never {
 
 /** 正本コマンドの既知エラーを HTTP へ写す。未知のエラーはそのまま再throw。 */
 export function throwSourceCommandError(error: unknown): never {
+  if (error instanceof DlsiteRefetchRequiredError) {
+    throw apiError("dlsite_refetch_required", error.message);
+  }
   if (error instanceof SourceChangedError) throw apiError("source_changed", error.message);
   if (error instanceof SourceParseError) throw apiError("parse_error", error.message);
   if (error instanceof SourceConflictError) throw apiError("conflict", error.message);

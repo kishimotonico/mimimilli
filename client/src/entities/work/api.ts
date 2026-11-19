@@ -37,7 +37,7 @@ import {
   type WorkSourceMutationResult,
   type WorkSourcePatchInput,
   type DlsitePreview,
-  type DlsiteApplyBody,
+  type DlsiteApplyBodyInput,
   type DlsiteStateUpdateBody,
   type ResumeBody,
   type UnregisterMissingWorksResult,
@@ -225,7 +225,7 @@ export async function fetchDlsiteInfo(workId: string): Promise<DlsitePreview> {
 
 export async function applyDlsiteInfo(
   workId: string,
-  body: DlsiteApplyBody,
+  body: DlsiteApplyBodyInput,
 ): Promise<WorkSourceMutationResult> {
   return postParsed(
     workSourceMutationResultSchema,

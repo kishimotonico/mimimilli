@@ -1,23 +1,28 @@
 import {
   DEFAULT_DLSITE_CACHE_TTLS_MS,
   applyDlsiteStatePatch,
-  buildDlsiteApplyPatch,
+  planDlsiteApply,
   dlsiteProductFetchOutcomeOfResult,
   hasRjCode,
 } from "@mimimilli/shared";
+import { DlsiteRefetchRequiredError } from "../../errors.ts";
 import type {
+  DlsiteApplyBody,
   DlsiteCachedCover,
   DlsiteFetchResult,
   DlsiteProductFetchOutcome,
   DlsiteStateUpdateBody,
+  DlsiteWorkFetchResult,
   DlsiteWorkInfo,
   WorkSourceMutationResult,
 } from "@mimimilli/shared";
 import type { DlsiteAdapter } from "../../adapter/dlsite.ts";
-import { fixtureCoverFromColumns, type FixtureCoverColumns } from "./data.ts";
 import {
+  applyFixtureCachedCover,
   dlsiteFetchFailureFor,
+  fixtureDlsiteCoverCached,
   fixtureDlsiteCoverKey,
+  fixtureUsableDlsite,
   fixtureDlsiteResolutionHead,
   dlsiteLinkageOf,
   normalizeDlsiteCacheKey,
@@ -146,8 +151,19 @@ export function createDlsiteMethods(
     return fetchProduct(rjCode, force ?? false, options?.signal);
   }
 
+  function lookupDlsiteCachedCover(coverUrl: string | null): DlsiteCachedCover | null {
+    if (!coverUrl) return null;
+    const key = fixtureDlsiteCoverKey(coverUrl);
+    const cover = state.dlsiteCovers.get(key);
+    return cover ? { key, version: cover.fetchedAt } : null;
+  }
+
   return {
-    async dlsiteFetch(workId: string, force?: boolean, options?: { signal?: AbortSignal }) {
+    async dlsiteFetch(
+      workId: string,
+      force?: boolean,
+      options?: { signal?: AbortSignal },
+    ): Promise<DlsiteWorkFetchResult> {
       const work = state.works.find((candidate) => candidate.id === workId);
       if (!work)
         return { ok: false, kind: "not_found", message: `作品が見つかりません: ${workId}` };
@@ -155,17 +171,23 @@ export function createDlsiteMethods(
       if (!hasRjCode(linkage)) {
         return { ok: false, kind: "not_found", message: "RJコードが検出されていません" };
       }
-      return dlsiteFetchByCode(linkage.rjCode, force, options);
+      const result = await dlsiteFetchByCode(linkage.rjCode, force, options);
+      if (!result.ok) return result;
+      const usable = fixtureUsableDlsite(state, linkage.rjCode);
+      if (!usable) {
+        return { ok: false, kind: "error", message: "DLsite情報を読み出せませんでした" };
+      }
+      return {
+        ok: true,
+        info: result.info,
+        infoRevision: usable.revision,
+        cachedCover: lookupDlsiteCachedCover(result.info.coverUrl),
+      };
     },
 
     dlsiteFetchByCode,
 
-    lookupDlsiteCachedCover(coverUrl: string | null): DlsiteCachedCover | null {
-      if (!coverUrl) return null;
-      const key = fixtureDlsiteCoverKey(coverUrl);
-      const cover = state.dlsiteCovers.get(key);
-      return cover ? { key, version: cover.fetchedAt } : null;
-    },
+    lookupDlsiteCachedCover,
 
     getCachedDlsiteCover(coverKey: string) {
       const cover = state.dlsiteCovers.get(coverKey);
@@ -187,34 +209,32 @@ export function createDlsiteMethods(
 
     async dlsiteApply(
       workId: string,
-      body: import("@mimimilli/shared").DlsiteApplyBody,
-      _options?: { signal?: AbortSignal },
+      body: DlsiteApplyBody,
     ): Promise<WorkSourceMutationResult | null> {
       const work = state.works.find((w) => w.id === workId);
       if (!work) return null;
       requireFixtureRevision(state, workId, body.sourceRevision);
-      const patch = buildDlsiteApplyPatch(
+      const linkage = dlsiteLinkageOf(state, workId);
+      const usable = hasRjCode(linkage) ? fixtureUsableDlsite(state, linkage.rjCode) : null;
+      if (!usable || usable.revision !== body.infoRevision) throw new DlsiteRefetchRequiredError();
+      const { info } = usable;
+      const plan = planDlsiteApply(
         {
           title: work.title,
           tags: work.tags,
           urls: work.urls,
-          dlsite: dlsiteLinkageOf(state, workId),
+          hasCover: work.cover !== null,
+          dlsite: linkage,
         },
-        body,
+        info,
+        body.apply,
+        { coverCached: fixtureDlsiteCoverCached(state, info.coverUrl) },
       );
-      if (patch.title !== undefined) work.title = patch.title;
-      if (patch.tags !== undefined) work.tags = patch.tags;
-      if (patch.urls !== undefined) work.urls = patch.urls;
-      if (body.applyCover && body.info.coverUrl) {
-        const dimensions = work.cover?.dimensions ?? { width: 900, height: 900 };
-        const columns: FixtureCoverColumns = {
-          image: body.info.coverUrl,
-          dimensions,
-        };
-        state.coverColumns.set(workId, columns);
-        work.cover = fixtureCoverFromColumns(work, columns);
-      }
-      setDlsiteLinkage(state, workId, patch.dlsite);
+      if (plan.title !== undefined) work.title = plan.title;
+      if (plan.tags !== undefined) work.tags = plan.tags;
+      if (plan.urls !== undefined) work.urls = plan.urls;
+      if (plan.applyCover) applyFixtureCachedCover(state, work, info.coverUrl);
+      setDlsiteLinkage(state, workId, plan.dlsite);
       return fixtureSourceMutation(state, work);
     },
 

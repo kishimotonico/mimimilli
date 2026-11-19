@@ -1,6 +1,7 @@
 import {
   applyDlsiteStatePatch,
-  buildDlsiteApplyPatch,
+  hasRjCode,
+  planDlsiteApply,
   workPlacementOf,
   type DlsiteApplyBody,
   type DlsiteStateUpdateBody,
@@ -9,8 +10,7 @@ import {
   type WorkSourceMutationResult,
 } from "@mimimilli/shared";
 import { MetaMutationReject, encodeMetaRaw } from "./meta.ts";
-import { CoverSaveError, SourceChangedError } from "../../errors.ts";
-import { throwIfAborted } from "./sharedFlight.ts";
+import { DlsiteRefetchRequiredError, SourceChangedError } from "../../errors.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import {
   mutateVerifiedMetaSource,
@@ -20,11 +20,13 @@ import {
 import type { Scanner } from "./scanner.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
 import { stageCachedDlsiteCover } from "./dlsiteCoverStaging.ts";
+import { readUsableDlsite, type DlsiteProductResolver } from "./dlsiteProductResolve.ts";
 
 export interface DlsiteApplyDeps {
   catalog: CatalogWorkRepository;
   scanner: Scanner;
   dlsiteCache: DlsiteCache;
+  resolve: DlsiteProductResolver;
   requireRoot: () => string;
 }
 
@@ -48,7 +50,7 @@ function applyDlsiteMergeToRaw(
 }
 
 export function createDlsiteApply(deps: DlsiteApplyDeps) {
-  const { catalog, scanner, dlsiteCache, requireRoot } = deps;
+  const { catalog, scanner, dlsiteCache, resolve, requireRoot } = deps;
 
   async function persistVerified(
     verified: ReturnType<typeof mutateVerifiedMetaSource>,
@@ -61,42 +63,49 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
     async dlsiteApply(
       workId: string,
       body: DlsiteApplyBody,
-      options?: { signal?: AbortSignal },
     ): Promise<WorkSourceMutationResult | null> {
-      const signal = options?.signal;
-      throwIfAborted(signal, "DLsite取得は中止されました");
       const current = readVerifiedEditSource(catalog, workId);
       if (!current) return null;
 
-      const coverUrl = body.applyCover ? body.info.coverUrl : null;
-      const cover = coverUrl
-        ? await stageCachedDlsiteCover(
-            dlsiteCache,
-            coverUrl,
-            workPlacementOf(current.metaPath).mediaRoot,
-            requireRoot(),
-          )
-        : null;
-      if (coverUrl && !cover) throw new CoverSaveError();
+      if (current.source.sourceRevision !== body.sourceRevision) throw new SourceChangedError();
+      const linkage = current.source.meta.dlsite;
+      const usable = hasRjCode(linkage) ? readUsableDlsite(resolve, linkage.rjCode) : null;
+      if (!usable || usable.revision !== body.infoRevision) throw new DlsiteRefetchRequiredError();
+      const { info } = usable;
+
+      const cover =
+        body.apply.cover && info.coverUrl
+          ? await stageCachedDlsiteCover(
+              dlsiteCache,
+              info.coverUrl,
+              workPlacementOf(current.metaPath).mediaRoot,
+              requireRoot(),
+            )
+          : null;
 
       try {
-        throwIfAborted(signal, "DLsite取得は中止されました");
         return await persistVerified(
           mutateVerifiedMetaSource(catalog, workId, (source) => {
             if (source.sourceRevision !== body.sourceRevision) {
               return new MetaMutationReject(new SourceChangedError());
             }
-            const patch = buildDlsiteApplyPatch(
+            const plan = planDlsiteApply(
               {
                 title: source.meta.title,
                 tags: source.meta.tags,
                 urls: source.meta.urls,
+                hasCover: Boolean(source.meta.coverImage),
                 dlsite: source.meta.dlsite,
               },
-              body,
+              info,
+              body.apply,
+              { coverCached: cover !== null },
             );
-            cover?.commit();
-            return applyDlsiteMergeToRaw(source.bytes, { ...patch, coverImage: cover?.fileName });
+            if (plan.applyCover) cover?.commit();
+            return applyDlsiteMergeToRaw(source.bytes, {
+              ...plan,
+              coverImage: plan.applyCover ? cover?.fileName : undefined,
+            });
           }),
         );
       } finally {
