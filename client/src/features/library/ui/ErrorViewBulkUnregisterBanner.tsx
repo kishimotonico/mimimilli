@@ -22,7 +22,7 @@ export function ErrorViewBulkUnregisterBanner({
     try {
       await mutation.mutateAsync();
     } catch (cause) {
-      toast.error(apiErrorMessage(cause, "欠損作品の一括登録解除に失敗しました"));
+      toast.error(apiErrorMessage(cause, "行方不明の作品の登録解除に失敗しました"));
       return;
     }
     onUnregistered();
@@ -32,7 +32,7 @@ export function ErrorViewBulkUnregisterBanner({
   return (
     <div className="flex items-center justify-between gap-3 rounded-[6px] border border-line-soft bg-paper-2 px-3 py-2">
       <span className="font-jp text-body text-ink-1">
-        ファイル欠損した作品が <b className="text-ink-0">{missingCount}</b> 件あります
+        行方不明の作品が <b className="text-ink-0">{missingCount}</b> 件あります
       </span>
       <Button
         variant="ghost"
@@ -40,7 +40,7 @@ export function ErrorViewBulkUnregisterBanner({
         disabled={mutation.isPending}
         className="shrink-0 text-[color:var(--r-coral)]"
       >
-        欠損作品をまとめて登録解除
+        まとめて登録解除
       </Button>
       {isConfirmOpen && (
         <ConfirmDialog

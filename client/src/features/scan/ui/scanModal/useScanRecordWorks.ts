@@ -1,5 +1,5 @@
-// 新規作品・更新済みタブ共通: スキャンの記録に入っている作品を、件数の上限なく全ページ取得する。
-import { useEffect, useMemo } from "react";
+// 新規作品・更新済みタブ共通: スキャンの記録に入っている作品を、スクロールに応じてページ単位で取得する。
+import { useMemo } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import type { ScanRecordKind, WorkChangeKind, WorkListItem } from "@mimimilli/shared";
 import { searchWorks } from "../../../../entities/work/api";
@@ -13,6 +13,9 @@ export interface ScanRecordWorks {
   total: number;
   loading: boolean;
   error: string | null;
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  fetchNextPage: () => void;
 }
 
 export function useScanRecordWorks(
@@ -36,15 +39,14 @@ export function useScanRecordWorks(
   });
   const { hasNextPage, isFetchingNextPage, isError, fetchNextPage } = query;
 
-  useEffect(() => {
-    if (hasNextPage && !isFetchingNextPage && !isError) void fetchNextPage();
-  }, [hasNextPage, isFetchingNextPage, isError, fetchNextPage]);
-
   const pages = query.data?.pages;
   return {
     works: useMemo(() => pages?.flatMap((page) => page.items) ?? [], [pages]),
     total: pages?.[pages.length - 1]?.total ?? 0,
-    loading: query.isPending || hasNextPage === true,
+    loading: query.isPending,
     error: isError ? apiErrorMessage(query.error, errorFallback) : null,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage: () => void fetchNextPage(),
   };
 }

@@ -4,22 +4,28 @@
 import type { ScanExternalTab } from "../../../../shared/model/activeModalAtom";
 
 // 外部（通知ベル・トースト）から直接指定できるタブはshared側を正とし、モーダル内部限定の
-// タブ（新規登録済み・更新された作品）をここで追加する。
-export type ScanTabKey = ScanExternalTab | "newlyRegistered" | "updated";
+// タブ（新規作品・更新済み）をここで追加する。
+export type ScanTabKey = ScanExternalTab | "newWorks" | "updated";
 
 export const SCAN_TAB_ORDER: ScanTabKey[] = [
   "unregistered",
+  "newWorks",
   "needsAttention",
-  "newlyRegistered",
   "updated",
 ];
 
 export const SCAN_TAB_LABEL: Record<ScanTabKey, string> = {
   unregistered: "未登録",
+  newWorks: "新規作品",
   needsAttention: "要対応",
-  newlyRegistered: "新規登録済み",
-  updated: "更新された作品",
+  updated: "更新済み",
 };
+
+/** 件数を出すタブ。開いているタブには出さない */
+export const SCAN_TAB_WITH_COUNT: ReadonlySet<ScanTabKey> = new Set([
+  "unregistered",
+  "needsAttention",
+]);
 
 /** UnregisteredTab が候補登録の成否をScanModalへ伝える契約。 */
 export interface CandidatesRegisteredResult {

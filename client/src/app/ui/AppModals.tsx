@@ -1,3 +1,4 @@
+import type { WorkspacePath } from "@mimimilli/shared";
 import { lazy, Suspense, useCallback } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { activeModalAtom, isDlsiteNotificationModal } from "../../shared/model/activeModalAtom";
@@ -10,7 +11,8 @@ interface AppModalsProps {
   lastScanTime: string | null;
   onChangeFolder: (path: string) => Promise<unknown>;
   onExport: () => void;
-  onOpenFiles: (path: string) => void;
+  onOpenFiles: (path: WorkspacePath) => void;
+  onOpenWorkDetail: (workId: string) => void;
   onOpenWork: (workId: string) => void;
 }
 
@@ -21,6 +23,7 @@ export default function AppModals({
   onChangeFolder,
   onExport,
   onOpenFiles,
+  onOpenWorkDetail,
   onOpenWork,
 }: AppModalsProps) {
   const activeModal = useAtomValue(activeModalAtom);
@@ -49,6 +52,7 @@ export default function AppModals({
             initialTab={activeModal.tab}
             onClose={handleClose}
             onOpenFiles={onOpenFiles}
+            onOpenWorkDetail={onOpenWorkDetail}
           />
         </Suspense>
       )}

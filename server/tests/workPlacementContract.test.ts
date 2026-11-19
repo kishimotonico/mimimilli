@@ -433,7 +433,8 @@ function fixtureReassignHarness(layout: ReassignLayout): ReassignHarness {
   const metaName = layout === "file" ? "single.mimimilli.json" : META_FILE_NAME;
   const physicalPathOf = (dir: string) =>
     `/library/${dir}${layout === "file" ? "/single.wav" : ""}`;
-  const conflictPathOf = (dir: string) => (layout === "file" ? `${dir}/${metaName}` : dir);
+  const conflictPathOf = (dir: string) =>
+    workspacePath(layout === "file" ? `${dir}/${metaName}` : dir);
   const adapter = createFixtureAdapter({
     works: [
       {

@@ -26,7 +26,7 @@ import { LibraryNavigationProvider } from "../features/library/ui/LibraryNavigat
 import GlobalToast from "./ui/GlobalToast";
 import AppModals from "./ui/AppModals";
 import { activeModalAtom } from "../shared/model/activeModalAtom";
-import type { RootReconfigurationState, Settings } from "@mimimilli/shared";
+import type { RootReconfigurationState, Settings, WorkspacePath } from "@mimimilli/shared";
 import { useDownloadLibraryExport } from "../features/library/useDownloadLibraryExport";
 import { startRootReconfiguration } from "../entities/settings/api";
 import { runStartRootReconfiguration } from "./model/runStartRootReconfiguration";
@@ -116,11 +116,19 @@ export default function App() {
   );
 
   const handleOpenScanProblemInFiles = useCallback(
-    (path: string) => {
+    (path: WorkspacePath) => {
       openPathInFiles({ path, root: requireRootFolder(rootFolderOrNull) });
       setActiveModal(null);
     },
     [openPathInFiles, rootFolderOrNull, setActiveModal],
+  );
+
+  const handleOpenScanWorkDetail = useCallback(
+    (workId: string) => {
+      openWorkDetail(workId);
+      setActiveModal(null);
+    },
+    [openWorkDetail, setActiveModal],
   );
 
   if (startupState === "loading") {
@@ -192,6 +200,7 @@ export default function App() {
                 onChangeFolder={handleChangeFolder}
                 onExport={handleExport}
                 onOpenFiles={handleOpenScanProblemInFiles}
+                onOpenWorkDetail={handleOpenScanWorkDetail}
                 onOpenWork={handleOpenLibraryWork}
               />
               <GlobalToast />

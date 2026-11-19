@@ -64,7 +64,10 @@ export default function SplitButton({
         type="button"
         disabled={disabled}
         onClick={onClick}
-        className={buttonClass(variant, size, { disabled, className: "rounded-r-none pr-3" })}
+        className={buttonClass(variant, size, {
+          disabled,
+          className: "flex-1 justify-center rounded-r-none pr-3",
+        })}
       >
         {children}
       </button>

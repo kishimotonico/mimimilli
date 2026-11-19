@@ -1,5 +1,5 @@
 import { NO_DLSITE } from "./helpers/scanLibrary.ts";
-// 欠損作品の一括登録解除（GET /api/works/missing-count, POST /api/works/unregister-missing）
+// 行方不明の作品の一括登録解除（GET /api/works/missing-count, POST /api/works/unregister-missing）
 // の契約テスト。real/fixture 両アダプタを実際に通し、「missingのみが対象」「件数の意味論」を縛る。
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";

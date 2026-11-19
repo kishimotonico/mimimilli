@@ -166,7 +166,7 @@ export type ScanResult = z.infer<typeof scanResultSchema>;
 export const identityConflictSchema = z.object({
   kind: z.literal("identity_conflict"),
   workId: z.string(),
-  paths: z.array(z.string()).min(2),
+  paths: z.array(workspacePathSchema).min(2),
 });
 export type IdentityConflict = z.infer<typeof identityConflictSchema>;
 

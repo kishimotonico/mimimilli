@@ -1,4 +1,4 @@
-// 新規登録済み・更新された作品タブ共通: タイトルのインライン編集。
+// 新規作品タブ: タイトルのインライン編集。
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type {
   WorkListItem,
@@ -6,12 +6,12 @@ import type {
   WorkSourceMutationResult,
   WorkspacePath,
 } from "@mimimilli/shared";
-import { useRenameWorkMutation } from "../../../../entities/work/model/workMutations";
+import { useRenameWorkMutation } from "../../../../../entities/work/model/workMutations";
 import {
   sourceMutationErrorMessage,
   projectionWorkspacePath,
-} from "../../../../entities/work/sourceMutation";
-import { useRootFolderOrNull } from "../../../../entities/settings/useSettingsQuery";
+} from "../../../../../entities/work/sourceMutation";
+import { useRootFolderOrNull } from "../../../../../entities/settings/useSettingsQuery";
 
 export interface InlineTitleEdit {
   editingId: string | null;

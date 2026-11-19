@@ -15,6 +15,8 @@ import {
   type PreviewCapability,
   unresolvedWorkPhysicalPath,
   workPlacementOf,
+  type WorkspacePath,
+  workspacePath,
 } from "@mimimilli/shared";
 
 /** SQLite LIKE の ESCAPE 文字（`ESCAPE '!'` とセットで使う。パス区切り `\` と衝突しない） */
@@ -68,8 +70,10 @@ export function toPortableRelativePath(base: string, target: string): string {
 }
 
 /** identity_conflict 診断に載せる作品の root 相対パス。フォルダー形式はフォルダー、単一ファイル形式はメタファイル */
-export function identityConflictPathOf(root: string, metaPath: string): string {
-  return toPortableRelativePath(root, unresolvedWorkPhysicalPath(workPlacementOf(metaPath)));
+export function identityConflictPathOf(root: string, metaPath: string): WorkspacePath {
+  return workspacePath(
+    toPortableRelativePath(root, unresolvedWorkPhysicalPath(workPlacementOf(metaPath))),
+  );
 }
 
 /** identityConflictPathOf の逆。パス名だけで対象のメタファイルを決める */

@@ -1,30 +1,37 @@
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { useMotionVariants } from "../../../../shared/ui/useMotionVariants";
 import { cn } from "../../../../shared/lib/cn";
-import { formatScanSidebarTime } from "../../../../shared/lib/format";
+import { formatScanDateTime } from "../../../../shared/lib/format";
+import { buttonClass } from "../../../../shared/ui/Button";
+import { I } from "../../../../shared/ui/Icon";
+import SplitButton from "../../../../shared/ui/SplitButton";
 import { scanPhaseLabel, type ScanProgress } from "../../model";
-import { SCAN_TAB_LABEL, SCAN_TAB_ORDER, type ScanTabKey } from "./types";
+import { SCAN_TAB_LABEL, SCAN_TAB_ORDER, SCAN_TAB_WITH_COUNT, type ScanTabKey } from "./types";
 
 interface ScanSidebarProps {
   active: ScanTabKey;
   onSelect: (tab: ScanTabKey) => void;
   counts: Partial<Record<ScanTabKey, number>>;
-  libraryTotal: number | null;
   scanning: boolean;
   progress: ScanProgress | null;
   lastScanTime: string | null;
   showCompletedHint: boolean;
+  onStart: () => void;
+  onFullScan: () => void;
+  onCancel: () => void;
 }
 
 export default function ScanSidebar({
   active,
   onSelect,
   counts,
-  libraryTotal,
   scanning,
   progress,
   lastScanTime,
   showCompletedHint,
+  onStart,
+  onFullScan,
+  onCancel,
 }: ScanSidebarProps) {
   const status: "scanning" | "completed" | "lastScan" = scanning
     ? "scanning"
@@ -35,7 +42,7 @@ export default function ScanSidebar({
   return (
     <nav
       aria-label="スキャン結果"
-      className="flex w-[148px] shrink-0 flex-col gap-3 overflow-y-auto border-r border-line-soft px-2.5 py-3"
+      className="flex w-[160px] shrink-0 flex-col overflow-y-auto border-r border-line-soft py-3 pr-2.5"
     >
       <div role="tablist" aria-orientation="vertical" className="flex flex-col gap-0.5">
         {SCAN_TAB_ORDER.map((tab) => (
@@ -49,20 +56,29 @@ export default function ScanSidebar({
         ))}
       </div>
 
-      <div className="flex flex-col gap-1 border-t border-line-soft pt-2.5">
-        <SidebarSummaryRow label="ライブラリ全体" value={libraryTotal} />
-      </div>
-
-      <div className="flex flex-col gap-1 border-t border-line-soft pt-2.5">
-        <p className="font-sans text-label font-semibold tracking-[0.06em] text-ink-2 uppercase">
-          最終スキャン
-        </p>
-        <div className="relative flex min-h-[14px] flex-col gap-1.5">
+      <div className="mt-auto flex flex-col gap-2 border-t border-line-soft pt-2.5 pl-2.5">
+        <div className="flex flex-col gap-1">
+          <p className="font-sans text-label font-semibold tracking-[0.06em] text-ink-2 uppercase">
+            最終スキャン
+          </p>
+          <div className="relative flex h-[30px] flex-col">
+            <AnimatePresence initial={false}>
+              {status === "scanning" && (
+                <SidebarStatusScanning key="scanning" progress={progress} />
+              )}
+              {status === "completed" && <SidebarStatusCompleted key="completed" />}
+              {status === "lastScan" && (
+                <SidebarStatusLastScan key="lastScan" lastScanTime={lastScanTime} />
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+        <div className="relative h-9">
           <AnimatePresence initial={false}>
-            {status === "scanning" && <SidebarStatusScanning key="scanning" progress={progress} />}
-            {status === "completed" && <SidebarStatusCompleted key="completed" />}
-            {status === "lastScan" && (
-              <SidebarStatusLastScan key="lastScan" lastScanTime={lastScanTime} />
+            {scanning ? (
+              <SidebarCancelButton key="cancel" onClick={onCancel} />
+            ) : (
+              <SidebarStartButton key="start" onStart={onStart} onFullScan={onFullScan} />
             )}
           </AnimatePresence>
         </div>
@@ -83,6 +99,8 @@ function ScanSidebarTab({
   onSelect: (tab: ScanTabKey) => void;
 }) {
   const label = SCAN_TAB_LABEL[tab];
+  const shownCount =
+    SCAN_TAB_WITH_COUNT.has(tab) && !selected && count !== undefined && count > 0 ? count : null;
   return (
     <button
       type="button"
@@ -90,41 +108,79 @@ function ScanSidebarTab({
       id={`scan-tab-${tab}`}
       aria-selected={selected}
       aria-controls={`scan-tabpanel-${tab}`}
-      aria-label={count === undefined ? label : `${label}（${count}件）`}
+      aria-label={shownCount === null ? label : `${label}（${shownCount}件）`}
       onClick={() => onSelect(tab)}
       className={cn(
-        "flex items-center justify-between gap-2 rounded-[6px] px-2 py-1.5 text-left font-jp text-control transition-colors",
-        selected ? "bg-paper-2 text-ink-0" : "text-ink-2 hover:bg-paper-2 hover:text-ink-0",
+        "flex items-center justify-between gap-2 rounded-r-[6px] py-1.5 pr-2 pl-2.5 text-left font-jp text-control transition-colors",
+        selected
+          ? "bg-paper-2 font-semibold text-ink-0 shadow-[inset_2px_0_0_var(--acc)]"
+          : "text-ink-2 hover:bg-paper-2 hover:text-ink-0",
       )}
     >
       <span aria-hidden="true" className="truncate">
         {label}
       </span>
-      {count !== undefined && (
+      {shownCount !== null && (
         <span
           aria-hidden="true"
           className={cn(
             "shrink-0 rounded-pill px-1.5 py-0.5 font-mono text-caption font-semibold tabular-nums",
-            tab === "needsAttention" && count > 0
+            tab === "needsAttention"
               ? "bg-[color-mix(in_oklch,var(--r-coral)_20%,transparent)] text-[var(--r-coral)]"
               : "bg-paper-3 text-ink-2",
           )}
         >
-          {count}
+          {shownCount}
         </span>
       )}
     </button>
   );
 }
 
-function SidebarSummaryRow({ label, value }: { label: string; value: number | null }) {
+function SidebarStartButton({
+  onStart,
+  onFullScan,
+}: {
+  onStart: () => void;
+  onFullScan: () => void;
+}) {
+  const { fade } = useMotionVariants();
+  const isPresent = useIsPresent();
+  const v = fade();
   return (
-    <div className="flex items-baseline justify-between gap-2">
-      <span className="font-jp text-label text-ink-2">{label}</span>
-      <span className="font-mono text-mono font-semibold text-ink-0 tabular-nums">
-        {value ?? "—"}
-      </span>
-    </div>
+    <motion.div className="absolute inset-0" inert={!isPresent} {...v}>
+      <SplitButton
+        variant="ghost"
+        size="lg"
+        className="w-full"
+        menuLabel="スキャンの方法"
+        onClick={onStart}
+        items={[{ key: "full", label: "すべての作品を読み直す", onSelect: onFullScan }]}
+      >
+        <I.refresh size={12} />
+        スキャン
+      </SplitButton>
+    </motion.div>
+  );
+}
+
+function SidebarCancelButton({ onClick }: { onClick: () => void }) {
+  const { fade } = useMotionVariants();
+  const isPresent = useIsPresent();
+  const v = fade();
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      inert={!isPresent}
+      {...v}
+      className={buttonClass("danger-quiet", "lg", {
+        className: "absolute inset-0 w-full justify-center",
+      })}
+    >
+      <I.x size={12} />
+      スキャンを中止
+    </motion.button>
   );
 }
 
@@ -176,7 +232,7 @@ function SidebarStatusLastScan({ lastScanTime }: { lastScanTime: string | null }
   const v = fade();
   return (
     <motion.span className="font-mono text-mono text-ink-2" inert={!isPresent} {...v}>
-      {formatScanSidebarTime(lastScanTime)}
+      {formatScanDateTime(lastScanTime)}
     </motion.span>
   );
 }

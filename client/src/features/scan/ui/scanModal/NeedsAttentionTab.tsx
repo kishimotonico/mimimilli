@@ -1,5 +1,10 @@
 import { useSetAtom } from "jotai";
-import type { DataIntegrityWarning, InvalidMetaFile, IdentityConflict } from "@mimimilli/shared";
+import type {
+  DataIntegrityWarning,
+  InvalidMetaFile,
+  IdentityConflict,
+  WorkspacePath,
+} from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
 import { activeModalAtom, type ActiveModal } from "../../../../shared/model/activeModalAtom";
 import { buildNeedsAttentionRows, type NeedsAttentionRow } from "../../model/needsAttention";
@@ -12,7 +17,7 @@ export interface NeedsAttentionTabProps {
   dlsiteParseErrorCount: number;
   dlsiteParseErrorAlert: boolean;
   dataIntegrityWarning: DataIntegrityWarning | undefined;
-  onOpenFiles: (path: string) => void;
+  onOpenFiles: (path: WorkspacePath) => void;
 }
 
 const KIND_LABEL: Record<NeedsAttentionRow["kind"], string> = {
@@ -29,11 +34,15 @@ export default function NeedsAttentionTab(props: NeedsAttentionTabProps) {
   const rows = buildNeedsAttentionRows(props);
 
   if (rows.length === 0) {
-    return <p className="font-jp text-body text-ink-2">要対応の項目はありません。</p>;
+    return (
+      <div className="min-h-0 flex-1 overflow-y-auto px-[18px] py-4">
+        <p className="font-jp text-body text-ink-2">要対応の項目はありません。</p>
+      </div>
+    );
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-[18px] py-4">
       <p className="font-jp text-secondary text-ink-2">
         自動では直しません。内容を確認してから対応してください。
       </p>
@@ -77,7 +86,7 @@ function AttentionRow({
   onOpenNotificationModal,
 }: {
   row: NeedsAttentionRow;
-  onOpenFiles: (path: string) => void;
+  onOpenFiles: (path: WorkspacePath) => void;
   onOpenNotificationModal: (modal: ActiveModal) => void;
 }) {
   if (row.kind === "identityConflict") {

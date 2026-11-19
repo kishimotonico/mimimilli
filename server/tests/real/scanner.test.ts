@@ -16,7 +16,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
-import { EMPTY_TAG_FILTERS } from "@mimimilli/shared";
+import { EMPTY_TAG_FILTERS, workspacePath } from "@mimimilli/shared";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
 import { Scanner } from "../../src/adapters/real/scanner.ts";
@@ -963,7 +963,7 @@ test("単一作品再投影は他作品のpresenceとidentity conflict診断を�
   const scanner = new Scanner(db, repos, { measureCover: async () => null });
   await scanner.scan(root);
   repos.catalog.replaceIdentityConflicts([
-    { kind: "identity_conflict", workId: idB, paths: ["b", "copy"] },
+    { kind: "identity_conflict", workId: idB, paths: [workspacePath("b"), workspacePath("copy")] },
   ]);
   const source = JSON.parse(readFileSync(join(workA, "mimimilli.json"), "utf-8")) as Record<
     string,

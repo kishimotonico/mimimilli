@@ -51,7 +51,7 @@ export class SourceParseError extends Error {
   }
 }
 
-/** ファイル欠損・identity/location 不一致。HTTP は conflict。 */
+/** 作品情報ファイルが無い・identity/location 不一致。HTTP は conflict。 */
 export class SourceConflictError extends Error {
   constructor(message: string) {
     super(message);

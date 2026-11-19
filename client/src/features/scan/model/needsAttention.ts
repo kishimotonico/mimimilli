@@ -1,7 +1,12 @@
 // 「要対応」の一元定義。通知ベルのバッジと要対応タブのバッジが
 // 同じ問題一覧・同じ件数を出すよう、両方がこのビルダーの結果だけを見る。
 // 件数は「問題の件数（行数）」で数える。ID重複は競合（workId）単位で1件。
-import type { DataIntegrityWarning, InvalidMetaFile, IdentityConflict } from "@mimimilli/shared";
+import type {
+  DataIntegrityWarning,
+  InvalidMetaFile,
+  IdentityConflict,
+  WorkspacePath,
+} from "@mimimilli/shared";
 
 export interface NeedsAttentionSource {
   identityConflicts: IdentityConflict[];
@@ -14,8 +19,8 @@ export interface NeedsAttentionSource {
 }
 
 export type NeedsAttentionRow =
-  | { kind: "identityConflict"; key: string; workId: string; paths: string[] }
-  | { kind: "invalidMetaFile"; key: string; path: string; message: string }
+  | { kind: "identityConflict"; key: string; workId: string; paths: WorkspacePath[] }
+  | { kind: "invalidMetaFile"; key: string; path: WorkspacePath; message: string }
   | { kind: "rjCodeMissing"; key: string; count: number }
   | { kind: "dlsiteFetchFailed"; key: string; count: number }
   | { kind: "dlsiteParseFailed"; key: string; count: number }

@@ -1,6 +1,7 @@
 // fixture アダプタ用の自己完結シードデータ。
 // client/mocks からは import せず、本ファイル内で完結させる。
 import {
+  workspacePath,
   dedupeTags,
   normalizeTags,
   TEXT_PREVIEW_LIMIT_BYTES,
@@ -349,7 +350,10 @@ export const SINGLE_FILE_SEED_WORK: FixtureWorkRecord = {
 export const SINGLE_FILE_SEED_IDENTITY_CONFLICT: IdentityConflict = {
   kind: "identity_conflict",
   workId: SINGLE_FILE_SEED_WORK.id,
-  paths: ["fanza/d00002.mimimilli.json", "copies/d00002.mimimilli.json"],
+  paths: [
+    workspacePath("fanza/d00002.mimimilli.json"),
+    workspacePath("copies/d00002.mimimilli.json"),
+  ],
 };
 
 /** シード作品のDLsite連携分類（meta linkage）。取得失敗はここには持たせず

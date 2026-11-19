@@ -11,7 +11,7 @@ import TagPrefixSettings from "./TagPrefixSettings";
 import ExcludedFoldersSettings from "./ExcludedFoldersSettings";
 import Modal, { ModalHeader } from "../../../shared/ui/Modal";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
-import { formatLastScanTime } from "../../../shared/lib/format";
+import { formatScanDateTime } from "../../../shared/lib/format";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 
 const SECTION_CLASS = "flex flex-col gap-2";
@@ -158,7 +158,7 @@ export default function SettingsModal({
           <span className={SECTION_LABEL_CLASS}>スキャン</span>
           <div className={ROW_CLASS}>
             <span className="flex-1 font-mono text-mono text-ink-2">
-              最終スキャン: {formatLastScanTime(lastScanTime)}
+              最終スキャン: {formatScanDateTime(lastScanTime)}
             </span>
             <Button variant="primary" size="md" onClick={onOpenScan}>
               <I.refresh size={12} className={scanning ? "animate-spin" : undefined} />

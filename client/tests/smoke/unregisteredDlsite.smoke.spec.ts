@@ -61,7 +61,7 @@ test("失敗の行の再試行は枠を変えず、取得後に追加すると�
 
   await expect(panel.getByText(/うち\d+件はDLsite情報なし/)).toBeVisible({ timeout: 15_000 });
   await panel.getByRole("button", { name: /^\d+件を追加$/ }).click();
-  await expect(dialog.getByRole("tab", { name: /^新規登録済み/ })).toHaveAttribute(
+  await expect(dialog.getByRole("tab", { name: /^新規作品/ })).toHaveAttribute(
     "aria-selected",
     "true",
   );

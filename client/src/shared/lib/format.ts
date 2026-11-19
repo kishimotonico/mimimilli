@@ -44,19 +44,10 @@ export function formatDateTime(iso: string): string {
   });
 }
 
-export function formatLastScanTime(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleString("ja-JP") : "未実行";
-}
-
-/** スキャンモーダル左リスト用の短い日時表示。当日は時刻のみ、それ以外は "8/13 09:12" 形式。 */
-export function formatScanSidebarTime(iso: string | null): string {
+/** "2026/11/08 17:49" 形式（ローカル時刻）。未実行（null）は「未実行」 */
+export function formatScanDateTime(iso: string | null): string {
   if (!iso) return "未実行";
   const date = new Date(iso);
-  const now = new Date();
-  const time = date.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
-  const sameDay =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate();
-  return sameDay ? time : `${date.getMonth() + 1}/${date.getDate()} ${time}`;
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }

@@ -5,6 +5,7 @@ import {
   probeResultFromCache,
   resolveTrackDurationSec,
   workPlacementOf,
+  workspacePath,
 } from "@mimimilli/shared";
 import type {
   NormalizedTag,
@@ -13,6 +14,7 @@ import type {
   InvalidMetaFile,
   UrlEntry,
   Work,
+  WorkspacePath,
 } from "@mimimilli/shared";
 import { japaneseSortKey } from "../../core/japaneseSortKey.ts";
 import { isPathWithin } from "../../lib/path.ts";
@@ -112,10 +114,10 @@ export class CatalogWorkRepository {
       .from(identityConflicts)
       .orderBy(identityConflicts.workId, identityConflicts.path)
       .all();
-    const grouped = new Map<string, string[]>();
+    const grouped = new Map<string, WorkspacePath[]>();
     for (const row of rows) {
       const paths = grouped.get(row.workId) ?? [];
-      paths.push(row.path);
+      paths.push(workspacePath(row.path));
       grouped.set(row.workId, paths);
     }
     return [...grouped].map(([workId, paths]) => ({ kind: "identity_conflict", workId, paths }));

@@ -9,7 +9,7 @@ import type {
   ScanDiagnostics,
   ScanResult,
 } from "@mimimilli/shared";
-import { errorMessage, detectRjCode, workspacePath } from "@mimimilli/shared";
+import { errorMessage, detectRjCode, workspacePath, type WorkspacePath } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import type { ScanOptions } from "../../adapter/index.ts";
 import { descendantsRegisteredError } from "../../errors.ts";
@@ -117,7 +117,7 @@ function findIdentityConflicts(
   root: string,
   inspections: ReadonlyMap<string, MetaInspection>,
 ): IdentityConflict[] {
-  const pathsByWorkId = new Map<string, string[]>();
+  const pathsByWorkId = new Map<string, WorkspacePath[]>();
   for (const [metaPath, { declaredId }] of inspections) {
     if (declaredId === null) continue;
     const paths = pathsByWorkId.get(declaredId) ?? [];
