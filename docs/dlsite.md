@@ -50,7 +50,7 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 
 未登録の候補一覧（`GET /scan/candidates`）の `dlsite` はキャッシュ由来の状態（`none` / `fetched` / `not_found` / `failed`）だけで、取得中は含めない。取得中の行はクライアントがジョブのsnapshotとSSEから出す。
 
-**新旧の判定**: ジョブの状態には単調増加の `revision` が付く（プロセス全体で1つ。`max(前の値 + 1, 現在時刻)` で、クライアントに見える変化の直前に進める）。ジョブの終端は、候補と同じ導出関数（`deriveDlsiteProductSummary`）でキャッシュから導いた取得結果 `dlsite` を運ぶ。候補GETと `POST /scan/candidates/rj-code` の応答は、候補を組み立てる前に読んだ revision を各候補の `dlsiteRevision` に持つ。クライアントはサーバー状態を revision が進むものだけ取り込み、行の表示は候補の値と終端の結果のうち revision が大きい方（同じなら候補）を出す。ジョブの終端で候補を取り直さない。想定外の例外とオフラインで `failed` になった取得はキャッシュを書き換えないので、次の候補GETで表示がキャッシュの状態に戻る（[ADR-0038](adr/0038-dlsite-job-state-revision.md)）。
+**新旧の判定**: ジョブの状態には単調増加の `revision` が付く（プロセス全体で1つ。`max(前の値 + 1, 現在時刻のマイクロ秒)` で、クライアントに見える変化の直前に進める）。ジョブの終端は、候補と同じ導出関数（`deriveDlsiteProductSummary`）でキャッシュから導いた取得結果 `dlsite` を運ぶ。候補GETと `POST /scan/candidates/rj-code` の応答は、候補を組み立てる前に読んだ revision を各候補の `dlsiteRevision` に持つ。クライアントはサーバー状態を revision が進むものだけ取り込み、行の表示は候補の値と終端の結果のうち revision が大きい方（同じなら候補）を出す。ジョブの終端で候補を取り直さない。想定外の例外とオフラインで `failed` になった取得はキャッシュを書き換えないので、次の候補GETで表示がキャッシュの状態に戻る（[ADR-0038](adr/0038-dlsite-job-state-revision.md)）。
 
 `work.dlsite.appliedTags` は、手動適用でこの作品へ反映したタグを `mimimilli.json` に記録したもの。
 
