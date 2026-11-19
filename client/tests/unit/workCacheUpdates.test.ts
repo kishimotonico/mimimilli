@@ -13,7 +13,6 @@ import { FILE_SYSTEM_QUERY_KEYS } from "../../src/entities/file-system/queryKeys
 import { SCAN_QUERY_KEYS } from "../../src/entities/scan/queryKeys";
 import {
   updateCachesAfterBookmark,
-  updateCachesAfterDlsiteBulkApply,
   updateCachesAfterDlsiteLinkageChange,
   updateCachesAfterDlsitePreviewFetch,
   updateCachesAfterIdentityReassign,
@@ -83,7 +82,6 @@ const KEYS = {
   tags: TAG_QUERY_KEYS.all(),
   smartWorks: SMART_FOLDER_QUERY_KEYS.works("sf-1"),
   smartPreview: SMART_FOLDER_QUERY_KEYS.preview([{ axis: "circle", op: "eq", value: "c" }]),
-  notifications: WORK_QUERY_KEYS.dlsiteNotificationSummary(),
   fs: FILE_SYSTEM_QUERY_KEYS.directory("dlsite"),
   diagnostics: SCAN_QUERY_KEYS.diagnostics(),
   scanRecord: SCAN_QUERY_KEYS.last(),
@@ -107,7 +105,6 @@ function seededClient(): QueryClient {
   queryClient.setQueryData(KEYS.tags, []);
   queryClient.setQueryData(KEYS.smartWorks, structuredClone(emptyPages));
   queryClient.setQueryData(KEYS.smartPreview, 3);
-  queryClient.setQueryData(KEYS.notifications, { rjMissing: 0 });
   queryClient.setQueryData(KEYS.fs, { entries: [] });
   queryClient.setQueryData(KEYS.diagnostics, { identityConflicts: [], invalidMetaFiles: [] });
   queryClient.setQueryData(KEYS.scanRecord, { finishedAt: null });
@@ -135,7 +132,6 @@ const LIBRARY_VIEWS: KeyName[] = [
   "tags",
   "smartWorks",
   "smartPreview",
-  "notifications",
 ];
 const REGISTRATION_VIEWS: KeyName[] = [...LIBRARY_VIEWS, "fs", "diagnostics", "scanRecord"];
 
@@ -144,7 +140,7 @@ function sorted(names: KeyName[]): KeyName[] {
 }
 
 describe("meta 編集の必須更新", () => {
-  it("source へ応答の snapshot を書き戻し、詳細・一覧系・facet・タグ・SF・通知を無効化する", async () => {
+  it("source へ応答の snapshot を書き戻し、詳細・一覧系・facet・タグ・SF を無効化する", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterSourceEdit(queryClient, mutationResult("w1"));
@@ -214,7 +210,7 @@ describe("bookmark の必須更新", () => {
 });
 
 describe("登録・スキャン完了の必須更新", () => {
-  it("登録は一覧系・facet・タグ・SF（件数プレビューを含む）・通知・FS・診断・スキャンの記録を無効化し、詳細と scan 候補は触らない", async () => {
+  it("登録は一覧系・facet・タグ・SF（件数プレビューを含む）・FS・診断・スキャンの記録を無効化し、詳細と scan 候補は触らない", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterRegistration(queryClient);
@@ -269,7 +265,7 @@ describe("ID 再採番の必須更新", () => {
 });
 
 describe("DLsite の必須更新", () => {
-  it("単体適用は source を書き戻して残し、詳細・一覧系・facet・タグ・SF・通知を無効化する", async () => {
+  it("単体適用は source を書き戻して残し、詳細・一覧系・facet・タグ・SF を無効化する", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterDlsiteLinkageChange(queryClient, mutationResult("w1"));
@@ -284,15 +280,5 @@ describe("DLsite の必須更新", () => {
     await updateCachesAfterDlsitePreviewFetch(queryClient, "w1");
 
     expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(["detail1", ...LIBRARY_VIEWS]));
-  });
-
-  it("未設定項目の一括適用は対象作品の詳細と source を無効化する", async () => {
-    const queryClient = seededClient();
-
-    await updateCachesAfterDlsiteBulkApply(queryClient, ["w1"]);
-
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(
-      sorted(["detail1", "source1", ...LIBRARY_VIEWS]),
-    );
   });
 });

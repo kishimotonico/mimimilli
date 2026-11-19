@@ -271,7 +271,6 @@ for (const [kind, createHarness] of harnesses) {
         ["GET", `/api/media/audio/${h.keptWorkId}/track.wav`],
         ["POST", "/api/scan"],
         ["GET", "/api/scan/candidates"],
-        ["GET", "/api/dlsite/notifications"],
         ["GET", "/api/tags"],
         ["GET", "/api/smart-folders"],
       ];

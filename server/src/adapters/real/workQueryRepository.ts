@@ -2,8 +2,6 @@ import { sep } from "node:path";
 import { asc, eq } from "drizzle-orm";
 import {
   createRandomSeed,
-  dlsiteNotificationItemSchema,
-  evaluateParseErrorAlert,
   isCoverUnmeasured,
   projectCoverKind,
   withNormalizeTagBatchCache,
@@ -11,10 +9,6 @@ import {
 } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
-  DlsiteNotificationKind,
-  DlsiteNotificationPage,
-  DlsiteNotificationQuery,
-  DlsiteNotificationSummary,
   SmartFolderRule,
   Work,
   WorkPlacement,
@@ -43,8 +37,6 @@ import {
 import {
   axisFacetSql,
   chunk,
-  dlsiteNotificationWhere,
-  DLSITE_NOTIFICATION_SUMMARY_SELECT,
   inClausePlaceholders,
   JOINED_WORKS_SELECT,
   smartFolderRulePredicates,
@@ -60,7 +52,6 @@ import {
   type ListSummariesResult,
   mapRawWorkRows,
   parseDlsiteStateJson,
-  parseRecord,
   type RawPlaylistRow,
   type RawSummaryListRow,
   type RawWorkListRow,
@@ -425,25 +416,6 @@ export class WorkQueryRepository {
     });
   }
 
-  getDlsiteNotificationSummary(): DlsiteNotificationSummary {
-    const row = this.db.sqlite.query(DLSITE_NOTIFICATION_SUMMARY_SELECT).get() as {
-      rjCodeMissingCount: number | null;
-      fetchFailedCount: number | null;
-      parseErrorCount: number | null;
-      parseSuccessCount: number | null;
-      unlinkedCount: number | null;
-    };
-    const parseErrorCount = row.parseErrorCount ?? 0;
-    const parseSuccessCount = row.parseSuccessCount ?? 0;
-    return {
-      rjCodeMissingCount: row.rjCodeMissingCount ?? 0,
-      fetchFailedCount: row.fetchFailedCount ?? 0,
-      parseErrorCount,
-      parseErrorAlert: evaluateParseErrorAlert(parseErrorCount, parseSuccessCount),
-      unlinkedCount: row.unlinkedCount ?? 0,
-    };
-  }
-
   /** DLsite連携のRJコードが一致する作品のID。投影更新の対象を引く */
   listWorkIdsByRjCode(productCode: string): string[] {
     const rows = this.db.sqlite
@@ -469,46 +441,6 @@ export class WorkQueryRepository {
          ORDER BY works.title, works.id`,
       )
       .all() as Array<{ rjCode: string; workId: string; title: string }>;
-  }
-
-  queryDlsiteNotifications(
-    kind: DlsiteNotificationKind,
-    query: Required<DlsiteNotificationQuery>,
-  ): DlsiteNotificationPage {
-    const condition = dlsiteNotificationWhere(kind);
-    const rjCodeSelect =
-      kind === "parse-failed"
-        ? `json_extract(work_dlsite.state_json, '$.rjCode') AS rjCode`
-        : `NULL AS rjCode`;
-    const count = this.db.sqlite
-      .query(
-        `SELECT COUNT(*) AS total
-         FROM main.works AS works
-         LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
-         WHERE ${condition}`,
-      )
-      .get() as { total: number };
-    const rows = this.db.sqlite
-      .query(
-        `SELECT works.id AS id, works.title AS title,
-                ${rjCodeSelect},
-                COALESCE(json_extract(work_dlsite.state_json, '$.status'), 'none') AS status
-         FROM main.works AS works
-         LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
-         WHERE ${condition}
-         ORDER BY works.title_sort_key COLLATE BINARY ASC, works.id COLLATE BINARY ASC
-         LIMIT ? OFFSET ?`,
-      )
-      .all(query.limit, (query.page - 1) * query.limit) as Array<{
-      id: string;
-      title: string;
-      rjCode: string | null;
-      status: unknown;
-    }>;
-    const items = rows.map((row) =>
-      parseRecord(dlsiteNotificationItemSchema, row, "works", row.id),
-    );
-    return { items, total: count.total };
   }
 
   getScanWorkMap() {

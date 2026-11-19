@@ -1,11 +1,8 @@
 import {
   workspacePath,
   axisFacetItemSchema,
-  dlsiteApplyMissingPreviewSchema,
   fsEntrySchema,
   fsListingSchema,
-  dlsiteBulkApplyMissingResultSchema,
-  dlsiteNotificationSummarySchema,
   scanCandidateSchema,
   scanCandidatesRegisterResponseSchema,
   resolvedPlaylistSchema,
@@ -25,11 +22,8 @@ import {
   workSchema,
   workSourceMutationResultSchema,
   type AxisFacetItem,
-  type DlsiteApplyMissingPreview,
   type FsEntry,
   type FsListing,
-  type DlsiteBulkApplyMissingResult,
-  type DlsiteNotificationSummary,
   type DlsitePreview,
   type ScanDiagnostics,
   type ScanRecord,
@@ -155,19 +149,6 @@ export function buildSmartFolder(overrides: Partial<SmartFolder> = {}): SmartFol
   });
 }
 
-export function buildDlsiteNotificationSummary(
-  overrides: Partial<DlsiteNotificationSummary> = {},
-): DlsiteNotificationSummary {
-  return dlsiteNotificationSummarySchema.parse({
-    rjCodeMissingCount: 0,
-    fetchFailedCount: 0,
-    parseErrorCount: 0,
-    parseErrorAlert: false,
-    unlinkedCount: 0,
-    ...overrides,
-  });
-}
-
 export function buildScanDiagnostics(overrides: Partial<ScanDiagnostics> = {}): ScanDiagnostics {
   return scanDiagnosticsSchema.parse({ identityConflicts: [], invalidMetaFiles: [], ...overrides });
 }
@@ -270,24 +251,6 @@ export function buildResolvedPlaylist(
       durationSec: 10,
       durationKind: "resolved",
     })),
-    ...overrides,
-  });
-}
-
-export function buildDlsiteApplyMissingPreview(
-  items: DlsiteApplyMissingPreview["items"] = [],
-): DlsiteApplyMissingPreview {
-  return dlsiteApplyMissingPreviewSchema.parse({ items });
-}
-
-export function buildDlsiteBulkApplyMissingResult(
-  overrides: Partial<DlsiteBulkApplyMissingResult> = {},
-): DlsiteBulkApplyMissingResult {
-  return dlsiteBulkApplyMissingResultSchema.parse({
-    applied: 0,
-    pending: 0,
-    skipped: 0,
-    failed: 0,
     ...overrides,
   });
 }

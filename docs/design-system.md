@@ -39,7 +39,6 @@
 | `text-control`   | ボタン・操作ラベル（`--font-sans`と併用）            |
 | `text-label`     | セクション見出し・カテゴリラベル（uppercase等）      |
 | `text-mono`      | 時刻・件数・パス等の数値/等幅表示（`font-mono`併用） |
-| `text-badge`     | 通知バッジ等、丸ピル内の極小数字                     |
 
 13px以上（モーダル見出し・大きい数字表示など）はこのスケールの対象外で、個別に決めてよい。スケール外の現在値は `tokens.css` に無い `text-[Npx]` を `rg 'text-\[\d' client/src` で探すと拾える（正は実装）。
 
@@ -135,7 +134,7 @@ dialog を `useTopmostOpenModalDialog`（`shared/ui/`）で検出し、そのdia
 の形で、`priority` は次の2値のいずれか。
 
 - `"action"`: ユーザーが直前に行った操作の直接の結果（元に戻す・完了フィードバック等）
-- `"notice"`: スキャンの中止・失敗、DLsite取得の結果等、アプリ全体に関わる単発の通知
+- `"notice"`: スキャンの中止・失敗、DLsite取得の失敗等、アプリ全体に関わる単発の通知
 
 `dismissOnUnmount`（既定true）は発行元のアンマウントで要求を取り下げるかどうか。
 ダイアログ内のUndo通知のように発行元の生存期間だけ意味を持つ要求は既定のままでよいが、

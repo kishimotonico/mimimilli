@@ -25,7 +25,6 @@ import type {
 import {
   addWorkTag,
   applyDlsiteInfo,
-  applyDlsiteMissing,
   createWork,
   deleteWork,
   fetchDlsiteInfo,
@@ -43,7 +42,6 @@ import {
 } from "../api";
 import {
   updateCachesAfterBookmark,
-  updateCachesAfterDlsiteBulkApply,
   updateCachesAfterDlsiteLinkageChange,
   updateCachesAfterDlsitePreviewFetch,
   updateCachesAfterIdentityReassign,
@@ -229,13 +227,5 @@ export function useApplyDlsiteInfoMutation() {
   return useMutation<WorkSourceMutationResult, Error, { workId: string; body: DlsiteApplyBody }>({
     mutationFn: ({ workId, body }) => applyDlsiteInfo(workId, body),
     onSuccess: (result) => updateCachesAfterDlsiteLinkageChange(queryClient, result),
-  });
-}
-
-export function useApplyDlsiteMissingMutation() {
-  const queryClient = useQueryClient();
-  return useMutation<Awaited<ReturnType<typeof applyDlsiteMissing>>, Error, string[]>({
-    mutationFn: (workIds) => applyDlsiteMissing(workIds),
-    onSuccess: (_result, workIds) => updateCachesAfterDlsiteBulkApply(queryClient, workIds),
   });
 }

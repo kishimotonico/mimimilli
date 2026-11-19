@@ -11,9 +11,10 @@ import {
   detectRjCode,
   dlsiteStatePatchSchema,
   dlsiteInfoTags,
+  isDlsiteFetchFailed,
+  isDlsiteParseFailed,
   normalizeDlsiteAgeRating,
   type DlsiteWorkInfo,
-  fillUnsetDlsiteTags,
   mergeAppliedDlsiteTags,
 } from "@mimimilli/shared";
 import {
@@ -381,25 +382,7 @@ test("dlsiteStatePatchSchema: RJ/VJコードの手動入力を受け付け、そ
   assert.equal(unknownPrefix.success, false);
 });
 
-test("fillUnsetDlsiteTags: 未設定prefixだけを新規タグとして返す", () => {
-  const info: DlsiteWorkInfo = {
-    rjCode: "RJ900002",
-    title: "x",
-    circle: "夜想曲",
-    cvs: ["水瀬なずな", "新CV"],
-    genreTags: ["耳かき"],
-    ageRating: null,
-    coverUrl: null,
-    url: "",
-  };
-  const added = fillUnsetDlsiteTags(
-    nts(["サークル/夜想曲", "cv/水瀬なずな", "バイノーラル"]),
-    info,
-  );
-  assert.deepEqual(added, nts(["cv/新CV", "genre/耳かき"]));
-});
-
-test("fillUnsetDlsiteTags: ratingタグを追加する", () => {
+test("dlsiteInfoTags: ageRating を rating タグにする", () => {
   const info: DlsiteWorkInfo = {
     rjCode: "RJ900002",
     title: "x",
@@ -411,21 +394,6 @@ test("fillUnsetDlsiteTags: ratingタグを追加する", () => {
     url: "",
   };
   assert.deepEqual(dlsiteInfoTags(info), nts(["rating/R18"]));
-  assert.deepEqual(fillUnsetDlsiteTags(nts(["genre/耳かき"]), info), nts(["rating/R18"]));
-});
-
-test("fillUnsetDlsiteTags: サークル・ratingは既存に同prefixの値があれば異なる値でも追加しない", () => {
-  const info: DlsiteWorkInfo = {
-    rjCode: "RJ900002",
-    title: "x",
-    circle: "満月堂",
-    cvs: [],
-    genreTags: [],
-    ageRating: "R15",
-    coverUrl: null,
-    url: "",
-  };
-  assert.deepEqual(fillUnsetDlsiteTags(nts(["サークル/夜想曲", "rating/R18"]), info), []);
 });
 
 test("mergeAppliedDlsiteTags: 複数値prefix（cv・genre）は加算する", () => {
@@ -1994,14 +1962,14 @@ test("dlsiteFetch: abortでDLsite HTTP取得が中断される", async (t) => {
   release();
 });
 
-test("DLsite通知: 適用後は未連携件数から外れる", async (t) => {
+test("DLsite適用後は作品のdlsite.statusがappliedになる", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
   const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, lib.root);
   await adapter.scan();
-  const before = await adapter.getDlsiteNotificationSummary();
   const work = await adapter.getWork(lib.existingWorkId);
+  assert.equal(work?.dlsite.status, "none");
   const ok = await adapter.dlsiteApply(lib.existingWorkId, {
     info: {
       rjCode: "RJ900002",
@@ -2020,13 +1988,12 @@ test("DLsite通知: 適用後は未連携件数から外れる", async (t) => {
     sourceRevision: (await adapter.getWorkEditSnapshot(work!.id))!.sourceRevision,
   });
   assert.ok(ok);
-  const after = await adapter.getDlsiteNotificationSummary();
-  assert.equal(after.unlinkedCount, before.unlinkedCount - 1);
+  assert.equal((await adapter.getWork(lib.existingWorkId))?.dlsite.status, "applied");
 });
 
-test("DLsite通知: 取得失敗が取得失敗件数へ反映される", async (t) => {
+test("DLsiteの取得失敗は作品のdlsiteに取得失敗として残る", async (t) => {
   const lib = makeSampleLibrary();
-  const dir = makeTestDirectory("dlsite-notification-fetch-failed");
+  const dir = makeTestDirectory("dlsite-fetch-failed-state");
   t.after(lib.cleanup);
   t.after(dir.cleanup);
   const adapter = dir.own(
@@ -2041,30 +2008,18 @@ test("DLsite通知: 取得失敗が取得失敗件数へ反映される", async 
   );
   await configureRoot(adapter, lib.root);
   await adapter.scan();
-  const before = await adapter.getDlsiteNotificationSummary();
+  const before = await adapter.getWork(lib.existingWorkId);
+  assert.equal(isDlsiteFetchFailed(before!.dlsite), false);
   await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
-  const after = await adapter.getDlsiteNotificationSummary();
-  assert.equal(after.fetchFailedCount, before.fetchFailedCount + 1);
+  const after = await adapter.getWork(lib.existingWorkId);
+  assert.equal(isDlsiteFetchFailed(after!.dlsite), true);
 });
 
-test("DLsite通知: parse_error 警報が実データの流れで発火する", async (t) => {
+test("DLsiteのパース失敗は作品のdlsiteにパース失敗として残る", async (t) => {
   const lib = makeSampleLibrary();
-  const dir = makeTestDirectory("dlsite-notification-parse-alert");
+  const dir = makeTestDirectory("dlsite-parse-failed-state");
   t.after(lib.cleanup);
   t.after(dir.cleanup);
-  const duplicateIds = [
-    "44444444-4444-4444-8444-444444444441",
-    "44444444-4444-4444-8444-444444444442",
-    "44444444-4444-4444-8444-444444444443",
-  ];
-  for (const [index, workId] of duplicateIds.entries()) {
-    const duplicateDir = join(lib.root, "dlsite", `RJ900002_複製${index + 1}`);
-    cpSync(join(lib.root, "dlsite", "RJ900002_既存メタ"), duplicateDir, { recursive: true });
-    const metaPath = join(duplicateDir, "mimimilli.json");
-    const meta = JSON.parse(readFileSync(metaPath, "utf-8")) as { id: string };
-    meta.id = workId;
-    writeFileSync(metaPath, JSON.stringify(meta, null, 2));
-  }
   const adapter = dir.own(
     createRealAdapter({
       database: { kind: "memory" },
@@ -2077,8 +2032,8 @@ test("DLsite通知: parse_error 警報が実データの流れで発火する", 
   );
   await configureRoot(adapter, lib.root);
   await adapter.scan();
-  await fetchDlsiteOfWorks(adapter, undefined);
-  const summary = await adapter.getDlsiteNotificationSummary();
-  assert.ok(summary.parseErrorCount >= 3);
-  assert.equal(summary.parseErrorAlert, true);
+  await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
+  const work = await adapter.getWork(lib.existingWorkId);
+  assert.equal(isDlsiteParseFailed(work!.dlsite), true);
+  assert.equal(isDlsiteFetchFailed(work!.dlsite), false);
 });

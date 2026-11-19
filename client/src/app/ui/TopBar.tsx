@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
 import { useAtomValue, useSetAtom } from "jotai";
@@ -16,18 +16,12 @@ import {
   playingTrackTitleAtom,
 } from "../../entities/player/model/atoms";
 import { cn } from "../../shared/lib/cn";
-import { useScanning, useScanProgressLabel } from "../../entities/scan/useScanJob";
-import { useUnregisteredCandidateCount } from "../../features/scan/model/useScanCandidatesCache";
+import { useScanEntryStatus } from "../../features/scan/model/useScanEntryStatus";
+import ScanEntryButton from "./ScanEntryButton";
 
-interface TopBarProps {
-  notificationBell: ReactNode;
-}
-
-export default function TopBar({ notificationBell }: TopBarProps) {
+export default function TopBar() {
   const setActiveModal = useSetAtom(activeModalAtom);
-  const scanning = useScanning();
-  const scanProgressLabel = useScanProgressLabel();
-  const unregisteredCount = useUnregisteredCandidateCount();
+  const { ring, unseen } = useScanEntryStatus();
   const mode = useAtomValue(appModeAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
   const searchQuery = useAtomValue(librarySearchQueryAtom);
@@ -169,36 +163,11 @@ export default function TopBar({ notificationBell }: TopBarProps) {
         </div>
       )}
 
-      {scanning && (
-        <span className="font-mono text-mono text-ink-2" aria-live="polite">
-          {scanProgressLabel ?? "スキャン中..."}
-        </span>
-      )}
-      <div className="relative">
-        <IconButton
-          size="md"
-          icon={I.refresh}
-          label={
-            scanning
-              ? (scanProgressLabel ?? "スキャン中...")
-              : unregisteredCount > 0
-                ? `スキャン（未登録${unregisteredCount}件）`
-                : "スキャン"
-          }
-          onClick={() => setActiveModal({ kind: "scan" })}
-          className={scanning ? "animate-spin" : undefined}
-        />
-        {!scanning && unregisteredCount > 0 && (
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute top-0 right-0 flex h-[15px] min-w-[15px] items-center justify-center rounded-pill px-[3px] font-mono text-badge font-bold text-paper-1"
-            style={{ background: "var(--acc)" }}
-          >
-            {unregisteredCount > 99 ? "99+" : unregisteredCount}
-          </span>
-        )}
-      </div>
-      {notificationBell}
+      <ScanEntryButton
+        ring={ring}
+        unseen={unseen}
+        onOpen={() => setActiveModal({ kind: "scan" })}
+      />
       <IconButton
         size="md"
         icon={I.cog}

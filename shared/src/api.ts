@@ -13,7 +13,7 @@ import {
   workListItemSchema,
 } from "./work.ts";
 import { splitSelectedTags, type TagFilters } from "./pseudoTag.ts";
-import { dlsiteStatusSchema, rjCodeFormatSchema } from "./dlsite.ts";
+import { rjCodeFormatSchema } from "./dlsite.ts";
 import { workspacePathSchema } from "./media.ts";
 import { scanRecordKindSchema, workChangeKindSchema } from "./scan.ts";
 
@@ -128,42 +128,6 @@ export const axisFacetsQuerySchema = worksQueryBaseSchema
     smartFolder: z.string().optional(),
   });
 export type AxisFacetsQuery = z.infer<typeof axisFacetsQuerySchema>;
-
-// ── DLsite 通知 ─────────────────────────────────────────────
-
-/** 通知ベルが表示するDLsite状態の集計。通常の作品一覧とは独立して取得する。 */
-export const dlsiteNotificationSummarySchema = z.object({
-  rjCodeMissingCount: z.number().int().nonnegative(),
-  fetchFailedCount: z.number().int().nonnegative(),
-  parseErrorCount: z.number().int().nonnegative(),
-  parseErrorAlert: z.boolean(),
-  unlinkedCount: z.number().int().nonnegative(),
-});
-export type DlsiteNotificationSummary = z.infer<typeof dlsiteNotificationSummarySchema>;
-
-export const dlsiteNotificationKindSchema = z.enum(["rj-missing", "fetch-failed", "parse-failed"]);
-export type DlsiteNotificationKind = z.infer<typeof dlsiteNotificationKindSchema>;
-
-/** DLsite通知モーダルの最小行DTO。parse-failed 以外は rjCode は null。 */
-export const dlsiteNotificationItemSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  status: dlsiteStatusSchema,
-  rjCode: z.string().nullable(),
-});
-export type DlsiteNotificationItem = z.infer<typeof dlsiteNotificationItemSchema>;
-
-export const dlsiteNotificationPageSchema = z.object({
-  items: z.array(dlsiteNotificationItemSchema),
-  total: z.number().int().nonnegative(),
-});
-export type DlsiteNotificationPage = z.infer<typeof dlsiteNotificationPageSchema>;
-
-export const dlsiteNotificationQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).optional(),
-  limit: z.coerce.number().int().min(1).max(500).optional(),
-});
-export type DlsiteNotificationQuery = z.infer<typeof dlsiteNotificationQuerySchema>;
 
 /** GET /api/tags */
 export const tagListSchema = z.array(z.string());

@@ -12,7 +12,6 @@ import { ScanUpsertBatch } from "../../src/adapters/real/scanUpsertBatch.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
-import { fetchDlsiteOfWorks } from "../helpers/dlsiteFetch.ts";
 
 const OWNER_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const PLAYLIST_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -202,61 +201,6 @@ test("新規登録がunpublishedでも201になり同じpathの再投影でcatal
   assert.deepEqual(replayed.projection, { status: "published" });
   assert.equal(replayed.snapshot.title, "changed-during-project");
   assert.equal((await adapter.getWork(body.snapshot.id))?.title, "changed-during-project");
-});
-
-test("apply-missingは1件の投影例外をpendingに数え後続はappliedになる", async (t) => {
-  const directory = makeTestDirectory("projection-apply-missing-pending");
-  t.after(directory.cleanup);
-  const root = join(directory.path, "lib");
-  const firstId = "11111111-1111-4111-8111-111111111111";
-  const secondId = "22222222-2222-4222-8222-222222222222";
-  writeWork(join(root, "first"), firstId, "一件目");
-  writeWork(join(root, "second"), secondId, "二件目");
-  const firstMeta = JSON.parse(readFileSync(join(root, "first", "mimimilli.json"), "utf-8")) as {
-    dlsite: { rjCode: string | null };
-  };
-  firstMeta.dlsite.rjCode = "RJ900001";
-  writeFileSync(join(root, "first", "mimimilli.json"), `${JSON.stringify(firstMeta, null, 2)}\n`);
-  const secondMeta = JSON.parse(readFileSync(join(root, "second", "mimimilli.json"), "utf-8")) as {
-    dlsite: { rjCode: string | null };
-  };
-  secondMeta.dlsite.rjCode = "RJ900002";
-  writeFileSync(join(root, "second", "mimimilli.json"), `${JSON.stringify(secondMeta, null, 2)}\n`);
-
-  const { DEFAULT_DLSITE_REQUEST_CONFIG } = await import("../../src/adapters/real/dlsiteConfig.ts");
-  const { htmlResponse, mockDlsiteTransport, sampleWorkHtml } =
-    await import("../helpers/dlsiteTransport.ts");
-  const { createRealAdapter } = await import("../../src/adapters/real/index.ts");
-  const adapter = directory.own(
-    createRealAdapter({
-      database: { kind: "memory" },
-      dlsiteCache: { path: join(directory.path, "cache.sqlite") },
-      dlsiteRequestConfig: {
-        ...DEFAULT_DLSITE_REQUEST_CONFIG,
-        requestIntervalMs: 0,
-        retryCount: 0,
-      },
-      dlsiteSchedulerDependencies: mockDlsiteTransport({
-        html: (code) => htmlResponse(sampleWorkHtml(code, { title: "取得タイトル", cover: false })),
-      }),
-    }),
-  );
-  await configureRoot(adapter, root);
-  await adapter.scan({ full: true });
-  await fetchDlsiteOfWorks(adapter, [firstId, secondId]);
-
-  const spy = wrapUpsert((work) => {
-    if (work.id === firstId) throw new Error("catalog write failed");
-  });
-  t.after(() => spy.mockRestore());
-
-  const result = await adapter.dlsiteApplyMissing([firstId, secondId]);
-  assert.deepEqual(result, { applied: 1, pending: 1, skipped: 0, failed: 0 });
-  assert.equal(
-    JSON.parse(readFileSync(join(root, "first", "mimimilli.json"), "utf-8")).dlsite.status,
-    "applied",
-  );
-  assert.ok((await adapter.getWork(secondId))?.tags.length);
 });
 
 test("POST /works/projection の path は root 外・不存在なら invalid_request", async (t) => {

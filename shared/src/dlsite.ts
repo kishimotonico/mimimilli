@@ -7,7 +7,6 @@ import {
   normalizedTagInputArraySchema,
   type NormalizedTag,
 } from "./tagNormalize.ts";
-import type { WorkSummary } from "./work.ts";
 
 export const dlsiteStatusSchema = z.enum(["none", "applied", "not_found", "error", "skipped"]);
 export type DlsiteStatus = z.infer<typeof dlsiteStatusSchema>;
@@ -197,7 +196,7 @@ export function hasRjCode<T extends Pick<DlsiteState, "rjCode">>(
 
 /** RJコードが未検出のまま放置されている作品か（ユーザーが明示的にスキップした作品は除く）。
  *  `rjCode === ""` はユーザーが明示的にRJコードなしとした状態であり、未検出には含めない。
- *  スキャン完了通知・一覧の両方で判定基準を一致させるための正典 */
+ *  作品詳細の警告で判定基準を一致させるための正典 */
 export function isRjCodeMissing(state: Pick<DlsiteState, "rjCode" | "status">): boolean {
   return state.rjCode === null && state.status !== "skipped";
 }
@@ -221,29 +220,6 @@ export function isDlsiteFetchFailed(state: DlsiteState): boolean {
   return (
     state.status === "not_found" || (state.status === "error" && state.errorKind !== "parse_error")
   );
-}
-
-/** パース失敗が構造変更レベルで増えたかのしきい値（件数・割合の下限） */
-export const DLSITE_PARSE_ERROR_ALERT_MIN_COUNT = 3;
-export const DLSITE_PARSE_ERROR_ALERT_MIN_RATIO = 0.2;
-
-/** 分母はパース成功 + パース失敗（HTTPエラー・not_found はパース未到達のため含めない） */
-export function evaluateParseErrorAlert(
-  parseErrorCount: number,
-  parseSuccessCount: number,
-): boolean {
-  const attempted = parseErrorCount + parseSuccessCount;
-  return (
-    parseErrorCount >= DLSITE_PARSE_ERROR_ALERT_MIN_COUNT &&
-    attempted > 0 &&
-    parseErrorCount / attempted >= DLSITE_PARSE_ERROR_ALERT_MIN_RATIO
-  );
-}
-
-/** DLsite未連携（RJコードは判明しているが取得を一度も試みていない）作品か。
- *  通知の未連携件数の判定基準。取得失敗（error）は isDlsiteFetchFailed 側で別掲する。 */
-export function isDlsiteUnlinked(state: DlsiteState): boolean {
-  return hasRjCode(state) && state.status === "none";
 }
 
 export const DLSITE_AGE_RATINGS = ["全年齢", "R15", "R18"] as const;
@@ -338,37 +314,6 @@ function tagPrefixOf(tag: string): string {
   return tag.split("/", 1)[0] ?? "";
 }
 
-function hasTagWithPrefix(tags: readonly NormalizedTag[], prefix: string): boolean {
-  return tags.some((tag) => tagPrefixOf(tag) === prefix);
-}
-
-/** 一括適用（fill-unset）: 単一値prefix（サークル・rating）は、既存に同prefixのタグが
- *  1つでもあれば追加しない。複数値prefix（cv・genre）は完全一致のみ除外して加算する。
- *  返り値は既存タグへ新たに追加する分だけ（既存値は上書きしない） */
-export function fillUnsetDlsiteTags(
-  existing: readonly NormalizedTag[],
-  info: DlsiteWorkInfo,
-): NormalizedTag[] {
-  return dlsiteInfoTags(info).filter((tag) => {
-    if (existing.includes(tag)) return false;
-    const prefix = tagPrefixOf(tag);
-    if (SINGLE_VALUE_DLSITE_PREFIXES.has(prefix)) return !hasTagWithPrefix(existing, prefix);
-    return true;
-  });
-}
-
-/** dlsiteApplyMissing / dlsiteApplyMissingPreview が real/fixture 両 adapter で共有する差分計算。
- *  既存値は上書きしない */
-export function computeMissingDiff(
-  work: Pick<WorkSummary, "tags" | "cover" | "urls">,
-  info: DlsiteWorkInfo,
-): { newTags: NormalizedTag[]; applyCover: boolean; applyUrl: boolean } {
-  const newTags = fillUnsetDlsiteTags(work.tags, info);
-  const applyCover = !work.cover && info.coverUrl !== null;
-  const applyUrl = !hasDlsiteUrl(work.urls);
-  return { newTags, applyCover, applyUrl };
-}
-
 /** dlsiteApply（単体適用）のパッチ。cover は非同期I/Oを伴うため呼び出し側が別途解決し、
  *  パッチには含めない。title/tags/urls は未変更なら undefined。 */
 export interface DlsiteApplyPatch {
@@ -384,7 +329,7 @@ interface DlsiteApplyCurrent {
   dlsite: MetaDlsiteState;
 }
 
-/** 単体適用・欠落適用が共有する tags/urls/linkage の組み立て。linkage は status: "applied" にする */
+/** 単体適用の tags/urls/linkage の組み立て。linkage は status: "applied" にする */
 function buildDlsiteTagsUrlsPatch(
   current: DlsiteApplyCurrent,
   info: DlsiteWorkInfo,
@@ -422,18 +367,6 @@ export function buildDlsiteApplyPatch(
     title: dlsiteTitleToApply(body.info, body.applyTitle),
     ...buildDlsiteTagsUrlsPatch(current, body.info, body.applyTags, body.applyUrl),
   };
-}
-
-/** dlsiteApplyMissing（未設定項目まとめ適用）のtags/urls/linkageパッチを組み立てる。
- *  real/fixture 両adapterが共有する。差分が無ければnull（何も書かない）。
- *  title/coverはこの関数の対象外。 */
-export function buildDlsiteMissingApplyPatch(
-  current: DlsiteApplyCurrent,
-  info: DlsiteWorkInfo,
-  diff: { newTags: readonly NormalizedTag[]; applyCover: boolean; applyUrl: boolean },
-): Omit<DlsiteApplyPatch, "title"> | null {
-  if (diff.newTags.length === 0 && !diff.applyCover && !diff.applyUrl) return null;
-  return buildDlsiteTagsUrlsPatch(current, info, diff.newTags, diff.applyUrl);
 }
 
 /** 単体適用（replace）: ユーザーが明示的に選んだタグ（applyTags）を既存タグへ反映する。
@@ -539,37 +472,6 @@ export function planDlsiteRegistration(input: {
     },
   };
 }
-
-/** POST /api/dlsite/apply-missing のリクエスト。workIds 省略時は全作品対象。 */
-export const dlsiteApplyMissingBodySchema = z.object({
-  workIds: z.array(z.string()).optional(),
-});
-export type DlsiteApplyMissingBody = z.infer<typeof dlsiteApplyMissingBodySchema>;
-
-export const dlsiteBulkApplyMissingResultSchema = z.object({
-  applied: z.number().int().nonnegative(),
-  pending: z.number().int().nonnegative(),
-  skipped: z.number().int().nonnegative(),
-  failed: z.number().int().nonnegative(),
-});
-export type DlsiteBulkApplyMissingResult = z.infer<typeof dlsiteBulkApplyMissingResultSchema>;
-
-/** 「未設定項目をまとめて適用」の対象作品1件分の差分。既存値を上書きする項目は含まない
- *  （適用前に差分を表示し、ユーザーが対象を選んでから適用する） */
-export const dlsiteApplyMissingPreviewItemSchema = z.object({
-  workId: z.string(),
-  title: z.string(),
-  newTags: normalizedTagArraySchema,
-  applyCover: z.boolean(),
-  applyUrl: z.boolean(),
-});
-export type DlsiteApplyMissingPreviewItem = z.infer<typeof dlsiteApplyMissingPreviewItemSchema>;
-
-/** POST /api/dlsite/apply-missing/preview の応答。何も変わらない作品は含まない */
-export const dlsiteApplyMissingPreviewSchema = z.object({
-  items: z.array(dlsiteApplyMissingPreviewItemSchema),
-});
-export type DlsiteApplyMissingPreview = z.infer<typeof dlsiteApplyMissingPreviewSchema>;
 
 export const dlsiteStatePatchSchema = z
   .object({

@@ -28,7 +28,6 @@ import { createFakeScanJobStore } from "../helpers/fakeJobStores";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import { apiError, apiNoContent, mockApi, type ApiMock, type ApiRequest } from "../helpers/api";
 import {
-  buildDlsiteNotificationSummary,
   buildScanCandidate,
   buildScanCandidatesRegisterResponse,
   buildScanDiagnostics,
@@ -147,7 +146,6 @@ beforeEach(() => {
     "GET /api/scan/candidates/exclusions": { paths: [] },
     "GET /api/scan/last": () => apiNoContent(),
     "GET /api/scan/diagnostics": buildScanDiagnostics(),
-    "GET /api/dlsite/notifications": buildDlsiteNotificationSummary(),
     "GET /api/settings": buildSettings(),
   });
 });
@@ -684,7 +682,6 @@ describe("ScanModal", () => {
 
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["works"] }));
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["axisFacets"] });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["dlsiteNotifications"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["smartFolderWorks"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: SCAN_QUERY_KEYS.last() });
   });

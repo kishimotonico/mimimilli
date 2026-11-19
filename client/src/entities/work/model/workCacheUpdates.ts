@@ -20,7 +20,6 @@ async function invalidateLibraryViews(queryClient: QueryClient): Promise<void> {
     queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() }),
     queryClient.invalidateQueries({ queryKey: TAG_QUERY_KEYS.all() }),
     queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() }),
-    queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.dlsiteNotifications() }),
   ]);
 }
 
@@ -162,25 +161,13 @@ export function updateCachesAfterDlsiteLinkageChange(
   return updateCachesAfterSourceMutation(queryClient, result);
 }
 
-/** DLsite 情報の取得後。失敗時も取得キャッシュと通知が変わるため成否を問わず呼ぶ */
+/** DLsite 情報の取得後。失敗時も取得キャッシュが変わるため成否を問わず呼ぶ */
 export async function updateCachesAfterDlsitePreviewFetch(
   queryClient: QueryClient,
   workId: string,
 ): Promise<void> {
   await Promise.all([
     invalidateWorkDetail(queryClient, workId),
-    invalidateLibraryViews(queryClient),
-  ]);
-}
-
-export async function updateCachesAfterDlsiteBulkApply(
-  queryClient: QueryClient,
-  workIds: readonly string[],
-): Promise<void> {
-  await Promise.all([
-    ...workIds.map((workId) =>
-      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(workId) }),
-    ),
     invalidateLibraryViews(queryClient),
   ]);
 }

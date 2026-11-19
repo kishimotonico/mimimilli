@@ -2,10 +2,6 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type {
   DataIntegrityWarning,
-  DlsiteNotificationKind,
-  DlsiteNotificationPage,
-  DlsiteNotificationQuery,
-  DlsiteNotificationSummary,
   IdentityConflictReassignBody,
   IdentityConflict,
   NormalizedTag,
@@ -111,17 +107,6 @@ export function createWorkMethods(deps: {
   return {
     async queryWorks(params: WorksQuery): Promise<WorksPage> {
       return query.queryWorks(params, requireRoot());
-    },
-
-    async getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary> {
-      return query.getDlsiteNotificationSummary();
-    },
-
-    async queryDlsiteNotifications(
-      kind: DlsiteNotificationKind,
-      queryParams: Required<DlsiteNotificationQuery>,
-    ): Promise<DlsiteNotificationPage> {
-      return query.queryDlsiteNotifications(kind, queryParams);
     },
 
     async getWork(id: string): Promise<Work | null> {

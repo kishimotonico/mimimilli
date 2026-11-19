@@ -1,12 +1,9 @@
 import {
   applyDlsiteStatePatch,
   buildDlsiteApplyPatch,
-  buildDlsiteMissingApplyPatch,
-  computeMissingDiff,
   workPlacementOf,
   type DlsiteApplyBody,
   type DlsiteStateUpdateBody,
-  type DlsiteWorkInfo,
   type MetaDlsiteState,
   type NormalizedTag,
   type WorkSourceMutationResult,
@@ -29,12 +26,6 @@ export interface DlsiteApplyDeps {
   scanner: Scanner;
   dlsiteCache: DlsiteCache;
   requireRoot: () => string;
-}
-
-function coverStub(coverImage: string | null) {
-  return coverImage
-    ? { image: coverImage, dimensions: { width: 1, height: 1 }, version: "source" }
-    : null;
 }
 
 function applyDlsiteMergeToRaw(
@@ -111,70 +102,6 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
       } finally {
         cover?.discard();
       }
-    },
-
-    async applyDlsiteMissingItem(
-      workId: string,
-      info: DlsiteWorkInfo,
-    ): Promise<"applied" | "skipped" | "missing" | "pending"> {
-      const current = readVerifiedEditSource(catalog, workId);
-      if (!current) return "missing";
-      const planned = computeMissingDiff(
-        {
-          tags: current.source.meta.tags,
-          urls: current.source.meta.urls,
-          cover: coverStub(current.source.meta.coverImage ?? null),
-        },
-        info,
-      );
-      if (planned.newTags.length === 0 && !planned.applyCover && !planned.applyUrl) {
-        return "skipped";
-      }
-
-      const coverUrl = planned.applyCover ? info.coverUrl : null;
-      const cover = coverUrl
-        ? await stageCachedDlsiteCover(
-            dlsiteCache,
-            coverUrl,
-            workPlacementOf(current.metaPath).mediaRoot,
-            requireRoot(),
-          )
-        : null;
-
-      let wrote = false;
-      let verified: ReturnType<typeof mutateVerifiedMetaSource>;
-      try {
-        verified = mutateVerifiedMetaSource(catalog, workId, (source) => {
-          const diff = computeMissingDiff(
-            {
-              tags: source.meta.tags,
-              urls: source.meta.urls,
-              cover: coverStub(source.meta.coverImage ?? null),
-            },
-            info,
-          );
-          if (!cover) diff.applyCover = false;
-          const patch = buildDlsiteMissingApplyPatch(
-            { tags: source.meta.tags, urls: source.meta.urls, dlsite: source.meta.dlsite },
-            info,
-            diff,
-          );
-          if (!patch) return source.bytes;
-          wrote = true;
-          const applied = diff.applyCover ? cover : null;
-          applied?.commit();
-          return applyDlsiteMergeToRaw(source.bytes, {
-            ...patch,
-            coverImage: applied?.fileName,
-          });
-        });
-      } finally {
-        cover?.discard();
-      }
-      if (!verified) return "missing";
-      if (!wrote) return "skipped";
-      const projected = await projectVerifiedSource(scanner, verified);
-      return projected.projection.status === "published" ? "applied" : "pending";
     },
 
     async updateDlsiteState(

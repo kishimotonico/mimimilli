@@ -1,8 +1,7 @@
 import type { WorkspacePath } from "@mimimilli/shared";
 import { lazy, Suspense, useCallback } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
-import { activeModalAtom, isDlsiteNotificationModal } from "../../shared/model/activeModalAtom";
-import DlsiteNotificationModals from "../../features/dlsite/ui/DlsiteNotificationModals";
+import { activeModalAtom } from "../../shared/model/activeModalAtom";
 
 const SettingsModal = lazy(() => import("../../features/settings/ui/SettingsModal"));
 const ScanModal = lazy(() => import("../../features/scan/ui/ScanModal"));
@@ -13,24 +12,20 @@ interface AppModalsProps {
   onExport: () => void;
   onOpenFiles: (path: WorkspacePath) => void;
   onOpenWorkDetail: (workId: string) => void;
-  onOpenWork: (workId: string) => void;
 }
 
 // activeModalAtom を読む唯一の場所。どのモーダルを表示するかの判断をここへ集約し、
-// 各モーダル本体（SettingsModal / ScanModal / DlsiteNotificationModals）は props 駆動のまま保つ。
+// 各モーダル本体（SettingsModal / ScanModal）は props 駆動のまま保つ。
 export default function AppModals({
   lastScanTime,
   onChangeFolder,
   onExport,
   onOpenFiles,
   onOpenWorkDetail,
-  onOpenWork,
 }: AppModalsProps) {
   const activeModal = useAtomValue(activeModalAtom);
   const setActiveModal = useSetAtom(activeModalAtom);
   const handleClose = useCallback(() => setActiveModal(null), [setActiveModal]);
-  const dlsiteModalKind =
-    activeModal && isDlsiteNotificationModal(activeModal.kind) ? activeModal.kind : null;
 
   return (
     <>
@@ -49,18 +44,12 @@ export default function AppModals({
         <Suspense fallback={null}>
           <ScanModal
             lastScanTime={lastScanTime}
-            initialTab={activeModal.tab}
             onClose={handleClose}
             onOpenFiles={onOpenFiles}
             onOpenWorkDetail={onOpenWorkDetail}
           />
         </Suspense>
       )}
-      <DlsiteNotificationModals
-        activeModal={dlsiteModalKind}
-        onClose={handleClose}
-        onOpenWork={onOpenWork}
-      />
     </>
   );
 }

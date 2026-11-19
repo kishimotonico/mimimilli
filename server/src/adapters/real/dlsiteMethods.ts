@@ -1,11 +1,8 @@
 import { basename } from "node:path";
 import {
-  computeMissingDiff,
   detectRjCode,
-  hasRjCode,
   dlsiteProductFetchOutcomeOfResult,
   errorMessage,
-  type DlsiteApplyMissingPreviewItem,
   type DlsiteFetchResult,
   type DlsiteProductFetchOutcome,
 } from "@mimimilli/shared";
@@ -23,9 +20,6 @@ import { createDlsiteFetch } from "./dlsiteFetch.ts";
 import { cachedCoverOf } from "./scanCandidateDlsite.ts";
 import { createDlsiteApply } from "./dlsiteApply.ts";
 import { sniffImageContentType } from "./dlsiteCoverStaging.ts";
-import { MetaParseError } from "./meta.ts";
-import { readVerifiedEditSource } from "./workEditSource.ts";
-import { SourceConflictError, SourceParseError } from "../../errors.ts";
 import {
   refreshWorkDlsiteProjection,
   shouldRefreshDlsiteProjectionAfterFetch,
@@ -145,85 +139,6 @@ export function createDlsiteMethods(deps: {
       } finally {
         if (options.signal?.aborted) await fetch.dlsiteScheduler.drain();
       }
-    },
-
-    async dlsiteApplyMissing(workIds?: string[]) {
-      const { summaries } = query.listSummaries(workIds);
-      const result = { applied: 0, pending: 0, skipped: 0, failed: 0 };
-      for (const summary of summaries) {
-        if (!hasRjCode(summary.dlsite) || summary.dlsite.status === "skipped") {
-          result.skipped += 1;
-          continue;
-        }
-        try {
-          const fetched = await fetch.fetchCachedDlsite(summary.dlsite.rjCode);
-          if (shouldRefreshDlsiteProjectionAfterFetch(fetched)) {
-            refreshWorkDlsiteProjection(catalog, summary.id, dlsiteCache);
-          }
-          if (!fetched.ok) {
-            result.failed += 1;
-            continue;
-          }
-          const outcome = await apply.applyDlsiteMissingItem(summary.id, fetched.info);
-          if (outcome === "applied") result.applied += 1;
-          else if (outcome === "pending") result.pending += 1;
-          else result.skipped += 1;
-        } catch {
-          result.failed += 1;
-        }
-      }
-      return result;
-    },
-
-    async dlsiteApplyMissingPreview(workIds?: string[]) {
-      const { summaries } = query.listSummaries(workIds);
-      const items: DlsiteApplyMissingPreviewItem[] = [];
-      for (const summary of summaries) {
-        if (!hasRjCode(summary.dlsite) || summary.dlsite.status === "skipped") continue;
-        let fetched: DlsiteFetchResult | undefined;
-        let verified;
-        try {
-          fetched = await fetch.fetchCachedDlsite(summary.dlsite.rjCode);
-          if (shouldRefreshDlsiteProjectionAfterFetch(fetched)) {
-            refreshWorkDlsiteProjection(catalog, summary.id, dlsiteCache);
-          }
-          if (!fetched.ok) continue;
-          verified = readVerifiedEditSource(catalog, summary.id);
-        } catch (error) {
-          if (
-            error instanceof SourceParseError ||
-            error instanceof SourceConflictError ||
-            error instanceof MetaParseError
-          ) {
-            continue;
-          }
-          throw error;
-        }
-        if (!fetched?.ok || !verified) continue;
-        const { newTags, applyCover, applyUrl } = computeMissingDiff(
-          {
-            tags: verified.source.meta.tags,
-            urls: verified.source.meta.urls,
-            cover: verified.source.meta.coverImage
-              ? {
-                  image: verified.source.meta.coverImage,
-                  dimensions: { width: 1, height: 1 },
-                  version: "source",
-                }
-              : null,
-          },
-          fetched.info,
-        );
-        if (newTags.length === 0 && !applyCover && !applyUrl) continue;
-        items.push({
-          workId: summary.id,
-          title: verified.source.meta.title,
-          newTags,
-          applyCover,
-          applyUrl,
-        });
-      }
-      return { items };
     },
 
     ...apply,

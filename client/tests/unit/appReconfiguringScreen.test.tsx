@@ -4,13 +4,11 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../../src/app/App";
-import DlsiteBulkApplyRuntime from "../../src/features/dlsite/ui/DlsiteBulkApplyRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import NavigationHistorySync from "../../src/features/navigation/ui/NavigationHistorySync";
 import { PlayerRuntimeProvider } from "../../src/entities/player/model/PlayerRuntimeProvider";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
-import { dlsiteBulkApplyOpenAtom } from "../../src/entities/dlsite/model/bulkAtoms";
 import { appModeAtom, setAppModeAtom } from "../../src/entities/navigation/model/appRouteStore";
 import {
   filesRelPathAtom,
@@ -30,11 +28,9 @@ import { buildScanRecord, buildSettings } from "../helpers/builders";
 const DLSITE_JOB_START_ROUTE = "POST /api/dlsite/jobs";
 const DLSITE_JOB_CURRENT_ROUTE = "GET /api/dlsite/jobs/current";
 const LAST_SCAN_ROUTE = "GET /api/scan/last";
-const PREVIEW_ROUTE = "POST /api/dlsite/apply-missing/preview";
 
 let api: ApiMock;
 let serverSettings: Settings;
-let previewReply: () => unknown;
 
 function settingsOf(
   rootReconfiguration: Settings["rootReconfiguration"],
@@ -64,7 +60,6 @@ function renderAppWithSettings(settings: Settings) {
         createElement(
           PlayerRuntimeProvider,
           null,
-          createElement(DlsiteBulkApplyRuntime),
           createElement(NavigationHistorySync),
           createElement(ScanRuntime),
           createElement(App),
@@ -92,12 +87,10 @@ beforeEach(() => {
   sessionStorage.clear();
   history.replaceState(null, "", "/");
   serverSettings = settingsOf({ status: "idle", completedAt: null });
-  previewReply = () => new Promise(() => {});
   api = mockApi(
     appShellRoutes({
       "GET /api/settings": () => serverSettings,
       [LAST_SCAN_ROUTE]: () => buildScanRecord(),
-      [PREVIEW_ROUTE]: () => previewReply(),
       "POST /api/root-reconfiguration": () => ({
         status: "running",
         rootFolder: "/new/root",
@@ -212,19 +205,16 @@ describe("root再設定突入時のモーダル初期化", () => {
   });
 });
 
-describe("root再設定突入時のDLsite一括適用ダイアログ初期化", () => {
-  it("プレビューを開いたままreconfiguringに入ると閉じる", async () => {
-    // プレビュー取得を解決させないことで、dlsiteBulkApplyOpenAtomがopen中の
-    // 内部エフェクト（失敗時に自動でreset()する）に邪魔されず、突入リセットだけを縛れる。
-    previewReply = () => new Promise(() => {});
-
-    const { queryClient, store } = renderAppWithSettings(
+describe("root再設定突入時のスキャン入口の記憶", () => {
+  it("前回開いたときの記憶を捨てる", async () => {
+    localStorage.setItem(
+      "mimimilli:scanEntrySeen",
+      JSON.stringify({ candidates: ["a"], needsAttention: [] }),
+    );
+    const { queryClient } = renderAppWithSettings(
       settingsOf({ status: "idle", completedAt: null }),
     );
     await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
-
-    store.set(dlsiteBulkApplyOpenAtom, true);
-    expect(store.get(dlsiteBulkApplyOpenAtom)).toBe(true);
 
     queryClient.setQueryData(
       SETTINGS_QUERY_KEYS.all(),
@@ -234,7 +224,7 @@ describe("root再設定突入時のDLsite一括適用ダイアログ初期化", 
     await waitFor(() =>
       expect(screen.getByText("ライブラリを再構築しています")).toBeInTheDocument(),
     );
-    expect(store.get(dlsiteBulkApplyOpenAtom)).toBe(false);
+    expect(localStorage.getItem("mimimilli:scanEntrySeen")).toBeNull();
   });
 });
 

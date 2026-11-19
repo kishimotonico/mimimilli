@@ -375,19 +375,6 @@ describe("work api", () => {
       "/api/media/audio/RJ001001/track01.mp3",
     );
   });
-
-  it("getDlsiteNotificationSummary fetches the dedicated endpoint", async () => {
-    const summary = {
-      rjCodeMissingCount: 2,
-      fetchFailedCount: 1,
-      parseErrorCount: 0,
-      parseErrorAlert: false,
-      unlinkedCount: 3,
-    };
-    mockFetch.mockResolvedValue(makeResponse(summary));
-    await expect(workApi.getDlsiteNotificationSummary()).resolves.toEqual(summary);
-    expect(mockFetch).toHaveBeenCalledWith("/api/dlsite/notifications");
-  });
 });
 
 describe("library api", () => {

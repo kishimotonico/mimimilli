@@ -16,7 +16,6 @@ import AppBody from "./AppBody";
 import TopBar from "./ui/TopBar";
 import LeftNav from "./ui/LeftNav";
 import AddressBar from "./ui/AddressBar";
-import NotificationBell from "./ui/NotificationBell";
 import { SETTINGS_QUERY_KEYS } from "../entities/settings/queryKeys";
 import PlayerDock from "../features/player/ui/PlayerDock";
 import { resolveAppStartupState } from "./model/resolveAppStartupState";
@@ -186,7 +185,7 @@ export default function App() {
     <MotionConfig reducedMotion="user">
       <LibraryNavigationProvider>
         <AppShell
-          topBar={<TopBar notificationBell={<NotificationBell />} />}
+          topBar={<TopBar />}
           addressBar={<AddressBar />}
           leftNav={<LeftNav />}
           body={<AppBody onOpenWorkDetail={handleOpenWorkDetail} />}
@@ -201,7 +200,6 @@ export default function App() {
                 onExport={handleExport}
                 onOpenFiles={handleOpenScanProblemInFiles}
                 onOpenWorkDetail={handleOpenScanWorkDetail}
-                onOpenWork={handleOpenLibraryWork}
               />
               <GlobalToast />
             </>

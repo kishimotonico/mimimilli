@@ -17,11 +17,7 @@ import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import type { WorkSummary } from "../../src/entities/work/model";
 import { createFakeDlsiteJobStore, createFakeScanJobStore } from "../helpers/fakeJobStores";
 import { mockApi } from "../helpers/api";
-import {
-  buildDlsiteNotificationSummary,
-  buildScanRecord,
-  buildSettings,
-} from "../helpers/builders";
+import { buildScanRecord, buildSettings } from "../helpers/builders";
 import { seedLibraryRoute } from "../helpers/route";
 
 let appShellCallCount = 0;
@@ -41,8 +37,6 @@ function JotaiSubscriptionProbe() {
   jotaiProbeRenderCount += 1;
   return null;
 }
-
-const summaryDefaults = buildDlsiteNotificationSummary();
 
 const work: WorkSummary = {
   id: "work-1",
@@ -84,7 +78,6 @@ function seedQueryCache(queryClient: QueryClient) {
   );
   queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
   queryClient.setQueryData(WORK_QUERY_KEYS.total(), 0);
-  queryClient.setQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary(), summaryDefaults);
 }
 
 function createTestQueryClient() {
@@ -238,27 +231,6 @@ describe("App root subscriptions", () => {
     });
   });
 
-  describe("notification summary", () => {
-    it("summary query の更新で App が再レンダリングされない", async () => {
-      const { queryClient } = renderApp();
-      const baseline = await waitForAppShellBaseline();
-
-      await act(async () => {
-        queryClient.setQueryData(
-          WORK_QUERY_KEYS.dlsiteNotificationSummary(),
-          buildDlsiteNotificationSummary({ rjCodeMissingCount: 5 }),
-        );
-      });
-
-      await waitFor(() =>
-        expect(
-          queryClient.getQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary())?.rjCodeMissingCount,
-        ).toBe(5),
-      );
-      expect(appShellCallCount).toBe(baseline);
-    });
-  });
-
   describe("library search query", () => {
     it("検索語の更新で App が再レンダリングされない", async () => {
       const { store } = renderApp();
@@ -329,7 +301,7 @@ describe("App root subscriptions", () => {
   });
 
   describe("library total / last scan query", () => {
-    // libraryTotalQuery / lastScanQuery を ScanModal・NotificationBell が購読し、App は購読しないことのテスト。
+    // libraryTotalQuery / lastScanQuery を ScanModal・TopBar が購読し、App は購読しないことのテスト。
     // trackedProps が空の観測者は無条件通知にフォールバックする（TanStack Query v5）ため、
     // App がこれらの query を直接持つと fetchStatus 等の変化だけでも再レンダリングされてしまう。
     it("ライブラリ総件数クエリの更新で App が再レンダリングされない", async () => {

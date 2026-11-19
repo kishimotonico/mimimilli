@@ -16,8 +16,6 @@ import {
   workSchema,
   worksPageSchema,
   dlsitePreviewSchema,
-  dlsiteApplyMissingPreviewSchema,
-  dlsiteBulkApplyMissingResultSchema,
   missingWorksCountSchema,
   workCreateResponseSchema,
   identityConflictReassignResponseSchema,
@@ -33,11 +31,6 @@ import {
   workBookmarkResultSchema,
   workEditSnapshotSchema,
   workSourceMutationResultSchema,
-  dlsiteNotificationPageSchema,
-  dlsiteNotificationSummarySchema,
-  type DlsiteNotificationKind,
-  type DlsiteNotificationPage,
-  type DlsiteNotificationSummary,
   type WorkBookmarkPatch,
   type WorkBookmarkResult,
   type WorkEditSnapshot,
@@ -86,18 +79,6 @@ export async function getWork(id: string): Promise<Work> {
 
 export async function prepareWorkPlayback(id: string): Promise<Work> {
   return postParsed(workSchema, `/works/${encodeURIComponent(id)}/playback-preparation`);
-}
-
-export async function getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary> {
-  return getParsed(dlsiteNotificationSummarySchema, "/dlsite/notifications");
-}
-
-export async function queryDlsiteNotifications(
-  kind: DlsiteNotificationKind,
-  params: { page: number; limit: number },
-): Promise<DlsiteNotificationPage> {
-  const query = new URLSearchParams({ page: String(params.page), limit: String(params.limit) });
-  return getParsed(dlsiteNotificationPageSchema, `/dlsite/notifications/${kind}?${query}`);
 }
 
 export async function getWorkEditSnapshot(id: string): Promise<WorkEditSnapshot> {
@@ -258,20 +239,4 @@ export async function updateDlsiteState(
   body: DlsiteStateUpdateBody,
 ): Promise<WorkSourceMutationResult> {
   return patchParsed(workSourceMutationResultSchema, `/dlsite/${encodeURIComponent(workId)}`, body);
-}
-
-export async function applyDlsiteMissing(workIds?: string[]) {
-  return postParsed(
-    dlsiteBulkApplyMissingResultSchema,
-    "/dlsite/apply-missing",
-    workIds ? { workIds } : undefined,
-  );
-}
-
-export async function previewDlsiteMissing(workIds?: string[]) {
-  return postParsed(
-    dlsiteApplyMissingPreviewSchema,
-    "/dlsite/apply-missing/preview",
-    workIds ? { workIds } : undefined,
-  );
 }

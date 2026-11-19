@@ -24,8 +24,6 @@ import type { CandidatesRegisteredResult, ScanTabKey } from "./scanModal/types";
 interface ScanModalProps {
   lastScanTime: string | null;
   onClose: () => void;
-  /** 開いた時点で選択するタブ。省略時は未登録タブ（通知ベルから要対応タブへ直接遷移するため） */
-  initialTab?: ScanTabKey;
   onOpenFiles: (path: WorkspacePath) => void;
   onOpenWorkDetail: (workId: string) => void;
 }
@@ -33,14 +31,13 @@ interface ScanModalProps {
 export default function ScanModal({
   lastScanTime,
   onClose,
-  initialTab = "unregistered",
   onOpenFiles,
   onOpenWorkDetail,
 }: ScanModalProps) {
   const scanning = useScanning();
   const progress = useScanProgress();
   const { start, cancel } = useScanJobStore();
-  const [activeTab, setActiveTab] = useState<ScanTabKey>(initialTab);
+  const [activeTab, setActiveTab] = useState<ScanTabKey>("unregistered");
   const toast = useToast();
 
   const handleUnregisteredRegistered = ({

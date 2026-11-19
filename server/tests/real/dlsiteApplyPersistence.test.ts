@@ -236,229 +236,6 @@ test("Filesの作品登録はキャッシュのDLsite情報を使い、タイト
   assert.deepEqual(meta.urls, [{ label: "DLsite", url: cachedUrl }]);
 });
 
-test("missing-only一括適用はcache結果だけを使い、既存フィールドを上書きしない", async (t) => {
-  const lib = makeSampleLibrary();
-  const dir = makeTestDirectory("dlsite-apply-missing-cache");
-  t.after(lib.cleanup);
-  t.after(dir.cleanup);
-  let htmlCalls = 0;
-  const adapter = dir.own(
-    createRealAdapter({
-      database: { kind: "memory" },
-      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-      dlsiteSchedulerDependencies: mockDlsiteTransport({
-        html: (code) => {
-          htmlCalls += 1;
-          return htmlResponse(sampleWorkHtml(code, { title: "取得タイトル", cover: false }));
-        },
-      }),
-    }),
-  );
-  await configureRoot(adapter, lib.root);
-  await adapter.scan();
-  const before = await adapter.getWork(lib.existingWorkId);
-  const metaPath = join(before!.physicalPath, META_FILE_NAME);
-  const bytesBefore = readFileSync(metaPath);
-
-  await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
-  assert.equal(htmlCalls, 1);
-  assert.deepEqual(readFileSync(metaPath), bytesBefore);
-
-  const applied = await adapter.dlsiteApplyMissing([lib.existingWorkId]);
-  assert.equal(applied.applied, 1);
-  assert.equal(htmlCalls, 1);
-  const after = await adapter.getWork(lib.existingWorkId);
-  assert.equal(after?.title, before?.title);
-  assert.notDeepEqual(readFileSync(metaPath), bytesBefore);
-  assert.ok(after?.tags.length && after.tags.length > before!.tags.length);
-
-  assert.deepEqual(await adapter.dlsiteApplyMissing([lib.existingWorkId]), {
-    applied: 0,
-    pending: 0,
-    skipped: 1,
-    failed: 0,
-  });
-});
-
-test("missing-only一括適用プレビューは書き込みをせず、適用と同じ差分を返す", async (t) => {
-  const lib = makeSampleLibrary();
-  const dir = makeTestDirectory("dlsite-apply-missing-preview");
-  t.after(lib.cleanup);
-  t.after(dir.cleanup);
-  const adapter = dir.own(
-    createRealAdapter({
-      database: { kind: "memory" },
-      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-      dlsiteSchedulerDependencies: mockDlsiteTransport({
-        html: (code) => htmlResponse(sampleWorkHtml(code, { title: "取得タイトル", cover: false })),
-      }),
-    }),
-  );
-  await configureRoot(adapter, lib.root);
-  await adapter.scan();
-  const before = await adapter.getWork(lib.existingWorkId);
-  const metaPath = join(before!.physicalPath, META_FILE_NAME);
-  const bytesBefore = readFileSync(metaPath);
-
-  await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
-
-  const preview = await adapter.dlsiteApplyMissingPreview([lib.existingWorkId]);
-  assert.equal(preview.items.length, 1);
-  assert.equal(preview.items[0]?.workId, lib.existingWorkId);
-  assert.ok(preview.items[0]!.newTags.length > 0);
-  assert.deepEqual(readFileSync(metaPath), bytesBefore, "プレビューはmetaを書き換えない");
-
-  const applied = await adapter.dlsiteApplyMissing([lib.existingWorkId]);
-  assert.equal(applied.applied, 1);
-  const after = await adapter.getWork(lib.existingWorkId);
-  assert.deepEqual(
-    preview.items[0]!.newTags.sort(),
-    after!.tags.filter((tag) => !before!.tags.includes(tag)).sort(),
-  );
-
-  assert.deepEqual(await adapter.dlsiteApplyMissingPreview([lib.existingWorkId]), { items: [] });
-});
-
-function writeMinimalLibraryWork(directory: string, id: string, title: string, rjCode: string) {
-  mkdirSync(directory, { recursive: true });
-  writeWav(join(directory, "track.wav"), 1);
-  writeFileSync(
-    join(directory, META_FILE_NAME),
-    `${JSON.stringify(
-      {
-        formatVersion: 1,
-        id,
-        title,
-        playlists: [
-          {
-            id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-            name: "default",
-            tracks: [
-              {
-                id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-                title: "本編",
-                file: "track.wav",
-              },
-            ],
-          },
-        ],
-        defaultPlaylistId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-        dlsite: {
-          rjCode,
-          status: "none",
-          lastAttemptAt: null,
-          error: null,
-          errorKind: null,
-          appliedTags: [],
-        },
-      },
-      null,
-      2,
-    )}\n`,
-  );
-}
-
-async function setupTwoWorkMissingApply(t: { after: (fn: () => void) => void }, name: string) {
-  const directory = makeTestDirectory(name);
-  t.after(directory.cleanup);
-  const root = join(directory.path, "library");
-  const firstId = "11111111-1111-4111-8111-111111111111";
-  const secondId = "22222222-2222-4222-8222-222222222222";
-  const firstDir = join(root, "RJ900101_first");
-  const secondDir = join(root, "RJ900102_continue");
-  const firstMetaPath = join(firstDir, META_FILE_NAME);
-  writeMinimalLibraryWork(firstDir, firstId, "壊す作品", "RJ900101");
-  writeMinimalLibraryWork(secondDir, secondId, "後続の作品", "RJ900102");
-  const adapter = directory.own(
-    createRealAdapter({
-      database: { kind: "memory" },
-      dlsiteCache: { path: join(directory.path, "cache.sqlite") },
-      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-      dlsiteSchedulerDependencies: mockDlsiteTransport({
-        html: (code) => htmlResponse(sampleWorkHtml(code, { cover: false })),
-      }),
-    }),
-  );
-  await configureRoot(adapter, root);
-  await adapter.scan({ full: true });
-  await fetchDlsiteOfWorks(adapter, [firstId, secondId]);
-  return { adapter, firstId, secondId, firstMetaPath };
-}
-
-test("missing-only一括適用は1件のidentity不一致を集計して後続作品を続行する", async (t) => {
-  const { adapter, firstId, secondId, firstMetaPath } = await setupTwoWorkMissingApply(
-    t,
-    "dlsite-apply-missing-identity",
-  );
-  const raw = JSON.parse(readFileSync(firstMetaPath, "utf-8")) as { id: string };
-  raw.id = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
-  writeFileSync(firstMetaPath, `${JSON.stringify(raw, null, 2)}\n`);
-
-  assert.deepEqual(await adapter.dlsiteApplyMissing([firstId, secondId]), {
-    applied: 1,
-    pending: 0,
-    skipped: 0,
-    failed: 1,
-  });
-  assert.equal(JSON.parse(readFileSync(firstMetaPath, "utf-8")).id, raw.id);
-  assert.ok((await adapter.getWork(secondId))?.tags.length);
-});
-
-test("missing-only一括適用は1件の壊れたJSONをfailedに数え後続作品を続行する", async (t) => {
-  const { adapter, firstId, secondId, firstMetaPath } = await setupTwoWorkMissingApply(
-    t,
-    "dlsite-apply-missing-parse-error",
-  );
-  writeFileSync(firstMetaPath, "{ not json");
-
-  assert.deepEqual(await adapter.dlsiteApplyMissing([firstId, secondId]), {
-    applied: 1,
-    pending: 0,
-    skipped: 0,
-    failed: 1,
-  });
-  assert.equal(readFileSync(firstMetaPath, "utf-8"), "{ not json");
-  assert.ok((await adapter.getWork(secondId))?.tags.length);
-});
-
-test("missing-only一括適用: 取得失敗後もcatalog投影で通知集計へ反映される", async (t) => {
-  const lib = makeSampleLibrary();
-  const dir = makeTestDirectory("dlsite-apply-missing-failure-projection");
-  t.after(lib.cleanup);
-  t.after(dir.cleanup);
-  const adapter = dir.own(
-    createRealAdapter({
-      database: { kind: "memory" },
-      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-      dlsiteSchedulerDependencies: mockDlsiteTransport({
-        html: () => htmlResponse("<html>404</html>", 404),
-      }),
-    }),
-  );
-  await configureRoot(adapter, lib.root);
-  await adapter.scan();
-  const metaPath = join((await adapter.getWork(lib.existingWorkId))!.physicalPath, META_FILE_NAME);
-  const bytesBefore = readFileSync(metaPath);
-
-  assert.deepEqual(await adapter.dlsiteApplyMissing([lib.existingWorkId]), {
-    applied: 0,
-    pending: 0,
-    skipped: 0,
-    failed: 1,
-  });
-
-  const work = await adapter.getWork(lib.existingWorkId);
-  assert.equal(work?.dlsite.status, "not_found");
-  assert.equal(work?.dlsite.errorKind, "not_found");
-  assert.deepEqual(readFileSync(metaPath), bytesBefore);
-
-  const summary = await adapter.getDlsiteNotificationSummary();
-  assert.ok(summary.fetchFailedCount >= 1);
-});
-
 test("取得はカバーをキャッシュへ先取りし、明示適用はキャッシュのカバーを使ってHTTPしない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-shared-cache");
@@ -511,4 +288,92 @@ test("取得はカバーをキャッシュへ先取りし、明示適用はキ�
   });
   assert.equal(coverHttpCalls, 1);
   assert.equal(existsSync(join(workDir, "dlsite_cover.jpg")), true);
+});
+
+async function setupSampleAdapter(t: { after: (fn: () => void) => void }, html: () => Response) {
+  const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-apply-state");
+  t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({ html }),
+    }),
+  );
+  await configureRoot(adapter, lib.root);
+  await adapter.scan();
+  const work = await adapter.getWork(lib.existingWorkId);
+  return {
+    adapter,
+    work: work!,
+    id: lib.existingWorkId,
+    metaPath: join(work!.physicalPath, META_FILE_NAME),
+  };
+}
+
+test("取得失敗のあとも作品情報ファイルは書き換わらず、dlsiteのstatusとerrorKindがnot_foundで残る", async (t) => {
+  const { adapter, id, metaPath } = await setupSampleAdapter(t, () =>
+    htmlResponse("<html>404</html>", 404),
+  );
+  const bytesBefore = readFileSync(metaPath);
+
+  await fetchDlsiteOfWorks(adapter, [id]);
+
+  const work = await adapter.getWork(id);
+  assert.equal(work?.dlsite.status, "not_found");
+  assert.equal(work?.dlsite.errorKind, "not_found");
+  assert.deepEqual(readFileSync(metaPath), bytesBefore);
+});
+
+async function applyBodyOf(
+  adapter: Awaited<ReturnType<typeof setupSampleAdapter>>["adapter"],
+  id: string,
+) {
+  return {
+    info: {
+      rjCode: "RJ900002",
+      title: "適用タイトル",
+      circle: "夜想曲",
+      cvs: [],
+      genreTags: ["耳かき"],
+      ageRating: null,
+      coverUrl: null,
+      url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
+    },
+    applyTitle: true,
+    applyTags: ["genre/耳かき"] as never,
+    applyCover: false,
+    applyUrl: true,
+    sourceRevision: (await adapter.getWorkEditSnapshot(id))!.sourceRevision,
+  };
+}
+
+test("単体適用: 作品情報ファイルが壊れていればエラーになり何も書かれない", async (t) => {
+  const { adapter, id, metaPath } = await setupSampleAdapter(t, () =>
+    htmlResponse(sampleWorkHtml("RJ900002", { cover: false })),
+  );
+  const body = await applyBodyOf(adapter, id);
+  writeFileSync(metaPath, "{ not json");
+
+  await assert.rejects(adapter.dlsiteApply(id, body));
+
+  assert.equal(readFileSync(metaPath, "utf-8"), "{ not json");
+});
+
+test("単体適用: 作品情報ファイルのidが食い違えばエラーになり何も書かれない", async (t) => {
+  const { adapter, id, metaPath } = await setupSampleAdapter(t, () =>
+    htmlResponse(sampleWorkHtml("RJ900002", { cover: false })),
+  );
+  const body = await applyBodyOf(adapter, id);
+  const raw = JSON.parse(readFileSync(metaPath, "utf-8")) as { id: string };
+  raw.id = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const mismatched = `${JSON.stringify(raw, null, 2)}\n`;
+  writeFileSync(metaPath, mismatched);
+
+  await assert.rejects(adapter.dlsiteApply(id, body));
+
+  assert.equal(readFileSync(metaPath, "utf-8"), mismatched);
 });

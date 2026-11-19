@@ -1,9 +1,5 @@
 import type {
   DataIntegrityWarning,
-  DlsiteNotificationKind,
-  DlsiteNotificationPage,
-  DlsiteNotificationQuery,
-  DlsiteNotificationSummary,
   IdentityConflictReassignBody,
   NormalizedTag,
   ResumeBody,
@@ -37,11 +33,6 @@ export interface WorkAdapter {
   countMissingWorks(): Promise<number>;
   /** status === "missing" の作品を全件登録解除する。一部失敗しても残りを続行する */
   unregisterMissingWorks(): Promise<UnregisterMissingWorksResult & { deletedWorkIds: string[] }>;
-  getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary>;
-  queryDlsiteNotifications(
-    kind: DlsiteNotificationKind,
-    query: Required<DlsiteNotificationQuery>,
-  ): Promise<DlsiteNotificationPage>;
   getWork(id: string): Promise<Work | null>;
   /** 再生準備。対象作品を live probe し、総時間を catalog へ公開する。存在しなければ null */
   prepareWorkPlayback(id: string): Promise<Work | null>;

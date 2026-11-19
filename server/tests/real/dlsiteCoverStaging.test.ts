@@ -13,12 +13,7 @@ import {
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import sharp from "sharp";
-import {
-  dlsiteInfoTags,
-  emptyMetaDlsiteState,
-  META_FILE_NAME,
-  type DlsiteApplyBody,
-} from "@mimimilli/shared";
+import { emptyMetaDlsiteState, META_FILE_NAME, type DlsiteApplyBody } from "@mimimilli/shared";
 import { CoverSaveError, SourceChangedError } from "../../src/errors.ts";
 import { createApp } from "../helpers/testApp.ts";
 import { writeMetaFile } from "../../src/adapters/real/meta.ts";
@@ -157,32 +152,6 @@ test("カバーの拡張子はURLではなく画像の中身で決まる", async
   assert.equal(result.snapshot.coverImage, "dlsite_cover.png");
   assert.ok(existsSync(join(workDir, "dlsite_cover.png")));
   assert.deepEqual(coverFilesIn(workDir), ["dlsite_cover.png"]);
-});
-
-test("apply-missingも一時ファイル経由で確定し、カバーを使えないときはカバーだけ外してタグ・URLを反映する", async (t) => {
-  for (const cover of [NOT_AN_IMAGE, "fail" as const]) {
-    const unusable = await setup(t, cover);
-    const { info } = await unusable.applyBody();
-    assert.deepEqual(await unusable.adapter.dlsiteApplyMissing([unusable.workId]), {
-      applied: 1,
-      pending: 0,
-      skipped: 0,
-      failed: 0,
-    });
-    assert.deepEqual(coverFilesIn(unusable.workDir), []);
-    const work = await unusable.adapter.getWork(unusable.workId);
-    for (const tag of dlsiteInfoTags(info)) assert.ok(work!.tags.includes(tag), tag);
-    assert.ok(work!.urls.some((entry) => entry.url === info.url));
-  }
-
-  const accepted = await setup(t);
-  assert.deepEqual(await accepted.adapter.dlsiteApplyMissing([accepted.workId]), {
-    applied: 1,
-    pending: 0,
-    skipped: 0,
-    failed: 0,
-  });
-  assert.deepEqual(coverFilesIn(accepted.workDir), ["dlsite_cover.jpg"]);
 });
 
 const REGISTER_FOLDER = "RJ900020_manual";

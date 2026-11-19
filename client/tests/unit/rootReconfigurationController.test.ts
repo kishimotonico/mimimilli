@@ -17,7 +17,6 @@ const AFFECTED_KEYS = [
   WORK_QUERY_KEYS.list({}),
   WORK_QUERY_KEYS.detail("work-1"),
   WORK_QUERY_KEYS.allFacets(),
-  WORK_QUERY_KEYS.dlsiteNotifications(),
   SMART_FOLDER_QUERY_KEYS.all(),
   SMART_FOLDER_QUERY_KEYS.works("folder-1"),
   TAG_QUERY_KEYS.all(),

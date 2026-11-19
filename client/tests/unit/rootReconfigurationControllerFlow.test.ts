@@ -34,7 +34,6 @@ function setup() {
     queryClient,
     stopPlayback: vi.fn(() => void calls.push("stopPlayback")),
     closeActiveModal: vi.fn(() => void calls.push("closeActiveModal")),
-    closeDlsiteApplyDialog: vi.fn(() => void calls.push("closeDlsiteApplyDialog")),
     scanJob: { reset: vi.fn(() => void calls.push("scanReset")) },
     navigateToDefaultRoute: vi.fn(() => void calls.push("navigate")),
     clearScanCandidateLocalState: vi.fn(() => void calls.push("clearLocalState")),
@@ -49,7 +48,7 @@ describe("rootReconfigurationController", () => {
     });
   });
 
-  it("突入で再生停止・モーダル閉・DLsite適用ダイアログ閉・scanのreset・既定画面へ遷移・hiddenPaths破棄を行う", () => {
+  it("突入で再生停止・モーダル閉・scanのreset・既定画面へ遷移・hiddenPaths破棄を行う", () => {
     const { controller, calls } = setup();
 
     controller.enter();
@@ -57,7 +56,6 @@ describe("rootReconfigurationController", () => {
     expect(calls).toEqual([
       "stopPlayback",
       "closeActiveModal",
-      "closeDlsiteApplyDialog",
       "scanReset",
       "navigate",
       "clearLocalState",

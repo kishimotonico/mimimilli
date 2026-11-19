@@ -86,7 +86,7 @@ smokeテストの注意:
 | `rootReconfiguration.ts` | ルートフォルダーの再設定ワークフロー（[ADR-0029](adr/0029-root-reconfiguration-workflow.md)） |
 | `scan.ts`                | スキャンジョブ（開始・取得・キャンセル・SSE）、候補プール・除外・登録、診断                   |
 | `works.ts`               | 作品の一覧・登録・正本編集・タグ編集・しおり・再生準備・resume・登録解除、`/tags`、`/export`  |
-| `dlsite.ts`              | DLsite の取得・適用・取得ジョブ（SSE）・通知（[dlsite.md](dlsite.md)）                        |
+| `dlsite.ts`              | DLsite の取得・適用・取得ジョブ（SSE）（[dlsite.md](dlsite.md)）                              |
 | `tagPrefixes.ts`         | prefix 定義の一覧・追加・変更・削除・並び替え・候補                                           |
 | `axes.ts`                | 軸ごとのファセット集計                                                                        |
 | `smartFolders.ts`        | スマートフォルダーの CRUD・プレビュー・評価結果                                               |
@@ -123,7 +123,7 @@ smokeテストの注意:
 - **ナビゲーションとURL同期**: 画面mode・Libraryの軸/タグ/選択作品/sort/検索語・Filesの場所/選択・作品詳細IDは `entities/navigation/model/appRouteStore.ts` の AppRoute 1つが正本で、各entityの `navigationAtoms.ts` はそこからの読み取り専用の派生。書き込みは各操作の write atom（次のrouteとpush/replaceを計算する純粋関数＋`navigate`）と履歴からの適用だけ。URLとの同期は `Providers` 直下の `NavigationHistorySync`（汎用の `shared/model/useRouteHistorySync.ts` に codec を渡す）が常時マウントで受け持つ（[ADR-0031](adr/0031-app-route-navigation.md)）。AddressBar の戻る/進む・パンくずも本物
 - **scanのジョブ追跡**: スナップショット・SSE接続・世代管理・終端検知は React 外の純 TS ストア（`entities/scan/model/scanJobStore.ts`）が持つ。`getState`/`subscribe`（状態）と `subscribeEvents`（終端などの一回きりの通知）、`start`/`cancel`/`attach`（サーバー上の実行中ジョブへの後乗り）/`reset`（ローカルの追跡だけを捨てる。サーバー側のジョブには触れない）を持つ。ストアは Jotai store ごとに1つ（`scanJobStoreAtom`）で、操作は Runtime のマウントに依存しない。React からは `useScanJob` の `useStoreSelector` 経由の hook で読む。`ScanRuntime` はイベントをトースト・キャッシュ更新へつなぐだけ
 - **共通UIコンポーネント**: `client/src/shared/ui/` の `Button` / `IconButton` / `TagCombobox` を使う（CSSクラス直付けボタンは廃止済み。LeftNav と円形トランスポートだけ固有意匠のため例外）
-- `App.tsx` はランタイム状態も TanStack Query も購読しない。`libraryTotalQuery` / `lastScanQuery` のような画面固有の購読は、それを使う消費者（`ScanModal` / `NotificationBell`）が自分で行う。この境界は `.oxlintrc.json` の `**/App.tsx` override で機械的に強制されており、`features/**/model/**` の import は deny-by-default（型モジュールだけ否定 glob で許可。player の `usePlayerActions` は `entities/player/model` にあるため制限対象外）
+- `App.tsx` はランタイム状態も TanStack Query も購読しない。`libraryTotalQuery` / `lastScanQuery` のような画面固有の購読は、それを使う消費者（`ScanModal` / `TopBar`）が自分で行う。この境界は `.oxlintrc.json` の `**/App.tsx` override で機械的に強制されており、`features/**/model/**` の import は deny-by-default（型モジュールだけ否定 glob で許可。player の `usePlayerActions` は `entities/player/model` にあるため制限対象外）
 
 ## プレイヤーのアーキテクチャ
 

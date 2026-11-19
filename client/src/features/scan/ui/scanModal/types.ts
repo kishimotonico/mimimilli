@@ -1,11 +1,7 @@
 // スキャンモーダルの左リスト⇄各タブの境界契約。親（ScanModal）がデータ取得・状態を持ち、
 // 各タブコンポーネントはここで定義した props だけを受け取る。
 
-import type { ScanExternalTab } from "../../../../shared/model/activeModalAtom";
-
-// 外部（通知ベル・トースト）から直接指定できるタブはshared側を正とし、モーダル内部限定の
-// タブ（新規作品・更新済み）をここで追加する。
-export type ScanTabKey = ScanExternalTab | "newWorks" | "updated";
+export type ScanTabKey = "unregistered" | "newWorks" | "needsAttention" | "updated";
 
 export const SCAN_TAB_ORDER: ScanTabKey[] = [
   "unregistered",

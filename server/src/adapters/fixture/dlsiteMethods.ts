@@ -2,14 +2,11 @@ import {
   DEFAULT_DLSITE_CACHE_TTLS_MS,
   applyDlsiteStatePatch,
   buildDlsiteApplyPatch,
-  buildDlsiteMissingApplyPatch,
-  computeMissingDiff,
   dlsiteProductFetchOutcomeOfResult,
   hasRjCode,
 } from "@mimimilli/shared";
 import type {
   DlsiteCachedCover,
-  DlsiteApplyMissingPreviewItem,
   DlsiteFetchResult,
   DlsiteProductFetchOutcome,
   DlsiteStateUpdateBody,
@@ -186,56 +183,6 @@ export function createDlsiteMethods(
       return dlsiteProductFetchOutcomeOfResult(
         await fetchProduct(productCode, fetchOptions.force, fetchOptions.signal),
       );
-    },
-
-    async dlsiteApplyMissing(workIds) {
-      const candidates = state.works.filter((work) => !workIds || workIds.includes(work.id));
-      let applied = 0;
-      let pending = 0;
-      let skipped = 0;
-      let failed = 0;
-      for (const work of candidates) {
-        const linkage = dlsiteLinkageOf(state, work.id);
-        if (!hasRjCode(linkage) || linkage.status === "skipped") {
-          skipped += 1;
-          continue;
-        }
-        const fetched = await dlsiteFetchByCode(linkage.rjCode);
-        if (!fetched.ok) {
-          failed += 1;
-          continue;
-        }
-        const diff = computeMissingDiff(work, fetched.info);
-        const patch = buildDlsiteMissingApplyPatch(
-          { tags: work.tags, urls: work.urls, dlsite: linkage },
-          fetched.info,
-          diff,
-        );
-        if (!patch) {
-          skipped += 1;
-          continue;
-        }
-        if (patch.tags !== undefined) work.tags = patch.tags;
-        if (patch.urls !== undefined) work.urls = patch.urls;
-        setDlsiteLinkage(state, work.id, patch.dlsite);
-        applied += 1;
-      }
-      return { applied, pending, skipped, failed };
-    },
-
-    async dlsiteApplyMissingPreview(workIds) {
-      const candidates = state.works.filter((work) => !workIds || workIds.includes(work.id));
-      const items: DlsiteApplyMissingPreviewItem[] = [];
-      for (const work of candidates) {
-        const linkage = dlsiteLinkageOf(state, work.id);
-        if (!hasRjCode(linkage) || linkage.status === "skipped") continue;
-        const fetched = await dlsiteFetchByCode(linkage.rjCode);
-        if (!fetched.ok) continue;
-        const { newTags, applyCover, applyUrl } = computeMissingDiff(work, fetched.info);
-        if (newTags.length === 0 && !applyCover && !applyUrl) continue;
-        items.push({ workId: work.id, title: work.title, newTags, applyCover, applyUrl });
-      }
-      return { items };
     },
 
     async dlsiteApply(

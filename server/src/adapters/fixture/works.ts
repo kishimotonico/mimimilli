@@ -3,9 +3,6 @@ import {
   META_FILE_NAME,
   isAudioFileName,
   isSidecarMetaFileName,
-  isDlsiteFetchFailed,
-  isDlsiteParseFailed,
-  isRjCodeMissing,
   planDlsiteRegistration,
   sidecarMetaFileName,
   tagEquals,
@@ -15,10 +12,6 @@ import {
 } from "@mimimilli/shared";
 import type {
   DataIntegrityWarning,
-  DlsiteNotificationKind,
-  DlsiteNotificationPage,
-  DlsiteNotificationQuery,
-  DlsiteNotificationSummary,
   IdentityConflictReassignBody,
   Work,
   WorkBookmarkPatch,
@@ -35,9 +28,7 @@ import type {
 } from "@mimimilli/shared";
 import { SourceChangedError } from "../../errors.ts";
 import type { WorkAdapter } from "../../adapter/work.ts";
-import { summarizeDlsiteNotifications } from "../../core/dlsiteNotifications.ts";
 import { removeIdentityConflictPath } from "../../core/identityConflicts.ts";
-import { compareJapaneseSortKeys, compareUtf8Bytes } from "../../core/japaneseSortKey.ts";
 import { fileRegisterNaming, folderRegisterNaming } from "../../core/workRegisterPreview.ts";
 import { validateResumeRequest } from "../../core/resumeValidation.ts";
 import { assertRegistrationAllowed } from "../../core/workRegistrationGuard.ts";
@@ -161,39 +152,6 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
     },
 
     getWorkRegisterPreview,
-
-    async getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary> {
-      return summarizeDlsiteNotifications(composeWorks(state).map((work) => work.dlsite));
-    },
-
-    async queryDlsiteNotifications(
-      kind: DlsiteNotificationKind,
-      query: Required<DlsiteNotificationQuery>,
-    ): Promise<DlsiteNotificationPage> {
-      const predicate = (() => {
-        switch (kind) {
-          case "rj-missing":
-            return isRjCodeMissing;
-          case "fetch-failed":
-            return isDlsiteFetchFailed;
-          case "parse-failed":
-            return isDlsiteParseFailed;
-        }
-      })();
-      const matches = composeWorks(state)
-        .filter((work) => predicate(work.dlsite))
-        .sort((a, b) => compareJapaneseSortKeys(a.title, b.title) || compareUtf8Bytes(a.id, b.id));
-      const start = (query.page - 1) * query.limit;
-      return {
-        items: matches.slice(start, start + query.limit).map((work) => ({
-          id: work.id,
-          title: work.title,
-          status: work.dlsite.status,
-          rjCode: kind === "parse-failed" ? work.dlsite.rjCode : null,
-        })),
-        total: matches.length,
-      };
-    },
 
     async getWork(id: string): Promise<Work | null> {
       const work = state.works.find((w) => w.id === id);

@@ -89,6 +89,7 @@ DLsite由来の情報（DLsiteのタイトル・タグ・URL・カバー）は�
 
 - [ADR-0030](0030-job-progress-sse-current-state.md): 「DLsiteの契約」節と「DLsite一括取得の終端でのキャッシュ更新」節を置き換える。取得ジョブは、対象のproduct codeの集合（またはforce付きの単発）を受け取り、開始時にジョブIDを返す。中止は、起点がまとめてで待機中のコードを取り除く操作とする。進捗の配信と、再接続のときに確定に使うGETは、ジョブIDと、product codeごとの起点と状態（取得中・取得済み・該当なし・失敗）を返す。DLsiteの進捗SSEにも、scanと同じ15秒間隔のheartbeatを送る（今は送っていないので、無音が90秒続くと `idleTimeout` で切れる）。「進捗＝現在状態」「完了を失わない規則」「古い接続の上書き防止」の原則は、そのままDLsiteにも適用する。また、「scanの完了結果の中身」節が現在の状態の取得経路として挙げる `GET /api/dlsite/notifications` は廃止する。
 - [ADR-0028](0028-work-management-mutation-ownership.md): 必須更新の表のうち、「DLsite 未設定項目の一括適用」と「DLsite 一括取得の完了」の行は、廃止と前節の無効化で置き換える。通知キー（`["dlsiteNotifications"]`）は、通知の廃止とともになくなる。「DLsite の無効化経路」節にある `DlsiteBulkRuntime` と `dlsiteBulkStore` は、新しい取得ジョブの追跡に置き換える。scan候補（`["scan", "candidates"]`）は、取得の終端で無効化する対象に加える。
+- [ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md): SQL再実装の認可済みの例外のうち、「DLsite通知の集計」は通知の廃止とともになくなる。
 - [ADR-0029](0029-root-reconfiguration-workflow.md): 再設定の開始時に実行中のDLsiteジョブを取り消して待機キューを捨てる手順は維持する。ジョブが1本になり、合流したコードはそのジョブ内のキューに入るので、「待機キューを捨てる」は「ジョブ内のキューを、起点を問わずすべて捨てる」と読み替える。手順6の「新規作品はスキャン完了時と同じくDLsite取得（`new`）へ渡す」は廃止する。
 
 ### 2026-09-22の方針（TASK-451）から変えたところ

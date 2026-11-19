@@ -21,7 +21,6 @@ function affectedQueryKeys(): readonly (readonly unknown[])[] {
     WORK_QUERY_KEYS.all(),
     WORK_QUERY_KEYS.allDetails(),
     WORK_QUERY_KEYS.allFacets(),
-    WORK_QUERY_KEYS.dlsiteNotifications(),
     SMART_FOLDER_QUERY_KEYS.all(),
     SMART_FOLDER_QUERY_KEYS.allWorks(),
     TAG_QUERY_KEYS.all(),
@@ -57,7 +56,6 @@ export interface RootReconfigurationControllerDeps {
   queryClient: QueryClient;
   stopPlayback: () => void;
   closeActiveModal: () => void;
-  closeDlsiteApplyDialog: () => void;
   scanJob: { reset: () => void };
   navigateToDefaultRoute: () => void;
   clearScanCandidateLocalState: () => void;
@@ -96,7 +94,6 @@ export function createRootReconfigurationController(
   const entryResets: readonly (() => void)[] = [
     deps.stopPlayback,
     deps.closeActiveModal,
-    deps.closeDlsiteApplyDialog,
     deps.scanJob.reset,
     deps.navigateToDefaultRoute,
     deps.clearScanCandidateLocalState,

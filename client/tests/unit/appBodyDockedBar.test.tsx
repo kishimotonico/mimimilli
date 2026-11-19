@@ -12,12 +12,7 @@ import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { libraryViewModeAtom } from "../../src/features/library/model/atoms";
 import { playerUiModeAtom } from "../../src/features/player/model/playerPresentationAtoms";
 import { mockApi } from "../helpers/api";
-import {
-  buildDlsiteNotificationSummary,
-  buildSettings,
-  buildWorkListItem,
-  buildWorksPage,
-} from "../helpers/builders";
+import { buildSettings, buildWorkListItem, buildWorksPage } from "../helpers/builders";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 
 const WORK = buildWorkListItem({ id: "work-1", title: "作品 1" });
@@ -34,7 +29,6 @@ beforeEach(() => {
     "GET /api/tags": [],
     "GET /api/axes/:axis": [],
     "GET /api/works/missing-count": { count: 0 },
-    "GET /api/dlsite/notifications": buildDlsiteNotificationSummary(),
   });
 });
 

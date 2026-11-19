@@ -68,6 +68,13 @@ function dispatchCancel(dialog: HTMLElement) {
 }
 
 describe("SettingsModal", () => {
+  it("DLsite連携の節を出さない", () => {
+    renderModal();
+
+    expect(screen.queryByText("DLSITE連携")).toBeNull();
+    expect(screen.queryByRole("button", { name: /未設定項目/ })).toBeNull();
+  });
+
   it("ルートフォルダー編集中のEscapeは編集フォームだけを閉じ、モーダルは閉じない", () => {
     const { onClose } = renderModal();
     fireEvent.click(screen.getByRole("button", { name: "変更" }));

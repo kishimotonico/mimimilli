@@ -1,11 +1,8 @@
-import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 import TextInput from "../../../shared/ui/TextInput";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
-import { dlsiteBulkApplyBusyAtom } from "../../../entities/dlsite/model/bulkAtoms";
-import { useDlsiteBulkApplyActions } from "../../../entities/dlsite/useDlsiteBulkApplyActions";
 import { useScanning, useScanProgressLabel } from "../../../entities/scan/useScanJob";
 import TagPrefixSettings from "./TagPrefixSettings";
 import ExcludedFoldersSettings from "./ExcludedFoldersSettings";
@@ -17,8 +14,6 @@ import { apiErrorMessage } from "../../../shared/lib/apiError";
 const SECTION_CLASS = "flex flex-col gap-2";
 const SECTION_LABEL_CLASS =
   "font-sans text-label font-semibold tracking-[0.08em] text-ink-2 uppercase";
-const SECTION_LABEL_NO_UPPERCASE_CLASS =
-  "font-sans text-label font-semibold tracking-[0.08em] text-ink-2";
 const ROW_CLASS = "flex items-center gap-2";
 
 interface SettingsModalProps {
@@ -41,8 +36,6 @@ export default function SettingsModal({
   const rootFolder = useRootFolder();
   const scanning = useScanning();
   const scanProgressLabel = useScanProgressLabel();
-  const dlsiteBulkApplyBusy = useAtomValue(dlsiteBulkApplyBusyAtom);
-  const { openDialog: onOpenDlsiteBulkApply } = useDlsiteBulkApplyActions();
   const [isEditingFolder, setIsEditingFolder] = useState(false);
   const [folderDraft, setFolderDraft] = useState(rootFolder);
   const [savingFolder, setSavingFolder] = useState(false);
@@ -165,20 +158,6 @@ export default function SettingsModal({
               {scanning ? (scanProgressLabel ?? "スキャン中...") : "スキャン"}
             </Button>
           </div>
-        </div>
-
-        {/* Tag prefixes（ADR-0005） */}
-        <div className={SECTION_CLASS}>
-          <span className={SECTION_LABEL_NO_UPPERCASE_CLASS}>DLSITE連携</span>
-          <Button
-            variant="ghost"
-            size="md"
-            className="self-start"
-            disabled={dlsiteBulkApplyBusy}
-            onClick={onOpenDlsiteBulkApply}
-          >
-            {dlsiteBulkApplyBusy ? "適用中..." : "未設定項目をまとめて適用"}
-          </Button>
         </div>
 
         {/* 候補から外したフォルダー */}

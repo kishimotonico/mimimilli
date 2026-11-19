@@ -2,9 +2,6 @@
 import { Hono } from "hono";
 import {
   dlsiteApplyBodySchema,
-  dlsiteApplyMissingBodySchema,
-  dlsiteApplyMissingPreviewSchema,
-  dlsiteBulkApplyMissingResultSchema,
   dlsiteJobCancelBulkResponseSchema,
   dlsiteJobCurrentResponseSchema,
   dlsiteJobStartBodySchema,
@@ -12,15 +9,13 @@ import {
   type DlsiteJobEvent,
   dlsiteFetchByCodeBodySchema,
   dlsiteFetchByCodeResponseSchema,
-  dlsiteNotificationKindSchema,
-  dlsiteNotificationQuerySchema,
   dlsiteStateUpdateBodySchema,
   workSourceMutationResultSchema,
 } from "@mimimilli/shared";
 import { DlsiteOfflineError } from "../errors.ts";
 import type { DataAdapter } from "../adapter/index.ts";
 import { apiError, invalidRequest, notFound, throwSourceCommandError } from "../lib/httpError.ts";
-import { readJsonBody, readOptionalJsonBody } from "../lib/jsonBody.ts";
+import { readJsonBody } from "../lib/jsonBody.ts";
 import { getCategoryLogger } from "../lib/logger.ts";
 import type { DlsiteJobManager } from "../dlsiteJobManager.ts";
 import { SSE_HEARTBEAT_INTERVAL_MS, streamJobEvents } from "../lib/sseStream.ts";
@@ -37,23 +32,6 @@ export function dlsiteRoute(
   heartbeatIntervalMs: number = SSE_HEARTBEAT_INTERVAL_MS,
 ): Hono {
   const app = new Hono();
-
-  app.get("/dlsite/notifications", async (c) =>
-    c.json(await adapter.getDlsiteNotificationSummary()),
-  );
-
-  app.get("/dlsite/notifications/:kind", async (c) => {
-    const parsedKind = dlsiteNotificationKindSchema.safeParse(c.req.param("kind"));
-    if (!parsedKind.success) notFound("通知種別が見つかりません");
-    const parsed = dlsiteNotificationQuerySchema.safeParse(c.req.query());
-    if (!parsed.success) invalidRequest("DLsite通知のクエリパラメータが不正です");
-    return c.json(
-      await adapter.queryDlsiteNotifications(parsedKind.data, {
-        page: parsed.data.page ?? 1,
-        limit: parsed.data.limit ?? 200,
-      }),
-    );
-  });
 
   app.post("/dlsite/fetch-by-code", async (c) => {
     const data = await readJsonBody(
@@ -130,28 +108,6 @@ export function dlsiteRoute(
     }
     if (!result) notFound(`作品が見つかりません: ${workId}`);
     return c.json(workSourceMutationResultSchema.parse(result));
-  });
-
-  app.post("/dlsite/apply-missing", async (c) => {
-    const data = await readOptionalJsonBody(
-      c,
-      dlsiteApplyMissingBodySchema,
-      "workIds は文字列配列で指定してください",
-    );
-    return c.json(
-      dlsiteBulkApplyMissingResultSchema.parse(await adapter.dlsiteApplyMissing(data.workIds)),
-    );
-  });
-
-  app.post("/dlsite/apply-missing/preview", async (c) => {
-    const data = await readOptionalJsonBody(
-      c,
-      dlsiteApplyMissingBodySchema,
-      "workIds は文字列配列で指定してください",
-    );
-    return c.json(
-      dlsiteApplyMissingPreviewSchema.parse(await adapter.dlsiteApplyMissingPreview(data.workIds)),
-    );
   });
 
   app.patch("/dlsite/:id", async (c) => {

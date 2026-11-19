@@ -64,7 +64,6 @@ const emptyResult = {
   unreadablePaths: [],
   errors: 0,
   missing: 0,
-  rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
   identityConflicts: [],
