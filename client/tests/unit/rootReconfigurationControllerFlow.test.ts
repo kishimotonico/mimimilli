@@ -37,7 +37,7 @@ function setup() {
     closeDlsiteApplyDialog: vi.fn(() => void calls.push("closeDlsiteApplyDialog")),
     scanJob: { reset: vi.fn(() => void calls.push("scanReset")) },
     navigateToDefaultRoute: vi.fn(() => void calls.push("navigate")),
-    clearScanCandidateHiddenPaths: vi.fn(() => void calls.push("clearHiddenPaths")),
+    clearScanCandidateLocalState: vi.fn(() => void calls.push("clearLocalState")),
   } satisfies RootReconfigurationControllerDeps;
   return { queryClient, deps, calls, controller: createRootReconfigurationController(deps) };
 }
@@ -60,7 +60,7 @@ describe("rootReconfigurationController", () => {
       "closeDlsiteApplyDialog",
       "scanReset",
       "navigate",
-      "clearHiddenPaths",
+      "clearLocalState",
     ]);
   });
 

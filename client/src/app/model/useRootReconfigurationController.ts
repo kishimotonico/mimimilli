@@ -5,7 +5,7 @@ import { usePlayerActions } from "../../entities/player/model/usePlayerActions";
 import { activeModalAtom } from "../../shared/model/activeModalAtom";
 import { navigateAtom } from "../../entities/navigation/model/appRouteStore";
 import { DEFAULT_APP_ROUTE } from "../../entities/navigation/model/appRoute";
-import { scanCandidateHiddenPathsAtom } from "../../entities/scan/model/atoms";
+import { clearScanCandidateLocalState } from "../../entities/scan/model/atoms";
 import { scanJobStoreAtom } from "../../entities/scan/model/scanJobStore";
 import { dlsiteBulkApplyOpenAtom } from "../../entities/dlsite/model/bulkAtoms";
 import {
@@ -27,7 +27,7 @@ export function useRootReconfigurationController(): RootReconfigurationControlle
         closeDlsiteApplyDialog: () => store.set(dlsiteBulkApplyOpenAtom, false),
         scanJob: store.get(scanJobStoreAtom),
         navigateToDefaultRoute: () => store.set(navigateAtom, DEFAULT_APP_ROUTE, { replace: true }),
-        clearScanCandidateHiddenPaths: () => store.set(scanCandidateHiddenPathsAtom, new Set()),
+        clearScanCandidateLocalState: () => clearScanCandidateLocalState(store),
       }),
     [queryClient, store, stop],
   );

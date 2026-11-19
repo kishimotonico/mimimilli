@@ -51,6 +51,8 @@ export const scanCandidateSchema = z.object({
   ),
   /** 直したRJコード、なければフォルダー名から検出したRJコード。どちらも無ければ null。 */
   rjCode: z.string().nullable(),
+  /** RJコードを直した上書きがある（コードなしに直した場合も含む） */
+  rjCodeEdited: z.boolean(),
   /** rjCode が null のときは常に none */
   dlsite: scanCandidateDlsiteSchema,
   missingWorks: z.array(scanCandidateMissingWorkSchema),

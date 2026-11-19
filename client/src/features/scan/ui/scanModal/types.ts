@@ -25,6 +25,6 @@ export const SCAN_TAB_LABEL: Record<ScanTabKey, string> = {
 export interface CandidatesRegisteredResult {
   registeredCount: number;
   failedCount: number;
-  /** この登録の後もまだ未登録として残っている件数 */
-  remainingCount: number;
+  /** 途中で止まったか（候補の変更など） */
+  interrupted: boolean;
 }

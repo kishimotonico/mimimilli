@@ -4,16 +4,18 @@ import { Provider as JotaiProvider, createStore, useAtomValue } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../../src/app/App";
+import DlsiteJobRuntime from "../../src/features/dlsite/ui/DlsiteJobRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import NavigationHistorySync from "../../src/features/navigation/ui/NavigationHistorySync";
 import { PlayerRuntimeProvider } from "../../src/entities/player/model/PlayerRuntimeProvider";
 import { PLAYER_CORE_INITIAL, playerCoreAtom } from "../../src/entities/player/model/atoms";
+import { dlsiteJobStoreAtom } from "../../src/entities/dlsite/model/dlsiteJobStore";
 import { scanJobStoreAtom } from "../../src/entities/scan/model/scanJobStore";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import type { WorkSummary } from "../../src/entities/work/model";
-import { createFakeScanJobStore } from "../helpers/fakeJobStores";
+import { createFakeDlsiteJobStore, createFakeScanJobStore } from "../helpers/fakeJobStores";
 import { mockApi } from "../helpers/api";
 import {
   buildDlsiteNotificationSummary,
@@ -104,6 +106,8 @@ function renderApp() {
   const store = createStore();
   const scanJob = createFakeScanJobStore();
   store.set(scanJobStoreAtom, scanJob);
+  const dlsiteJob = createFakeDlsiteJobStore();
+  store.set(dlsiteJobStoreAtom, dlsiteJob);
 
   function Wrapper({ children }: { children: ReactNode }) {
     const client = useMemo(() => queryClient, []);
@@ -119,6 +123,7 @@ function renderApp() {
           null,
           createElement(NavigationHistorySync),
           createElement(ScanRuntime),
+          createElement(DlsiteJobRuntime),
           createElement(JotaiSubscriptionProbe),
           children,
         ),
@@ -127,7 +132,7 @@ function renderApp() {
   }
 
   render(createElement(Wrapper, null, createElement(App)));
-  return { queryClient, store, scanJob };
+  return { queryClient, store, scanJob, dlsiteJob };
 }
 
 async function waitForAppShellBaseline() {
@@ -295,6 +300,28 @@ describe("App root subscriptions", () => {
           job: runningJob({ phase: "registering", processed: 5, total: 10 }),
           error: null,
         });
+      });
+
+      expect(appShellCallCount).toBe(baseline);
+    });
+  });
+
+  describe("dlsite job progress", () => {
+    it("取得ジョブの進捗更新で App が再レンダリングされない", async () => {
+      const { dlsiteJob } = renderApp();
+      const baseline = await waitForAppShellBaseline();
+
+      const view = (processed: number) => ({
+        jobId: "job-1",
+        status: "running" as const,
+        codes: new Map([["RJ000001", { origin: "bulk" as const, state: "fetching" as const }]]),
+        bulk: { processed, total: 10 },
+      });
+      act(() => {
+        dlsiteJob.setState((state) => ({ ...state, job: view(1) }));
+      });
+      act(() => {
+        dlsiteJob.setState((state) => ({ ...state, job: view(5) }));
       });
 
       expect(appShellCallCount).toBe(baseline);

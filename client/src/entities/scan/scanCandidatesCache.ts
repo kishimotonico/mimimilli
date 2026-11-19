@@ -9,10 +9,12 @@ export async function fetchScanCandidates(): Promise<ScanCandidate[]> {
   return candidates;
 }
 
-const scanCandidatesQueryOptions = {
+/** 購読者がいなくても一覧が消えないよう gcTime を無限にする（モーダルを閉じて開き直しても残す） */
+export const scanCandidatesQueryOptions = {
   queryKey: SCAN_CANDIDATES_QUERY_KEY,
   queryFn: fetchScanCandidates,
   staleTime: 0,
+  gcTime: Number.POSITIVE_INFINITY,
 } as const;
 
 /** サーバーから候補を明示的に取り直す。候補クエリは enabled:false のため、この呼び出し以外では

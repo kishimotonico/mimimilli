@@ -40,6 +40,7 @@ contract("候補一覧は未登録フォルダーの推定タイトルと音声�
     audioFileCount: 2,
     audioBreakdown: [{ extension: "mp3", count: 2 }],
     rjCode: null,
+    rjCodeEdited: false,
     dlsite: { state: "none" },
     missingWorks: [],
   });
@@ -90,6 +91,7 @@ contract(
     assert.equal(scanCandidateSchema.parse(fixed.body.candidate).rjCode, "RJ1234567");
     const listed = (await listCandidates(harness)).find((entry) => entry.path === TARGET);
     assert.equal(listed?.rjCode, "RJ1234567");
+    assert.equal(listed?.rjCodeEdited, true);
 
     const registered = await harness.send("POST", "/api/scan/candidates/register", {
       paths: ["未登録作品"],
@@ -176,6 +178,7 @@ realContract(
     });
     assert.equal(fixed.status, 200);
     assert.equal(fixed.body.candidate.rjCode, null);
+    assert.equal(fixed.body.candidate.rjCodeEdited, true);
     const registered = await harness.send("POST", "/api/scan/candidates/register", {
       paths: ["RJ123456_推定あり", "RJ234567_空指定"],
       apply: { title: true, cover: true, tags: true, url: true },

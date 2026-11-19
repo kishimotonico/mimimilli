@@ -358,7 +358,7 @@ test("スキャンダイアログが開いて完了し、閉じられる", async
   assertNoErrors(tracker);
 });
 
-test("未登録タブでRJコードを編集でき、候補を1件ずつ除外して元に戻せる", async ({ page }) => {
+test("未登録タブでRJコードを編集でき、選んだ候補を除外して元に戻せる", async ({ page }) => {
   const tracker = trackErrors(page);
   await openApp(page);
   await page.getByRole("button", { name: "スキャン" }).click();
@@ -369,22 +369,21 @@ test("未登録タブでRJコードを編集でき、候補を1件ずつ除外�
   await expect(unregistered).toBeVisible({ timeout: 15_000 });
   await expect(dialog.getByRole("tab", { name: "未登録（2件）" })).toBeVisible();
 
-  // 行の accessible name は全セルの連結。x ボタンのラベルは全行が「〜を候補から外す」を
-  // 含むため、行の識別は先頭セル（チェックボックスのラベル）へのアンカーで一意にする。
+  // 行の accessible name は全セルの連結。行の識別は先頭セル（チェックボックスのラベル）へのアンカーで一意にする。
   const editRow = unregistered.getByRole("row", { name: /^「未登録作品」を選択/ });
-  await editRow.getByRole("button", { name: "未検出" }).click();
+  await editRow.getByRole("button", { name: "—" }).click();
   const rjInput = editRow.getByPlaceholder("RJコード");
   await rjInput.fill("RJ999999");
   await rjInput.press("Enter");
   await expect(editRow.getByRole("button", { name: "RJ999999" })).toBeVisible();
 
   const excludeRowName = /^「候補」を選択/;
-  const excludeRow = unregistered.getByRole("row", { name: excludeRowName });
-  await excludeRow.getByRole("button", { name: "「候補」を候補から外す" }).click();
+  await unregistered.getByRole("checkbox", { name: "「未登録作品」を選択" }).uncheck();
+  await unregistered.getByRole("button", { name: "除外", exact: true }).click();
   await expect(unregistered.getByRole("row", { name: excludeRowName })).toBeHidden();
   await expect(dialog.getByRole("tab", { name: "未登録（1件）" })).toBeVisible();
 
-  await expect(dialog.getByText("「候補」を候補から外しました")).toBeVisible();
+  await expect(dialog.getByText("1件を候補から外しました")).toBeVisible();
   await dialog.getByRole("button", { name: "元に戻す" }).click();
 
   await expect(dialog.getByRole("tab", { name: "未登録（2件）" })).toBeVisible();
@@ -404,8 +403,7 @@ test("スキャン完了後に候補を選択登録でき、問題をFilesで確
   await expect(unregistered).toBeVisible({ timeout: 15_000 });
   await expect(dialog.getByRole("tab", { name: "未登録（2件）" })).toBeVisible();
 
-  await unregistered.getByRole("button", { name: "2件をライブラリに追加" }).click();
-  await expect(dialog.getByText("2件をライブラリに追加しました")).toBeVisible();
+  await unregistered.getByRole("button", { name: "2件を追加" }).click();
 
   // 切り替え完了を先に待つと、件数ラベル更新に別の5秒枠が与えられる（useScanCandidatesCache は setActiveTab と別レンダー）。
   await expect(dialog.getByRole("tab", { name: /^新規登録済み/ })).toHaveAttribute(

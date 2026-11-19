@@ -232,6 +232,7 @@ export function buildScanCandidate(
     audioFileCount: 1,
     audioBreakdown: [{ extension: "mp3", count: 1 }],
     rjCode: null,
+    rjCodeEdited: false,
     dlsite: { state: "none" },
     missingWorks: [],
     ...overrides,

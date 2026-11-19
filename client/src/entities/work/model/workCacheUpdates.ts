@@ -2,7 +2,12 @@
 // 変更の入口は workMutations.ts の hook か、ここの関数を直接呼ぶ。
 
 import { hashKey, type Query, type QueryClient, type QueryKey } from "@tanstack/react-query";
-import type { Work, WorkEditSnapshot, WorkSourceMutationResult } from "@mimimilli/shared";
+import {
+  canonicalDlsiteProductCode,
+  type Work,
+  type WorkEditSnapshot,
+  type WorkSourceMutationResult,
+} from "@mimimilli/shared";
 import { WORK_QUERY_KEYS } from "../queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../tag/queryKeys";
@@ -176,6 +181,30 @@ export async function updateCachesAfterDlsiteBulkApply(
     ...workIds.map((workId) =>
       queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(workId) }),
     ),
+    invalidateLibraryViews(queryClient),
+  ]);
+}
+
+function isWorkDetailQuery(query: Query): boolean {
+  const key = query.queryKey;
+  return key[0] === WORK_QUERY_KEYS.allDetails()[0] && key.length === 2;
+}
+
+/** DLsite取得ジョブの終端後。同じRJコードの作品の詳細と、ライブラリ一覧（RJコードで絞れないので一式）を無効化する */
+export async function updateCachesAfterDlsiteFetch(
+  queryClient: QueryClient,
+  productCodes: readonly string[],
+): Promise<void> {
+  if (productCodes.length === 0) return;
+  const codes = new Set(productCodes.map(canonicalDlsiteProductCode));
+  await Promise.all([
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        if (!isWorkDetailQuery(query)) return false;
+        const rjCode = (query.state.data as Work | undefined)?.dlsite?.rjCode;
+        return typeof rjCode === "string" && codes.has(canonicalDlsiteProductCode(rjCode));
+      },
+    }),
     invalidateLibraryViews(queryClient),
   ]);
 }

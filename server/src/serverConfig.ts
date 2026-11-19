@@ -6,6 +6,7 @@ export interface ServerConfig {
   adapterKind: AdapterKind;
   port: number;
   mockScenario: string | undefined;
+  dlsiteFetchDelayMs: number;
   thumbnailCacheDirOverride: string | undefined;
   staticDir: string | undefined;
 }
@@ -21,6 +22,12 @@ export function resolveServerConfig(
   const adapterKind = parseAdapterKind(env.MIMIMILLI_ADAPTER ?? "real");
   const port = Number(env.PORT ?? 8080);
   const mockScenario = env.MIMIMILLI_MOCK_SCENARIO;
+  const dlsiteFetchDelayMs = Number(env.MIMIMILLI_MOCK_DLSITE_FETCH_DELAY_MS ?? 0);
+  if (!Number.isFinite(dlsiteFetchDelayMs) || dlsiteFetchDelayMs < 0) {
+    throw new Error(
+      `不正な MIMIMILLI_MOCK_DLSITE_FETCH_DELAY_MS です: ${env.MIMIMILLI_MOCK_DLSITE_FETCH_DELAY_MS}`,
+    );
+  }
   const thumbnailCacheDirOverride = env.MIMIMILLI_THUMBNAIL_CACHE_DIR;
   const staticDir = resolveStaticDir(env.MIMIMILLI_STATIC_DIR);
 
@@ -28,6 +35,7 @@ export function resolveServerConfig(
     adapterKind,
     port,
     mockScenario,
+    dlsiteFetchDelayMs,
     thumbnailCacheDirOverride,
     staticDir,
   };

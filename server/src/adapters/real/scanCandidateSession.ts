@@ -95,6 +95,7 @@ export class ScanCandidateSession {
       audioFileCount: folder.audioFileCount,
       audioBreakdown: folder.audioBreakdown,
       rjCode,
+      rjCodeEdited: this.rjCodeOverrides.has(folder.path),
       dlsite: deriveCandidateDlsite(context.dlsite, rjCode),
       missingWorks: rjCode ? (context.missingWorksByRjCode.get(rjCode) ?? []) : [],
     };

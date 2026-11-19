@@ -12,6 +12,7 @@
 - `--acc` 系: アクセント（既定は柿色）。soft=淡色背景、line=枠線、ink=アクセント上の文字
 - riso 系（`--r-coral` / `-leaf` / `-mustard` / `-plum`）: カバーアートやマルチchミキサーの色分け用。リソグラフ風の彩度
 - タグカテゴリ色（`--cv-color` / `--circle-color` / `--series-color` / `--cat-color`）: 構造化タグ（`cv/` `サークル/` `シリーズ/` `カテゴリ/`）を視覚的に区別する専用色。フラットタグには使わない。値の実背景（`--paper-2`、hover時`--paper-3`）の両方で4.5:1以上を満たすよう明度を調整済み。色を変える場合は両背景で計算し直す
+- 状態の4区分（`StatusLabel`）: 完了＝`--state-success`、あなたの番（該当なし・失敗など）＝`--state-danger`、作業中＝`--ink-2`、対象外＝色なし。文字には `--ink-0` を混ぜて読める濃さにし、薄い背景が要るときは `color-mix()` でその場で作る。新しい色トークンは作らない
 - `--shadow-cover`: カバーアート専用の影（内側ハイライト付き）。通常の面には `--shadow-1/2/pop` を使う
 - 影・暗幕の基底色: `--shadow-ink`（影・暗幕）、`--immersive-ink`（没入モードの暗幕）、`--immersive-text-shadow-ink`（没入モードの文字影）、`--shadow-black`（画像上アイコンの影）。影・暗幕の色はこれらから `color-mix(in oklch, var(--x) N%, transparent)` で透明度を付けて作り、`oklch` を直書きしない
 - `--scrim`: モーダルの暗幕。`--shadow-ink` を透過したもので、モーダルの暗幕にはこれを使う

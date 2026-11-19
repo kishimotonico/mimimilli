@@ -65,3 +65,15 @@ test("resolveServerConfig: staticDir は有効なディレクトリを返す", (
   const config = resolveServerConfig({ MIMIMILLI_STATIC_DIR: dir });
   assert.equal(config.staticDir, dir);
 });
+
+test("resolveServerConfig: MOCK_DLSITE_FETCH_DELAY_MS は未設定なら0、不正値は失敗する", () => {
+  assert.equal(resolveServerConfig({}).dlsiteFetchDelayMs, 0);
+  assert.equal(
+    resolveServerConfig({ MIMIMILLI_MOCK_DLSITE_FETCH_DELAY_MS: "1500" }).dlsiteFetchDelayMs,
+    1500,
+  );
+  assert.throws(
+    () => resolveServerConfig({ MIMIMILLI_MOCK_DLSITE_FETCH_DELAY_MS: "abc" }),
+    /MIMIMILLI_MOCK_DLSITE_FETCH_DELAY_MS/,
+  );
+});

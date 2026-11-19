@@ -14,7 +14,7 @@ import {
 import { useScanCandidatesCache } from "../model/useScanCandidatesCache";
 import { useDlsiteNotificationSummary } from "../../../entities/dlsite/model/useDlsiteNotificationSummary";
 import ScanSidebar from "./scanModal/ScanSidebar";
-import UnregisteredTab from "./scanModal/UnregisteredTab";
+import UnregisteredTab from "./scanModal/unregistered/UnregisteredTab";
 import NeedsAttentionTab from "./scanModal/NeedsAttentionTab";
 import NewlyRegisteredTab from "./scanModal/NewlyRegisteredTab";
 import UpdatedWorksTab from "./scanModal/UpdatedWorksTab";
@@ -46,19 +46,18 @@ export default function ScanModal({
   const handleUnregisteredRegistered = ({
     registeredCount,
     failedCount,
-    remainingCount,
+    interrupted,
   }: CandidatesRegisteredResult) => {
-    toast.show({
-      message:
-        failedCount > 0
-          ? `${registeredCount}件をライブラリに追加しました。${failedCount}件は追加できませんでした。`
-          : `${registeredCount}件をライブラリに追加しました`,
-      variant: failedCount > 0 ? "warning" : "success",
-      actionLabel: "新規登録済みを見る",
-      onAction: () => setActiveTab("newlyRegistered"),
-      priority: "action",
-    });
-    if (remainingCount === 0) setActiveTab("newlyRegistered");
+    if (failedCount > 0 || interrupted) {
+      toast.show({
+        message: interrupted
+          ? `${registeredCount}件を追加して止まりました。残りは未登録タブから追加してください。`
+          : `${registeredCount}件を追加しました。${failedCount}件は追加できませんでした。`,
+        variant: "warning",
+        priority: "notice",
+      });
+    }
+    setActiveTab("newlyRegistered");
   };
 
   // 直近のスキャンの記録（サーバーのメモリ。次のスキャンかサーバー再起動まで）。
@@ -110,7 +109,7 @@ export default function ScanModal({
   const dialog = useDialogModal({ onClose });
 
   return (
-    <Modal dialog={dialog} size={740} height="short" labelledBy="scan-modal-title">
+    <Modal dialog={dialog} size={960} height="fixed" labelledBy="scan-modal-title">
       <ModalHeader
         title="スキャン"
         titleId="scan-modal-title"
@@ -133,7 +132,10 @@ export default function ScanModal({
           role="tabpanel"
           id={`scan-tabpanel-${activeTab}`}
           aria-labelledby={`scan-tab-${activeTab}`}
-          className="min-h-0 flex-1 overflow-y-auto px-[18px] py-4"
+          className={cn(
+            "flex min-h-0 flex-1 flex-col",
+            activeTab === "unregistered" ? "overflow-hidden" : "overflow-y-auto px-[18px] py-4",
+          )}
         >
           {activeTab === "unregistered" && (
             <UnregisteredTab candidates={candidates} onRegistered={handleUnregisteredRegistered} />

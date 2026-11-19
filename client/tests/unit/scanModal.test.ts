@@ -9,7 +9,7 @@ import {
   useQuery,
   type InfiniteData,
 } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import {
   type ScanCandidate,
   type ScanJobSnapshot,
@@ -19,10 +19,15 @@ import {
   type WorkListItem,
   type WorksPage,
 } from "@mimimilli/shared";
+import * as workApi from "../../src/entities/work/api";
 import ScanModal from "../../src/features/scan/ui/ScanModal";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { scanJobStoreAtom } from "../../src/entities/scan/model/scanJobStore";
+import {
+  flushUnregisteredListSize,
+  mockUnregisteredListSize,
+} from "../helpers/unregisteredListSize";
 import { createFakeScanJobStore } from "../helpers/fakeJobStores";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import { libraryTotalQueryOptions } from "../../src/entities/work/libraryTotalQueryOptions";
@@ -73,7 +78,18 @@ function saveTitleReply(request: ApiRequest) {
   return buildWorkSourceMutationResult(scanSnapshot(title));
 }
 
+let restoreListSize: () => void = () => {};
+afterEach(() => restoreListSize());
+
+async function showUnregisteredList() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    flushUnregisteredListSize();
+  });
+}
+
 beforeEach(() => {
+  restoreListSize = mockUnregisteredListSize();
   HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
     this.open = true;
   });
@@ -561,10 +577,11 @@ describe("ScanModal", () => {
       candidates: [candidateDetected, candidateUndetected],
     });
 
+    await showUnregisteredList();
     const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
     await expect.poll(() => unregistered.textContent).toContain(candidateDetected.inferredTitle);
 
-    fireEvent.click(within(unregistered).getByRole("button", { name: "2件をライブラリに追加" }));
+    fireEvent.click(within(unregistered).getByRole("button", { name: "2件を追加" }));
 
     await waitFor(() =>
       expect(api.requestsTo("POST /api/scan/candidates/register")).toHaveLength(1),
@@ -575,11 +592,41 @@ describe("ScanModal", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByText("2件をライブラリに追加しました")).toBeInTheDocument(),
+      expect(screen.getByRole("tabpanel", { name: /^新規登録済み/ })).toBeInTheDocument(),
     );
+  });
+
+  it("全件追加に成功したときは警告トーストを出さない", async () => {
+    registerReply = buildScanCandidatesRegisterResponse({
+      registered: [{ path: candidateDetected.path, workId: "w-detected" }],
+    });
+    renderModal({ candidates: [candidateDetected] });
+    await showUnregisteredList();
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    fireEvent.click(within(unregistered).getByRole("button", { name: "1件を追加" }));
     await waitFor(() =>
       expect(screen.getByRole("tabpanel", { name: /^新規登録済み/ })).toBeInTheDocument(),
     );
+    expect(screen.queryByText(/追加できませんでした|止まりました/)).toBeNull();
+  });
+
+  it("途中で止まったときは追加できた件数つきの警告トーストを出して新規登録済みへ移る", async () => {
+    const registerSpy = vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
+      registered: [{ path: candidateDetected.path, workId: "w-detected" }],
+      failures: [],
+      interruptedBy: new Error("通信エラー"),
+    });
+    onTestFinished(() => registerSpy.mockRestore());
+    renderModal({ candidates: [candidateDetected, candidateUndetected] });
+    await showUnregisteredList();
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    fireEvent.click(within(unregistered).getByRole("button", { name: "2件を追加" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText("1件を追加して止まりました。残りは未登録タブから追加してください。"),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("tabpanel", { name: /^新規登録済み/ })).toBeInTheDocument();
   });
 
   it("候補登録に成功すると作品一覧・軸件数・DLsite通知・スマートフォルダーのクエリを無効化する", async () => {
@@ -591,9 +638,10 @@ describe("ScanModal", () => {
     });
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
+    await showUnregisteredList();
     const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
     await expect.poll(() => unregistered.textContent).toContain(candidateDetected.inferredTitle);
-    fireEvent.click(within(unregistered).getByRole("button", { name: "1件をライブラリに追加" }));
+    fireEvent.click(within(unregistered).getByRole("button", { name: "1件を追加" }));
 
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["works"] }));
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["axisFacets"] });
@@ -612,12 +660,17 @@ describe("ScanModal", () => {
     });
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
+    await showUnregisteredList();
     const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
     await expect.poll(() => unregistered.textContent).toContain(candidateDetected.inferredTitle);
-    fireEvent.click(within(unregistered).getByRole("button", { name: "2件をライブラリに追加" }));
+    fireEvent.click(within(unregistered).getByRole("button", { name: "2件を追加" }));
 
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["works"] }));
-    await waitFor(() => expect(screen.getByText("失敗")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByText("1件を追加しました。1件は追加できませんでした。"),
+      ).toBeInTheDocument(),
+    );
   });
 
   it("候補の除外では作品一覧・軸件数・スマートフォルダーの再取得を行わない（AC#4）", async () => {
@@ -626,13 +679,10 @@ describe("ScanModal", () => {
     });
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
+    await showUnregisteredList();
     const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
     await expect.poll(() => unregistered.textContent).toContain(candidateUndetected.inferredTitle);
-    fireEvent.click(
-      within(unregistered).getByRole("button", {
-        name: `「${candidateUndetected.inferredTitle}」を候補から外す`,
-      }),
-    );
+    fireEvent.click(within(unregistered).getByRole("button", { name: "除外" }));
 
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith({
@@ -652,8 +702,9 @@ describe("ScanModal", () => {
       candidates: [candidateDetected, candidateUndetected],
     });
 
+    await showUnregisteredList();
     const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
-    fireEvent.click(within(unregistered).getByRole("button", { name: "未検出" }));
+    fireEvent.click(within(unregistered).getByRole("button", { name: "—" }));
     const input = within(unregistered).getByPlaceholderText("RJコード");
     fireEvent.change(input, { target: { value: "RJ200002" } });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -672,7 +723,7 @@ describe("ScanModal", () => {
         name: `「${candidateDetected.inferredTitle}」を選択`,
       }),
     );
-    fireEvent.click(within(unregistered).getByRole("button", { name: "1件をライブラリに追加" }));
+    fireEvent.click(within(unregistered).getByRole("button", { name: "1件を追加" }));
 
     await waitFor(() =>
       expect(api.requestsTo("POST /api/scan/candidates/register")).toHaveLength(1),
@@ -683,30 +734,28 @@ describe("ScanModal", () => {
     });
   });
 
-  it("候補を1件ずつ除外でき、「元に戻す」で取り消せる", async () => {
+  it("選んだ候補を除外でき、「元に戻す」で取り消せる", async () => {
     renderModal({
       candidates: [candidateDetected, candidateUndetected],
     });
 
+    await showUnregisteredList();
     const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
     await expect.poll(() => unregistered.textContent).toContain(candidateUndetected.inferredTitle);
 
     fireEvent.click(
-      within(unregistered).getByRole("button", {
-        name: `「${candidateUndetected.inferredTitle}」を候補から外す`,
+      within(unregistered).getByRole("checkbox", {
+        name: `「${candidateDetected.inferredTitle}」を選択`,
       }),
     );
+    fireEvent.click(within(unregistered).getByRole("button", { name: "除外" }));
 
     await waitFor(() =>
       expect(api.requestsTo("POST /api/scan/candidates/exclude")[0]?.body).toEqual({
         paths: [candidateUndetected.path],
       }),
     );
-    await waitFor(() =>
-      expect(
-        screen.getByText(`「${candidateUndetected.inferredTitle}」を候補から外しました`),
-      ).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("1件を候補から外しました")).toBeInTheDocument());
     expect(screen.queryByText(candidateUndetected.inferredTitle)).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "元に戻す" }));

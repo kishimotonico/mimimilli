@@ -82,6 +82,7 @@ function toCandidate(state: FixtureState, folder: ScanCandidateFolder): ScanCand
     audioFileCount: folder.audioFileCount,
     audioBreakdown: folder.audioBreakdown,
     rjCode,
+    rjCodeEdited: state.scanCandidateRjCodeOverrides.has(folder.path),
     dlsite: deriveDlsite(state, rjCode),
     missingWorks,
   };

@@ -635,6 +635,14 @@ export function applyDlsiteStatePatch(
 /** POST /api/dlsite/jobs の1リクエストに含められるproduct codeの上限。超える分はクライアントが分割して送る */
 export const DLSITE_JOB_MAX_PRODUCT_CODES = 1000;
 
+/** 取得ジョブのキー（product code）の正規化。表記ゆれを大文字に揃える */
+export function canonicalDlsiteProductCode(code: string): string {
+  return code.trim().toUpperCase();
+}
+
+/** 1コードあたりの取得時間の目安。「N件・約M分」の表示に使う（測った速度は使わない） */
+export const DLSITE_FETCH_ESTIMATE_MS_PER_CODE = 2000;
+
 export const dlsiteJobOriginSchema = z.enum(["bulk", "single"]);
 export type DlsiteJobOrigin = z.infer<typeof dlsiteJobOriginSchema>;
 

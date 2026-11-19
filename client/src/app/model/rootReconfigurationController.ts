@@ -60,7 +60,7 @@ export interface RootReconfigurationControllerDeps {
   closeDlsiteApplyDialog: () => void;
   scanJob: { reset: () => void };
   navigateToDefaultRoute: () => void;
-  clearScanCandidateHiddenPaths: () => void;
+  clearScanCandidateLocalState: () => void;
 }
 
 export interface RootReconfigurationController {
@@ -99,7 +99,7 @@ export function createRootReconfigurationController(
     deps.closeDlsiteApplyDialog,
     deps.scanJob.reset,
     deps.navigateToDefaultRoute,
-    deps.clearScanCandidateHiddenPaths,
+    deps.clearScanCandidateLocalState,
     () => markReconfigurationAffectedQueriesStale(queryClient),
   ];
 

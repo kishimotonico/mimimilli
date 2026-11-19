@@ -492,3 +492,59 @@ test("fixture: 異なるrootへの変更で候補sessionを破棄し、次のsca
   );
   assert.deepEqual(await paths(), ["未登録作品", "朗読/候補"]);
 });
+
+test("scan-review: 候補が取得状態ごとの表示になり、直した行だけ rjCodeEdited になる", async () => {
+  const app = buildApp("scan-review");
+  try {
+    const list = async () => {
+      const response = await app.request("/api/scan/candidates");
+      assert.equal(response.status, 200);
+      const { candidates } = await response.json();
+      return new Map<string, { rjCode: string | null; rjCodeEdited: boolean; dlsite: unknown }>(
+        candidates.map((entry: { rjCode: string | null }) => [entry.rjCode ?? "", entry as never]),
+      );
+    };
+    const before = await list();
+    assert.ok(before.has("RJ000402") && before.has("RJ000403") && before.has("RJ000404"));
+    assert.ok(before.has(""), "RJコードなしの候補がある");
+    assert.ok([...before.values()].every((entry) => !entry.rjCodeEdited));
+
+    const fetchCodes = async (productCodes: string[]) => {
+      const response = await app.request("/api/dlsite/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ origin: "bulk", productCodes }),
+      });
+      assert.equal(response.status, 202);
+    };
+    await fetchCodes(["RJ000401", "RJ000402", "RJ000403", "RJ000404"]);
+    for (let i = 0; i < 50; i++) {
+      const states = await list();
+      if (
+        states.get("RJ000404")?.dlsite &&
+        (states.get("RJ000404")!.dlsite as never as { state: string }).state !== "fetching"
+      )
+        break;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    const after = await list();
+    const stateOf = (code: string) => (after.get(code)!.dlsite as { state: string }).state;
+    assert.equal(stateOf("RJ000401"), "fetched");
+    assert.equal(stateOf("RJ000402"), "fetched");
+    assert.equal((after.get("RJ000402")!.dlsite as { cover: unknown }).cover, null);
+    assert.notEqual((after.get("RJ000401")!.dlsite as { cover: unknown }).cover, null);
+    assert.equal(stateOf("RJ000403"), "not_found");
+    assert.equal(stateOf("RJ000404"), "failed");
+
+    const edited = await app.request("/api/scan/candidates/rj-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "RJ000405_夜更けの朗読", rjCode: "" }),
+    });
+    assert.equal(edited.status, 200);
+    assert.equal((await edited.json()).candidate.rjCodeEdited, true);
+    assert.equal((await list()).get("")?.rjCodeEdited, true);
+  } finally {
+    await app.shutdown();
+  }
+});
