@@ -113,44 +113,6 @@ test("スキャン finalize は壊れた作品があっても ScanResult を返�
   assert.deepEqual(result.dataIntegrityWarning?.skippedWorkIds, [badId]);
 });
 
-test("DLsite 一括取得は壊れた作品を除外し dataIntegrityWarning を返す", async (t) => {
-  const directory = makeTestDirectory("dlsite-bulk-integrity");
-  t.after(directory.cleanup);
-  const db = directory.own(openFileDb(directory.path));
-  const { catalog, user } = createWorkRepos(db);
-  const { badId } = seedCorruptedPair(catalog, user, db);
-  const adapter = fileAdapter(directory);
-
-  const result = await adapter.runDlsiteBulk("existing", undefined);
-  assert.equal(result.dataIntegrityWarning?.skippedCount, 1);
-  assert.deepEqual(result.dataIntegrityWarning?.skippedWorkIds, [badId]);
-});
-
-test("DLsite 一括取得: workIds に含まない壊れた作品は dataIntegrityWarning に出ない", async (t) => {
-  const directory = makeTestDirectory("dlsite-bulk-scope");
-  t.after(directory.cleanup);
-  const db = directory.own(openFileDb(directory.path));
-  const { catalog, user } = createWorkRepos(db);
-  const { goodId } = seedCorruptedPair(catalog, user, db);
-  const adapter = fileAdapter(directory);
-
-  const result = await adapter.runDlsiteBulk("existing", [goodId]);
-  assert.equal(result.dataIntegrityWarning, undefined);
-});
-
-test("DLsite 一括取得: workIds に含まれる壊れた作品は dataIntegrityWarning に出る", async (t) => {
-  const directory = makeTestDirectory("dlsite-bulk-scope-bad");
-  t.after(directory.cleanup);
-  const db = directory.own(openFileDb(directory.path));
-  const { catalog, user } = createWorkRepos(db);
-  const { badId } = seedCorruptedPair(catalog, user, db);
-  const adapter = fileAdapter(directory);
-
-  const result = await adapter.runDlsiteBulk("existing", [badId]);
-  assert.equal(result.dataIntegrityWarning?.skippedCount, 1);
-  assert.deepEqual(result.dataIntegrityWarning?.skippedWorkIds, [badId]);
-});
-
 test("HTTP smart folder は dataIntegrityWarning を返す", async (t) => {
   const directory = makeTestDirectory("sf-integrity");
   t.after(directory.cleanup);

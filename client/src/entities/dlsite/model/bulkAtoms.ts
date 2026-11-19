@@ -1,4 +1,4 @@
-// DLsite 一括取得まわりの Jotai atoms。ジョブの状態は dlsiteBulkStore が持つ。
+// DLsite 未設定項目のまとめて適用まわりの Jotai atoms。
 
 import { atom } from "jotai";
 

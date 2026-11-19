@@ -63,7 +63,6 @@ export class ScanCandidateSession {
     items: ScanCandidateRegisterItem[],
     scanner: Scanner,
     user: Pick<UserWorkStateRepository, "listScanCandidateExclusions">,
-    onRegistered: (workId: string) => void = () => {},
   ): Promise<ScanCandidatesRegisterResponse> {
     this.assertRootMatches(root);
     const candidates = this.listCandidates(user);
@@ -84,9 +83,6 @@ export class ScanCandidateSession {
           rjCode: item.rjCode,
         });
         registered.push({ path: current.path, workId: outcome.snapshot.meta.id });
-        if (outcome.status === "published") {
-          onRegistered(outcome.snapshot.meta.id);
-        }
       } catch (error) {
         failures.push({
           path: current.path,

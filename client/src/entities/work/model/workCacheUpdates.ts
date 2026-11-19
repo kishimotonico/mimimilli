@@ -166,8 +166,3 @@ export async function updateCachesAfterDlsiteBulkApply(
     invalidateLibraryViews(queryClient),
   ]);
 }
-
-/** 一括取得の終端（結果不明を含む）。処理対象を問わず全詳細を無効化する */
-export async function updateCachesAfterDlsiteBulkFetch(queryClient: QueryClient): Promise<void> {
-  await Promise.all([invalidateAllWorkDetails(queryClient), invalidateLibraryViews(queryClient)]);
-}

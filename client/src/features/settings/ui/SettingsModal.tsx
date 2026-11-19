@@ -5,12 +5,6 @@ import Button from "../../../shared/ui/Button";
 import TextInput from "../../../shared/ui/TextInput";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
 import { dlsiteBulkApplyBusyAtom } from "../../../entities/dlsite/model/bulkAtoms";
-import {
-  useDlsiteBulkActive,
-  useDlsiteBulkProgress,
-  useDlsiteBulkStarting,
-  useDlsiteBulkStore,
-} from "../../../entities/dlsite/useDlsiteBulk";
 import { useDlsiteBulkApplyActions } from "../../../entities/dlsite/useDlsiteBulkApplyActions";
 import { useScanning, useScanProgressLabel } from "../../../entities/scan/useScanJob";
 import TagPrefixSettings from "./TagPrefixSettings";
@@ -47,12 +41,7 @@ export default function SettingsModal({
   const rootFolder = useRootFolder();
   const scanning = useScanning();
   const scanProgressLabel = useScanProgressLabel();
-  const dlsiteBulkActive = useDlsiteBulkActive();
-  const dlsiteBulkStarting = useDlsiteBulkStarting();
-  const dlsiteBulkProgress = useDlsiteBulkProgress();
   const dlsiteBulkApplyBusy = useAtomValue(dlsiteBulkApplyBusyAtom);
-  const dlsiteBulkBusy = dlsiteBulkActive || dlsiteBulkStarting;
-  const { start: onStartDlsiteBulk } = useDlsiteBulkStore();
   const { openDialog: onOpenDlsiteBulkApply } = useDlsiteBulkApplyActions();
   const [isEditingFolder, setIsEditingFolder] = useState(false);
   const [folderDraft, setFolderDraft] = useState(rootFolder);
@@ -185,18 +174,7 @@ export default function SettingsModal({
             variant="ghost"
             size="md"
             className="self-start"
-            disabled={dlsiteBulkBusy || dlsiteBulkApplyBusy}
-            onClick={() => void onStartDlsiteBulk()}
-          >
-            {dlsiteBulkActive
-              ? `取得中${dlsiteBulkProgress ? ` (${dlsiteBulkProgress.processed}/${dlsiteBulkProgress.total})` : "..."}`
-              : "未連携をまとめて取得"}
-          </Button>
-          <Button
-            variant="ghost"
-            size="md"
-            className="self-start"
-            disabled={dlsiteBulkBusy || dlsiteBulkApplyBusy}
+            disabled={dlsiteBulkApplyBusy}
             onClick={onOpenDlsiteBulkApply}
           >
             {dlsiteBulkApplyBusy ? "適用中..." : "未設定項目をまとめて適用"}

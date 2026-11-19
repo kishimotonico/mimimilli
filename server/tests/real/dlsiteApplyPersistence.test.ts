@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { DlsiteWorkInfo } from "@mimimilli/shared";
@@ -16,6 +16,7 @@ import {
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
+import { fetchDlsiteOfWorks } from "../helpers/dlsiteFetch.ts";
 
 const FAST_DLSITE_REQUEST_CONFIG = {
   ...DEFAULT_DLSITE_REQUEST_CONFIG,
@@ -54,7 +55,7 @@ test("title: 単発適用は applyTitle に従い、一括取得は作品情報�
   const existingMetaPath = join(existingBeforeBulk!.physicalPath, META_FILE_NAME);
   const existingBytesBeforeBulk = readFileSync(existingMetaPath);
 
-  await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
+  await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
   const existingAfterBulk = await adapter.getWork(lib.existingWorkId);
   assert.equal(existingAfterBulk?.title, customTitle);
   assert.deepEqual(readFileSync(existingMetaPath), existingBytesBeforeBulk);
@@ -86,7 +87,7 @@ test("title: 単発適用は applyTitle に従い、一括取得は作品情報�
   );
   const generatedId = registration.registered[0]!.workId;
   const generatedBefore = await adapter.getWork(generatedId);
-  await adapter.runDlsiteBulk("existing", [generatedId]);
+  await fetchDlsiteOfWorks(adapter, [generatedId]);
   const generatedAfterBulk = await adapter.getWork(generatedId);
   assert.equal(generatedAfterBulk?.title, generatedBefore?.title);
 
@@ -164,7 +165,7 @@ test("cover: 単発適用は applyCover で既存カバーを上書きし、一�
   assert.ok(withCover?.cover);
   const firstCoverImage = withCover!.cover!.image;
 
-  await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
+  await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
   assert.equal(coverHttpCalls, 1);
   const afterBulk = await adapter.getWork(lib.existingWorkId);
   assert.equal(afterBulk?.cover?.image, firstCoverImage);
@@ -254,7 +255,7 @@ test("missing-only一括適用はcache結果だけを使い、既存フィール
   const metaPath = join(before!.physicalPath, META_FILE_NAME);
   const bytesBefore = readFileSync(metaPath);
 
-  await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
+  await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
   assert.equal(htmlCalls, 1);
   assert.deepEqual(readFileSync(metaPath), bytesBefore);
 
@@ -295,7 +296,7 @@ test("missing-only一括適用プレビューは書き込みをせず、適用�
   const metaPath = join(before!.physicalPath, META_FILE_NAME);
   const bytesBefore = readFileSync(metaPath);
 
-  await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
+  await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
 
   const preview = await adapter.dlsiteApplyMissingPreview([lib.existingWorkId]);
   assert.equal(preview.items.length, 1);
@@ -376,7 +377,7 @@ async function setupTwoWorkMissingApply(t: { after: (fn: () => void) => void }, 
   );
   await configureRoot(adapter, root);
   await adapter.scan({ full: true });
-  await adapter.runDlsiteBulk("existing", [firstId, secondId]);
+  await fetchDlsiteOfWorks(adapter, [firstId, secondId]);
   return { adapter, firstId, secondId, firstMetaPath };
 }
 
@@ -452,7 +453,7 @@ test("missing-only一括適用: 取得失敗後もcatalog投影で通知集計�
   assert.ok(summary.fetchFailedCount >= 1);
 });
 
-test("一括取得はカバーをキャッシュも適用もせず、明示適用で取得する", async (t) => {
+test("取得はカバーをキャッシュへ先取りし、明示適用はキャッシュのカバーを使ってHTTPしない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-shared-cache");
   t.after(lib.cleanup);
@@ -480,8 +481,10 @@ test("一括取得はカバーをキャッシュも適用もせず、明示適�
   await configureRoot(adapter, lib.root);
   await adapter.scan();
 
-  await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
-  assert.equal(coverHttpCalls, 0);
+  await fetchDlsiteOfWorks(adapter, [lib.existingWorkId]);
+  assert.equal(coverHttpCalls, 1);
+  const workDir = (await adapter.getWork(lib.existingWorkId))!.physicalPath;
+  assert.equal(existsSync(join(workDir, "dlsite_cover.jpg")), false);
 
   await adapter.dlsiteApply(lib.existingWorkId, {
     info: {
@@ -501,4 +504,5 @@ test("一括取得はカバーをキャッシュも適用もせず、明示適�
     sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
   });
   assert.equal(coverHttpCalls, 1);
+  assert.equal(existsSync(join(workDir, "dlsite_cover.jpg")), true);
 });

@@ -4,7 +4,6 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../../src/app/App";
-import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
 import DlsiteBulkApplyRuntime from "../../src/features/dlsite/ui/DlsiteBulkApplyRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import NavigationHistorySync from "../../src/features/navigation/ui/NavigationHistorySync";
@@ -28,7 +27,8 @@ import { mockApi, type ApiMock } from "../helpers/api";
 import { appShellRoutes } from "../helpers/appShellApi";
 import { buildScanLastResult, buildScanResult, buildSettings } from "../helpers/builders";
 
-const DLSITE_BULK_ROUTE = "GET /api/dlsite/bulk";
+const DLSITE_JOB_START_ROUTE = "POST /api/dlsite/jobs";
+const DLSITE_JOB_CURRENT_ROUTE = "GET /api/dlsite/jobs/current";
 const LAST_SCAN_ROUTE = "GET /api/scan/last";
 const PREVIEW_ROUTE = "POST /api/dlsite/apply-missing/preview";
 
@@ -65,7 +65,6 @@ function renderAppWithSettings(settings: Settings) {
         createElement(
           PlayerRuntimeProvider,
           null,
-          createElement(DlsiteBulkRuntime),
           createElement(DlsiteBulkApplyRuntime),
           createElement(NavigationHistorySync),
           createElement(ScanRuntime),
@@ -162,11 +161,8 @@ describe("root再設定中の画面", () => {
   });
 });
 
-describe("root再設定完了後のDLsite自動取得attach", () => {
-  // settings更新→reconfiguring突入検知effect→queryClient.fetchQuery→.then→attach()→
-  // DLsite一括取得の状態取得という多段の非同期チェーンを待つ。並列実行時の負荷でwaitFor既定の
-  // 1000msを超えうるため、明示的に長めのtimeoutを与えて安定させる。
-  it("新規作品があればDLsite一括取得の状態を取得してattachする", async () => {
+describe("root再設定完了後のDLsite取得", () => {
+  it("新規作品があってもDLsite取得を始めず、取得ジョブの状態も取りに行かない", async () => {
     insertedWorkIds = ["work-1"];
 
     const { queryClient } = renderAppWithSettings(
@@ -181,34 +177,11 @@ describe("root再設定完了後のDLsite自動取得attach", () => {
       settingsOf({ status: "idle", completedAt: null }),
     );
 
-    await waitFor(() => expect(api.requestsTo(DLSITE_BULK_ROUTE)).not.toHaveLength(0), {
-      timeout: 5000,
-    });
-  });
-
-  it("新規作品が無ければDLsite一括取得の状態を取得しない", async () => {
-    const { queryClient } = renderAppWithSettings(
-      settingsOf({ status: "running", rootFolder: "/audio/library", progress: null }),
-    );
-    await waitFor(() =>
-      expect(screen.getByText("ライブラリを再構築しています")).toBeInTheDocument(),
-    );
-
-    queryClient.setQueryData(
-      SETTINGS_QUERY_KEYS.all(),
-      settingsOf({ status: "idle", completedAt: null }),
-    );
-
-    // DLsite一括取得の状態が取得されないことの確認は「取得する経路自体は完了した」ことを
-    // 待ってから行う。そうしないと、まだチェーンの途中（直近スキャン結果が未解決）な
-    // だけで判定してしまい、偽陰性（取得されるはずが間に合わず未検出）になりうる。
-    await waitFor(() => expect(api.requestsTo(LAST_SCAN_ROUTE)).not.toHaveLength(0), {
-      timeout: 5000,
-    });
     await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument(), {
       timeout: 5000,
     });
-    expect(api.requestsTo(DLSITE_BULK_ROUTE)).toHaveLength(0);
+    expect(api.requestsTo(DLSITE_JOB_START_ROUTE)).toHaveLength(0);
+    expect(api.requestsTo(DLSITE_JOB_CURRENT_ROUTE)).toHaveLength(0);
   });
 });
 
@@ -271,7 +244,7 @@ describe("root再設定突入時のDLsite一括適用ダイアログ初期化", 
 });
 
 describe("root再設定の高速完了（runningが描画されない）競合", () => {
-  it("settings再取得がidleを即座に返しても、突入側のクエリ破棄と離脱側のDLsite attachが行われる", async () => {
+  it("settings再取得がidleを即座に返しても、突入側のクエリ破棄が行われる", async () => {
     // invalidateSettings（GET /api/settings再取得）が即座にidleを返す競合を模す。
     // Reactが中間状態（running）の描画を挟まないケースでも、performEntryReset・
     // leavePendingは描画観測に依存せず必ず立つ想定。
@@ -298,10 +271,10 @@ describe("root再設定の高速完了（runningが描画されない）競合",
     });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
-    await waitFor(() => expect(api.requestsTo(DLSITE_BULK_ROUTE)).not.toHaveLength(0), {
-      timeout: 5000,
-    });
-    expect(queryClient.getQueryData(WORK_QUERY_KEYS.detail("work-1"))).toBeUndefined();
+    await waitFor(
+      () => expect(queryClient.getQueryData(WORK_QUERY_KEYS.detail("work-1"))).toBeUndefined(),
+      { timeout: 5000 },
+    );
   });
 });
 

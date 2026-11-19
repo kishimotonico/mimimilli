@@ -223,9 +223,6 @@ test("errors: dataIntegrityWarningがWorksPage・スキャン結果・エクス�
     limit: 50,
   });
   assert.deepEqual(smartFolderWorks?.dataIntegrityWarning, worksPage.dataIntegrityWarning);
-
-  const bulk = await adapter.runDlsiteBulk("existing", undefined);
-  assert.deepEqual(bulk.dataIntegrityWarning, worksPage.dataIntegrityWarning);
 });
 
 test("new-work・default: dataIntegrityWarningは付かない", async () => {
@@ -442,9 +439,7 @@ test("fixture: RJコード変更で旧状態をリセットし一括取得対象
   assert.equal(updated?.snapshot.dlsite.status, "none");
   assert.deepEqual(updated?.snapshot.dlsite.appliedTags, []);
 
-  const bulk = await adapter.runDlsiteBulk("existing", [workId]);
-  assert.equal(bulk.fetched, 1);
-  assert.equal(bulk.skipped, 0);
+  assert.equal(await adapter.fetchDlsiteProduct("RJ7654321", { force: false }), "fetched");
 });
 
 test("fixture: 単一音声ファイルのregister-previewと登録ができる", async () => {

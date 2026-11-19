@@ -10,7 +10,6 @@ import {
   type WorkSummary,
 } from "@mimimilli/shared";
 import { summarizeDlsiteNotifications } from "../src/core/dlsiteNotifications.ts";
-import { selectDlsiteBulkTargets } from "../src/adapters/real/dlsiteBulk.ts";
 import { openDb } from "../src/adapters/real/db.ts";
 import { coverFieldsFromCover, createWorkRepos, upsertTestWork } from "./helpers/workTestUtils.ts";
 import { nts } from "./helpers/tag.ts";
@@ -110,13 +109,6 @@ test("rjCode 4状態: JS集計・SQL集計・一括取得対象が一致する",
       parseErrorAlert: false,
       unlinkedCount: 1,
     });
-
-    const bulk = selectDlsiteBulkTargets(query, undefined, { warn: () => {} });
-    assert.deepEqual(
-      bulk.targets.map((work) => work.id),
-      ["unlinked"],
-    );
-    assert.equal(bulk.skipped, 3);
   } finally {
     db.close();
   }

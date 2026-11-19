@@ -1,14 +1,15 @@
 // POST /dlsite/:id/fetch, POST /dlsite/:id/apply
 import { Hono } from "hono";
-import { streamSSE } from "hono/streaming";
 import {
   dlsiteApplyBodySchema,
   dlsiteApplyMissingBodySchema,
   dlsiteApplyMissingPreviewSchema,
   dlsiteBulkApplyMissingResultSchema,
-  dlsiteBulkCancelResponseSchema,
-  dlsiteBulkSnapshotSchema,
-  dlsiteBulkStartResponseSchema,
+  dlsiteJobCancelBulkResponseSchema,
+  dlsiteJobCurrentResponseSchema,
+  dlsiteJobStartBodySchema,
+  dlsiteJobStartResponseSchema,
+  type DlsiteJobEvent,
   dlsiteFetchByCodeBodySchema,
   dlsiteNotificationKindSchema,
   dlsiteNotificationQuerySchema,
@@ -21,6 +22,7 @@ import { apiError, invalidRequest, notFound, throwSourceCommandError } from "../
 import { readJsonBody, readOptionalJsonBody } from "../lib/jsonBody.ts";
 import { getCategoryLogger } from "../lib/logger.ts";
 import type { DlsiteJobManager } from "../dlsiteJobManager.ts";
+import { SSE_HEARTBEAT_INTERVAL_MS, streamJobEvents } from "../lib/sseStream.ts";
 
 const dlsiteLogger = getCategoryLogger("dlsite");
 
@@ -28,7 +30,11 @@ function isClientAbort(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-export function dlsiteRoute(adapter: DataAdapter, dlsiteJobs: DlsiteJobManager): Hono {
+export function dlsiteRoute(
+  adapter: DataAdapter,
+  dlsiteJobs: DlsiteJobManager,
+  heartbeatIntervalMs: number = SSE_HEARTBEAT_INTERVAL_MS,
+): Hono {
   const app = new Hono();
 
   app.get("/dlsite/notifications", async (c) =>
@@ -157,79 +163,41 @@ export function dlsiteRoute(adapter: DataAdapter, dlsiteJobs: DlsiteJobManager):
     }
   });
 
-  app.get("/dlsite/bulk", (c) => {
-    return c.json(dlsiteBulkSnapshotSchema.parse(dlsiteJobs.getSnapshot()));
-  });
-
-  app.post("/dlsite/bulk", async (c) => {
-    if (dlsiteJobs.isInProgress()) throw apiError("conflict", "DLsite取得は既に実行中です");
-    const jobId = dlsiteJobs.enqueue("existing", undefined);
+  app.post("/dlsite/jobs", async (c) => {
+    const data = await readJsonBody(
+      c,
+      dlsiteJobStartBodySchema,
+      (error) => error.issues[0]?.message ?? "DLsite取得ジョブの指定が不正です",
+    );
+    if (adapter.isDlsiteOffline()) {
+      throw apiError("offline", "オフライン設定のためDLsiteから取得できません");
+    }
+    const jobId = dlsiteJobs.start(data);
     if (!jobId) throw apiError("conflict", "サーバーの終了処理中のためDLsite取得を開始できません");
-    return c.json(dlsiteBulkStartResponseSchema.parse({ jobId }), 202);
+    return c.json(dlsiteJobStartResponseSchema.parse({ jobId }), 202);
   });
 
-  app.delete("/dlsite/bulk", (c) => {
-    if (!dlsiteJobs.cancel()) notFound("実行中のDLsite一括取得がありません");
-    return c.json(dlsiteBulkCancelResponseSchema.parse({ cancelling: true }));
-  });
+  app.get("/dlsite/jobs/current", (c) =>
+    c.json(dlsiteJobCurrentResponseSchema.parse({ job: dlsiteJobs.getSnapshot() })),
+  );
 
-  app.get("/dlsite/events", (c) =>
-    streamSSE(c, async (stream) => {
-      let resolveDone!: () => void;
-      const done = new Promise<void>((resolve) => {
-        resolveDone = resolve;
-      });
-      let stopped = false;
-      let writeChain: Promise<void> = Promise.resolve();
-      let unsubscribe = (): void => {};
+  app.delete("/dlsite/jobs/:jobId/bulk", (c) =>
+    c.json(
+      dlsiteJobCancelBulkResponseSchema.parse({
+        removed: dlsiteJobs.cancelBulk(c.req.param("jobId")),
+      }),
+    ),
+  );
 
-      const writeSerialized = (frame: { event: string; data: string }): Promise<void> => {
-        const next = writeChain.then(() => stream.writeSSE(frame));
-        writeChain = next.then(
-          () => {},
-          () => {},
-        );
-        return next;
-      };
-
-      const stop = (): void => {
-        if (stopped) return;
-        stopped = true;
-        unsubscribe();
-        resolveDone();
-      };
-
-      const send = (event: import("@mimimilli/shared").DlsiteBulkProgressEvent): Promise<void> =>
-        writeSerialized({ event: event.type, data: JSON.stringify(event) });
-
-      const listener = (event: import("@mimimilli/shared").DlsiteBulkProgressEvent) => {
-        if (stopped) return;
-        const written = send(event);
-        if (event.type !== "progress" && event.type !== "cancelling") {
-          void written.then(
-            () => stop(),
-            () => stop(),
-          );
-        }
-      };
-
-      try {
-        const subscription = dlsiteJobs.subscribe(listener);
-        unsubscribe = subscription.unsubscribe;
-        for (const event of subscription.replay) await send(event);
-        if (
-          !subscription.isLive ||
-          subscription.replay.some((event) => event.type !== "progress")
-        ) {
-          return;
-        }
-        stream.onAbort(stop);
-        await done;
-        await writeChain;
-      } finally {
-        unsubscribe();
-      }
-    }),
+  app.get("/dlsite/jobs/events", (c) =>
+    streamJobEvents<DlsiteJobEvent>(
+      c,
+      {
+        subscribe: (listener) => dlsiteJobs.subscribe(listener),
+        isTerminal: (event) => event.type === "finished",
+      },
+      heartbeatIntervalMs,
+    ),
   );
 
   return app;

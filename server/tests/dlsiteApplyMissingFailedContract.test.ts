@@ -62,7 +62,7 @@ test("dlsiteApplyMissing: 取得失敗はfailedへ数え、他の作品の適用
   assert.deepEqual(applied!.dlsite.appliedTags, applied!.tags);
   const failedWork = await adapter.getWork("fail-1");
   assert.deepEqual(failedWork!.tags, [], "取得に失敗した作品は変更されない");
-  assert.equal(failedWork!.dlsite.status, "none", "取得に失敗した作品のlinkageは変更されない");
+  assert.equal(failedWork!.dlsite.status, "error", "取得失敗はキャッシュ由来の表示になる");
 });
 
 test("dlsiteApplyMissing: 取得失敗はfailedへ数え、他の作品の適用は続く（real）", async (t) => {

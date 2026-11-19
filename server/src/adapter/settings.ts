@@ -26,7 +26,6 @@ export interface SettingsAdapter {
   listScanCandidates(): Promise<ScanCandidate[]>;
   registerScanCandidates(
     items: ScanCandidateRegisterItem[],
-    onRegistered?: (workId: string) => void,
   ): Promise<ScanCandidatesRegisterResponse>;
   excludeScanCandidates(paths: string[]): Promise<void>;
   listScanCandidateExclusions(): Promise<string[]>;

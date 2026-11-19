@@ -37,7 +37,6 @@ export class ActiveScanConflictError extends Error {
 export class ScanJobManager {
   private readonly adapter: DataAdapter;
   private readonly terminalLimit: number;
-  private readonly onCompleted: (insertedWorkIds: string[]) => void;
   private readonly jobs = new Map<string, Job>();
   private activeId: string | null = null;
   private runCompletion: Promise<void> | null = null;
@@ -45,14 +44,9 @@ export class ScanJobManager {
   // terminal job はpruneTerminalで消えるため、前回結果はディスク永続化せずここにだけ保持する。
   private lastCompleted: ScanLastResultResponse | null = null;
 
-  constructor(
-    adapter: DataAdapter,
-    terminalLimit = 16,
-    onCompleted: (insertedWorkIds: string[]) => void = () => {},
-  ) {
+  constructor(adapter: DataAdapter, terminalLimit = 16) {
     this.adapter = adapter;
     this.terminalLimit = terminalLimit;
-    this.onCompleted = onCompleted;
   }
 
   start(options?: { full?: boolean }): ScanJobSnapshot {
@@ -113,7 +107,6 @@ export class ScanJobManager {
   /** ジョブ外で完了したスキャン（root再設定の構築）を、ジョブの完了と同じく直近完了結果として扱う。 */
   recordCompleted(result: ScanResult): void {
     this.lastCompleted = { result, finishedAt: new Date().toISOString() };
-    if (result.insertedWorkIds.length > 0) this.onCompleted(result.insertedWorkIds);
   }
 
   async listDiagnostics(): Promise<ScanDiagnostics> {
@@ -126,9 +119,8 @@ export class ScanJobManager {
 
   async registerCandidates(
     items: ScanCandidateRegisterItem[],
-    onRegistered: (workId: string) => void,
   ): Promise<ScanCandidatesRegisterResponse> {
-    return this.adapter.registerScanCandidates(items, onRegistered);
+    return this.adapter.registerScanCandidates(items);
   }
 
   async excludeCandidates(paths: string[]): Promise<void> {
@@ -238,7 +230,6 @@ export class ScanJobManager {
     this.emit(job, { type: "completed", result });
     this.deactivate(job);
     this.pruneTerminal();
-    if (result.insertedWorkIds.length > 0) this.onCompleted(result.insertedWorkIds);
   }
 
   private finishFailed(job: Job, error: unknown): void {

@@ -16,11 +16,8 @@ import {
   workSchema,
   worksPageSchema,
   dlsitePreviewSchema,
-  dlsiteBulkStartResponseSchema,
   dlsiteApplyMissingPreviewSchema,
   dlsiteBulkApplyMissingResultSchema,
-  dlsiteBulkCancelResponseSchema,
-  dlsiteBulkSnapshotSchema,
   missingWorksCountSchema,
   workCreateResponseSchema,
   identityConflictReassignResponseSchema,
@@ -32,7 +29,6 @@ import {
   type WorkCreateResponse,
   unregisterMissingWorksResultSchema,
   createRandomSeed,
-  type DlsiteBulkSnapshot,
   type Work,
   workBookmarkResultSchema,
   workEditSnapshotSchema,
@@ -243,10 +239,6 @@ export async function updateDlsiteState(
   return patchParsed(workSourceMutationResultSchema, `/dlsite/${encodeURIComponent(workId)}`, body);
 }
 
-export async function startDlsiteBulk(): Promise<string> {
-  return (await postParsed(dlsiteBulkStartResponseSchema, "/dlsite/bulk")).jobId;
-}
-
 export async function applyDlsiteMissing(workIds?: string[]) {
   return postParsed(
     dlsiteBulkApplyMissingResultSchema,
@@ -261,12 +253,4 @@ export async function previewDlsiteMissing(workIds?: string[]) {
     "/dlsite/apply-missing/preview",
     workIds ? { workIds } : undefined,
   );
-}
-
-export async function getDlsiteBulkStatus(): Promise<DlsiteBulkSnapshot> {
-  return getParsed(dlsiteBulkSnapshotSchema, "/dlsite/bulk");
-}
-
-export async function cancelDlsiteBulk(): Promise<void> {
-  await deleteParsed(dlsiteBulkCancelResponseSchema, "/dlsite/bulk");
 }

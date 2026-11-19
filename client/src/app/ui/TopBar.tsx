@@ -1,18 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
-import { buttonClass } from "../../shared/ui/Button";
 import { useAtomValue, useSetAtom } from "jotai";
-import { useMotionVariants } from "../../shared/ui/useMotionVariants";
 import { activeModalAtom } from "../../shared/model/activeModalAtom";
-import {
-  useDlsiteBulkActive,
-  useDlsiteBulkCancelling,
-  useDlsiteBulkCurrentWorkLabel,
-  useDlsiteBulkProgressLabel,
-  useDlsiteBulkStore,
-} from "../../entities/dlsite/useDlsiteBulk";
 import {
   activeAxisAtom,
   librarySearchQueryAtom,
@@ -33,34 +23,11 @@ interface TopBarProps {
   notificationBell: ReactNode;
 }
 
-function DlsiteBulkCancelButton({ onClick }: { onClick: () => void }) {
-  const { fade } = useMotionVariants();
-  const isPresent = useIsPresent();
-  const v = fade();
-  return (
-    <motion.button
-      type="button"
-      inert={!isPresent}
-      {...v}
-      onClick={onClick}
-      className={buttonClass("danger-quiet", "sm", { className: "justify-center" })}
-    >
-      <I.x size={11} />
-      中止
-    </motion.button>
-  );
-}
-
 export default function TopBar({ notificationBell }: TopBarProps) {
   const setActiveModal = useSetAtom(activeModalAtom);
   const scanning = useScanning();
   const scanProgressLabel = useScanProgressLabel();
   const unregisteredCount = useUnregisteredCandidateCount();
-  const dlsiteBulkActive = useDlsiteBulkActive();
-  const dlsiteBulkProgressLabel = useDlsiteBulkProgressLabel();
-  const dlsiteBulkCurrentWorkLabel = useDlsiteBulkCurrentWorkLabel();
-  const dlsiteBulkCancelling = useDlsiteBulkCancelling();
-  const { cancel: onCancelDlsiteBulk } = useDlsiteBulkStore();
   const mode = useAtomValue(appModeAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
   const searchQuery = useAtomValue(librarySearchQueryAtom);
@@ -231,26 +198,6 @@ export default function TopBar({ notificationBell }: TopBarProps) {
           </span>
         )}
       </div>
-      {dlsiteBulkActive && (
-        <>
-          <span
-            className="flex min-w-0 items-center gap-1 text-caption text-ink-2"
-            aria-live="polite"
-          >
-            <span className="whitespace-nowrap font-mono">{dlsiteBulkProgressLabel}</span>
-            {dlsiteBulkCurrentWorkLabel && (
-              <span className="max-w-[220px] truncate" title={dlsiteBulkCurrentWorkLabel}>
-                — {dlsiteBulkCurrentWorkLabel}
-              </span>
-            )}
-          </span>
-          <AnimatePresence initial={false}>
-            {!dlsiteBulkCancelling && (
-              <DlsiteBulkCancelButton onClick={() => void onCancelDlsiteBulk()} />
-            )}
-          </AnimatePresence>
-        </>
-      )}
       {notificationBell}
       <IconButton
         size="md"

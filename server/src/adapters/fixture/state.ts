@@ -2,6 +2,7 @@ import { DEFAULT_TAG_PREFIXES, projectDlsiteState, toDlsiteLinkageStatus } from 
 import type {
   DataIntegrityWarning,
   DlsiteCacheResolution,
+  DlsiteWorkInfo,
   InvalidMetaFile,
   MetaDlsiteState,
   ResumeBody,
@@ -23,7 +24,7 @@ import { requireConfiguredRoot } from "../../core/rootFolder.ts";
 import { createFixtureScenario, type FixtureRootReconfiguration } from "./scenarios.ts";
 
 /** rjCodeをDLsite取得キャッシュのキーとして正規化する（realのnormalizeDlsiteProductCodeに合わせ大文字化）。 */
-function normalizeDlsiteCacheKey(rjCode: string): string {
+export function normalizeDlsiteCacheKey(rjCode: string): string {
   return rjCode.trim().toUpperCase();
 }
 
@@ -55,6 +56,8 @@ export interface FixtureState {
   dlsiteLinkages: Map<string, MetaDlsiteState>;
   /** rjCodeごとのDLsite取得キャッシュ相当。realのDlsiteCacheに対応する。 */
   dlsiteFetchFailures: Map<string, DlsiteCacheResolution>;
+  /** rjCodeごとの取得済み情報（realのDlsiteCacheのHTML snapshot相当）。 */
+  dlsiteFetched: Map<string, DlsiteWorkInfo>;
   /** 編集用カバー列（表示用 cover と独立。unmeasured を表現する） */
   coverColumns: Map<string, FixtureCoverColumns>;
   tagPrefixes: TagPrefix[];
@@ -157,6 +160,8 @@ export interface FixtureAdapterOptions {
   scenario?: string;
   /** 再設定の構築段階1ステップあたりの待ち時間。再設定中の状態と進捗を観測できるよう既定では長めにする */
   rootRebuildStepMs?: number;
+  /** DLsite取得1コードあたりの待ち時間。取得ジョブの進行を観測できるようにする（既定0）。 */
+  dlsiteFetchDelayMs?: number;
   /** 契約テスト用に差し替える作品一覧。省略時はscenarioのseedを使う。dlsiteはrjCode/status/appliedTags
    *  （linkage相当）だけを取り出して使い、lastAttemptAt/error/errorKindは読まない。 */
   works?: FixtureSeedWork[];
@@ -219,6 +224,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     detachedWorks,
     dlsiteLinkages,
     dlsiteFetchFailures,
+    dlsiteFetched: new Map(),
     coverColumns,
     tagPrefixes: DEFAULT_TAG_PREFIXES.map((def) => ({ ...def })),
     smartFolders: scenario.smartFolders,

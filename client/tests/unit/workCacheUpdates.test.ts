@@ -14,7 +14,6 @@ import { SCAN_QUERY_KEYS } from "../../src/entities/scan/queryKeys";
 import {
   updateCachesAfterBookmark,
   updateCachesAfterDlsiteBulkApply,
-  updateCachesAfterDlsiteBulkFetch,
   updateCachesAfterDlsiteLinkageChange,
   updateCachesAfterDlsitePreviewFetch,
   updateCachesAfterIdentityReassign,
@@ -292,16 +291,6 @@ describe("DLsite の必須更新", () => {
 
     expect(sorted(invalidatedKeys(queryClient))).toEqual(
       sorted(["detail1", "source1", ...LIBRARY_VIEWS]),
-    );
-  });
-
-  it("一括取得の終端は処理対象を問わず全詳細と一覧系を無効化する", async () => {
-    const queryClient = seededClient();
-
-    await updateCachesAfterDlsiteBulkFetch(queryClient);
-
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(
-      sorted(["detail1", "source1", "detail2", "source2", ...LIBRARY_VIEWS]),
     );
   });
 });

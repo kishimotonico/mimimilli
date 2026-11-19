@@ -221,9 +221,8 @@ export function createSettingsScanMethods(deps: {
     },
     async registerScanCandidates(
       items: ScanCandidateRegisterItem[],
-      onRegistered?: (workId: string) => void,
     ): Promise<ScanCandidatesRegisterResponse> {
-      return candidateSession.registerCandidates(requireRoot(), items, scanner, user, onRegistered);
+      return candidateSession.registerCandidates(requireRoot(), items, scanner, user);
     },
     async excludeScanCandidates(paths: string[]): Promise<void> {
       await candidateSession.excludeCandidates(requireRoot(), paths, user);

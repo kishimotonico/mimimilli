@@ -16,7 +16,6 @@ export function appShellRoutes(overrides: ApiRoutes = {}): ApiRoutes {
     "GET /api/scan/candidates/exclusions": { paths: [] },
     "GET /api/scan/diagnostics": buildScanDiagnostics(),
     "GET /api/dlsite/notifications": buildDlsiteNotificationSummary(),
-    "GET /api/dlsite/bulk": { current: null, lastTerminal: null },
     "GET /api/works": buildWorksPage(),
     "GET /api/tags": [],
     "GET /api/tag-prefixes": [],

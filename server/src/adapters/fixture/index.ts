@@ -19,7 +19,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
     ...createClassificationMethods(state),
     ...createFsMethods(state),
     ...createCoverMediaMethods(state),
-    ...createDlsiteMethods(state),
+    ...createDlsiteMethods(state, { fetchDelayMs: options.dlsiteFetchDelayMs }),
     resetFixtureState: () => resetState(state, options),
   };
 }

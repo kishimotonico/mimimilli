@@ -364,11 +364,6 @@ describe("work api", () => {
     expect(result).toEqual(preview);
   });
 
-  it("startDlsiteBulk: ジョブ開始レスポンスを検証する", async () => {
-    mockFetch.mockResolvedValue(makeResponse({ started: false }, 202));
-    await expect(workApi.startDlsiteBulk()).rejects.toThrow(/POST \/dlsite\/bulk/);
-  });
-
   it("getCoverImageUrl returns the media/cover URL", () => {
     expect(workApi.getCoverImageUrl("RJ001001", "abc123")).toBe(
       "/api/media/cover/RJ001001?v=abc123",

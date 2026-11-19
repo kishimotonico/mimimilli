@@ -1,10 +1,8 @@
 import type {
   DlsiteApplyBody,
   DlsiteApplyMissingPreview,
-  DlsiteBulkMode,
   DlsiteBulkApplyMissingResult,
-  DlsiteBulkProgressSnapshot,
-  DlsiteBulkResult,
+  DlsiteProductFetchOutcome,
   DlsiteFetchResult,
   DlsiteStateUpdateBody,
   WorkSourceMutationResult,
@@ -35,12 +33,11 @@ export interface DlsiteAdapter {
   dlsiteApplyMissing(workIds?: string[]): Promise<DlsiteBulkApplyMissingResult>;
   /** dlsiteApplyMissing のdry-run。書き込みはせず、対象作品ごとの差分だけを返す */
   dlsiteApplyMissingPreview(workIds?: string[]): Promise<DlsiteApplyMissingPreview>;
-  runDlsiteBulk(
-    mode: DlsiteBulkMode,
-    workIds: string[] | undefined,
-    options?: {
-      signal?: AbortSignal;
-      onProgress?: (progress: DlsiteBulkProgressSnapshot) => void;
-    },
-  ): Promise<DlsiteBulkResult>;
+  /** DLsiteへ通信しない設定か。取得ジョブの開始可否に使う */
+  isDlsiteOffline(): boolean;
+  /** 取得ジョブが1コードずつ呼ぶ取得の本体。HTML取得・カバー先取り・同じRJコードの作品の投影更新まで行う */
+  fetchDlsiteProduct(
+    productCode: string,
+    options: { force: boolean; signal?: AbortSignal },
+  ): Promise<DlsiteProductFetchOutcome>;
 }

@@ -5,7 +5,6 @@ client のエラー所有権・Promise 契約・best-effort 失敗の基準。�
 ## ユーザーに見せる操作失敗
 
 - **スキャン start / cancel**: 所有者は `scanJobStore`（`entities/scan`）。失敗は `state.error` に持ち、`ScanRuntime` が `useToast().show({ variant: "error", ... })` で表示する。Promise は reject しない
-- **DLsite 一括 start / cancel**: 所有者は `dlsiteBulkStore`（`entities/dlsite`）。失敗は `error` イベントで通知し、`DlsiteBulkRuntime` が `useToast().error(...)` で表示する。Promise は reject しない
 - **その他の mutation**（再生・エクスポート等）: 呼び出し側が catch し `useToast().error(...)` で表示する
 
 表示は単一ホストの `GlobalToast`（`toastRequestsAtom` の要求を受けて描画）に集約される。variant="error" は発行元の priority に関わらず最優先で表示される。scan / DLsite の SSE 由来の失敗（イベント解析エラー・接続切断等）も、それぞれの runtime が上記と同じ `useToast` 経路で扱う。
@@ -30,8 +29,6 @@ client のエラー所有権・Promise 契約・best-effort 失敗の基準。�
 - `audioEngine` の `AudioContext.resume()` — ブラウザの自動再生ポリシーでよく失敗する。次の `play()` で再試行
 - `audioEngine` の `AudioContext.close()`（`destroy` 時）— 破棄時のクリーンアップ。既に再生は止まっている
 - `refreshScanCandidates` の呼び出し（`ScanRuntime` のスキャン完了時・起動時、root再設定の離脱時、`UnregisteredTab` の候補更新エラー後）— 失敗しても直前の候補キャッシュが残るだけ。ユーザーの明示操作（再スキャン・候補タブの再取得）で取り直せる
-- `dlsiteBulkStore.attach` の `getDlsiteBulkStatus` — 起動・スキャン完了後の再接続の試行。失敗しても一括取得は手動で開始でき、状態は次の `attach` で揃う
-- root再設定の離脱時（`rootReconfigurationController`）の直近スキャン結果取得 — 失敗すると DLsite 一括の自動再接続が行われないだけ。手動の一括取得は使える
 - `Toast` の `showPopover` / `hidePopover` — 既に同じ状態のときの `DOMException`。状態は目的どおりになっている
 - `useMediaSession` の `setActionHandler` — 個別 action に未対応のブラウザでは、その action だけ無効になる
 - `scanJobStore` の SSE 切断後 `getScanJob` 一時失敗 — EventSource の標準再接続に任せる。404/410 とスキーマ不一致だけ `state.error`（ScanRuntimeが読みuseToastへ渡す）へ

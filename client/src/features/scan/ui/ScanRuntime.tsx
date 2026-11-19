@@ -3,7 +3,6 @@ import { useSetAtom, useStore } from "jotai";
 import { useEffect } from "react";
 import type { ScanResult } from "@mimimilli/shared";
 import { SETTINGS_QUERY_KEYS } from "../../../entities/settings/queryKeys";
-import { useDlsiteBulkStore } from "../../../entities/dlsite/useDlsiteBulk";
 import { SCAN_QUERY_KEYS } from "../api";
 import { scanDiagnosticsQueryOptions } from "../../../entities/scan/queryOptions";
 import { dlsiteNotificationSummaryQueryOptions } from "../../../entities/dlsite/model/dlsiteNotificationSummaryQueryOptions";
@@ -41,7 +40,6 @@ export default function ScanRuntime() {
   const queryClient = useQueryClient();
   const jotaiStore = useStore();
   const scanJob = useScanJobStore();
-  const dlsiteBulk = useDlsiteBulkStore();
   const setHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
   const setActiveModal = useSetAtom(activeModalAtom);
   // dismiss()は発行元（useToastの呼び出し）単位でしか効かないため、終了通知用とエラー用で分ける。
@@ -100,18 +98,8 @@ export default function ScanRuntime() {
             });
           });
         }
-        if (result.insertedWorkIds.length > 0) void dlsiteBulk.attach();
       }),
-    [
-      dlsiteBulk,
-      errorToast,
-      jotaiStore,
-      queryClient,
-      scanJob,
-      setActiveModal,
-      setHiddenPaths,
-      terminalToast,
-    ],
+    [errorToast, jotaiStore, queryClient, scanJob, setActiveModal, setHiddenPaths, terminalToast],
   );
 
   // 候補は明示的な取得でしか更新されないため、アプリ起動時に一度取得して未登録バッジを揃える。

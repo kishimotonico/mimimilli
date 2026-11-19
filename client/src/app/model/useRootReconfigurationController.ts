@@ -8,7 +8,6 @@ import { DEFAULT_APP_ROUTE } from "../../entities/navigation/model/appRoute";
 import { scanCandidateHiddenPathsAtom } from "../../entities/scan/model/atoms";
 import { scanJobStoreAtom } from "../../entities/scan/model/scanJobStore";
 import { dlsiteBulkApplyOpenAtom } from "../../entities/dlsite/model/bulkAtoms";
-import { dlsiteBulkStoreAtom } from "../../entities/dlsite/model/dlsiteBulkStore";
 import {
   createRootReconfigurationController,
   type RootReconfigurationController,
@@ -27,7 +26,6 @@ export function useRootReconfigurationController(): RootReconfigurationControlle
         closeActiveModal: () => store.set(activeModalAtom, null),
         closeDlsiteApplyDialog: () => store.set(dlsiteBulkApplyOpenAtom, false),
         scanJob: store.get(scanJobStoreAtom),
-        dlsiteBulk: store.get(dlsiteBulkStoreAtom),
         navigateToDefaultRoute: () => store.set(navigateAtom, DEFAULT_APP_ROUTE, { replace: true }),
         clearScanCandidateHiddenPaths: () => store.set(scanCandidateHiddenPathsAtom, new Set()),
       }),

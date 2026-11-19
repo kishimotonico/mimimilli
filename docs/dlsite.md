@@ -39,7 +39,7 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 
 ## 適用の流れ
 
-作品への反映経路は2つある。一括取得は反映せず、取得結果をキャッシュへ記録するだけ（後述）。
+作品への反映経路は2つある。取得ジョブは反映せず、取得結果とカバーをキャッシュへ記録するだけ（後述）。
 
 **手動プレビュー→適用**: `POST /dlsite/:id/fetch` で取得結果をプレビューし、ユーザーが選んだ項目だけを `POST /dlsite/:id/apply`（`DlsiteApplyBody`）で反映する。タイトル・タグ・カバーそれぞれに適用可否のフラグがあり、ユーザーが個別に選べる。
 
@@ -49,9 +49,9 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 
 このデータドリフト自体への対応（単発適用の`sourceRevision`のようなCASチェック）は行っていない。理由: (1) このアプリはローカル単一ユーザー向けで、プレビュー取得から適用実行までの時間差が短い、(2) 差分が消えた場合はskipされるため壊れる方向には倒れない、(3) 一括適用は「未設定項目を埋める」操作なので、埋める先が既に埋まっていれば埋めない、という結果自体は妥当。将来複数クライアント・長時間放置されたプレビュー等でズレが問題になった場合は改めて検討する。
 
-**一括取得**: `DlsiteJobManager`（`server/src/dlsiteJobManager.ts`）が待機キューのジョブを1本ずつ `runDlsiteBulk`（`adapters/real/dlsiteBulk.ts`）で処理する。対象作品の作品ページを取得してキャッシュへ記録し、`work_dlsite.state_json` を再投影するだけで、タイトル・タグ・カバー・`mimimilli.json` は変更しない。取得した内容を作品へ反映するのは、上の手動適用か未設定項目の一括適用。
+**取得ジョブ**: スキャン・候補登録・作品登録・root再設定は取得を始めない。取得はユーザーが対象のproduct code（RJコード）を指定して `POST /dlsite/jobs` で始める。`DlsiteJobManager`（`server/src/dlsiteJobManager.ts`）がジョブを同時に1本だけ動かし、コードを1件ずつ `fetchDlsiteProduct`（real: `adapters/real/dlsiteMethods.ts`）で処理する。1件の処理は、作品ページの取得とキャッシュへの記録、カバーの先取り（ベストエフォート）、同じRJコードを持つ全作品の `work_dlsite.state_json` の再投影で、タイトル・タグ・カバー・`mimimilli.json` は変更しない。同期の単発取得（`POST /dlsite/:id/fetch`・`POST /dlsite/fetch-by-code`）も同じ処理を通る。
 
-`mode`（`new` / `existing`）は起動元を表す。スキャン完了後・候補登録・作品登録の自動起動は新規作品だけを対象に `new`、手動の「まとめて取得」は `existing` で投入する。処理内容は両モードで同じ。
+起点（`bulk` / `single`）はproduct codeごとに持つ。実行中に受けた取得は同じジョブのキューへ合流し、単発は待機中の単発の末尾（まとめての前）、まとめては末尾に入る。待機中のまとめてを単発で取り直すと単発へ移り、取得を終えたコードの再取得はその要求の起点で取り直す。単発はキャッシュの失敗の記録を無視して取り直す（force）。中止は起点がまとめてで待機中のコードだけを外し、取得中のコードと単発は止めない。root再設定の開始時は、キューを起点を問わず捨てて取得中の処理を打ち切る。ジョブは永続化せず、サーバー再起動では再開しない。
 
 `work.dlsite.appliedTags` は、手動適用と一括適用でこの作品へ反映したタグを `mimimilli.json` に記録したもの。
 
@@ -67,7 +67,7 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 | `error`     | 直近の取得または適用が失敗した（`errorKind` で HTTP エラーと `parse_error` を区別）            |
 | `skipped`   | ユーザーが明示的にこの作品を対象から外した                                                     |
 
-RJコードがあり、`none`・`error`・`not_found` の作品が一括取得の対象になる。`applied` と `skipped` は対象から外れる（`selectDlsiteBulkTargets`）。適用に成功すると `applied` になる。取得が失敗しても `mimimilli.json` は変わらず、次の投影で `error` か `not_found` として見える。`skipped` は `PATCH /dlsite/:id` でユーザーが操作したときだけ遷移し、一括取得では変化しない。
+適用に成功すると `applied` になる。取得が失敗しても `mimimilli.json` は変わらず、次の投影で `error` か `not_found` として見える。`skipped` は `PATCH /dlsite/:id` でユーザーが操作したときだけ遷移し、取得では変化しない。
 
 なお `shared/src/dlsite.ts` の `isDlsiteUnlinked()` は `rjCode !== null && status === "none"` で「RJコードはあるが未連携」を判定する。これは通知バッジ用の別の基準で、`none` そのものの定義とは区別する。
 
@@ -101,7 +101,7 @@ TTLは `DEFAULT_DLSITE_CACHE_TTLS_MS`（`shared/src/dlsite.ts`）の定数で固
 
 HTMLの転送・展開サイズには上限があり（既定2 MiB / 8 MiB、`DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES` / `DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES`）、gzip展開時にも `zlib` の `maxOutputLength` で同じ上限を渡してgzip bombを防ぐ。転送サイズの上限はHTTP応答にだけ課す。CLIのローカルファイルimportは転送を伴わないため、展開後サイズの上限だけで判定する。
 
-取得が失敗した作品は、HTTPレスポンスまたはパース結果を DLsite キャッシュへ記録する。`mimimilli.json`は変更しない。キャッシュ更新後、scan・一括取得・手動fetch・`POST /dlsite/apply-missing` はいずれも、`mimimilli.json`の正本とキャッシュを合成して `work_dlsite.state_json` を再投影する（`dlsiteProjection.ts`）。これにより通知ベルの取得失敗件数・パースエラー警報が、フルスキャンを待たずに反映される。`offline` 由来の miss はキャッシュにも catalog にも書かない。
+取得が失敗した作品は、HTTPレスポンスまたはパース結果を DLsite キャッシュへ記録する。`mimimilli.json`は変更しない。キャッシュ更新後、scan・取得ジョブ・手動fetch・`POST /dlsite/apply-missing` はいずれも、`mimimilli.json`の正本とキャッシュを合成して `work_dlsite.state_json` を再投影する（`dlsiteProjection.ts`）。これにより通知ベルの取得失敗件数・パースエラー警報が、フルスキャンを待たずに反映される。`offline` 由来の miss はキャッシュにも catalog にも書かない。
 
 キャッシュ hit（HTTPを試みなかった）で、投影済みの `status`・`error`・`errorKind` がキャッシュ内容とすでに一致しているときは、catalog への再投影を省略してよい（実装は経路ごとに投影関数を呼ぶ。副作用は同一状態の upsert にとどまる）。`lastAttemptAt` は実HTTPを試みたときだけキャッシュに記録され、投影時に catalog へ載る。cache hit では更新しない。
 
@@ -203,7 +203,7 @@ importはHTML snapshotを成功記録として書き直すため、取り込ん�
 
 ## 通知とパース失敗の検知
 
-通知ベル（`GET /dlsite/notifications`）は作品カタログの `work.dlsite` を集計する。`errorKind` は一括取得で失敗を記録したときだけ更新され、手動プレビュー（`POST /dlsite/:id/fetch`）では変わらない。
+通知ベル（`GET /dlsite/notifications`）は作品カタログの `work.dlsite` を集計する。`errorKind` は取得ジョブ・同期取得で失敗を記録したときに更新され、手動プレビュー（`POST /dlsite/:id/fetch`）では変わらない。
 
 サマリーの主なフィールド。
 
@@ -222,8 +222,6 @@ importはHTML snapshotを成功記録として書き直すため、取り込ん�
 
 通知ベルのバッジは `parseErrorAlert` が true のときだけ `parseErrorCount` を加算する。パース失敗一覧は `GET /dlsite/notifications/parse-failed`（各行に `rjCode` 付き）。取得失敗一覧（`fetch-failed`）からは `parse_error` を除外する。
 
-一括取得の完了結果（SSE `complete` / `cancelled`）には `parseErrors`（そのジョブで `parse_error` になった作品数）が含まれる。
-
 実HTTPで `parse_error` が確定したとき、サーバーは構造化ログ `dlsite_parse_error`（`productCode`・`httpAttempted`）を出力する。
 
 ## HTTPエンドポイント
@@ -235,9 +233,7 @@ importはHTML snapshotを成功記録として書き直すため、取り込ん�
 - `POST /dlsite/:id/fetch` — 1作品分の取得プレビュー。`?force=true` でキャッシュを無視
 - `POST /dlsite/:id/apply` — プレビュー結果のうち選択した項目を適用
 - `PATCH /dlsite/:id` — RJコードの手動設定、または `skipped` の切り替え
-- `POST /dlsite/bulk` — 一括取得ジョブを`mode: "existing"`で待機キューへ積み、202 `{ jobId }` を返す。実行中は409（`conflict`）
-- `GET /dlsite/bulk` — 常に200で `{ current, lastTerminal }`。`current` は実行中ジョブ（`jobId`・`status`・`progress`）、`lastTerminal` は直近に終わったジョブの結果。どちらも無ければ `null`
-- `DELETE /dlsite/bulk` — 実行中の一括取得をキャンセルし `{ cancelling: true }` を返す。実行中ジョブがなければ404
-- `GET /dlsite/events` — 一括取得の進捗SSE（`progress` / `cancelling` / `complete` / `cancelled` / `error`。各イベントに `jobId`）。接続時、実行中なら直近の `progress`、実行中でなければ直近の終端を1件送る。以後はlive配信し、終端で閉じる
-
-一括取得ジョブは `DlsiteJobManager` のFIFOキューで直列実行するが、投入経路によって挙動が非対称になっている。スキャン完了・候補登録・作品登録の自動起動（`mode: "new"`）は `dlsiteJobs.enqueue()` を直接呼ぶため、実行中のジョブがあってもキューに積まれ、順番に処理される。配線は `app.ts` が `ScanJobManager` のコンストラクタ、`scanRoute`、`worksRoute` へ渡すコールバックで行い（これらは `DlsiteJobManager` を直接知らない）、スキャン完了時は `result.insertedWorkIds` が1件以上あるときだけ `enqueue("new", insertedWorkIds)` を呼ぶ。一方、手動の `POST /dlsite/bulk` は先に `dlsiteJobs.isInProgress()` を確認し、実行中ならキューに積まれずconflictエラーで即座に弾かれる。
+- `POST /dlsite/jobs` — 取得ジョブを開始し、202 `{ jobId }` を返す。実行中ジョブがあればそのキューへ合流し、そのジョブIDを返す。body は `{ origin: "bulk", productCodes }`（1〜1000件）か `{ origin: "single", productCode }`（失敗の記録を無視して取り直す）。オフライン設定では `offline`、サーバーの終了処理中は409（`conflict`）で拒否する
+- `GET /dlsite/jobs/current` — 常に200で `{ job }`。`job` は `jobId`・`status`（`running` / `finished`）・コードごとの `origin` と `state`（`queued` / `fetching` / `fetched` / `not_found` / `failed`）・まとめての進捗 `bulk`。終了したジョブは次のジョブ開始まで残る。無ければ `null`
+- `DELETE /dlsite/jobs/:jobId/bulk` — 起点がまとめてで待機中のコードをキューから外し `{ removed }` を返す。IDが現在のジョブと違う・対象なしは `removed: 0`
+- `GET /dlsite/jobs/events` — 取得ジョブの進捗SSE。接続直後に `snapshot`（現在のジョブ、無ければ `job: null`）を送り、実行中なら以後 `code`（コードの現在状態）・`removed`（中止で外れたコード）・`finished`（`complete` / `aborted`）をlive配信して `finished` で閉じる。15秒間隔で `ping` を送る

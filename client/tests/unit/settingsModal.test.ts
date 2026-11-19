@@ -7,8 +7,6 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SettingsModal from "../../src/features/settings/ui/SettingsModal";
-import { dlsiteBulkStoreAtom } from "../../src/entities/dlsite/model/dlsiteBulkStore";
-import { createFakeDlsiteBulkStore } from "../helpers/fakeJobStores";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { ApiRequestError } from "../../src/shared/api/http";
 import { mockApi } from "../helpers/api";
@@ -45,7 +43,6 @@ function renderModal(options: RenderModalOptions = {}) {
   });
   queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), buildSettings({ rootFolder: "/audio" }));
   const store = createStore();
-  store.set(dlsiteBulkStoreAtom, createFakeDlsiteBulkStore());
   render(
     createElement(
       QueryClientProvider,

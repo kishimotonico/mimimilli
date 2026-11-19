@@ -22,7 +22,6 @@ import type {
   WorksPage,
   WorksQuery,
 } from "@mimimilli/shared";
-import type { WorkSourceProjectionResult } from "../../adapter/work.ts";
 import { errorMessage, resolveWorkPlacement, tagEquals } from "@mimimilli/shared";
 import { type Db } from "./db.ts";
 import type { StagedCover } from "./dlsiteFetch.ts";
@@ -189,7 +188,7 @@ export function createWorkMethods(deps: {
       return mutationResultFromOutcome(toEditSnapshot(updated, physicalPath), outcome);
     },
 
-    async projectWorkSource(path: WorkspacePath): Promise<WorkSourceProjectionResult | null> {
+    async projectWorkSource(path: WorkspacePath): Promise<WorkSourceMutationResult | null> {
       const root = requireRoot();
       const target = resolveWithin(root, join(root, path));
       if (!target) return null;
@@ -203,7 +202,6 @@ export function createWorkMethods(deps: {
       }
       const physicalPath = resolveWorkPlacement(metaPath, source.meta).physicalPath;
       const existing = query.getScanWorkMap().get(source.meta.id);
-      const hadCatalogRow = existing !== undefined;
       if (existing && existing.metaPath !== metaPath && existing.status !== "missing") {
         recordIdentityConflict(source.meta.id, existing.metaPath, metaPath);
         return {
@@ -213,11 +211,7 @@ export function createWorkMethods(deps: {
       }
       try {
         const outcome = await scanner.projectMetaFile(metaPath, source);
-        const result = mutationResultFromOutcome(toEditSnapshot(source, physicalPath), outcome);
-        if (result.projection.status === "published" && !hadCatalogRow) {
-          return { ...result, catalogInserted: true };
-        }
-        return result;
+        return mutationResultFromOutcome(toEditSnapshot(source, physicalPath), outcome);
       } catch (error) {
         scanLogger.error("作品の一覧反映に失敗しました", {
           workId: source.meta.id,

@@ -10,7 +10,6 @@ import { SMART_FOLDER_QUERY_KEYS } from "../../entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../entities/tag/queryKeys";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../entities/file-system/queryKeys";
 import { refreshScanCandidates } from "../../entities/scan/scanCandidatesCache";
-import { scanLastResultQueryOptions } from "../../entities/scan/queryOptions";
 
 // entities/scan/queryKeys.ts の全キー（last/candidates/candidateExclusions/diagnostics）は
 // すべて["scan", ...]配下なので、ルートの["scan"]だけで丸ごと対象にできる
@@ -60,7 +59,6 @@ export interface RootReconfigurationControllerDeps {
   closeActiveModal: () => void;
   closeDlsiteApplyDialog: () => void;
   scanJob: { reset: () => void };
-  dlsiteBulk: { reset: () => void; attach: () => Promise<void> };
   navigateToDefaultRoute: () => void;
   clearScanCandidateHiddenPaths: () => void;
 }
@@ -93,14 +91,13 @@ interface SettingsBaseline {
 export function createRootReconfigurationController(
   deps: RootReconfigurationControllerDeps,
 ): RootReconfigurationController {
-  const { queryClient, dlsiteBulk } = deps;
+  const { queryClient } = deps;
 
   const entryResets: readonly (() => void)[] = [
     deps.stopPlayback,
     deps.closeActiveModal,
     deps.closeDlsiteApplyDialog,
     deps.scanJob.reset,
-    dlsiteBulk.reset,
     deps.navigateToDefaultRoute,
     deps.clearScanCandidateHiddenPaths,
     () => markReconfigurationAffectedQueriesStale(queryClient),
@@ -128,12 +125,6 @@ export function createRootReconfigurationController(
     leavePending = false;
     resetReconfigurationAffectedQueries(queryClient);
     void refreshScanCandidates(queryClient).catch(() => {});
-    void queryClient
-      .fetchQuery(scanLastResultQueryOptions)
-      .then((last) => {
-        if (last && last.result.insertedWorkIds.length > 0) void dlsiteBulk.attach();
-      })
-      .catch(() => {});
   };
 
   return {

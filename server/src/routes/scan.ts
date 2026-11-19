@@ -42,7 +42,6 @@ function isTerminalEvent(event: ScanJobEvent): boolean {
 export function scanRoute(
   jobs: ScanJobManager,
   heartbeatIntervalMs: number = HEARTBEAT_INTERVAL_MS,
-  onCandidateRegistered: (workId: string) => void = () => {},
 ): Hono {
   const app = new Hono();
 
@@ -124,7 +123,7 @@ export function scanRoute(
       "候補の登録内容が不正です",
     );
     try {
-      const result = await jobs.registerCandidates(data.items, onCandidateRegistered);
+      const result = await jobs.registerCandidates(data.items);
       return c.json(scanCandidatesRegisterResponseSchema.parse(result), 201);
     } catch (error) {
       if (error instanceof CandidatePoolChangedError) {

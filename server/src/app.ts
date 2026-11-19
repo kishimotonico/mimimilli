@@ -72,9 +72,7 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
 
   const api = new Hono();
   const dlsiteJobs = new DlsiteJobManager(adapter);
-  const scanJobs = new ScanJobManager(adapter, undefined, (insertedWorkIds) =>
-    dlsiteJobs.enqueue("new", insertedWorkIds),
-  );
+  const scanJobs = new ScanJobManager(adapter);
   const admittedRequestGate = new InFlightRequestGate();
   const rootReconfiguration = new RootReconfigurationWorkflow(adapter, scanJobs, dlsiteJobs, () =>
     admittedRequestGate.drain(),
@@ -89,14 +87,8 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
   );
   api.route("/", settingsRoute(adapter, rootReconfiguration));
   api.route("/", rootReconfigurationRoute(rootReconfiguration));
-  api.route(
-    "/",
-    scanRoute(scanJobs, undefined, (workId) => dlsiteJobs.enqueue("new", [workId])),
-  );
-  api.route(
-    "/",
-    worksRoute(adapter, (workId) => dlsiteJobs.enqueue("new", [workId])),
-  );
+  api.route("/", scanRoute(scanJobs));
+  api.route("/", worksRoute(adapter));
   api.route("/", axesRoute(adapter));
   api.route("/", tagPrefixesRoute(adapter));
   api.route("/", smartFoldersRoute(adapter));

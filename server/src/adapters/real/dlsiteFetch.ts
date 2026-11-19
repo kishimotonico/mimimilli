@@ -252,7 +252,7 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     force = false,
     signal?: AbortSignal,
   ): Promise<DlsiteFetchAttempt> {
-    throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
+    throwIfAborted(signal, "DLsite取得は中止されました");
     const cached = resolveCachedDlsiteAttempt(productCode, force);
     if (cached) return cached;
     return fetchDlsiteHtmlNetworkAttempt(productCode, force, signal);
@@ -270,7 +270,7 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     coverUrl: string,
     signal?: AbortSignal,
   ): Promise<{ body: Uint8Array; normalizedUrl: string }> {
-    throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
+    throwIfAborted(signal, "DLsite取得は中止されました");
     const normalizedUrl = normalizeDlsiteCoverUrl(coverUrl);
     const key = `cover:${createHash("sha256").update(normalizedUrl).digest("hex")}`;
     const cached = dlsiteCache.getCover(normalizedUrl);
@@ -281,7 +281,7 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
         key: normalizedUrl,
         reason: "cached",
       });
-      throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
+      throwIfAborted(signal, "DLsite取得は中止されました");
       return { body: cached.body, normalizedUrl };
     }
     dlsiteScheduler.assertOnline();
@@ -312,10 +312,38 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
           return { body: fetched.body, normalizedUrl: finalUrl };
         });
       });
-      throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
+      throwIfAborted(signal, "DLsite取得は中止されました");
       return image;
     } finally {
       await dlsiteScheduler.drain();
+    }
+  }
+
+  /**
+   * 取得時にカバーをキャッシュへ先取りする。失敗は握り潰してログに出し、HTMLの取得結果には影響させない。
+   * 再送出するのは呼び出し元のsignalがabort済みのときだけ。deadlineMsを過ぎたらカバーなしで戻る。
+   */
+  async function prefetchCover(
+    coverUrl: string | null,
+    options: { signal?: AbortSignal; deadlineMs?: number } = {},
+  ): Promise<void> {
+    if (!coverUrl) return;
+    const timeout =
+      options.deadlineMs === undefined
+        ? undefined
+        : AbortSignal.timeout(Math.max(0, options.deadlineMs - Date.now()));
+    const signals = [options.signal, timeout].filter(
+      (signal): signal is AbortSignal => signal !== undefined,
+    );
+    const signal = signals.length > 0 ? AbortSignal.any(signals) : undefined;
+    try {
+      await fetchCoverImage(coverUrl, signal);
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      dlsiteLogger.warn("DLsiteカバーの先取りに失敗しました", {
+        coverUrl,
+        message: errorMessage(error),
+      });
     }
   }
 
@@ -367,6 +395,7 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     dlsiteScheduler,
     fetchCachedDlsiteAttempt,
     fetchCachedDlsite,
+    prefetchCover,
     stageCover,
   };
 }

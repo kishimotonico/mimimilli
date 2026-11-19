@@ -4,18 +4,16 @@ import { Provider as JotaiProvider, createStore, useAtomValue } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../../src/app/App";
-import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import NavigationHistorySync from "../../src/features/navigation/ui/NavigationHistorySync";
 import { PlayerRuntimeProvider } from "../../src/entities/player/model/PlayerRuntimeProvider";
-import { dlsiteBulkStoreAtom } from "../../src/entities/dlsite/model/dlsiteBulkStore";
 import { PLAYER_CORE_INITIAL, playerCoreAtom } from "../../src/entities/player/model/atoms";
 import { scanJobStoreAtom } from "../../src/entities/scan/model/scanJobStore";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import type { WorkSummary } from "../../src/entities/work/model";
-import { createFakeDlsiteBulkStore, createFakeScanJobStore } from "../helpers/fakeJobStores";
+import { createFakeScanJobStore } from "../helpers/fakeJobStores";
 import { mockApi } from "../helpers/api";
 import {
   buildDlsiteNotificationSummary,
@@ -106,9 +104,7 @@ function renderApp() {
   const queryClient = createTestQueryClient();
   const store = createStore();
   const scanJob = createFakeScanJobStore();
-  const dlsiteBulk = createFakeDlsiteBulkStore();
   store.set(scanJobStoreAtom, scanJob);
-  store.set(dlsiteBulkStoreAtom, dlsiteBulk);
 
   function Wrapper({ children }: { children: ReactNode }) {
     const client = useMemo(() => queryClient, []);
@@ -122,7 +118,6 @@ function renderApp() {
         createElement(
           PlayerRuntimeProvider,
           null,
-          createElement(DlsiteBulkRuntime),
           createElement(NavigationHistorySync),
           createElement(ScanRuntime),
           createElement(JotaiSubscriptionProbe),
@@ -133,7 +128,7 @@ function renderApp() {
   }
 
   render(createElement(Wrapper, null, createElement(App)));
-  return { queryClient, store, scanJob, dlsiteBulk };
+  return { queryClient, store, scanJob };
 }
 
 async function waitForAppShellBaseline() {
@@ -339,28 +334,6 @@ describe("App root subscriptions", () => {
       await waitFor(() =>
         expect(queryClient.getQueryData(SCAN_QUERY_KEYS.last())).toEqual(nextResult),
       );
-      expect(appShellCallCount).toBe(baseline);
-    });
-  });
-
-  describe("dlsite bulk progress", () => {
-    it("DLsite 一括取得の進捗更新で App が再レンダリングされない", async () => {
-      const { dlsiteBulk } = renderApp();
-      const baseline = await waitForAppShellBaseline();
-
-      act(() => {
-        dlsiteBulk.setState((state) => ({
-          ...state,
-          progress: { processed: 1, total: 10, work: null },
-        }));
-      });
-      act(() => {
-        dlsiteBulk.setState((state) => ({
-          ...state,
-          progress: { processed: 7, total: 10, work: null },
-        }));
-      });
-
       expect(appShellCallCount).toBe(baseline);
     });
   });

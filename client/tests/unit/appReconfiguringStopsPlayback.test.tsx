@@ -10,7 +10,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import App from "../../src/app/App";
-import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import NavigationHistorySync from "../../src/features/navigation/ui/NavigationHistorySync";
 import { PlayerRuntimeProvider } from "../../src/entities/player/model/PlayerRuntimeProvider";
@@ -89,7 +88,6 @@ function renderAppWithSettings(
           PlayerRuntimeProvider,
           null,
           options.withApiErrorHandler ? createElement(ApiErrorSubscriber, { client }) : null,
-          createElement(DlsiteBulkRuntime),
           createElement(NavigationHistorySync),
           createElement(ScanRuntime),
           createElement(App),

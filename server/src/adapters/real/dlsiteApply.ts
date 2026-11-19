@@ -73,7 +73,7 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
       options?: { signal?: AbortSignal },
     ): Promise<WorkSourceMutationResult | null> {
       const signal = options?.signal;
-      throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
+      throwIfAborted(signal, "DLsite取得は中止されました");
       const current = readVerifiedEditSource(catalog, workId);
       if (!current) return null;
 
@@ -89,7 +89,7 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
       if (coverUrl && !cover) throw new CoverSaveError();
 
       try {
-        throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
+        throwIfAborted(signal, "DLsite取得は中止されました");
         return await persistVerified(
           mutateVerifiedMetaSource(catalog, workId, (source) => {
             if (source.sourceRevision !== body.sourceRevision) {

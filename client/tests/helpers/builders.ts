@@ -2,8 +2,6 @@ import {
   workspacePath,
   axisFacetItemSchema,
   dlsiteApplyMissingPreviewSchema,
-  dlsiteBulkResultSchema,
-  dlsiteBulkSnapshotSchema,
   fsEntrySchema,
   fsListingSchema,
   dlsiteBulkApplyMissingResultSchema,
@@ -29,8 +27,6 @@ import {
   workSourceMutationResultSchema,
   type AxisFacetItem,
   type DlsiteApplyMissingPreview,
-  type DlsiteBulkResult,
-  type DlsiteBulkSnapshot,
   type FsEntry,
   type FsListing,
   type DlsiteBulkApplyMissingResult,
@@ -356,20 +352,4 @@ export function buildScanJobSnapshot(overrides: Partial<ScanJobSnapshot> = {}): 
 
 export function buildScanJobEvent(event: ScanJobEvent): ScanJobEvent {
   return scanJobEventSchema.parse(event);
-}
-
-export function buildDlsiteBulkResult(overrides: Partial<DlsiteBulkResult> = {}): DlsiteBulkResult {
-  return dlsiteBulkResultSchema.parse({
-    fetched: 0,
-    failed: 0,
-    parseErrors: 0,
-    skipped: 0,
-    ...overrides,
-  });
-}
-
-export function buildDlsiteBulkSnapshot(
-  overrides: Partial<DlsiteBulkSnapshot> = {},
-): DlsiteBulkSnapshot {
-  return dlsiteBulkSnapshotSchema.parse({ current: null, lastTerminal: null, ...overrides });
 }

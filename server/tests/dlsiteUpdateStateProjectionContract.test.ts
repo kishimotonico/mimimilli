@@ -14,6 +14,7 @@ import { htmlResponse, mockDlsiteTransport } from "./helpers/dlsiteTransport.ts"
 import { makeTestDirectory, writeWav } from "./helpers/sampleLibrary.ts";
 import { configureRoot } from "./helpers/rootFolder.ts";
 import { folderFixtureWork } from "./helpers/workTestUtils.ts";
+import { fetchDlsiteOfWorks } from "./helpers/dlsiteFetch.ts";
 
 const FAST_DLSITE_REQUEST_CONFIG = {
   ...DEFAULT_DLSITE_REQUEST_CONFIG,
@@ -154,7 +155,7 @@ async function setupRealWithCachedFailure(t: TestContext) {
   await adapter.scan();
   const before = await adapter.getWork("11111111-1111-4111-8111-111111111111");
   const workId = before!.id;
-  const bulk = await adapter.runDlsiteBulk("existing", [workId]);
+  const bulk = await fetchDlsiteOfWorks(adapter, [workId]);
   assert.equal(bulk.failed, 1);
   const failed = await adapter.getWork(workId);
   assert.equal(failed?.dlsite.status, "not_found");

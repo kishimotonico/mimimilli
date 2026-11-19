@@ -3,8 +3,11 @@ import {
   computeMissingDiff,
   detectRjCode,
   hasRjCode,
+  dlsiteProductFetchOutcomeOfResult,
+  errorMessage,
   type DlsiteApplyMissingPreviewItem,
   type DlsiteFetchResult,
+  type DlsiteProductFetchOutcome,
 } from "@mimimilli/shared";
 import { DlsiteCache } from "./dlsiteCache.ts";
 import type { DlsiteCacheOptions } from "./dlsiteCache.ts";
@@ -18,7 +21,6 @@ import type { Scanner } from "./scanner.ts";
 import { getWorkFromCatalog } from "./workRefresh.ts";
 import { createDlsiteFetch } from "./dlsiteFetch.ts";
 import { createDlsiteApply } from "./dlsiteApply.ts";
-import { createDlsiteBulk } from "./dlsiteBulk.ts";
 import { MetaParseError } from "./meta.ts";
 import { readVerifiedEditSource } from "./workEditSource.ts";
 import { SourceConflictError, SourceParseError } from "../../errors.ts";
@@ -39,7 +41,7 @@ export function createDlsiteMethods(deps: {
   schedulerDependencies?: DlsiteSchedulerDependencies;
   requireRoot: () => string;
 }) {
-  const { db, query, catalog, dlsiteCache } = deps;
+  const { query, catalog, dlsiteCache } = deps;
   const fetch = createDlsiteFetch(deps);
   const apply = createDlsiteApply({
     catalog,
@@ -47,17 +49,43 @@ export function createDlsiteMethods(deps: {
     fetch,
     requireRoot: deps.requireRoot,
   });
-  const bulk = createDlsiteBulk({
-    db,
-    query,
-    catalog,
-    scanner: deps.scanner,
-    fetch,
-    dlsiteCache: deps.dlsiteCache,
-  });
+  const fetchTimeoutMs = deps.dlsiteRequestConfig.timeoutMs;
+
+  /** 取得の本体。HTML取得、カバー先取り、同じRJコードを持つ全作品の投影更新を行う。
+   *  同期経路ではHTMLと合わせて総期限に収まる範囲でカバーを取る */
+  async function fetchProduct(
+    productCode: string,
+    force: boolean,
+    options: { signal?: AbortSignal; synchronous: boolean },
+  ): Promise<DlsiteFetchResult> {
+    const deadlineMs = options.synchronous ? Date.now() + fetchTimeoutMs : undefined;
+    const result = await fetch.fetchCachedDlsite(productCode, force, options.signal);
+    if (result.ok) {
+      await fetch.prefetchCover(result.info.coverUrl, { signal: options.signal, deadlineMs });
+    }
+    if (shouldRefreshDlsiteProjectionAfterFetch(result)) {
+      for (const workId of query.listWorkIdsByRjCode(productCode)) {
+        try {
+          refreshWorkDlsiteProjection(catalog, workId, dlsiteCache);
+        } catch (error) {
+          fetch.dlsiteLogger.warn("DLsite取得後の作品の投影更新に失敗しました", {
+            workId,
+            productCode,
+            message: errorMessage(error),
+          });
+        }
+      }
+    }
+    return result;
+  }
 
   return {
     stageCover: fetch.stageCover,
+
+    isDlsiteOffline(): boolean {
+      return deps.dlsiteRequestConfig.offline;
+    },
+
     async dlsiteFetch(
       workId: string,
       force = false,
@@ -70,11 +98,7 @@ export function createDlsiteMethods(deps: {
       if (!rjCode) {
         return { ok: false, kind: "not_found", message: "RJコードが検出されていません" };
       }
-      const result = await fetch.fetchCachedDlsite(rjCode, force, options?.signal);
-      if (shouldRefreshDlsiteProjectionAfterFetch(result)) {
-        refreshWorkDlsiteProjection(catalog, workId, dlsiteCache);
-      }
-      return result;
+      return fetchProduct(rjCode, force, { signal: options?.signal, synchronous: true });
     },
 
     async dlsiteFetchByCode(
@@ -82,7 +106,30 @@ export function createDlsiteMethods(deps: {
       force = false,
       options?: { signal?: AbortSignal },
     ): Promise<DlsiteFetchResult> {
-      return fetch.fetchCachedDlsite(rjCode, force, options?.signal);
+      return fetchProduct(rjCode, force, { signal: options?.signal, synchronous: true });
+    },
+
+    async fetchDlsiteProduct(
+      productCode: string,
+      options: { force: boolean; signal?: AbortSignal },
+    ): Promise<DlsiteProductFetchOutcome> {
+      fetch.dlsiteScheduler.assertOnline();
+      try {
+        const result = await fetchProduct(productCode, options.force, {
+          signal: options.signal,
+          synchronous: false,
+        });
+        return dlsiteProductFetchOutcomeOfResult(result);
+      } catch (error) {
+        if (options.signal?.aborted) throw error;
+        fetch.dlsiteLogger.error("DLsite取得に失敗しました", {
+          productCode,
+          message: errorMessage(error),
+        });
+        return "failed";
+      } finally {
+        if (options.signal?.aborted) await fetch.dlsiteScheduler.drain();
+      }
     },
 
     async dlsiteApplyMissing(workIds?: string[]) {
@@ -165,6 +212,5 @@ export function createDlsiteMethods(deps: {
     },
 
     ...apply,
-    ...bulk,
   };
 }

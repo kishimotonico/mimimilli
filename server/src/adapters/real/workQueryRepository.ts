@@ -446,6 +446,17 @@ export class WorkQueryRepository {
     };
   }
 
+  /** DLsite連携のRJコードが一致する作品のID。投影更新の対象を引く */
+  listWorkIdsByRjCode(productCode: string): string[] {
+    const rows = this.db.sqlite
+      .query(
+        `SELECT work_id AS workId FROM main.work_dlsite
+         WHERE upper(json_extract(state_json, '$.rjCode')) = ?`,
+      )
+      .all(productCode.trim().toUpperCase()) as Array<{ workId: string }>;
+    return rows.map((row) => row.workId);
+  }
+
   queryDlsiteNotifications(
     kind: DlsiteNotificationKind,
     query: Required<DlsiteNotificationQuery>,

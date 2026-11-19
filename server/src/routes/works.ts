@@ -41,10 +41,7 @@ function parseWorkTagPath(c: {
   return normalized;
 }
 
-export function worksRoute(
-  adapter: DataAdapter,
-  onWorkRegistered: (workId: string) => void = () => {},
-): Hono {
+export function worksRoute(adapter: DataAdapter): Hono {
   const app = new Hono();
 
   app.get("/works", async (c) => {
@@ -79,7 +76,6 @@ export function worksRoute(
     try {
       const result = await adapter.projectWorkSource(data.path);
       if (!result) invalidRequest("指定されたパスは存在しないか、ルート配下ではありません");
-      if (result.catalogInserted) onWorkRegistered(result.snapshot.id);
       return c.json(workSourceMutationResultSchema.parse(result));
     } catch (error) {
       throwSourceCommandError(error);
@@ -91,7 +87,6 @@ export function worksRoute(
     try {
       const result = await adapter.createWork(data);
       if (!result) notFound("指定されたパスは存在しないか、ルート配下ではありません");
-      if (result.projection.status === "published") onWorkRegistered(result.snapshot.id);
       return c.json(workSourceMutationResultSchema.parse(result), 201);
     } catch (error) {
       if (error instanceof WorkRegisterError) {
@@ -114,7 +109,6 @@ export function worksRoute(
     try {
       const result = await adapter.reassignIdentityConflict(data);
       if (!result) notFound("指定されたパスはidentity_conflict診断の対象ではありません");
-      if (result.projection.status === "published") onWorkRegistered(result.snapshot.id);
       return c.json(workSourceMutationResultSchema.parse(result), 201);
     } catch (error) {
       throwSourceCommandError(error);

@@ -9,13 +9,11 @@ import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_CANDIDATES_QUERY_KEY } from "../../src/entities/scan/scanCandidatesCache";
 import { mockApi, type ApiMock } from "../helpers/api";
-import { buildScanLastResult, buildScanResult, buildSettings } from "../helpers/builders";
+import { buildSettings } from "../helpers/builders";
 
-const LAST_SCAN_ROUTE = "GET /api/scan/last";
 const CANDIDATES_ROUTE = "GET /api/scan/candidates";
 
 let api: ApiMock;
-let insertedWorkIds: string[];
 
 function idleSettings(rootFolder: string, completedAt: string | null) {
   return buildSettings({ rootFolder, rootReconfiguration: { status: "idle", completedAt } });
@@ -38,10 +36,6 @@ function setup() {
     closeActiveModal: vi.fn(() => void calls.push("closeActiveModal")),
     closeDlsiteApplyDialog: vi.fn(() => void calls.push("closeDlsiteApplyDialog")),
     scanJob: { reset: vi.fn(() => void calls.push("scanReset")) },
-    dlsiteBulk: {
-      reset: vi.fn(() => void calls.push("dlsiteReset")),
-      attach: vi.fn(async () => {}),
-    },
     navigateToDefaultRoute: vi.fn(() => void calls.push("navigate")),
     clearScanCandidateHiddenPaths: vi.fn(() => void calls.push("clearHiddenPaths")),
   } satisfies RootReconfigurationControllerDeps;
@@ -50,15 +44,12 @@ function setup() {
 
 describe("rootReconfigurationController", () => {
   beforeEach(() => {
-    insertedWorkIds = ["work-1"];
     api = mockApi({
-      [LAST_SCAN_ROUTE]: () =>
-        buildScanLastResult({ result: buildScanResult({ insertedWorkIds }) }),
       [CANDIDATES_ROUTE]: { candidates: [] },
     });
   });
 
-  it("突入で再生停止・モーダル閉・DLsite適用ダイアログ閉・scan/DLsiteのreset・既定画面へ遷移・hiddenPaths破棄を行う", () => {
+  it("突入で再生停止・モーダル閉・DLsite適用ダイアログ閉・scanのreset・既定画面へ遷移・hiddenPaths破棄を行う", () => {
     const { controller, calls } = setup();
 
     controller.enter();
@@ -68,7 +59,6 @@ describe("rootReconfigurationController", () => {
       "closeActiveModal",
       "closeDlsiteApplyDialog",
       "scanReset",
-      "dlsiteReset",
       "navigate",
       "clearHiddenPaths",
     ]);
@@ -105,12 +95,11 @@ describe("rootReconfigurationController", () => {
 
     expect(deps.stopPlayback).not.toHaveBeenCalled();
     expect(api.requestsTo(CANDIDATES_ROUTE)).toHaveLength(0);
-    expect(deps.dlsiteBulk.attach).not.toHaveBeenCalled();
     expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("work-1"))?.isInvalidated).toBe(false);
   });
 
-  it("離脱ではobserverのいる作品系クエリを再取得し、候補を取り直し、挿入ありならDLsite一括取得にattachする", async () => {
-    const { controller, deps, queryClient } = setup();
+  it("離脱ではobserverのいる作品系クエリを再取得し、候補を取り直す", async () => {
+    const { controller, queryClient } = setup();
     controller.enter();
     controller.reconfiguringUiMounted();
     const queryFn = vi.fn().mockResolvedValue({ fresh: true });
@@ -124,19 +113,18 @@ describe("rootReconfigurationController", () => {
     controller.readyUiMounted();
 
     await vi.waitFor(() => expect(queryFn).toHaveBeenCalledTimes(2));
-    await vi.waitFor(() => expect(deps.dlsiteBulk.attach).toHaveBeenCalledTimes(1));
     await vi.waitFor(() => expect(queryClient.getQueryData(SCAN_CANDIDATES_QUERY_KEY)).toEqual([]));
     expect(api.requestsTo(CANDIDATES_ROUTE)).toHaveLength(1);
     unsubscribe();
   });
 
   it("ロック中は通常UIが残っていても離脱させず、解除後に1回だけ行う", async () => {
-    const { controller, deps, queryClient } = setup();
+    const { controller, queryClient } = setup();
     queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), runningSettings("/audio/library", "/b"));
     controller.enter();
 
     controller.readyUiMounted();
-    expect(api.requestsTo(LAST_SCAN_ROUTE)).toHaveLength(0);
+    expect(api.requestsTo(CANDIDATES_ROUTE)).toHaveLength(0);
 
     queryClient.setQueryData(
       SETTINGS_QUERY_KEYS.all(),
@@ -144,43 +132,29 @@ describe("rootReconfigurationController", () => {
     );
     controller.readyUiMounted();
 
-    await vi.waitFor(() => expect(deps.dlsiteBulk.attach).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(api.requestsTo(CANDIDATES_ROUTE)).toHaveLength(1));
   });
 
   it("離脱後処理は1回の突入につき1回だけ（readyUiMountedの重複呼び出しでは再実行しない）", async () => {
-    const { controller, deps } = setup();
+    const { controller } = setup();
 
     controller.enter();
     controller.readyUiMounted();
     controller.readyUiMounted();
 
-    await vi.waitFor(() => expect(deps.dlsiteBulk.attach).toHaveBeenCalledTimes(1));
-    expect(api.requestsTo(LAST_SCAN_ROUTE)).toHaveLength(1);
+    await vi.waitFor(() => expect(api.requestsTo(CANDIDATES_ROUTE)).toHaveLength(1));
   });
 
   it("次の突入ではまた離脱後処理が走る（取りこぼさない）", async () => {
-    const { controller, deps } = setup();
+    const { controller } = setup();
 
     controller.enter();
     controller.readyUiMounted();
-    await vi.waitFor(() => expect(deps.dlsiteBulk.attach).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(api.requestsTo(CANDIDATES_ROUTE)).toHaveLength(1));
     controller.enter();
     controller.readyUiMounted();
 
-    await vi.waitFor(() => expect(deps.dlsiteBulk.attach).toHaveBeenCalledTimes(2));
-    expect(api.requestsTo(LAST_SCAN_ROUTE)).toHaveLength(2);
-  });
-
-  it("insertedWorkIdsが空ならDLsite一括取得にattachしない", async () => {
-    insertedWorkIds = [];
-    const { controller, deps } = setup();
-
-    controller.enter();
-    controller.readyUiMounted();
-
-    await vi.waitFor(() => expect(api.requestsTo(LAST_SCAN_ROUTE)).toHaveLength(1));
-    await Promise.resolve();
-    expect(deps.dlsiteBulk.attach).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(api.requestsTo(CANDIDATES_ROUTE)).toHaveLength(2));
   });
 
   it("突入するたびに購読者へ通知し、購読解除後は通知しない", () => {
@@ -227,13 +201,11 @@ describe("rootReconfigurationController", () => {
       controller.observeSettings(idleSettings("/audio/library", "2026-01-01T00:05:00.000Z"));
 
       expect(controller.getEntryCount()).toBe(1);
-      expect(deps.dlsiteBulk.attach).not.toHaveBeenCalled();
       controller.readyUiMounted();
       expect(deps.stopPlayback).toHaveBeenCalledTimes(1);
       expect(deps.navigateToDefaultRoute).toHaveBeenCalledTimes(1);
       expect(deps.scanJob.reset).toHaveBeenCalledTimes(1);
-      expect(deps.dlsiteBulk.reset).toHaveBeenCalledTimes(1);
-      await vi.waitFor(() => expect(deps.dlsiteBulk.attach).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() => expect(api.requestsTo(CANDIDATES_ROUTE)).toHaveLength(1));
       expect(queryClient.getQueryData(WORK_QUERY_KEYS.detail("work-1"))).toBeUndefined();
     });
 
@@ -250,8 +222,7 @@ describe("rootReconfigurationController", () => {
       expect(controller.getEntryCount()).toBe(1);
       expect(deps.stopPlayback).toHaveBeenCalledTimes(1);
       expect(deps.navigateToDefaultRoute).toHaveBeenCalledTimes(1);
-      await vi.waitFor(() => expect(deps.dlsiteBulk.attach).toHaveBeenCalledTimes(1));
-      expect(api.requestsTo(LAST_SCAN_ROUTE)).toHaveLength(1);
+      await vi.waitFor(() => expect(api.requestsTo(CANDIDATES_ROUTE)).toHaveLength(1));
     });
 
     it("rootFolderが変わっても発火する", () => {

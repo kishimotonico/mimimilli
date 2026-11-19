@@ -5,12 +5,10 @@ import {
   scanCandidateSchema,
   scanCandidatesRegisterResponseSchema,
   workspacePath,
-  type DlsiteBulkResult,
 } from "@mimimilli/shared";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { createApp } from "./helpers/testApp.ts";
 import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
-import { pollUntil } from "./helpers/poll.ts";
 
 // fixture はシナリオ new-work の候補を持つ（未登録作品のほか、fixture 固有の入れ子候補「朗読/候補」）。
 // 入れ子候補は real の候補探索（作品ルートは最上位フォルダー）と一致しないため、両 adapter に共通する
@@ -139,29 +137,21 @@ realContract("候補にないパスを含む登録・除外は409で拒否し、
   assert.equal(staleExclude.status, 409);
 });
 
-// 以降は adapter メソッドを差し替えて、ルートの写像（登録ごとのDLsite取得enqueue・部分失敗の201・
+// 以降は adapter メソッドを差し替えて、ルートの写像（DLsite取得を積まないこと・部分失敗の201・
 // リクエスト→adapter 引数）を fixture ベースで確認する。adapter の戻り値は両 adapter で
 // 一様には作れないため、上の contract では扱わない
 
-test("候補登録は登録された作品ごとにDLsite取得をenqueueする", async () => {
-  const queued: string[][] = [];
+test("候補登録はDLsite取得ジョブを作らない", async () => {
   const app = createApp({
     ...createFixtureAdapter(),
-    registerScanCandidates: async (_items, onRegistered) => {
-      onRegistered?.("work-a");
-      onRegistered?.("work-b");
-      return scanCandidatesRegisterResponseSchema.parse({
+    registerScanCandidates: async () =>
+      scanCandidatesRegisterResponseSchema.parse({
         registered: [
           { path: "候補作品", workId: "work-a" },
           { path: "候補作品-2", workId: "work-b" },
         ],
         failures: [],
-      });
-    },
-    runDlsiteBulk: async (_mode, workIds): Promise<DlsiteBulkResult> => {
-      queued.push(workIds ?? []);
-      return { fetched: 0, failed: 0, parseErrors: 0, skipped: 0 };
-    },
+      }),
   });
 
   try {
@@ -171,29 +161,22 @@ test("候補登録は登録された作品ごとにDLsite取得をenqueueする"
       body: JSON.stringify({ items: [{ path: "候補作品" }] }),
     });
     assert.equal(registered.status, 201);
-    await pollUntil(() => queued.length >= 2, 5);
-    assert.deepEqual(queued, [["work-a"], ["work-b"]]);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(await (await app.request("/api/dlsite/jobs/current")).json(), { job: null });
   } finally {
     await app.shutdown();
   }
 });
 
-test("候補登録APIは部分失敗と全失敗を201で返し、成功分だけenqueueする", async () => {
-  const queued: string[][] = [];
+test("候補登録APIは部分失敗と全失敗を201で返す", async () => {
   const fixture = createFixtureAdapter();
   const app = createApp({
     ...fixture,
-    registerScanCandidates: async (_items, onRegistered) => {
-      onRegistered?.("work-ok");
-      return scanCandidatesRegisterResponseSchema.parse({
+    registerScanCandidates: async () =>
+      scanCandidatesRegisterResponseSchema.parse({
         registered: [{ path: "候補作品", workId: "work-ok" }],
         failures: [{ path: "失敗作品", message: "catalogの投影に失敗しました" }],
-      });
-    },
-    runDlsiteBulk: async (_mode, workIds): Promise<DlsiteBulkResult> => {
-      queued.push(workIds ?? []);
-      return { fetched: 0, failed: 0, parseErrors: 0, skipped: 0 };
-    },
+      }),
   });
   try {
     const partial = await app.request("/api/scan/candidates/register", {
@@ -206,8 +189,6 @@ test("候補登録APIは部分失敗と全失敗を201で返し、成功分だ�
       registered: [{ path: "候補作品", workId: "work-ok" }],
       failures: [{ path: "失敗作品", message: "catalogの投影に失敗しました" }],
     });
-    await pollUntil(() => queued.length > 0, 5);
-    assert.deepEqual(queued, [["work-ok"]]);
   } finally {
     await app.shutdown();
   }

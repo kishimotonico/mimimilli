@@ -366,75 +366,94 @@ test("POST /api/dlsite/:id/fetch は取得分類をHTTPエラーコードへ反�
   }
 });
 
-test("GET /api/dlsite/bulk は実行中・終了後の状態をPOSTのjobId付きで返し、未実行時は両方null", async () => {
+test("GET /api/dlsite/jobs/current は実行中・終了後のジョブをPOSTのjobId付きで返し、未実行時はnull", async () => {
   const app = createApp(createFixtureAdapter());
-  const idle = await app.request("/api/dlsite/bulk");
+  const idle = await app.request("/api/dlsite/jobs/current");
   assert.equal(idle.status, 200);
-  assert.deepEqual(await idle.json(), { current: null, lastTerminal: null });
+  assert.deepEqual(await idle.json(), { job: null });
 
   let release!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
   const adapter = createFixtureAdapter();
-  adapter.runDlsiteBulk = async (_mode, _workIds, options) => {
+  adapter.fetchDlsiteProduct = async (_code, options) => {
     await gate;
-    options?.signal?.throwIfAborted();
-    return { fetched: 0, failed: 0, parseErrors: 0, skipped: 0 };
+    options.signal?.throwIfAborted();
+    return "fetched";
   };
   const gatedApp = createApp(adapter);
 
-  const start = await gatedApp.request("/api/dlsite/bulk", { method: "POST" });
+  const start = await postJob(gatedApp, { origin: "bulk", productCodes: ["RJ000001"] });
   assert.equal(start.status, 202);
   const { jobId } = await start.json();
   assert.equal(typeof jobId, "string");
   await new Promise((resolve) => setImmediate(resolve));
-  const running = await gatedApp.request("/api/dlsite/bulk");
-  assert.equal(running.status, 200);
-  const runningBody = await running.json();
-  assert.equal(runningBody.current.status, "running");
-  assert.equal(runningBody.current.jobId, jobId);
+  const running = await (await gatedApp.request("/api/dlsite/jobs/current")).json();
+  assert.equal(running.job.status, "running");
+  assert.equal(running.job.jobId, jobId);
+  assert.deepEqual(running.job.codes, [
+    { productCode: "RJ000001", origin: "bulk", state: "fetching" },
+  ]);
 
   release();
   await new Promise((resolve) => setImmediate(resolve));
-  const completed = await gatedApp.request("/api/dlsite/bulk");
-  assert.equal(completed.status, 200);
-  const completedBody = await completed.json();
-  assert.equal(completedBody.current, null);
-  assert.equal(completedBody.lastTerminal.status, "complete");
-  assert.equal(completedBody.lastTerminal.jobId, jobId);
+  const finished = await (await gatedApp.request("/api/dlsite/jobs/current")).json();
+  assert.equal(finished.job.status, "finished");
+  assert.equal(finished.job.jobId, jobId);
+  assert.deepEqual(finished.job.codes, [
+    { productCode: "RJ000001", origin: "bulk", state: "fetched" },
+  ]);
+  assert.deepEqual(finished.job.bulk, { processed: 1, total: 1 });
 });
 
-test("DLsite一括取得は202で開始し、SSEに進捗と完了件数を配信する", async () => {
+test("DLsite取得ジョブは202で開始し、SSEにsnapshotと完了を配信する", async () => {
   const app = createApp(createFixtureAdapter());
-  const start = await app.request("/api/dlsite/bulk", { method: "POST" });
+  const start = await postJob(app, { origin: "bulk", productCodes: ["RJ000001", "rj000002"] });
   assert.equal(start.status, 202);
-  const events = await app.request("/api/dlsite/events");
+  const events = await app.request("/api/dlsite/jobs/events");
   assert.equal(events.status, 200);
   const text = await events.text();
-  assert.match(text, /event: complete/);
-  assert.match(text, /"fetched":/);
-  assert.match(text, /"failed":0/);
+  assert.match(text, /event: snapshot/);
+  assert.match(text, /"productCode":"RJ000002"/);
+  assert.match(text, /"state":"fetched"/);
 });
 
-test("DELETE /api/dlsite/bulk は実行中ジョブの取消を要求し、終了済みには404", async () => {
+test("POST /api/dlsite/jobs は不正なコードを400で拒否し、オフラインでは offline で拒否してジョブを作らない", async () => {
+  const adapter = createFixtureAdapter();
+  const app = createApp(adapter);
+  assert.equal((await postJob(app, { origin: "bulk", productCodes: ["abc"] })).status, 400);
+  assert.equal((await postJob(app, { origin: "bulk", productCodes: [] })).status, 400);
+
+  adapter.isDlsiteOffline = () => true;
+  const offline = await postJob(app, { origin: "single", productCode: "RJ000001" });
+  assert.equal(offline.status, 503);
+  assert.equal((await offline.json()).error.code, "offline");
+  assert.deepEqual(await (await app.request("/api/dlsite/jobs/current")).json(), { job: null });
+});
+
+test("DELETE /api/dlsite/jobs/:jobId/bulk は待機中のまとめてだけを外し、別のIDや対象なしは removed: 0", async () => {
   let release!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
   const adapter = createFixtureAdapter();
-  adapter.runDlsiteBulk = async (_mode, _workIds, options) => {
+  adapter.fetchDlsiteProduct = async () => {
     await gate;
-    options?.signal?.throwIfAborted();
-    return { fetched: 0, failed: 0, parseErrors: 0, skipped: 0 };
+    return "fetched";
   };
   const app = createApp(adapter);
-  const start = await app.request("/api/dlsite/bulk", { method: "POST" });
-  assert.equal(start.status, 202);
+  const start = await postJob(app, {
+    origin: "bulk",
+    productCodes: ["RJ000001", "RJ000002", "RJ000003"],
+  });
+  const { jobId } = await start.json();
   await new Promise((resolve) => setImmediate(resolve));
-  const cancelling = await app.request("/api/dlsite/bulk", { method: "DELETE" });
-  assert.equal(cancelling.status, 200);
-  assert.deepEqual(await cancelling.json(), { cancelling: true });
+  const other = await app.request("/api/dlsite/jobs/other/bulk", { method: "DELETE" });
+  assert.deepEqual(await other.json(), { removed: 0 });
+  const cancelled = await app.request(`/api/dlsite/jobs/${jobId}/bulk`, { method: "DELETE" });
+  assert.equal(cancelled.status, 200);
+  assert.deepEqual(await cancelled.json(), { removed: 2 });
   release();
   await new Promise((resolve) => setImmediate(resolve));
-  const idle = await app.request("/api/dlsite/bulk", { method: "DELETE" });
-  assert.equal(idle.status, 404);
+  const again = await app.request(`/api/dlsite/jobs/${jobId}/bulk`, { method: "DELETE" });
+  assert.deepEqual(await again.json(), { removed: 0 });
 });
 
 test("POST /api/__test__/reset は実行中スキャンを取消して完了待ちしてからfixture状態を戻す", async () => {
@@ -471,34 +490,39 @@ test("POST /api/__test__/reset は実行中スキャンを取消して完了待�
   assert.equal(restart.status, 202);
 });
 
-test("POST /api/__test__/reset は実行中DLsite一括取得を取消して完了待ちしてからfixture状態を戻す", async () => {
+test("POST /api/__test__/reset は実行中DLsite取得ジョブを打ち切って完了待ちしてからfixture状態を戻す", async () => {
   const adapter = createFixtureAdapter();
-  adapter.runDlsiteBulk = async (_mode, _workIds, options) => {
-    const signal = options?.signal;
+  adapter.fetchDlsiteProduct = async (_code, options) => {
+    const signal = options.signal;
     if (!signal) throw new Error("missing signal");
     while (!signal.aborted) {
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
-    return { fetched: 0, failed: 0, parseErrors: 0, skipped: 0 };
+    throw signal.reason;
   };
   const app = createApp(adapter);
 
-  const start = await app.request("/api/dlsite/bulk", { method: "POST" });
+  const start = await postJob(app, { origin: "bulk", productCodes: ["RJ000001", "RJ000002"] });
   assert.equal(start.status, 202);
   await new Promise((resolve) => setImmediate(resolve));
-  const running = await app.request("/api/dlsite/bulk");
-  assert.equal(running.status, 200);
-  assert.equal((await running.json()).current.status, "running");
+  const running = await (await app.request("/api/dlsite/jobs/current")).json();
+  assert.equal(running.job.status, "running");
 
   const reset = await app.request("/api/__test__/reset", { method: "POST" });
   assert.equal(reset.status, 200);
   assert.deepEqual(await reset.json(), { ok: true });
-  const afterReset = await app.request("/api/dlsite/bulk");
-  assert.equal(afterReset.status, 200);
-  const afterResetBody = await afterReset.json();
-  assert.equal(afterResetBody.current, null);
-  assert.equal(afterResetBody.lastTerminal.status, "cancelled");
+  assert.deepEqual(await (await app.request("/api/dlsite/jobs/current")).json(), { job: null });
 
-  const restart = await app.request("/api/dlsite/bulk", { method: "POST" });
+  const restart = await postJob(app, { origin: "single", productCode: "RJ000001" });
   assert.equal(restart.status, 202);
 });
+
+function postJob(app: ReturnType<typeof createApp>, body: unknown): Promise<Response> {
+  return Promise.resolve(
+    app.request("/api/dlsite/jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
+}

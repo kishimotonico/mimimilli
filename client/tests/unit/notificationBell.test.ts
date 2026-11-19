@@ -9,8 +9,6 @@ import NotificationBell from "../../src/app/ui/NotificationBell";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
-import { dlsiteBulkStoreAtom } from "../../src/entities/dlsite/model/dlsiteBulkStore";
-import { createFakeDlsiteBulkStore } from "../helpers/fakeJobStores";
 import { mockApi, apiNoContent } from "../helpers/api";
 import {
   buildDlsiteNotificationSummary,
@@ -27,10 +25,6 @@ const scanResult: ScanResult = buildScanResult({
 
 function renderBell(
   summaryOverrides: Partial<DlsiteNotificationSummary> = {},
-  atomOverrides?: {
-    active?: boolean;
-    progress?: import("@mimimilli/shared").DlsiteBulkProgressSnapshot | null;
-  },
   scanResultOverride?: ScanResult | null,
   diagnostics: Partial<ScanDiagnostics> = {},
 ) {
@@ -52,12 +46,6 @@ function renderBell(
   queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), scanDiagnostics);
 
   const store = createStore();
-  const dlsiteBulk = createFakeDlsiteBulkStore({
-    ...(atomOverrides?.active !== undefined && { jobId: atomOverrides.active ? "job-1" : null }),
-    ...(atomOverrides?.progress !== undefined && { progress: atomOverrides.progress }),
-  });
-  const onStartDlsiteBulk = dlsiteBulk.start;
-  store.set(dlsiteBulkStoreAtom, dlsiteBulk);
 
   render(
     createElement(
@@ -66,7 +54,7 @@ function renderBell(
       createElement(JotaiProvider, { store }, createElement(NotificationBell)),
     ),
   );
-  return { store, queryClient, onStartDlsiteBulk };
+  return { store, queryClient };
 }
 
 describe("NotificationBell", () => {
@@ -75,7 +63,7 @@ describe("NotificationBell", () => {
     expect(screen.getByRole("button", { name: "通知" })).toBeInTheDocument();
   });
 
-  it("バッジ数はRJコード未検出とDLsite取得失敗の合算（DLsite未連携は含めない）", () => {
+  it("バッジ数はRJコード未検出とDLsite取得失敗の合算", () => {
     renderBell({ rjCodeMissingCount: 3, fetchFailedCount: 2, unlinkedCount: 100 });
     expect(screen.getByText("5")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "通知（要対応5件）" })).toBeInTheDocument();
@@ -144,30 +132,8 @@ describe("NotificationBell", () => {
     expect(store.get(activeModalAtom)).toEqual({ kind: "parse-failed" });
   });
 
-  it("DLsite未連携: 件数がある場合はまとめて取得ボタンを表示し、押すとコールバックを呼ぶ", () => {
-    const { onStartDlsiteBulk } = renderBell({ unlinkedCount: 5 });
-    fireEvent.click(screen.getByRole("button", { name: /通知/ }));
-    expect(screen.getByText("5件")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "まとめて取得" }));
-    expect(onStartDlsiteBulk).toHaveBeenCalledTimes(1);
-  });
-
-  it("DLsite未連携: 実行中は進捗を表示し、ボタンをdisabledにする", () => {
-    renderBell(
-      { unlinkedCount: 0 },
-      {
-        active: true,
-        progress: { processed: 3, total: 8, work: null },
-      },
-    );
-    fireEvent.click(screen.getByRole("button", { name: /通知/ }));
-    expect(screen.getByText("取得中 (3/8)")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "まとめて取得" })).toBeDisabled();
-  });
-
   it("scanResultがあれば直近のスキャン結果サマリを表示する", () => {
-    renderBell({}, undefined, scanResult);
+    renderBell({}, scanResult);
     fireEvent.click(screen.getByRole("button", { name: /通知/ }));
     expect(screen.getByText("直近のスキャン結果")).toBeInTheDocument();
     expect(screen.getByText("12")).toBeInTheDocument();
@@ -176,7 +142,7 @@ describe("NotificationBell", () => {
 
   describe("要対応タブとの件数統一", () => {
     it("ID重複はworkId単位で1件として数え、行クリックで要対応タブを開く", () => {
-      const { store } = renderBell({}, undefined, undefined, {
+      const { store } = renderBell({}, undefined, {
         identityConflicts: [
           { kind: "identity_conflict", workId: "RJ501001", paths: ["a/1", "a/2"] },
         ],
@@ -191,7 +157,7 @@ describe("NotificationBell", () => {
     });
 
     it("ID重複とRJコード未検出が両方あるとき、バッジは行の合算になる", () => {
-      renderBell({ rjCodeMissingCount: 2 }, undefined, undefined, {
+      renderBell({ rjCodeMissingCount: 2 }, undefined, {
         identityConflicts: [
           { kind: "identity_conflict", workId: "RJ501001", paths: ["a/1", "a/2"] },
         ],
@@ -200,7 +166,7 @@ describe("NotificationBell", () => {
     });
 
     it("読み取り失敗は現在の診断のinvalidMetaFilesから行を作る", () => {
-      const { store } = renderBell({}, undefined, undefined, {
+      const { store } = renderBell({}, undefined, {
         invalidMetaFiles: [{ path: "a/1", message: "壊れています" }],
       });
       fireEvent.click(screen.getByRole("button", { name: /通知/ }));

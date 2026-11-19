@@ -1,4 +1,4 @@
-// ライブラリの健康状態（RJコード未検出・DLsite取得失敗・DLsite未連携・直近のスキャン結果）を
+// ライブラリの健康状態（RJコード未検出・DLsite取得失敗・直近のスキャン結果）を
 // 集約する通知ベルパネル。開閉・外側クリック/Escapeでの閉じ方は
 // AddressBar の並び替えメニュー（.mle-sortmenu）と同じ「position:relative + absolute」の
 // 素朴な実装に倣う（work-preview専用の useAnchoredPopover は左寄せクランプ前提でここには合わない）。
@@ -6,12 +6,6 @@ import { useSetAtom } from "jotai";
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { activeModalAtom } from "../../shared/model/activeModalAtom";
-import {
-  useDlsiteBulkActive,
-  useDlsiteBulkProgress,
-  useDlsiteBulkStarting,
-  useDlsiteBulkStore,
-} from "../../entities/dlsite/useDlsiteBulk";
 import { useDlsiteNotificationSummary } from "../../entities/dlsite/model/useDlsiteNotificationSummary";
 import {
   scanDiagnosticsQueryOptions,
@@ -23,17 +17,12 @@ import {
   needsAttentionRowWeight,
   type NeedsAttentionRow,
 } from "../../features/scan/model/needsAttention";
-import Button from "../../shared/ui/Button";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
 import { usePopoverDismissal } from "../../shared/ui/usePopoverDismissal";
 
 export default function NotificationBell() {
   const setActiveModal = useSetAtom(activeModalAtom);
-  const dlsiteBulkActive = useDlsiteBulkActive();
-  const dlsiteBulkStarting = useDlsiteBulkStarting();
-  const dlsiteBulkProgress = useDlsiteBulkProgress();
-  const { start: onStartDlsiteBulk } = useDlsiteBulkStore();
   // 前回スキャン結果（ディスク永続化なし）。購読する。
   const lastScanQuery = useQuery(scanLastResultQueryOptions);
   const scanResult = lastScanQuery.data?.result ?? null;
@@ -44,7 +33,6 @@ export default function NotificationBell() {
     fetchFailedCount: dlsiteFetchFailedCount,
     parseErrorAlert: dlsiteParseErrorAlert,
     parseErrorCount: dlsiteParseErrorCount,
-    unlinkedCount: dlsiteUnlinkedCount,
   } = useDlsiteNotificationSummary();
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -66,8 +54,7 @@ export default function NotificationBell() {
     dataIntegrityWarning: scanResult?.dataIntegrityWarning,
   });
   const badgeCount = countNeedsAttention(needsAttentionRows);
-  const showUnlinkedRow = dlsiteUnlinkedCount > 0 || dlsiteBulkActive;
-  const isEmpty = needsAttentionRows.length === 0 && !showUnlinkedRow && !scanResult;
+  const isEmpty = needsAttentionRows.length === 0 && !scanResult;
 
   return (
     <div ref={rootRef} className="relative">
@@ -125,27 +112,6 @@ export default function NotificationBell() {
                   }}
                 />
               ))}
-              {showUnlinkedRow && (
-                <div className="flex items-center justify-between gap-2 px-3.5 py-2.5">
-                  <div className="min-w-0">
-                    <p className="text-body text-ink-0">DLsite未連携</p>
-                    <p className="font-mono text-mono text-ink-2" aria-live="polite">
-                      {dlsiteBulkActive
-                        ? dlsiteBulkProgress
-                          ? `取得中 (${dlsiteBulkProgress.processed}/${dlsiteBulkProgress.total})`
-                          : "取得中..."
-                        : `${dlsiteUnlinkedCount}件`}
-                    </p>
-                  </div>
-                  <Button
-                    variant="primary"
-                    disabled={dlsiteBulkActive || dlsiteBulkStarting}
-                    onClick={onStartDlsiteBulk}
-                  >
-                    まとめて取得
-                  </Button>
-                </div>
-              )}
               {scanResult && (
                 <button
                   type="button"
