@@ -198,6 +198,17 @@ export function worksRoute(adapter: DataAdapter, scanRecord: ScanRecordStore): H
     }
   });
 
+  app.post("/works/:id/reload", async (c) => {
+    const workId = c.req.param("id");
+    try {
+      if (!(await adapter.reloadWork(workId))) notFound(`作品が見つかりません: ${workId}`);
+    } catch (error) {
+      throwSourceCommandError(error);
+    }
+    scanRecord.resolveDataIntegrity(workId);
+    return c.body(null, 204);
+  });
+
   app.delete("/works/:id", async (c) => {
     const ok = await adapter.deleteWork(c.req.param("id"));
     if (ok) scanRecord.forgetWork(c.req.param("id"));

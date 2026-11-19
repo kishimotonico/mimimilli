@@ -29,6 +29,8 @@ export interface WorkAdapter {
     body: IdentityConflictReassignBody,
   ): Promise<WorkSourceMutationResult | null>;
   projectWorkSource(path: WorkspacePath): Promise<WorkSourceMutationResult | null>;
+  /** 作品情報ファイルからこの作品だけを読み直して catalog を作り直す。存在しなければ false。直らないときは例外 */
+  reloadWork(id: string): Promise<boolean>;
   /** 作品を DB とメタファイルから削除する。物理ファイルは触らない。存在しなければ false */
   deleteWork(id: string): Promise<boolean>;
   /** status === "missing" の作品数 */

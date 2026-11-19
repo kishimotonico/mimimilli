@@ -169,6 +169,11 @@ export async function reassignIdentityConflict(
   });
 }
 
+/** 作品情報ファイルからこの作品だけを読み直して一覧へ反映する */
+export async function reloadWork(workId: string): Promise<void> {
+  await postVoid(`/works/${encodeURIComponent(workId)}/reload`);
+}
+
 /** 作品登録を解除する（DB・メタファイルのみ。物理ファイルは残す） */
 export async function deleteWork(workId: string): Promise<void> {
   await deleteVoid(`/works/${encodeURIComponent(workId)}`);

@@ -36,6 +36,7 @@ import {
   projectWorkSource,
   reassignIdentityConflict,
   registerScanCandidates,
+  reloadWork,
   removeWorkTag,
   unregisterMissingWorks,
   updateDlsiteState,
@@ -51,6 +52,7 @@ import {
   updateCachesAfterSourceEdit,
   updateCachesAfterSourceEditFailure,
   updateCachesAfterUnregistration,
+  updateCachesAfterWorkReload,
 } from "./workCacheUpdates";
 
 /** 一括draft保存（ADR-0025）の変数。未変更のフィールドはキー自体を含めない */
@@ -162,6 +164,14 @@ export function useRegisterScanCandidatesMutation() {
   return useMutation<ScanCandidatesRegisterResponse, Error, ScanCandidateRegisterItem[]>({
     mutationFn: (items) => registerScanCandidates(items),
     onSuccess: () => updateCachesAfterRegistration(queryClient),
+  });
+}
+
+export function useReloadWorkMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: (workId) => reloadWork(workId),
+    onSuccess: (_data, workId) => updateCachesAfterWorkReload(queryClient, workId),
   });
 }
 

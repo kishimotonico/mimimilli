@@ -117,6 +117,18 @@ export async function updateCachesAfterUnregistration(
   queryClient.removeQueries({ queryKey: WORK_QUERY_KEYS.detail(workId) });
 }
 
+/** 作品単位の読み直し（データ不整合の解消）の成功後 */
+export async function updateCachesAfterWorkReload(
+  queryClient: QueryClient,
+  workId: string,
+): Promise<void> {
+  await Promise.all([
+    invalidateRegistrationViews(queryClient),
+    invalidateWorkDetail(queryClient, workId),
+    queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.source(workId), exact: true }),
+  ]);
+}
+
 export async function updateCachesAfterMissingUnregistration(
   queryClient: QueryClient,
 ): Promise<void> {

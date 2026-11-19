@@ -27,7 +27,13 @@ import { errorMessage, resolveWorkPlacement, tagEquals } from "@mimimilli/shared
 import { type Db } from "./db.ts";
 import type { StagedCover } from "./dlsiteFetch.ts";
 import { MetaMutationReject, encodeMetaRaw, patchMetaFileCas, readMetaSource } from "./meta.ts";
-import { SourceChangedError } from "../../errors.ts";
+import {
+  SOURCE_IDENTITY_MISMATCH_MESSAGE,
+  SOURCE_RELOAD_FAILED_MESSAGE,
+  SOURCE_RELOAD_UNRESOLVED_MESSAGE,
+  SourceChangedError,
+  SourceConflictError,
+} from "../../errors.ts";
 import { removeIdentityConflictPath } from "../../core/identityConflicts.ts";
 import { validateResumeRequest } from "../../core/resumeValidation.ts";
 import { identityConflictMetaPath, identityConflictPathOf, resolveWithin } from "./paths.ts";
@@ -223,6 +229,29 @@ export function createWorkMethods(deps: {
           projection: { status: "pending", reason: "error" },
         };
       }
+    },
+
+    async reloadWork(id: string): Promise<boolean> {
+      const location = catalog.getWorkSourceLocation(id);
+      if (!location) return false;
+      let source;
+      try {
+        source = readMetaSource(location.metaPath);
+      } catch (error) {
+        mapMetaReadError(error);
+      }
+      if (source.meta.id !== id) throw new SourceConflictError(SOURCE_IDENTITY_MISMATCH_MESSAGE);
+      const outcome = await scanner.projectMetaFile(location.metaPath, source);
+      if (outcome.status === "unpublished" && outcome.reason === "source_changed") {
+        throw new SourceChangedError();
+      }
+      if (outcome.status !== "published") {
+        throw new SourceConflictError(SOURCE_RELOAD_FAILED_MESSAGE);
+      }
+      if (query.listSummaries([id]).summaries.length === 0) {
+        throw new SourceConflictError(SOURCE_RELOAD_UNRESOLVED_MESSAGE);
+      }
+      return true;
     },
 
     async deleteWork(id: string): Promise<boolean> {

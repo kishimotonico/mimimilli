@@ -309,6 +309,18 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       return { snapshot: fixtureEditSnapshot(state, work), projection: { status: "published" } };
     },
 
+    async reloadWork(id: string): Promise<boolean> {
+      const warning = state.dataIntegrityWarning;
+      if (warning?.skippedWorkIds.includes(id)) {
+        const rest = warning.skippedWorkIds.filter((skipped) => skipped !== id);
+        state.dataIntegrityWarning = rest.length
+          ? { skippedCount: rest.length, skippedWorkIds: rest }
+          : undefined;
+        return true;
+      }
+      return state.works.some((w) => w.id === id);
+    },
+
     async deleteWork(id: string): Promise<boolean> {
       if (!state.works.some((w) => w.id === id)) return false;
       removeIdentityConflictForWork(state, id);

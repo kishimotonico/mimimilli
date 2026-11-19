@@ -25,20 +25,23 @@ export class CoverSaveError extends Error {
 
 export class SourceChangedError extends Error {
   constructor() {
-    super("作品データが外部で変更されました。再読み込みしてから編集してください");
+    super("作品データが外部で変更されました。再読み込みしてからやり直してください");
     this.name = "SourceChangedError";
   }
 }
 
-export const SOURCE_FILE_MISSING_MESSAGE = "作品情報ファイルが見つからないため編集できません。";
+export const SOURCE_FILE_MISSING_MESSAGE = "作品情報ファイルが見つかりません。";
 export const SOURCE_FILE_BROKEN_MESSAGE =
-  "作品情報ファイルが壊れているため編集できません。表示は前回スキャン時点の内容です。";
-export const SOURCE_FORMAT_UNSUPPORTED_MESSAGE =
-  "この作品情報の形式には未対応のため編集できません。";
+  "作品情報ファイルが壊れています。表示は前回スキャン時点の内容です。";
+export const SOURCE_FORMAT_UNSUPPORTED_MESSAGE = "この作品情報の形式には未対応です。";
 export const SOURCE_IDENTITY_MISMATCH_MESSAGE =
   "作品情報の識別子が一致しないため、この操作は適用できません。";
 export const SOURCE_LOCATION_MISMATCH_MESSAGE =
   "作品の場所が一致しないため、この操作は適用できません。";
+
+export const SOURCE_RELOAD_FAILED_MESSAGE = "作品を一覧へ反映できませんでした。";
+export const SOURCE_RELOAD_UNRESOLVED_MESSAGE =
+  "作品情報ファイルを読み直しても、この作品の保存値を直せませんでした。";
 
 /** JSON 不正・スキーマ不正・formatVersion 非対応。HTTP は parse_error。 */
 export class SourceParseError extends Error {
