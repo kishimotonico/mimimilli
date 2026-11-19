@@ -69,9 +69,9 @@ test("ジョブの終端状態は、同じコードのDlsiteCache.resolve由来�
   const manager = new DlsiteJobManager(adapter);
   const codes = ["RJ000001", "RJ000002", "RJ000003", "RJ000004"];
   manager.start({ origin: "bulk", productCodes: codes });
-  while (manager.getSnapshot()?.status !== "finished") await tick();
-  const states = Object.fromEntries(
-    manager.getSnapshot()!.codes.map((code) => [code.productCode, code.state]),
+  while (manager.getState().job?.status !== "finished") await tick();
+  const states: Record<string, string> = Object.fromEntries(
+    manager.getState().job!.codes.map((code) => [code.productCode, code.state]),
   );
   assert.deepEqual(states, {
     RJ000001: "fetched",
@@ -82,7 +82,7 @@ test("ジョブの終端状態は、同じコードのDlsiteCache.resolve由来�
   for (const code of codes) {
     assert.equal(
       dlsiteFetchStateOfResolution(cache.resolve({ productCode: code })),
-      states[code],
+      states[code as keyof typeof states],
       code,
     );
   }
@@ -99,11 +99,11 @@ test("forceは失敗の記録を無視して取り直し、forceなしは記録�
         : htmlResponse(sampleWorkHtml(code, { cover: false }));
     },
   });
-  assert.equal(await adapter.fetchDlsiteProduct("RJ000001", { force: false }), "not_found");
+  assert.equal((await adapter.fetchDlsiteProduct("RJ000001", { force: false })).state, "not_found");
   gone = false;
-  assert.equal(await adapter.fetchDlsiteProduct("RJ000001", { force: false }), "not_found");
+  assert.equal((await adapter.fetchDlsiteProduct("RJ000001", { force: false })).state, "not_found");
   assert.equal(htmlCalls, 1);
-  assert.equal(await adapter.fetchDlsiteProduct("RJ000001", { force: true }), "fetched");
+  assert.equal((await adapter.fetchDlsiteProduct("RJ000001", { force: true })).state, "fetched");
   assert.equal(htmlCalls, 2);
   assert.equal(dlsiteFetchStateOfResolution(cache.resolve({ productCode: "RJ000001" })), "fetched");
 });
@@ -125,7 +125,7 @@ test("取得は取得ジョブ・fetch-by-code・作品の取得の3経路で、
   await configureRoot(adapter, lib.root);
   await runScan(adapter);
 
-  assert.equal(await adapter.fetchDlsiteProduct("RJ000001", { force: false }), "fetched");
+  assert.equal((await adapter.fetchDlsiteProduct("RJ000001", { force: false })).state, "fetched");
   assert.ok(cache.getCover(coverUrlOf("RJ000001")));
 
   const byCode = await adapter.dlsiteFetchByCode("RJ000002");
@@ -146,7 +146,7 @@ test("カバーの取得に失敗しても取得結果は成功のままで、�
     html: (code) => htmlResponse(sampleWorkHtml(code, { cover: true })),
     cover: () => Promise.reject(new Error("カバー取得失敗")),
   });
-  assert.equal(await adapter.fetchDlsiteProduct("RJ000001", { force: false }), "fetched");
+  assert.equal((await adapter.fetchDlsiteProduct("RJ000001", { force: false })).state, "fetched");
   assert.equal(cache.getCover(coverUrlOf("RJ000001")), null);
   assert.equal((await adapter.dlsiteFetchByCode("RJ000002")).ok, true);
 });
@@ -237,13 +237,13 @@ test("同じRJコードにmissingや壊れた作品が混ざっても、取得�
   await runScan(adapter);
   writeFileSync(copyMetaPath, "{ broken");
 
-  assert.equal(await adapter.fetchDlsiteProduct("RJ900002", { force: false }), "not_found");
+  assert.equal((await adapter.fetchDlsiteProduct("RJ900002", { force: false })).state, "not_found");
   assert.equal((await adapter.getWork(lib.existingWorkId))?.dlsite.status, "not_found");
   assert.equal((await adapter.dlsiteFetchByCode("RJ900002", true)).ok, false);
 
   rmSync(join(lib.root, "dlsite", "RJ900002_既存メタ"), { recursive: true });
   await runScan(adapter);
-  assert.equal(await adapter.fetchDlsiteProduct("RJ900002", { force: true }), "not_found");
+  assert.equal((await adapter.fetchDlsiteProduct("RJ900002", { force: true })).state, "not_found");
 });
 
 test("オフライン設定ではisDlsiteOfflineがtrueを返す", (t) => {
@@ -259,9 +259,9 @@ test("forceでも、TTL内で解析できるokのsnapshotはHTTPなしで使う�
       return htmlResponse(sampleWorkHtml(code, { cover: false }));
     },
   });
-  assert.equal(await adapter.fetchDlsiteProduct("RJ000001", { force: false }), "fetched");
+  assert.equal((await adapter.fetchDlsiteProduct("RJ000001", { force: false })).state, "fetched");
   assert.equal(htmlCalls, 1);
-  assert.equal(await adapter.fetchDlsiteProduct("RJ000001", { force: true }), "fetched");
+  assert.equal((await adapter.fetchDlsiteProduct("RJ000001", { force: true })).state, "fetched");
   assert.equal((await adapter.dlsiteFetchByCode("RJ000001", true)).ok, true);
   assert.equal(htmlCalls, 1);
 });
@@ -275,11 +275,11 @@ test("forceは、解析できないsnapshot（parse_error）を取り直す", as
       return broken ? htmlResponse("<html></html>") : htmlResponse(sampleWorkHtml(code));
     },
   });
-  assert.equal(await adapter.fetchDlsiteProduct("RJ000001", { force: false }), "failed");
+  assert.equal((await adapter.fetchDlsiteProduct("RJ000001", { force: false })).state, "failed");
   broken = false;
-  assert.equal(await adapter.fetchDlsiteProduct("RJ000001", { force: false }), "failed");
+  assert.equal((await adapter.fetchDlsiteProduct("RJ000001", { force: false })).state, "failed");
   assert.equal(htmlCalls, 1);
-  assert.equal(await adapter.fetchDlsiteProduct("RJ000001", { force: true }), "fetched");
+  assert.equal((await adapter.fetchDlsiteProduct("RJ000001", { force: true })).state, "fetched");
   assert.equal(htmlCalls, 2);
 });
 
@@ -287,7 +287,7 @@ test("オフライン設定でも、TTL内のokのsnapshotがあれば同期取�
   const { adapter, dir } = setup(t, {
     html: (code) => htmlResponse(sampleWorkHtml(code, { cover: false })),
   });
-  assert.equal(await adapter.fetchDlsiteProduct("RJ000001", { force: false }), "fetched");
+  assert.equal((await adapter.fetchDlsiteProduct("RJ000001", { force: false })).state, "fetched");
 
   let offlineCalls = 0;
   const offline = dir.own(

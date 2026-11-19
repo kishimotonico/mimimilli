@@ -93,7 +93,7 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
   );
   api.route("/", settingsRoute(adapter, rootReconfiguration));
   api.route("/", rootReconfigurationRoute(rootReconfiguration));
-  api.route("/", scanRoute(scanJobs));
+  api.route("/", scanRoute(scanJobs, { revision: () => dlsiteJobs.revision }));
   api.route("/", worksRoute(adapter, scanJobs.session.record));
   api.route("/", axesRoute(adapter));
   api.route("/", tagPrefixesRoute(adapter));

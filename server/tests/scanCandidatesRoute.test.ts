@@ -35,6 +35,7 @@ const hasTarget = (candidates: Array<{ path: string }>) =>
 
 contract("候補一覧は未登録フォルダーの推定タイトルと音声内訳を返す", async (harness) => {
   const target = (await listCandidates(harness)).find((entry) => entry.path === TARGET);
+  assert.equal(typeof target?.dlsiteRevision, "number");
   assert.deepEqual(target, {
     path: TARGET,
     inferredTitle: "未登録作品",
@@ -43,6 +44,7 @@ contract("候補一覧は未登録フォルダーの推定タイトルと音声�
     rjCode: null,
     rjCodeEdited: false,
     dlsite: { state: "none" },
+    dlsiteRevision: target!.dlsiteRevision,
     missingWorks: [],
   });
 });
@@ -287,7 +289,7 @@ test("候補登録はDLsite取得ジョブを作らない", async () => {
     const registered = await postRegister(app, ["候補作品"]);
     assert.equal(registered.status, 201);
     await new Promise((resolve) => setImmediate(resolve));
-    assert.deepEqual(await (await app.request("/api/dlsite/jobs/current")).json(), { job: null });
+    assert.equal((await (await app.request("/api/dlsite/jobs/current")).json()).job, null);
   } finally {
     await app.shutdown();
   }

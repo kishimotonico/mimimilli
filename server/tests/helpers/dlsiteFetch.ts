@@ -44,10 +44,12 @@ export async function fetchDlsiteOfWorks(
     const code = work.dlsite.rjCode;
     let outcome = outcomes.get(code);
     if (!outcome) {
-      outcome = await adapter.fetchDlsiteProduct(code, {
-        force: options.force ?? false,
-        signal: options.signal,
-      });
+      outcome = (
+        await adapter.fetchDlsiteProduct(code, {
+          force: options.force ?? false,
+          signal: options.signal,
+        })
+      ).state;
       outcomes.set(code, outcome);
     }
     if (outcome === "fetched") counts.fetched += 1;

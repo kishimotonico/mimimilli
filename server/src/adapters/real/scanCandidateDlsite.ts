@@ -1,6 +1,6 @@
 import type {
   DlsiteCachedCover,
-  ScanCandidateDlsite,
+  DlsiteProductSummary,
   ScanCandidateMissingWork,
 } from "@mimimilli/shared";
 import { normalizeDlsiteCoverUrl } from "./dlsite.ts";
@@ -23,11 +23,11 @@ export function createCandidateDlsiteSource(
   return { resolve, coverVersion: (key) => cache.coverVersionByKey(key) };
 }
 
-/** 取得ジョブの待機中・取得中は含まない */
-export function deriveCandidateDlsite(
+/** キャッシュから導く取得状態。候補の表示と取得ジョブの終端が同じ規則を使う。待機中・取得中は含まない */
+export function deriveDlsiteProductSummary(
   source: CandidateDlsiteSource,
   rjCode: string | null,
-): ScanCandidateDlsite {
+): DlsiteProductSummary {
   if (!rjCode) return { state: "none" };
   const resolution = source.resolve(rjCode);
   const state = dlsiteFetchStateOfProductResolution(resolution);

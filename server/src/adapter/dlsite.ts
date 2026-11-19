@@ -2,7 +2,7 @@ import type {
   DlsiteCachedCover,
   DlsiteApplyBody,
   DlsiteApplyResponse,
-  DlsiteProductFetchOutcome,
+  DlsiteTerminalProductSummary,
   DlsiteFetchResult,
   DlsiteStateUpdateBody,
   DlsiteWorkFetchResult,
@@ -30,11 +30,14 @@ export interface DlsiteAdapter {
   ): Promise<WorkSourceMutationResult | null>;
   /** DLsiteへ通信しない設定か。取得ジョブの開始可否に使う */
   isDlsiteOffline(): boolean;
-  /** 取得ジョブが1コードずつ呼ぶ取得の本体。HTML取得・カバー先取り・同じRJコードの作品の投影更新まで行う */
+  /**
+   * 取得ジョブが1コードずつ呼ぶ取得の本体。HTML取得・カバー先取り・同じRJコードの作品の投影更新まで行い、
+   * 戻り値はその直後にスキャン候補が同じキャッシュから導く値と同じ規則で作る
+   */
   fetchDlsiteProduct(
     productCode: string,
     options: { force: boolean; signal?: AbortSignal },
-  ): Promise<DlsiteProductFetchOutcome>;
+  ): Promise<DlsiteTerminalProductSummary>;
   /** カバーURLに対応するキャッシュ済みカバー。キャッシュに無ければnull。DLsiteへは通信しない */
   lookupDlsiteCachedCover(coverUrl: string | null): DlsiteCachedCover | null;
   /** キャッシュ済みカバーの配信用。キャッシュに無ければnull。DLsiteへは通信しない */

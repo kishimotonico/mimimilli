@@ -57,11 +57,11 @@ test("root再設定の開始は、DLsite取得ジョブのキューを起点を�
   dlsiteJobs.start({ origin: "bulk", productCodes: ["RJ000001", "RJ000002"] });
   await new Promise((resolve) => setImmediate(resolve));
   dlsiteJobs.start({ origin: "single", productCode: "RJ000010" });
-  assert.equal(dlsiteJobs.getSnapshot()?.codes.length, 3);
+  assert.equal(dlsiteJobs.getState().job?.codes.length, 3);
 
   const workflow = new RootReconfigurationWorkflow(adapter, scanJobs, dlsiteJobs, async () => {});
   await workflow.start("/library");
-  assert.equal(dlsiteJobs.getSnapshot(), null);
+  assert.equal(dlsiteJobs.getState().job, null);
   await workflow.shutdown();
 });
 

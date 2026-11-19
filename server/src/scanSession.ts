@@ -1,6 +1,6 @@
 import type {
   DlsiteRegistrationApply,
-  ScanCandidate,
+  ScanCandidateBody,
   ScanCandidateFolder,
   ScanCandidatesRegisterResponse,
   ScanRecord,
@@ -102,7 +102,7 @@ export class ScanSession {
     });
   }
 
-  async listCandidates(): Promise<ScanCandidate[]> {
+  async listCandidates(): Promise<ScanCandidateBody[]> {
     if (this.pool.size === 0) return [];
     const [isCandidate, describe] = await Promise.all([
       this.adapter.candidateAvailability(),
@@ -116,7 +116,7 @@ export class ScanSession {
   private toCandidate(
     folder: ScanCandidateFolder,
     describe: Awaited<ReturnType<SessionAdapter["describeCandidates"]>>,
-  ): ScanCandidate {
+  ): ScanCandidateBody {
     const rjCode = this.effectiveRjCode(folder);
     return {
       path: folder.path,
@@ -130,7 +130,7 @@ export class ScanSession {
   }
 
   /** nullはRJコードなしの明示。検出値と同じ値に直したときは直した記録を残さない */
-  async setRjCode(path: string, rjCode: string | null): Promise<ScanCandidate> {
+  async setRjCode(path: string, rjCode: string | null): Promise<ScanCandidateBody> {
     const [, isCandidate, describe] = await Promise.all([
       this.assertRootMatches(),
       this.adapter.candidateAvailability(),

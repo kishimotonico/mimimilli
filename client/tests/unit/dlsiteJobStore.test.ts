@@ -59,8 +59,29 @@ function createHarness(overrides: Partial<DlsiteJobDeps> = {}) {
   return { store, deps, sources, events, last };
 }
 
-function dispatch(source: FakeEventSource, event: DlsiteJobEvent): void {
-  source.dispatchEvent(new MessageEvent(event.type, { data: JSON.stringify(event) }));
+type LooseCode = { productCode: string; origin: string; state: string };
+type LooseEvent = { type: DlsiteJobEvent["type"] } & Record<string, unknown>;
+
+let testRevision = 0;
+const terminalSummary = (state: string) =>
+  state === "fetched" ? { state, title: "タイトル", cover: null } : { state };
+const withRevision = (code: LooseCode) => ({
+  ...code,
+  revision: (testRevision += 1),
+  ...(code.state === "fetched" || code.state === "not_found" || code.state === "failed"
+    ? { dlsite: terminalSummary(code.state) }
+    : {}),
+});
+
+/** サーバーのイベントとして必要な revision と終端の結果を補って送る */
+function dispatch(source: FakeEventSource, event: LooseEvent): void {
+  const filled: Record<string, unknown> = { ...event, revision: (testRevision += 1) };
+  if (event.type === "code") Object.assign(filled, withRevision(event as unknown as LooseCode));
+  if (event.type === "snapshot" && event.job) {
+    const job = event.job as { codes: LooseCode[] };
+    filled.job = { ...job, codes: job.codes.map(withRevision) };
+  }
+  source.dispatchEvent(new MessageEvent(event.type, { data: JSON.stringify(filled) }));
 }
 
 function deferred<T>() {

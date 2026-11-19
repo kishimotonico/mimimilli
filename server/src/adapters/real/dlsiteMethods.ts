@@ -1,9 +1,8 @@
 import {
   hasRjCode,
-  dlsiteProductFetchOutcomeOfResult,
   errorMessage,
   type DlsiteFetchResult,
-  type DlsiteProductFetchOutcome,
+  type DlsiteTerminalProductSummary,
   type DlsiteWorkFetchResult,
 } from "@mimimilli/shared";
 import { DlsiteCache } from "./dlsiteCache.ts";
@@ -18,7 +17,11 @@ import type { Scanner } from "./scanner.ts";
 import { getWorkFromCatalog } from "./workRefresh.ts";
 import type { DlsiteParser } from "./dlsite.ts";
 import { createDlsiteFetch } from "./dlsiteFetch.ts";
-import { cachedCoverOf } from "./scanCandidateDlsite.ts";
+import {
+  cachedCoverOf,
+  createCandidateDlsiteSource,
+  deriveDlsiteProductSummary,
+} from "./scanCandidateDlsite.ts";
 import { createDlsiteApply } from "./dlsiteApply.ts";
 import { createDlsiteProductResolver, readUsableDlsite } from "./dlsiteProductResolve.ts";
 import { sniffImageContentType } from "./dlsiteCoverStaging.ts";
@@ -43,6 +46,7 @@ export function createDlsiteMethods(deps: {
   const { query, catalog, dlsiteCache } = deps;
   const fetch = createDlsiteFetch(deps);
   const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache, deps.parser);
+  const candidateDlsite = createCandidateDlsiteSource(dlsiteCache, resolveDlsiteProduct);
   const apply = createDlsiteApply({
     catalog,
     scanner: deps.scanner,
@@ -146,21 +150,22 @@ export function createDlsiteMethods(deps: {
     async fetchDlsiteProduct(
       productCode: string,
       options: { force: boolean; signal?: AbortSignal },
-    ): Promise<DlsiteProductFetchOutcome> {
+    ): Promise<DlsiteTerminalProductSummary> {
       fetch.dlsiteScheduler.assertOnline();
       try {
-        const result = await fetchProduct(productCode, options.force, {
+        await fetchProduct(productCode, options.force, {
           signal: options.signal,
           synchronous: false,
         });
-        return dlsiteProductFetchOutcomeOfResult(result);
+        const summary = deriveDlsiteProductSummary(candidateDlsite, productCode);
+        return summary.state === "none" ? { state: "failed" } : summary;
       } catch (error) {
         if (options.signal?.aborted) throw error;
         fetch.dlsiteLogger.error("DLsite取得に失敗しました", {
           productCode,
           message: errorMessage(error),
         });
-        return "failed";
+        return { state: "failed" };
       } finally {
         if (options.signal?.aborted) await fetch.dlsiteScheduler.drain();
       }

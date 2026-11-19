@@ -232,6 +232,7 @@ export function buildScanCandidate(
     rjCode: null,
     rjCodeEdited: false,
     dlsite: { state: "none" },
+    dlsiteRevision: 0,
     missingWorks: [],
     ...overrides,
     path: workspacePath(overrides.path),

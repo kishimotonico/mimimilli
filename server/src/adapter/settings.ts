@@ -1,7 +1,7 @@
 import type {
   DlsiteCoverSkipReason,
   DlsiteRegistrationApply,
-  ScanCandidateDlsite,
+  DlsiteProductSummary,
   ScanCandidateFolder,
   ScanCandidateMissingWork,
   ScanDiagnostics,
@@ -34,7 +34,7 @@ export type CandidateAvailability = (folder: ScanCandidateFolder) => boolean;
 
 /** RJコードから、候補に載せるDLsite状態と行方不明作品を導く。DLsite状態は「取得中」を含まない */
 export type CandidateDescriber = (rjCode: string | null) => {
-  dlsite: ScanCandidateDlsite;
+  dlsite: DlsiteProductSummary;
   missingWorks: ScanCandidateMissingWork[];
 };
 

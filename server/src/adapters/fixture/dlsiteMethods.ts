@@ -2,7 +2,6 @@ import {
   DEFAULT_DLSITE_CACHE_TTLS_MS,
   applyDlsiteStatePatch,
   planDlsiteApply,
-  dlsiteProductFetchOutcomeOfResult,
   hasRjCode,
 } from "@mimimilli/shared";
 import { DlsiteRefetchRequiredError } from "../../errors.ts";
@@ -11,7 +10,7 @@ import type {
   DlsiteApplyResponse,
   DlsiteCachedCover,
   DlsiteFetchResult,
-  DlsiteProductFetchOutcome,
+  DlsiteTerminalProductSummary,
   DlsiteStateUpdateBody,
   DlsiteWorkFetchResult,
   DlsiteWorkInfo,
@@ -23,6 +22,7 @@ import {
   dlsiteFetchFailureFor,
   fixtureDlsiteCoverCached,
   fixtureDlsiteCoverKey,
+  fixtureDlsiteSummary,
   fixtureUsableDlsite,
   dlsiteLinkageOf,
   normalizeDlsiteCacheKey,
@@ -209,10 +209,10 @@ export function createDlsiteMethods(
     async fetchDlsiteProduct(
       productCode: string,
       fetchOptions: { force: boolean; signal?: AbortSignal },
-    ): Promise<DlsiteProductFetchOutcome> {
-      return dlsiteProductFetchOutcomeOfResult(
-        await fetchProduct(productCode, fetchOptions.force, fetchOptions.signal),
-      );
+    ): Promise<DlsiteTerminalProductSummary> {
+      await fetchProduct(productCode, fetchOptions.force, fetchOptions.signal);
+      const summary = fixtureDlsiteSummary(state, productCode);
+      return summary.state === "none" ? { state: "failed" } : summary;
     },
 
     async dlsiteApply(workId: string, body: DlsiteApplyBody): Promise<DlsiteApplyResponse | null> {

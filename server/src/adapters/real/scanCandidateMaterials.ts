@@ -15,7 +15,7 @@ import { saveWithDlsiteCover } from "./dlsiteCoverStaging.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
 import { ancestorFolderIsRegistered, folderTarget } from "./registrationTarget.ts";
 import {
-  deriveCandidateDlsite,
+  deriveDlsiteProductSummary,
   groupMissingWorksByRjCode,
   type CandidateDlsiteSource,
 } from "./scanCandidateDlsite.ts";
@@ -81,7 +81,7 @@ export function createCandidateMaterials(deps: {
     async describeCandidates(): Promise<CandidateDescriber> {
       const missingWorksByRjCode = groupMissingWorksByRjCode(query.listMissingWorksWithRjCode());
       return (rjCode) => ({
-        dlsite: deriveCandidateDlsite(deps.candidateDlsite, rjCode),
+        dlsite: deriveDlsiteProductSummary(deps.candidateDlsite, rjCode),
         missingWorks: rjCode ? (missingWorksByRjCode.get(rjCode) ?? []) : [],
       });
     },

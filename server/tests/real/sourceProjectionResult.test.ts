@@ -299,7 +299,7 @@ test("登録がpendingで終わった作品がprojectionでpublishedになって
   });
   assert.equal(second.status, 200);
   assert.deepEqual((await second.json()).projection, { status: "published" });
-  assert.deepEqual(await (await app.request("/api/dlsite/jobs/current")).json(), { job: null });
+  assert.equal((await (await app.request("/api/dlsite/jobs/current")).json()).job, null);
 });
 
 test("projectionの再試行はDLsiteのHTTP取得を呼ばない", async (t) => {

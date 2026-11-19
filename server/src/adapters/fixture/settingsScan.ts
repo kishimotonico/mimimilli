@@ -1,15 +1,5 @@
-import {
-  META_FILE_NAME,
-  dlsiteFetchStateOfResolution,
-  planDlsiteRegistration,
-  relativeToRoot,
-} from "@mimimilli/shared";
-import type {
-  MissingWork,
-  ScanCandidateDlsite,
-  ScanCandidateFolder,
-  ScanResult,
-} from "@mimimilli/shared";
+import { META_FILE_NAME, planDlsiteRegistration, relativeToRoot } from "@mimimilli/shared";
+import type { MissingWork, ScanCandidateFolder, ScanResult } from "@mimimilli/shared";
 import type {
   CandidateAvailability,
   CandidateDescriber,
@@ -27,8 +17,7 @@ import { FIXTURE_UNREADABLE_ROOT } from "./scenarios.ts";
 import {
   dlsiteLinkageOf,
   applyFixtureCachedCover,
-  fixtureDlsiteCoverKey,
-  fixtureDlsiteResolutionHead,
+  fixtureDlsiteSummary,
   fixtureUsableDlsite,
   requireFixtureRoot,
   setDlsiteLinkage,
@@ -40,21 +29,6 @@ const FIXTURE_ROOT_REBUILD_STEP_MS = 250;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function deriveDlsite(state: FixtureState, rjCode: string | null): ScanCandidateDlsite {
-  if (!rjCode) return { state: "none" };
-  const fetchState = dlsiteFetchStateOfResolution(fixtureDlsiteResolutionHead(state, rjCode));
-  if (fetchState !== "fetched") return { state: fetchState };
-  const fetched = state.dlsiteFetched.get(rjCode.toUpperCase());
-  if (!fetched) return { state: "none" };
-  const key = fetched.info.coverUrl ? fixtureDlsiteCoverKey(fetched.info.coverUrl) : null;
-  const cover = key ? state.dlsiteCovers.get(key) : undefined;
-  return {
-    state: "fetched",
-    title: fetched.info.title,
-    cover: key && cover ? { key, version: cover.fetchedAt } : null,
-  };
 }
 
 function describeMissingWorks(state: FixtureState, rjCode: string | null) {
@@ -240,7 +214,7 @@ export function createSettingsScanMethods(
     },
     async describeCandidates(): Promise<CandidateDescriber> {
       return (rjCode) => ({
-        dlsite: deriveDlsite(state, rjCode),
+        dlsite: fixtureDlsiteSummary(state, rjCode),
         missingWorks: describeMissingWorks(state, rjCode),
       });
     },

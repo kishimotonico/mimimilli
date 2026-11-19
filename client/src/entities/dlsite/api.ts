@@ -1,28 +1,28 @@
 // DLsite取得ジョブの開始・現在状態・まとめての中止。進捗はSSE（DLSITE_JOB_EVENTS_URL）で受ける。
 import {
   dlsiteJobCancelBulkResponseSchema,
-  dlsiteJobCurrentResponseSchema,
+  dlsiteJobStateSchema,
   dlsiteJobStartBodySchema,
-  dlsiteJobStartResponseSchema,
   type DlsiteJobCancelBulkResponse,
-  type DlsiteJobSnapshot,
   type DlsiteJobStartBody,
-  type DlsiteJobStartResponse,
+  type DlsiteJobSnapshot,
 } from "@mimimilli/shared";
 import { API_BASE, deleteParsed, getParsed, postParsed } from "../../shared/api/http";
 
 export const DLSITE_JOB_EVENTS_URL = `${API_BASE}/dlsite/jobs/events`;
 
-export function startDlsiteJob(body: DlsiteJobStartBody): Promise<DlsiteJobStartResponse> {
-  return postParsed(
-    dlsiteJobStartResponseSchema,
+export async function startDlsiteJob(body: DlsiteJobStartBody): Promise<{ jobId: string }> {
+  const { job } = await postParsed(
+    dlsiteJobStateSchema,
     "/dlsite/jobs",
     dlsiteJobStartBodySchema.parse(body),
   );
+  if (!job) throw new Error("DLsite取得ジョブの開始応答にジョブがありません");
+  return { jobId: job.jobId };
 }
 
 export async function getCurrentDlsiteJob(): Promise<DlsiteJobSnapshot | null> {
-  const { job } = await getParsed(dlsiteJobCurrentResponseSchema, "/dlsite/jobs/current");
+  const { job } = await getParsed(dlsiteJobStateSchema, "/dlsite/jobs/current");
   return job;
 }
 

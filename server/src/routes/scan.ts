@@ -31,6 +31,7 @@ function isTerminalEvent(event: ScanJobEvent): boolean {
 
 export function scanRoute(
   jobs: ScanJobManager,
+  dlsite: { revision: () => number },
   heartbeatIntervalMs: number = SSE_HEARTBEAT_INTERVAL_MS,
 ): Hono {
   const app = new Hono();
@@ -73,8 +74,13 @@ export function scanRoute(
   });
 
   app.get("/scan/candidates", async (c) => {
+    const dlsiteRevision = dlsite.revision();
     const candidates = await jobs.session.listCandidates();
-    return c.json(scanCandidatesResponseSchema.parse({ candidates }));
+    return c.json(
+      scanCandidatesResponseSchema.parse({
+        candidates: candidates.map((candidate) => ({ ...candidate, dlsiteRevision })),
+      }),
+    );
   });
 
   app.post("/scan/candidates/rj-code", async (c) => {
@@ -84,8 +90,11 @@ export function scanRoute(
       "候補のRJコードの内容が不正です",
     );
     try {
+      const dlsiteRevision = dlsite.revision();
       const candidate = await jobs.session.setRjCode(data.path, data.rjCode || null);
-      return c.json(scanCandidateRjCodeResponseSchema.parse({ candidate }));
+      return c.json(
+        scanCandidateRjCodeResponseSchema.parse({ candidate: { ...candidate, dlsiteRevision } }),
+      );
     } catch (error) {
       if (error instanceof CandidatePoolChangedError) {
         conflict(error.message);

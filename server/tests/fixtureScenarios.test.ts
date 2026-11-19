@@ -447,7 +447,7 @@ test("fixture: RJコード変更で旧状態をリセットし一括取得対象
   assert.equal(updated?.snapshot.dlsite.status, "none");
   assert.deepEqual(updated?.snapshot.dlsite.appliedTags, []);
 
-  assert.equal(await adapter.fetchDlsiteProduct("RJ7654321", { force: false }), "fetched");
+  assert.equal((await adapter.fetchDlsiteProduct("RJ7654321", { force: false })).state, "fetched");
 });
 
 test("fixture: 単一音声ファイルのregister-previewと登録ができる", async () => {

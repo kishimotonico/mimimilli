@@ -239,7 +239,7 @@ test("job scoped SSEは接続時に現在snapshotをstateで1件送り、以後�
   const { adapter, progressReady, finishScan } = createGatedScanAdapter();
   const manager = createScanJobManager(adapter);
   const app = new Hono();
-  app.route("/", scanRoute(manager));
+  app.route("/", scanRoute(manager, { revision: () => 0 }));
   const job = manager.start();
   const emitProgress = await progressReady;
   emitProgress(1);
@@ -441,7 +441,7 @@ test("進捗の無い区間でも一定間隔でpingを送り、完了時にハ�
 
   // heartbeat間隔を20msに短縮したscanRouteだけを直に積んだ最小appでテストする
   const app = new Hono();
-  app.route("/", scanRoute(manager, 20));
+  app.route("/", scanRoute(manager, { revision: () => 0 }, 20));
 
   const response = await app.request(`/scan/${job.id}/events`);
   assert.equal(response.status, 200);

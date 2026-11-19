@@ -663,14 +663,58 @@ export const dlsiteJobStartBodySchema = z.discriminatedUnion("origin", [
 ]);
 export type DlsiteJobStartBody = z.infer<typeof dlsiteJobStartBodySchema>;
 
-export const dlsiteJobStartResponseSchema = z.object({ jobId: z.string() });
-export type DlsiteJobStartResponse = z.infer<typeof dlsiteJobStartResponseSchema>;
+const dlsiteFetchedSummarySchema = z.object({
+  state: z.literal("fetched"),
+  title: z.string(),
+  /** null はカバーの先取りに失敗してキャッシュに無い */
+  cover: dlsiteCachedCoverSchema.nullable(),
+});
+const dlsiteNotFoundSummarySchema = z.object({ state: z.literal("not_found") });
+const dlsiteFailedSummarySchema = z.object({ state: z.literal("failed") });
 
-export const dlsiteJobCodeSchema = z.object({
+/** 取得結果の表示用の要約。スキャン候補の表示と取得ジョブの終端が同じ形を運ぶ */
+export const dlsiteProductSummarySchema = z.discriminatedUnion("state", [
+  /** 未取得（キャッシュに無い・TTL切れ・RJコードなし） */
+  z.object({ state: z.literal("none") }),
+  dlsiteFetchedSummarySchema,
+  dlsiteNotFoundSummarySchema,
+  dlsiteFailedSummarySchema,
+]);
+export type DlsiteProductSummary = z.infer<typeof dlsiteProductSummarySchema>;
+
+/** 取得ジョブの終端が運ぶ結果。none は取得の結果として現れない */
+export type DlsiteTerminalProductSummary = Exclude<DlsiteProductSummary, { state: "none" }>;
+
+/**
+ * サーバー状態の新旧を決める単調増加の値。プロセス全体で1つ数え、クライアントに見える変化のたびに進む。
+ * イベント履歴を再生するための連番ではない
+ */
+const dlsiteRevisionSchema = z.number().int().nonnegative();
+
+const dlsiteJobCodeBase = {
   productCode: z.string(),
   origin: dlsiteJobOriginSchema,
-  state: dlsiteJobCodeStateSchema,
-});
+  /** このコードが最後に変化した時点の revision */
+  revision: dlsiteRevisionSchema,
+};
+
+/** コードの現在状態。終端（fetched / not_found / failed）は取得の結果 dlsite を運ぶ */
+export const dlsiteJobCodeSchema = z.discriminatedUnion("state", [
+  z.object({ ...dlsiteJobCodeBase, state: z.literal("queued") }),
+  z.object({ ...dlsiteJobCodeBase, state: z.literal("fetching") }),
+  z.object({
+    ...dlsiteJobCodeBase,
+    state: z.literal("fetched"),
+    dlsite: dlsiteFetchedSummarySchema,
+  }),
+  z.object({
+    ...dlsiteJobCodeBase,
+    state: z.literal("not_found"),
+    dlsite: dlsiteNotFoundSummarySchema,
+  }),
+  z.object({ ...dlsiteJobCodeBase, state: z.literal("failed"), dlsite: dlsiteFailedSummarySchema }),
+]);
+export type DlsiteJobCode = z.infer<typeof dlsiteJobCodeSchema>;
 
 /** 起点がまとめてのコードだけを数える。processedは終端状態のコード数 */
 export const dlsiteJobBulkProgressSchema = z.object({
@@ -687,10 +731,15 @@ export const dlsiteJobSnapshotSchema = z.object({
 });
 export type DlsiteJobSnapshot = z.infer<typeof dlsiteJobSnapshotSchema>;
 
-/** GET /api/dlsite/jobs/current。finishedのジョブは次のジョブ開始まで残る */
-export const dlsiteJobCurrentResponseSchema = z.object({
+/**
+ * POST /api/dlsite/jobs（受け付けた直後の状態）と GET /api/dlsite/jobs/current のレスポンス。
+ * finishedのジョブは次のジョブ開始まで残る。revision はジョブ全体の新旧を決め、job が null でも付く
+ */
+export const dlsiteJobStateSchema = z.object({
+  revision: dlsiteRevisionSchema,
   job: dlsiteJobSnapshotSchema.nullable(),
 });
+export type DlsiteJobState = z.infer<typeof dlsiteJobStateSchema>;
 
 /** DELETE /api/dlsite/jobs/:jobId/bulk のレスポンス */
 export const dlsiteJobCancelBulkResponseSchema = z.object({
@@ -698,32 +747,56 @@ export const dlsiteJobCancelBulkResponseSchema = z.object({
 });
 export type DlsiteJobCancelBulkResponse = z.infer<typeof dlsiteJobCancelBulkResponseSchema>;
 
-/** 進捗SSE。codeは当該コードの現在状態（差分ではない） */
-export const dlsiteJobEventSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("snapshot"), job: dlsiteJobSnapshotSchema.nullable() }),
+const dlsiteJobCodeEventBase = {
+  type: z.literal("code"),
+  jobId: z.string(),
+  bulk: dlsiteJobBulkProgressSchema,
+  ...dlsiteJobCodeBase,
+};
+
+const dlsiteJobCodeEventSchema = z.discriminatedUnion("state", [
+  z.object({ ...dlsiteJobCodeEventBase, state: z.literal("queued") }),
+  z.object({ ...dlsiteJobCodeEventBase, state: z.literal("fetching") }),
   z.object({
-    type: z.literal("code"),
-    jobId: z.string(),
-    productCode: z.string(),
-    origin: dlsiteJobOriginSchema,
-    state: dlsiteJobCodeStateSchema,
-    bulk: dlsiteJobBulkProgressSchema,
+    ...dlsiteJobCodeEventBase,
+    state: z.literal("fetched"),
+    dlsite: dlsiteFetchedSummarySchema,
   }),
   z.object({
+    ...dlsiteJobCodeEventBase,
+    state: z.literal("not_found"),
+    dlsite: dlsiteNotFoundSummarySchema,
+  }),
+  z.object({
+    ...dlsiteJobCodeEventBase,
+    state: z.literal("failed"),
+    dlsite: dlsiteFailedSummarySchema,
+  }),
+]);
+
+/** 進捗SSE。codeは当該コードの現在状態（差分ではない） */
+export const dlsiteJobEventSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("snapshot"),
+    revision: dlsiteRevisionSchema,
+    job: dlsiteJobSnapshotSchema.nullable(),
+  }),
+  dlsiteJobCodeEventSchema,
+  z.object({
     type: z.literal("removed"),
+    revision: dlsiteRevisionSchema,
     jobId: z.string(),
     productCodes: z.array(z.string()),
     bulk: dlsiteJobBulkProgressSchema,
   }),
   z.object({
     type: z.literal("finished"),
+    revision: dlsiteRevisionSchema,
     jobId: z.string(),
     reason: z.enum(["complete", "aborted"]),
   }),
 ]);
 export type DlsiteJobEvent = z.infer<typeof dlsiteJobEventSchema>;
-
-export type DlsiteProductFetchOutcome = "fetched" | "not_found" | "failed";
 
 export type DlsiteFetchState = "none" | "fetched" | "not_found" | "failed";
 
@@ -735,11 +808,4 @@ export function dlsiteFetchStateOfResolution(
   if (resolution.kind === "failure")
     return resolution.outcome === "not_found" ? "not_found" : "failed";
   return resolution.outcome === "ok" ? "fetched" : "failed";
-}
-
-export function dlsiteProductFetchOutcomeOfResult(
-  result: DlsiteFetchResult,
-): DlsiteProductFetchOutcome {
-  if (result.ok) return "fetched";
-  return result.kind === "not_found" ? "not_found" : "failed";
 }

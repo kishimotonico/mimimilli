@@ -1,11 +1,17 @@
 import { createHash } from "node:crypto";
-import { DEFAULT_TAG_PREFIXES, projectDlsiteState, toDlsiteLinkageStatus } from "@mimimilli/shared";
+import {
+  DEFAULT_TAG_PREFIXES,
+  dlsiteFetchStateOfResolution,
+  projectDlsiteState,
+  toDlsiteLinkageStatus,
+} from "@mimimilli/shared";
 import type {
   DlsiteWorkInfo,
   DataIntegrityWarning,
   DlsiteCacheResolution,
   DlsiteCacheResolutionHead,
   DlsiteCoverSkipReason,
+  DlsiteProductSummary,
   InvalidMetaFile,
   MetaDlsiteState,
   ResumeBody,
@@ -179,6 +185,25 @@ export function fixtureUsableDlsite(
   return fetched
     ? { info: fetched.info, revision: `${fetched.fetchedAt}:${FIXTURE_DLSITE_PARSER_VERSION}` }
     : null;
+}
+
+/** RJコードのDLsite取得状態の表示用の要約。スキャン候補と取得ジョブの終端が同じ規則で導く */
+export function fixtureDlsiteSummary(
+  state: FixtureState,
+  rjCode: string | null,
+): DlsiteProductSummary {
+  if (!rjCode) return { state: "none" };
+  const fetchState = dlsiteFetchStateOfResolution(fixtureDlsiteResolutionHead(state, rjCode));
+  if (fetchState !== "fetched") return { state: fetchState };
+  const fetched = state.dlsiteFetched.get(normalizeDlsiteCacheKey(rjCode));
+  if (!fetched) return { state: "none" };
+  const key = fetched.info.coverUrl ? fixtureDlsiteCoverKey(fetched.info.coverUrl) : null;
+  const cover = key ? state.dlsiteCovers.get(key) : undefined;
+  return {
+    state: "fetched",
+    title: fetched.info.title,
+    cover: key && cover ? { key, version: cover.fetchedAt } : null,
+  };
 }
 
 export function fixtureDlsiteCoverKey(coverUrl: string): string {

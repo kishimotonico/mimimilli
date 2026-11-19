@@ -1810,7 +1810,7 @@ test("取得の打ち切り後の再取得はcache結果を使い、mimimilli.js
   const duplicateId = "22222222-2222-4222-8222-222222222222";
   const ids = [lib.existingWorkId, duplicateId];
 
-  assert.equal(await adapter.fetchDlsiteProduct("RJ900002", { force: false }), "fetched");
+  assert.equal((await adapter.fetchDlsiteProduct("RJ900002", { force: false })).state, "fetched");
   assert.equal(httpCalls, 1);
   controller.abort();
   await assert.rejects(

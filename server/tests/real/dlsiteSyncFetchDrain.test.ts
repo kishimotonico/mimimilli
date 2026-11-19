@@ -69,7 +69,7 @@ test("同期取得は、カバー取得の後ろに積まれた別コードの�
   assert.equal(outcome, true);
 
   releaseOther.resolve();
-  assert.equal(await background, "fetched");
+  assert.equal((await background).state, "fetched");
 });
 
 async function openAdapterWithPendingCover(

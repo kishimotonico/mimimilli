@@ -1,6 +1,6 @@
 import type {
   DlsiteRegistrationApply,
-  ScanCandidate,
+  ScanCandidateBody,
   ScanCandidatesRegisterResponse,
   ScanResult,
 } from "@mimimilli/shared";
@@ -36,7 +36,7 @@ export async function runScan(adapter: SessionAdapter, options?: ScanOptions): P
   return execution.result;
 }
 
-export function listCandidates(adapter: SessionAdapter): Promise<ScanCandidate[]> {
+export function listCandidates(adapter: SessionAdapter): Promise<ScanCandidateBody[]> {
   return scanSessionOf(adapter).listCandidates();
 }
 
@@ -44,7 +44,7 @@ export function setCandidateRjCode(
   adapter: SessionAdapter,
   path: string,
   rjCode: string | null,
-): Promise<ScanCandidate> {
+): Promise<ScanCandidateBody> {
   return scanSessionOf(adapter).setRjCode(path, rjCode);
 }
 
