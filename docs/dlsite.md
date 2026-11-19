@@ -1,6 +1,6 @@
 # DLsite連携
 
-DLsiteの作品ページから情報を取得し、作品のタイトル・タグ・カバー画像・URLへ反映する機能。要件は[requirements-v4.md](requirements-v4.md) 4.4節。実装は `server/src/adapters/real/` の `dlsite.ts`（パース）、`dlsiteFetch.ts`（取得）、`dlsiteCache.ts`（キャッシュ）、`dlsiteScheduler.ts`（レート制限）、`dlsiteApply.ts`・`dlsiteBulk.ts`・`dlsiteProjection.ts` と、ジョブを管理する `server/src/dlsiteJobManager.ts` にある。API契約の正典はこのドキュメントではなく `shared/src/dlsite.ts`（Zodスキーマと、real/fixture 共通の純関数）。
+DLsiteの作品ページから情報を取得し、作品のタイトル・タグ・カバー画像・URLへ反映する機能。要件は[requirements-v4.md](requirements-v4.md) 4.4節。実装は `server/src/adapters/real/` の `dlsite.ts`（パース）、`dlsiteFetch.ts`（取得）、`dlsiteCache.ts`（キャッシュ）、`dlsiteScheduler.ts`（レート制限）、`dlsiteApply.ts`・`dlsiteMethods.ts`・`dlsiteProductResolve.ts`・`dlsiteProjection.ts` と、ジョブを管理する `server/src/dlsiteJobManager.ts` にある。API契約の正典はこのドキュメントではなく `shared/src/dlsite.ts`（Zodスキーマと、real/fixture 共通の純関数）。
 
 ## RJ/VJコードの検出
 
