@@ -17,22 +17,32 @@ export const scanCandidatesQueryOptions = {
   gcTime: Number.POSITIVE_INFINITY,
 } as const;
 
-/** サーバーから候補を明示的に取り直す。候補クエリは enabled:false のため、この呼び出し以外では
- *  再取得されない。後から呼ばれた再取得は実行中のフェッチを打ち切り、最新の応答だけをキャッシュへ反映する。 */
-export async function refreshScanCandidates(queryClient: QueryClient): Promise<ScanCandidate[]> {
-  const query = queryClient.getQueryCache().build(queryClient, scanCandidatesQueryOptions);
-  if (query.state.fetchStatus === "fetching") {
-    await query.cancel({ revert: true });
-  }
+const latestRefreshes = new WeakMap<
+  QueryClient,
+  { ticket: symbol; promise: Promise<ScanCandidate[]> }
+>();
 
-  try {
-    return await queryClient.fetchQuery(scanCandidatesQueryOptions);
-  } catch (error) {
-    if (isCancelledError(error)) {
-      return queryClient.getQueryData<ScanCandidate[]>(SCAN_CANDIDATES_QUERY_KEY) ?? [];
+/** サーバーから候補を明示的に取り直す。候補クエリは enabled:false のため、この呼び出し以外では
+ *  再取得されない。後から呼ばれた再取得は実行中のフェッチを打ち切る。後続に打ち切られた側は最新の
+ *  取得の結果を待って返すので、解決したときはその時点の最新のサーバー応答がキャッシュへ反映されている。
+ *  最新のまま打ち切られた（キャッシュの破棄など）ときはそのまま投げる。 */
+export function refreshScanCandidates(queryClient: QueryClient): Promise<ScanCandidate[]> {
+  const ticket = Symbol();
+  const run = (async () => {
+    const query = queryClient.getQueryCache().build(queryClient, scanCandidatesQueryOptions);
+    if (query.state.fetchStatus === "fetching") {
+      await query.cancel({ revert: true });
     }
-    throw error;
-  }
+    try {
+      return await queryClient.fetchQuery(scanCandidatesQueryOptions);
+    } catch (error) {
+      const latest = latestRefreshes.get(queryClient);
+      if (isCancelledError(error) && latest && latest.ticket !== ticket) return latest.promise;
+      throw error;
+    }
+  })();
+  latestRefreshes.set(queryClient, { ticket, promise: run });
+  return run;
 }
 
 /** 1件の候補を、サーバーが返した最新の内容で置き換える。一覧に無ければ何もしない。 */

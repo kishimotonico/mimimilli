@@ -187,6 +187,11 @@ export async function updateCachesAfterDlsiteFetch(
   ]);
 }
 
+/** DLsite取得ジョブの終わりの通知を受け取れなかったとき。どのコードの結果が出たか分からないので、作品の詳細と一覧を一式無効化する */
+export async function updateCachesAfterDlsiteJobLost(queryClient: QueryClient): Promise<void> {
+  await Promise.all([invalidateAllWorkDetails(queryClient), invalidateLibraryViews(queryClient)]);
+}
+
 /** DLsiteの同期取得（作品詳細の取得・Filesの取得）の終了後。成否にかかわらず、同じRJコードの作品を無効化し、
  *  キャッシュ済みの候補一覧にそのRJコードの候補があるときだけ候補一覧を取り直す */
 export async function updateCachesAfterDlsiteSyncFetch(

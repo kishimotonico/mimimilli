@@ -130,9 +130,7 @@ describe("dlsiteJobStore", () => {
         .mockResolvedValueOnce({ jobId: "job-2" });
       const { store, events } = createHarness({ startJob });
       await store.startBulk(codesOf(1500));
-      expect(events.filter((event) => event.type === "finished")).toEqual([
-        { type: "finished", jobId: "job-1", productCodes: [] },
-      ]);
+      expect(events).toEqual([{ type: "finished", jobId: "job-1", affected: { kind: "unknown" } }]);
       expect(store.getState().job?.jobId).toBe("job-2");
     });
 
@@ -228,7 +226,13 @@ describe("dlsiteJobStore", () => {
       });
       dispatch(source, { type: "finished", jobId: "job-1", reason: "complete" });
       dispatch(source, { type: "finished", jobId: "job-1", reason: "complete" });
-      expect(events).toEqual([{ type: "finished", jobId: "job-1", productCodes: ["RJ000001"] }]);
+      expect(events).toEqual([
+        {
+          type: "finished",
+          jobId: "job-1",
+          affected: { kind: "codes", productCodes: ["RJ000001"] },
+        },
+      ]);
       expect(source.closed).toBe(true);
       expect(store.getState().job?.status).toBe("finished");
       expect(store.getState().settled).toBe(false);
@@ -244,7 +248,13 @@ describe("dlsiteJobStore", () => {
         job: snapshot("job-1", [bulkCode("RJ000001", "fetched"), bulkCode("RJ000002", "queued")]),
       });
       dispatch(last(), { type: "finished", jobId: "job-1", reason: "aborted" });
-      expect(events).toEqual([{ type: "finished", jobId: "job-1", productCodes: ["RJ000001"] }]);
+      expect(events).toEqual([
+        {
+          type: "finished",
+          jobId: "job-1",
+          affected: { kind: "codes", productCodes: ["RJ000001"] },
+        },
+      ]);
     });
 
     it("code イベントで行の状態と bulk を更新し、終端状態なら codesTerminal を出す", async () => {
@@ -322,6 +332,20 @@ describe("dlsiteJobStore", () => {
       await flush();
       expect(events.map((event) => event.type)).toEqual(["finished"]);
       expect(store.getState().job?.status).toBe("finished");
+    });
+
+    it("ジョブAの取得中に切断してジョブBで再接続すると、Aは終わりを受け取れなかった扱いで終端する", async () => {
+      const { store, events, last } = createHarness({
+        getCurrent: vi.fn(async () => snapshot("job-2")),
+      });
+      await store.startBulk(["RJ000001"]);
+      dispatch(last(), {
+        type: "snapshot",
+        job: snapshot("job-1", [bulkCode("RJ000001", "fetched")]),
+      });
+      last().onerror?.(new Event("error"));
+      await flush();
+      expect(events).toEqual([{ type: "finished", jobId: "job-1", affected: { kind: "unknown" } }]);
     });
 
     it("違う jobId が running なら終端してから乗り換える", async () => {
@@ -479,6 +503,105 @@ describe("dlsiteJobStore", () => {
       gate.resolve({ jobId: "job-1" });
       await pending;
       expect(store.getState().pendingSingles.size).toBe(0);
+    });
+  });
+
+  describe("単発の保留と応答順", () => {
+    const singleOf = (state: "queued" | "fetched" | "failed") => ({
+      productCode: "RJ000001",
+      origin: "single" as const,
+      state,
+    });
+
+    it("終端の code イベントが POST 応答より先に届いても、応答で保留が外れる", async () => {
+      const gate = deferred<{ jobId: string }>();
+      const { store, last } = createHarness({
+        startJob: vi.fn(() => gate.promise),
+        getCurrent: vi.fn(async () => snapshot("job-1")),
+      });
+      await store.attach();
+      const pending = store.startSingle("RJ000001");
+      dispatch(last(), {
+        type: "code",
+        jobId: "job-1",
+        productCode: "RJ000001",
+        origin: "single",
+        state: "fetched",
+        bulk: { processed: 0, total: 0 },
+      });
+      expect(store.getState().pendingSingles.has("RJ000001")).toBe(true);
+      gate.resolve({ jobId: "job-1" });
+      await pending;
+      expect(store.getState().pendingSingles.size).toBe(0);
+    });
+
+    it("POST 中の再接続で snapshot から終端を直接受け取っても、応答で保留が外れる", async () => {
+      const gate = deferred<{ jobId: string }>();
+      const { store, last } = createHarness({
+        startJob: vi.fn(() => gate.promise),
+        getCurrent: vi.fn(async () => snapshot("job-1")),
+      });
+      await store.attach();
+      const pending = store.startSingle("RJ000001");
+      dispatch(last(), { type: "snapshot", job: snapshot("job-1", [singleOf("failed")]) });
+      gate.resolve({ jobId: "job-1" });
+      await pending;
+      expect(store.getState().pendingSingles.size).toBe(0);
+    });
+
+    it("開始より前に受け取った終端状態だけが残るコードは、応答後も取り直しの状態まで保留する", async () => {
+      const gate = deferred<{ jobId: string }>();
+      const { store, last } = createHarness({
+        startJob: vi.fn(() => gate.promise),
+        getCurrent: vi.fn(async () => snapshot("job-1", [singleOf("fetched")])),
+      });
+      await store.attach();
+      const pending = store.startSingle("RJ000001");
+      gate.resolve({ jobId: "job-1" });
+      await pending;
+      expect(store.getState().pendingSingles.has("RJ000001")).toBe(true);
+      dispatch(last(), {
+        type: "code",
+        jobId: "job-1",
+        productCode: "RJ000001",
+        origin: "single",
+        state: "queued",
+        bulk: { processed: 0, total: 0 },
+      });
+      expect(store.getState().pendingSingles.size).toBe(0);
+    });
+  });
+
+  describe("単発の保留と古い照会", () => {
+    it("POST より前に発行した照会が POST 中に返っても、その終端では保留を外さない", async () => {
+      const post = deferred<{ jobId: string }>();
+      const stale = deferred<DlsiteJobSnapshot>();
+      const getCurrent = vi
+        .fn<DlsiteJobDeps["getCurrent"]>()
+        .mockResolvedValueOnce(snapshot("job-1"))
+        .mockReturnValueOnce(stale.promise);
+      const { store, last } = createHarness({ startJob: vi.fn(() => post.promise), getCurrent });
+      await store.attach();
+      last().onerror?.(new Event("error"));
+      const pending = store.startSingle("RJ000001");
+      stale.resolve(
+        snapshot("job-1", [{ productCode: "RJ000001", origin: "single", state: "fetched" }]),
+      );
+      await flush();
+      post.resolve({ jobId: "job-1" });
+      await pending;
+      expect(store.getState().pendingSingles.has("RJ000001")).toBe(true);
+    });
+
+    it("応答で別のジョブに乗り換えても、そのコードの状態を受け取るまで保留は外れない", async () => {
+      const { store } = createHarness({
+        startJob: vi.fn(async () => ({ jobId: "job-2" })),
+        getCurrent: vi.fn(async () => snapshot("job-1")),
+      });
+      await store.attach();
+      await store.startSingle("RJ000001");
+      expect(store.getState().job?.jobId).toBe("job-2");
+      expect(store.getState().pendingSingles.has("RJ000001")).toBe(true);
     });
   });
 

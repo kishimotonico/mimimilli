@@ -538,13 +538,10 @@ test("scan-review: 候補が取得状態ごとの表示になり、直した行�
       assert.equal(response.status, 202);
     };
     await fetchCodes(["RJ000401", "RJ000402", "RJ000403", "RJ000404"]);
-    for (let i = 0; i < 50; i++) {
-      const states = await list();
-      if (
-        states.get("RJ000404")?.dlsite &&
-        (states.get("RJ000404")!.dlsite as never as { state: string }).state !== "fetching"
-      )
-        break;
+    for (let i = 0; i < 100; i++) {
+      const response = await app.request("/api/dlsite/jobs/current");
+      const { job } = (await response.json()) as { job: { status: string } | null };
+      if (job?.status === "finished") break;
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
     const after = await list();

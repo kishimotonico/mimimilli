@@ -72,9 +72,7 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
 
   const api = new Hono();
   const dlsiteJobs = new DlsiteJobManager(adapter);
-  const scanJobs = new ScanJobManager(adapter, {
-    dlsiteInFlightState: (productCode) => dlsiteJobs.getInFlightState(productCode),
-  });
+  const scanJobs = new ScanJobManager(adapter);
   const admittedRequestGate = new InFlightRequestGate();
   const rootReconfiguration = new RootReconfigurationWorkflow(adapter, scanJobs, dlsiteJobs, () =>
     admittedRequestGate.drain(),

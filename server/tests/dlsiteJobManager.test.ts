@@ -280,19 +280,6 @@ test("取得の例外はそのコードのfailedになり、ジョブは続く",
   assert.deepEqual(states(manager), { RJ000001: "failed", RJ000002: "fetched" });
 });
 
-test("getInFlightStateは待機中・取得中だけを返す", async () => {
-  const { manager, calls } = controlled();
-  manager.start({ origin: "bulk", productCodes: ["RJ000001", "RJ000002"] });
-  await tick();
-  assert.equal(manager.getInFlightState("RJ000001"), "fetching");
-  assert.equal(manager.getInFlightState("RJ000002"), "queued");
-  assert.equal(manager.getInFlightState("RJ000009"), null);
-  calls[0]!.settle("fetched");
-  await tick();
-  assert.equal(manager.getInFlightState("RJ000001"), null);
-  await manager.cancelActiveAndAwait();
-});
-
 test("shutdownは実行中の取得を打ち切って完了を待ち、以降のstartを拒否する", async () => {
   const { manager, calls } = controlled();
   manager.start({ origin: "bulk", productCodes: ["RJ000001", "RJ000002"] });

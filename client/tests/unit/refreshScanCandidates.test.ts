@@ -69,10 +69,27 @@ describe("refreshScanCandidates", () => {
     firstRelease();
 
     const secondResult = await second;
-    await first;
+    expect(await first).toEqual([candidateB]);
 
     expect(callCount).toBe(2);
     expect(secondResult).toEqual([candidateB]);
     expect(readCache(queryClient)).toEqual([candidateB]);
+  });
+
+  it("キャッシュの破棄で打ち切られたら再フェッチせずに投げる", async () => {
+    let callCount = 0;
+    mockApi({
+      "GET /api/scan/candidates": async () => {
+        callCount += 1;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return { candidates: [candidateA] };
+      },
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const refresh = refreshScanCandidates(queryClient);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    queryClient.removeQueries({ queryKey: SCAN_CANDIDATES_QUERY_KEY });
+    await expect(refresh).rejects.toThrow();
+    expect(callCount).toBe(1);
   });
 });

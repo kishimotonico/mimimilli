@@ -615,3 +615,41 @@ describe("UnregisteredTab 追加", () => {
     expect(store.get(scanCandidateHiddenPathsAtom)).toEqual(new Set([candidateA.path]));
   });
 });
+
+describe("UnregisteredTab 終端表示の同期", () => {
+  const finishedJob = {
+    job: {
+      jobId: "job-1",
+      status: "finished" as const,
+      codes: new Map(),
+      bulk: { processed: 0, total: 0 },
+    },
+    settled: false,
+  };
+
+  it("未同期のまま終わったジョブがある状態で開くと候補を取り直し、成功したら同期済みにする", async () => {
+    const refreshSpy = vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue([]);
+    const { job } = await renderTab([candidateB], finishedJob);
+    await waitFor(() => expect(job.markSettled).toHaveBeenCalledWith("job-1"));
+    expect(refreshSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("取り直しに失敗したら同期済みにしない", async () => {
+    const refreshSpy = vi
+      .spyOn(scanCandidatesCache, "refreshScanCandidates")
+      .mockRejectedValue(new Error("通信エラー"));
+    const { job } = await renderTab([candidateB], finishedJob);
+    await waitFor(() => expect(refreshSpy).toHaveBeenCalledTimes(1));
+    expect(job.markSettled).not.toHaveBeenCalled();
+  });
+
+  it("同期済み、またはジョブが実行中なら取り直さない", async () => {
+    const refreshSpy = vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue([]);
+    await renderTab([candidateB], { ...finishedJob, settled: true });
+    await renderTab([candidateB], {
+      job: { ...finishedJob.job, status: "running" },
+      settled: false,
+    });
+    expect(refreshSpy).not.toHaveBeenCalled();
+  });
+});

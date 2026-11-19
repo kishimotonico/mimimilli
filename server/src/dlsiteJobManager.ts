@@ -73,12 +73,6 @@ export class DlsiteJobManager {
     return this.job ? this.snapshotOf(this.job) : null;
   }
 
-  /** 待機中・取得中のコードの状態。候補一覧が「取得中」を載せるために同期で読む */
-  getInFlightState(productCode: string): "queued" | "fetching" | null {
-    const entry = this.job?.status === "running" ? this.job.codes.get(productCode) : undefined;
-    return entry && !isTerminalState(entry.state) ? (entry.state as "queued" | "fetching") : null;
-  }
-
   /** 現在のsnapshotの取得とlistener登録を同期の1手で行う（ADR-0030） */
   subscribe(listener: Listener): SseSubscription<DlsiteJobEvent> {
     const job = this.job;

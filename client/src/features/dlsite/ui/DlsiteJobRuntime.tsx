@@ -1,7 +1,10 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
-import { updateCachesAfterDlsiteFetch } from "../../../entities/work/model/workCacheUpdates";
+import {
+  updateCachesAfterDlsiteFetch,
+  updateCachesAfterDlsiteJobLost,
+} from "../../../entities/work/model/workCacheUpdates";
 import { useDlsiteJobState, useDlsiteJobStore } from "../../../entities/dlsite/useDlsiteJob";
 import { useToast } from "../../../shared/ui/useToast";
 
@@ -35,10 +38,15 @@ export default function DlsiteJobRuntime() {
         return;
       }
       clearTimer();
-      void Promise.allSettled([
-        refreshScanCandidates(queryClient),
-        updateCachesAfterDlsiteFetch(queryClient, event.productCodes),
-      ]).then(() => dlsiteJob.markSettled(event.jobId));
+      void (
+        event.affected.kind === "unknown"
+          ? updateCachesAfterDlsiteJobLost(queryClient)
+          : updateCachesAfterDlsiteFetch(queryClient, event.affected.productCodes)
+      ).catch(() => {});
+      void refreshScanCandidates(queryClient).then(
+        () => dlsiteJob.markSettled(event.jobId),
+        () => {},
+      );
     });
     return () => {
       unsubscribe();

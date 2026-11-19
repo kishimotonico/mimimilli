@@ -644,10 +644,10 @@ describe("ScanModal", () => {
     await waitFor(() =>
       expect(screen.getByRole("tabpanel", { name: /^新規作品/ })).toBeInTheDocument(),
     );
-    expect(screen.queryByText(/追加できませんでした|止まりました/)).toBeNull();
+    expect(screen.queryByText(/追加できず|止まりました/)).toBeNull();
   });
 
-  it("途中で止まったときは追加できた件数つきの警告トーストを出して新規作品へ移る", async () => {
+  it("途中で止まったときは追加できた件数つきの警告トーストを出して未登録タブにとどまる", async () => {
     const registerSpy = vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
       registered: [{ path: candidateDetected.path, workId: "w-detected" }],
       failures: [],
@@ -659,11 +659,10 @@ describe("ScanModal", () => {
     const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
     fireEvent.click(within(unregistered).getByRole("button", { name: "2件を追加" }));
     await waitFor(() =>
-      expect(
-        screen.getByText("1件を追加して止まりました。残りは未登録タブから追加してください。"),
-      ).toBeInTheDocument(),
+      expect(screen.getByText("1件を追加して止まりました。")).toBeInTheDocument(),
     );
-    expect(screen.getByRole("tabpanel", { name: /^新規作品/ })).toBeInTheDocument();
+    expect(screen.getByRole("tabpanel", { name: /^未登録/ })).toBeInTheDocument();
+    expect(screen.queryByRole("tabpanel", { name: /^新規作品/ })).toBeNull();
   });
 
   it("候補登録に成功すると作品一覧・軸件数・DLsite通知・スマートフォルダーのクエリを無効化する", async () => {
@@ -704,9 +703,29 @@ describe("ScanModal", () => {
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["works"] }));
     await waitFor(() =>
       expect(
-        screen.getByText("1件を追加しました。1件は追加できませんでした。"),
+        screen.getByText("1件を追加しました。1件は追加できず、未登録タブに残っています。"),
       ).toBeInTheDocument(),
     );
+    expect(screen.getByRole("tabpanel", { name: /^未登録/ })).toBeInTheDocument();
+    expect(screen.queryByRole("tabpanel", { name: /^新規作品/ })).toBeNull();
+    expect(screen.getByRole("alert")).toHaveTextContent("失敗");
+  });
+
+  it("全件が項目ごとの失敗でも新規作品へ移らず、失敗理由を未登録タブに見せる", async () => {
+    registerReply = buildScanCandidatesRegisterResponse({
+      registered: [],
+      failures: [{ path: candidateDetected.path, message: "フォルダーが見つかりません" }],
+    });
+    renderModal({ candidates: [candidateDetected] });
+    await showUnregisteredList();
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    fireEvent.click(within(unregistered).getByRole("button", { name: "1件を追加" }));
+    await waitFor(() =>
+      expect(within(unregistered).getByRole("alert")).toHaveTextContent(
+        "フォルダーが見つかりません",
+      ),
+    );
+    expect(screen.queryByRole("tabpanel", { name: /^新規作品/ })).toBeNull();
   });
 
   it("候補の除外では作品一覧・軸件数・スマートフォルダーの再取得を行わない（AC#4）", async () => {

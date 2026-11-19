@@ -57,8 +57,12 @@ export interface DlsiteJobState {
 export type DlsiteJobStoreEvent =
   /** コードが終端状態になった（行の情報を候補一覧から取り直す契機。Runtimeが間引く） */
   | { type: "codesTerminal"; jobId: string; origin: DlsiteJobOrigin; productCodes: string[] }
-  /** 追跡中のジョブが終わった。productCodes はこのジョブで終端に達したコードすべて */
-  | { type: "finished"; jobId: string; productCodes: string[] };
+  /** 追跡中のジョブが終わった。終わりの通知を受け取れずに知ったとき（切断中に終わった・入れ替わった）は、
+   *  どのコードの結果が出たか分からないので affected を unknown にする */
+  | { type: "finished"; jobId: string; affected: DlsiteJobAffected };
+
+/** ジョブの終わりで結果が変わりうるコード */
+export type DlsiteJobAffected = { kind: "codes"; productCodes: string[] } | { kind: "unknown" };
 
 export type DlsiteJobActionResult = { ok: true } | { ok: false; error: string };
 
@@ -152,7 +156,12 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
   let connection: SseConnection | null = null;
   let trackedJobId: string | null = null;
   let receivedForTracked = false;
-  let eventSeq = 0;
+  /** 最後にSSEのイベントを受信した時点の clock */
+  let lastSseAt = 0;
+  /** 状態の受信・照会の発行・単発の開始に付ける通し番号 */
+  let clock = 0;
+  /** コードごとに、最後に受け取った状態が反映している時点（SSEは受信時、照会は発行時） */
+  const codeSeenAt = new Map<string, number>();
   let emptyReopens = 0;
   let bulkPosting = false;
   const inflightSingles = new Set<string>();
@@ -182,15 +191,16 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
     if (next) patch({ pendingSingles: next });
   };
 
-  const applySnapshot = (snapshot: DlsiteJobSnapshot): void => {
+  const applySnapshot = (snapshot: DlsiteJobSnapshot, stamp: number): void => {
     const view = toView(snapshot);
+    for (const code of view.codes.keys()) codeSeenAt.set(code, stamp);
     receivedForTracked = true;
     patch({ job: view, settled: view.status === "finished" ? store.getState().settled : false });
     releasePendingSingles(view.codes.keys());
     clearStartingBulk();
   };
 
-  const terminate = (jobId: string): void => {
+  const terminate = (jobId: string, lost: boolean): void => {
     if (terminalHandled.has(jobId)) return;
     terminalHandled.add(jobId);
     const { job, pendingSingles } = store.getState();
@@ -207,11 +217,15 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
       pendingSingles: new Set([...pendingSingles].filter((code) => inflightSingles.has(code))),
     });
     clearStartingBulk();
-    events.emit({ type: "finished", jobId, productCodes });
+    events.emit({
+      type: "finished",
+      jobId,
+      affected: lost ? { kind: "unknown" } : { kind: "codes", productCodes },
+    });
   };
 
   const failTracking = (jobId: string, message: string): void => {
-    terminate(jobId);
+    terminate(jobId, true);
     patch({ job: null, error: message });
   };
 
@@ -224,6 +238,7 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
     emptyReopens = 0;
     bulkPosting = false;
     inflightSingles.clear();
+    codeSeenAt.clear();
     terminalHandled.clear();
     store.setState(INITIAL_DLSITE_JOB_STATE);
   };
@@ -246,9 +261,10 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
       },
       onValidatedEvent: (event) => {
         if (!owned()) return;
-        eventSeq += 1;
+        clock += 1;
+        lastSseAt = clock;
         if (event.type === "snapshot") {
-          handleSnapshot(jobId, event.job);
+          handleSnapshot(jobId, event.job, clock);
           return;
         }
         if (event.jobId !== jobId) {
@@ -256,7 +272,7 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
           return;
         }
         if (event.type === "finished") {
-          terminate(jobId);
+          terminate(jobId, false);
           return;
         }
         const state = store.getState();
@@ -268,6 +284,7 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
         if (event.type === "code") {
           const productCode = canonicalDlsiteProductCode(event.productCode);
           codes.set(productCode, { origin: event.origin, state: event.state });
+          codeSeenAt.set(productCode, clock);
           patch({ job: { ...job, codes, bulk: event.bulk } });
           releasePendingSingles([productCode]);
           clearStartingBulk();
@@ -292,32 +309,32 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
     });
   };
 
-  function handleSnapshot(jobId: string, snapshot: DlsiteJobSnapshot | null): void {
+  function handleSnapshot(jobId: string, snapshot: DlsiteJobSnapshot | null, stamp: number): void {
     if (snapshot === null) {
-      terminate(jobId);
+      terminate(jobId, true);
       return;
     }
     if (snapshot.jobId !== jobId) {
-      if (snapshot.status === "running") follow(snapshot.jobId, snapshot);
-      else terminate(jobId);
+      if (snapshot.status === "running") follow(snapshot.jobId, { snapshot, stamp });
+      else terminate(jobId, true);
       return;
     }
     emptyReopens = 0;
-    applySnapshot(snapshot);
-    if (snapshot.status === "finished") terminate(jobId);
+    applySnapshot(snapshot, stamp);
+    if (snapshot.status === "finished") terminate(jobId, false);
   }
 
-  function follow(jobId: string, initial: DlsiteJobSnapshot | null = null): void {
+  function follow(jobId: string, initial?: { snapshot: DlsiteJobSnapshot; stamp: number }): void {
     if (trackedJobId === jobId && connection !== null) {
-      if (initial) applySnapshot(initial);
+      if (initial) applySnapshot(initial.snapshot, initial.stamp);
       return;
     }
-    if (trackedJobId !== null && trackedJobId !== jobId) terminate(trackedJobId);
+    if (trackedJobId !== null && trackedJobId !== jobId) terminate(trackedJobId, true);
     terminalHandled.delete(jobId);
     trackedJobId = jobId;
     emptyReopens = 0;
     const state = store.getState();
-    if (initial) applySnapshot(initial);
+    if (initial) applySnapshot(initial.snapshot, initial.stamp);
     else if (state.job?.jobId !== jobId) {
       patch({
         job: { jobId, status: "running", codes: new Map(), bulk: { processed: 0, total: 0 } },
@@ -329,7 +346,7 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
 
   async function reconcile(token: number, jobId: string): Promise<void> {
     const startEpoch = epoch;
-    const startSeq = eventSeq;
+    const issuedAt = (clock += 1);
     let current: DlsiteJobSnapshot | null;
     try {
       current = await deps.getCurrent();
@@ -344,22 +361,23 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
     }
     if (epoch !== startEpoch || !generation.isCurrent(token) || trackedJobId !== jobId) return;
     if (current === null) {
-      terminate(jobId);
+      terminate(jobId, true);
       return;
     }
     if (current.jobId !== jobId) {
-      if (current.status === "running") follow(current.jobId, current);
-      else terminate(jobId);
+      if (current.status === "running")
+        follow(current.jobId, { snapshot: current, stamp: issuedAt });
+      else terminate(jobId, true);
       return;
     }
     if (current.status === "finished") {
-      applySnapshot(current);
-      terminate(jobId);
+      applySnapshot(current, issuedAt);
+      terminate(jobId, false);
       return;
     }
     // 照会の発行後にSSEで同じジョブの状態を受け取っていたら、古い照会結果でコードを巻き戻さない
-    if (eventSeq !== startSeq) return;
-    applySnapshot(current);
+    if (lastSseAt > issuedAt) return;
+    applySnapshot(current, issuedAt);
     noteEmptyReopen(jobId);
   }
 
@@ -389,10 +407,12 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
 
     async attach() {
       const startEpoch = epoch;
+      const issuedAt = (clock += 1);
       try {
         const current = await deps.getCurrent();
         if (epoch !== startEpoch || trackedJobId !== null) return;
-        if (current?.status === "running") follow(current.jobId, current);
+        if (current?.status === "running")
+          follow(current.jobId, { snapshot: current, stamp: issuedAt });
       } catch (cause) {
         if (epoch === startEpoch && isRootReconfiguringError(cause)) reset();
       }
@@ -426,6 +446,7 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
       const code = canonicalDlsiteProductCode(productCode);
       if (store.getState().pendingSingles.has(code)) return { ok: true };
       const startEpoch = epoch;
+      const startedAt = (clock += 1);
       inflightSingles.add(code);
       patch({ pendingSingles: new Set(store.getState().pendingSingles).add(code) });
       const drop = (): void => {
@@ -437,12 +458,11 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
       try {
         const { jobId } = await deps.startJob({ origin: "single", productCode: code });
         if (epoch !== startEpoch) return { ok: true };
-        inflightSingles.delete(code);
         follow(jobId);
-        // 応答より先に待機中・取得中の状態を受け取っていれば保留は不要。終端済みの状態が残るコードは、
-        // 取り直しの code イベントを受け取るまで保留する。
-        const entry = store.getState().job?.codes.get(code);
-        if (entry && !isTerminalCodeState(entry.state)) releasePendingSingles([code]);
+        inflightSingles.delete(code);
+        // 開始以降に発行・受信した状態にそのコードがあれば保留は不要。なければ、
+        // 以前の終端状態が残っていても取り直しの状態を受け取るまで保留する。
+        if ((codeSeenAt.get(code) ?? 0) > startedAt) releasePendingSingles([code]);
         return { ok: true };
       } catch (cause) {
         if (epoch !== startEpoch) return { ok: true };

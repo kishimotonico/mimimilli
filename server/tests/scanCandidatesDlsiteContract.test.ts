@@ -298,13 +298,13 @@ for (const kind of ["fixture", "real"] as const) {
     },
   );
 
-  test(`取得中の候補はfetchingで、終わると取得済みになる (${kind})`, async () => {
+  test(`取得中の候補はキャッシュどおり未取得で、終わると取得済みになる (${kind})`, async () => {
     const subject = await createSubject(kind, { hold: true });
     try {
       await setRjCode(subject, OK_CODE);
       await startJob(subject, OK_CODE);
-      assert.deepEqual((await targetCandidate(subject)).dlsite, { state: "fetching" });
-      assert.deepEqual((await setRjCode(subject, OK_CODE)).dlsite, { state: "fetching" });
+      assert.deepEqual((await targetCandidate(subject)).dlsite, { state: "none" });
+      assert.deepEqual((await setRjCode(subject, OK_CODE)).dlsite, { state: "none" });
       subject.release();
       await waitJobFinished(subject);
       assert.equal((await targetCandidate(subject)).dlsite.state, "fetched");

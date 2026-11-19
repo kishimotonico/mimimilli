@@ -95,12 +95,50 @@ describe("DlsiteJobRuntime", () => {
     queryClient.setQueryData(WORK_QUERY_KEYS.list({ q: "" }), { items: [] });
     await act(async () => {});
     const baseline = candidateRequests;
-    act(() => dlsiteJob.emit({ type: "finished", jobId: "job-1", productCodes: ["RJ000001"] }));
+    act(() =>
+      dlsiteJob.emit({
+        type: "finished",
+        jobId: "job-1",
+        affected: { kind: "codes", productCodes: ["RJ000001"] },
+      }),
+    );
     await waitFor(() => expect(dlsiteJob.markSettled).toHaveBeenCalledWith("job-1"));
     expect(candidateRequests - baseline).toBe(1);
     expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w1"))?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w2"))?.isInvalidated).toBe(false);
     expect(queryClient.getQueryState(WORK_QUERY_KEYS.list({ q: "" }))?.isInvalidated).toBe(true);
+  });
+
+  it("終わりを受け取れなかったジョブの終端では、コードに関わらず作品の詳細と一覧を無効化する", async () => {
+    const { dlsiteJob, queryClient } = renderRuntime();
+    queryClient.setQueryData(WORK_QUERY_KEYS.detail("w1"), detail("w1", "RJ000001"));
+    queryClient.setQueryData(WORK_QUERY_KEYS.detail("w2"), detail("w2", "RJ999999"));
+    queryClient.setQueryData(WORK_QUERY_KEYS.list({ q: "" }), { items: [] });
+    await act(async () => {});
+    act(() => dlsiteJob.emit({ type: "finished", jobId: "job-1", affected: { kind: "unknown" } }));
+    await waitFor(() =>
+      expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w2"))?.isInvalidated).toBe(true),
+    );
+    expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w1"))?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w2"))?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(WORK_QUERY_KEYS.list({ q: "" }))?.isInvalidated).toBe(true);
+  });
+
+  it("終端後の候補一覧の取得に失敗したら markSettled しない", async () => {
+    const { dlsiteJob } = renderRuntime();
+    await act(async () => {});
+    mockApi({ "GET /api/scan/candidates": () => new Response("{}", { status: 500 }) });
+    act(() =>
+      dlsiteJob.emit({
+        type: "finished",
+        jobId: "job-1",
+        affected: { kind: "codes", productCodes: ["RJ000001"] },
+      }),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+    expect(dlsiteJob.markSettled).not.toHaveBeenCalled();
   });
 
   it("起点がsingleのコードが終端すると、ジョブの終端を待たず同じRJコードの作品を無効化する", async () => {
@@ -149,7 +187,13 @@ describe("DlsiteJobRuntime", () => {
         productCodes: ["RJ000001"],
       }),
     );
-    act(() => dlsiteJob.emit({ type: "finished", jobId: "job-1", productCodes: [] }));
+    act(() =>
+      dlsiteJob.emit({
+        type: "finished",
+        jobId: "job-1",
+        affected: { kind: "codes", productCodes: [] },
+      }),
+    );
     await waitFor(() => expect(dlsiteJob.markSettled).toHaveBeenCalled());
     const afterFinish = candidateRequests;
     await act(async () => {

@@ -66,6 +66,15 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   const toast = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const { job, settled } = jobStore.getState();
+    if (job?.status !== "finished" || settled) return;
+    void refreshScanCandidates(queryClient).then(
+      () => jobStore.markSettled(job.jobId),
+      () => {},
+    );
+  }, [jobStore, queryClient]);
+
   const allRows = useMemo<CandidateRowModel[]>(
     () =>
       candidates.map((candidate) => ({

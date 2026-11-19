@@ -48,11 +48,12 @@ export default function ScanModal({
     if (failedCount > 0 || interrupted) {
       toast.show({
         message: interrupted
-          ? `${registeredCount}件を追加して止まりました。残りは未登録タブから追加してください。`
-          : `${registeredCount}件を追加しました。${failedCount}件は追加できませんでした。`,
+          ? `${registeredCount}件を追加して止まりました。`
+          : `${registeredCount}件を追加しました。${failedCount}件は追加できず、未登録タブに残っています。`,
         variant: "warning",
         priority: "notice",
       });
+      return;
     }
     setActiveTab("newWorks");
   };

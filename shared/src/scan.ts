@@ -21,8 +21,6 @@ export type ScanCandidateFolder = {
 export const scanCandidateDlsiteSchema = z.discriminatedUnion("state", [
   /** 未取得（キャッシュに無い・TTL切れ・RJコードなし） */
   z.object({ state: z.literal("none") }),
-  /** 取得ジョブで待機中または取得中 */
-  z.object({ state: z.literal("fetching") }),
   z.object({
     state: z.literal("fetched"),
     title: z.string(),
