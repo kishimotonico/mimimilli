@@ -1,7 +1,7 @@
 import type {
   MetaFile,
   NormalizedTag,
-  ScanCandidate,
+  ScanCandidateFolder,
   ScanResult,
   UrlEntry,
   Work,
@@ -11,7 +11,7 @@ import type {
 /** スキャン実行の戻り値。候補プールは HTTP 契約の ScanResult とは分離する。 */
 export type ScanExecutionResult = {
   result: ScanResult;
-  candidatePool: ScanCandidate[];
+  candidatePool: ScanCandidateFolder[];
 };
 import type { MetaParseError } from "./meta.ts";
 import type { CoverColumns, ScanWorkState } from "./workRowMapping.ts";

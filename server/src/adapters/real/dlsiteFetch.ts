@@ -5,6 +5,7 @@ import type { DlsiteFetchResult } from "@mimimilli/shared";
 import { CoverSaveError, DlsiteOfflineError } from "../../errors.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import {
+  DLSITE_PARSER_VERSION,
   fetchDlsiteCover,
   fetchDlsiteHtml,
   listDlsiteMissingFields,
@@ -18,6 +19,10 @@ import {
   type DlsiteCacheOptions,
 } from "./dlsiteCache.ts";
 import { type DlsiteRequestConfig } from "./dlsiteConfig.ts";
+import {
+  createDlsiteProductResolver,
+  dlsiteFetchResultOfProductResolution,
+} from "./dlsiteProductResolve.ts";
 import {
   DlsiteScheduler,
   type DlsiteHttpLogContext,
@@ -129,6 +134,7 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
       dlsiteCoverMaximumBytes,
       dlsiteUserAgent,
     );
+  const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache);
   const dlsiteFlightPool = new SharedFlightPool<DlsiteFetchAttempt>();
   const dlsiteCoverFlightPool = new SharedFlightPool<{ body: Uint8Array; normalizedUrl: string }>();
 
@@ -146,7 +152,7 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
       });
       return null;
     }
-    const resolution = dlsiteCache.resolve({ productCode: key });
+    const resolution = resolveDlsiteProduct(key);
     if (resolution.kind === "miss") {
       logDlsiteEvent({
         event: "dlsite_cache_miss",
@@ -156,27 +162,15 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
       });
       return null;
     }
-    const cacheReason = resolution.kind === "failure" ? "failure_ttl_valid" : "ttl_valid";
     logDlsiteEvent({
       event: "dlsite_cache_hit",
       resource: "html",
       key,
-      reason: cacheReason,
+      reason: resolution.kind === "failure" ? "failure_ttl_valid" : "ttl_valid",
       outcome: resolution.outcome,
     });
-    if (resolution.kind === "html") {
-      const parsed = parseDlsiteHtml(resolution.html, key);
-      logDlsiteParseResult(key, parsed, false);
-      return { result: parsed, httpAttempted: false };
-    }
-    return {
-      result: {
-        ok: false,
-        kind: resolution.outcome,
-        message: `DLsite取得キャッシュ: ${resolution.outcome}（${key}）`,
-      },
-      httpAttempted: false,
-    };
+    const result = dlsiteFetchResultOfProductResolution(resolution, key);
+    return result ? { result, httpAttempted: false } : null;
   }
 
   async function fetchDlsiteHtmlNetworkAttempt(
@@ -229,6 +223,9 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
           contentType: response.contentType ?? "",
           html: response.body,
           transferSize: response.transferSize,
+          parsed: parsed.ok
+            ? { parserVersion: DLSITE_PARSER_VERSION, info: parsed.info }
+            : undefined,
         });
         logDlsiteParseResult(key, parsed, true);
         return { result: parsed, httpAttempted: true };

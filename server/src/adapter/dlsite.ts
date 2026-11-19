@@ -1,4 +1,5 @@
 import type {
+  DlsiteCachedCover,
   DlsiteApplyBody,
   DlsiteApplyMissingPreview,
   DlsiteBulkApplyMissingResult,
@@ -40,4 +41,10 @@ export interface DlsiteAdapter {
     productCode: string,
     options: { force: boolean; signal?: AbortSignal },
   ): Promise<DlsiteProductFetchOutcome>;
+  /** カバーURLに対応するキャッシュ済みカバー。キャッシュに無ければnull。DLsiteへは通信しない */
+  lookupDlsiteCachedCover(coverUrl: string | null): DlsiteCachedCover | null;
+  /** キャッシュ済みカバーの配信用。キャッシュに無ければnull。DLsiteへは通信しない */
+  getCachedDlsiteCover(
+    coverKey: string,
+  ): { body: Uint8Array; contentType: string; version: number } | null;
 }

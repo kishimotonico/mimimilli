@@ -11,7 +11,7 @@ import {
 import { errorMessage } from "@mimimilli/shared";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
-import { parseDlsiteHtml } from "./adapters/real/dlsite.ts";
+import { DLSITE_PARSER_VERSION, parseDlsiteHtml } from "./adapters/real/dlsite.ts";
 import {
   DlsiteCache,
   normalizeDlsiteProductCode,
@@ -97,6 +97,7 @@ function importOne(
     outcome: parsed.ok ? "ok" : "parse_error",
     contentType: "text/html; charset=utf-8",
     html: bytes,
+    parsed: parsed.ok ? { parserVersion: DLSITE_PARSER_VERSION, info: parsed.info } : undefined,
   });
   return { outcome: parsed.ok ? "ok" : "parse_error" };
 }

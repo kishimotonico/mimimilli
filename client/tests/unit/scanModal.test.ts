@@ -97,6 +97,11 @@ beforeEach(() => {
     "GET /api/works/:id/source": () => scanSnapshot(work.title),
     "PATCH /api/works/:id": (request) => patchWorkSourceReply(request),
     "POST /api/scan/candidates/register": () => registerReply,
+    "POST /api/scan/candidates/rj-code": ({ body }) => {
+      const { path, rjCode } = body as { path: string; rjCode: string };
+      const base = serverCandidates.find((candidate) => candidate.path === path);
+      return { candidate: { ...base, rjCode: rjCode === "" ? null : rjCode } };
+    },
     "POST /api/scan/candidates/exclude": () => apiNoContent(),
     "POST /api/scan/candidates/exclusions/restore": () => apiNoContent(),
     "GET /api/scan/candidates": () => ({ candidates: serverCandidates }),
@@ -562,7 +567,7 @@ describe("ScanModal", () => {
     expect(screen.getByText(newWork.title)).toBeInTheDocument();
   });
 
-  it("検出済みRJコードは明示送信し、未検出のまま登録すると空文字を送る。全件登録で新規登録済みへ自動遷移する", async () => {
+  it("登録リクエストは候補のパスだけを送り（RJコードはサーバーが持つ）、全件登録で新規登録済みへ自動遷移する", async () => {
     registerReply = buildScanCandidatesRegisterResponse({
       registered: [
         { path: candidateDetected.path, workId: "w-detected" },
@@ -582,10 +587,7 @@ describe("ScanModal", () => {
       expect(api.requestsTo("POST /api/scan/candidates/register")).toHaveLength(1),
     );
     expect(api.requestsTo("POST /api/scan/candidates/register")[0]?.body).toEqual({
-      items: [
-        { path: candidateDetected.path, rjCode: candidateDetected.rjCode },
-        { path: candidateUndetected.path, rjCode: "" },
-      ],
+      items: [{ path: candidateDetected.path }, { path: candidateUndetected.path }],
     });
 
     await waitFor(() =>
@@ -657,7 +659,7 @@ describe("ScanModal", () => {
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["smartFolderWorks"] });
   });
 
-  it("未検出のRJコードをクリックで編集し、編集した値を登録に送る", async () => {
+  it("未検出のRJコードをクリックで編集するとサーバーで直り、行の表示が更新され、登録はパスだけを送る", async () => {
     registerReply = buildScanCandidatesRegisterResponse({
       registered: [{ path: candidateUndetected.path, workId: "w-undetected" }],
     });
@@ -671,6 +673,15 @@ describe("ScanModal", () => {
     fireEvent.change(input, { target: { value: "RJ200002" } });
     fireEvent.keyDown(input, { key: "Enter" });
 
+    await waitFor(() =>
+      expect(api.requestsTo("POST /api/scan/candidates/rj-code")[0]?.body).toEqual({
+        path: candidateUndetected.path,
+        rjCode: "RJ200002",
+      }),
+    );
+    await waitFor(() => expect(within(unregistered).getByText("RJ200002")).toBeInTheDocument());
+    expect(within(unregistered).queryByPlaceholderText("RJコード")).toBeNull();
+
     fireEvent.click(
       within(unregistered).getByRole("checkbox", {
         name: `「${candidateDetected.inferredTitle}」を選択`,
@@ -682,7 +693,7 @@ describe("ScanModal", () => {
       expect(api.requestsTo("POST /api/scan/candidates/register")).toHaveLength(1),
     );
     expect(api.requestsTo("POST /api/scan/candidates/register")[0]?.body).toEqual({
-      items: [{ path: candidateUndetected.path, rjCode: "RJ200002" }],
+      items: [{ path: candidateUndetected.path }],
     });
   });
 

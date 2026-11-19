@@ -3,6 +3,7 @@ import { createElement, Fragment } from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ApiRequestError } from "../../src/shared/api/http";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   workspacePath,
@@ -27,6 +28,8 @@ const candidateA: ScanCandidate = {
   audioFileCount: 1,
   audioBreakdown: [{ extension: "mp3", count: 1 }],
   rjCode: null,
+  dlsite: { state: "none" },
+  missingWorks: [],
 };
 const candidateB: ScanCandidate = {
   path: workspacePath("dlsite/検出済み作品"),
@@ -34,6 +37,8 @@ const candidateB: ScanCandidate = {
   audioFileCount: 2,
   audioBreakdown: [{ extension: "mp3", count: 2 }],
   rjCode: "RJ100001",
+  dlsite: { state: "none" },
+  missingWorks: [],
 };
 
 function renderTab(candidates: ScanCandidate[] = [candidateA, candidateB]) {
@@ -64,7 +69,7 @@ function renderTab(candidates: ScanCandidate[] = [candidateA, candidateB]) {
       ),
     ),
   );
-  return { ...view, onRegistered };
+  return { ...view, onRegistered, queryClient };
 }
 
 describe("UnregisteredTab RJコード編集", () => {
@@ -131,9 +136,68 @@ describe("UnregisteredTab RJコード編集", () => {
     fireEvent.click(registerButton);
 
     await waitFor(() => expect(registerSpy).toHaveBeenCalledTimes(1));
-    expect(registerSpy.mock.calls[0]?.[0]).toEqual([
-      { path: candidateB.path, rjCode: candidateB.rjCode },
+    expect(registerSpy.mock.calls[0]?.[0]).toEqual([{ path: candidateB.path }]);
+  });
+
+  it("正しい値を確定すると修正APIを呼び、応答の候補で一覧キャッシュの行を置き換える", async () => {
+    const fixed: ScanCandidate = { ...candidateA, rjCode: "RJ200002" };
+    const setSpy = vi.spyOn(scanApi, "setScanCandidateRjCode").mockResolvedValue(fixed);
+    const { queryClient } = renderTab([candidateA, candidateB]);
+    queryClient.setQueryData(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY, [
+      candidateA,
+      candidateB,
     ]);
+
+    fireEvent.click(screen.getAllByTitle("クリックしてRJコードを編集")[0]);
+    const input = screen.getByPlaceholderText("RJコード");
+    fireEvent.change(input, { target: { value: " rj200002 " } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => expect(setSpy).toHaveBeenCalledWith(candidateA.path, "RJ200002"));
+    await waitFor(() => expect(screen.queryByPlaceholderText("RJコード")).toBeNull());
+    expect(
+      queryClient.getQueryData<ScanCandidate[]>(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY),
+    ).toEqual([fixed, candidateB]);
+  });
+
+  it("RJコードを空にして確定すると、RJコードなしの明示として空文字で修正APIを呼ぶ", async () => {
+    const cleared: ScanCandidate = { ...candidateB, rjCode: null };
+    const setSpy = vi.spyOn(scanApi, "setScanCandidateRjCode").mockResolvedValue(cleared);
+    renderTab([candidateB]);
+
+    fireEvent.click(screen.getByTitle("クリックしてRJコードを編集"));
+    const input = screen.getByPlaceholderText("RJコード");
+    fireEvent.change(input, { target: { value: "" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => expect(setSpy).toHaveBeenCalledWith(candidateB.path, ""));
+  });
+
+  it("値を変えずに確定したときは修正APIを呼ばず編集だけ閉じる", async () => {
+    const setSpy = vi.spyOn(scanApi, "setScanCandidateRjCode");
+    renderTab([candidateB]);
+
+    fireEvent.click(screen.getByTitle("クリックしてRJコードを編集"));
+    fireEvent.keyDown(screen.getByPlaceholderText("RJコード"), { key: "Enter" });
+
+    expect(screen.queryByPlaceholderText("RJコード")).toBeNull();
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it("候補が更新済み（409）のときは候補を取り直してメッセージを出す", async () => {
+    vi.spyOn(scanApi, "setScanCandidateRjCode").mockRejectedValue(
+      new ApiRequestError(409, "conflict", "候補プールが更新されました"),
+    );
+    const refreshSpy = vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue([]);
+    renderTab([candidateA]);
+
+    fireEvent.click(screen.getByTitle("クリックしてRJコードを編集"));
+    const input = screen.getByPlaceholderText("RJコード");
+    fireEvent.change(input, { target: { value: "RJ200002" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => expect(refreshSpy).toHaveBeenCalled());
+    expect(screen.getByText(/候補が更新されたため表示を更新しました/)).not.toBeNull();
   });
 
   it("別の行を編集し始めても、エラー行の表示は消えたままにならない", () => {

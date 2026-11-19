@@ -9,6 +9,7 @@ import { Readable } from "node:stream";
 import { Hono, type Context } from "hono";
 import { getBunServer } from "hono/bun";
 import {
+  DLSITE_COVER_KEY_PATTERN,
   coverQuerySchema,
   normalizeThumbnailWidth,
   workspaceMediaQuerySchema,
@@ -63,6 +64,36 @@ export function mediaRoute(adapter: DataAdapter, options: MediaRouteOptions = {}
     disableIdleTimeout(c);
     const location = await descriptor.materialize();
     return streamWhole(location, cacheHeaders);
+  });
+
+  app.get("/media/dlsite-cover/:key", (c) => {
+    const key = c.req.param("key");
+    if (!DLSITE_COVER_KEY_PATTERN.test(key)) invalidRequest("DLsiteカバーのキーが不正です");
+    const parsed = coverQuerySchema.safeParse(c.req.query());
+    if (!parsed.success) invalidRequest(`不正なクエリパラメータです: ${parsed.error.message}`);
+    const immutable = parsed.data.v !== undefined;
+
+    const cover = adapter.getCachedDlsiteCover(key);
+    if (!cover) notFound(`DLsiteカバーが見つかりません: ${key}`);
+    const validators = {
+      etag: `"dlsite-${key}-${cover.version}"`,
+      lastModifiedMs: cover.version,
+    };
+    const cacheHeaders = coverCacheHeaders(validators, immutable);
+    if (
+      !immutable &&
+      isNotModified(c.req.header("If-None-Match"), c.req.header("If-Modified-Since"), validators)
+    ) {
+      return new Response(null, { status: 304, headers: cacheHeaders });
+    }
+    return new Response(cover.body, {
+      status: 200,
+      headers: {
+        ...cacheHeaders,
+        "Content-Type": cover.contentType,
+        "Content-Length": String(cover.body.byteLength),
+      },
+    });
   });
 
   app.get("/media/workspace", async (c) => {
@@ -126,8 +157,10 @@ async function streamWhole(
   });
 }
 
+type CoverValidators = Pick<CoverDescriptor, "etag" | "lastModifiedMs">;
+
 function coverCacheHeaders(
-  descriptor: CoverDescriptor,
+  descriptor: CoverValidators,
   immutable: boolean,
 ): Record<string, string> {
   return {
@@ -143,7 +176,7 @@ function coverCacheHeaders(
 function isNotModified(
   ifNoneMatch: string | undefined,
   ifModifiedSince: string | undefined,
-  descriptor: CoverDescriptor,
+  descriptor: CoverValidators,
 ): boolean {
   if (ifNoneMatch !== undefined) return etagMatches(ifNoneMatch, descriptor.etag);
   if (ifModifiedSince === undefined) return false;

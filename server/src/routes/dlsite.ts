@@ -11,6 +11,7 @@ import {
   dlsiteJobStartResponseSchema,
   type DlsiteJobEvent,
   dlsiteFetchByCodeBodySchema,
+  dlsiteFetchByCodeResponseSchema,
   dlsiteNotificationKindSchema,
   dlsiteNotificationQuerySchema,
   dlsiteStateUpdateBodySchema,
@@ -69,7 +70,12 @@ export function dlsiteRoute(
         signal: c.req.raw.signal,
       });
       if (!result.ok) throw apiError(result.kind, result.message);
-      return c.json(result.info);
+      return c.json(
+        dlsiteFetchByCodeResponseSchema.parse({
+          info: result.info,
+          cachedCover: adapter.lookupDlsiteCachedCover(result.info.coverUrl),
+        }),
+      );
     } catch (error) {
       if (isClientAbort(error)) {
         dlsiteLogger.info("クライアント切断によりDLsite取得を中断しました", {

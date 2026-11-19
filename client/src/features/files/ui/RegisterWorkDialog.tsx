@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { normalizeTag } from "@mimimilli/shared";
 import type {
+  DlsiteCachedCover,
   DlsiteRegistrationBody,
   DlsiteWorkInfo,
   WorkCreateResponse,
@@ -27,6 +28,7 @@ import { buildDlsiteRegistrationBody } from "../../../entities/work/dlsitePrevie
 import { dlsiteFetchErrorMessage } from "../../../entities/work/dlsiteFetchError";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { sourceMutationErrorMessage } from "../../../entities/work/sourceMutation";
+import { getDlsiteCoverUrl } from "../../../entities/dlsite/dlsiteCoverUrl";
 import { fetchDlsiteInfoByCode } from "../api";
 import { useRegisterWorkMutation } from "../../../entities/work/model/workMutations";
 
@@ -50,6 +52,7 @@ export default function RegisterWorkDialog({
   const [isTagInputOpen, setIsTagInputOpen] = useState(false);
   const [rjCode, setRjCode] = useState(preview.detectedRjCode ?? "");
   const [dlsiteInfo, setDlsiteInfo] = useState<DlsiteWorkInfo | null>(null);
+  const [cachedCover, setCachedCover] = useState<DlsiteCachedCover | null>(null);
   const [applyCover, setApplyCover] = useState(true);
   const [dlsiteValidationError, setDlsiteValidationError] = useState<string | null>(null);
 
@@ -59,11 +62,12 @@ export default function RegisterWorkDialog({
 
   const dlsiteMutation = useMutation({
     mutationFn: (code: string) => fetchDlsiteInfoByCode(code),
-    onSuccess: (info) => {
+    onSuccess: ({ info, cachedCover: cover }) => {
       setDlsiteInfo(info);
+      setCachedCover(cover);
       setTitle(info.title);
       setTags((prev) => Array.from(new Set([...prev, ...dlsiteInfoTags(info)])));
-      setApplyCover(Boolean(info.coverUrl));
+      setApplyCover(cover !== null);
     },
   });
 
@@ -75,7 +79,7 @@ export default function RegisterWorkDialog({
     const dlsite: DlsiteRegistrationBody | undefined = dlsiteInfo
       ? buildDlsiteRegistrationBody(dlsiteInfo, {
           applyTitle: false,
-          applyCover,
+          applyCover: applyCover && cachedCover !== null,
           applyUrl: true,
           applyTags: dlsiteAppliedTags,
         })
@@ -101,6 +105,7 @@ export default function RegisterWorkDialog({
     setIsTagInputOpen(false);
     setRjCode(preview.detectedRjCode ?? "");
     setDlsiteInfo(null);
+    setCachedCover(null);
     setApplyCover(true);
     setDlsiteValidationError(null);
     dlsiteMutation.reset();
@@ -197,9 +202,9 @@ export default function RegisterWorkDialog({
           {dlsiteError && <p className="m-0 text-secondary text-[var(--r-coral)]">{dlsiteError}</p>}
 
           <div className="flex items-center gap-2.5">
-            {dlsiteInfo?.coverUrl ? (
+            {cachedCover ? (
               <img
-                src={dlsiteInfo.coverUrl}
+                src={getDlsiteCoverUrl(cachedCover)}
                 alt=""
                 className="h-[104px] w-[104px] shrink-0 rounded-[6px] border border-line-soft object-cover"
               />
@@ -210,12 +215,12 @@ export default function RegisterWorkDialog({
               </div>
             )}
             <label
-              className={`flex items-center gap-1.5 text-secondary ${dlsiteInfo?.coverUrl ? "text-ink-1" : "text-ink-4"}`}
+              className={`flex items-center gap-1.5 text-secondary ${cachedCover ? "text-ink-1" : "text-ink-4"}`}
             >
               <input
                 type="checkbox"
-                checked={Boolean(dlsiteInfo?.coverUrl) && applyCover}
-                disabled={!dlsiteInfo?.coverUrl}
+                checked={cachedCover !== null && applyCover}
+                disabled={cachedCover === null}
                 onChange={(event) => setApplyCover(event.target.checked)}
               />
               カバー画像を適用

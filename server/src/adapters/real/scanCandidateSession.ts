@@ -2,11 +2,14 @@ import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import type {
   ScanCandidate,
+  ScanCandidateFolder,
+  ScanCandidateMissingWork,
   ScanCandidateRegisterItem,
   ScanCandidatesRegisterResponse,
 } from "@mimimilli/shared";
 import { CandidatePoolChangedError } from "../../errors.ts";
 import { folderTarget } from "./registrationTarget.ts";
+import { deriveCandidateDlsite, type CandidateDlsiteSource } from "./scanCandidateDlsite.ts";
 import type { Scanner } from "./scanner.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 
@@ -24,17 +27,26 @@ function tryResolveRootFingerprint(root: string): string | null {
   }
 }
 
-/** 直近スキャン由来の候補プール。worker 完了時はインスタンスごと置き換える。 */
-export class ScanCandidateSession {
-  private pool: ScanCandidate[];
-  private readonly rootFingerprint: string | null;
+/** 候補一覧を組み立てるときに読むもの */
+export interface CandidateListContext {
+  dlsite: CandidateDlsiteSource;
+  missingWorksByRjCode: ReadonlyMap<string, ScanCandidateMissingWork[]>;
+}
 
-  private constructor(pool: ScanCandidate[], rootFingerprint: string | null) {
+/** 直近スキャン由来の候補プール。worker 完了時はインスタンスごと置き換える。
+ *  直したRJコードはこのセッションだけが持ち、次のスキャンかサーバー再起動で破棄される。 */
+export class ScanCandidateSession {
+  private pool: ScanCandidateFolder[];
+  private readonly rootFingerprint: string | null;
+  /** 値がnullのエントリはRJコードなしの明示 */
+  private readonly rjCodeOverrides = new Map<string, string | null>();
+
+  private constructor(pool: ScanCandidateFolder[], rootFingerprint: string | null) {
     this.pool = pool;
     this.rootFingerprint = rootFingerprint;
   }
 
-  static fromPool(pool: ScanCandidate[], root: string): ScanCandidateSession {
+  static fromPool(pool: ScanCandidateFolder[], root: string): ScanCandidateSession {
     return new ScanCandidateSession(pool, resolveRootFingerprint(root));
   }
 
@@ -51,11 +63,59 @@ export class ScanCandidateSession {
     }
   }
 
+  private effectiveRjCode(folder: ScanCandidateFolder): string | null {
+    return this.rjCodeOverrides.has(folder.path)
+      ? (this.rjCodeOverrides.get(folder.path) ?? null)
+      : folder.detectedRjCode;
+  }
+
+  /** 直したコードがあればそれ、なければ検出したコード。直して「なし」にしたときは空文字で明示する */
+  private registrationRjCode(folder: ScanCandidateFolder): string | undefined {
+    if (this.rjCodeOverrides.has(folder.path)) return this.rjCodeOverrides.get(folder.path) ?? "";
+    return folder.detectedRjCode ?? undefined;
+  }
+
+  private listFolders(
+    user: Pick<UserWorkStateRepository, "listScanCandidateExclusions">,
+  ): ScanCandidateFolder[] {
+    const excluded = new Set(user.listScanCandidateExclusions());
+    return this.pool.filter((folder) => !excluded.has(folder.path));
+  }
+
+  private toCandidate(folder: ScanCandidateFolder, context: CandidateListContext): ScanCandidate {
+    const rjCode = this.effectiveRjCode(folder);
+    return {
+      path: folder.path,
+      inferredTitle: folder.inferredTitle,
+      audioFileCount: folder.audioFileCount,
+      audioBreakdown: folder.audioBreakdown,
+      rjCode,
+      dlsite: deriveCandidateDlsite(context.dlsite, rjCode),
+      missingWorks: rjCode ? (context.missingWorksByRjCode.get(rjCode) ?? []) : [],
+    };
+  }
+
   listCandidates(
     user: Pick<UserWorkStateRepository, "listScanCandidateExclusions">,
+    context: CandidateListContext,
   ): ScanCandidate[] {
-    const excluded = new Set(user.listScanCandidateExclusions());
-    return this.pool.filter((candidate) => !excluded.has(candidate.path));
+    return this.listFolders(user).map((folder) => this.toCandidate(folder, context));
+  }
+
+  /** nullはRJコードなしの明示。検出値と同じ値に直したときは直した記録を残さない */
+  setRjCode(
+    root: string,
+    path: string,
+    rjCode: string | null,
+    user: Pick<UserWorkStateRepository, "listScanCandidateExclusions">,
+    context: CandidateListContext,
+  ): ScanCandidate {
+    this.assertRootMatches(root);
+    const folder = this.listFolders(user).find((candidate) => candidate.path === path);
+    if (!folder) throw new CandidatePoolChangedError();
+    if (rjCode === folder.detectedRjCode) this.rjCodeOverrides.delete(folder.path);
+    else this.rjCodeOverrides.set(folder.path, rjCode);
+    return this.toCandidate(folder, context);
   }
 
   async registerCandidates(
@@ -65,22 +125,21 @@ export class ScanCandidateSession {
     user: Pick<UserWorkStateRepository, "listScanCandidateExclusions">,
   ): Promise<ScanCandidatesRegisterResponse> {
     this.assertRootMatches(root);
-    const candidates = this.listCandidates(user);
-    const byPath = new Map<string, ScanCandidate>(
-      candidates.map((candidate) => [candidate.path, candidate]),
+    const byPath = new Map<string, ScanCandidateFolder>(
+      this.listFolders(user).map((folder) => [folder.path, folder]),
     );
-    const selected = items.map((item) => ({ item, candidate: byPath.get(item.path) }));
-    if (selected.some((entry) => entry.candidate === undefined)) {
+    const selected = items.map((item) => ({ item, folder: byPath.get(item.path) }));
+    if (selected.some((entry) => entry.folder === undefined)) {
       throw new CandidatePoolChangedError();
     }
     const registered: ScanCandidatesRegisterResponse["registered"] = [];
     const failures: ScanCandidatesRegisterResponse["failures"] = [];
-    for (const { item, candidate } of selected) {
-      const current = candidate!;
+    for (const { folder } of selected) {
+      const current = folder!;
       try {
         const outcome = await scanner.registerWork(folderTarget(resolve(root, current.path)), {
           title: current.inferredTitle,
-          rjCode: item.rjCode,
+          rjCode: this.registrationRjCode(current),
         });
         registered.push({ path: current.path, workId: outcome.snapshot.meta.id });
       } catch (error) {
@@ -91,7 +150,8 @@ export class ScanCandidateSession {
       }
     }
     const registeredPaths = new Set(registered.map((entry) => entry.path));
-    this.pool = this.pool.filter((candidate) => !registeredPaths.has(candidate.path));
+    this.pool = this.pool.filter((folder) => !registeredPaths.has(folder.path));
+    for (const path of registeredPaths) this.rjCodeOverrides.delete(path);
     return { registered, failures };
   }
 
@@ -101,8 +161,8 @@ export class ScanCandidateSession {
     user: Pick<UserWorkStateRepository, "listScanCandidateExclusions" | "excludeScanCandidates">,
   ): Promise<void> {
     this.assertRootMatches(root);
-    const currentPaths = new Set(this.listCandidates(user).map((candidate) => candidate.path));
-    if (paths.some((path) => !currentPaths.has(path as ScanCandidate["path"]))) {
+    const currentPaths = new Set<string>(this.listFolders(user).map((folder) => folder.path));
+    if (paths.some((path) => !currentPaths.has(path))) {
       throw new CandidatePoolChangedError();
     }
     user.excludeScanCandidates(paths);

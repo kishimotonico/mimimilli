@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   DEFAULT_DLSITE_CACHE_TTLS_MS,
   applyDlsiteStatePatch,
@@ -8,6 +9,7 @@ import {
   hasRjCode,
 } from "@mimimilli/shared";
 import type {
+  DlsiteCachedCover,
   DlsiteApplyMissingPreviewItem,
   DlsiteFetchResult,
   DlsiteProductFetchOutcome,
@@ -19,6 +21,7 @@ import type { DlsiteAdapter } from "../../adapter/dlsite.ts";
 import { fixtureCoverFromColumns, type FixtureCoverColumns } from "./data.ts";
 import {
   dlsiteFetchFailureFor,
+  fixtureDlsiteResolutionHead,
   dlsiteLinkageOf,
   normalizeDlsiteCacheKey,
   setDlsiteLinkage,
@@ -31,6 +34,22 @@ export const FIXTURE_DLSITE_FETCH_FAILURE_RJ_CODE = "RJ000404";
 
 /** このRJコードは取得すると該当なし（not_found）になる */
 export const FIXTURE_DLSITE_NOT_FOUND_RJ_CODE = "RJ000403";
+
+/** このRJコードは取得済みになるが、カバーはキャッシュに置かれない（カバーの先取り失敗相当） */
+export const FIXTURE_DLSITE_NO_COVER_RJ_CODE = "RJ000402";
+
+const FIXTURE_COVER_BACKGROUNDS = ["#3b6ea8", "#a8573b", "#4a8f5a", "#8a4fa0", "#b58a2d"];
+
+export function fixtureDlsiteCoverKey(coverUrl: string): string {
+  return createHash("sha256").update(coverUrl).digest("hex");
+}
+
+function fixtureCoverImage(rjCode: string): Uint8Array {
+  const background = FIXTURE_COVER_BACKGROUNDS[Number(rjCode.slice(-1)) % 5];
+  return new TextEncoder().encode(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400"><rect width="300" height="400" fill="${background}"/><text x="150" y="200" font-family="sans-serif" font-size="32" font-weight="700" fill="#fff" text-anchor="middle">${rjCode}</text></svg>`,
+  );
+}
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -72,8 +91,10 @@ export function createDlsiteMethods(
           message: `fixture: キャッシュ済みの取得失敗（${key}）`,
         };
       }
-      const cached = state.dlsiteFetched.get(key);
-      if (cached) return { ok: true, info: cached };
+      const fetched = state.dlsiteFetched.get(key);
+      if (fetched && fixtureDlsiteResolutionHead(state, key).kind === "html") {
+        return { ok: true, info: fetched.info };
+      }
     }
     if (fetchDelayMs > 0) await sleep(fetchDelayMs, signal);
     else if (signal?.aborted) throw new DOMException("取得はキャンセルされました", "AbortError");
@@ -105,11 +126,22 @@ export function createDlsiteMethods(
       cvs: ["fixture CV"],
       genreTags: ["テスト"],
       ageRating: "全年齢",
-      coverUrl: null,
+      coverUrl: `https://img.dlsite.jp/fixture/${key}_img_main.jpg`,
       url: `https://www.dlsite.com/maniax/work/=/product_id/${key}.html`,
     };
     state.dlsiteFetchFailures.delete(key);
-    state.dlsiteFetched.set(key, info);
+    state.dlsiteFetched.set(key, {
+      info,
+      fetchedAt: now,
+      expiresAt: now + DEFAULT_DLSITE_CACHE_TTLS_MS.ok,
+    });
+    if (key !== FIXTURE_DLSITE_NO_COVER_RJ_CODE) {
+      state.dlsiteCovers.set(fixtureDlsiteCoverKey(info.coverUrl!), {
+        body: fixtureCoverImage(key),
+        contentType: "image/svg+xml",
+        fetchedAt: now,
+      });
+    }
     return { ok: true, info };
   }
 
@@ -134,6 +166,20 @@ export function createDlsiteMethods(
     },
 
     dlsiteFetchByCode,
+
+    lookupDlsiteCachedCover(coverUrl: string | null): DlsiteCachedCover | null {
+      if (!coverUrl) return null;
+      const key = fixtureDlsiteCoverKey(coverUrl);
+      const cover = state.dlsiteCovers.get(key);
+      return cover ? { key, version: cover.fetchedAt } : null;
+    },
+
+    getCachedDlsiteCover(coverKey: string) {
+      const cover = state.dlsiteCovers.get(coverKey);
+      return cover
+        ? { body: cover.body, contentType: cover.contentType, version: cover.fetchedAt }
+        : null;
+    },
 
     isDlsiteOffline: () => false,
 

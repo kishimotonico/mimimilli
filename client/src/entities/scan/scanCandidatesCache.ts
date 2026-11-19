@@ -32,3 +32,10 @@ export async function refreshScanCandidates(queryClient: QueryClient): Promise<S
     throw error;
   }
 }
+
+/** 1件の候補を、サーバーが返した最新の内容で置き換える。一覧に無ければ何もしない。 */
+export function replaceScanCandidate(queryClient: QueryClient, candidate: ScanCandidate): void {
+  queryClient.setQueryData<ScanCandidate[]>(SCAN_CANDIDATES_QUERY_KEY, (previous) =>
+    previous?.map((entry) => (entry.path === candidate.path ? candidate : entry)),
+  );
+}

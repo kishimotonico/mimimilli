@@ -4,7 +4,7 @@ import { basename, resolve } from "node:path";
 import type {
   IdentityConflict,
   MetaFile,
-  ScanCandidate,
+  ScanCandidateFolder,
   ScanDiagnostics,
   ScanResult,
 } from "@mimimilli/shared";
@@ -374,7 +374,7 @@ export class Scanner {
 
   private async generatePhase(
     root: string,
-    candidates: ScanCandidate[],
+    candidates: ScanCandidateFolder[],
     emit: NonNullable<ScanOptions["onProgress"]>,
     checkAbort: () => void,
   ): Promise<void> {
@@ -397,7 +397,7 @@ export class Scanner {
     root: string,
     tree: WalkResult,
     options?: { filterExclusions?: boolean },
-  ): ScanCandidate[] {
+  ): ScanCandidateFolder[] {
     const workRoots = new Set<string>();
     for (const audioDir of tree.audioDirs) {
       if (isCoveredByMeta(audioDir, root, tree.metaDirs) || audioDir === root) continue;
@@ -422,7 +422,7 @@ export class Scanner {
           audioBreakdown: [...breakdown]
             .sort(([a], [b]) => naturalCompare(a, b))
             .map(([extension, count]) => ({ extension, count })),
-          rjCode: detectRjCode([folderName]),
+          detectedRjCode: detectRjCode([folderName]),
         };
       });
     if (options?.filterExclusions === false) return candidates;

@@ -6,7 +6,7 @@ import {
   type IdentityConflict,
   type InvalidMetaFile,
   type MetaDlsiteState,
-  type ScanCandidate,
+  type ScanCandidateFolder,
   type UpdatedWork,
   type SmartFolder,
 } from "@mimimilli/shared";
@@ -64,7 +64,7 @@ export interface FixtureScenario {
   /** scan() が insertedWorkIds として返す、新規に見つかった作品ID */
   scanInsertedWorkIds: string[];
   scanUpdatedWorks: UpdatedWork[];
-  scanCandidates: ScanCandidate[];
+  scanCandidates: ScanCandidateFolder[];
   invalidMetaFiles: InvalidMetaFile[];
   identityConflicts: IdentityConflict[];
   /** rootの配下にないためcatalogから外れている作品。rootを戻すと同じIDで一覧へ戻る */
@@ -160,14 +160,14 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
           inferredTitle: "未登録作品",
           audioFileCount: 2,
           audioBreakdown: [{ extension: "mp3", count: 2 }],
-          rjCode: null,
+          detectedRjCode: null,
         },
         {
           path: workspacePath("朗読/候補"),
           inferredTitle: "候補",
           audioFileCount: 3,
           audioBreakdown: [{ extension: "m4a", count: 3 }],
-          rjCode: null,
+          detectedRjCode: null,
         },
       ],
       invalidMetaFiles: [
@@ -295,14 +295,14 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
           inferredTitle: "未登録作品",
           audioFileCount: 2,
           audioBreakdown: [{ extension: "mp3", count: 2 }],
-          rjCode: null,
+          detectedRjCode: null,
         },
         {
           path: workspacePath("朗読/候補"),
           inferredTitle: "候補",
           audioFileCount: 3,
           audioBreakdown: [{ extension: "m4a", count: 3 }],
-          rjCode: null,
+          detectedRjCode: null,
         },
       ],
       invalidMetaFiles: [

@@ -874,7 +874,7 @@ test("offline結果はcache-onlyで、mimimilli.jsonのexact bytesを変更し�
   assert.equal(calls, 1);
 });
 
-test("DLsite HTMLキャッシュ: hitでも保存HTMLを毎回パースする", async (t) => {
+test("DLsite HTMLキャッシュ: hitは取得時の解析結果を使い、解析結果が無いときだけ保存HTMLを解析する", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-parser-cache");
   t.after(lib.cleanup);
@@ -915,7 +915,15 @@ test("DLsite HTMLキャッシュ: hitでも保存HTMLを毎回パースする", 
 
   const second = await adapter.dlsiteFetch(lib.existingWorkId);
   assert.equal(httpCalls, 1);
-  assert.equal(second.ok && second.info.title, "キャッシュ差し替えタイトル");
+  assert.equal(second.ok && second.info.title, "耳元ささやきの夜");
+
+  const reopened = new Database(join(dir.path, "cache.sqlite"));
+  reopened.run("DELETE FROM dlsite_parsed_products WHERE product_code = ?", ["RJ900002"]);
+  reopened.close();
+
+  const third = await adapter.dlsiteFetch(lib.existingWorkId);
+  assert.equal(httpCalls, 1);
+  assert.equal(third.ok && third.info.title, "キャッシュ差し替えタイトル");
 });
 
 test("DLsite HTMLキャッシュ: parse_errorは同じHTTPをretryしない", async (t) => {

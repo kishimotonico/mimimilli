@@ -95,6 +95,9 @@ export function listDlsiteMissingFields(info: DlsiteWorkInfo): DlsiteOptionalFie
   return missing;
 }
 
+/** parseDlsiteHtml の出力を変えたら上げる。キャッシュ済みの解析結果はこの版が違うと読み直される */
+export const DLSITE_PARSER_VERSION = 1;
+
 /** DLsite 作品ページの HTML から作品情報を抽出する（pure） */
 export function parseDlsiteHtml(html: string, rjCode: string): DlsiteFetchResult {
   const $ = load(html);

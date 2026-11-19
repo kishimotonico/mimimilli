@@ -93,16 +93,30 @@ export type DlsiteCacheOutcome = keyof typeof DEFAULT_DLSITE_CACHE_TTLS_MS;
 /** DLsite取得キャッシュの通常取得判断結果。fresh HTML / 有効な失敗記録 / miss のいずれか。
  *  real adapterのDlsiteCache（SQLite実装）とfixture adapterの両方が、この型を通じて
  *  projectDlsiteStateと合成する（real/fixtureで合成ロジックを重複実装しない）。 */
+type DlsiteHtmlResolutionHead = {
+  kind: "html";
+  outcome: DlsiteHtmlOutcome;
+  fetchedAt: number;
+  expiresAt: number;
+};
+type DlsiteFailureResolution = {
+  kind: "failure";
+  outcome: DlsiteFailureOutcome;
+  attemptedAt: number;
+  expiresAt: number;
+};
+type DlsiteMissResolution = { kind: "miss"; reason: DlsiteCacheMissReason };
+
+/** 本文を読まずに判断だけを返す解決結果。`DlsiteCacheResolution` から `html` を除いた形 */
+export type DlsiteCacheResolutionHead =
+  | DlsiteHtmlResolutionHead
+  | DlsiteFailureResolution
+  | DlsiteMissResolution;
+
 export type DlsiteCacheResolution =
-  | {
-      kind: "html";
-      outcome: DlsiteHtmlOutcome;
-      fetchedAt: number;
-      expiresAt: number;
-      html: string;
-    }
-  | { kind: "failure"; outcome: DlsiteFailureOutcome; attemptedAt: number; expiresAt: number }
-  | { kind: "miss"; reason: DlsiteCacheMissReason };
+  | (DlsiteHtmlResolutionHead & { html: string })
+  | DlsiteFailureResolution
+  | DlsiteMissResolution;
 
 function isoFromEpochMs(epochMs: number): string {
   return new Date(epochMs).toISOString();
@@ -287,6 +301,23 @@ export const dlsiteWorkInfoSchema = z.object({
   url: z.string(),
 });
 export type DlsiteWorkInfo = z.infer<typeof dlsiteWorkInfoSchema>;
+
+export const DLSITE_COVER_KEY_PATTERN = /^[0-9a-f]{64}$/;
+
+/** DLsiteキャッシュに保存済みのカバー。画面はkeyとversionから配信URLを組み立て、DLsiteのURLは読まない */
+export const dlsiteCachedCoverSchema = z.object({
+  key: z.string().regex(DLSITE_COVER_KEY_PATTERN),
+  /** カバーキャッシュのfetched_at。変わればURLが変わる */
+  version: z.number().int().positive(),
+});
+export type DlsiteCachedCover = z.infer<typeof dlsiteCachedCoverSchema>;
+
+/** POST /dlsite/fetch-by-code の成功応答 */
+export const dlsiteFetchByCodeResponseSchema = z.object({
+  info: dlsiteWorkInfoSchema,
+  cachedCover: dlsiteCachedCoverSchema.nullable(),
+});
+export type DlsiteFetchByCodeResponse = z.infer<typeof dlsiteFetchByCodeResponseSchema>;
 
 /** DLsite取得情報→タグの変換テーブル。cardinalityは `DlsiteWorkInfo` の型が表す事実
  *  （circle・ageRatingは単一nullable、cvs・genreTagsは配列）をそのまま写したもので、
@@ -637,7 +668,9 @@ export type DlsiteProductFetchOutcome = "fetched" | "not_found" | "failed";
 export type DlsiteFetchState = "none" | "fetched" | "not_found" | "failed";
 
 /** キャッシュの解決結果から導く取得状態。ジョブの終端状態はこれと一致する */
-export function dlsiteFetchStateOfResolution(resolution: DlsiteCacheResolution): DlsiteFetchState {
+export function dlsiteFetchStateOfResolution(
+  resolution: DlsiteCacheResolutionHead,
+): DlsiteFetchState {
   if (resolution.kind === "miss") return "none";
   if (resolution.kind === "failure")
     return resolution.outcome === "not_found" ? "not_found" : "failed";

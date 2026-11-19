@@ -1,8 +1,42 @@
 // サーバー側スキャンジョブの HTTP / SSE 契約。
 import { z } from "zod";
 import { dataIntegrityWarningSchema } from "./dataIntegrity.ts";
-import { rjCodeFormatSchema } from "./dlsite.ts";
+import { dlsiteCachedCoverSchema, rjCodeFormatSchema } from "./dlsite.ts";
 import { workspacePathSchema } from "./media.ts";
+
+/** スキャンが見つけた候補フォルダー。DLsiteの状態は持たない（サーバーが候補一覧を返すときに導く） */
+export type ScanCandidateFolder = {
+  path: z.infer<typeof workspacePathSchema>;
+  inferredTitle: string;
+  audioFileCount: number;
+  audioBreakdown: { extension: string; count: number }[];
+  /** フォルダー名から検出したRJコード。未検出は null */
+  detectedRjCode: string | null;
+};
+
+export const scanCandidateDlsiteSchema = z.discriminatedUnion("state", [
+  /** 未取得（キャッシュに無い・TTL切れ・RJコードなし） */
+  z.object({ state: z.literal("none") }),
+  /** 取得ジョブで待機中または取得中 */
+  z.object({ state: z.literal("fetching") }),
+  z.object({
+    state: z.literal("fetched"),
+    title: z.string(),
+    /** null はカバーの先取りに失敗してキャッシュに無い */
+    cover: dlsiteCachedCoverSchema.nullable(),
+  }),
+  z.object({ state: z.literal("not_found") }),
+  z.object({ state: z.literal("failed") }),
+]);
+export type ScanCandidateDlsite = z.infer<typeof scanCandidateDlsiteSchema>;
+export type ScanCandidateDlsiteState = ScanCandidateDlsite["state"];
+
+/** 同じRJコードを持つ、行方不明（catalogでmissing）の作品 */
+export const scanCandidateMissingWorkSchema = z.object({
+  workId: z.string(),
+  title: z.string(),
+});
+export type ScanCandidateMissingWork = z.infer<typeof scanCandidateMissingWorkSchema>;
 
 export const scanCandidateSchema = z.object({
   path: workspacePathSchema,
@@ -11,8 +45,11 @@ export const scanCandidateSchema = z.object({
   audioBreakdown: z.array(
     z.object({ extension: z.string().min(1), count: z.number().int().positive() }),
   ),
-  /** フォルダー名から検出したRJコード。未検出は null。 */
+  /** 直したRJコード、なければフォルダー名から検出したRJコード。どちらも無ければ null。 */
   rjCode: z.string().nullable(),
+  /** rjCode が null のときは常に none */
+  dlsite: scanCandidateDlsiteSchema,
+  missingWorks: z.array(scanCandidateMissingWorkSchema),
 });
 export type ScanCandidate = z.infer<typeof scanCandidateSchema>;
 
@@ -29,11 +66,17 @@ export const scanCandidatesMutationSchema = z.object({
     .min(1)
     .refine((paths) => new Set(paths).size === paths.length, "候補パスが重複しています"),
 });
+/** 登録するRJコードはサーバーの候補一覧が持つ値（直した値、なければ検出した値）を使う */
 export const scanCandidateRegisterItemSchema = z.object({
   path: workspacePathSchema,
-  /** 省略時はフォルダー名から自動検出。空文字はRJコードなしの明示。値ありは検証・正規化して mimimilli.json へ書き込む。 */
-  rjCode: z.union([z.literal(""), rjCodeFormatSchema]).optional(),
 });
+/** 空文字はRJコードなしの明示。値ありは検証・正規化して候補一覧に保持する。 */
+export const scanCandidateRjCodeRequestSchema = z.object({
+  path: workspacePathSchema,
+  rjCode: z.union([z.literal(""), rjCodeFormatSchema]),
+});
+export type ScanCandidateRjCodeRequest = z.infer<typeof scanCandidateRjCodeRequestSchema>;
+export const scanCandidateRjCodeResponseSchema = z.object({ candidate: scanCandidateSchema });
 export const scanCandidatesRegisterRequestSchema = z.object({
   items: z
     .array(scanCandidateRegisterItemSchema)

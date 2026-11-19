@@ -85,7 +85,7 @@ export function createRealAdapter(
     user,
     scanner,
     thumbnailCacheDir,
-    dlsiteCache: dlsiteCache.config,
+    dlsiteCache,
     runFileScanInWorker: assembly.runFileScanInWorker ?? runFileScanInWorker,
   });
   const { stageCover, ...dlsiteMethods } = createDlsiteMethods({

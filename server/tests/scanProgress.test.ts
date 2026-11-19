@@ -9,7 +9,7 @@ import { ScanJobManager } from "../src/scanJobManager.ts";
 import { pollUntil } from "./helpers/poll.ts";
 
 function createScanJobManager(adapter: DataAdapter, terminalLimit?: number): ScanJobManager {
-  return new ScanJobManager(adapter, terminalLimit);
+  return new ScanJobManager(adapter, { terminalLimit });
 }
 
 type EmitProgress = (processed: number) => void;

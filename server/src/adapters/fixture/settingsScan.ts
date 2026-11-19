@@ -1,5 +1,11 @@
-import { META_FILE_NAME, workspacePath } from "@mimimilli/shared";
-import type { ScanCandidate, ScanCandidatesRegisterResponse, ScanResult } from "@mimimilli/shared";
+import { META_FILE_NAME, dlsiteFetchStateOfResolution, workspacePath } from "@mimimilli/shared";
+import type {
+  ScanCandidate,
+  ScanCandidateDlsite,
+  ScanCandidateFolder,
+  ScanCandidatesRegisterResponse,
+  ScanResult,
+} from "@mimimilli/shared";
 import type {
   RootReconfigurationAdapter,
   RootReconfigurationRecord,
@@ -7,11 +13,19 @@ import type {
   SettingsAdapter,
   StoredSettings,
 } from "../../adapter/index.ts";
+import { CandidatePoolChangedError } from "../../errors.ts";
 import type { FixtureWorkRecord } from "./data.ts";
 import { isFsPathWithin, normalizeFsPath } from "./fsResolve.ts";
 import { checkWorkPlacement } from "./playback.ts";
+import { fixtureDlsiteCoverKey } from "./dlsiteMethods.ts";
 import { FIXTURE_UNREADABLE_ROOT } from "./scenarios.ts";
-import { requireFixtureRoot, setDlsiteLinkage, type FixtureState } from "./state.ts";
+import {
+  dlsiteLinkageOf,
+  fixtureDlsiteResolutionHead,
+  requireFixtureRoot,
+  setDlsiteLinkage,
+  type FixtureState,
+} from "./state.ts";
 
 const FIXTURE_SCAN_STEP_MS = 20;
 const FIXTURE_ROOT_REBUILD_STEP_MS = 250;
@@ -20,13 +34,53 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** 候補承認時のRJコード解決（候補登録APIの規約と同じ）。
- *  rjCode省略=候補が検出した値を採用 / ""=明示的になし / 値=そのまま採用。 */
-export function resolveRegisteredRjCode(
-  candidateRjCode: string | null,
-  itemRjCode: string | undefined,
-): string | null {
-  return itemRjCode === undefined ? candidateRjCode : itemRjCode;
+/** 直したコードがあればそれ、なければ検出したコード */
+function effectiveRjCode(state: FixtureState, folder: ScanCandidateFolder): string | null {
+  return state.scanCandidateRjCodeOverrides.has(folder.path)
+    ? (state.scanCandidateRjCodeOverrides.get(folder.path) ?? null)
+    : folder.detectedRjCode;
+}
+
+function deriveDlsite(state: FixtureState, rjCode: string | null): ScanCandidateDlsite {
+  if (!rjCode) return { state: "none" };
+  const fetchState = dlsiteFetchStateOfResolution(fixtureDlsiteResolutionHead(state, rjCode));
+  if (fetchState !== "fetched") return { state: fetchState };
+  const fetched = state.dlsiteFetched.get(rjCode.toUpperCase());
+  if (!fetched) return { state: "none" };
+  const key = fetched.info.coverUrl ? fixtureDlsiteCoverKey(fetched.info.coverUrl) : null;
+  const cover = key ? state.dlsiteCovers.get(key) : undefined;
+  return {
+    state: "fetched",
+    title: fetched.info.title,
+    cover: key && cover ? { key, version: cover.fetchedAt } : null,
+  };
+}
+
+function toCandidate(state: FixtureState, folder: ScanCandidateFolder): ScanCandidate {
+  const rjCode = effectiveRjCode(state, folder);
+  const missingWorks = rjCode
+    ? state.works
+        .filter(
+          (work) =>
+            work.status === "missing" &&
+            dlsiteLinkageOf(state, work.id).rjCode?.toUpperCase() === rjCode,
+        )
+        .map((work) => ({ workId: work.id, title: work.title }))
+    : [];
+  return {
+    path: folder.path,
+    inferredTitle: folder.inferredTitle,
+    audioFileCount: folder.audioFileCount,
+    audioBreakdown: folder.audioBreakdown,
+    rjCode,
+    dlsite: deriveDlsite(state, rjCode),
+    missingWorks,
+  };
+}
+
+function visibleFolders(state: FixtureState): ScanCandidateFolder[] {
+  const excluded = new Set(state.scanCandidateExclusions);
+  return state.scanCandidates.filter((folder) => !excluded.has(folder.path));
 }
 
 async function runPseudoScan(
@@ -58,6 +112,7 @@ async function runPseudoScan(
   state.works = state.works.map((work) => checkWorkPlacement(state, work));
   state.lastScanTime = new Date().toISOString();
   state.scanCandidates = [...state.scanCandidatePool];
+  state.scanCandidateRjCodeOverrides.clear();
   return {
     registered: state.works.length,
     insertedWorkIds: state.scanInsertedWorkIds,
@@ -106,6 +161,7 @@ export function createSettingsScanMethods(
       if (state.rootFolder !== null && state.rootFolder !== rootFolder) {
         state.scanCandidateExclusions = [];
         state.scanCandidates = [];
+        state.scanCandidateRjCodeOverrides.clear();
       }
       state.rootFolder = rootFolder;
       state.rootReconfiguration = { phase: "running" };
@@ -144,11 +200,17 @@ export function createSettingsScanMethods(
       };
     },
     async listScanCandidates(): Promise<ScanCandidate[]> {
-      const excluded = new Set(state.scanCandidateExclusions);
-      return state.scanCandidates.filter((candidate) => !excluded.has(candidate.path));
+      return visibleFolders(state).map((folder) => toCandidate(state, folder));
+    },
+    async setScanCandidateRjCode(path, rjCode): Promise<ScanCandidate> {
+      const folder = visibleFolders(state).find((candidate) => candidate.path === path);
+      if (!folder) throw new CandidatePoolChangedError();
+      if (rjCode === folder.detectedRjCode) state.scanCandidateRjCodeOverrides.delete(path);
+      else state.scanCandidateRjCodeOverrides.set(path, rjCode);
+      return toCandidate(state, folder);
     },
     async registerScanCandidates(items): Promise<ScanCandidatesRegisterResponse> {
-      const candidatesByPath = new Map<string, ScanCandidate>(
+      const candidatesByPath = new Map<string, ScanCandidateFolder>(
         state.scanCandidates.map((candidate) => [candidate.path, candidate]),
       );
       const rootAbs = normalizeFsPath(requireFixtureRoot(state));
@@ -159,7 +221,9 @@ export function createSettingsScanMethods(
       const registered = items.flatMap((item) => {
         const candidate = candidatesByPath.get(item.path);
         if (!candidate) return [];
-        const rjCode = resolveRegisteredRjCode(candidate.rjCode, item.rjCode);
+        const rjCode = state.scanCandidateRjCodeOverrides.has(candidate.path)
+          ? (state.scanCandidateRjCodeOverrides.get(candidate.path) ?? "")
+          : candidate.detectedRjCode;
         const physicalPath = normalizeFsPath(`${rootAbs}/${candidate.path}`);
         const work: FixtureWorkRecord = {
           id: crypto.randomUUID(),
@@ -187,7 +251,8 @@ export function createSettingsScanMethods(
           : [{ path: workspacePath(item.path), message: "候補が見つかりません" }],
       );
       const registeredPaths = new Set(registered.map((candidate) => candidate.path));
-      const unregistered = (candidate: ScanCandidate) => !registeredPaths.has(candidate.path);
+      const unregistered = (candidate: ScanCandidateFolder) => !registeredPaths.has(candidate.path);
+      for (const path of registeredPaths) state.scanCandidateRjCodeOverrides.delete(path);
       state.scanCandidatePool = state.scanCandidatePool.filter(unregistered);
       state.scanCandidates = state.scanCandidates.filter(unregistered);
       return { registered, failures };

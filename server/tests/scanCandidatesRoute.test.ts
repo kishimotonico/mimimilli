@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  scanCandidateRegisterItemSchema,
+  scanCandidateRjCodeRequestSchema,
   scanCandidateSchema,
   scanCandidatesRegisterResponseSchema,
   workspacePath,
 } from "@mimimilli/shared";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { createApp } from "./helpers/testApp.ts";
+import { pollUntil } from "./helpers/poll.ts";
 import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
 
 // fixture はシナリオ new-work の候補を持つ（未登録作品のほか、fixture 固有の入れ子候補「朗読/候補」）。
@@ -38,6 +39,8 @@ contract("候補一覧は未登録フォルダーの推定タイトルと音声�
     audioFileCount: 2,
     audioBreakdown: [{ extension: "mp3", count: 2 }],
     rjCode: null,
+    dlsite: { state: "none" },
+    missingWorks: [],
   });
 });
 
@@ -74,23 +77,79 @@ contract("候補の除外は一覧から隠し、除外解除で戻る", async (
   assert.equal(hasTarget(await listCandidates(harness)), true);
 });
 
-contract("候補登録のrjCodeは正規化して作品のDLsite連携に反映される", async (harness) => {
-  const registered = await harness.send("POST", "/api/scan/candidates/register", {
-    items: [{ path: "未登録作品", rjCode: "rj1234567" }],
-  });
-  assert.equal(registered.status, 201);
-  const work = await harness.json(`/api/works/${registered.body.registered[0].workId}`);
-  assert.equal(work.body.dlsite.rjCode, "RJ1234567");
-});
+contract(
+  "候補のRJコードを直すと正規化して一覧に保持され、登録はその値で行われる",
+  async (harness) => {
+    const fixed = await harness.send("POST", "/api/scan/candidates/rj-code", {
+      path: "未登録作品",
+      rjCode: "rj1234567",
+    });
+    assert.equal(fixed.status, 200);
+    assert.equal(scanCandidateSchema.parse(fixed.body.candidate).rjCode, "RJ1234567");
+    const listed = (await listCandidates(harness)).find((entry) => entry.path === TARGET);
+    assert.equal(listed?.rjCode, "RJ1234567");
 
-contract("候補登録APIは不正な形式のRJコードを400で拒否し、何も登録しない", async (harness) => {
-  const before = (await harness.json("/api/works")).body.total;
-  const response = await harness.send("POST", "/api/scan/candidates/register", {
-    items: [{ path: "未登録作品", rjCode: "RJ123" }],
+    const registered = await harness.send("POST", "/api/scan/candidates/register", {
+      items: [{ path: "未登録作品" }],
+    });
+    assert.equal(registered.status, 201);
+    const work = await harness.json(`/api/works/${registered.body.registered[0].workId}`);
+    assert.equal(work.body.dlsite.rjCode, "RJ1234567");
+  },
+);
+
+contract("RJコード修正は不正な形式を400で拒否し、一覧の値を変えない", async (harness) => {
+  const response = await harness.send("POST", "/api/scan/candidates/rj-code", {
+    path: "未登録作品",
+    rjCode: "RJ123",
   });
   assert.equal(response.status, 400);
-  assert.equal((await harness.json("/api/works")).body.total, before);
-  assert.equal(hasTarget(await listCandidates(harness)), true);
+  const listed = (await listCandidates(harness)).find((entry) => entry.path === TARGET);
+  assert.equal(listed?.rjCode, null);
+});
+
+contract("除外してから戻しても、直したRJコードは残る", async (harness) => {
+  await harness.send("POST", "/api/scan/candidates/rj-code", {
+    path: "未登録作品",
+    rjCode: "RJ1234567",
+  });
+  await harness.send("POST", "/api/scan/candidates/exclude", { paths: ["未登録作品"] });
+  const excludedFix = await harness.send("POST", "/api/scan/candidates/rj-code", {
+    path: "未登録作品",
+    rjCode: "RJ7654321",
+  });
+  assert.equal(excludedFix.status, 409);
+  await harness.send("POST", "/api/scan/candidates/exclusions/restore", {
+    paths: ["未登録作品"],
+  });
+  const listed = (await listCandidates(harness)).find((entry) => entry.path === TARGET);
+  assert.equal(listed?.rjCode, "RJ1234567");
+});
+
+contract(
+  "次のスキャンで、直したRJコードは破棄されフォルダー名から検出し直される",
+  async (harness) => {
+    await harness.send("POST", "/api/scan/candidates/rj-code", {
+      path: "未登録作品",
+      rjCode: "RJ1234567",
+    });
+    const started = await harness.send("POST", "/api/scan");
+    assert.equal(started.status, 202);
+    await pollUntil(async () => {
+      const job = await harness.json(`/api/scan/${started.body.job.id}`);
+      return job.body.status === "completed";
+    });
+    const listed = (await listCandidates(harness)).find((entry) => entry.path === TARGET);
+    assert.equal(listed?.rjCode, null);
+  },
+);
+
+contract("RJコード修正は候補にないパスを409で拒否する", async (harness) => {
+  const response = await harness.send("POST", "/api/scan/candidates/rj-code", {
+    path: "存在しない候補",
+    rjCode: "RJ1234567",
+  });
+  assert.equal(response.status, 409);
 });
 
 // real のみ: フォルダー名由来のRJコードと、省略・空文字の区別は実ファイルの推定に依存する
@@ -106,10 +165,16 @@ const realContract = defineContract(
 );
 
 realContract(
-  "候補登録のrjCodeは省略ならフォルダー名からの推定値、空文字なら明示的なしとして保持される",
+  "候補登録のRJコードは、直さなければフォルダー名からの推定値、なしに直せば明示的なしとして保持される",
   async (harness) => {
+    const fixed = await harness.send("POST", "/api/scan/candidates/rj-code", {
+      path: "RJ234567_空指定",
+      rjCode: "",
+    });
+    assert.equal(fixed.status, 200);
+    assert.equal(fixed.body.candidate.rjCode, null);
     const registered = await harness.send("POST", "/api/scan/candidates/register", {
-      items: [{ path: "RJ123456_推定あり" }, { path: "RJ234567_空指定", rjCode: "" }],
+      items: [{ path: "RJ123456_推定あり" }, { path: "RJ234567_空指定" }],
     });
     assert.equal(registered.status, 201);
     const rjCodes = new Map<string, string | null>();
@@ -220,23 +285,21 @@ test("候補登録APIは全失敗を成功なしの結果として201で返す",
   }
 });
 
-test("scanCandidateRegisterItemSchema: RJ/VJコードの形式を検証・正規化し、空文字はそのまま通す", () => {
-  const lowercase = scanCandidateRegisterItemSchema.safeParse({
+test("scanCandidateRjCodeRequestSchema: RJ/VJコードの形式を検証・正規化し、空文字はそのまま通す", () => {
+  const lowercase = scanCandidateRjCodeRequestSchema.safeParse({
     path: "候補作品",
     rjCode: "rj1234567",
   });
   assert.equal(lowercase.success, true);
   if (lowercase.success) assert.equal(lowercase.data.rjCode, "RJ1234567");
 
-  const empty = scanCandidateRegisterItemSchema.safeParse({ path: "候補作品", rjCode: "" });
+  const empty = scanCandidateRjCodeRequestSchema.safeParse({ path: "候補作品", rjCode: "" });
   assert.equal(empty.success, true);
   if (empty.success) assert.equal(empty.data.rjCode, "");
 
-  const omitted = scanCandidateRegisterItemSchema.safeParse({ path: "候補作品" });
-  assert.equal(omitted.success, true);
-  if (omitted.success) assert.equal(omitted.data.rjCode, undefined);
+  assert.equal(scanCandidateRjCodeRequestSchema.safeParse({ path: "候補作品" }).success, false);
 
-  const tooShort = scanCandidateRegisterItemSchema.safeParse({
+  const tooShort = scanCandidateRjCodeRequestSchema.safeParse({
     path: "候補作品",
     rjCode: "RJ123",
   });

@@ -7,6 +7,8 @@ import {
   scanCandidatesRegisterRequestSchema,
   scanCandidatesRegisterResponseSchema,
   scanCandidatesResponseSchema,
+  scanCandidateRjCodeRequestSchema,
+  scanCandidateRjCodeResponseSchema,
   scanCandidateExclusionsResponseSchema,
   startScanRequestSchema,
   startScanResponseSchema,
@@ -86,6 +88,23 @@ export function scanRoute(
   app.get("/scan/candidates", async (c) => {
     const candidates = await jobs.listCandidates();
     return c.json(scanCandidatesResponseSchema.parse({ candidates }));
+  });
+
+  app.post("/scan/candidates/rj-code", async (c) => {
+    const data = await readJsonBody(
+      c,
+      scanCandidateRjCodeRequestSchema,
+      "候補のRJコードの内容が不正です",
+    );
+    try {
+      const candidate = await jobs.setCandidateRjCode(data.path, data.rjCode || null);
+      return c.json(scanCandidateRjCodeResponseSchema.parse({ candidate }));
+    } catch (error) {
+      if (error instanceof CandidatePoolChangedError) {
+        conflict(error.message);
+      }
+      throw error;
+    }
   });
 
   app.post("/scan/candidates/exclude", async (c) => {

@@ -34,9 +34,16 @@ export class ActiveScanConflictError extends Error {
   }
 }
 
+export interface ScanJobManagerOptions {
+  terminalLimit?: number;
+  /** 候補のRJコードが取得ジョブで待機中・取得中かどうか */
+  dlsiteInFlightState?: (productCode: string) => "queued" | "fetching" | null;
+}
+
 export class ScanJobManager {
   private readonly adapter: DataAdapter;
   private readonly terminalLimit: number;
+  private readonly dlsiteInFlightState: NonNullable<ScanJobManagerOptions["dlsiteInFlightState"]>;
   private readonly jobs = new Map<string, Job>();
   private activeId: string | null = null;
   private runCompletion: Promise<void> | null = null;
@@ -44,9 +51,10 @@ export class ScanJobManager {
   // terminal job はpruneTerminalで消えるため、前回結果はディスク永続化せずここにだけ保持する。
   private lastCompleted: ScanLastResultResponse | null = null;
 
-  constructor(adapter: DataAdapter, terminalLimit = 16) {
+  constructor(adapter: DataAdapter, options: ScanJobManagerOptions = {}) {
     this.adapter = adapter;
-    this.terminalLimit = terminalLimit;
+    this.terminalLimit = options.terminalLimit ?? 16;
+    this.dlsiteInFlightState = options.dlsiteInFlightState ?? (() => null);
   }
 
   start(options?: { full?: boolean }): ScanJobSnapshot {
@@ -114,7 +122,20 @@ export class ScanJobManager {
   }
 
   async listCandidates(): Promise<ScanCandidate[]> {
-    return this.adapter.listScanCandidates();
+    return (await this.adapter.listScanCandidates()).map((candidate) =>
+      this.withInFlightDlsite(candidate),
+    );
+  }
+
+  async setCandidateRjCode(path: string, rjCode: string | null): Promise<ScanCandidate> {
+    return this.withInFlightDlsite(await this.adapter.setScanCandidateRjCode(path, rjCode));
+  }
+
+  private withInFlightDlsite(candidate: ScanCandidate): ScanCandidate {
+    if (candidate.rjCode === null || this.dlsiteInFlightState(candidate.rjCode) === null) {
+      return candidate;
+    }
+    return { ...candidate, dlsite: { state: "fetching" } };
   }
 
   async registerCandidates(

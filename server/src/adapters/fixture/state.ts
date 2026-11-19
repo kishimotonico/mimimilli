@@ -2,11 +2,12 @@ import { DEFAULT_TAG_PREFIXES, projectDlsiteState, toDlsiteLinkageStatus } from 
 import type {
   DataIntegrityWarning,
   DlsiteCacheResolution,
+  DlsiteCacheResolutionHead,
   DlsiteWorkInfo,
   InvalidMetaFile,
   MetaDlsiteState,
   ResumeBody,
-  ScanCandidate,
+  ScanCandidateFolder,
   UpdatedWork,
   IdentityConflict,
   SmartFolder,
@@ -39,6 +40,18 @@ export function requireFixtureRoot(state: FixtureState): string {
   return requireConfiguredRoot(state.rootFolder);
 }
 
+export interface FixtureDlsiteFetched {
+  info: DlsiteWorkInfo;
+  fetchedAt: number;
+  expiresAt: number;
+}
+
+export interface FixtureDlsiteCover {
+  body: Uint8Array;
+  contentType: string;
+  fetchedAt: number;
+}
+
 export interface FixtureState {
   rootFolder: string | null;
   lastScanTime: string | null;
@@ -56,8 +69,10 @@ export interface FixtureState {
   dlsiteLinkages: Map<string, MetaDlsiteState>;
   /** rjCodeごとのDLsite取得キャッシュ相当。realのDlsiteCacheに対応する。 */
   dlsiteFetchFailures: Map<string, DlsiteCacheResolution>;
-  /** rjCodeごとの取得済み情報（realのDlsiteCacheのHTML snapshot相当）。 */
-  dlsiteFetched: Map<string, DlsiteWorkInfo>;
+  /** rjCodeごとの取得済み情報（realのDlsiteCacheのHTML snapshotと解析結果相当）。 */
+  dlsiteFetched: Map<string, FixtureDlsiteFetched>;
+  /** カバーキャッシュのキーごとのカバー画像（realのdlsite_cover_entries相当）。 */
+  dlsiteCovers: Map<string, FixtureDlsiteCover>;
   /** 編集用カバー列（表示用 cover と独立。unmeasured を表現する） */
   coverColumns: Map<string, FixtureCoverColumns>;
   tagPrefixes: TagPrefix[];
@@ -75,9 +90,11 @@ export interface FixtureState {
   scanCandidateExclusions: string[];
   identityConflicts: IdentityConflict[];
   /** scan() が見つける候補。rootを変えても変わらない（fixtureには物理FSがない） */
-  scanCandidatePool: ScanCandidate[];
+  scanCandidatePool: ScanCandidateFolder[];
   /** 直近のscan以降に有効な候補session。root変更で破棄し、次のscanで作り直す */
-  scanCandidates: ScanCandidate[];
+  scanCandidates: ScanCandidateFolder[];
+  /** 候補のRJコードの直し。値がnullのエントリはRJコードなしの明示。scanで破棄する */
+  scanCandidateRjCodeOverrides: Map<string, string | null>;
   invalidMetaFiles: InvalidMetaFile[];
   /** listSummaries でタグ等の不整合により除外した作品の報告（シナリオ errors のみ） */
   dataIntegrityWarning: DataIntegrityWarning | undefined;
@@ -132,6 +149,25 @@ export function dlsiteFetchFailureFor(
   const entry = state.dlsiteFetchFailures.get(normalizeDlsiteCacheKey(rjCode));
   if (!entry || entry.kind === "miss") return null;
   return entry.expiresAt > Date.now() ? entry : null;
+}
+
+/** realのDlsiteCache.resolveHeadと同じ順（有効な失敗の記録→TTL内の取得済み→miss）で判断する。 */
+export function fixtureDlsiteResolutionHead(
+  state: FixtureState,
+  rjCode: string,
+): DlsiteCacheResolutionHead {
+  const key = normalizeDlsiteCacheKey(rjCode);
+  const failure = dlsiteFetchFailureFor(state, key);
+  if (failure) return failure;
+  const fetched = state.dlsiteFetched.get(key);
+  if (!fetched) return { kind: "miss", reason: "not_cached" };
+  if (fetched.expiresAt <= Date.now()) return { kind: "miss", reason: "ttl_expired" };
+  return {
+    kind: "html",
+    outcome: "ok",
+    fetchedAt: fetched.fetchedAt,
+    expiresAt: fetched.expiresAt,
+  };
 }
 
 /** 作品レコードとlinkage・取得キャッシュから、API向けの合成済みWorkSummaryを読み出し時に組み立てる。
@@ -225,6 +261,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     dlsiteLinkages,
     dlsiteFetchFailures,
     dlsiteFetched: new Map(),
+    dlsiteCovers: new Map(),
     coverColumns,
     tagPrefixes: DEFAULT_TAG_PREFIXES.map((def) => ({ ...def })),
     smartFolders: scenario.smartFolders,
@@ -238,6 +275,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     identityConflicts: options.identityConflicts ?? scenario.identityConflicts,
     scanCandidatePool: scenario.scanCandidates,
     scanCandidates: scenario.scanCandidates,
+    scanCandidateRjCodeOverrides: new Map(),
     invalidMetaFiles: scenario.invalidMetaFiles,
     dataIntegrityWarning:
       scenario.id === "errors"

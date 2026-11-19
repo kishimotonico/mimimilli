@@ -82,6 +82,8 @@ test("選択した候補だけを登録し、除外した候補は以後返さ�
       audioFileCount: 1,
       audioBreakdown: [{ extension: "wav", count: 1 }],
       rjCode: null,
+      dlsite: { state: "none" },
+      missingWorks: [],
     },
   ]);
 

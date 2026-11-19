@@ -457,6 +457,22 @@ export class WorkQueryRepository {
     return rows.map((row) => row.workId);
   }
 
+  /** 行方不明（missing）でRJコードを持つ作品。候補に「同じRJコードの行方不明の作品」を付記するために引く */
+  listMissingWorksWithRjCode(): Array<{ rjCode: string; workId: string; title: string }> {
+    return this.db.sqlite
+      .query(
+        `SELECT upper(json_extract(work_dlsite.state_json, '$.rjCode')) AS rjCode,
+                works.id AS workId, works.title AS title
+         FROM main.works
+         INNER JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
+         WHERE works.status = 'missing'
+           AND json_extract(work_dlsite.state_json, '$.rjCode') IS NOT NULL
+           AND json_extract(work_dlsite.state_json, '$.rjCode') != ''
+         ORDER BY works.title, works.id`,
+      )
+      .all() as Array<{ rjCode: string; workId: string; title: string }>;
+  }
+
   queryDlsiteNotifications(
     kind: DlsiteNotificationKind,
     query: Required<DlsiteNotificationQuery>,

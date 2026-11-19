@@ -1,7 +1,7 @@
 // fixture アダプタのシナリオ機能（ADR-0002 / client/mocks/scenarios.ts からの移植）のテスト。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { scanCandidateSchema, workspacePath } from "@mimimilli/shared";
+import { workspacePath } from "@mimimilli/shared";
 import type { DataAdapter } from "../src/adapter/index.ts";
 import { createApp } from "./helpers/testApp.ts";
 import { pollUntil } from "./helpers/poll.ts";
@@ -15,17 +15,14 @@ import {
   LARGE_SCENARIO_WORK_COUNT,
   SCENARIO_IDS,
 } from "../src/adapters/fixture/scenarios.ts";
-import {
-  createSettingsScanMethods,
-  resolveRegisteredRjCode,
-} from "../src/adapters/fixture/settingsScan.ts";
+import { createSettingsScanMethods } from "../src/adapters/fixture/settingsScan.ts";
 import { createInitialState } from "../src/adapters/fixture/state.ts";
 import { createWorkMethods } from "../src/adapters/fixture/works.ts";
-import type { ScanCandidate } from "@mimimilli/shared";
+import type { ScanCandidateFolder } from "@mimimilli/shared";
 import { configureRoot } from "./helpers/rootFolder.ts";
 
 /** createFixtureAdapter同様の合成だが、候補一覧だけを差し替えられる（候補登録の契約テスト用） */
-function buildFixtureAdapterWithCandidates(candidates: ScanCandidate[]): DataAdapter {
+function buildFixtureAdapterWithCandidates(candidates: ScanCandidateFolder[]): DataAdapter {
   const state = createInitialState({ scenario: "empty" });
   state.rootFolder = "/library";
   state.scanCandidates = candidates;
@@ -238,48 +235,42 @@ test("new-work・default: dataIntegrityWarningは付かない", async () => {
   }
 });
 
-test("fixture: rjCode省略・空文字・指定を区別する", () => {
-  // 省略=候補が検出した値を採用、空文字=明示的になし（real adapterと同じく""のまま）、値=そのまま採用（候補登録APIの規約）。
-  assert.equal(resolveRegisteredRjCode("RJ999999", undefined), "RJ999999");
-  assert.equal(resolveRegisteredRjCode("RJ999999", ""), "");
-  assert.equal(resolveRegisteredRjCode("RJ999999", "RJ111111"), "RJ111111");
-  assert.equal(resolveRegisteredRjCode(null, undefined), null);
-});
-
-test("候補登録APIはHTTP境界の正規化からfixture adapterの保存まで、rjCodeの3状態をモックを挟まず通す", async () => {
-  const candidates = [
-    scanCandidateSchema.parse({
-      path: "自動検出済み",
-      inferredTitle: "自動検出済み",
-      audioFileCount: 1,
-      audioBreakdown: [{ extension: "wav", count: 1 }],
-      rjCode: "RJ700001",
-    }),
-    scanCandidateSchema.parse({
-      path: "明示なし",
-      inferredTitle: "明示なし",
-      audioFileCount: 1,
-      audioBreakdown: [{ extension: "wav", count: 1 }],
-      rjCode: null,
-    }),
-    scanCandidateSchema.parse({
-      path: "値指定",
-      inferredTitle: "値指定",
-      audioFileCount: 1,
-      audioBreakdown: [{ extension: "wav", count: 1 }],
-      rjCode: null,
-    }),
-  ];
-  const app = createApp(buildFixtureAdapterWithCandidates(candidates));
+test("候補登録APIは、サーバーが持つ実効RJコード（検出値・直した値・なしの明示）で登録する", async () => {
+  const folder = (path: string, detectedRjCode: string | null): ScanCandidateFolder => ({
+    path: workspacePath(path),
+    inferredTitle: path,
+    audioFileCount: 1,
+    audioBreakdown: [{ extension: "wav", count: 1 }],
+    detectedRjCode,
+  });
+  const app = createApp(
+    buildFixtureAdapterWithCandidates([
+      folder("自動検出済み", "RJ700001"),
+      folder("明示なし", "RJ700002"),
+      folder("値指定", null),
+      folder("検出なし", null),
+    ]),
+  );
   try {
+    const setRjCode = async (path: string, rjCode: string) => {
+      const response = await app.request("/api/scan/candidates/rj-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path, rjCode }),
+      });
+      assert.equal(response.status, 200);
+    };
+    await setRjCode("明示なし", "");
+    await setRjCode("値指定", "rj1234567");
     const response = await app.request("/api/scan/candidates/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         items: [
           { path: "自動検出済み" },
-          { path: "明示なし", rjCode: "" },
-          { path: "値指定", rjCode: "rj1234567" },
+          { path: "明示なし" },
+          { path: "値指定" },
+          { path: "検出なし" },
         ],
       }),
     });
@@ -299,6 +290,7 @@ test("候補登録APIはHTTP境界の正規化からfixture adapterの保存ま�
     assert.equal(await rjCodeOf("自動検出済み"), "RJ700001");
     assert.equal(await rjCodeOf("明示なし"), "");
     assert.equal(await rjCodeOf("値指定"), "RJ1234567");
+    assert.equal(await rjCodeOf("検出なし"), null);
   } finally {
     await app.shutdown();
   }

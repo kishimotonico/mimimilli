@@ -1,5 +1,5 @@
 import { createElement, type ReactNode } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { workRegisterPreviewSchema } from "@mimimilli/shared";
@@ -94,5 +94,48 @@ describe("RegisterWorkDialog", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "登録" })).toBeDisabled();
+  });
+
+  describe("DLsite取得後のカバー", () => {
+    const info = {
+      rjCode: "RJ123456",
+      title: "取得したタイトル",
+      circle: null,
+      cvs: [],
+      genreTags: [],
+      ageRating: null,
+      coverUrl: "https://img.dlsite.jp/modpub/images2/work/doujin/RJ123000/RJ123456_img_main.jpg",
+      url: "https://www.dlsite.com/maniax/work/=/product_id/RJ123456.html",
+    };
+    const key = "a".repeat(64);
+
+    async function fetchWith(cachedCover: { key: string; version: number } | null) {
+      mockApi({
+        "GET /api/tags": [],
+        "GET /api/tag-prefixes": [],
+        "POST /api/dlsite/fetch-by-code": { info, cachedCover },
+      });
+      renderDialog();
+      fireEvent.change(screen.getByPlaceholderText("RJ123456"), { target: { value: "RJ123456" } });
+      fireEvent.click(screen.getByRole("button", { name: "取得" }));
+      await waitFor(() => expect(screen.getByDisplayValue("取得したタイトル")).toBeInTheDocument());
+    }
+
+    it("キャッシュ済みのカバーはサーバーの配信URLで表示し、DLsiteのURLは読まない", async () => {
+      await fetchWith({ key, version: 1_700_000_000_000 });
+
+      const image = document.querySelector("img");
+      expect(image?.getAttribute("src")).toBe(`/api/media/dlsite-cover/${key}?v=1700000000000`);
+      expect(screen.getByLabelText("カバー画像を適用")).toBeEnabled();
+      expect(screen.getByLabelText("カバー画像を適用")).toBeChecked();
+    });
+
+    it("カバーがキャッシュに無いときは画像を出さず、カバー適用を選べない", async () => {
+      await fetchWith(null);
+
+      expect(document.querySelector("img")).toBeNull();
+      expect(screen.getByLabelText("カバー画像を適用")).toBeDisabled();
+      expect(screen.getByLabelText("カバー画像を適用")).not.toBeChecked();
+    });
   });
 });

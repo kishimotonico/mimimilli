@@ -2,9 +2,9 @@
 // 物理FSブラウズ（/api/fs）と、作品配下ファイルのメディア URL（既存）を束ねる。
 
 import {
-  dlsiteWorkInfoSchema,
+  dlsiteFetchByCodeResponseSchema,
   workRegisterPreviewSchema,
-  type DlsiteWorkInfo,
+  type DlsiteFetchByCodeResponse,
   type WorkRegisterPreview,
   type WorkspacePath,
 } from "@mimimilli/shared";
@@ -24,6 +24,6 @@ export async function getWorkRegisterPreview(path: WorkspacePath): Promise<WorkR
 }
 
 /** 作品未登録時の DLsite メタ取得（RJ/VJコード指定） */
-export async function fetchDlsiteInfoByCode(rjCode: string): Promise<DlsiteWorkInfo> {
-  return postParsed(dlsiteWorkInfoSchema, "/dlsite/fetch-by-code", { rjCode });
+export async function fetchDlsiteInfoByCode(rjCode: string): Promise<DlsiteFetchByCodeResponse> {
+  return postParsed(dlsiteFetchByCodeResponseSchema, "/dlsite/fetch-by-code", { rjCode });
 }

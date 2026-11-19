@@ -5,11 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { InvalidRootFolderError } from "../../src/errors.ts";
 import { createSettingsScanMethods } from "../../src/adapters/real/settingsScanMethods.ts";
-import {
-  DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES,
-  DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES,
-  DEFAULT_DLSITE_CACHE_TTLS_MS,
-} from "../../src/adapters/real/dlsiteCache.ts";
+import { DlsiteCache } from "../../src/adapters/real/dlsiteCache.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { UserWorkStateRepository } from "../../src/adapters/real/userWorkStateRepository.ts";
 import type { Scanner } from "../../src/adapters/real/scanner.ts";
@@ -19,6 +15,7 @@ import { configureRoot } from "../helpers/rootFolder.ts";
 
 test("resolveRootFolder / beginRootReconfiguration は receiver なしで呼び出せる", async () => {
   const rootDir = mkdtempSync(join(tmpdir(), "mimimilli-settings-methods-"));
+  const dlsiteCache = new DlsiteCache({ path: ":memory:" });
   const settings = new Map<string, string>();
   const user = {
     getUserSetting: (key: string) => settings.get(key) ?? null,
@@ -46,6 +43,7 @@ test("resolveRootFolder / beginRootReconfiguration は receiver なしで呼び�
       unmeasuredCovers: [],
       placements: new Map(),
     }),
+    listMissingWorksWithRjCode: () => [],
   };
 
   try {
@@ -61,12 +59,7 @@ test("resolveRootFolder / beginRootReconfiguration は receiver なしで呼び�
       user,
       scanner: undefined as unknown as Scanner,
       thumbnailCacheDir: rootDir,
-      dlsiteCache: {
-        path: ":memory:",
-        ttlsMs: DEFAULT_DLSITE_CACHE_TTLS_MS,
-        maxTransferBytes: DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES,
-        maxExpandedBytes: DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES,
-      },
+      dlsiteCache,
       runFileScanInWorker: async () => {
         throw new Error("scan はこのテストで呼び出されません");
       },
@@ -81,6 +74,7 @@ test("resolveRootFolder / beginRootReconfiguration は receiver なしで呼び�
     });
     assert.equal(settings.get("root_folder"), expectedRoot);
   } finally {
+    dlsiteCache.close();
     rmSync(rootDir, { recursive: true, force: true });
   }
 });

@@ -71,8 +71,9 @@ test("候補登録: RJコード指定をmimimilli.jsonへ書き込む", async (t
   await configureRoot(adapter, root);
   await adapter.scan();
 
+  await adapter.setScanCandidateRjCode(workspacePath("RJ123456_指定作品"), "RJ999999");
   const registered = await adapter.registerScanCandidates([
-    { path: workspacePath("RJ123456_指定作品"), rjCode: "RJ999999" },
+    { path: workspacePath("RJ123456_指定作品") },
   ]);
   assert.equal(registered.registered.length, 1);
 
@@ -93,8 +94,9 @@ test("候補登録: RJコード空文字は自動検出せずRJコードなし�
   await adapter.scan();
   assert.equal((await adapter.listScanCandidates())[0]?.rjCode, "RJ123456");
 
+  await adapter.setScanCandidateRjCode(workspacePath("RJ123456_誤検出を消す作品"), null);
   const registered = await adapter.registerScanCandidates([
-    { path: workspacePath("RJ123456_誤検出を消す作品"), rjCode: "" },
+    { path: workspacePath("RJ123456_誤検出を消す作品") },
   ]);
   assert.equal(registered.registered.length, 1);
 

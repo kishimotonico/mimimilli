@@ -16,9 +16,10 @@ import type {
 import { z } from "zod";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import { type DbLocation } from "./db.ts";
-import type { DlsiteCacheConfig } from "./dlsiteCache.ts";
+import type { DlsiteCache } from "./dlsiteCache.ts";
 import { Scanner } from "./scanner.ts";
-import { ScanCandidateSession } from "./scanCandidateSession.ts";
+import { createCandidateDlsiteSource, groupMissingWorksByRjCode } from "./scanCandidateDlsite.ts";
+import { ScanCandidateSession, type CandidateListContext } from "./scanCandidateSession.ts";
 import { LAST_SCAN_TIME_KEY, scanAndFinalize } from "./scanFinalize.ts";
 import type { ScanExecutionResult } from "./scanTypes.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
@@ -38,7 +39,7 @@ type StoredRootReconfiguration = z.infer<typeof storedRootReconfigurationSchema>
 
 export function createSettingsScanMethods(deps: {
   database: DbLocation;
-  query: Pick<WorkQueryRepository, "listSummaries">;
+  query: Pick<WorkQueryRepository, "listSummaries" | "listMissingWorksWithRjCode">;
   catalog: Pick<
     CatalogWorkRepository,
     | "getScanState"
@@ -60,12 +61,12 @@ export function createSettingsScanMethods(deps: {
   >;
   scanner: Scanner;
   thumbnailCacheDir: string;
-  dlsiteCache: DlsiteCacheConfig;
+  dlsiteCache: DlsiteCache;
   runFileScanInWorker: (
     database: Extract<DbLocation, { kind: "files" }>,
     root: string,
     thumbnailCacheDir: string,
-    dlsiteCache: DlsiteCacheConfig,
+    dlsiteCache: DlsiteCache["config"],
     options: ScanOptions,
   ) => Promise<ScanExecutionResult>;
 }) {
@@ -80,6 +81,11 @@ export function createSettingsScanMethods(deps: {
     runFileScanInWorker,
   } = deps;
   let candidateSession = ScanCandidateSession.empty();
+  const candidateDlsite = createCandidateDlsiteSource(dlsiteCache);
+  const candidateListContext = (): CandidateListContext => ({
+    dlsite: candidateDlsite,
+    missingWorksByRjCode: groupMissingWorksByRjCode(query.listMissingWorksWithRjCode()),
+  });
   const requireRoot = (): string => requireConfiguredRoot(user.getUserSetting(KEY_ROOT_FOLDER));
   const getSettings = async (): Promise<StoredSettings> => ({
     rootFolder: user.getUserSetting(KEY_ROOT_FOLDER),
@@ -95,7 +101,7 @@ export function createSettingsScanMethods(deps: {
         },
         resolve(root),
         resolve(thumbnailCacheDir),
-        dlsiteCache,
+        dlsiteCache.config,
         normalized,
       );
       candidateSession = ScanCandidateSession.fromPool(execution.candidatePool, root);
@@ -217,7 +223,10 @@ export function createSettingsScanMethods(deps: {
       };
     },
     async listScanCandidates(): Promise<ScanCandidate[]> {
-      return candidateSession.listCandidates(user);
+      return candidateSession.listCandidates(user, candidateListContext());
+    },
+    async setScanCandidateRjCode(path: string, rjCode: string | null): Promise<ScanCandidate> {
+      return candidateSession.setRjCode(requireRoot(), path, rjCode, user, candidateListContext());
     },
     async registerScanCandidates(
       items: ScanCandidateRegisterItem[],

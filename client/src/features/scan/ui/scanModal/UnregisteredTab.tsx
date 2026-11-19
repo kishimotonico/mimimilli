@@ -17,9 +17,12 @@ import { cn } from "../../../../shared/lib/cn";
 import { ApiRequestError } from "../../../../shared/api/http";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import { parentDirOf } from "../../../../shared/lib/workspacePath";
-import { excludeScanCandidates, SCAN_QUERY_KEYS } from "../../api";
+import { excludeScanCandidates, setScanCandidateRjCode, SCAN_QUERY_KEYS } from "../../api";
 import { restoreScanCandidateExclusions } from "../../../../entities/scan/api";
-import { refreshScanCandidates } from "../../../../entities/scan/scanCandidatesCache";
+import {
+  refreshScanCandidates,
+  replaceScanCandidate,
+} from "../../../../entities/scan/scanCandidatesCache";
 import { useRegisterScanCandidatesMutation } from "../../../../entities/work/model/workMutations";
 import { scanCandidateHiddenPathsAtom } from "../../../../entities/scan/model/atoms";
 import type { CandidatesRegisteredResult } from "./types";
@@ -44,7 +47,6 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   const queryClient = useQueryClient();
   const setHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
   const [deselectedPaths, setDeselectedPaths] = useState<Set<string>>(() => new Set());
-  const [rjCodeOverrides, setRjCodeOverrides] = useState<Map<string, string>>(() => new Map());
   const [fieldErrors, setFieldErrors] = useState<Map<string, FieldError>>(() => new Map());
   const [editingPath, setEditingPath] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
@@ -53,10 +55,6 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   const headerCheckboxRef = useRef<HTMLInputElement>(null);
   const editingInputRef = useRef<HTMLInputElement>(null);
 
-  const effectiveRjCode = (candidate: ScanCandidate) =>
-    rjCodeOverrides.has(candidate.path)
-      ? (rjCodeOverrides.get(candidate.path) ?? "")
-      : candidate.rjCode;
   const hasFieldError = (path: string) => fieldErrors.has(path);
 
   const selectedCandidates = useMemo(
@@ -169,7 +167,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   const startEdit = (candidate: ScanCandidate) => {
     const pending = fieldErrors.get(candidate.path);
     setEditingPath(candidate.path);
-    setEditingValue(pending ? pending.value : (effectiveRjCode(candidate) ?? ""));
+    setEditingValue(pending ? pending.value : (candidate.rjCode ?? ""));
   };
 
   /** Escapeでの取り消し。保存はせず、書きかけの不正値も含めて編集を破棄する
@@ -179,21 +177,47 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     setEditingPath(null);
   };
 
-  const commitEdit = () => {
-    if (editingPath === null) return;
-    const path = editingPath;
-    const trimmed = editingValue.trim();
-
-    if (trimmed === "") {
-      setRjCodeOverrides((previous) => new Map(previous).set(path, ""));
-      clearFieldError(path);
+  const rjCodeMutation = useMutation({
+    mutationFn: ({ path, rjCode }: { path: ScanCandidate["path"]; rjCode: string }) =>
+      setScanCandidateRjCode(path, rjCode),
+    onSuccess: (candidate) => {
+      replaceScanCandidate(queryClient, candidate);
+      clearFieldError(candidate.path);
       setEditingPath(null);
+      setErrorMessage(null);
+    },
+    onError: async (error) => {
+      setErrorMessage(
+        isCandidatesStale(error)
+          ? "候補が更新されたため表示を更新しました。選び直してください。"
+          : apiErrorMessage(error, "RJコードを直せませんでした"),
+      );
+      setEditingPath(null);
+      if (isCandidatesStale(error)) await refreshScanCandidates(queryClient).catch(() => {});
+    },
+  });
+
+  const commitEdit = () => {
+    if (editingPath === null || rjCodeMutation.isPending) return;
+    const candidate = candidates.find((entry) => entry.path === editingPath);
+    if (!candidate) {
+      setEditingPath(null);
+      return;
+    }
+    const trimmed = editingValue.trim();
+    if (trimmed === "") {
+      if (candidate.rjCode === null) {
+        clearFieldError(candidate.path);
+        setEditingPath(null);
+        return;
+      }
+      rjCodeMutation.mutate({ path: candidate.path, rjCode: "" });
       return;
     }
     const parsed = rjCodeFormatSchema.safeParse(trimmed);
     if (!parsed.success) {
       setFieldErrors((previous) =>
-        new Map(previous).set(path, {
+        new Map(previous).set(candidate.path, {
           value: editingValue,
           message: parsed.error.issues[0]?.message ?? "RJ/VJコードの形式が正しくありません",
         }),
@@ -203,9 +227,12 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
       editingInputRef.current?.focus();
       return;
     }
-    setRjCodeOverrides((previous) => new Map(previous).set(path, parsed.data));
-    clearFieldError(path);
-    setEditingPath(null);
+    if (parsed.data === candidate.rjCode) {
+      clearFieldError(candidate.path);
+      setEditingPath(null);
+      return;
+    }
+    rjCodeMutation.mutate({ path: candidate.path, rjCode: parsed.data });
   };
 
   const handleEditKeyDown = useInlineEditKeyDown({
@@ -214,10 +241,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   });
 
   const handleRegisterSelected = () => {
-    const items = registerableCandidates.map((candidate) => ({
-      path: candidate.path,
-      rjCode: effectiveRjCode(candidate) ?? "",
-    }));
+    const items = registerableCandidates.map((candidate) => ({ path: candidate.path }));
     void register(items);
   };
 
@@ -274,7 +298,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
                 {candidates.map((candidate) => {
                   const rjCodeEditing = editingPath === candidate.path;
                   const rjCodeError = fieldErrors.get(candidate.path);
-                  const rjCode = effectiveRjCode(candidate);
+                  const rjCode = candidate.rjCode;
                   const rjCodeDisplayValue = rjCodeError ? rjCodeError.value : rjCode;
                   const rowHasError = Boolean(rjCodeError);
                   const parentFolder = parentDirOf(candidate.path);

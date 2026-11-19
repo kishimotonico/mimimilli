@@ -23,7 +23,10 @@ export interface SettingsAdapter {
   /** signal はジョブ取消用。 */
   scan(options?: ScanOptions): Promise<ScanResult>;
   listScanDiagnostics(): Promise<ScanDiagnostics>;
+  /** DLsite状態は「取得中」を含まない（取得ジョブの状態はサーバー層が重ねる） */
   listScanCandidates(): Promise<ScanCandidate[]>;
+  /** 候補のRJコードを直す。nullはRJコードなしの明示。候補が一覧に無ければ CandidatePoolChangedError */
+  setScanCandidateRjCode(path: string, rjCode: string | null): Promise<ScanCandidate>;
   registerScanCandidates(
     items: ScanCandidateRegisterItem[],
   ): Promise<ScanCandidatesRegisterResponse>;
