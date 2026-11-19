@@ -21,12 +21,13 @@ import {
   readVerifiedEditSource,
 } from "./workEditSource.ts";
 import type { Scanner } from "./scanner.ts";
-import type { createDlsiteFetch } from "./dlsiteFetch.ts";
+import type { DlsiteCache } from "./dlsiteCache.ts";
+import { stageCachedDlsiteCover } from "./dlsiteCoverStaging.ts";
 
 export interface DlsiteApplyDeps {
   catalog: CatalogWorkRepository;
   scanner: Scanner;
-  fetch: ReturnType<typeof createDlsiteFetch>;
+  dlsiteCache: DlsiteCache;
   requireRoot: () => string;
 }
 
@@ -56,8 +57,7 @@ function applyDlsiteMergeToRaw(
 }
 
 export function createDlsiteApply(deps: DlsiteApplyDeps) {
-  const { catalog, scanner, fetch, requireRoot } = deps;
-  const { stageCover } = fetch;
+  const { catalog, scanner, dlsiteCache, requireRoot } = deps;
 
   async function persistVerified(
     verified: ReturnType<typeof mutateVerifiedMetaSource>,
@@ -79,11 +79,11 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
 
       const coverUrl = body.applyCover ? body.info.coverUrl : null;
       const cover = coverUrl
-        ? await stageCover(
+        ? await stageCachedDlsiteCover(
+            dlsiteCache,
             coverUrl,
             workPlacementOf(current.metaPath).mediaRoot,
             requireRoot(),
-            signal,
           )
         : null;
       if (coverUrl && !cover) throw new CoverSaveError();
@@ -133,9 +133,13 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
 
       const coverUrl = planned.applyCover ? info.coverUrl : null;
       const cover = coverUrl
-        ? await stageCover(coverUrl, workPlacementOf(current.metaPath).mediaRoot, requireRoot())
+        ? await stageCachedDlsiteCover(
+            dlsiteCache,
+            coverUrl,
+            workPlacementOf(current.metaPath).mediaRoot,
+            requireRoot(),
+          )
         : null;
-      if (coverUrl && !cover) return "skipped";
 
       let wrote = false;
       let verified: ReturnType<typeof mutateVerifiedMetaSource>;
@@ -149,6 +153,7 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
             },
             info,
           );
+          if (!cover) diff.applyCover = false;
           const patch = buildDlsiteMissingApplyPatch(
             { tags: source.meta.tags, urls: source.meta.urls, dlsite: source.meta.dlsite },
             info,

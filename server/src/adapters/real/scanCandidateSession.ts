@@ -1,15 +1,20 @@
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import type {
+  DlsiteRegistrationApply,
+  DlsiteWorkInfo,
   ScanCandidate,
   ScanCandidateFolder,
   ScanCandidateMissingWork,
-  ScanCandidateRegisterItem,
   ScanCandidatesRegisterResponse,
 } from "@mimimilli/shared";
 import { CandidatePoolChangedError } from "../../errors.ts";
+import { planDlsiteRegistration } from "@mimimilli/shared";
+import { stageCachedDlsiteCover } from "./dlsiteCoverStaging.ts";
+import type { DlsiteCache } from "./dlsiteCache.ts";
 import { folderTarget } from "./registrationTarget.ts";
 import { deriveCandidateDlsite, type CandidateDlsiteSource } from "./scanCandidateDlsite.ts";
+import type { StagedCover } from "./dlsiteCoverStaging.ts";
 import type { Scanner } from "./scanner.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 
@@ -69,10 +74,10 @@ export class ScanCandidateSession {
       : folder.detectedRjCode;
   }
 
-  /** 直したコードがあればそれ、なければ検出したコード。直して「なし」にしたときは空文字で明示する */
-  private registrationRjCode(folder: ScanCandidateFolder): string | undefined {
+  /** 直して「なし」にしたときは空文字で明示する。検出も上書きもなければnull */
+  private registrationRjCode(folder: ScanCandidateFolder): string | null {
     if (this.rjCodeOverrides.has(folder.path)) return this.rjCodeOverrides.get(folder.path) ?? "";
-    return folder.detectedRjCode ?? undefined;
+    return folder.detectedRjCode;
   }
 
   private listFolders(
@@ -120,33 +125,67 @@ export class ScanCandidateSession {
 
   async registerCandidates(
     root: string,
-    items: ScanCandidateRegisterItem[],
-    scanner: Scanner,
-    user: Pick<UserWorkStateRepository, "listScanCandidateExclusions">,
+    paths: string[],
+    apply: DlsiteRegistrationApply,
+    deps: {
+      scanner: Scanner;
+      user: Pick<UserWorkStateRepository, "listScanCandidateExclusions">;
+      dlsiteCache: Pick<DlsiteCache, "getCover">;
+      readUsableInfo: (productCode: string) => DlsiteWorkInfo | null;
+    },
   ): Promise<ScanCandidatesRegisterResponse> {
     this.assertRootMatches(root);
     const byPath = new Map<string, ScanCandidateFolder>(
-      this.listFolders(user).map((folder) => [folder.path, folder]),
+      this.listFolders(deps.user).map((folder) => [folder.path, folder]),
     );
-    const selected = items.map((item) => ({ item, folder: byPath.get(item.path) }));
-    if (selected.some((entry) => entry.folder === undefined)) {
+    const selected = paths.map((path) => byPath.get(path));
+    if (selected.some((folder) => folder === undefined)) {
       throw new CandidatePoolChangedError();
     }
     const registered: ScanCandidatesRegisterResponse["registered"] = [];
     const failures: ScanCandidatesRegisterResponse["failures"] = [];
-    for (const { folder } of selected) {
-      const current = folder!;
+    for (const folder of selected as ScanCandidateFolder[]) {
+      let cover: StagedCover | null = null;
       try {
-        const outcome = await scanner.registerWork(folderTarget(resolve(root, current.path)), {
-          title: current.inferredTitle,
-          rjCode: this.registrationRjCode(current),
+        const target = folderTarget(resolve(root, folder.path));
+        const rjCode = this.registrationRjCode(folder);
+        const plan = planDlsiteRegistration({
+          rjCode,
+          info: rjCode ? deps.readUsableInfo(rjCode) : null,
+          title: folder.inferredTitle,
+          tags: [],
+          apply,
         });
-        registered.push({ path: current.path, workId: outcome.snapshot.meta.id });
+        if (plan.coverUrl) {
+          cover = await stageCachedDlsiteCover(
+            deps.dlsiteCache,
+            plan.coverUrl,
+            target.placement.mediaRoot,
+            root,
+          );
+        }
+        cover?.commit();
+        let outcome;
+        try {
+          outcome = await deps.scanner.registerWork(target, {
+            title: plan.title,
+            tags: plan.tags,
+            urls: plan.dlsiteUrl ? [plan.dlsiteUrl] : [],
+            coverImage: cover?.fileName,
+            dlsite: plan.dlsite,
+          });
+        } catch (error) {
+          cover?.rollback();
+          throw error;
+        }
+        registered.push({ path: folder.path, workId: outcome.snapshot.meta.id });
       } catch (error) {
         failures.push({
-          path: current.path,
+          path: folder.path,
           message: error instanceof Error ? error.message : "候補の登録に失敗しました",
         });
+      } finally {
+        cover?.discard();
       }
     }
     const registeredPaths = new Set(registered.map((entry) => entry.path));

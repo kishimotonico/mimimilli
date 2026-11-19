@@ -1,13 +1,9 @@
+import { REGISTER_ALL, NO_DLSITE } from "./helpers/scanLibrary.ts";
 // fixture アダプタのシナリオ機能（ADR-0002 / client/mocks/scenarios.ts からの移植）のテスト。
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { workspacePath } from "@mimimilli/shared";
-import type { DataAdapter } from "../src/adapter/index.ts";
 import { createApp } from "./helpers/testApp.ts";
-import { createClassificationMethods } from "../src/adapters/fixture/classification.ts";
-import { createCoverMediaMethods } from "../src/adapters/fixture/coverMedia.ts";
-import { createDlsiteMethods } from "../src/adapters/fixture/dlsiteMethods.ts";
-import { createFsMethods } from "../src/adapters/fixture/fsMethods.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import {
   createFixtureScenario,
@@ -16,25 +12,11 @@ import {
 } from "../src/adapters/fixture/scenarios.ts";
 import { createSettingsScanMethods } from "../src/adapters/fixture/settingsScan.ts";
 import { createInitialState } from "../src/adapters/fixture/state.ts";
-import { createWorkMethods } from "../src/adapters/fixture/works.ts";
 import type { ScanCandidateFolder } from "@mimimilli/shared";
+import { buildFixtureAdapterWithCandidates } from "./helpers/fixtureCandidates.ts";
 import { configureRoot } from "./helpers/rootFolder.ts";
 
 /** createFixtureAdapter同様の合成だが、候補一覧だけを差し替えられる（候補登録の契約テスト用） */
-function buildFixtureAdapterWithCandidates(candidates: ScanCandidateFolder[]): DataAdapter {
-  const state = createInitialState({ scenario: "empty" });
-  state.rootFolder = "/library";
-  state.scanCandidates = candidates;
-  return {
-    ...createSettingsScanMethods(state),
-    ...createWorkMethods(state),
-    ...createClassificationMethods(state),
-    ...createFsMethods(state),
-    ...createCoverMediaMethods(state),
-    ...createDlsiteMethods(state),
-  };
-}
-
 function buildApp(scenario?: string) {
   return createApp(createFixtureAdapter({ scenario }));
 }
@@ -93,10 +75,10 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
     "copies/RJ501001_夜更けの図書室で囁き朗読",
   ]);
 
-  const registration = await adapter.registerScanCandidates([
-    { path: workspacePath("未登録作品") },
-    { path: workspacePath("消えた候補") },
-  ]);
+  const registration = await adapter.registerScanCandidates(
+    [workspacePath("未登録作品"), workspacePath("消えた候補")],
+    REGISTER_ALL,
+  );
   assert.deepEqual(
     registration.registered.map((entry) => entry.path),
     ["未登録作品"],
@@ -274,12 +256,8 @@ test("候補登録APIは、サーバーが持つ実効RJコード（検出値・
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        items: [
-          { path: "自動検出済み" },
-          { path: "明示なし" },
-          { path: "値指定" },
-          { path: "検出なし" },
-        ],
+        paths: ["自動検出済み", "明示なし", "値指定", "検出なし"],
+        apply: { title: true, cover: true, tags: true, url: true },
       }),
     });
     assert.equal(response.status, 201);
@@ -454,7 +432,7 @@ test("fixture: 単一音声ファイルのregister-previewと登録ができる"
   const created = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: "fanza/d00001.mp3", title: "FANZA単一ファイル" }),
+    body: JSON.stringify({ path: "fanza/d00001.mp3", title: "FANZA単一ファイル", ...NO_DLSITE }),
   });
   assert.equal(created.status, 201);
   const createdBody = await created.json();
@@ -478,7 +456,7 @@ test("fixture: 単一音声ファイルのregister-previewと登録ができる"
   const again = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: "fanza/d00001.mp3", title: "再登録" }),
+    body: JSON.stringify({ path: "fanza/d00001.mp3", title: "再登録", ...NO_DLSITE }),
   });
   assert.equal(again.status, 409);
 });

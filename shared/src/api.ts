@@ -13,7 +13,7 @@ import {
   workListItemSchema,
 } from "./work.ts";
 import { splitSelectedTags, type TagFilters } from "./pseudoTag.ts";
-import { dlsiteRegistrationBodySchema, dlsiteStatusSchema, rjCodeFormatSchema } from "./dlsite.ts";
+import { dlsiteStatusSchema, rjCodeFormatSchema } from "./dlsite.ts";
 import { workspacePathSchema } from "./media.ts";
 import { scanRecordKindSchema, workChangeKindSchema } from "./scan.ts";
 
@@ -276,7 +276,10 @@ export const workCreateBodySchema = z.object({
     .array(tagSchema)
     .default([])
     .transform((tags) => dedupeTags(normalizeTags(tags))),
-  dlsite: dlsiteRegistrationBodySchema.optional(),
+  /** 空文字はRJコードなし */
+  rjCode: z.union([z.literal(""), rjCodeFormatSchema]),
+  applyCover: z.boolean(),
+  applyUrl: z.boolean(),
 });
 /** クライアントが送信するリクエストボディ（tags は正規化前の生 string[]） */
 export type WorkCreateBodyInput = z.input<typeof workCreateBodySchema>;

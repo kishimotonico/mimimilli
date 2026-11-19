@@ -1,3 +1,4 @@
+import { REGISTER_ALL, NO_DLSITE } from "./helpers/scanLibrary.ts";
 // resume検証・DLsite適用パッチ・登録重複チェックが real/fixture 両adapterで
 // 同じ意味になることを縛る契約テスト。境界より手前のモックではなく、両adapterを
 // DataAdapter インターフェース経由で実際に通して結果を比較する。
@@ -61,7 +62,8 @@ async function realResumeAdapter(
   await configureRoot(adapter, root);
   await adapter.scan();
   const registration = await adapter.registerScanCandidates(
-    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    REGISTER_ALL,
   );
   const workId = registration.registered[0]!.workId;
   return { adapter, workId };
@@ -216,7 +218,7 @@ async function assertAlreadyRegisteredContract(
   label: string,
 ) {
   await assert.rejects(
-    () => adapter.createWork({ path: path as never, title: "重複登録", tags: [] }),
+    () => adapter.createWork({ path: path as never, title: "重複登録", tags: [], ...NO_DLSITE }),
     (error: unknown) => {
       assert.ok(error instanceof WorkRegisterError, label);
       assert.equal((error as WorkRegisterError).code, "already_registered", label);
@@ -232,7 +234,7 @@ async function assertDescendantsRegisteredContract(
   label: string,
 ) {
   await assert.rejects(
-    () => adapter.createWork({ path: path as never, title: "親作品", tags: [] }),
+    () => adapter.createWork({ path: path as never, title: "親作品", tags: [], ...NO_DLSITE }),
     (error: unknown) => {
       assert.ok(error instanceof WorkRegisterError, label);
       assert.equal((error as WorkRegisterError).code, "descendants_registered", label);
@@ -289,7 +291,8 @@ test("createWork: 重複登録の拒否メッセージがreal/fixtureで一致�
   await configureRoot(adapter, root);
   await adapter.scan();
   await adapter.registerScanCandidates(
-    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    REGISTER_ALL,
   );
   await assertAlreadyRegisteredContract(
     adapter,
@@ -346,6 +349,7 @@ test("createWork: 配下に登録済み作品がある親の登録拒否がreal/
     path: "parent/child" as never,
     title: "子作品",
     tags: [],
+    ...NO_DLSITE,
   });
   assert.ok(childResult, "real descendants setup");
   await assertDescendantsRegisteredContract(adapter, "parent", "real descendants");

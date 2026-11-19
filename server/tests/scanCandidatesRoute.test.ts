@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  SCAN_CANDIDATE_REGISTER_MAX_PATHS,
   scanCandidateRjCodeRequestSchema,
   scanCandidateSchema,
   scanCandidatesRegisterResponseSchema,
@@ -46,7 +47,8 @@ contract("候補一覧は未登録フォルダーの推定タイトルと音声�
 
 contract("候補を登録すると作品一覧に加わり、候補一覧から消える", async (harness) => {
   const registered = await harness.send("POST", "/api/scan/candidates/register", {
-    items: [{ path: "未登録作品" }],
+    paths: ["未登録作品"],
+    apply: { title: true, cover: true, tags: true, url: true },
   });
   assert.equal(registered.status, 201);
   assert.equal(registered.body.registered.length, 1);
@@ -90,7 +92,8 @@ contract(
     assert.equal(listed?.rjCode, "RJ1234567");
 
     const registered = await harness.send("POST", "/api/scan/candidates/register", {
-      items: [{ path: "未登録作品" }],
+      paths: ["未登録作品"],
+      apply: { title: true, cover: true, tags: true, url: true },
     });
     assert.equal(registered.status, 201);
     const work = await harness.json(`/api/works/${registered.body.registered[0].workId}`);
@@ -174,7 +177,8 @@ realContract(
     assert.equal(fixed.status, 200);
     assert.equal(fixed.body.candidate.rjCode, null);
     const registered = await harness.send("POST", "/api/scan/candidates/register", {
-      items: [{ path: "RJ123456_推定あり" }, { path: "RJ234567_空指定" }],
+      paths: ["RJ123456_推定あり", "RJ234567_空指定"],
+      apply: { title: true, cover: true, tags: true, url: true },
     });
     assert.equal(registered.status, 201);
     const rjCodes = new Map<string, string | null>();
@@ -191,7 +195,8 @@ realContract(
 
 realContract("候補にないパスを含む登録・除外は409で拒否し、何も書き込まない", async (harness) => {
   const stale = await harness.send("POST", "/api/scan/candidates/register", {
-    items: [{ path: "RJ123456_推定あり" }, { path: "古い候補" }],
+    paths: ["RJ123456_推定あり", "古い候補"],
+    apply: { title: true, cover: true, tags: true, url: true },
   });
   assert.equal(stale.status, 409);
   assert.equal((await harness.json("/api/works")).body.total, 0);
@@ -223,7 +228,10 @@ test("候補登録はDLsite取得ジョブを作らない", async () => {
     const registered = await app.request("/api/scan/candidates/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: [{ path: "候補作品" }] }),
+      body: JSON.stringify({
+        paths: ["候補作品"],
+        apply: { title: true, cover: true, tags: true, url: true },
+      }),
     });
     assert.equal(registered.status, 201);
     await new Promise((resolve) => setImmediate(resolve));
@@ -247,7 +255,10 @@ test("候補登録APIは部分失敗と全失敗を201で返す", async () => {
     const partial = await app.request("/api/scan/candidates/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: [{ path: "候補作品" }] }),
+      body: JSON.stringify({
+        paths: ["候補作品"],
+        apply: { title: true, cover: true, tags: true, url: true },
+      }),
     });
     assert.equal(partial.status, 201);
     assert.deepEqual(await partial.json(), {
@@ -273,7 +284,10 @@ test("候補登録APIは全失敗を成功なしの結果として201で返す",
     const failed = await app.request("/api/scan/candidates/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: [{ path: "候補作品" }] }),
+      body: JSON.stringify({
+        paths: ["候補作品"],
+        apply: { title: true, cover: true, tags: true, url: true },
+      }),
     });
     assert.equal(failed.status, 201);
     assert.deepEqual(await failed.json(), {
@@ -306,28 +320,35 @@ test("scanCandidateRjCodeRequestSchema: RJ/VJコードの形式を検証・正�
   assert.equal(tooShort.success, false);
 });
 
-test("候補APIは101件以上の一括登録を受け付ける", async () => {
-  const paths = Array.from({ length: 101 }, (_, index) => `候補-${index}`);
+test("候補APIは上限ちょうどの件数を受け付け、超えると400にする", async () => {
+  const pathsOf = (count: number) => Array.from({ length: count }, (_, index) => `候補-${index}`);
   const fixture = createFixtureAdapter();
-  let received: Array<{ path: string }> = [];
+  let received: { paths: string[]; apply: unknown } | null = null;
   const app = createApp({
     ...fixture,
-    registerScanCandidates: async (requestedItems) => {
-      received = requestedItems;
+    registerScanCandidates: async (paths, apply) => {
+      received = { paths, apply };
       return { registered: [], failures: [] };
     },
   });
-  try {
-    const response = await app.request("/api/scan/candidates/register", {
+  const post = (paths: string[]) =>
+    app.request("/api/scan/candidates/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: paths.map((path) => ({ path })) }),
+      body: JSON.stringify({ paths, apply: { title: true, cover: false, tags: true, url: false } }),
     });
-    assert.equal(response.status, 201);
-    assert.deepEqual(
-      received,
-      paths.map((path) => ({ path })),
-    );
+  try {
+    const atLimit = pathsOf(SCAN_CANDIDATE_REGISTER_MAX_PATHS);
+    const accepted = await post(atLimit);
+    assert.equal(accepted.status, 201);
+    assert.deepEqual(received, {
+      paths: atLimit,
+      apply: { title: true, cover: false, tags: true, url: false },
+    });
+    received = null;
+    const overLimit = await post(pathsOf(SCAN_CANDIDATE_REGISTER_MAX_PATHS + 1));
+    assert.equal(overLimit.status, 400);
+    assert.equal(received, null);
   } finally {
     await app.shutdown();
   }

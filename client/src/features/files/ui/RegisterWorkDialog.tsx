@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { normalizeTag } from "@mimimilli/shared";
+import { dlsiteInfoTags, normalizeTag, rjCodeFormatSchema } from "@mimimilli/shared";
 import type {
   DlsiteCachedCover,
-  DlsiteRegistrationBody,
-  DlsiteWorkInfo,
   WorkCreateResponse,
   WorkRegisterPreview,
   WorkSourceMutationResult,
@@ -23,8 +21,6 @@ import { buildTagsWithAdded, buildTagsWithRemoved } from "../../../entities/work
 import Tag from "../../../entities/work/ui/Tag";
 import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
 import { tagPrefixDefinition } from "../../../entities/tag/tagPrefixDefinition";
-import { dlsiteInfoTags } from "@mimimilli/shared";
-import { buildDlsiteRegistrationBody } from "../../../entities/work/dlsitePreview";
 import { dlsiteFetchErrorMessage } from "../../../entities/work/dlsiteFetchError";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { sourceMutationErrorMessage } from "../../../entities/work/sourceMutation";
@@ -51,8 +47,10 @@ export default function RegisterWorkDialog({
   const [tags, setTags] = useState<string[]>(preview.tags);
   const [isTagInputOpen, setIsTagInputOpen] = useState(false);
   const [rjCode, setRjCode] = useState(preview.detectedRjCode ?? "");
-  const [dlsiteInfo, setDlsiteInfo] = useState<DlsiteWorkInfo | null>(null);
-  const [cachedCover, setCachedCover] = useState<DlsiteCachedCover | null>(null);
+  const [fetched, setFetched] = useState<{
+    rjCode: string;
+    cachedCover: DlsiteCachedCover | null;
+  } | null>(null);
   const [applyCover, setApplyCover] = useState(true);
   const [dlsiteValidationError, setDlsiteValidationError] = useState<string | null>(null);
 
@@ -63,8 +61,7 @@ export default function RegisterWorkDialog({
   const dlsiteMutation = useMutation({
     mutationFn: (code: string) => fetchDlsiteInfoByCode(code),
     onSuccess: ({ info, cachedCover: cover }) => {
-      setDlsiteInfo(info);
-      setCachedCover(cover);
+      setFetched({ rjCode: info.rjCode, cachedCover: cover });
       setTitle(info.title);
       setTags((prev) => Array.from(new Set([...prev, ...dlsiteInfoTags(info)])));
       setApplyCover(cover !== null);
@@ -72,25 +69,29 @@ export default function RegisterWorkDialog({
   });
 
   const registerMutation = useRegisterWorkMutation();
+  const trimmedRjCode = rjCode.trim();
+  const parsedRjCode = trimmedRjCode === "" ? null : rjCodeFormatSchema.safeParse(trimmedRjCode);
+  const rjCodeInvalid = parsedRjCode !== null && !parsedRjCode.success;
+  const currentFetched =
+    fetched && parsedRjCode?.success && parsedRjCode.data === fetched.rjCode ? fetched : null;
+  const cachedCover = currentFetched?.cachedCover ?? null;
+
   const register = async () => {
-    const dlsiteAppliedTags = dlsiteInfo
-      ? dlsiteInfoTags(dlsiteInfo).filter((tag) => tags.includes(tag))
-      : [];
-    const dlsite: DlsiteRegistrationBody | undefined = dlsiteInfo
-      ? buildDlsiteRegistrationBody(dlsiteInfo, {
-          applyTitle: false,
-          applyCover: applyCover && cachedCover !== null,
-          applyUrl: true,
-          applyTags: dlsiteAppliedTags,
-        })
-      : undefined;
+    if (rjCodeInvalid) {
+      setDlsiteValidationError(
+        parsedRjCode.error.issues[0]?.message ?? "RJ/VJコードの形式が正しくありません",
+      );
+      return;
+    }
     let result: WorkCreateResponse;
     try {
       result = await registerMutation.mutateAsync({
         path: folderPath,
         title: title.trim(),
         tags,
-        dlsite,
+        rjCode: trimmedRjCode,
+        applyCover: cachedCover !== null && applyCover,
+        applyUrl: currentFetched !== null,
       });
     } catch {
       return;
@@ -104,8 +105,7 @@ export default function RegisterWorkDialog({
     setTags(preview.tags);
     setIsTagInputOpen(false);
     setRjCode(preview.detectedRjCode ?? "");
-    setDlsiteInfo(null);
-    setCachedCover(null);
+    setFetched(null);
     setApplyCover(true);
     setDlsiteValidationError(null);
     dlsiteMutation.reset();

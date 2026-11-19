@@ -14,8 +14,7 @@ import type {
   DlsitePreview,
   DlsiteStateUpdateBody,
   NormalizedTag,
-  ScanCandidateRegisterItem,
-  ScanCandidatesRegisterResponse,
+  DlsiteRegistrationApply,
   UnregisterMissingWorksResult,
   UrlEntry,
   WorkCreateBodyInput,
@@ -37,6 +36,7 @@ import {
   reassignIdentityConflict,
   registerScanCandidates,
   reloadWork,
+  type ScanCandidatesRegisterOutcome,
   removeWorkTag,
   unregisterMissingWorks,
   updateDlsiteState,
@@ -161,9 +161,14 @@ export function useRegisterWorkMutation() {
 
 export function useRegisterScanCandidatesMutation() {
   const queryClient = useQueryClient();
-  return useMutation<ScanCandidatesRegisterResponse, Error, ScanCandidateRegisterItem[]>({
-    mutationFn: (items) => registerScanCandidates(items),
-    onSuccess: () => updateCachesAfterRegistration(queryClient),
+  return useMutation<
+    ScanCandidatesRegisterOutcome,
+    Error,
+    { paths: string[]; apply: DlsiteRegistrationApply }
+  >({
+    mutationFn: ({ paths, apply }) => registerScanCandidates(paths, apply),
+    onSuccess: (outcome) =>
+      outcome.registered.length > 0 ? updateCachesAfterRegistration(queryClient) : undefined,
   });
 }
 

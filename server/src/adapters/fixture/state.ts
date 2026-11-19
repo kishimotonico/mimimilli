@@ -1,9 +1,11 @@
+import { createHash } from "node:crypto";
 import { DEFAULT_TAG_PREFIXES, projectDlsiteState, toDlsiteLinkageStatus } from "@mimimilli/shared";
 import type {
+  DlsiteRegistrationPlan,
+  DlsiteWorkInfo,
   DataIntegrityWarning,
   DlsiteCacheResolution,
   DlsiteCacheResolutionHead,
-  DlsiteWorkInfo,
   InvalidMetaFile,
   MetaDlsiteState,
   ResumeBody,
@@ -18,6 +20,7 @@ import type {
 import {
   SEED_PLAYLIST_SPECS,
   fixtureCoverColumnsForWork,
+  fixtureCoverFromColumns,
   type FixtureCoverColumns,
   type FixtureWorkRecord,
   type SeedPlaylistSpec,
@@ -171,6 +174,34 @@ export function fixtureDlsiteResolutionHead(
     fetchedAt: fetched.fetchedAt,
     expiresAt: fetched.expiresAt,
   };
+}
+
+/** realのreadUsableDlsiteInfoと同じ判断。TTL内で取得済みのときだけ情報を返す */
+export function fixtureUsableDlsiteInfo(
+  state: FixtureState,
+  rjCode: string,
+): DlsiteWorkInfo | null {
+  if (fixtureDlsiteResolutionHead(state, rjCode).kind !== "html") return null;
+  return state.dlsiteFetched.get(normalizeDlsiteCacheKey(rjCode))?.info ?? null;
+}
+
+export function fixtureDlsiteCoverKey(coverUrl: string): string {
+  return createHash("sha256").update(coverUrl).digest("hex");
+}
+
+/** 追加のカバー。カバーキャッシュにあるときだけ反映する（DLsiteへは取りに行かない） */
+export function applyFixtureRegistrationCover(
+  state: FixtureState,
+  work: FixtureWorkRecord,
+  plan: DlsiteRegistrationPlan,
+): void {
+  if (!plan.coverUrl || !state.dlsiteCovers.has(fixtureDlsiteCoverKey(plan.coverUrl))) return;
+  const columns: FixtureCoverColumns = {
+    image: plan.coverUrl,
+    dimensions: { width: 900, height: 900 },
+  };
+  state.coverColumns.set(work.id, columns);
+  work.cover = fixtureCoverFromColumns(work, columns);
 }
 
 /** 作品レコードとlinkage・取得キャッシュから、API向けの合成済みWorkSummaryを読み出し時に組み立てる。

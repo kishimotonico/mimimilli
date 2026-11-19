@@ -6,6 +6,7 @@ import {
   isDlsiteFetchFailed,
   isDlsiteParseFailed,
   isRjCodeMissing,
+  planDlsiteRegistration,
   sidecarMetaFileName,
   tagEquals,
   unresolvedWorkPhysicalPath,
@@ -19,7 +20,6 @@ import type {
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
   IdentityConflictReassignBody,
-  MetaDlsiteState,
   Work,
   WorkBookmarkPatch,
   WorkBookmarkResult,
@@ -47,9 +47,11 @@ import { buildFullWorkFromState, checkWorkPlacement } from "./playback.ts";
 import { normalizeFsPath } from "./fsResolve.ts";
 import {
   composeWorks,
+  applyFixtureRegistrationCover,
   copyWorkState,
   coverColumnsOf,
   dlsiteLinkageOf,
+  fixtureUsableDlsiteInfo,
   reassignWorkId,
   removeWorks,
   setDlsiteLinkage,
@@ -216,7 +218,14 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
         kind: isFile ? "file" : "folder",
       });
       const now = new Date().toISOString();
-      const applyTags = body.dlsite?.applyTags ?? [];
+      const rjCode = body.rjCode === "" ? null : body.rjCode;
+      const plan = planDlsiteRegistration({
+        rjCode,
+        info: rjCode ? fixtureUsableDlsiteInfo(state, rjCode) : null,
+        title: body.title,
+        tags: body.tags,
+        apply: { title: false, tags: false, cover: body.applyCover, url: body.applyUrl },
+      });
       const work: FixtureWorkRecord = {
         id: crypto.randomUUID(),
         title: body.title,
@@ -228,21 +237,16 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
         trackCount: isFile ? 1 : 0,
         addedAt: now,
         errorMessage: null,
-        urls:
-          body.dlsite?.info.url && body.dlsite.info.url.length > 0
-            ? [{ label: "DLsite", url: body.dlsite.info.url }]
-            : [],
-        tags: body.tags,
+        urls: plan.dlsiteUrl ? [plan.dlsiteUrl] : [],
+        tags: plan.tags,
         bookmarked: false,
         lastPlayedAt: null,
       };
+      applyFixtureRegistrationCover(state, work, plan);
       const registered = checkWorkPlacement(state, work);
       state.works.push(registered);
       state.sourceRevisions.set(work.id, "fixture");
-      const linkage: MetaDlsiteState = body.dlsite
-        ? { rjCode: body.dlsite.info.rjCode, status: "applied", appliedTags: applyTags }
-        : { rjCode: preview.detectedRjCode, status: "none", appliedTags: [] };
-      setDlsiteLinkage(state, work.id, linkage);
+      setDlsiteLinkage(state, work.id, plan.dlsite);
       return {
         snapshot: fixtureEditSnapshot(state, registered),
         projection: { status: "published" },

@@ -6,8 +6,10 @@ import * as libraryApi from "../../src/features/library/api";
 import * as settingsApi from "../../src/features/settings/api";
 import * as scanEntityApi from "../../src/entities/scan/api";
 import {
+  SCAN_CANDIDATE_REGISTER_MAX_PATHS,
   emptyDlsiteState,
   emptyMetaDlsiteState,
+  scanCandidatesRegisterRequestSchema,
   workspacePath,
   type Work,
   type WorkListItem,
@@ -530,6 +532,57 @@ describe("library api", () => {
     const result = await libraryApi.exportLibrary();
     expect(result.data).toBe('{"version":1}');
     expect(result.dataIntegrityWarning).toEqual({ skippedCount: 1, skippedWorkIds: ["w-1"] });
+  });
+});
+
+describe("候補の追加の分割送信", () => {
+  const APPLY = { title: true, cover: true, tags: false, url: true };
+  const pathsOf = (count: number) => Array.from({ length: count }, (_, i) => `候補${i}`);
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it("1000件を上限ごとに分けて順に送り、全件を追加済みとして返す", async () => {
+    const requestSizes: number[] = [];
+    mockFetch.mockImplementation(async (_url, init) => {
+      const body = scanCandidatesRegisterRequestSchema.parse(JSON.parse(String(init?.body)));
+      requestSizes.push(body.paths.length);
+      expect(body.apply).toEqual(APPLY);
+      return makeResponse(
+        { registered: body.paths.map((path) => ({ path, workId: `w-${path}` })), failures: [] },
+        201,
+      );
+    });
+
+    const outcome = await workApi.registerScanCandidates(pathsOf(1000), APPLY);
+
+    expect(requestSizes).toHaveLength(Math.ceil(1000 / SCAN_CANDIDATE_REGISTER_MAX_PATHS));
+    expect(Math.max(...requestSizes)).toBeLessThanOrEqual(SCAN_CANDIDATE_REGISTER_MAX_PATHS);
+    expect(outcome.registered).toHaveLength(1000);
+    expect(outcome.failures).toEqual([]);
+    expect(outcome.interruptedBy).toBeNull();
+  });
+
+  it("途中の分割が409で失敗したらそこで止め、それまでに追加できた分を返す", async () => {
+    let calls = 0;
+    mockFetch.mockImplementation(async (_url, init) => {
+      calls += 1;
+      if (calls === 3) {
+        return makeResponse({ error: { code: "conflict", message: "候補が更新されました" } }, 409);
+      }
+      const body = scanCandidatesRegisterRequestSchema.parse(JSON.parse(String(init?.body)));
+      return makeResponse(
+        { registered: body.paths.map((path) => ({ path, workId: `w-${path}` })), failures: [] },
+        201,
+      );
+    });
+
+    const outcome = await workApi.registerScanCandidates(pathsOf(100), APPLY);
+
+    expect(calls).toBe(3);
+    expect(outcome.registered).toHaveLength(2 * SCAN_CANDIDATE_REGISTER_MAX_PATHS);
+    expect(outcome.interruptedBy).toMatchObject({ status: 409 });
   });
 });
 

@@ -49,6 +49,8 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 
 このデータドリフト自体への対応（単発適用の`sourceRevision`のようなCASチェック）は行っていない。理由: (1) このアプリはローカル単一ユーザー向けで、プレビュー取得から適用実行までの時間差が短い、(2) 差分が消えた場合はskipされるため壊れる方向には倒れない、(3) 一括適用は「未設定項目を埋める」操作なので、埋める先が既に埋まっていれば埋めない、という結果自体は妥当。将来複数クライアント・長時間放置されたプレビュー等でズレが問題になった場合は改めて検討する。
 
+**追加（候補の追加・Filesの作品登録）**: 未登録の候補は `POST /scan/candidates/register`（候補のパスと反映項目のフラグ。1リクエストの上限は `SCAN_CANDIDATE_REGISTER_MAX_PATHS`、クライアントが分割して送る）、Filesは `POST /works`（rjCode・title・tags・applyCover・applyUrl）で追加する。どちらもクライアントからDLsiteの取得結果は受け取らず、サーバーがRJコード（候補は候補一覧の値、Filesは入力）でキャッシュを引く。使うのはTTL内でoutcomeが `ok` のsnapshotを解析できたときだけで、TTL切れ・キャッシュに無い・該当なし・失敗・`parse_error`・RJコードなしはDLsite情報なしとしてフォルダー名・入力のまま追加する。組み立ては `planDlsiteRegistration`（`shared/src/dlsite.ts`）を2つのアダプタと2入口が共有し、`appliedTags` は「DLsiteのタグ」と「最終的なタグ」の共通部分になる。カバーはカバーキャッシュ（`stageCachedDlsiteCover`）だけから作品フォルダーへ置き、キャッシュに無ければカバーだけ反映せず続行する。追加の処理はDLsiteへHTTPを出さない。
+
 **取得ジョブ**: スキャン・候補登録・作品登録・root再設定は取得を始めない。取得はユーザーが対象のproduct code（RJコード）を指定して `POST /dlsite/jobs` で始める。`DlsiteJobManager`（`server/src/dlsiteJobManager.ts`）がジョブを同時に1本だけ動かし、コードを1件ずつ `fetchDlsiteProduct`（real: `adapters/real/dlsiteMethods.ts`）で処理する。1件の処理は、作品ページの取得とキャッシュへの記録、カバーの先取り（ベストエフォート）、同じRJコードを持つ全作品の `work_dlsite.state_json` の再投影で、タイトル・タグ・カバー・`mimimilli.json` は変更しない。同期の単発取得（`POST /dlsite/:id/fetch`・`POST /dlsite/fetch-by-code`）も同じ処理を通る。
 
 起点（`bulk` / `single`）はproduct codeごとに持つ。実行中に受けた取得は同じジョブのキューへ合流し、単発は待機中の単発の末尾（まとめての前）、まとめては末尾に入る。待機中のまとめてを単発で取り直すと単発へ移り、取得を終えたコードの再取得はその要求の起点で取り直す。単発はキャッシュの失敗の記録を無視して取り直す（force）。中止は起点がまとめてで待機中のコードだけを外し、取得中のコードと単発は止めない。root再設定の開始時は、キューを起点を問わず捨てて取得中の処理を打ち切る。ジョブは永続化せず、サーバー再起動では再開しない。

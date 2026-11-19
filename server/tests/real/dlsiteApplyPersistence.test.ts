@@ -1,9 +1,10 @@
+import { REGISTER_ALL } from "../helpers/scanLibrary.ts";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import type { DlsiteWorkInfo } from "@mimimilli/shared";
 import { META_FILE_NAME } from "@mimimilli/shared";
+import { CoverSaveError } from "../../src/errors.ts";
 import { createApp } from "../helpers/testApp.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../../src/adapters/real/dlsiteConfig.ts";
@@ -25,8 +26,6 @@ const FAST_DLSITE_REQUEST_CONFIG = {
   maxBackoffMs: 0,
   timeoutMs: 1_000,
 };
-
-const COVER_URL = "https://img.dlsite.jp/modpub/images2/work/a.jpg";
 
 test("title: 単発適用は applyTitle に従い、一括取得は作品情報を変更しない", async (t) => {
   const lib = makeSampleLibrary();
@@ -83,7 +82,8 @@ test("title: 単発適用は applyTitle に従い、一括取得は作品情報�
   assert.equal(existingAfterApply?.title, applyTitle);
 
   const registration = await adapter.registerScanCandidates(
-    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    REGISTER_ALL,
   );
   const generatedId = registration.registered[0]!.workId;
   const generatedBefore = await adapter.getWork(generatedId);
@@ -112,7 +112,7 @@ test("title: 単発適用は applyTitle に従い、一括取得は作品情報�
   assert.equal(generatedAfterApply?.title, generatedAfterBulk?.title);
 });
 
-test("cover: 単発適用は applyCover で既存カバーを上書きし、一括取得は変更しない", async (t) => {
+test("cover: 単発適用は先取りしたカバーを適用し、一括取得は変更せず、キャッシュに無いカバーは取りに行かない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-cover-behavior");
   t.after(lib.cleanup);
@@ -138,16 +138,10 @@ test("cover: 単発適用は applyCover で既存カバーを上書きし、一�
   await configureRoot(adapter, lib.root);
   await adapter.scan();
 
-  const info: DlsiteWorkInfo = {
-    rjCode: "RJ900002",
-    title: "x",
-    circle: null,
-    cvs: [],
-    genreTags: [],
-    ageRating: null,
-    coverUrl: COVER_URL,
-    url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
-  };
+  const fetched = await adapter.dlsiteFetchByCode("RJ900002");
+  assert.equal(fetched.ok, true);
+  const info = (fetched as Extract<typeof fetched, { ok: true }>).info;
+  assert.equal(coverHttpCalls, 1);
   assert.ok(
     (
       await adapter.dlsiteApply(lib.existingWorkId, {
@@ -170,22 +164,22 @@ test("cover: 単発適用は applyCover で既存カバーを上書きし、一�
   const afterBulk = await adapter.getWork(lib.existingWorkId);
   assert.equal(afterBulk?.cover?.image, firstCoverImage);
 
-  assert.ok(
-    (
-      await adapter.dlsiteApply(lib.existingWorkId, {
+  await assert.rejects(
+    async () =>
+      adapter.dlsiteApply(lib.existingWorkId, {
         info: { ...info, coverUrl: "https://img.dlsite.jp/modpub/images2/work/b.jpg" },
         applyTitle: false,
         applyTags: [],
         applyCover: true,
         applyUrl: true,
         sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
-      })
-    )?.snapshot,
+      }),
+    CoverSaveError,
   );
-  assert.equal(coverHttpCalls, 2);
+  assert.equal(coverHttpCalls, 1);
 });
 
-test("登録時のDLsite指定はregistration bodyでタイトルを上書きしない", async (t) => {
+test("Filesの作品登録はキャッシュのDLsite情報を使い、タイトルは入力のまま、bodyのinfoは使わない", async (t) => {
   const directory = makeTestDirectory("work-register-dlsite-title");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");
@@ -193,9 +187,20 @@ test("登録時のDLsite指定はregistration bodyでタイトルを上書きし
   mkdirSync(folder, { recursive: true });
   writeWav(join(folder, "intro.wav"), 1);
 
-  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  const adapter = directory.own(
+    createTestRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => htmlResponse(sampleWorkHtml(code, { title: "DLsiteからのタイトル" })),
+      }),
+    }),
+  );
   const app = createApp(adapter);
   await configureRoot(adapter, root);
+  const fetched = await adapter.dlsiteFetchByCode("RJ900020");
+  assert.equal(fetched.ok, true);
+  const cachedUrl = (fetched as Extract<typeof fetched, { ok: true }>).info.url;
 
   const formTitle = "フォームで指定したタイトル";
   const res = await app.request("/api/works", {
@@ -204,21 +209,18 @@ test("登録時のDLsite指定はregistration bodyでタイトルを上書きし
     body: JSON.stringify({
       path: "RJ900020_manual",
       title: formTitle,
-      dlsite: {
-        info: {
-          rjCode: "RJ900020",
-          title: "DLsiteからのタイトル",
-          circle: null,
-          cvs: [],
-          genreTags: [],
-          ageRating: null,
-          coverUrl: null,
-          url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900020.html",
-        },
-        applyTitle: false,
-        applyTags: [],
-        applyCover: false,
-        applyUrl: true,
+      rjCode: "RJ900020",
+      applyCover: false,
+      applyUrl: true,
+      info: {
+        rjCode: "RJ900020",
+        title: "偽のタイトル",
+        circle: null,
+        cvs: [],
+        genreTags: [],
+        ageRating: null,
+        coverUrl: null,
+        url: "https://www.dlsite.com/maniax/work/=/product_id/RJ999999.html",
       },
     }),
   });
@@ -226,8 +228,12 @@ test("登録時のDLsite指定はregistration bodyでタイトルを上書きし
   const body = await res.json();
   assert.equal(body.snapshot.title, formTitle);
 
-  const meta = JSON.parse(readFileSync(join(folder, META_FILE_NAME), "utf-8")) as { title: string };
+  const meta = JSON.parse(readFileSync(join(folder, META_FILE_NAME), "utf-8")) as {
+    title: string;
+    urls: Array<{ label: string; url: string }>;
+  };
   assert.equal(meta.title, formTitle);
+  assert.deepEqual(meta.urls, [{ label: "DLsite", url: cachedUrl }]);
 });
 
 test("missing-only一括適用はcache結果だけを使い、既存フィールドを上書きしない", async (t) => {

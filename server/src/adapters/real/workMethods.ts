@@ -25,7 +25,8 @@ import type {
 } from "@mimimilli/shared";
 import { errorMessage, resolveWorkPlacement, tagEquals } from "@mimimilli/shared";
 import { type Db } from "./db.ts";
-import type { StagedCover } from "./dlsiteFetch.ts";
+import type { DlsiteCache } from "./dlsiteCache.ts";
+import { createDlsiteProductResolver, readUsableDlsiteInfo } from "./dlsiteProductResolve.ts";
 import { MetaMutationReject, encodeMetaRaw, patchMetaFileCas, readMetaSource } from "./meta.ts";
 import {
   SOURCE_IDENTITY_MISMATCH_MESSAGE,
@@ -65,14 +66,12 @@ export function createWorkMethods(deps: {
   user: UserWorkStateRepository;
   scanner: Scanner;
   requireRoot: () => string;
-  stageCover: (
-    coverUrl: string,
-    workDir: string,
-    root: string,
-    signal?: AbortSignal,
-  ) => Promise<StagedCover | null>;
+  dlsiteCache: DlsiteCache;
 }) {
-  const { db, query, catalog, user, scanner, requireRoot, stageCover } = deps;
+  const { db, query, catalog, user, scanner, requireRoot, dlsiteCache } = deps;
+  const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache);
+  const readUsableInfo = (productCode: string) =>
+    readUsableDlsiteInfo(resolveDlsiteProduct, productCode);
 
   function recordIdentityConflict(workId: string, ownerMetaPath: string, conflictMetaPath: string) {
     const root = requireRoot();
@@ -155,13 +154,10 @@ export function createWorkMethods(deps: {
 
     async createWork(body: WorkCreateBody): Promise<WorkSourceMutationResult | null> {
       const root = requireRoot();
-      return await createWorkFromPath(
-        { db, query, catalog, user },
-        scanner,
-        root,
-        body,
-        (coverUrl, workDir) => stageCover(coverUrl, workDir, root),
-      );
+      return await createWorkFromPath({ db, query, catalog, user }, scanner, root, body, {
+        dlsiteCache,
+        readUsableInfo,
+      });
     },
 
     async reassignIdentityConflict(

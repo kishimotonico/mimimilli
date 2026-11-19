@@ -137,5 +137,93 @@ describe("RegisterWorkDialog", () => {
       expect(screen.getByLabelText("カバー画像を適用")).toBeDisabled();
       expect(screen.getByLabelText("カバー画像を適用")).not.toBeChecked();
     });
+
+    function mockRegister() {
+      return mockApi({
+        "GET /api/tags": [],
+        "GET /api/tag-prefixes": [],
+        "POST /api/dlsite/fetch-by-code": {
+          info,
+          cachedCover: { key, version: 1_700_000_000_000 },
+        },
+        "POST /api/works": {
+          snapshot: {
+            sourceRevision: "r1",
+            id: "w1",
+            physicalPath: "/music/test",
+            title: "取得したタイトル",
+            tags: [],
+            urls: [],
+            coverImage: null,
+            dlsite: { rjCode: "RJ123456", status: "applied", appliedTags: [] },
+          },
+          projection: { status: "published" },
+        },
+      });
+    }
+
+    async function fetchThenRegister(afterFetch?: () => void) {
+      const api = mockRegister();
+      renderDialog();
+      const input = screen.getByPlaceholderText("RJ123456");
+      fireEvent.change(input, { target: { value: "RJ123456" } });
+      fireEvent.click(screen.getByRole("button", { name: "取得" }));
+      await waitFor(() => expect(screen.getByDisplayValue("取得したタイトル")).toBeInTheDocument());
+      afterFetch?.();
+      fireEvent.click(screen.getByRole("button", { name: "登録" }));
+      await waitFor(() => expect(api.requestsTo("POST /api/works")).toHaveLength(1));
+      return api.requestsTo("POST /api/works")[0]!.body;
+    }
+
+    it("取得した結果の入力のまま登録すると、カバーとURLの反映を送り、取得結果のinfoは送らない", async () => {
+      const body = await fetchThenRegister();
+
+      expect(body).toEqual({
+        path: "/music/test",
+        title: "取得したタイトル",
+        tags: [],
+        rjCode: "RJ123456",
+        applyCover: true,
+        applyUrl: true,
+      });
+    });
+
+    it("取得後にRJコードを変えると、取得結果のカバーとURLは反映しない", async () => {
+      const body = await fetchThenRegister(() => {
+        fireEvent.change(screen.getByPlaceholderText("RJ123456"), {
+          target: { value: "RJ654321" },
+        });
+        expect(screen.getByLabelText("カバー画像を適用")).toBeDisabled();
+        expect(document.querySelector("img")).toBeNull();
+      });
+
+      expect(body).toMatchObject({ rjCode: "RJ654321", applyCover: false, applyUrl: false });
+    });
+
+    it("RJコードを空にすると、RJコードなしで登録する", async () => {
+      const body = await fetchThenRegister(() => {
+        fireEvent.change(screen.getByPlaceholderText("RJ123456"), { target: { value: "" } });
+      });
+
+      expect(body).toMatchObject({ rjCode: "", applyCover: false, applyUrl: false });
+    });
+
+    it("カバーのチェックを外すと、applyCoverをfalseで送る", async () => {
+      const body = await fetchThenRegister(() => {
+        fireEvent.click(screen.getByLabelText("カバー画像を適用"));
+      });
+
+      expect(body).toMatchObject({ applyCover: false, applyUrl: true });
+    });
+
+    it("形式違いのRJコードでは送信せず、エラーを表示する", async () => {
+      const api = mockRegister();
+      renderDialog();
+      fireEvent.change(screen.getByPlaceholderText("RJ123456"), { target: { value: "xyz" } });
+      fireEvent.click(screen.getByRole("button", { name: "登録" }));
+
+      await waitFor(() => expect(screen.getByText(/RJまたはVJに続く6〜8桁/)).toBeInTheDocument());
+      expect(api.requestsTo("POST /api/works")).toHaveLength(0);
+    });
   });
 });

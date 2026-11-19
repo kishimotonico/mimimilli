@@ -4,6 +4,7 @@ import {
   type DlsiteFetchResult,
   type DlsiteFetchState,
   type DlsiteHtmlOutcome,
+  type DlsiteWorkInfo,
 } from "@mimimilli/shared";
 import { DLSITE_PARSER_VERSION, parseDlsiteHtml } from "./dlsite.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
@@ -89,4 +90,16 @@ export function dlsiteFetchResultOfProductResolution(
     };
   }
   return resolution.result;
+}
+
+/** 追加で使えるDLsite情報。TTL内でoutcomeがokのsnapshotを解析できたときだけ返す */
+export function readUsableDlsiteInfo(
+  resolve: DlsiteProductResolver,
+  productCode: string,
+): DlsiteWorkInfo | null {
+  const resolution = resolve(productCode);
+  if (resolution.kind !== "html" || !resolution.result.ok) return null;
+  return dlsiteFetchStateOfProductResolution(resolution) === "fetched"
+    ? resolution.result.info
+    : null;
 }

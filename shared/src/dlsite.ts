@@ -428,13 +428,18 @@ function buildDlsiteTagsUrlsPatch(
   };
 }
 
+/** タイトルを反映するときに使うDLsiteのタイトル。反映しない・DLsite側が空のときはundefined */
+export function dlsiteTitleToApply(info: DlsiteWorkInfo, applyTitle: boolean): string | undefined {
+  return applyTitle && info.title !== "" ? info.title : undefined;
+}
+
 /** dlsiteApply（単体適用）のtitle/tags/urlsパッチを組み立てる。real/fixture 両adapterが共有する。 */
 export function buildDlsiteApplyPatch(
   current: DlsiteApplyCurrent & { title: string },
   body: DlsiteApplyBody,
 ): DlsiteApplyPatch {
   return {
-    title: body.applyTitle && body.info.title ? body.info.title : undefined,
+    title: dlsiteTitleToApply(body.info, body.applyTitle),
     ...buildDlsiteTagsUrlsPatch(current, body.info, body.applyTags, body.applyUrl),
   };
 }
@@ -500,9 +505,60 @@ export type DlsiteApplyBodyInput = z.input<typeof dlsiteApplyBodySchema>;
 /** サーバーがパース後に扱う型（applyTags は正規化済み NormalizedTag[]） */
 export type DlsiteApplyBody = z.output<typeof dlsiteApplyBodySchema>;
 
-/** 新規登録時はmimimilli.jsonがまだ存在しないためCASトークンを持たない。 */
-export const dlsiteRegistrationBodySchema = dlsiteApplyBodySchema.omit({ sourceRevision: true });
-export type DlsiteRegistrationBody = z.output<typeof dlsiteRegistrationBodySchema>;
+/** 追加で反映するDLsiteの項目。DLsite情報が使えない作品では無視される */
+export const dlsiteRegistrationApplySchema = z.object({
+  title: z.boolean(),
+  cover: z.boolean(),
+  tags: z.boolean(),
+  url: z.boolean(),
+});
+export type DlsiteRegistrationApply = z.infer<typeof dlsiteRegistrationApplySchema>;
+
+export interface DlsiteRegistrationPlan {
+  title: string;
+  tags: NormalizedTag[];
+  dlsiteUrl: { label: "DLsite"; url: string } | null;
+  /** 反映するときだけ。nullならカバーを触らない */
+  coverUrl: string | null;
+  dlsite: MetaDlsiteState;
+}
+
+/**
+ * 作品の追加で、入力とDLsite情報からメタに書く内容を決める。real/fixture と、候補の追加・Filesの作品登録が共有する。
+ * infoは「TTL内でokのキャッシュ」を解析できたときだけ渡す。appliedTagsはDLsiteのタグのうち最終的なタグに含まれるもの。
+ */
+export function planDlsiteRegistration(input: {
+  rjCode: string | null;
+  info: DlsiteWorkInfo | null;
+  title: string;
+  tags: readonly NormalizedTag[];
+  apply: DlsiteRegistrationApply;
+}): DlsiteRegistrationPlan {
+  const { rjCode, info, apply } = input;
+  if (info === null) {
+    return {
+      title: input.title,
+      tags: [...input.tags],
+      dlsiteUrl: null,
+      coverUrl: null,
+      dlsite: { rjCode, status: "none", appliedTags: [] },
+    };
+  }
+  const infoTags = dlsiteInfoTags(info);
+  const tags = apply.tags ? dedupeTags([...input.tags, ...infoTags]) : [...input.tags];
+  const finalTags = new Set<string>(tags);
+  return {
+    title: dlsiteTitleToApply(info, apply.title) ?? input.title,
+    tags,
+    dlsiteUrl: apply.url && info.url !== "" ? { label: "DLsite", url: info.url } : null,
+    coverUrl: apply.cover ? info.coverUrl : null,
+    dlsite: {
+      rjCode: info.rjCode,
+      status: "applied",
+      appliedTags: infoTags.filter((tag) => finalTags.has(tag)),
+    },
+  };
+}
 
 /** POST /api/dlsite/apply-missing のリクエスト。workIds 省略時は全作品対象。 */
 export const dlsiteApplyMissingBodySchema = z.object({

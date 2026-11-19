@@ -1,6 +1,7 @@
 import {
   META_FILE_NAME,
   dlsiteFetchStateOfResolution,
+  planDlsiteRegistration,
   relativeToRoot,
   workspacePath,
 } from "@mimimilli/shared";
@@ -23,11 +24,13 @@ import { CandidatePoolChangedError } from "../../errors.ts";
 import type { FixtureWorkRecord } from "./data.ts";
 import { isFsPathWithin, normalizeFsPath } from "./fsResolve.ts";
 import { checkWorkPlacement } from "./playback.ts";
-import { fixtureDlsiteCoverKey } from "./dlsiteMethods.ts";
 import { FIXTURE_UNREADABLE_ROOT } from "./scenarios.ts";
 import {
   dlsiteLinkageOf,
+  applyFixtureRegistrationCover,
+  fixtureDlsiteCoverKey,
   fixtureDlsiteResolutionHead,
+  fixtureUsableDlsiteInfo,
   requireFixtureRoot,
   setDlsiteLinkage,
   type FixtureState,
@@ -236,7 +239,7 @@ export function createSettingsScanMethods(
       else state.scanCandidateRjCodeOverrides.set(path, rjCode);
       return toCandidate(state, folder);
     },
-    async registerScanCandidates(items): Promise<ScanCandidatesRegisterResponse> {
+    async registerScanCandidates(paths, apply): Promise<ScanCandidatesRegisterResponse> {
       const candidatesByPath = new Map<string, ScanCandidateFolder>(
         state.scanCandidates.map((candidate) => [candidate.path, candidate]),
       );
@@ -245,16 +248,23 @@ export function createSettingsScanMethods(
       // real adapter の registerCandidates（scanCandidateSession.ts）と同じ意味論: 登録した候補は
       // 実際にcatalog（ここではstate.works）へ行が増える。作品一覧・スキャン結果一覧の
       // 両方から見えて初めて「登録した」と言える。
-      const registered = items.flatMap((item) => {
-        const candidate = candidatesByPath.get(item.path);
+      const registered = paths.flatMap((path) => {
+        const candidate = candidatesByPath.get(path);
         if (!candidate) return [];
         const rjCode = state.scanCandidateRjCodeOverrides.has(candidate.path)
           ? (state.scanCandidateRjCodeOverrides.get(candidate.path) ?? "")
           : candidate.detectedRjCode;
+        const plan = planDlsiteRegistration({
+          rjCode,
+          info: rjCode ? fixtureUsableDlsiteInfo(state, rjCode) : null,
+          title: candidate.inferredTitle,
+          tags: [],
+          apply,
+        });
         const physicalPath = normalizeFsPath(`${rootAbs}/${candidate.path}`);
         const work: FixtureWorkRecord = {
           id: crypto.randomUUID(),
-          title: candidate.inferredTitle,
+          title: plan.title,
           cover: null,
           status: "ok",
           physicalPath,
@@ -263,19 +273,20 @@ export function createSettingsScanMethods(
           trackCount: candidate.audioFileCount,
           addedAt: now,
           errorMessage: null,
-          urls: [],
-          tags: [],
+          urls: plan.dlsiteUrl ? [plan.dlsiteUrl] : [],
+          tags: plan.tags,
           bookmarked: false,
           lastPlayedAt: null,
         };
+        applyFixtureRegistrationCover(state, work, plan);
         state.works.push(work);
-        setDlsiteLinkage(state, work.id, { rjCode, status: "none", appliedTags: [] });
+        setDlsiteLinkage(state, work.id, plan.dlsite);
         return [{ path: candidate.path, workId: work.id }];
       });
-      const failures = items.flatMap((item) =>
-        candidatesByPath.has(item.path)
+      const failures = paths.flatMap((path) =>
+        candidatesByPath.has(path)
           ? []
-          : [{ path: workspacePath(item.path), message: "候補が見つかりません" }],
+          : [{ path: workspacePath(path), message: "候補が見つかりません" }],
       );
       const registeredPaths = new Set(registered.map((candidate) => candidate.path));
       const unregistered = (candidate: ScanCandidateFolder) => !registeredPaths.has(candidate.path);

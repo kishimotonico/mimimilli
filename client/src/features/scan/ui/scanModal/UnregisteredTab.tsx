@@ -1,13 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSetAtom } from "jotai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  hasRjCode,
-  rjCodeFormatSchema,
-  type ScanCandidate,
-  type ScanCandidateRegisterItem,
-  type ScanCandidatesRegisterResponse,
-} from "@mimimilli/shared";
+import { hasRjCode, rjCodeFormatSchema, type ScanCandidate } from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
 import { useToast } from "../../../../shared/ui/useToast";
@@ -26,6 +20,9 @@ import {
 import { useRegisterScanCandidatesMutation } from "../../../../entities/work/model/workMutations";
 import { scanCandidateHiddenPathsAtom } from "../../../../entities/scan/model/atoms";
 import type { CandidatesRegisteredResult } from "./types";
+
+/** 追加の既定。▾で項目を選べるようにするのは別タスク */
+const REGISTER_APPLY_ALL = { title: true, cover: true, tags: true, url: true } as const;
 
 export interface UnregisteredTabProps {
   candidates: ScanCandidate[];
@@ -78,31 +75,30 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   }, [editingPath]);
 
   const registerMutation = useRegisterScanCandidatesMutation();
-  const register = async (items: ScanCandidateRegisterItem[]) => {
+  const register = async (paths: string[]) => {
     const candidateCount = candidates.length;
-    let response: ScanCandidatesRegisterResponse;
-    try {
-      response = await registerMutation.mutateAsync(items, {
-        onSuccess: ({ failures }) =>
-          setErrorMessage(
-            failures.length > 0 ? failures.map((failure) => failure.message).join("\n") : null,
-          ),
-        onError: (error) =>
-          setErrorMessage(
-            isCandidatesStale(error)
-              ? "候補が更新されたため表示を更新しました。選び直してください。"
-              : apiErrorMessage(error, "ライブラリへの追加に失敗しました"),
-          ),
-      });
-    } catch (error) {
-      if (isCandidatesStale(error)) await refreshScanCandidates(queryClient).catch(() => {});
-      return;
+    const outcome = await registerMutation.mutateAsync({ paths, apply: REGISTER_APPLY_ALL });
+    const { interruptedBy } = outcome;
+    if (interruptedBy) {
+      setErrorMessage(
+        isCandidatesStale(interruptedBy)
+          ? "候補が更新されたため表示を更新しました。選び直してください。"
+          : apiErrorMessage(interruptedBy, "ライブラリへの追加に失敗しました"),
+      );
+    } else {
+      setErrorMessage(
+        outcome.failures.length > 0
+          ? outcome.failures.map((failure) => failure.message).join("\n")
+          : null,
+      );
     }
-    const registeredPaths = new Set(response.registered.map((entry) => entry.path));
+    if (isCandidatesStale(interruptedBy)) await refreshScanCandidates(queryClient).catch(() => {});
+    const registeredPaths = new Set(outcome.registered.map((entry) => entry.path));
     setHiddenPaths((previous) => new Set([...previous, ...registeredPaths]));
+    if (registeredPaths.size === 0 && interruptedBy) return;
     onRegistered({
-      registeredCount: response.registered.length,
-      failedCount: response.failures.length,
+      registeredCount: outcome.registered.length,
+      failedCount: outcome.failures.length,
       remainingCount: candidateCount - registeredPaths.size,
     });
   };
@@ -241,8 +237,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   });
 
   const handleRegisterSelected = () => {
-    const items = registerableCandidates.map((candidate) => ({ path: candidate.path }));
-    void register(items);
+    void register(registerableCandidates.map((candidate) => candidate.path));
   };
 
   return (

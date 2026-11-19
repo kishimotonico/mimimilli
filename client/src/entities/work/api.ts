@@ -21,9 +21,10 @@ import {
   missingWorksCountSchema,
   workCreateResponseSchema,
   identityConflictReassignResponseSchema,
+  SCAN_CANDIDATE_REGISTER_MAX_PATHS,
   scanCandidatesRegisterRequestSchema,
   scanCandidatesRegisterResponseSchema,
-  type ScanCandidateRegisterItem,
+  type DlsiteRegistrationApply,
   type ScanCandidatesRegisterResponse,
   type WorkCreateBodyInput,
   type WorkCreateResponse,
@@ -151,14 +152,39 @@ export async function createWork(body: WorkCreateBodyInput): Promise<WorkCreateR
   return postParsed(workCreateResponseSchema, "/works", body);
 }
 
+export type ScanCandidatesRegisterOutcome = ScanCandidatesRegisterResponse & {
+  /** 途中で止まった原因。最後まで送れたらnull */
+  interruptedBy: Error | null;
+};
+
+/** 上限ごとに分けて順に送る。途中で失敗したらそこで止め、それまでに追加できた分は返す */
 export async function registerScanCandidates(
-  items: ScanCandidateRegisterItem[],
-): Promise<ScanCandidatesRegisterResponse> {
-  return postParsed(
-    scanCandidatesRegisterResponseSchema,
-    "/scan/candidates/register",
-    scanCandidatesRegisterRequestSchema.parse({ items }),
-  );
+  paths: string[],
+  apply: DlsiteRegistrationApply,
+): Promise<ScanCandidatesRegisterOutcome> {
+  const outcome: ScanCandidatesRegisterOutcome = {
+    registered: [],
+    failures: [],
+    interruptedBy: null,
+  };
+  for (let start = 0; start < paths.length; start += SCAN_CANDIDATE_REGISTER_MAX_PATHS) {
+    try {
+      const response = await postParsed(
+        scanCandidatesRegisterResponseSchema,
+        "/scan/candidates/register",
+        scanCandidatesRegisterRequestSchema.parse({
+          paths: paths.slice(start, start + SCAN_CANDIDATE_REGISTER_MAX_PATHS),
+          apply,
+        }),
+      );
+      outcome.registered.push(...response.registered);
+      outcome.failures.push(...response.failures);
+    } catch (error) {
+      outcome.interruptedBy = error instanceof Error ? error : new Error(String(error));
+      break;
+    }
+  }
+  return outcome;
 }
 
 export async function reassignIdentityConflict(

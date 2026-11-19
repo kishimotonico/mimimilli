@@ -129,7 +129,7 @@ export function scanRoute(
       "候補の登録内容が不正です",
     );
     try {
-      const result = await jobs.registerCandidates(data.items);
+      const result = await jobs.registerCandidates(data.paths, data.apply);
       return c.json(scanCandidatesRegisterResponseSchema.parse(result), 201);
     } catch (error) {
       if (error instanceof CandidatePoolChangedError) {

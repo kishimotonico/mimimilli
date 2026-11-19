@@ -48,8 +48,7 @@ export interface RegisterWorkOptions {
   tags?: NormalizedTag[];
   urls?: UrlEntry[];
   coverImage?: string | null;
-  dlsite?: MetaFile["dlsite"];
-  rjCode?: string;
+  dlsite: MetaFile["dlsite"];
 }
 
 export interface PreparedMeta {

@@ -135,6 +135,9 @@ async function createSubject(
     body: JSON.stringify({
       path: `${MISSING_CODE}_${MISSING_WORK_TITLE}`,
       title: MISSING_WORK_TITLE,
+      rjCode: MISSING_CODE,
+      applyCover: false,
+      applyUrl: false,
     }),
   });
   assert.equal(registered.status, 201);

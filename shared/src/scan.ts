@@ -1,7 +1,11 @@
 // サーバー側スキャンジョブの HTTP / SSE 契約。
 import { z } from "zod";
 import { dataIntegrityWarningSchema } from "./dataIntegrity.ts";
-import { dlsiteCachedCoverSchema, rjCodeFormatSchema } from "./dlsite.ts";
+import {
+  dlsiteCachedCoverSchema,
+  dlsiteRegistrationApplySchema,
+  rjCodeFormatSchema,
+} from "./dlsite.ts";
 import { workspacePathSchema } from "./media.ts";
 
 /** スキャンが見つけた候補フォルダー。DLsiteの状態は持たない（サーバーが候補一覧を返すときに導く） */
@@ -66,10 +70,6 @@ export const scanCandidatesMutationSchema = z.object({
     .min(1)
     .refine((paths) => new Set(paths).size === paths.length, "候補パスが重複しています"),
 });
-/** 登録するRJコードはサーバーの候補一覧が持つ値（直した値、なければ検出した値）を使う */
-export const scanCandidateRegisterItemSchema = z.object({
-  path: workspacePathSchema,
-});
 /** 空文字はRJコードなしの明示。値ありは検証・正規化して候補一覧に保持する。 */
 export const scanCandidateRjCodeRequestSchema = z.object({
   path: workspacePathSchema,
@@ -77,15 +77,17 @@ export const scanCandidateRjCodeRequestSchema = z.object({
 });
 export type ScanCandidateRjCodeRequest = z.infer<typeof scanCandidateRjCodeRequestSchema>;
 export const scanCandidateRjCodeResponseSchema = z.object({ candidate: scanCandidateSchema });
+/** 1リクエストで追加できる候補の上限。クライアントはこれごとに分割して送る */
+export const SCAN_CANDIDATE_REGISTER_MAX_PATHS = 20;
+/** RJコードとDLsite情報はサーバーが候補一覧とキャッシュから読む */
 export const scanCandidatesRegisterRequestSchema = z.object({
-  items: z
-    .array(scanCandidateRegisterItemSchema)
+  paths: z
+    .array(workspacePathSchema)
     .min(1)
-    .refine((items) => new Set(items.map((item) => item.path)).size === items.length, {
-      message: "候補パスが重複しています",
-    }),
+    .max(SCAN_CANDIDATE_REGISTER_MAX_PATHS)
+    .refine((paths) => new Set(paths).size === paths.length, "候補パスが重複しています"),
+  apply: dlsiteRegistrationApplySchema,
 });
-export type ScanCandidateRegisterItem = z.infer<typeof scanCandidateRegisterItemSchema>;
 export const scanCandidateExclusionsResponseSchema = z.object({
   paths: z.array(workspacePathSchema),
 });

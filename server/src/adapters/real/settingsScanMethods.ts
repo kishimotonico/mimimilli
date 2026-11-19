@@ -8,8 +8,8 @@ import type {
   StoredSettings,
 } from "../../adapter/index.ts";
 import type {
+  DlsiteRegistrationApply,
   ScanCandidate,
-  ScanCandidateRegisterItem,
   ScanCandidatesRegisterResponse,
   ScanResult,
 } from "@mimimilli/shared";
@@ -17,6 +17,7 @@ import { z } from "zod";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import { type DbLocation } from "./db.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
+import { createDlsiteProductResolver, readUsableDlsiteInfo } from "./dlsiteProductResolve.ts";
 import { Scanner } from "./scanner.ts";
 import { createCandidateDlsiteSource, groupMissingWorksByRjCode } from "./scanCandidateDlsite.ts";
 import { ScanCandidateSession, type CandidateListContext } from "./scanCandidateSession.ts";
@@ -81,7 +82,10 @@ export function createSettingsScanMethods(deps: {
     runFileScanInWorker,
   } = deps;
   let candidateSession = ScanCandidateSession.empty();
-  const candidateDlsite = createCandidateDlsiteSource(dlsiteCache);
+  const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache);
+  const candidateDlsite = createCandidateDlsiteSource(dlsiteCache, resolveDlsiteProduct);
+  const readUsableInfo = (productCode: string) =>
+    readUsableDlsiteInfo(resolveDlsiteProduct, productCode);
   const candidateListContext = (): CandidateListContext => ({
     dlsite: candidateDlsite,
     missingWorksByRjCode: groupMissingWorksByRjCode(query.listMissingWorksWithRjCode()),
@@ -229,9 +233,15 @@ export function createSettingsScanMethods(deps: {
       return candidateSession.setRjCode(requireRoot(), path, rjCode, user, candidateListContext());
     },
     async registerScanCandidates(
-      items: ScanCandidateRegisterItem[],
+      paths: string[],
+      apply: DlsiteRegistrationApply,
     ): Promise<ScanCandidatesRegisterResponse> {
-      return candidateSession.registerCandidates(requireRoot(), items, scanner, user);
+      return candidateSession.registerCandidates(requireRoot(), paths, apply, {
+        scanner,
+        user,
+        dlsiteCache,
+        readUsableInfo,
+      });
     },
     async excludeScanCandidates(paths: string[]): Promise<void> {
       await candidateSession.excludeCandidates(requireRoot(), paths, user);

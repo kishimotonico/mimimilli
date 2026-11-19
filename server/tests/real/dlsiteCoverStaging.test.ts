@@ -12,7 +12,13 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
-import { emptyMetaDlsiteState, META_FILE_NAME, type DlsiteApplyBody } from "@mimimilli/shared";
+import sharp from "sharp";
+import {
+  dlsiteInfoTags,
+  emptyMetaDlsiteState,
+  META_FILE_NAME,
+  type DlsiteApplyBody,
+} from "@mimimilli/shared";
 import { CoverSaveError, SourceChangedError } from "../../src/errors.ts";
 import { createApp } from "../helpers/testApp.ts";
 import { writeMetaFile } from "../../src/adapters/real/meta.ts";
@@ -33,10 +39,26 @@ import {
   writeWav,
 } from "../helpers/sampleLibrary.ts";
 
-const COVER_URL = "https://img.dlsite.jp/modpub/images2/work/a.jpg";
 const SENTINEL = Buffer.from("sentinel-not-an-image");
+const NOT_AN_IMAGE = new Uint8Array(Buffer.from("this-is-not-an-image"));
 
-async function setup(t: TestContext, coverExtension = "jpg") {
+const FAST_REQUESTS = {
+  ...DEFAULT_DLSITE_REQUEST_CONFIG,
+  requestIntervalMs: 0,
+  retryCount: 0,
+  maxBackoffMs: 0,
+  timeoutMs: 1_000,
+};
+
+/** カバー応答の差し替え。省略時は実在するJPEG、failはカバー取得失敗（先取りに失敗してキャッシュに残らない） */
+type CoverTransport = Uint8Array | "fail" | undefined;
+
+function coverTransport(cover: CoverTransport, fallback: Uint8Array) {
+  return () =>
+    cover === "fail" ? new Response("error", { status: 500 }) : jpegResponse(cover ?? fallback);
+}
+
+async function setup(t: TestContext, cover?: CoverTransport) {
   const lib = makeSampleLibrary();
   const outside = makeTestDirectory("dlsite-cover-outside");
   t.after(lib.cleanup);
@@ -47,19 +69,10 @@ async function setup(t: TestContext, coverExtension = "jpg") {
   const adapter = lib.own(
     createTestRealAdapter({
       database: { kind: "memory" },
-      dlsiteRequestConfig: {
-        ...DEFAULT_DLSITE_REQUEST_CONFIG,
-        requestIntervalMs: 0,
-        retryCount: 0,
-        maxBackoffMs: 0,
-        timeoutMs: 1_000,
-      },
+      dlsiteRequestConfig: FAST_REQUESTS,
       dlsiteSchedulerDependencies: mockDlsiteTransport({
-        html: (code) =>
-          htmlResponse(
-            sampleWorkHtml(code, { cover: true }).replace('.jpg"', `.${coverExtension}"`),
-          ),
-        cover: () => jpegResponse(coverBody),
+        html: (code) => htmlResponse(sampleWorkHtml(code, { cover: true })),
+        cover: coverTransport(cover, coverBody),
       }),
     }),
   );
@@ -67,20 +80,13 @@ async function setup(t: TestContext, coverExtension = "jpg") {
   await adapter.scan();
   const workId = lib.existingWorkId;
   const workDir = (await adapter.getWork(workId))!.physicalPath;
+  const rjCode = (await adapter.getWork(workId))!.dlsite.rjCode!;
+  const fetched = await adapter.dlsiteFetchByCode(rjCode);
+  assert.equal(fetched.ok, true);
 
-  const applyBody = async (overrides: Partial<DlsiteApplyBody["info"]> = {}) =>
+  const applyBody = async () =>
     ({
-      info: {
-        rjCode: "RJ900002",
-        title: "x",
-        circle: null,
-        cvs: [],
-        genreTags: [],
-        ageRating: null,
-        coverUrl: COVER_URL,
-        url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
-        ...overrides,
-      },
+      info: (fetched as Extract<typeof fetched, { ok: true }>).info,
       applyTitle: false,
       applyTags: [],
       applyCover: true,
@@ -133,43 +139,41 @@ test("作品フォルダーがルート外を指すsymlinkなら、カバーを�
   assert.deepEqual(coverFilesIn(moved), []);
 });
 
-test("許可リスト外の拡張子ではカバーを書かない", async (t) => {
-  const { adapter, workId, workDir, applyBody } = await setup(t);
-  for (const name of ["a.svg", "a.php", "a", "a.jpg.php"]) {
-    await assert.rejects(
-      async () =>
-        adapter.dlsiteApply(
-          workId,
-          await applyBody({ coverUrl: `https://img.dlsite.jp/modpub/images2/work/${name}` }),
-        ),
-      CoverSaveError,
-      name,
-    );
-    assert.deepEqual(coverFilesIn(workDir), [], name);
-  }
+test("画像として判定できないキャッシュのカバーは書かない", async (t) => {
+  const { adapter, workId, workDir, applyBody } = await setup(t, NOT_AN_IMAGE);
+  await assert.rejects(async () => adapter.dlsiteApply(workId, await applyBody()), CoverSaveError);
+  assert.deepEqual(coverFilesIn(workDir), []);
 });
 
-test("許可リスト内の拡張子は固定のbasenameで確定する", async (t) => {
-  const { adapter, workId, workDir, applyBody } = await setup(t);
-  const result = await adapter.dlsiteApply(
-    workId,
-    await applyBody({ coverUrl: "https://img.dlsite.jp/modpub/images2/work/a.JPEG" }),
+test("カバーの拡張子はURLではなく画像の中身で決まる", async (t) => {
+  const png = new Uint8Array(
+    await sharp({ create: { width: 3, height: 2, channels: 3, background: "#fff" } })
+      .png()
+      .toBuffer(),
   );
+  const { adapter, workId, workDir, applyBody } = await setup(t, png);
+  const result = await adapter.dlsiteApply(workId, await applyBody());
   assert.ok(result);
-  assert.equal(result.snapshot.coverImage, "dlsite_cover.jpeg");
-  assert.ok(existsSync(join(workDir, "dlsite_cover.jpeg")));
-  assert.deepEqual(coverFilesIn(workDir), ["dlsite_cover.jpeg"]);
+  assert.equal(result.snapshot.coverImage, "dlsite_cover.png");
+  assert.ok(existsSync(join(workDir, "dlsite_cover.png")));
+  assert.deepEqual(coverFilesIn(workDir), ["dlsite_cover.png"]);
 });
 
-test("apply-missingも一時ファイル経由で確定し、許可リスト外の画像は書かない", async (t) => {
-  const rejected = await setup(t, "svg");
-  assert.deepEqual(await rejected.adapter.dlsiteApplyMissing([rejected.workId]), {
-    applied: 0,
-    pending: 0,
-    skipped: 1,
-    failed: 0,
-  });
-  assert.deepEqual(coverFilesIn(rejected.workDir), []);
+test("apply-missingも一時ファイル経由で確定し、カバーを使えないときはカバーだけ外してタグ・URLを反映する", async (t) => {
+  for (const cover of [NOT_AN_IMAGE, "fail" as const]) {
+    const unusable = await setup(t, cover);
+    const { info } = await unusable.applyBody();
+    assert.deepEqual(await unusable.adapter.dlsiteApplyMissing([unusable.workId]), {
+      applied: 1,
+      pending: 0,
+      skipped: 0,
+      failed: 0,
+    });
+    assert.deepEqual(coverFilesIn(unusable.workDir), []);
+    const work = await unusable.adapter.getWork(unusable.workId);
+    for (const tag of dlsiteInfoTags(info)) assert.ok(work!.tags.includes(tag), tag);
+    assert.ok(work!.urls.some((entry) => entry.url === info.url));
+  }
 
   const accepted = await setup(t);
   assert.deepEqual(await accepted.adapter.dlsiteApplyMissing([accepted.workId]), {
@@ -183,7 +187,9 @@ test("apply-missingも一時ファイル経由で確定し、許可リスト外�
 
 const REGISTER_FOLDER = "RJ900020_manual";
 
-async function setupRegistration(t: TestContext, coverExtension = "jpg") {
+const REGISTER_CODE = "RJ900020";
+
+async function setupRegistration(t: TestContext, cover?: CoverTransport) {
   const dir = makeTestDirectory("dlsite-cover-register");
   t.after(dir.cleanup);
   const root = join(dir.path, "lib");
@@ -193,19 +199,18 @@ async function setupRegistration(t: TestContext, coverExtension = "jpg") {
   const adapter = dir.own(
     createTestRealAdapter({
       database: { kind: "memory" },
-      dlsiteRequestConfig: {
-        ...DEFAULT_DLSITE_REQUEST_CONFIG,
-        requestIntervalMs: 0,
-        retryCount: 0,
-        maxBackoffMs: 0,
-        timeoutMs: 1_000,
-      },
+      dlsiteRequestConfig: FAST_REQUESTS,
       dlsiteSchedulerDependencies: mockDlsiteTransport({
-        cover: () => jpegResponse(new Uint8Array(Buffer.from(SAMPLE_COVER_JPEG_BASE64, "base64"))),
+        html: (code) => htmlResponse(sampleWorkHtml(code, { cover: true })),
+        cover: coverTransport(
+          cover,
+          new Uint8Array(Buffer.from(SAMPLE_COVER_JPEG_BASE64, "base64")),
+        ),
       }),
     }),
   );
   await configureRoot(adapter, root);
+  assert.equal((await adapter.dlsiteFetchByCode(REGISTER_CODE)).ok, true);
   const app = createApp(adapter);
   const register = (path = REGISTER_FOLDER) =>
     app.request("/api/works", {
@@ -214,22 +219,9 @@ async function setupRegistration(t: TestContext, coverExtension = "jpg") {
       body: JSON.stringify({
         path,
         title: "登録",
-        dlsite: {
-          info: {
-            rjCode: "RJ900020",
-            title: "x",
-            circle: null,
-            cvs: [],
-            genreTags: [],
-            ageRating: null,
-            coverUrl: `https://img.dlsite.jp/modpub/images2/work/a.${coverExtension}`,
-            url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900020.html",
-          },
-          applyTitle: false,
-          applyTags: [],
-          applyCover: true,
-          applyUrl: false,
-        },
+        rjCode: REGISTER_CODE,
+        applyCover: true,
+        applyUrl: false,
       }),
     });
   return { folder, register, root };
@@ -245,7 +237,12 @@ test("新規登録はapplyCoverでカバーをdlsite_cover.<ext>に確定する"
 });
 
 test("孤立メタの復元でもカバーを確定する", async (t) => {
-  const { folder, register } = await setupRegistration(t, "png");
+  const png = new Uint8Array(
+    await sharp({ create: { width: 3, height: 2, channels: 3, background: "#fff" } })
+      .png()
+      .toBuffer(),
+  );
+  const { folder, register } = await setupRegistration(t, png);
   writeMetaFile(join(folder, META_FILE_NAME), {
     formatVersion: 1,
     id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
@@ -279,22 +276,18 @@ test("登録が失敗しても一時ファイルは残らない", async (t) => {
   assert.ok(lstatSync(join(blocked.folder, "dlsite_cover.jpg")).isDirectory());
 });
 
-test("カバー保存の失敗は登録と適用で同じ扱い(502 error)になる", async (t) => {
-  const { register } = await setupRegistration(t, "svg");
+test("カバーがキャッシュに無いとき、登録はカバーなしで成功し、適用は取り直さず502 errorになる", async (t) => {
+  const { folder, register } = await setupRegistration(t, "fail");
   const res = await register();
-  assert.equal(res.status, 502);
-  assert.deepEqual((await res.json()).error, {
-    code: "error",
-    message: "DLsiteカバーの保存に失敗しました",
-  });
+  assert.equal(res.status, 201);
+  assert.equal((await res.json()).snapshot.coverImage, null);
+  assert.deepEqual(coverFilesIn(folder), []);
 
-  const { adapter, workId, applyBody } = await setup(t);
+  const { adapter, workId, applyBody } = await setup(t, "fail");
   const apply = await createApp(adapter).request(`/api/dlsite/${workId}/apply`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(
-      await applyBody({ coverUrl: "https://img.dlsite.jp/modpub/images2/work/a.svg" }),
-    ),
+    body: JSON.stringify(await applyBody()),
   });
   assert.equal(apply.status, 502);
   assert.equal((await apply.json()).error.code, "error");

@@ -9,7 +9,7 @@ import type {
   ScanDiagnostics,
   ScanResult,
 } from "@mimimilli/shared";
-import { errorMessage, detectRjCode, emptyMetaDlsiteState, workspacePath } from "@mimimilli/shared";
+import { errorMessage, detectRjCode, workspacePath } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import type { ScanOptions } from "../../adapter/index.ts";
 import { descendantsRegisteredError } from "../../errors.ts";
@@ -642,24 +642,12 @@ export class Scanner {
       );
     }
 
-    let dlsite = options.dlsite;
-    if (dlsite === undefined) {
-      if (options.rjCode === undefined) {
-        const detected = detectRjCode([targetName(target), options.title]);
-        dlsite = detected
-          ? { ...emptyMetaDlsiteState(), rjCode: detected }
-          : emptyMetaDlsiteState();
-      } else {
-        dlsite = { ...emptyMetaDlsiteState(), rjCode: options.rjCode };
-      }
-    }
-
     const meta = this.draftMetaFor(target, {
       title: options.title,
       tags: options.tags,
       urls: options.urls,
       coverImage: options.coverImage,
-      dlsite,
+      dlsite: options.dlsite,
     });
     const snapshot = writeMetaFile(metaPath, meta);
     return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));

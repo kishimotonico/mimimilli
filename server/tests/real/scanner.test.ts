@@ -1,3 +1,4 @@
+import { REGISTER_ALL } from "../helpers/scanLibrary.ts";
 // real アダプタのスキャナー結合テスト。
 // サンプルライブラリ構成（tests/helpers/sampleLibrary.ts）:
 //   dlsite/RJ900001_テスト作品/ … メタなし（mp3/ に 2秒+3秒 の WAV、cover.jpg）→ 自動生成対象
@@ -37,7 +38,8 @@ async function setup(t: TestContext) {
   await configureRoot(adapter, lib.root);
   await adapter.scan();
   const result = await adapter.registerScanCandidates(
-    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    REGISTER_ALL,
   );
   const candidateWorkId = result.registered[0]!.workId;
   return { ...lib, adapter, candidateWorkId: candidateWorkId! };

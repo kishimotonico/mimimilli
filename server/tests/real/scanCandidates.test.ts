@@ -1,3 +1,4 @@
+import { REGISTER_ALL, NO_DLSITE } from "../helpers/scanLibrary.ts";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -87,13 +88,13 @@ test("選択した候補だけを登録し、除外した候補は以後返さ�
     },
   ]);
 
-  const result = await adapter.registerScanCandidates([{ path: workspacePath("選択作品") }]);
+  const result = await adapter.registerScanCandidates([workspacePath("選択作品")], REGISTER_ALL);
   assert.equal(result.registered.length, 1);
   assert.deepEqual(result.failures, []);
   assert.equal(existsSync(join(selected, "mimimilli.json")), true);
   assert.equal(existsSync(join(excluded, "mimimilli.json")), false);
   await assert.rejects(
-    () => adapter.registerScanCandidates([{ path: workspacePath("選択作品") }]),
+    () => adapter.registerScanCandidates([workspacePath("選択作品")], REGISTER_ALL),
     CandidatePoolChangedError,
   );
 });
@@ -121,7 +122,7 @@ test("root変更後の候補登録・除外はCandidatePoolChangedErrorで拒否
   await configureRoot(adapter, rootB);
 
   await assert.rejects(
-    () => adapter.registerScanCandidates([{ path: workspacePath("同名候補") }]),
+    () => adapter.registerScanCandidates([workspacePath("同名候補")], REGISTER_ALL),
     CandidatePoolChangedError,
   );
   assert.equal(existsSync(join(candidateDirA, "mimimilli.json")), false);
@@ -156,7 +157,10 @@ test("rootフォルダー消失後の候補登録はCandidatePoolChangedError(40
   const response = await app.request("/api/scan/candidates/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ items: [{ path: "候補作品" }] }),
+    body: JSON.stringify({
+      paths: ["候補作品"],
+      apply: { title: true, cover: true, tags: true, url: true },
+    }),
   });
   assert.equal(response.status, 409);
 });
@@ -173,10 +177,10 @@ test("stale候補を含む一括登録は書込み前に全件拒否する", asy
 
   await assert.rejects(
     () =>
-      adapter.registerScanCandidates([
-        { path: workspacePath("現在の候補") },
-        { path: workspacePath("古い候補") },
-      ]),
+      adapter.registerScanCandidates(
+        [workspacePath("現在の候補"), workspacePath("古い候補")],
+        REGISTER_ALL,
+      ),
     CandidatePoolChangedError,
   );
   assert.equal(existsSync(join(current, "mimimilli.json")), false);
@@ -261,7 +265,11 @@ test("スキャン候補の親登録は配下の子作品がある場合に失�
   const childRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspacePath("親フォルダー/子作品"), title: "子作品" }),
+    body: JSON.stringify({
+      path: workspacePath("親フォルダー/子作品"),
+      title: "子作品",
+      ...NO_DLSITE,
+    }),
   });
   assert.equal(childRes.status, 201);
   const childWork = await childRes.json();
@@ -270,7 +278,10 @@ test("スキャン候補の親登録は配下の子作品がある場合に失�
   const candidates = await adapter.listScanCandidates();
   assert.ok(candidates.some((candidate) => candidate.path === "親フォルダー"));
 
-  const result = await adapter.registerScanCandidates([{ path: workspacePath("親フォルダー") }]);
+  const result = await adapter.registerScanCandidates(
+    [workspacePath("親フォルダー")],
+    REGISTER_ALL,
+  );
   assert.deepEqual(result.registered, []);
   assert.equal(result.failures.length, 1);
   assert.match(result.failures[0]?.message ?? "", /配下に登録済み作品が1件あります/);

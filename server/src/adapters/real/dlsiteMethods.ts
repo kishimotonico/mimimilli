@@ -22,6 +22,7 @@ import { getWorkFromCatalog } from "./workRefresh.ts";
 import { createDlsiteFetch } from "./dlsiteFetch.ts";
 import { cachedCoverOf } from "./scanCandidateDlsite.ts";
 import { createDlsiteApply } from "./dlsiteApply.ts";
+import { sniffImageContentType } from "./dlsiteCoverStaging.ts";
 import { MetaParseError } from "./meta.ts";
 import { readVerifiedEditSource } from "./workEditSource.ts";
 import { SourceConflictError, SourceParseError } from "../../errors.ts";
@@ -29,18 +30,6 @@ import {
   refreshWorkDlsiteProjection,
   shouldRefreshDlsiteProjectionAfterFetch,
 } from "./dlsiteProjection.ts";
-
-function sniffImageContentType(body: Uint8Array): string | null {
-  const startsWith = (offset: number, bytes: number[]) =>
-    bytes.every((byte, index) => body[offset + index] === byte);
-  if (startsWith(0, [0xff, 0xd8, 0xff])) return "image/jpeg";
-  if (startsWith(0, [0x89, 0x50, 0x4e, 0x47])) return "image/png";
-  if (startsWith(0, [0x47, 0x49, 0x46, 0x38])) return "image/gif";
-  if (startsWith(0, [0x52, 0x49, 0x46, 0x46]) && startsWith(8, [0x57, 0x45, 0x42, 0x50])) {
-    return "image/webp";
-  }
-  return null;
-}
 
 export function createDlsiteMethods(deps: {
   db: Db;
@@ -59,7 +48,7 @@ export function createDlsiteMethods(deps: {
   const apply = createDlsiteApply({
     catalog,
     scanner: deps.scanner,
-    fetch,
+    dlsiteCache,
     requireRoot: deps.requireRoot,
   });
   const fetchTimeoutMs = deps.dlsiteRequestConfig.timeoutMs;
@@ -93,8 +82,6 @@ export function createDlsiteMethods(deps: {
   }
 
   return {
-    stageCover: fetch.stageCover,
-
     lookupDlsiteCachedCover(coverUrl: string | null) {
       return cachedCoverOf(coverUrl, (key) => dlsiteCache.coverVersionByKey(key));
     },

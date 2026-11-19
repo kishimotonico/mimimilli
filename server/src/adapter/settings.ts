@@ -1,7 +1,7 @@
 import type {
+  DlsiteRegistrationApply,
   ScanDiagnostics,
   ScanCandidate,
-  ScanCandidateRegisterItem,
   ScanCandidatesRegisterResponse,
   ScanProgressEvent,
   ScanResult,
@@ -28,7 +28,8 @@ export interface SettingsAdapter {
   /** 候補のRJコードを直す。nullはRJコードなしの明示。候補が一覧に無ければ CandidatePoolChangedError */
   setScanCandidateRjCode(path: string, rjCode: string | null): Promise<ScanCandidate>;
   registerScanCandidates(
-    items: ScanCandidateRegisterItem[],
+    paths: string[],
+    apply: DlsiteRegistrationApply,
   ): Promise<ScanCandidatesRegisterResponse>;
   excludeScanCandidates(paths: string[]): Promise<void>;
   listScanCandidateExclusions(): Promise<string[]>;

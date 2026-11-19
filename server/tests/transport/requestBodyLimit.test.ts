@@ -25,7 +25,10 @@ test("上限内の本文はルートの検証まで届く", async (t: TestContex
   const { server, baseUrl } = serveFixtureTransport();
   t.after(() => server.stop(true));
 
-  const res = await postRegister(baseUrl, JSON.stringify({ items: [] }));
+  const res = await postRegister(
+    baseUrl,
+    JSON.stringify({ paths: [], apply: { title: true, cover: true, tags: true, url: true } }),
+  );
 
   assert.equal(res.status, 400);
 });

@@ -570,7 +570,8 @@ describe("ScanModal", () => {
       expect(api.requestsTo("POST /api/scan/candidates/register")).toHaveLength(1),
     );
     expect(api.requestsTo("POST /api/scan/candidates/register")[0]?.body).toEqual({
-      items: [{ path: candidateDetected.path }, { path: candidateUndetected.path }],
+      paths: [candidateDetected.path, candidateUndetected.path],
+      apply: { title: true, cover: true, tags: true, url: true },
     });
 
     await waitFor(() =>
@@ -677,7 +678,8 @@ describe("ScanModal", () => {
       expect(api.requestsTo("POST /api/scan/candidates/register")).toHaveLength(1),
     );
     expect(api.requestsTo("POST /api/scan/candidates/register")[0]?.body).toEqual({
-      items: [{ path: candidateUndetected.path }],
+      paths: [candidateUndetected.path],
+      apply: { title: true, cover: true, tags: true, url: true },
     });
   });
 

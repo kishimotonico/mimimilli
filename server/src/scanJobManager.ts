@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type {
+  DlsiteRegistrationApply,
   ScanJobEvent,
   ScanJobSnapshot,
   ScanDiagnostics,
   ScanCandidate,
-  ScanCandidateRegisterItem,
   ScanCandidatesRegisterResponse,
   ScanProgressEvent,
   ScanResult,
@@ -134,9 +134,10 @@ export class ScanJobManager {
   }
 
   async registerCandidates(
-    items: ScanCandidateRegisterItem[],
+    paths: string[],
+    apply: DlsiteRegistrationApply,
   ): Promise<ScanCandidatesRegisterResponse> {
-    const response = await this.adapter.registerScanCandidates(items);
+    const response = await this.adapter.registerScanCandidates(paths, apply);
     this.record.addNewWorks(response.registered.map((entry) => entry.workId));
     return response;
   }

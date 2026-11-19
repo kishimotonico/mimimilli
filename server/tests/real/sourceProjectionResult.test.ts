@@ -1,3 +1,4 @@
+import { NO_DLSITE } from "../helpers/scanLibrary.ts";
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -182,7 +183,7 @@ test("新規登録がunpublishedでも201になり同じpathの再投影でcatal
   const created = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspacePath("new-work"), title: "登録タイトル" }),
+    body: JSON.stringify({ path: workspacePath("new-work"), title: "登録タイトル", ...NO_DLSITE }),
   });
   assert.equal(created.status, 201);
   const body = await created.json();
@@ -333,7 +334,7 @@ test("登録がpendingで終わった作品がprojectionでpublishedになって
   const created = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: workspacePath("new-work"), title: "登録タイトル" }),
+    body: JSON.stringify({ path: workspacePath("new-work"), title: "登録タイトル", ...NO_DLSITE }),
   });
   assert.equal(created.status, 201);
   const body = await created.json();

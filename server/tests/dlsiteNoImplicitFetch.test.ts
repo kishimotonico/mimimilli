@@ -9,6 +9,7 @@ import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../src/adapters/real/dlsiteConfig
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { configureRoot } from "./helpers/rootFolder.ts";
 import { htmlResponse, mockDlsiteTransport, sampleWorkHtml } from "./helpers/dlsiteTransport.ts";
+import { NO_DLSITE } from "./helpers/scanLibrary.ts";
 import { pollUntil } from "./helpers/poll.ts";
 import { createTestRealAdapter } from "./helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "./helpers/sampleLibrary.ts";
@@ -103,7 +104,8 @@ test("スキャン完了・候補登録・作品登録3経路・root再設定の
   const target = candidates.filter((candidate) => candidate.path.endsWith("RJ900003_候補"));
   assert.equal(target.length, 1);
   const registered = await post(app, "/api/scan/candidates/register", {
-    items: target.map((candidate) => ({ path: candidate.path })),
+    paths: target.map((candidate) => candidate.path),
+    apply: { title: true, cover: true, tags: true, url: true },
   });
   assert.equal(registered.status, 201);
   assert.equal(httpCalls, 0);
@@ -112,6 +114,7 @@ test("スキャン完了・候補登録・作品登録3経路・root再設定の
   const created = await post(app, "/api/works", {
     path: workspacePath("plain"),
     title: "手動登録",
+    ...NO_DLSITE,
   });
   assert.equal(created.status, 201);
   const projected = await post(app, "/api/works/projection", { path: "owned" });

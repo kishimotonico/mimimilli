@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import {
   DEFAULT_DLSITE_CACHE_TTLS_MS,
   applyDlsiteStatePatch,
@@ -21,6 +20,7 @@ import type { DlsiteAdapter } from "../../adapter/dlsite.ts";
 import { fixtureCoverFromColumns, type FixtureCoverColumns } from "./data.ts";
 import {
   dlsiteFetchFailureFor,
+  fixtureDlsiteCoverKey,
   fixtureDlsiteResolutionHead,
   dlsiteLinkageOf,
   normalizeDlsiteCacheKey,
@@ -39,10 +39,6 @@ export const FIXTURE_DLSITE_NOT_FOUND_RJ_CODE = "RJ000403";
 export const FIXTURE_DLSITE_NO_COVER_RJ_CODE = "RJ000402";
 
 const FIXTURE_COVER_BACKGROUNDS = ["#3b6ea8", "#a8573b", "#4a8f5a", "#8a4fa0", "#b58a2d"];
-
-export function fixtureDlsiteCoverKey(coverUrl: string): string {
-  return createHash("sha256").update(coverUrl).digest("hex");
-}
 
 function fixtureCoverImage(rjCode: string): Uint8Array {
   const background = FIXTURE_COVER_BACKGROUNDS[Number(rjCode.slice(-1)) % 5];

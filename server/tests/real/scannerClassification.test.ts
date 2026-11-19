@@ -1,3 +1,4 @@
+import { REGISTER_ALL } from "../helpers/scanLibrary.ts";
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -50,9 +51,10 @@ test("候補登録: RJコード省略時はフォルダー名から自動検出�
   await configureRoot(adapter, root);
   await adapter.scan();
 
-  const registered = await adapter.registerScanCandidates([
-    { path: workspacePath("RJ123456_自動検出作品") },
-  ]);
+  const registered = await adapter.registerScanCandidates(
+    [workspacePath("RJ123456_自動検出作品")],
+    REGISTER_ALL,
+  );
   assert.equal(registered.registered.length, 1);
 
   const meta = JSON.parse(readFileSync(join(workDir, "mimimilli.json"), "utf-8"));
@@ -72,9 +74,10 @@ test("候補登録: RJコード指定をmimimilli.jsonへ書き込む", async (t
   await adapter.scan();
 
   await adapter.setScanCandidateRjCode(workspacePath("RJ123456_指定作品"), "RJ999999");
-  const registered = await adapter.registerScanCandidates([
-    { path: workspacePath("RJ123456_指定作品") },
-  ]);
+  const registered = await adapter.registerScanCandidates(
+    [workspacePath("RJ123456_指定作品")],
+    REGISTER_ALL,
+  );
   assert.equal(registered.registered.length, 1);
 
   const meta = JSON.parse(readFileSync(join(workDir, "mimimilli.json"), "utf-8"));
@@ -95,9 +98,10 @@ test("候補登録: RJコード空文字は自動検出せずRJコードなし�
   assert.equal((await adapter.listScanCandidates())[0]?.rjCode, "RJ123456");
 
   await adapter.setScanCandidateRjCode(workspacePath("RJ123456_誤検出を消す作品"), null);
-  const registered = await adapter.registerScanCandidates([
-    { path: workspacePath("RJ123456_誤検出を消す作品") },
-  ]);
+  const registered = await adapter.registerScanCandidates(
+    [workspacePath("RJ123456_誤検出を消す作品")],
+    REGISTER_ALL,
+  );
   assert.equal(registered.registered.length, 1);
 
   const meta = JSON.parse(readFileSync(join(workDir, "mimimilli.json"), "utf-8"));

@@ -22,17 +22,6 @@ export function buildDlsiteApplyBody(
   };
 }
 
-export function buildDlsiteRegistrationBody(
-  info: DlsiteWorkInfo,
-  selection: { applyTitle: boolean; applyCover: boolean; applyUrl: boolean; applyTags: string[] },
-) {
-  const { sourceRevision: _sourceRevision, ...body } = buildDlsiteApplyBody(info, {
-    ...selection,
-    sourceRevision: "new-work",
-  });
-  return body;
-}
-
 export function unappliedDlsiteTags(
   work: Pick<Work, "tags">,
   info: DlsiteWorkInfo,

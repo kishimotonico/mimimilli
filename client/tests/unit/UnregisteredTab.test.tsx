@@ -5,11 +5,8 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ApiRequestError } from "../../src/shared/api/http";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  workspacePath,
-  type ScanCandidate,
-  type ScanCandidatesRegisterResponse,
-} from "@mimimilli/shared";
+import { workspacePath, type ScanCandidate } from "@mimimilli/shared";
+import type { ScanCandidatesRegisterOutcome } from "../../src/entities/work/api";
 import UnregisteredTab from "../../src/features/scan/ui/scanModal/UnregisteredTab";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import * as scanApi from "../../src/features/scan/api";
@@ -116,9 +113,11 @@ describe("UnregisteredTab RJコード編集", () => {
   });
 
   it("1行のRJコードが不正でも、正常な行だけを選んで登録できる（不正な行は自動的に除外される）", async () => {
-    const registerSpy = vi
-      .spyOn(workApi, "registerScanCandidates")
-      .mockResolvedValue({ registered: [{ path: candidateB.path, workId: "w2" }], failures: [] });
+    const registerSpy = vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
+      registered: [{ path: candidateB.path, workId: "w2" }],
+      failures: [],
+      interruptedBy: null,
+    });
     renderTab([candidateA, candidateB]);
 
     fireEvent.click(screen.getAllByTitle("クリックしてRJコードを編集")[0]);
@@ -136,7 +135,10 @@ describe("UnregisteredTab RJコード編集", () => {
     fireEvent.click(registerButton);
 
     await waitFor(() => expect(registerSpy).toHaveBeenCalledTimes(1));
-    expect(registerSpy.mock.calls[0]?.[0]).toEqual([{ path: candidateB.path }]);
+    expect(registerSpy.mock.calls[0]).toEqual([
+      [candidateB.path],
+      { title: true, cover: true, tags: true, url: true },
+    ]);
   });
 
   it("正しい値を確定すると修正APIを呼び、応答の候補で一覧キャッシュの行を置き換える", async () => {
@@ -260,6 +262,7 @@ describe("UnregisteredTab 候補から外す", () => {
 describe("UnregisteredTab 登録失敗", () => {
   it("サーバーの失敗理由をそのまま表示する", async () => {
     vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
+      interruptedBy: null,
       registered: [],
       failures: [
         {
@@ -281,9 +284,46 @@ describe("UnregisteredTab 登録失敗", () => {
   });
 });
 
+describe("UnregisteredTab 追加の途中停止", () => {
+  it("途中で候補変更が起きても、追加できた分はonRegisteredへ渡し、更新を促す", async () => {
+    vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
+      registered: [{ path: candidateA.path, workId: "w-a" }],
+      failures: [],
+      interruptedBy: new ApiRequestError(409, "conflict", "候補が更新されました"),
+    });
+    vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue(undefined);
+    const { onRegistered } = renderTab([candidateA, candidateB]);
+    fireEvent.click(screen.getByRole("button", { name: "2件をライブラリに追加" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText("候補が更新されたため表示を更新しました。選び直してください。"),
+      ).not.toBeNull(),
+    );
+    expect(onRegistered).toHaveBeenCalledWith({
+      registeredCount: 1,
+      failedCount: 0,
+      remainingCount: 1,
+    });
+  });
+
+  it("1件も追加できないまま止まったときはonRegisteredを呼ばず、失敗を表示する", async () => {
+    vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
+      registered: [],
+      failures: [],
+      interruptedBy: new Error("通信エラー"),
+    });
+    const { onRegistered } = renderTab([candidateA]);
+    fireEvent.click(screen.getByRole("button", { name: "1件をライブラリに追加" }));
+    await waitFor(() =>
+      expect(screen.getByText(/通信エラー|ライブラリへの追加に失敗/)).not.toBeNull(),
+    );
+    expect(onRegistered).not.toHaveBeenCalled();
+  });
+});
+
 describe("UnregisteredTab 登録中のアンマウント", () => {
   it("登録リクエスト中にタブがアンマウントされても、非表示集合とonRegisteredへ登録結果が届く", async () => {
-    let resolveRegister!: (response: ScanCandidatesRegisterResponse) => void;
+    let resolveRegister!: (response: ScanCandidatesRegisterOutcome) => void;
     vi.spyOn(workApi, "registerScanCandidates").mockReturnValue(
       new Promise((resolve) => {
         resolveRegister = resolve;
@@ -308,6 +348,7 @@ describe("UnregisteredTab 登録中のアンマウント", () => {
     await waitFor(() => expect(workApi.registerScanCandidates).toHaveBeenCalled());
     view.unmount();
     resolveRegister({
+      interruptedBy: null,
       registered: [{ path: candidateA.path, workId: "w-a" }],
       failures: [{ path: candidateB.path, message: "失敗" }],
     });

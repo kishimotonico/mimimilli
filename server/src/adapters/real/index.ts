@@ -88,7 +88,7 @@ export function createRealAdapter(
     dlsiteCache,
     runFileScanInWorker: assembly.runFileScanInWorker ?? runFileScanInWorker,
   });
-  const { stageCover, ...dlsiteMethods } = createDlsiteMethods({
+  const dlsiteMethods = createDlsiteMethods({
     db,
     query,
     catalog,
@@ -114,7 +114,7 @@ export function createRealAdapter(
     user,
     scanner,
     requireRoot,
-    stageCover,
+    dlsiteCache,
   });
   const classificationMethods = createClassificationMethods({ query, user, requireRoot });
 

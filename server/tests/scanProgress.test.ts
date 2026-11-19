@@ -208,7 +208,10 @@ test("候補から追加した作品は、スキャンで自動登録された�
   const registered = await app.request("/api/scan/candidates/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ items: [{ path: "未登録作品" }] }),
+    body: JSON.stringify({
+      paths: ["未登録作品"],
+      apply: { title: true, cover: true, tags: true, url: true },
+    }),
   });
   assert.equal(registered.status, 201);
   const { registered: entries } = await registered.json();

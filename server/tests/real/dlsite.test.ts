@@ -1,3 +1,4 @@
+import { REGISTER_ALL } from "../helpers/scanLibrary.ts";
 // DLsite スクレイパーのテスト。ネットワークアクセスはしない:
 // パースは合成 HTML、apply はモック info（coverUrl: null でカバー DL をスキップ）。
 import assert from "node:assert/strict";
@@ -656,7 +657,8 @@ test("DLsite取得はタイトル・タグを自動適用せず、mimimilli.json
   await configureRoot(adapter, lib.root);
   await adapter.scan();
   const registered = await adapter.registerScanCandidates(
-    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    REGISTER_ALL,
   );
   const candidateId = registered.registered[0]!.workId;
   const beforeExisting = await adapter.getWork(lib.existingWorkId);
@@ -704,7 +706,8 @@ test("DLsite取得はcache TTLとskipped状態を利用し、mimimilli.jsonを�
   await configureRoot(adapter, lib.root);
   await adapter.scan();
   const registered = await adapter.registerScanCandidates(
-    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    REGISTER_ALL,
   );
   const candidateId = registered.registered[0]!.workId;
   await adapter.updateDlsiteState(candidateId!, {
@@ -1285,27 +1288,23 @@ test("DLsiteカバー: キャッシュから各作品フォルダーへコピー
     createRealAdapter({
       database,
       dlsiteCache: { path: cachePath },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
       dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => htmlResponse(sampleWorkHtml(code, { cover: true })),
         cover: () => {
           coverHttpCalls += 1;
           return jpegResponse(coverBody);
         },
       }),
     });
-  const info: DlsiteWorkInfo = {
-    rjCode: "RJ900002",
-    title: "x",
-    circle: null,
-    cvs: [],
-    genreTags: [],
-    ageRating: null,
-    coverUrl: "https://img.dlsite.jp/modpub/images2/work/RJ900002_cover.jpg",
-    url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
-  };
 
   const first = makeAdapter();
   await configureRoot(first, lib.root);
   await first.scan();
+  const fetched = await first.dlsiteFetchByCode("RJ900002");
+  assert.equal(fetched.ok, true);
+  const info = (fetched as Extract<typeof fetched, { ok: true }>).info;
+  assert.equal(coverHttpCalls, 1);
   assert.ok(
     (
       await first.dlsiteApply(lib.existingWorkId, {
@@ -1347,7 +1346,7 @@ test("DLsiteカバー: キャッシュから各作品フォルダーへコピー
   reregistered.close();
 });
 
-test("DLsite HTMLキャッシュ: fresh DBでmimimilli.jsonを削除して同じ作品を再登録してもHTTPしない", async (t) => {
+test("DLsite HTMLキャッシュ: fresh DBでmimimilli.jsonを削除して同じ作品を再登録してもHTTPせず、キャッシュのDLsite情報で登録される", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-html-reregister");
   t.after(lib.cleanup);
@@ -1390,18 +1389,17 @@ test("DLsite HTMLキャッシュ: fresh DBでmimimilli.jsonを削除して同じ
   const registration = await second.registerScanCandidates(
     (await second.listScanCandidates())
       .filter((candidate) => candidate.path.endsWith("RJ900002_既存メタ"))
-      .map((candidate) => ({ path: candidate.path })),
+      .map((candidate) => candidate.path),
+    REGISTER_ALL,
   );
   const workIds = registration.registered.map((entry) => entry.workId);
   assert.equal(workIds.length, 1);
   const works = await Promise.all(workIds.map((id) => second.getWork(id)));
   const reregistered = works.find((work) => work?.physicalPath.endsWith("RJ900002_既存メタ"));
   assert.ok(reregistered);
-  assert.deepEqual(await fetchDlsiteOfWorks(second, [reregistered!.id]), {
-    fetched: 1,
-    failed: 0,
-    skipped: 0,
-  });
+  assert.equal(reregistered.title, "耳元ささやきの夜");
+  assert.equal(reregistered.dlsite.status, "applied");
+  assert.equal(reregistered.dlsite.rjCode, "RJ900002");
   assert.equal(htmlHttpCalls, 1);
   second.close();
 });
@@ -1516,7 +1514,7 @@ test("DLsite取得のlastAttemptAtはmimimilli.jsonへ保存しない", async (t
   assert.equal(after!.dlsite.lastAttemptAt, before!.dlsite.lastAttemptAt);
 });
 
-test("DLsiteカバー: 同じURLを2作品へ同時適用してもHTTPは1回で両方にファイルができる", async (t) => {
+test("DLsiteカバー: 先取りしたカバーを2作品へ同時適用しても、適用でHTTPせず両方にファイルができる", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-cover-concurrent-two-works");
   t.after(lib.cleanup);
@@ -1531,6 +1529,7 @@ test("DLsiteカバー: 同じURLを2作品へ同時適用してもHTTPは1回で
       dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
       dlsiteCache: { path: join(dir.path, "cache.sqlite") },
       dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => htmlResponse(sampleWorkHtml(code, { cover: true })),
         cover: () => {
           coverCalls += 1;
           return jpegResponse(coverBody);
@@ -1540,14 +1539,18 @@ test("DLsiteカバー: 同じURLを2作品へ同時適用してもHTTPは1回で
   );
   await configureRoot(adapter, lib.root);
   await adapter.scan();
+  const prefetched = await adapter.dlsiteFetchByCode("RJ900002");
+  assert.equal(prefetched.ok, true);
+  assert.equal(coverCalls, 1);
   const workAId = lib.existingWorkId;
   const registration = await adapter.registerScanCandidates(
-    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    REGISTER_ALL,
   );
   const registeredWorkBId = registration.registered[0]?.workId;
   assert.ok(registeredWorkBId);
   const workBId = registeredWorkBId;
-  const coverUrl = "https://img.dlsite.jp/modpub/images2/work/shared_cover.jpg";
+  const coverUrl = (prefetched as Extract<typeof prefetched, { ok: true }>).info.coverUrl!;
   const infoFor = (rjCode: string): DlsiteWorkInfo => ({
     rjCode,
     title: "x",
@@ -1704,7 +1707,7 @@ test("DLsite HTML: Content-Lengthが無い場合は実読込量がtransferMaxを
   );
 });
 
-test("DLsite apply: カバーはcache transportを通る", async (t) => {
+test("DLsite apply: カバーはキャッシュから読み、適用でHTTPしない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-apply-cover-cache");
   t.after(lib.cleanup);
@@ -1719,6 +1722,7 @@ test("DLsite apply: カバーはcache transportを通る", async (t) => {
       dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
       dlsiteCache: { path: join(dir.path, "cache.sqlite") },
       dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => htmlResponse(sampleWorkHtml(code, { cover: true })),
         cover: () => {
           coverCalls += 1;
           return jpegResponse(coverBody);
@@ -1728,17 +1732,11 @@ test("DLsite apply: カバーはcache transportを通る", async (t) => {
   );
   await configureRoot(adapter, lib.root);
   await adapter.scan();
+  const fetched = await adapter.dlsiteFetchByCode("RJ900002");
+  assert.equal(fetched.ok, true);
+  assert.equal(coverCalls, 1);
   const ok = await adapter.dlsiteApply(lib.existingWorkId, {
-    info: {
-      rjCode: "RJ900002",
-      title: "x",
-      circle: null,
-      cvs: [],
-      genreTags: [],
-      ageRating: null,
-      coverUrl: "https://img.dlsite.jp/modpub/images2/work/a.jpg",
-      url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
-    },
+    info: (fetched as Extract<typeof fetched, { ok: true }>).info,
     applyTitle: false,
     applyTags: [],
     applyCover: true,
@@ -1809,7 +1807,8 @@ test("DLsite取得はカバー失敗に依存せず、mimimilli.jsonを変更し
   await configureRoot(adapter, lib.root);
   await adapter.scan();
   await adapter.registerScanCandidates(
-    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    REGISTER_ALL,
   );
   const metaPath = join(
     (await adapter.getWork(lib.existingWorkId))!.physicalPath,
@@ -1850,7 +1849,8 @@ test("DLsite取得はmimimilli.json書込み権限に依存しない", async (t)
   await configureRoot(adapter, lib.root);
   await adapter.scan();
   await adapter.registerScanCandidates(
-    (await adapter.listScanCandidates()).map((candidate) => ({ path: candidate.path })),
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    REGISTER_ALL,
   );
 
   const failedMetaPath = join(lib.root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");
