@@ -219,8 +219,9 @@ export async function saveResumePosition(workId: string, resume: ResumeBody): Pr
   await postVoid(`/works/${encodeURIComponent(workId)}/resume`, resume);
 }
 
+/** 結果を待って押す取り直しなので、失敗の記録を無視して取得する */
 export async function fetchDlsiteInfo(workId: string): Promise<DlsitePreview> {
-  return postParsed(dlsitePreviewSchema, `/dlsite/${encodeURIComponent(workId)}/fetch`);
+  return postParsed(dlsitePreviewSchema, `/dlsite/${encodeURIComponent(workId)}/fetch?force=true`);
 }
 
 export async function applyDlsiteInfo(

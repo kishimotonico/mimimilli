@@ -56,7 +56,7 @@ export interface DlsiteJobState {
 
 export type DlsiteJobStoreEvent =
   /** コードが終端状態になった（行の情報を候補一覧から取り直す契機。Runtimeが間引く） */
-  | { type: "codesTerminal"; jobId: string; productCodes: string[] }
+  | { type: "codesTerminal"; jobId: string; origin: DlsiteJobOrigin; productCodes: string[] }
   /** 追跡中のジョブが終わった。productCodes はこのジョブで終端に達したコードすべて */
   | { type: "finished"; jobId: string; productCodes: string[] };
 
@@ -272,7 +272,12 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
           releasePendingSingles([productCode]);
           clearStartingBulk();
           if (isTerminalCodeState(event.state)) {
-            events.emit({ type: "codesTerminal", jobId, productCodes: [productCode] });
+            events.emit({
+              type: "codesTerminal",
+              jobId,
+              origin: event.origin,
+              productCodes: [productCode],
+            });
           }
         } else {
           for (const code of event.productCodes) codes.delete(canonicalDlsiteProductCode(code));

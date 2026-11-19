@@ -3,7 +3,6 @@ import {
   dlsiteFetchStateOfResolution,
   planDlsiteRegistration,
   relativeToRoot,
-  workspacePath,
 } from "@mimimilli/shared";
 import type {
   MissingWork,
@@ -137,23 +136,27 @@ async function runPseudoScan(
   checkAbort();
   emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
 
-  const missingWorks = markScenarioMissingWorks(state);
+  const scenario = !state.scanScenarioDelivered;
+  state.scanScenarioDelivered = true;
+  const missingWorks = scenario ? markScenarioMissingWorks(state) : [];
   state.works = state.works.map((work) => checkWorkPlacement(state, work));
   state.lastScanTime = new Date().toISOString();
   state.scanCandidates = [...state.scanCandidatePool];
   state.scanCandidateRjCodeOverrides.clear();
   return {
     registered: state.works.length,
-    insertedWorkIds: state.scanInsertedWorkIds,
+    insertedWorkIds: scenario ? state.scanInsertedWorkIds : [],
     startedWithEmptyCatalog,
     missingWorks,
-    updatedWorks: state.scanUpdatedWorks,
+    updatedWorks: scenario ? state.scanUpdatedWorks : [],
     errors: state.works.filter((w) => w.status === "error").length,
     missing: state.works.filter((w) => w.status === "missing").length,
     skipped: 0,
     coverErrors: 0,
-    unreadablePaths: state.scanUnreadablePaths,
-    ...(state.dataIntegrityWarning ? { dataIntegrityWarning: state.dataIntegrityWarning } : {}),
+    unreadablePaths: scenario ? state.scanUnreadablePaths : [],
+    ...(scenario && state.dataIntegrityWarning
+      ? { dataIntegrityWarning: state.dataIntegrityWarning }
+      : {}),
   };
 }
 
@@ -242,8 +245,9 @@ export function createSettingsScanMethods(
     },
     async registerScanCandidates(paths, apply): Promise<ScanCandidatesRegisterResponse> {
       const candidatesByPath = new Map<string, ScanCandidateFolder>(
-        state.scanCandidates.map((candidate) => [candidate.path, candidate]),
+        visibleFolders(state).map((candidate) => [candidate.path, candidate]),
       );
+      if (paths.some((path) => !candidatesByPath.has(path))) throw new CandidatePoolChangedError();
       const rootAbs = normalizeFsPath(requireFixtureRoot(state));
       const now = new Date().toISOString();
       // real adapter の registerCandidates（scanCandidateSession.ts）と同じ意味論: 登録した候補は
@@ -284,17 +288,12 @@ export function createSettingsScanMethods(
         setDlsiteLinkage(state, work.id, plan.dlsite);
         return [{ path: candidate.path, workId: work.id }];
       });
-      const failures = paths.flatMap((path) =>
-        candidatesByPath.has(path)
-          ? []
-          : [{ path: workspacePath(path), message: "候補が見つかりません" }],
-      );
       const registeredPaths = new Set(registered.map((candidate) => candidate.path));
       const unregistered = (candidate: ScanCandidateFolder) => !registeredPaths.has(candidate.path);
       for (const path of registeredPaths) state.scanCandidateRjCodeOverrides.delete(path);
       state.scanCandidatePool = state.scanCandidatePool.filter(unregistered);
       state.scanCandidates = state.scanCandidates.filter(unregistered);
-      return { registered, failures };
+      return { registered, failures: [] };
     },
     async excludeScanCandidates(paths): Promise<void> {
       // 除外は可逆な扱い（restoreScanCandidateExclusionsで戻せる）なので、

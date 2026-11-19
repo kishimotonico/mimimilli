@@ -274,7 +274,7 @@ describe("dlsiteJobStore", () => {
       expect(store.getState().job?.codes.get("RJ000001")?.state).toBe("fetched");
       expect(store.getState().job?.bulk).toEqual({ processed: 1, total: 1 });
       expect(events).toEqual([
-        { type: "codesTerminal", jobId: "job-1", productCodes: ["RJ000001"] },
+        { type: "codesTerminal", jobId: "job-1", origin: "bulk", productCodes: ["RJ000001"] },
       ]);
     });
 

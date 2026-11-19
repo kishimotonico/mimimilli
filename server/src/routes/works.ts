@@ -112,8 +112,10 @@ export function worksRoute(adapter: DataAdapter, scanRecord: ScanRecordStore): H
       "再取り込み対象のパスが不正です",
     );
     try {
-      const result = await adapter.reassignIdentityConflict(data);
-      if (!result) notFound("指定されたパスはidentity_conflict診断の対象ではありません");
+      const reassigned = await adapter.reassignIdentityConflict(data);
+      if (!reassigned) notFound("指定されたパスはidentity_conflict診断の対象ではありません");
+      const { replacedWorkId, ...result } = reassigned;
+      if (replacedWorkId !== null) scanRecord.forgetWork(replacedWorkId);
       return c.json(workSourceMutationResultSchema.parse(result), 201);
     } catch (error) {
       throwSourceCommandError(error);

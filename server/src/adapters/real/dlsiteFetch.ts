@@ -21,6 +21,7 @@ import { type DlsiteRequestConfig } from "./dlsiteConfig.ts";
 import {
   createDlsiteProductResolver,
   dlsiteFetchResultOfProductResolution,
+  dlsiteFetchStateOfProductResolution,
 } from "./dlsiteProductResolve.ts";
 import {
   DlsiteScheduler,
@@ -120,7 +121,13 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     force: boolean,
   ): DlsiteFetchAttempt | null {
     const key = productCode.trim().toUpperCase();
-    if (force) {
+    const resolution = resolveDlsiteProduct(key);
+    if (
+      force &&
+      (resolution.kind === "failure" ||
+        (resolution.kind === "html" &&
+          dlsiteFetchStateOfProductResolution(resolution) === "failed"))
+    ) {
       logDlsiteEvent({
         event: "dlsite_cache_miss",
         resource: "html",
@@ -129,7 +136,6 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
       });
       return null;
     }
-    const resolution = resolveDlsiteProduct(key);
     if (resolution.kind === "miss") {
       logDlsiteEvent({
         event: "dlsite_cache_miss",

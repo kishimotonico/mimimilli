@@ -23,7 +23,6 @@ import {
   fixtureDlsiteCoverCached,
   fixtureDlsiteCoverKey,
   fixtureUsableDlsite,
-  fixtureDlsiteResolutionHead,
   dlsiteLinkageOf,
   normalizeDlsiteCacheKey,
   setDlsiteLinkage,
@@ -73,7 +72,7 @@ export function createDlsiteMethods(
 ): DlsiteAdapter {
   const fetchDelayMs = options.fetchDelayMs ?? 0;
 
-  /** realのDlsiteCacheと同じく、失敗の記録→取得済み→通信の順に判断する。forceは記録を無視する */
+  /** realのDlsiteCacheと同じく、失敗の記録→取得済み→通信の順に判断する。forceは失敗の記録を無視して取り直す */
   async function fetchProduct(
     rjCode: string,
     force: boolean,
@@ -89,11 +88,9 @@ export function createDlsiteMethods(
           message: `fixture: キャッシュ済みの取得失敗（${key}）`,
         };
       }
-      const fetched = state.dlsiteFetched.get(key);
-      if (fetched && fixtureDlsiteResolutionHead(state, key).kind === "html") {
-        return { ok: true, info: fetched.info };
-      }
     }
+    const fetched = state.dlsiteFetched.get(key);
+    if (fetched && fetched.expiresAt > Date.now()) return { ok: true, info: fetched.info };
     if (fetchDelayMs > 0) await sleep(fetchDelayMs, signal);
     else if (signal?.aborted) throw new DOMException("取得はキャンセルされました", "AbortError");
     const now = Date.now();

@@ -284,11 +284,11 @@ for (const kind of ["fixture", "real"] as const) {
     },
   );
 
-  contract("候補の追加は旧形式のbodyと上限超過を400で拒否する", async (subject) => {
-    const legacy = await post(subject, "/api/scan/candidates/register", {
+  contract("候補の追加は paths のないbodyと上限超過を400で拒否する", async (subject) => {
+    const withoutPaths = await post(subject, "/api/scan/candidates/register", {
       items: [{ path: subject.candidatePath }],
     });
-    assert.equal(legacy.status, 400);
+    assert.equal(withoutPaths.status, 400);
     const tooMany = await post(subject, "/api/scan/candidates/register", {
       paths: Array.from({ length: SCAN_CANDIDATE_REGISTER_MAX_PATHS + 1 }, (_, i) => `候補${i}`),
       apply: ALL,

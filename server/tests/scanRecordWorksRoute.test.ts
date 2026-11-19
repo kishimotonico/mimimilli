@@ -100,6 +100,43 @@ test("DELETE /works/:id は記録の全項目から該当作品を外す", async
   assert.equal(snapshot.dataIntegrityWarning, undefined);
 });
 
+async function reassignWithRecord(path: string) {
+  const adapter = createFixtureAdapter({ scenario: "new-work" });
+  const store = new ScanRecordStore();
+  const app = new Hono().route("/api", worksRoute(adapter, store));
+  store.replace(
+    result({
+      insertedWorkIds: ["RJ501001", "RJ501002"],
+      updatedWorks: [{ workId: "RJ501001", changes: [{ kind: "meta" }] }],
+    }),
+    "t",
+  );
+  const res = await app.request("/api/works/identity-conflicts/reassign", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ path }),
+  });
+  assert.equal(res.status, 201);
+  const body = (await res.json()) as { snapshot: { id: string } };
+  return { store, body };
+}
+
+test("ID再採番で登録側の作品IDが置き換わったら、記録から古いIDの項目を外す", async () => {
+  const { store, body } = await reassignWithRecord(
+    "dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読",
+  );
+  assert.notEqual(body.snapshot.id, "RJ501001");
+  assert.equal("replacedWorkId" in body, false);
+  assert.deepEqual(store.workIds("new"), ["RJ501002"]);
+  assert.deepEqual(store.snapshot().updatedWorks, []);
+});
+
+test("ID再採番でコピー側を直しても、登録側の作品の記録は残る", async () => {
+  const { store } = await reassignWithRecord("copies/RJ501001_夜更けの図書室で囁き朗読");
+  assert.deepEqual(store.workIds("new"), ["RJ501001", "RJ501002"]);
+  assert.equal(store.snapshot().updatedWorks.length, 1);
+});
+
 test("POST /works/unregister-missing は解除した作品だけ記録から外す", async () => {
   const { adapter, store, app } = setup();
   const missingId = (
@@ -125,4 +162,23 @@ test("POST /works/unregister-missing は解除した作品だけ記録から外�
     store.snapshot().missingWorks.map((work) => work.workId),
     ["other"],
   );
+});
+
+test("fixtureのスキャンは、登録解除した新規作品を次のスキャンで記録へ戻さず、記録を今回の変化へ入れ替える", async () => {
+  const adapter = createFixtureAdapter({ scenario: "new-work" });
+  const store = new ScanRecordStore();
+  const app = new Hono().route("/api", worksRoute(adapter, store));
+
+  const first = await adapter.scan();
+  store.replace(first, "t1");
+  assert.deepEqual(store.workIds("new"), first.insertedWorkIds);
+  assert.ok(first.insertedWorkIds.length > 0);
+
+  const removed = first.insertedWorkIds[0]!;
+  assert.equal((await app.request(`/api/works/${removed}`, { method: "DELETE" })).status, 204);
+
+  const second = await adapter.scan();
+  store.replace(second, "t2");
+  assert.deepEqual(store.workIds("new"), []);
+  assert.deepEqual(store.snapshot().updatedWorks, []);
 });

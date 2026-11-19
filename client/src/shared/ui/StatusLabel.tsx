@@ -9,7 +9,7 @@ const TONE_CLASS: Record<StatusTone, string> = {
   done: "text-[color-mix(in_oklch,var(--state-success)_78%,var(--ink-0))]",
   work: "text-ink-2",
   attention: "text-[color-mix(in_oklch,var(--state-danger)_85%,var(--ink-0))]",
-  none: "text-ink-2",
+  none: "",
 };
 
 interface StatusLabelProps {

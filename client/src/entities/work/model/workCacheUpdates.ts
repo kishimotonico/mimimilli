@@ -4,6 +4,7 @@
 import { hashKey, type Query, type QueryClient, type QueryKey } from "@tanstack/react-query";
 import {
   canonicalDlsiteProductCode,
+  type ScanCandidate,
   type Work,
   type WorkEditSnapshot,
   type WorkSourceMutationResult,
@@ -13,6 +14,7 @@ import { SMART_FOLDER_QUERY_KEYS } from "../../smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../tag/queryKeys";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../file-system/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../scan/queryKeys";
+import { refreshScanCandidates, SCAN_CANDIDATES_QUERY_KEY } from "../../scan/scanCandidatesCache";
 
 async function invalidateLibraryViews(queryClient: QueryClient): Promise<void> {
   await Promise.all([
@@ -182,5 +184,23 @@ export async function updateCachesAfterDlsiteFetch(
       },
     }),
     invalidateLibraryViews(queryClient),
+  ]);
+}
+
+/** DLsiteの同期取得（作品詳細の取得・Filesの取得）の終了後。成否にかかわらず、同じRJコードの作品を無効化し、
+ *  キャッシュ済みの候補一覧にそのRJコードの候補があるときだけ候補一覧を取り直す */
+export async function updateCachesAfterDlsiteSyncFetch(
+  queryClient: QueryClient,
+  rjCode: string,
+): Promise<void> {
+  const code = canonicalDlsiteProductCode(rjCode);
+  const cached = queryClient.getQueryData<ScanCandidate[]>(SCAN_CANDIDATES_QUERY_KEY) ?? [];
+  const hasCandidate = cached.some(
+    (candidate) =>
+      candidate.rjCode !== null && canonicalDlsiteProductCode(candidate.rjCode) === code,
+  );
+  await Promise.allSettled([
+    hasCandidate ? refreshScanCandidates(queryClient) : Promise.resolve(),
+    updateCachesAfterDlsiteFetch(queryClient, [rjCode]),
   ]);
 }

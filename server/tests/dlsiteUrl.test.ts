@@ -1,11 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  emptyMetaDlsiteState,
-  hasDlsiteUrl,
-  isDlsiteUrl,
-  planDlsiteApply,
-} from "@mimimilli/shared";
+import { emptyMetaDlsiteState, isDlsiteUrl, planDlsiteApply } from "@mimimilli/shared";
 
 test("isDlsiteUrl: dlsite.com 本体とサブドメインだけを true にする", () => {
   assert.equal(isDlsiteUrl("https://www.dlsite.com/maniax/work/=/product_id/RJ1.html"), true);
@@ -18,14 +13,6 @@ test("isDlsiteUrl: dlsite.com を含む別ホストと不正URLは false", () =>
   assert.equal(isDlsiteUrl("https://example.com/?u=www.dlsite.com"), false);
   assert.equal(isDlsiteUrl("not a url"), false);
   assert.equal(isDlsiteUrl(""), false);
-});
-
-test("hasDlsiteUrl: 別ホストだけの一覧は false", () => {
-  assert.equal(hasDlsiteUrl([{ url: "https://notdlsite.com/a" }]), false);
-  assert.equal(
-    hasDlsiteUrl([{ url: "https://x.example/" }, { url: "https://www.dlsite.com/a" }]),
-    true,
-  );
 });
 
 test("planDlsiteApply: dlsite.com を含む別ホストのURLは保持し、DLsite URLを末尾に足す", () => {

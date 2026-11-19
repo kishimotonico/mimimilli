@@ -5,6 +5,7 @@ client のエラー所有権・Promise 契約・best-effort 失敗の基準。�
 ## ユーザーに見せる操作失敗
 
 - **スキャン start / cancel**: 所有者は `scanJobStore`（`entities/scan`）。失敗は `state.error` に持ち、`ScanRuntime` が `useToast().show({ variant: "error", ... })` で表示する。Promise は reject しない
+- **DLsite取得ジョブの失敗**: 所有者は `dlsiteJobStore`（`entities/dlsite`）。失敗は `state.error` に持ち、`DlsiteJobRuntime`（`features/dlsite`）が `useToast().show({ variant: "error", ... })` で表示する。Promise は reject しない
 - **その他の mutation**（再生・エクスポート等）: 呼び出し側が catch し `useToast().error(...)` で表示する
 
 表示は単一ホストの `GlobalToast`（`toastRequestsAtom` の要求を受けて描画）に集約される。variant="error" は発行元の priority に関わらず最優先で表示される。scan / DLsite の SSE 由来の失敗（イベント解析エラー・接続切断等）も、それぞれの runtime が上記と同じ `useToast` 経路で扱う。

@@ -491,6 +491,7 @@ for (const layout of ["folder", "file"] as const) {
       });
       assert.ok(result);
       assert.notEqual(result.snapshot.id, harness.ownerId);
+      assert.equal(result.replacedWorkId, harness.ownerId);
       assert.equal(result.snapshot.physicalPath, harness.physicalPathOf("a"));
       assert.deepEqual((await harness.adapter.listScanDiagnostics()).identityConflicts, []);
       const work = await harness.adapter.getWork(result.snapshot.id);
@@ -507,6 +508,7 @@ for (const layout of ["folder", "file"] as const) {
       });
       assert.ok(result);
       assert.notEqual(result.snapshot.id, harness.ownerId);
+      assert.equal(result.replacedWorkId, null);
       assert.equal(result.snapshot.physicalPath, harness.physicalPathOf("b"));
       assert.deepEqual((await harness.adapter.listScanDiagnostics()).identityConflicts, []);
       const copy = await harness.adapter.getWork(result.snapshot.id);

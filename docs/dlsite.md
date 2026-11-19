@@ -88,7 +88,7 @@ failure_kind（失敗記録側）と既定TTL。
 | `not_found`  | HTTP 404               | 3日   |
 | `error`      | 一時的なHTTP・通信障害 | 1時間 |
 
-TTLは `DEFAULT_DLSITE_CACHE_TTLS_MS`（`shared/src/dlsite.ts`）の定数で固定されている。通常取得の判断順序は、有効な失敗記録があればそれを返し（ネットワークへ出ない）、なければ有効なHTML snapshotを（保存済みの解析結果を使って）返し、どちらもなければネットワークへ出る。`?force=true` はキャッシュの読み取りだけを無視して必ずネットワークへ出るが、書き込みは通常時と同じ規則に従う。
+TTLは `DEFAULT_DLSITE_CACHE_TTLS_MS`（`shared/src/dlsite.ts`）の定数で固定されている。通常取得の判断順序は、有効な失敗記録があればそれを返し（ネットワークへ出ない）、なければ有効なHTML snapshotを（保存済みの解析結果を使って）返し、どちらもなければネットワークへ出る。force（`?force=true`、取得ジョブの単発）は、有効な失敗記録と解析できないsnapshot（`parse_error`、またはokでも今のパーサーで解析できないもの）をmissとして扱い、ネットワークへ取り直す。TTL内で解析できるokのsnapshotはforceでもそのまま使い、ネットワークへ出ない。書き込みは通常時と同じ規則に従う。
 
 HTMLの転送・展開サイズには上限があり（既定2 MiB / 8 MiB、`DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES` / `DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES`）、gzip展開時にも `zlib` の `maxOutputLength` で同じ上限を渡してgzip bombを防ぐ。転送サイズの上限はHTTP応答にだけ課す。CLIのローカルファイルimportは転送を伴わないため、展開後サイズの上限だけで判定する。
 
@@ -106,7 +106,7 @@ HTMLの転送・展開サイズには上限があり（既定2 MiB / 8 MiB、`DE
 
 `MIMIMILLI_DLSITE_OFFLINE=true` は、作品HTML・カバー画像・カバーのリダイレクト先を含むDLsiteへの実HTTPをすべて止める。ネットワーク環境がない場所での動作確認や、意図せず実サイトへアクセスしたくないデバッグ用途のフラグ。
 
-有効時、キャッシュのhitは通常どおり使える。missとforceは明示的な `offline` エラー（`DlsiteOfflineError`）になり、キャッシュにも `work.dlsite.status` にも書き込まない。オフラインで試しただけの結果を本物の取得失敗として残さないための挙動。値は `true` または `false` のみで、未指定時は `false`。
+有効時、キャッシュのhit（forceでも、TTL内で解析できるokのsnapshot）は通常どおり使える。miss、および失敗の記録を取り直すforceは明示的な `offline` エラー（`DlsiteOfflineError`）になり、キャッシュにも `work.dlsite.status` にも書き込まない。オフラインで試しただけの結果を本物の取得失敗として残さないための挙動。値は `true` または `false` のみで、未指定時は `false`。
 
 ## 安全性
 
@@ -190,11 +190,11 @@ importはHTML snapshotを成功記録として書き直すため、取り込ん�
 - 取得失敗記録（`dlsite_fetch_failures`）。404・通信失敗はTTLが3日・1時間と短く、アーカイブしてもすぐ期限切れになる
 - カバー画像（`dlsite_cover_entries`）。ローカルにカバーがない作品は、HTMLがcache hitしてもカバー取得へ進む。適用済み作品のカバーは作品フォルダーへ保存されるため通常は再取得されない
 
-強制的に再取得したい場合は、`POST /dlsite/:id/fetch?force=true` でキャッシュの読み取りだけを無視する。クライアント（`client/src/entities/work/api.ts`）はforceを付けずに呼ぶため、UIからは到達できない。現状は手で叩くときだけの手段。キャッシュの行自体を消したい場合は、TTLが切れるのを待って `cleanup` する。
+失敗の記録を無視して取り直したい場合は、`POST /dlsite/:id/fetch?force=true` や `POST /dlsite/fetch-by-code?force=true` を使う（TTL内で解析できるokのsnapshotは使うので、オフライン設定でも成功する）。作品詳細の「取得」とFilesの「取得」は、ユーザーが1件の結果を待って押す取り直しなので、クライアントは常にforce付きで呼ぶ（失敗の記録を無視して取り直す）。キャッシュの行自体を消したい場合は、TTLが切れるのを待って `cleanup` する。
 
 ## 取得失敗・パース失敗の検知
 
-`errorKind` は取得ジョブ・同期取得で失敗を記録したときに更新され、手動プレビュー（`POST /dlsite/:id/fetch`）では変わらない。作品詳細の警告（`WorkStatusWarnings`）は、`shared/src/dlsite.ts` の述語で作品の `work.dlsite` を判定して出す。
+`errorKind` は取得ジョブ・同期取得（`POST /dlsite/:id/fetch`・`POST /dlsite/fetch-by-code`）で失敗を記録したときに更新される。取得のあとは、同じRJコードを持つ全作品の投影が更新される。作品詳細の警告（`WorkStatusWarnings`）は、`shared/src/dlsite.ts` の述語で作品の `work.dlsite` を判定して出す。
 
 - `isRjCodeMissing`: `rjCode === null` かつ `status !== skipped`
 - `isDlsiteFetchFailed`: `status` が `not_found`、または `error` かつ `errorKind !== parse_error`
@@ -206,7 +206,9 @@ importはHTML snapshotを成功記録として書き直すため、取り込ん�
 
 `server/src/routes/dlsite.ts` に実装がある。進捗SSEの契約は [ADR-0030](adr/0030-job-progress-sse-current-state.md)。
 
-- `POST /dlsite/:id/fetch` — 1作品分の取得プレビュー（`info`・`infoRevision`・`cachedCover`・`sourceRevision`）。`?force=true` でキャッシュを無視
+- `POST /dlsite/:id/fetch` — 1作品分の取得プレビュー（`info`・`infoRevision`・`cachedCover`・`sourceRevision`）。`?force=true` で失敗の記録を無視して取り直す
+- `POST /dlsite/fetch-by-code` — 未登録のRJ/VJコードの取得（Filesの登録ダイアログ）。body は `{ rjCode }`、応答は `info` と `cachedCover`。`?force=true` で失敗の記録を無視して取り直す
+- `GET /media/dlsite-cover/:key` — DLsiteカバーキャッシュの配信。クライアントは応答の `cachedCover`（`key`・`version`）からURLを作る
 - `POST /dlsite/:id/apply` — 取得したDLsite情報のうち選択した項目を、キャッシュから読んで適用。`dlsite_refetch_required`（409）は再取得を促す
 - `PATCH /dlsite/:id` — RJコードの手動設定（空文字は「コードなし」の明示、`null` は受け付けない）、または `skipped` の切り替え
 - `POST /dlsite/jobs` — 取得ジョブを開始し、202 `{ jobId }` を返す。実行中ジョブがあればそのキューへ合流し、そのジョブIDを返す。body は `{ origin: "bulk", productCodes }`（1〜1000件）か `{ origin: "single", productCode }`（失敗の記録を無視して取り直す）。オフライン設定では `offline`、サーバーの終了処理中は409（`conflict`）で拒否する

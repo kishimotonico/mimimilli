@@ -9,9 +9,7 @@ import {
   type QueryKey,
   type UseMutationResult,
 } from "@tanstack/react-query";
-import { canonicalDlsiteProductCode } from "@mimimilli/shared";
 import type {
-  ScanCandidate,
   DlsiteApplyBodyInput,
   DlsitePreview,
   DlsiteStateUpdateBody,
@@ -42,11 +40,10 @@ import {
   unregisterMissingWorks,
   updateDlsiteState,
 } from "../api";
-import { SCAN_CANDIDATES_QUERY_KEY, refreshScanCandidates } from "../../scan/scanCandidatesCache";
 import {
   updateCachesAfterBookmark,
   updateCachesAfterDlsiteLinkageChange,
-  updateCachesAfterDlsiteFetch,
+  updateCachesAfterDlsiteSyncFetch,
   updateCachesAfterIdentityReassign,
   updateCachesAfterMissingUnregistration,
   updateCachesAfterRegistration,
@@ -221,18 +218,7 @@ export function useFetchDlsitePreviewMutation() {
   const queryClient = useQueryClient();
   return useMutation<DlsitePreview, Error, { workId: string; rjCode: string }>({
     mutationFn: ({ workId }) => fetchDlsiteInfo(workId),
-    onSettled: async (_data, _error, { rjCode }) => {
-      const code = canonicalDlsiteProductCode(rjCode);
-      const cached = queryClient.getQueryData<ScanCandidate[]>(SCAN_CANDIDATES_QUERY_KEY) ?? [];
-      const hasCandidate = cached.some(
-        (candidate) =>
-          candidate.rjCode !== null && canonicalDlsiteProductCode(candidate.rjCode) === code,
-      );
-      await Promise.allSettled([
-        hasCandidate ? refreshScanCandidates(queryClient) : Promise.resolve(),
-        updateCachesAfterDlsiteFetch(queryClient, [rjCode]),
-      ]);
-    },
+    onSettled: (_data, _error, { rjCode }) => updateCachesAfterDlsiteSyncFetch(queryClient, rjCode),
   });
 }
 

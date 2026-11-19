@@ -9,7 +9,7 @@ import type {
 } from "@mimimilli/shared";
 
 export interface DlsiteAdapter {
-  /** force=true はキャッシュを無視して明示的に再取得する。 */
+  /** force=true は失敗の記録と解析できないsnapshotを無視して取り直す。TTL内の解析できるsnapshotは使う */
   dlsiteFetch(
     workId: string,
     force?: boolean,

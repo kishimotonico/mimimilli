@@ -213,7 +213,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
 
     async reassignIdentityConflict(
       body: IdentityConflictReassignBody,
-    ): Promise<WorkSourceMutationResult | null> {
+    ): Promise<(WorkSourceMutationResult & { replacedWorkId: string | null }) | null> {
       const diagnostic = state.identityConflicts.find((candidate) =>
         candidate.paths.includes(body.path),
       );
@@ -227,6 +227,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
         : posix.join(target, META_FILE_NAME);
       const newId = crypto.randomUUID();
       let reassigned: FixtureWorkRecord;
+      const replacedWorkId = metaPath === owner.metaPath ? diagnostic.workId : null;
       if (metaPath === owner.metaPath) {
         owner.id = newId;
         owner.bookmarked = false;
@@ -259,6 +260,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       return {
         snapshot: fixtureEditSnapshot(state, reassigned),
         projection: { status: "published" },
+        replacedWorkId,
       };
     },
 

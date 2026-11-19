@@ -32,7 +32,12 @@ function coverUrlOf(code: string): string {
   );
 }
 
-function setup(t: TestContext, transport: MockDlsiteTransportOptions, config = FAST_CONFIG) {
+function setup(
+  t: TestContext,
+  transport: MockDlsiteTransportOptions,
+  config = FAST_CONFIG,
+  clock?: () => number,
+) {
   const dir = makeTestDirectory("dlsite-fetch-product");
   t.after(dir.cleanup);
   const cachePath = join(dir.path, "cache.sqlite");
@@ -40,7 +45,7 @@ function setup(t: TestContext, transport: MockDlsiteTransportOptions, config = F
     createRealAdapter({
       database: { kind: "memory" },
       dlsiteRequestConfig: config,
-      dlsiteCache: { path: cachePath },
+      dlsiteCache: { path: cachePath, ...(clock ? { clock } : {}) },
       dlsiteSchedulerDependencies: mockDlsiteTransport(transport),
     }),
   );
@@ -179,10 +184,16 @@ test("取得は同じRJコードを持つ全作品の投影を更新する（3�
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
   let gone = true;
-  const { adapter } = setup(t, {
-    html: (code) =>
-      gone ? htmlResponse("gone", 404) : htmlResponse(sampleWorkHtml(code, { cover: false })),
-  });
+  let now = 1_000;
+  const { adapter } = setup(
+    t,
+    {
+      html: (code) =>
+        gone ? htmlResponse("gone", 404) : htmlResponse(sampleWorkHtml(code, { cover: false })),
+    },
+    FAST_CONFIG,
+    () => now,
+  );
   const duplicateDir = join(lib.root, "dlsite", "RJ900002_複製");
   cpSync(join(lib.root, "dlsite", "RJ900002_既存メタ"), duplicateDir, { recursive: true });
   const duplicateMetaPath = join(duplicateDir, "mimimilli.json");
@@ -204,6 +215,7 @@ test("取得は同じRJコードを持つ全作品の投影を更新する（3�
   assert.equal(await statusOf(duplicateId), "none");
 
   gone = true;
+  now += 365 * 24 * 60 * 60 * 1000;
   await adapter.dlsiteFetch(lib.existingWorkId, true);
   assert.equal(await statusOf(lib.existingWorkId), "not_found");
   assert.equal(await statusOf(duplicateId), "not_found");
@@ -236,4 +248,61 @@ test("同じRJコードにmissingや壊れた作品が混ざっても、取得�
 test("オフライン設定ではisDlsiteOfflineがtrueを返す", (t) => {
   const { adapter } = setup(t, {}, { ...FAST_CONFIG, offline: true });
   assert.equal(adapter.isDlsiteOffline(), true);
+});
+
+test("forceでも、TTL内で解析できるokのsnapshotはHTTPなしで使う（同期取得・ジョブの単発）", async (t) => {
+  let htmlCalls = 0;
+  const { adapter } = setup(t, {
+    html: (code) => {
+      htmlCalls += 1;
+      return htmlResponse(sampleWorkHtml(code, { cover: false }));
+    },
+  });
+  assert.equal(await adapter.fetchDlsiteProduct("RJ000001", { force: false }), "fetched");
+  assert.equal(htmlCalls, 1);
+  assert.equal(await adapter.fetchDlsiteProduct("RJ000001", { force: true }), "fetched");
+  assert.equal((await adapter.dlsiteFetchByCode("RJ000001", true)).ok, true);
+  assert.equal(htmlCalls, 1);
+});
+
+test("forceは、解析できないsnapshot（parse_error）を取り直す", async (t) => {
+  let broken = true;
+  let htmlCalls = 0;
+  const { adapter } = setup(t, {
+    html: (code) => {
+      htmlCalls += 1;
+      return broken ? htmlResponse("<html></html>") : htmlResponse(sampleWorkHtml(code));
+    },
+  });
+  assert.equal(await adapter.fetchDlsiteProduct("RJ000001", { force: false }), "failed");
+  broken = false;
+  assert.equal(await adapter.fetchDlsiteProduct("RJ000001", { force: false }), "failed");
+  assert.equal(htmlCalls, 1);
+  assert.equal(await adapter.fetchDlsiteProduct("RJ000001", { force: true }), "fetched");
+  assert.equal(htmlCalls, 2);
+});
+
+test("オフライン設定でも、TTL内のokのsnapshotがあれば同期取得はforceで成功する", async (t) => {
+  const { adapter, dir } = setup(t, {
+    html: (code) => htmlResponse(sampleWorkHtml(code, { cover: false })),
+  });
+  assert.equal(await adapter.fetchDlsiteProduct("RJ000001", { force: false }), "fetched");
+
+  let offlineCalls = 0;
+  const offline = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: { ...FAST_CONFIG, offline: true },
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: () => {
+          offlineCalls += 1;
+          return htmlResponse("unexpected", 500);
+        },
+      }),
+    }),
+  );
+  const result = await offline.dlsiteFetchByCode("RJ000001", true);
+  assert.equal(result.ok, true);
+  assert.equal(offlineCalls, 0);
 });

@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { mockApi } from "../helpers/api";
+import { buildScanCandidate } from "../helpers/builders";
+import { SCAN_CANDIDATES_QUERY_KEY } from "../../src/entities/scan/scanCandidatesCache";
 import { QueryClient, QueryObserver, type QueryKey } from "@tanstack/react-query";
 import {
   emptyDlsiteState,
@@ -15,6 +18,7 @@ import {
   updateCachesAfterBookmark,
   updateCachesAfterDlsiteLinkageChange,
   updateCachesAfterDlsiteFetch,
+  updateCachesAfterDlsiteSyncFetch,
   updateCachesAfterIdentityReassign,
   updateCachesAfterLibraryScan,
   updateCachesAfterMissingUnregistration,
@@ -288,5 +292,36 @@ describe("DLsite の必須更新", () => {
     await updateCachesAfterDlsiteFetch(queryClient, ["rj000001"]);
 
     expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(["detail1", ...LIBRARY_VIEWS]));
+  });
+
+  describe("DLsiteの同期取得", () => {
+    it("同じRJコードの作品を無効化し、候補キャッシュに同じコードの候補が無ければ候補一覧は取り直さない", async () => {
+      const api = mockApi({ "GET /api/scan/candidates": { candidates: [] } });
+      const queryClient = seededClient();
+      queryClient.setQueryData(
+        KEYS.detail1,
+        makeWork({ dlsite: { ...emptyDlsiteState(), rjCode: "RJ000001" } }),
+      );
+      queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, [
+        buildScanCandidate({ path: "a", rjCode: "RJ000002" }),
+      ]);
+
+      await updateCachesAfterDlsiteSyncFetch(queryClient, "RJ000001");
+
+      expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(["detail1", ...LIBRARY_VIEWS]));
+      expect(api.requestsTo("GET /api/scan/candidates")).toHaveLength(0);
+    });
+
+    it("キャッシュ済みの候補一覧に同じRJコードの候補があるときだけ、候補一覧を取り直す", async () => {
+      const api = mockApi({ "GET /api/scan/candidates": { candidates: [] } });
+      const queryClient = seededClient();
+      queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, [
+        buildScanCandidate({ path: "a", rjCode: "rj000001" }),
+      ]);
+
+      await updateCachesAfterDlsiteSyncFetch(queryClient, "RJ000001");
+
+      expect(api.requestsTo("GET /api/scan/candidates")).toHaveLength(1);
+    });
   });
 });

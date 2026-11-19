@@ -12,6 +12,9 @@ export function dlsiteFetchErrorMessage(error: unknown): string {
   }
   if (error.code === "not_found") return "作品が見つかりません。コードが違うかもしれません。";
   if (error.code === "parse_error") return "DLsiteのページ構造が変わった可能性があります。";
+  if (error.code === "offline") {
+    return "オフライン設定（MIMIMILLI_DLSITE_OFFLINE）のため、DLsiteへ接続できません。";
+  }
   return "DLsiteとの通信に失敗しました。時間をおいて再試行してください。";
 }
 

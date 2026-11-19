@@ -202,7 +202,7 @@ contract("カバーがキャッシュに無いときは、カバーだけ反映�
   assert.equal(work!.dlsite.status, "applied");
 });
 
-contract("旧形式のbody（info・applyTitleなど）は400", async (h) => {
+contract("info・applyTitleを含むbodyは400", async (h) => {
   const id = h.workId("existing");
   const fetched = await fetchFor(h, id, OK_CODE);
   const res = await apply(h, id, {

@@ -91,6 +91,8 @@ export interface FixtureState {
   scanUpdatedWorks: UpdatedWork[];
   scanNewlyMissingWorkIds: string[];
   scanUnreadablePaths: WorkspacePath[];
+  /** シナリオが指定するスキャン結果（新規・更新・行方不明・読めないパス・データ不整合）を返し終えたか。返すのは最初のスキャンだけ */
+  scanScenarioDelivered: boolean;
   /** 永続化された候補除外パス */
   scanCandidateExclusions: string[];
   identityConflicts: IdentityConflict[];
@@ -309,6 +311,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     scanUpdatedWorks: scenario.scanUpdatedWorks,
     scanNewlyMissingWorkIds: scenario.scanNewlyMissingWorkIds,
     scanUnreadablePaths: scenario.scanUnreadablePaths,
+    scanScenarioDelivered: false,
     scanCandidateExclusions: [],
     identityConflicts: options.identityConflicts ?? scenario.identityConflicts,
     scanCandidatePool: scenario.scanCandidates,

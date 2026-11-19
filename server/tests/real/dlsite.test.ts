@@ -9,7 +9,7 @@ import { test } from "node:test";
 import { Database } from "bun:sqlite";
 import {
   detectRjCode,
-  dlsiteStatePatchSchema,
+  dlsiteStateUpdateBodySchema,
   dlsiteInfoTags,
   isDlsiteFetchFailed,
   isDlsiteParseFailed,
@@ -261,8 +261,8 @@ test("DLsite: キャッシュ判定ログに理由を含める", async (t) => {
 
   logs.length = 0;
   await adapter.dlsiteFetch(lib.existingWorkId, true);
-  const forceMiss = logs.find((event) => event.event === "dlsite_cache_miss");
-  assert.equal(forceMiss?.reason, "force_refresh");
+  const forceHit = logs.find((event) => event.event === "dlsite_cache_hit");
+  assert.equal(forceHit?.reason, "ttl_valid");
 });
 
 test("fetchDlsiteHtml: HTTP 404 / 通信エラーを分類する", async (t) => {
@@ -367,24 +367,30 @@ test("dlsiteWorkUrl: RJコードはmaniax、VJコードはproのURLを組み立�
   );
 });
 
-test("dlsiteStatePatchSchema: RJ/VJコードの手動入力を受け付け、それ以外は拒否する", () => {
-  const rj = dlsiteStatePatchSchema.safeParse({ rjCode: "rj1234567" });
+test("dlsiteStateUpdateBodySchema: RJ/VJコードの手動入力を受け付け、それ以外は拒否する", () => {
+  const rj = dlsiteStateUpdateBodySchema.safeParse({ sourceRevision: "r1", rjCode: "rj1234567" });
   assert.equal(rj.success, true);
   if (rj.success) assert.equal(rj.data.rjCode, "RJ1234567");
 
-  const vj = dlsiteStatePatchSchema.safeParse({ rjCode: "vj014780" });
+  const vj = dlsiteStateUpdateBodySchema.safeParse({ sourceRevision: "r1", rjCode: "vj014780" });
   assert.equal(vj.success, true);
   if (vj.success) assert.equal(vj.data.rjCode, "VJ014780");
 
-  const none = dlsiteStatePatchSchema.safeParse({ rjCode: "" });
+  const none = dlsiteStateUpdateBodySchema.safeParse({ sourceRevision: "r1", rjCode: "" });
   assert.equal(none.success, true);
   if (none.success) assert.equal(none.data.rjCode, "");
-  assert.equal(dlsiteStatePatchSchema.safeParse({ rjCode: null }).success, false);
+  assert.equal(
+    dlsiteStateUpdateBodySchema.safeParse({ sourceRevision: "r1", rjCode: null }).success,
+    false,
+  );
 
-  const tooShort = dlsiteStatePatchSchema.safeParse({ rjCode: "VJ123" });
+  const tooShort = dlsiteStateUpdateBodySchema.safeParse({ sourceRevision: "r1", rjCode: "VJ123" });
   assert.equal(tooShort.success, false);
 
-  const unknownPrefix = dlsiteStatePatchSchema.safeParse({ rjCode: "BJ123456" });
+  const unknownPrefix = dlsiteStateUpdateBodySchema.safeParse({
+    sourceRevision: "r1",
+    rjCode: "BJ123456",
+  });
   assert.equal(unknownPrefix.success, false);
 });
 
@@ -725,7 +731,7 @@ test("DLsite取得はcache TTLとskipped状態を利用し、mimimilli.jsonを�
   assert.deepEqual(readFileSync(metaPath), bytesBefore);
 });
 
-test("DLsite HTMLキャッシュ: 手動fetchはhitでHTTPせず、single-flightとforce refreshを扱う", async (t) => {
+test("DLsite HTMLキャッシュ: 手動fetchはhitでHTTPせず、single-flightを扱い、forceでもokのsnapshotは使う", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-cache-integration");
   t.after(lib.cleanup);
@@ -757,7 +763,7 @@ test("DLsite HTMLキャッシュ: 手動fetchはhitでHTTPせず、single-flight
   assert.equal((await adapter.dlsiteFetch(lib.existingWorkId)).ok, true);
   assert.equal(calls, 1);
   assert.equal((await adapter.dlsiteFetch(lib.existingWorkId, true)).ok, true);
-  assert.equal(calls, 2);
+  assert.equal(calls, 1);
 });
 
 test("offline結果はcache-onlyで、mimimilli.jsonのexact bytesを変更しない", async (t) => {
@@ -1372,18 +1378,19 @@ test("DLsite HTMLキャッシュ: 期限切れの再取得失敗はstaleへ戻�
   assert.equal((await adapter.dlsiteFetch(lib.existingWorkId)).ok, false);
 });
 
-test("DLsite HTMLキャッシュ: forceが失敗しても次回の通常取得は抑制される", async (t) => {
+test("DLsite HTMLキャッシュ: forceはTTL内のokを使い、期限切れで失敗しても次回の通常取得は抑制される", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-force-failure-suppress");
   t.after(lib.cleanup);
   t.after(dir.cleanup);
   let calls = 0;
+  let now = 1_000;
   let succeed = true;
   const adapter = dir.own(
     createRealAdapter({
       database: { kind: "memory" },
       dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteCache: { path: join(dir.path, "cache.sqlite"), ttlsMs: { ok: 10 }, clock: () => now },
       dlsiteSchedulerDependencies: mockDlsiteTransport({
         html: () => {
           calls += 1;
@@ -1399,6 +1406,10 @@ test("DLsite HTMLキャッシュ: forceが失敗しても次回の通常取得�
   assert.equal(calls, 1);
 
   succeed = false;
+  assert.equal((await adapter.dlsiteFetch(lib.existingWorkId, true)).ok, true);
+  assert.equal(calls, 1);
+
+  now = 1_000 + 11;
   const forced = await adapter.dlsiteFetch(lib.existingWorkId, true);
   assert.equal(forced.ok, false);
   assert.equal(calls, 2);

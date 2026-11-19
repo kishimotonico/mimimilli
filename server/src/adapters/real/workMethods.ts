@@ -147,7 +147,7 @@ export function createWorkMethods(deps: {
 
     async reassignIdentityConflict(
       body: IdentityConflictReassignBody,
-    ): Promise<WorkSourceMutationResult | null> {
+    ): Promise<(WorkSourceMutationResult & { replacedWorkId: string | null }) | null> {
       const diagnostic = catalog
         .listIdentityConflicts()
         .find((candidate) => candidate.paths.includes(body.path));
@@ -165,6 +165,10 @@ export function createWorkMethods(deps: {
       }
       if (source.meta.id !== diagnostic.workId) return null;
 
+      const replacedWorkId =
+        query.getScanWorkMap().get(diagnostic.workId)?.metaPath === metaPath
+          ? diagnostic.workId
+          : null;
       const updated = patchMetaFileCas(metaPath, source.sourceRevision, {
         id: crypto.randomUUID(),
       });
@@ -173,7 +177,10 @@ export function createWorkMethods(deps: {
       catalog.replaceIdentityConflicts(
         removeIdentityConflictPath(catalog.listIdentityConflicts(), diagnostic.workId, body.path),
       );
-      return mutationResultFromOutcome(toEditSnapshot(updated, physicalPath), outcome);
+      return {
+        ...mutationResultFromOutcome(toEditSnapshot(updated, physicalPath), outcome),
+        replacedWorkId,
+      };
     },
 
     async projectWorkSource(path: WorkspacePath): Promise<WorkSourceMutationResult | null> {

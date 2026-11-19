@@ -21,9 +21,10 @@ export interface WorkAdapter {
   queryWorks(params: WorksQuery): Promise<WorksPage>;
   getWorkRegisterPreview(path: WorkspacePath): Promise<WorkRegisterPreview | null>;
   createWork(body: WorkCreateBody): Promise<WorkSourceMutationResult | null>;
+  /** replacedWorkId は、再採番で別IDに置き換わった（もう存在しない）作品のID。コピー側の再採番では null */
   reassignIdentityConflict(
     body: IdentityConflictReassignBody,
-  ): Promise<WorkSourceMutationResult | null>;
+  ): Promise<(WorkSourceMutationResult & { replacedWorkId: string | null }) | null>;
   projectWorkSource(path: WorkspacePath): Promise<WorkSourceMutationResult | null>;
   /** 作品情報ファイルからこの作品だけを読み直して catalog を作り直す。存在しなければ false。直らないときは例外 */
   reloadWork(id: string): Promise<boolean>;

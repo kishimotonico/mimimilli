@@ -3,7 +3,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { workRegisterPreviewSchema } from "@mimimilli/shared";
-import { mockApi } from "../helpers/api";
+import { apiError, mockApi } from "../helpers/api";
+import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import RegisterWorkDialog from "../../src/features/files/ui/RegisterWorkDialog";
 
 const preview = workRegisterPreviewSchema.parse({
@@ -15,22 +16,23 @@ const preview = workRegisterPreviewSchema.parse({
   orphanedMeta: false,
 });
 
-function renderDialog() {
+function renderDialog(dialogPreview = preview) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(QueryClientProvider, { client: queryClient }, children);
 
-  return render(
+  const view = render(
     <RegisterWorkDialog
       folderPath="/music/test"
-      preview={preview}
+      preview={dialogPreview}
       onRegistered={vi.fn()}
       onClose={vi.fn()}
     />,
     { wrapper },
   );
+  return { queryClient, ...view };
 }
 
 describe("RegisterWorkDialog", () => {
@@ -94,6 +96,72 @@ describe("RegisterWorkDialog", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "登録" })).toBeDisabled();
+  });
+
+  describe("DLsite取得の契機", () => {
+    const detected = { ...preview, detectedRjCode: "RJ123456" };
+
+    it("検出したRJコードを入力欄の初期値にするが、開いただけでは取得しない", () => {
+      const api = mockApi({
+        "GET /api/tags": [],
+        "GET /api/tag-prefixes": [],
+        "POST /api/dlsite/fetch-by-code": new Response(null, { status: 500 }),
+      });
+      renderDialog(detected);
+
+      expect(screen.getByPlaceholderText("RJ123456")).toHaveValue("RJ123456");
+      expect(api.requestsTo("POST /api/dlsite/fetch-by-code")).toHaveLength(0);
+    });
+
+    it("取得ボタンは失敗の記録を無視して取り直す（force=true）", async () => {
+      const api = mockApi({
+        "GET /api/tags": [],
+        "GET /api/tag-prefixes": [],
+        "POST /api/dlsite/fetch-by-code": apiError(404, "not_found"),
+      });
+      renderDialog(detected);
+      fireEvent.click(screen.getByRole("button", { name: "取得" }));
+
+      await waitFor(() => expect(api.requestsTo("POST /api/dlsite/fetch-by-code")).toHaveLength(1));
+      expect(api.urlsTo("POST /api/dlsite/fetch-by-code")).toEqual([
+        "/api/dlsite/fetch-by-code?force=true",
+      ]);
+    });
+
+    it("取得が終わると、成否にかかわらず同じRJコードの作品を無効化する", async () => {
+      mockApi({
+        "GET /api/tags": [],
+        "GET /api/tag-prefixes": [],
+        "POST /api/dlsite/fetch-by-code": apiError(404, "not_found"),
+      });
+      const { queryClient } = renderDialog(detected);
+      queryClient.setQueryData(WORK_QUERY_KEYS.detail("w1"), {
+        id: "w1",
+        dlsite: { rjCode: "RJ123456" },
+      });
+      queryClient.setQueryData(WORK_QUERY_KEYS.detail("w2"), {
+        id: "w2",
+        dlsite: { rjCode: "RJ999999" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "取得" }));
+
+      await waitFor(() =>
+        expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w1"))?.isInvalidated).toBe(true),
+      );
+      expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w2"))?.isInvalidated).toBe(false);
+    });
+
+    it("オフライン設定で失敗したときは、オフラインであることが分かる文言を出す", async () => {
+      mockApi({
+        "GET /api/tags": [],
+        "GET /api/tag-prefixes": [],
+        "POST /api/dlsite/fetch-by-code": apiError(503, "offline"),
+      });
+      renderDialog(detected);
+      fireEvent.click(screen.getByRole("button", { name: "取得" }));
+
+      await waitFor(() => expect(screen.getByText(/オフライン設定/)).toBeInTheDocument());
+    });
   });
 
   describe("DLsite取得後のカバー", () => {

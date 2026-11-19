@@ -340,7 +340,7 @@ describe("work api", () => {
     ).rejects.toThrow(/POST \/works\/work-1\/resume/);
   });
 
-  it("fetchDlsiteInfo POSTs to /api/dlsite/:workId/fetch", async () => {
+  it("fetchDlsiteInfo POSTs to /api/dlsite/:workId/fetch with force", async () => {
     const mockInfo = {
       rjCode: "RJ123456",
       title: "test",
@@ -360,7 +360,7 @@ describe("work api", () => {
     mockFetch.mockResolvedValue(makeResponse(preview));
     const result = await workApi.fetchDlsiteInfo("work-1");
     expect(mockFetch).toHaveBeenCalledWith(
-      "/api/dlsite/work-1/fetch",
+      "/api/dlsite/work-1/fetch?force=true",
       expect.objectContaining({ method: "POST" }),
     );
     expect(result).toEqual(preview);

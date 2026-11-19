@@ -1,12 +1,12 @@
 // サーバー側スキャンジョブの HTTP / SSE 契約。
 import { z } from "zod";
-import { dataIntegrityWarningSchema } from "./dataIntegrity.ts";
+import { dataIntegrityWarningSchema, type DataIntegrityWarning } from "./dataIntegrity.ts";
 import {
   dlsiteCachedCoverSchema,
   dlsiteRegistrationApplySchema,
   rjCodeFormatSchema,
 } from "./dlsite.ts";
-import { workspacePathSchema } from "./media.ts";
+import { workspacePathSchema, type WorkspacePath } from "./media.ts";
 
 /** スキャンが見つけた候補フォルダー。DLsiteの状態は持たない（サーバーが候補一覧を返すときに導く） */
 export type ScanCandidateFolder = {
@@ -33,7 +33,6 @@ export const scanCandidateDlsiteSchema = z.discriminatedUnion("state", [
   z.object({ state: z.literal("failed") }),
 ]);
 export type ScanCandidateDlsite = z.infer<typeof scanCandidateDlsiteSchema>;
-export type ScanCandidateDlsiteState = ScanCandidateDlsite["state"];
 
 /** 同じRJコードを持つ、行方不明（catalogでmissing）の作品 */
 export const scanCandidateMissingWorkSchema = z.object({
@@ -77,7 +76,6 @@ export const scanCandidateRjCodeRequestSchema = z.object({
   path: workspacePathSchema,
   rjCode: z.union([z.literal(""), rjCodeFormatSchema]),
 });
-export type ScanCandidateRjCodeRequest = z.infer<typeof scanCandidateRjCodeRequestSchema>;
 export const scanCandidateRjCodeResponseSchema = z.object({ candidate: scanCandidateSchema });
 /** 1リクエストで追加できる候補の上限。クライアントはこれごとに分割して送る */
 export const SCAN_CANDIDATE_REGISTER_MAX_PATHS = 20;
@@ -139,28 +137,27 @@ export const missingWorkSchema = z.object({
 export type MissingWork = z.infer<typeof missingWorkSchema>;
 
 /** adapter が返すスキャン1回分の結果。HTTPには出さず、サーバーの記録（ScanRecord）の元になる */
-export const scanResultSchema = z.object({
-  registered: z.number().int().nonnegative(),
+export interface ScanResult {
+  registered: number;
   /** 今回のスキャンでカタログへ新規挿入された Work ID（mimimilli.json の自動投影） */
-  insertedWorkIds: z.array(z.string()),
+  insertedWorkIds: string[];
   /** スキャン開始時点でカタログに作品が1件も無かった。true のとき記録の新規作品は空にする */
-  startedWithEmptyCatalog: z.boolean(),
+  startedWithEmptyCatalog: boolean;
   /** 今回のスキャンで新たに行方不明になった作品 */
-  missingWorks: z.array(missingWorkSchema),
+  missingWorks: MissingWork[];
   /** 今回のスキャンで変化が見つかった既存作品。エラーからの復帰や全件読み直しで読み直しただけの作品は含まない */
-  updatedWorks: z.array(updatedWorkSchema),
-  errors: z.number().int().nonnegative(),
-  missing: z.number().int().nonnegative(),
+  updatedWorks: UpdatedWork[];
+  errors: number;
+  missing: number;
   /** 増分スキャンで fingerprint が一致し、プローブ・upsertWork を省略した作品数 */
-  skipped: z.number().int().nonnegative(),
+  skipped: number;
   /** カバー画像はあるが寸法を計測できなかった作品数（errors とは別枠。次回スキャンで再試行） */
-  coverErrors: z.number().int().nonnegative(),
+  coverErrors: number;
   /** 走査中に読み取れなかったサブツリーのディレクトリのroot相対path。ルート失敗時はスキャン自体がエラーになる */
-  unreadablePaths: z.array(workspacePathSchema),
+  unreadablePaths: WorkspacePath[];
   /** finalize 時の listSummaries() でタグ等の不整合により除外した作品。その実行の警告 */
-  dataIntegrityWarning: dataIntegrityWarningSchema.optional(),
-});
-export type ScanResult = z.infer<typeof scanResultSchema>;
+  dataIntegrityWarning?: DataIntegrityWarning;
+}
 
 /** 同じ Work ID を持つ mimimilli.json が複数見つかった診断。paths はroot相対・separator正規化済みのportable pathで、相互参照用に全件を含む。 */
 export const identityConflictSchema = z.object({

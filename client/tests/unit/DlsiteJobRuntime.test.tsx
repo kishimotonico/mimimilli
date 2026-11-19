@@ -74,7 +74,12 @@ describe("DlsiteJobRuntime", () => {
     const baseline = candidateRequests;
     for (let index = 0; index < 5; index += 1) {
       act(() =>
-        dlsiteJob.emit({ type: "codesTerminal", jobId: "job-1", productCodes: ["RJ000001"] }),
+        dlsiteJob.emit({
+          type: "codesTerminal",
+          jobId: "job-1",
+          origin: "bulk",
+          productCodes: ["RJ000001"],
+        }),
       );
     }
     await act(async () => {
@@ -98,11 +103,51 @@ describe("DlsiteJobRuntime", () => {
     expect(queryClient.getQueryState(WORK_QUERY_KEYS.list({ q: "" }))?.isInvalidated).toBe(true);
   });
 
+  it("起点がsingleのコードが終端すると、ジョブの終端を待たず同じRJコードの作品を無効化する", async () => {
+    const { dlsiteJob, queryClient } = renderRuntime();
+    queryClient.setQueryData(WORK_QUERY_KEYS.detail("w1"), detail("w1", "RJ000001"));
+    queryClient.setQueryData(WORK_QUERY_KEYS.detail("w2"), detail("w2", "RJ999999"));
+    await act(async () => {});
+    act(() =>
+      dlsiteJob.emit({
+        type: "codesTerminal",
+        jobId: "job-1",
+        origin: "single",
+        productCodes: ["RJ000001"],
+      }),
+    );
+    await waitFor(() =>
+      expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w1"))?.isInvalidated).toBe(true),
+    );
+    expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w2"))?.isInvalidated).toBe(false);
+  });
+
+  it("起点がbulkのコードが終端しても、ジョブの終端までは作品を無効化しない", async () => {
+    const { dlsiteJob, queryClient } = renderRuntime();
+    queryClient.setQueryData(WORK_QUERY_KEYS.detail("w1"), detail("w1", "RJ000001"));
+    await act(async () => {});
+    act(() =>
+      dlsiteJob.emit({
+        type: "codesTerminal",
+        jobId: "job-1",
+        origin: "bulk",
+        productCodes: ["RJ000001"],
+      }),
+    );
+    await act(async () => {});
+    expect(queryClient.getQueryState(WORK_QUERY_KEYS.detail("w1"))?.isInvalidated).toBe(false);
+  });
+
   it("finished で保留中の間引きを捨てる", async () => {
     const { dlsiteJob } = renderRuntime();
     await act(async () => {});
     act(() =>
-      dlsiteJob.emit({ type: "codesTerminal", jobId: "job-1", productCodes: ["RJ000001"] }),
+      dlsiteJob.emit({
+        type: "codesTerminal",
+        jobId: "job-1",
+        origin: "bulk",
+        productCodes: ["RJ000001"],
+      }),
     );
     act(() => dlsiteJob.emit({ type: "finished", jobId: "job-1", productCodes: [] }));
     await waitFor(() => expect(dlsiteJob.markSettled).toHaveBeenCalled());

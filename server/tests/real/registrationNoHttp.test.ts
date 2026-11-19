@@ -171,11 +171,12 @@ const unusableCases: Array<{
     },
   },
   {
-    name: "取得失敗の記録がokより新しい",
+    name: "TTL切れのあとの取得失敗の記録",
     async prepare(subject) {
       assert.equal((await subject.adapter.dlsiteFetchByCode(CODE)).ok, true);
+      subject.control.now += OK_TTL_MS + 1;
       subject.control.htmlStatus = 500;
-      assert.equal((await subject.adapter.dlsiteFetchByCode(CODE, true)).ok, false);
+      assert.equal((await subject.adapter.dlsiteFetchByCode(CODE)).ok, false);
     },
   },
   {
@@ -323,7 +324,6 @@ test("上限を超える件数の候補は、分割した追加で全件が作�
 
   const paths = (await adapter.listScanCandidates()).map((candidate) => candidate.path);
   const registered = new Set<string>();
-  const startedAt = performance.now();
   for (let start = 0; start < paths.length; start += SCAN_CANDIDATE_REGISTER_MAX_PATHS) {
     const result = await adapter.registerScanCandidates(
       paths.slice(start, start + SCAN_CANDIDATE_REGISTER_MAX_PATHS),
@@ -332,9 +332,6 @@ test("上限を超える件数の候補は、分割した追加で全件が作�
     assert.deepEqual(result.failures, []);
     for (const entry of result.registered) registered.add(entry.path);
   }
-  const perItemMs = (performance.now() - startedAt) / total;
-  if (process.env.REGISTRATION_TIMING)
-    console.log(`registration per item: ${perItemMs.toFixed(1)}ms`);
   assert.equal(registered.size, total);
   assert.deepEqual(counts, before);
   assert.deepEqual(await adapter.listScanCandidates(), []);

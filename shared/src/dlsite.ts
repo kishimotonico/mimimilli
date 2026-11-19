@@ -24,10 +24,6 @@ export function isDlsiteUrl(url: string): boolean {
   return hostname === DLSITE_HOSTNAME || hostname.endsWith(`.${DLSITE_HOSTNAME}`);
 }
 
-export function hasDlsiteUrl(urls: readonly { url: string }[]): boolean {
-  return urls.some((entry) => isDlsiteUrl(entry.url));
-}
-
 export const dlsiteFetchErrorKindSchema = z.enum(["not_found", "parse_error", "offline", "error"]);
 export type DlsiteFetchErrorKind = z.infer<typeof dlsiteFetchErrorKindSchema>;
 
@@ -596,14 +592,6 @@ export function planDlsiteRegistration(input: {
 /** 作品詳細で入力できるRJコード。空文字はコードなしの明示 */
 const dlsiteRjCodeInputSchema = z.union([z.literal(""), rjCodeFormatSchema]);
 
-export const dlsiteStatePatchSchema = z
-  .object({
-    rjCode: dlsiteRjCodeInputSchema.optional(),
-    skipped: z.boolean().optional(),
-  })
-  .refine((patch) => patch.rjCode !== undefined || patch.skipped !== undefined);
-export type DlsiteStatePatch = z.infer<typeof dlsiteStatePatchSchema>;
-
 /** PATCH /api/dlsite/:id。状態変更は正本 CAS のため sourceRevision 必須。 */
 export const dlsiteStateUpdateBodySchema = z
   .object({
@@ -613,6 +601,7 @@ export const dlsiteStateUpdateBodySchema = z
   })
   .refine((patch) => patch.rjCode !== undefined || patch.skipped !== undefined);
 export type DlsiteStateUpdateBody = z.infer<typeof dlsiteStateUpdateBodySchema>;
+export type DlsiteStatePatch = Omit<DlsiteStateUpdateBody, "sourceRevision">;
 
 /** updateDlsiteState の状態遷移（real/fixture 共通）。正本の連携分類（rjCode/status/
  *  appliedTags）だけを対象にする。RJコードが変わったときだけ旧コード由来の適用済みタグを捨てて
@@ -678,7 +667,6 @@ export const dlsiteJobCodeSchema = z.object({
   origin: dlsiteJobOriginSchema,
   state: dlsiteJobCodeStateSchema,
 });
-export type DlsiteJobCode = z.infer<typeof dlsiteJobCodeSchema>;
 
 /** 起点がまとめてのコードだけを数える。processedは終端状態のコード数 */
 export const dlsiteJobBulkProgressSchema = z.object({
@@ -699,7 +687,6 @@ export type DlsiteJobSnapshot = z.infer<typeof dlsiteJobSnapshotSchema>;
 export const dlsiteJobCurrentResponseSchema = z.object({
   job: dlsiteJobSnapshotSchema.nullable(),
 });
-export type DlsiteJobCurrentResponse = z.infer<typeof dlsiteJobCurrentResponseSchema>;
 
 /** DELETE /api/dlsite/jobs/:jobId/bulk のレスポンス */
 export const dlsiteJobCancelBulkResponseSchema = z.object({

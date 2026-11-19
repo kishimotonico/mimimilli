@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { dlsiteInfoTags, normalizeTag, rjCodeFormatSchema } from "@mimimilli/shared";
 import type {
   DlsiteCachedCover,
@@ -27,6 +27,7 @@ import { sourceMutationErrorMessage } from "../../../entities/work/sourceMutatio
 import { getDlsiteCoverUrl } from "../../../entities/dlsite/dlsiteCoverUrl";
 import { fetchDlsiteInfoByCode } from "../api";
 import { useRegisterWorkMutation } from "../../../entities/work/model/workMutations";
+import { updateCachesAfterDlsiteSyncFetch } from "../../../entities/work/model/workCacheUpdates";
 
 interface RegisterWorkDialogProps {
   folderPath: string;
@@ -58,8 +59,10 @@ export default function RegisterWorkDialog({
   const tagSuggestions = tagsQuery.data ?? [];
   const { tagPrefixes } = useTagPrefixes();
 
+  const queryClient = useQueryClient();
   const dlsiteMutation = useMutation({
     mutationFn: (code: string) => fetchDlsiteInfoByCode(code),
+    onSettled: (_data, _error, code) => updateCachesAfterDlsiteSyncFetch(queryClient, code),
     onSuccess: ({ info, cachedCover: cover }) => {
       setFetched({ rjCode: info.rjCode, cachedCover: cover });
       setTitle(info.title);
@@ -110,11 +113,7 @@ export default function RegisterWorkDialog({
     setDlsiteValidationError(null);
     dlsiteMutation.reset();
     registerMutation.reset();
-
-    if (preview.detectedRjCode && !preview.orphanedMeta) {
-      dlsiteMutation.mutate(preview.detectedRjCode);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 開いた瞬間の自動取得はフォルダー・プレビュー単位で1回だけ行う
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 入力の初期化はフォルダー・プレビュー単位で1回だけ行う
   }, [folderPath, preview]);
 
   const submitBusy = registerMutation.isPending;

@@ -45,7 +45,3 @@ export function useDlsiteBulkFrame(): DlsiteBulkFrame {
   const store = useDlsiteJobStore();
   return useStoreSelector(store, (state) => selectBulkFrameOf(store, state));
 }
-
-export function useDlsiteBulkActive(): boolean {
-  return useDlsiteBulkFrame().kind === "progress";
-}

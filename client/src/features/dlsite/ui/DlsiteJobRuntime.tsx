@@ -24,6 +24,9 @@ export default function DlsiteJobRuntime() {
     };
     const unsubscribe = dlsiteJob.subscribeEvents((event) => {
       if (event.type === "codesTerminal") {
+        if (event.origin === "single") {
+          void updateCachesAfterDlsiteFetch(queryClient, event.productCodes).catch(() => {});
+        }
         if (timer !== null) return;
         timer = setTimeout(() => {
           timer = null;

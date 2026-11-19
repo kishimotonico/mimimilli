@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { workspacePath } from "@mimimilli/shared";
 import { createApp } from "./helpers/testApp.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
+import { CandidatePoolChangedError } from "../src/errors.ts";
 import {
   createFixtureScenario,
   LARGE_SCENARIO_WORK_COUNT,
@@ -47,9 +48,13 @@ test("new-work: スキャン結果に新規作品・新たな行方不明・読�
   assert.deepEqual(first.unreadablePaths, ["権限なし/フォルダー"]);
   assert.equal((await adapter.getWork("RJ501008"))?.status, "missing");
 
-  // 以前から行方不明の作品は、次のスキャンでは新たな行方不明に含めない
+  // シナリオの結果は最初のスキャンだけ。2回目以降は今回の変化（なければ空）を返す
   const second = await adapter.scan();
   assert.deepEqual(second.missingWorks, []);
+  assert.deepEqual(second.insertedWorkIds, []);
+  assert.deepEqual(second.updatedWorks, []);
+  assert.deepEqual(second.unreadablePaths, []);
+  assert.equal(second.dataIntegrityWarning, undefined);
 
   // 新規作品自体は works 一覧に存在する（スキャンで見つかった扱い）
   assert.ok(await adapter.getWork("RJ501011"));
@@ -75,17 +80,28 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
     "copies/RJ501001_夜更けの図書室で囁き朗読",
   ]);
 
+  await assert.rejects(
+    () =>
+      adapter.registerScanCandidates(
+        [workspacePath("未登録作品"), workspacePath("消えた候補")],
+        REGISTER_ALL,
+      ),
+    CandidatePoolChangedError,
+  );
+  assert.equal(
+    (await adapter.listScanCandidates()).some((candidate) => candidate.path === "未登録作品"),
+    true,
+  );
+
   const registration = await adapter.registerScanCandidates(
-    [workspacePath("未登録作品"), workspacePath("消えた候補")],
+    [workspacePath("未登録作品")],
     REGISTER_ALL,
   );
   assert.deepEqual(
     registration.registered.map((entry) => entry.path),
     ["未登録作品"],
   );
-  assert.deepEqual(registration.failures, [
-    { path: "消えた候補", message: "候補が見つかりません" },
-  ]);
+  assert.deepEqual(registration.failures, []);
 
   // 候補承認はreal adapterのregisterCandidates（scanner.ts）と同じく、実際にcatalog
   // （fixtureではstate.works）へ行を増やす。新規登録済みタブはこのworksを介して
@@ -104,6 +120,10 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
 
   await adapter.excludeScanCandidates(["朗読/候補"]);
   assert.deepEqual(await adapter.listScanCandidates(), []);
+  await assert.rejects(
+    () => adapter.registerScanCandidates([workspacePath("朗読/候補")], REGISTER_ALL),
+    CandidatePoolChangedError,
+  );
 
   // 除外は可逆な扱い。restoreで戻すと一覧に復帰する（実装adapterは毎回ディスクを
   // 再走査するため自然に復帰するが、fixtureは静的リストを持つため個別に検証する）。

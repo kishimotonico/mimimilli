@@ -25,5 +25,7 @@ export async function getWorkRegisterPreview(path: WorkspacePath): Promise<WorkR
 
 /** 作品未登録時の DLsite メタ取得（RJ/VJコード指定） */
 export async function fetchDlsiteInfoByCode(rjCode: string): Promise<DlsiteFetchByCodeResponse> {
-  return postParsed(dlsiteFetchByCodeResponseSchema, "/dlsite/fetch-by-code", { rjCode });
+  return postParsed(dlsiteFetchByCodeResponseSchema, "/dlsite/fetch-by-code?force=true", {
+    rjCode,
+  });
 }
