@@ -11,6 +11,7 @@ import {
   selectedWorkIdAtom,
 } from "../../src/entities/library/model/navigationAtoms";
 import { appModeAtom } from "../../src/entities/navigation/model/appRouteStore";
+import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import { buildScanDiagnostics, buildScanRecord } from "../helpers/builders";
 import { seedAppMode, seedLibraryRoute } from "../helpers/route";
@@ -28,6 +29,7 @@ function renderTopBar(initialQuery = "") {
   queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), []);
   queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
   queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
+  queryClient.setQueryData(WORK_QUERY_KEYS.scanNewCount(), 0);
   render(
     createElement(
       QueryClientProvider,
@@ -148,6 +150,7 @@ describe("TopBar の検索入力", () => {
     queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), []);
     queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
     queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
+    queryClient.setQueryData(WORK_QUERY_KEYS.scanNewCount(), 0);
     render(
       createElement(
         QueryClientProvider,
@@ -176,6 +179,7 @@ describe("TopBar の検索入力", () => {
     queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), []);
     queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
     queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
+    queryClient.setQueryData(WORK_QUERY_KEYS.scanNewCount(), 0);
     render(
       createElement(
         QueryClientProvider,

@@ -343,7 +343,7 @@ test("スキャンダイアログが開いて完了し、閉じられる", async
   await expect(dialog.getByRole("heading", { name: "スキャン", level: 2 })).toBeVisible();
 
   await dialog.getByRole("button", { name: "スキャン", exact: true }).click();
-  await expect(dialog.getByText("完了しました")).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.getByText("スキャン完了")).toBeVisible({ timeout: 15_000 });
 
   await dialog.getByRole("tab", { name: /^新規作品/ }).click();
   await expect(
@@ -365,7 +365,7 @@ test("更新済みタブで変更内容を種類別に絞り込め、作品タ�
   await page.getByRole("button", { name: "スキャン" }).click();
   const dialog = page.getByRole("dialog", { name: "スキャン" });
   await dialog.getByRole("button", { name: "スキャン", exact: true }).click();
-  await expect(dialog.getByText("完了しました")).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.getByText("スキャン完了")).toBeVisible({ timeout: 15_000 });
 
   await dialog.getByRole("tab", { name: "更新済み" }).click();
   const panel = dialog.getByRole("tabpanel", { name: "更新済み" });
@@ -400,7 +400,7 @@ test("新規作品タブでパスを押すとFilesが開き、スキャンモー
   await page.getByRole("button", { name: "スキャン" }).click();
   const dialog = page.getByRole("dialog", { name: "スキャン" });
   await dialog.getByRole("button", { name: "スキャン", exact: true }).click();
-  await expect(dialog.getByText("完了しました")).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.getByText("スキャン完了")).toBeVisible({ timeout: 15_000 });
 
   await dialog.getByRole("tab", { name: "新規作品" }).click();
   const panel = dialog.getByRole("tabpanel", { name: "新規作品" });

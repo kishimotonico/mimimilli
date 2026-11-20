@@ -458,43 +458,126 @@ describe("ScanModal", () => {
     expect(screen.getByText("2026/11/08 17:49")).toBeInTheDocument();
   });
 
-  it("実行中から完了への遷移を見ていたときだけ、完了サインが一時的に出る", async () => {
-    vi.useFakeTimers();
-    try {
-      const { scanJob, rerenderModal } = renderModal(
-        { record: scanRecord },
-        { job: createRunningJob({ phase: "registering", processed: 1, total: 1 }) },
+  describe("状態欄の終端", () => {
+    const FINISHED_AT = new Date(2026, 10, 20, 14, 2).toISOString();
+    const terminal = (overrides: Partial<ScanJobSnapshot>): ScanJobSnapshot => ({
+      ...createRunningJob(),
+      finishedAt: FINISHED_AT,
+      ...overrides,
+    });
+
+    it("まだスキャンしていないときは見出しを変え、スキャンボタンは主ボタンの見た目になる", () => {
+      renderModal({ lastScanTime: null });
+
+      expect(screen.getByText("まだスキャンしていません")).toBeInTheDocument();
+      expect(screen.queryByText("最終スキャン")).toBeNull();
+      expect(screen.getByRole("button", { name: "スキャン" })).toHaveClass("bg-ink-0");
+    });
+
+    it("スキャン済みのスキャンボタンは主ボタンの見た目にしない", () => {
+      renderModal({ lastScanTime: FINISHED_AT });
+
+      expect(screen.getByRole("button", { name: "スキャン" })).not.toHaveClass("bg-ink-0");
+    });
+
+    it("実行中から完了への遷移を見ていたときだけ、完了が一時的に出てから最終スキャンへ戻る", async () => {
+      vi.useFakeTimers();
+      try {
+        const { scanJob } = renderModal(
+          { lastScanTime: "2026-01-01T00:00:00.000Z" },
+          { job: createRunningJob() },
+        );
+
+        act(() => {
+          scanJob.setState({ job: terminal({ status: "completed" }), error: null });
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(400);
+        });
+
+        expect(screen.getByText("スキャン完了")).toBeInTheDocument();
+        expect(screen.getByText("2026/11/20 14:02")).toBeInTheDocument();
+        expect(screen.queryByText("最終スキャン")).toBeNull();
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(2050);
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(50);
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(500);
+        });
+        expect(screen.queryByText("スキャン完了")).toBeNull();
+        expect(screen.getByText("最終スキャン")).toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("開いた時点で完了済みのジョブは完了を出さない", () => {
+      renderModal({}, { job: terminal({ status: "completed" }) });
+
+      expect(screen.queryByText("スキャン完了")).toBeNull();
+    });
+
+    it("中止受付中は中止ボタンを押せない", () => {
+      const { onCancel } = renderModal(
+        {},
+        { job: { ...createRunningJob(), status: "cancelling" } },
       );
 
+      expect(screen.getByText("中止しています…")).toBeInTheDocument();
+      const button = screen.getByRole("button", { name: "スキャンを中止" });
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it("中止では完了を出さず、中止と日時を残してスキャンできる", async () => {
+      const { scanJob } = renderModal({}, { job: createRunningJob() });
+
       act(() => {
-        scanJob.setState({ job: null, error: null });
-        rerenderModal({ lastScanTime: "2026-01-01T00:00:00.000Z" });
+        scanJob.setState({ job: terminal({ status: "cancelled" }), error: null });
       });
 
-      expect(screen.getByText("完了しました")).toBeInTheDocument();
+      expect(await screen.findByText("スキャンを中止しました")).toBeInTheDocument();
+      expect(screen.getByText("2026/11/20 14:02")).toBeInTheDocument();
+      expect(screen.queryByText("スキャン完了")).toBeNull();
+      expect(await screen.findByRole("button", { name: "スキャン" })).toBeInTheDocument();
+    });
 
-      // レイアウトは動かさず、時間経過（ScanModal の COMPLETION_HINT_MS=2400 と
-      // AnimatePresence（fade variant）の退出時間=150ms）で最終スキャン表示へ自然に戻る。
-      // 2回に分けて進めるのは、退出アニメーション開始（状態遷移でAnimatePresenceが退出
-      // フェーズへ入るタイミング）が一括advanceだと後続タイマーとして拾われないため。
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(2450);
-      });
-      // COMPLETION_HINT_MS(2400)は過ぎてstateはlastScanへ切り替わり退出フェーズに入っているが、
-      // fadeの退出アニメーション(150ms)がまだ終わっていないため、AnimatePresenceがマウントを
-      // 保ったままで「完了しました」がまだDOM上に残っている（退出中に即座に消える実装への退行を検知する）。
-      expect(screen.getByText("完了しました")).toBeInTheDocument();
+    it("失敗では完了を出さず、短い理由と再試行を出す。再試行で新しいスキャンを始める", async () => {
+      const { scanJob, onStart } = renderModal({}, { job: createRunningJob() });
 
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(50);
+      act(() => {
+        scanJob.setState({
+          job: terminal({ status: "failed", error: "フォルダーが見つかりません" }),
+          error: null,
+        });
       });
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(500);
+
+      expect(await screen.findByText("スキャンできませんでした")).toBeInTheDocument();
+      expect(screen.getByText("フォルダーが見つかりません")).toHaveAttribute(
+        "title",
+        "フォルダーが見つかりません",
+      );
+      expect(screen.queryByText("スキャン完了")).toBeNull();
+      fireEvent.click(await screen.findByRole("button", { name: "再試行" }));
+      expect(onStart).toHaveBeenCalledTimes(1);
+    });
+
+    it("状態が切り替わっても、見出しが同時に2つ出ない", async () => {
+      const { scanJob } = renderModal({}, { job: createRunningJob() });
+      expect(screen.getByText("スキャン中")).toBeInTheDocument();
+
+      act(() => {
+        scanJob.setState({ job: terminal({ status: "failed", error: "x" }), error: null });
       });
-      expect(screen.queryByText("完了しました")).toBeNull();
-    } finally {
-      vi.useRealTimers();
-    }
+
+      await waitFor(() => expect(screen.getByText("スキャンできませんでした")).toBeInTheDocument());
+      expect(screen.queryByText("スキャン中")).toBeNull();
+    });
   });
 
   it("新規作品は記録の絞り込み（scanRecord=new）で取得し、getWorkを呼ばない", async () => {

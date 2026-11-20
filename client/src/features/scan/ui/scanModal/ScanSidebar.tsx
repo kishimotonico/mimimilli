@@ -1,4 +1,5 @@
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
+import type { ReactNode } from "react";
 import { useMotionVariants } from "../../../../shared/ui/useMotionVariants";
 import { cn } from "../../../../shared/lib/cn";
 import { formatScanDateTime } from "../../../../shared/lib/format";
@@ -6,39 +7,32 @@ import { buttonClass } from "../../../../shared/ui/Button";
 import { I } from "../../../../shared/ui/Icon";
 import SplitButton from "../../../../shared/ui/SplitButton";
 import { scanPhaseLabel, type ScanProgress } from "../../model";
+import type { ScanStatusView } from "../../model/scanStatusView";
 import { SCAN_TAB_LABEL, SCAN_TAB_ORDER, SCAN_TAB_WITH_COUNT, type ScanTabKey } from "./types";
 
 interface ScanSidebarProps {
   active: ScanTabKey;
   onSelect: (tab: ScanTabKey) => void;
   counts: Partial<Record<ScanTabKey, number>>;
-  scanning: boolean;
-  progress: ScanProgress | null;
-  lastScanTime: string | null;
-  showCompletedHint: boolean;
+  status: ScanStatusView;
   onStart: () => void;
   onFullScan: () => void;
   onCancel: () => void;
 }
 
+const HEADING_CLASS = "font-sans text-label font-semibold tracking-[0.06em] text-ink-2";
+const VALUE_CLASS = "font-mono text-mono text-ink-2";
+
 export default function ScanSidebar({
   active,
   onSelect,
   counts,
-  scanning,
-  progress,
-  lastScanTime,
-  showCompletedHint,
+  status,
   onStart,
   onFullScan,
   onCancel,
 }: ScanSidebarProps) {
-  const status: "scanning" | "completed" | "lastScan" = scanning
-    ? "scanning"
-    : showCompletedHint
-      ? "completed"
-      : "lastScan";
-
+  const inProgress = status.kind === "running" || status.kind === "cancelling";
   return (
     <nav
       aria-label="スキャン結果"
@@ -57,28 +51,26 @@ export default function ScanSidebar({
       </div>
 
       <div className="mt-auto flex flex-col gap-2 border-t border-line-soft pt-2.5 pl-2.5">
-        <div className="flex flex-col gap-1">
-          <p className="font-sans text-label font-semibold tracking-[0.06em] text-ink-2 uppercase">
-            最終スキャン
-          </p>
-          <div className="relative flex h-[30px] flex-col">
-            <AnimatePresence initial={false}>
-              {status === "scanning" && (
-                <SidebarStatusScanning key="scanning" progress={progress} />
-              )}
-              {status === "completed" && <SidebarStatusCompleted key="completed" />}
-              {status === "lastScan" && (
-                <SidebarStatusLastScan key="lastScan" lastScanTime={lastScanTime} />
-              )}
-            </AnimatePresence>
-          </div>
+        <div className="relative h-[46px]">
+          <AnimatePresence initial={false} mode="wait">
+            <SidebarStatus key={status.kind} status={status} />
+          </AnimatePresence>
         </div>
         <div className="relative h-9">
-          <AnimatePresence initial={false}>
-            {scanning ? (
-              <SidebarCancelButton key="cancel" onClick={onCancel} />
+          <AnimatePresence initial={false} mode="wait">
+            {inProgress ? (
+              <SidebarCancelButton
+                key="cancel"
+                disabled={status.kind === "cancelling"}
+                onClick={onCancel}
+              />
             ) : (
-              <SidebarStartButton key="start" onStart={onStart} onFullScan={onFullScan} />
+              <SidebarStartButton
+                key="start"
+                status={status}
+                onStart={onStart}
+                onFullScan={onFullScan}
+              />
             )}
           </AnimatePresence>
         </div>
@@ -138,19 +130,22 @@ function ScanSidebarTab({
 }
 
 function SidebarStartButton({
+  status,
   onStart,
   onFullScan,
 }: {
+  status: ScanStatusView;
   onStart: () => void;
   onFullScan: () => void;
 }) {
   const { fade } = useMotionVariants();
   const isPresent = useIsPresent();
   const v = fade();
+  const neverScanned = status.kind === "idle" && status.at === null;
   return (
     <motion.div className="absolute inset-0" inert={!isPresent} {...v}>
       <SplitButton
-        variant="ghost"
+        variant={neverScanned ? "primary" : "ghost"}
         size="lg"
         className="w-full"
         menuLabel="スキャンの方法"
@@ -158,13 +153,13 @@ function SidebarStartButton({
         items={[{ key: "full", label: "すべての作品を読み直す", onSelect: onFullScan }]}
       >
         <I.refresh size={12} />
-        スキャン
+        {status.kind === "failed" ? "再試行" : "スキャン"}
       </SplitButton>
     </motion.div>
   );
 }
 
-function SidebarCancelButton({ onClick }: { onClick: () => void }) {
+function SidebarCancelButton({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
   const { fade } = useMotionVariants();
   const isPresent = useIsPresent();
   const v = fade();
@@ -172,9 +167,11 @@ function SidebarCancelButton({ onClick }: { onClick: () => void }) {
     <motion.button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       inert={!isPresent}
       {...v}
       className={buttonClass("danger-quiet", "lg", {
+        disabled,
         className: "absolute inset-0 w-full justify-center",
       })}
     >
@@ -184,21 +181,82 @@ function SidebarCancelButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function SidebarStatusScanning({ progress }: { progress: ScanProgress | null }) {
+function SidebarStatus({ status }: { status: ScanStatusView }) {
   const { fade } = useMotionVariants();
   const isPresent = useIsPresent();
   const v = fade();
+  return (
+    <motion.div className="absolute inset-0 flex flex-col gap-1" inert={!isPresent} {...v}>
+      {renderStatus(status)}
+    </motion.div>
+  );
+}
+
+function renderStatus(status: ScanStatusView): ReactNode {
+  switch (status.kind) {
+    case "idle":
+      return status.at === null ? (
+        <p className={HEADING_CLASS}>まだスキャンしていません</p>
+      ) : (
+        <>
+          <p className={HEADING_CLASS}>最終スキャン</p>
+          <p className={VALUE_CLASS}>{formatScanDateTime(status.at)}</p>
+        </>
+      );
+    case "running":
+    case "cancelling":
+      return (
+        <>
+          <p className={HEADING_CLASS}>
+            {status.kind === "running" ? "スキャン中" : "中止しています…"}
+          </p>
+          <ProgressRow progress={status.progress} dim={status.kind === "cancelling"} />
+        </>
+      );
+    case "completed":
+      return (
+        <>
+          <p className={cn(HEADING_CLASS, "flex items-center gap-1 text-[var(--r-leaf)]")}>
+            <I.check size={12} />
+            スキャン完了
+          </p>
+          <p className={VALUE_CLASS}>{formatScanDateTime(status.at)}</p>
+        </>
+      );
+    case "cancelled":
+      return (
+        <>
+          <p className={HEADING_CLASS}>スキャンを中止しました</p>
+          <p className={VALUE_CLASS}>{formatScanDateTime(status.at)}</p>
+        </>
+      );
+    case "failed":
+      return (
+        <>
+          <p className={cn(HEADING_CLASS, "flex items-center gap-1 text-[var(--r-coral)]")}>
+            <I.err size={12} />
+            スキャンできませんでした
+          </p>
+          <p className="truncate font-jp text-caption text-ink-2" title={status.reason}>
+            {status.reason}
+          </p>
+        </>
+      );
+  }
+}
+
+function ProgressRow({ progress, dim }: { progress: ScanProgress | null; dim: boolean }) {
   const pct =
     progress && progress.total > 0
       ? Math.min(100, Math.round((progress.processed / progress.total) * 100))
       : null;
   return (
-    <motion.div className="flex flex-col gap-1" inert={!isPresent} {...v}>
+    <>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="font-mono text-caption text-ink-2">
+        <span className="truncate font-mono text-caption text-ink-2">
           {progress ? scanPhaseLabel(progress.phase) : "準備中"}
         </span>
-        <span className="font-mono text-caption text-ink-2 tabular-nums">
+        <span className="shrink-0 font-mono text-caption text-ink-2 tabular-nums">
           {progress && progress.total > 0 ? `${progress.processed}/${progress.total}` : "…"}
         </span>
       </div>
@@ -206,33 +264,12 @@ function SidebarStatusScanning({ progress }: { progress: ScanProgress | null }) 
         <div
           className={cn(
             "h-full rounded-full bg-acc transition-[width] duration-300 ease-out",
+            dim && "opacity-40",
             pct === null && "w-1/3 animate-pulse",
           )}
           style={pct !== null ? { width: `${pct}%` } : undefined}
         />
       </div>
-    </motion.div>
-  );
-}
-
-function SidebarStatusCompleted() {
-  const { fade } = useMotionVariants();
-  const isPresent = useIsPresent();
-  const v = fade();
-  return (
-    <motion.span className="font-mono text-caption text-[var(--r-leaf)]" inert={!isPresent} {...v}>
-      完了しました
-    </motion.span>
-  );
-}
-
-function SidebarStatusLastScan({ lastScanTime }: { lastScanTime: string | null }) {
-  const { fade } = useMotionVariants();
-  const isPresent = useIsPresent();
-  const v = fade();
-  return (
-    <motion.span className="font-mono text-mono text-ink-2" inert={!isPresent} {...v}>
-      {formatScanDateTime(lastScanTime)}
-    </motion.span>
+    </>
   );
 }

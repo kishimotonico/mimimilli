@@ -4,17 +4,20 @@ import { atomWithStorage, createJSONStorage } from "jotai/utils";
 export interface ScanEntrySeen {
   candidates: string[];
   needsAttention: string[];
+  /** 変化のあったスキャンの完了時刻。 */
+  changes: string[];
 }
 
 /** 現在の項目のキー。まだ読めていない集合は null。 */
 export interface ScanEntryCurrent {
   candidates: readonly string[] | null;
   needsAttention: readonly string[] | null;
+  changes: readonly string[] | null;
 }
 
-const EMPTY_SEEN: ScanEntrySeen = { candidates: [], needsAttention: [] };
+const EMPTY_SEEN: ScanEntrySeen = { candidates: [], needsAttention: [], changes: [] };
 
-const SETS = ["candidates", "needsAttention"] as const;
+const SETS = ["candidates", "needsAttention", "changes"] as const;
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
@@ -22,9 +25,13 @@ function isStringArray(value: unknown): value is string[] {
 
 export function parseScanEntrySeen(value: unknown): ScanEntrySeen {
   if (typeof value !== "object" || value === null) return EMPTY_SEEN;
-  const { candidates, needsAttention } = value as Partial<Record<keyof ScanEntrySeen, unknown>>;
-  if (!isStringArray(candidates) || !isStringArray(needsAttention)) return EMPTY_SEEN;
-  return { candidates, needsAttention };
+  const { candidates, needsAttention, changes } = value as Partial<
+    Record<keyof ScanEntrySeen, unknown>
+  >;
+  if (!isStringArray(candidates) || !isStringArray(needsAttention) || !isStringArray(changes)) {
+    return EMPTY_SEEN;
+  }
+  return { candidates, needsAttention, changes };
 }
 
 /** 読めている集合のどれかに、記憶に無いキーがあるか。 */
@@ -44,6 +51,7 @@ export function nextSeen(seen: ScanEntrySeen, current: ScanEntryCurrent): ScanEn
     needsAttention: current.needsAttention
       ? [...new Set(current.needsAttention)].sort()
       : seen.needsAttention,
+    changes: current.changes ? [...new Set(current.changes)].sort() : seen.changes,
   };
   const unchanged = SETS.every(
     (set) => next[set].length === seen[set].length && next[set].every((k, i) => k === seen[set][i]),

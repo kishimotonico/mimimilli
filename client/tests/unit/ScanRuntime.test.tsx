@@ -8,12 +8,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import { scanJobStoreAtom } from "../../src/entities/scan/model/scanJobStore";
+import { scanEntrySeenAtom } from "../../src/features/scan/model/scanEntrySeen";
 import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
 import { toastRequestsAtom } from "../../src/shared/model/toastRequestsAtom";
 import type { ScanJobEvent } from "@mimimilli/shared";
 import { apiError, mockApi } from "../helpers/api";
 import { appShellRoutes } from "../helpers/appShellApi";
-import { buildScanJobEvent, buildScanJobSnapshot } from "../helpers/builders";
+import {
+  buildScanJobEvent,
+  buildScanJobSnapshot,
+  buildScanRecord,
+  buildWorksPage,
+} from "../helpers/builders";
 
 /** 現在表示中のerror variantトーストのメッセージ。無ければnull。 */
 function getErrorToastMessage(store: ReturnType<typeof createStore>): string | null {
@@ -47,6 +53,13 @@ function dispatch(source: FakeEventSource, event: ScanJobEvent): void {
     source.dispatchEvent(new MessageEvent(valid.type, { data: JSON.stringify(valid) }));
   });
 }
+
+const UPDATED_WORK = { workId: "work-u", changes: [{ kind: "meta" as const }] };
+
+const CHANGES_ROUTES = {
+  "GET /api/scan/last": () => buildScanRecord(),
+  "GET /api/works": () => buildWorksPage([], { total: 0 }),
+} as const;
 
 const UNSTRUCTURED_FAILURE = () => new Response("開始できませんでした", { status: 500 });
 
@@ -141,7 +154,7 @@ describe("ScanRuntime", () => {
     await waitFor(() => expect(screen.queryByText(message)).toBeNull());
   });
 
-  it("中止APIの失敗でエラーが出た直後にSSEで完了すると、エラートーストは消え、完了トーストは出ない", async () => {
+  it("中止APIの失敗でエラーが出た直後にSSEで完了すると、エラートーストは消え、完了トーストが出る", async () => {
     const running = buildScanJobSnapshot();
     const completed = buildScanJobSnapshot({
       status: "completed",
@@ -152,6 +165,7 @@ describe("ScanRuntime", () => {
     vi.stubGlobal("EventSource", FakeEventSource);
     mockApi({
       ...appShellRoutes(),
+      ...CHANGES_ROUTES,
       "POST /api/scan": { job: running },
       "DELETE /api/scan/:id": () => apiError(500, "internal", "中止できませんでした"),
       // SSEの"completed"はrefresh経由でGETするだけで確定するため、GETは完了済みを返す
@@ -175,13 +189,264 @@ describe("ScanRuntime", () => {
     const errorMessage = getErrorToastMessage(store)!;
     expect(screen.getByText(errorMessage)).toBeInTheDocument();
 
-    // その直後に同じジョブのSSEが完了を届ける。errorToast.dismiss()とonTerminalの完了トーストが
-    // 同じバッチで走る経路（cancel()のHTTP失敗＋SSE生存）を再現する。
     dispatch(source, { type: "completed", finishedAt: "2026-01-01T00:00:01.000Z" });
 
     await waitFor(() => expect(getErrorToastMessage(store)).toBeNull());
     await waitFor(() => expect(screen.queryByText(errorMessage)).toBeNull());
-    expect(screen.queryByText(/^スキャン完了/)).toBeNull();
+    expect(await screen.findByText(/^スキャン完了/)).toBeInTheDocument();
+  });
+
+  describe("終端のトースト（遅延・失敗を注入）", () => {
+    async function startAndGetSource(
+      routes: Parameters<typeof mockApi>[0],
+      options: { modalOpen: boolean },
+    ) {
+      FakeEventSource.instances = [];
+      vi.stubGlobal("EventSource", FakeEventSource);
+      mockApi({
+        ...appShellRoutes(),
+        ...CHANGES_ROUTES,
+        "POST /api/scan": { job: buildScanJobSnapshot() },
+        ...routes,
+      });
+      const { store } = renderRuntime();
+      if (options.modalOpen) store.set(activeModalAtom, { kind: "scan" });
+      await act(async () => {
+        await store.get(scanJobStoreAtom).start();
+      });
+      await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+      return { store, source: FakeEventSource.instances[0]! };
+    }
+
+    it("閉じている間の完了は、今回の変化の件数を出し、開くでモーダルを開ける", async () => {
+      const { store, source } = await startAndGetSource(
+        {
+          "GET /api/scan/:id": buildScanJobSnapshot({
+            status: "completed",
+            finishedAt: "2026-01-01T00:00:01.000Z",
+          }),
+          "GET /api/scan/last": buildScanRecord({ updatedWorks: [UPDATED_WORK] }),
+          "GET /api/works": () => buildWorksPage([], { total: 3 }),
+        },
+        { modalOpen: false },
+      );
+
+      dispatch(source, { type: "completed", finishedAt: "2026-01-01T00:00:01.000Z" });
+
+      expect(await screen.findByText("スキャン完了・新規作品3件・更新済み1件")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "開く" }));
+      expect(store.get(activeModalAtom)).toEqual({ kind: "scan" });
+    });
+
+    it("変化がなければ、そう出す", async () => {
+      const { source } = await startAndGetSource(
+        {
+          "GET /api/scan/:id": buildScanJobSnapshot({
+            status: "completed",
+            finishedAt: "2026-01-01T00:00:01.000Z",
+          }),
+        },
+        { modalOpen: false },
+      );
+
+      dispatch(source, { type: "completed", finishedAt: "2026-01-01T00:00:01.000Z" });
+
+      expect(await screen.findByText("スキャン完了・変化はありません")).toBeInTheDocument();
+    });
+
+    it("閉じている間の中止は完了を出さず、通常のトーストで知らせる", async () => {
+      const { store, source } = await startAndGetSource(
+        {
+          "GET /api/scan/:id": buildScanJobSnapshot({
+            status: "cancelled",
+            finishedAt: "2026-01-01T00:00:01.000Z",
+          }),
+        },
+        { modalOpen: false },
+      );
+
+      dispatch(source, { type: "cancelled" });
+
+      expect(await screen.findByText("スキャンを中止しました")).toBeInTheDocument();
+      expect(screen.queryByText(/^スキャン完了/)).toBeNull();
+      expect(getErrorToastMessage(store)).toBeNull();
+    });
+
+    it("閉じている間の失敗は理由つきのエラートーストで、時間が経っても消えない", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        const { store, source } = await startAndGetSource(
+          {
+            "GET /api/scan/:id": buildScanJobSnapshot({
+              status: "failed",
+              error: "フォルダーが見つかりません",
+              finishedAt: "2026-01-01T00:00:01.000Z",
+            }),
+          },
+          { modalOpen: false },
+        );
+
+        dispatch(source, { type: "failed", error: "フォルダーが見つかりません" });
+
+        await waitFor(() =>
+          expect(getErrorToastMessage(store)).toBe(
+            "スキャンできませんでした（フォルダーが見つかりません）",
+          ),
+        );
+        expect(screen.queryByText(/^スキャン完了/)).toBeNull();
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(60_000);
+        });
+        expect(getErrorToastMessage(store)).not.toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("モーダルを開いている間の終端はトーストを出さない（状態欄が知らせる）", async () => {
+      const { store, source } = await startAndGetSource(
+        {
+          "GET /api/scan/:id": buildScanJobSnapshot({
+            status: "failed",
+            error: "x",
+            finishedAt: "2026-01-01T00:00:01.000Z",
+          }),
+        },
+        { modalOpen: true },
+      );
+
+      dispatch(source, { type: "failed", error: "x" });
+
+      await waitFor(() =>
+        expect(store.get(scanJobStoreAtom).getState().job?.status).toBe("failed"),
+      );
+      expect(store.get(toastRequestsAtom).size).toBe(0);
+    });
+
+    it("中止APIの失敗でstore.errorが立ったあとにジョブが失敗しても、失敗トーストは消えない", async () => {
+      const { store, source } = await startAndGetSource(
+        {
+          "DELETE /api/scan/:id": () => apiError(500, "internal", "中止できませんでした"),
+          "GET /api/scan/:id": buildScanJobSnapshot({
+            status: "failed",
+            error: "フォルダーが見つかりません",
+            finishedAt: "2026-01-01T00:00:01.000Z",
+          }),
+        },
+        { modalOpen: false },
+      );
+      await act(async () => {
+        await store.get(scanJobStoreAtom).cancel();
+      });
+      await waitFor(() => expect(getErrorToastMessage(store)).toBe("中止できませんでした"));
+
+      dispatch(source, { type: "failed", error: "フォルダーが見つかりません" });
+
+      await waitFor(() =>
+        expect(getErrorToastMessage(store)).toBe(
+          "スキャンできませんでした（フォルダーが見つかりません）",
+        ),
+      );
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+      expect(getErrorToastMessage(store)).toBe(
+        "スキャンできませんでした（フォルダーが見つかりません）",
+      );
+    });
+
+    it("完了の確定を待つあいだに新しいスキャンを始めたら、前のジョブの完了トーストは出さない", async () => {
+      let releaseLast: () => void = () => {};
+      const lastGate = new Promise<void>((resolve) => {
+        releaseLast = resolve;
+      });
+      let posts = 0;
+      const { store, source } = await startAndGetSource(
+        {
+          "POST /api/scan": () => {
+            posts += 1;
+            return { job: buildScanJobSnapshot({ id: `job-${posts}` }) };
+          },
+          "GET /api/scan/:id": buildScanJobSnapshot({
+            status: "completed",
+            finishedAt: "2026-01-01T00:00:01.000Z",
+          }),
+          "GET /api/scan/last": async () => {
+            await lastGate;
+            return buildScanRecord();
+          },
+        },
+        { modalOpen: false },
+      );
+      dispatch(source, { type: "completed", finishedAt: "2026-01-01T00:00:01.000Z" });
+      await waitFor(() =>
+        expect(store.get(scanJobStoreAtom).getState().job?.status).toBe("completed"),
+      );
+
+      await act(async () => {
+        await store.get(scanJobStoreAtom).start();
+      });
+      releaseLast();
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      expect(screen.queryByText(/^スキャン完了/)).toBeNull();
+    });
+
+    it("完了の時点でモーダルが開いていて、確定前に閉じても、完了トーストは出ず入口の点も付かない", async () => {
+      localStorage.clear();
+      let releaseLast: () => void = () => {};
+      const lastGate = new Promise<void>((resolve) => {
+        releaseLast = resolve;
+      });
+      const { store, source } = await startAndGetSource(
+        {
+          "GET /api/scan/:id": buildScanJobSnapshot({
+            status: "completed",
+            finishedAt: "2026-01-01T00:00:01.000Z",
+          }),
+          "GET /api/scan/last": async () => {
+            await lastGate;
+            return buildScanRecord({ updatedWorks: [UPDATED_WORK] });
+          },
+        },
+        { modalOpen: true },
+      );
+      dispatch(source, { type: "completed", finishedAt: "2026-01-01T00:00:01.000Z" });
+      await waitFor(() =>
+        expect(store.get(scanJobStoreAtom).getState().job?.status).toBe("completed"),
+      );
+
+      act(() => store.set(activeModalAtom, null));
+      releaseLast();
+      await waitFor(() =>
+        expect(store.get(scanEntrySeenAtom).changes).toEqual(["2026-01-01T00:00:00.000Z"]),
+      );
+      expect(screen.queryByText(/^スキャン完了/)).toBeNull();
+      expect(store.get(toastRequestsAtom).size).toBe(0);
+    });
+
+    it("新しいスキャンを始めると、前の終端のトーストは消える", async () => {
+      const { store, source } = await startAndGetSource(
+        {
+          "GET /api/scan/:id": buildScanJobSnapshot({
+            status: "failed",
+            error: "x",
+            finishedAt: "2026-01-01T00:00:01.000Z",
+          }),
+        },
+        { modalOpen: false },
+      );
+      dispatch(source, { type: "failed", error: "x" });
+      await waitFor(() => expect(getErrorToastMessage(store)).not.toBeNull());
+
+      await act(async () => {
+        await store.get(scanJobStoreAtom).start();
+      });
+
+      await waitFor(() => expect(getErrorToastMessage(store)).toBeNull());
+    });
   });
 
   it("reset()（root再設定突入時用）を呼ぶと実行中ジョブの追跡状態が初期化される", async () => {

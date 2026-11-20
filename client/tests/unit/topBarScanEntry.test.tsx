@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import TopBar from "../../src/app/ui/TopBar";
 import { dlsiteJobStoreAtom } from "../../src/entities/dlsite/model/dlsiteJobStore";
 import { scanJobStoreAtom } from "../../src/entities/scan/model/scanJobStore";
+import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
 import { createFakeDlsiteJobStore, createFakeScanJobStore } from "../helpers/fakeJobStores";
@@ -31,7 +32,8 @@ interface Seed {
   record?: ReturnType<typeof buildScanRecord>;
   scanJob?: ReturnType<typeof createFakeScanJobStore>;
   dlsiteJob?: ReturnType<typeof createFakeDlsiteJobStore>;
-  seen?: { candidates: string[]; needsAttention: string[] };
+  seen?: { candidates: string[]; needsAttention: string[]; changes: string[] };
+  changes?: { newCount: number; updatedCount: number };
   diagnosticsPending?: boolean;
 }
 
@@ -40,7 +42,15 @@ function renderTopBar(seed: Seed = {}) {
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
   });
   if (seed.candidates) queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), seed.candidates);
-  queryClient.setQueryData(SCAN_QUERY_KEYS.last(), seed.record ?? buildScanRecord());
+  const updatedWorks = Array.from({ length: seed.changes?.updatedCount ?? 0 }, (_, i) => ({
+    workId: `w${i}`,
+    changes: [{ kind: "meta" as const }],
+  }));
+  queryClient.setQueryData(
+    SCAN_QUERY_KEYS.last(),
+    seed.record ?? buildScanRecord({ updatedWorks }),
+  );
+  queryClient.setQueryData(WORK_QUERY_KEYS.scanNewCount(), seed.changes?.newCount ?? 0);
   if (!seed.diagnosticsPending) {
     queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
   }
@@ -75,7 +85,7 @@ function ringKind(): string | null {
   return screen.getByTestId("scan-entry-ring").getAttribute("data-ring");
 }
 
-function storedSeen(): { candidates: string[]; needsAttention: string[] } {
+function storedSeen(): { candidates: string[]; needsAttention: string[]; changes: string[] } {
   return JSON.parse(localStorage.getItem(SEEN_KEY) ?? "null");
 }
 
@@ -125,7 +135,7 @@ describe("TopBar のスキャン入口", () => {
     it("候補があっても名前に件数を出さない", () => {
       renderTopBar({
         candidates: [candidate],
-        seen: { candidates: [candidate.path], needsAttention: [] },
+        seen: { candidates: [candidate.path], needsAttention: [], changes: [] },
       });
 
       expect(scanButton("スキャン")).toBeInTheDocument();
@@ -258,7 +268,11 @@ describe("TopBar のスキャン入口", () => {
     it("候補が減っただけでは点を出さない", () => {
       const { queryClient } = renderTopBar({
         candidates: [candidate, otherCandidate],
-        seen: { candidates: [candidate.path, otherCandidate.path].sort(), needsAttention: [] },
+        seen: {
+          candidates: [candidate.path, otherCandidate.path].sort(),
+          needsAttention: [],
+          changes: [],
+        },
       });
 
       act(() => queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), [candidate]));
@@ -270,7 +284,7 @@ describe("TopBar のスキャン入口", () => {
       renderTopBar({
         candidates: [],
         record: unreadableRecord,
-        seen: { candidates: [], needsAttention: [] },
+        seen: { candidates: [], needsAttention: [], changes: [] },
       });
 
       expect(scanButton("スキャン（新しい項目あり）")).toBeInTheDocument();
@@ -280,7 +294,31 @@ describe("TopBar のスキャン入口", () => {
       renderTopBar({
         candidates: [],
         record: unreadableRecord,
-        seen: { candidates: [], needsAttention: [UNREADABLE_KEY] },
+        seen: { candidates: [], needsAttention: [UNREADABLE_KEY], changes: [] },
+      });
+
+      expect(scanButton("スキャン")).toBeInTheDocument();
+    });
+
+    it("スキャンで変化があれば点を出し、開くと消える。変化なしのスキャンでは出さない", async () => {
+      const { store } = renderTopBar({
+        candidates: [],
+        changes: { newCount: 2, updatedCount: 1 },
+        seen: { candidates: [], needsAttention: [], changes: [] },
+      });
+      expect(scanButton("スキャン（新しい項目あり）")).toBeInTheDocument();
+
+      openScan(store);
+      await waitFor(() => expect(storedSeen().changes).toEqual(["2026-01-01T00:00:00.000Z"]));
+      closeModal(store);
+      expect(scanButton("スキャン")).toBeInTheDocument();
+    });
+
+    it("変化のなかったスキャンでは点を出さない", () => {
+      renderTopBar({
+        candidates: [],
+        changes: { newCount: 0, updatedCount: 0 },
+        seen: { candidates: [], needsAttention: [], changes: [] },
       });
 
       expect(scanButton("スキャン")).toBeInTheDocument();
@@ -298,7 +336,7 @@ describe("TopBar のスキャン入口", () => {
         candidates: [candidate],
         record: unreadableRecord,
         diagnosticsPending: true,
-        seen: { candidates: [], needsAttention: [UNREADABLE_KEY] },
+        seen: { candidates: [], needsAttention: [UNREADABLE_KEY], changes: [] },
       });
 
       openScan(store);

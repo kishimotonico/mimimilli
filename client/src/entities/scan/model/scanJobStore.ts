@@ -130,10 +130,7 @@ export function createScanJobStore(
     ) {
       return;
     }
-    store.setState({
-      job: next,
-      error: next.status === "failed" ? (next.error ?? "スキャンに失敗しました") : null,
-    });
+    store.setState({ job: next, error: null });
     if (isTerminalScanJob(next) && !terminalHandled.has(next.id)) {
       terminalHandled.add(next.id);
       if (localConnection !== null && connection === localConnection) closeConnection();

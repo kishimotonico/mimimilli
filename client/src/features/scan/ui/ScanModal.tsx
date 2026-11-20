@@ -6,7 +6,7 @@ import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
 import { useToast } from "../../../shared/ui/useToast";
-import { useScanJobStore, useScanProgress, useScanning } from "../../../entities/scan/useScanJob";
+import { useScanJobStore, useScanning } from "../../../entities/scan/useScanJob";
 import {
   scanDiagnosticsQueryOptions,
   scanRecordQueryOptions,
@@ -17,7 +17,7 @@ import UnregisteredTab from "./scanModal/unregistered/UnregisteredTab";
 import NeedsAttentionTab from "./scanModal/NeedsAttentionTab";
 import NewWorksTab from "./scanModal/newWorks/NewWorksTab";
 import UpdatedWorksTab from "./scanModal/updated/UpdatedWorksTab";
-import { useScanCompletionHint } from "./scanModal/useScanCompletionHint";
+import { useScanStatusView } from "./scanModal/useScanStatusView";
 import { buildNeedsAttentionRows, countNeedsAttention } from "../model/needsAttention";
 import type { CandidatesRegisteredResult, ScanTabKey } from "./scanModal/types";
 
@@ -35,7 +35,6 @@ export default function ScanModal({
   onOpenWorkDetail,
 }: ScanModalProps) {
   const scanning = useScanning();
-  const progress = useScanProgress();
   const { start, cancel } = useScanJobStore();
   const [activeTab, setActiveTab] = useState<ScanTabKey>("unregistered");
   const toast = useToast();
@@ -80,7 +79,7 @@ export default function ScanModal({
   // 常に最新を購読する。作品変更後のキャッシュ更新が同じキーを無効化する。
   const diagnosticsQuery = useQuery(scanDiagnosticsQueryOptions);
 
-  const { showCompletedHint } = useScanCompletionHint(scanning);
+  const statusView = useScanStatusView(lastScanTime);
 
   const needsAttentionRows = buildNeedsAttentionRows({
     diagnostics: diagnosticsQuery.data,
@@ -109,10 +108,7 @@ export default function ScanModal({
           active={activeTab}
           onSelect={setActiveTab}
           counts={counts}
-          scanning={scanning}
-          progress={progress}
-          lastScanTime={lastScanTime}
-          showCompletedHint={showCompletedHint}
+          status={statusView}
           onStart={() => void start()}
           onFullScan={() => void start({ full: true })}
           onCancel={() => void cancel()}

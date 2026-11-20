@@ -32,9 +32,7 @@ export default function AppModals({
       {activeModal?.kind === "settings" && (
         <Suspense fallback={null}>
           <SettingsModal
-            lastScanTime={lastScanTime}
             onClose={handleClose}
-            onOpenScan={() => setActiveModal({ kind: "scan" })}
             onChangeFolder={onChangeFolder}
             onExport={onExport}
           />

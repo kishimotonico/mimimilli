@@ -29,14 +29,11 @@ beforeEach(() => {
 
 interface RenderModalOptions {
   onClose?: ReturnType<typeof vi.fn>;
-  onOpenScan?: ReturnType<typeof vi.fn>;
   onChangeFolder?: ReturnType<typeof vi.fn>;
-  lastScanTime?: string | null;
 }
 
 function renderModal(options: RenderModalOptions = {}) {
   const onClose = options.onClose ?? vi.fn();
-  const onOpenScan = options.onOpenScan ?? vi.fn();
   const onChangeFolder = options.onChangeFolder ?? vi.fn();
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -51,16 +48,14 @@ function renderModal(options: RenderModalOptions = {}) {
         JotaiProvider,
         { store },
         createElement(SettingsModal, {
-          lastScanTime: options.lastScanTime ?? null,
           onClose,
-          onOpenScan,
           onChangeFolder,
           onExport: vi.fn(),
         }),
       ),
     ),
   );
-  return { onClose, onOpenScan, onChangeFolder };
+  return { onClose, onChangeFolder };
 }
 
 function dispatchCancel(dialog: HTMLElement) {
@@ -122,12 +117,6 @@ describe("SettingsModal", () => {
     const { onClose } = renderModal();
     fireEvent.click(screen.getByText("ルートフォルダー"));
     expect(onClose).not.toHaveBeenCalled();
-  });
-
-  it("スキャンボタンは即時実行せずonOpenScanを呼ぶ", () => {
-    const { onOpenScan } = renderModal();
-    fireEvent.click(screen.getByRole("button", { name: "スキャン" }));
-    expect(onOpenScan).toHaveBeenCalledTimes(1);
   });
 
   it("閲覧モードのルートフォルダーパスは選択可能クラスを持つ", () => {
