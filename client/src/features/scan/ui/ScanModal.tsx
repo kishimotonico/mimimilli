@@ -16,6 +16,7 @@ import {
 import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
 import { scanNewCountQueryOptions } from "../../../entities/work/scanNewCountQueryOptions";
 import { useScanCandidatesState } from "../model/useScanCandidatesCache";
+import { formatWorkNames } from "../model/formatWorkNames";
 import { deriveScanListStatus } from "../model/scanListStatus";
 import ScanSidebar from "./scanModal/ScanSidebar";
 import UnregisteredTab from "./scanModal/unregistered/UnregisteredTab";
@@ -71,34 +72,36 @@ export default function ScanModal({
   const [activeTab, setActiveTab] = useActiveTab(counts, countsSettled);
 
   const handleUnregisteredRegistered = ({
-    registeredCount,
+    registeredTitles,
+    coverSkippedTitles,
     failedCount,
-    coverSkippedCount,
+    remainingCount,
     interrupted,
   }: CandidatesRegisteredResult) => {
-    if (registeredCount === 0) return;
+    if (registeredTitles.length === 0) return;
+    const names = formatWorkNames(registeredTitles);
     const coverNote =
-      coverSkippedCount > 0 ? `うち${coverSkippedCount}件はカバーを適用できませんでした。` : "";
+      coverSkippedTitles.length > 0
+        ? `${formatWorkNames(coverSkippedTitles)}はカバーを適用できませんでした。`
+        : "";
     if (failedCount > 0 || interrupted) {
       toast.show({
         message:
           (interrupted
-            ? `${registeredCount}件を追加して止まりました。`
-            : `${registeredCount}件を追加しました。${failedCount}件は追加できず、未登録タブに残っています。`) +
+            ? `${names}を追加して止まりました。`
+            : `${names}を追加しました。${failedCount}件は追加できず、未登録タブに残っています。`) +
           coverNote,
         variant: "warning",
         priority: "notice",
       });
       return;
     }
-    if (coverNote) {
-      toast.show({
-        message: `${registeredCount}件を追加しました。${coverNote}`,
-        variant: "warning",
-        priority: "notice",
-      });
-    }
-    setActiveTab("newWorks");
+    toast.show({
+      message: `${names}を追加しました。${coverNote}`,
+      variant: coverNote ? "warning" : "success",
+      priority: "notice",
+    });
+    if (remainingCount <= 0) setActiveTab("newWorks");
   };
 
   const retryCandidates = () => void refreshScanCandidates(queryClient).catch(() => undefined);

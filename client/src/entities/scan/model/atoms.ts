@@ -9,13 +9,20 @@ export const scanModalOpenAtom = atom((get) => get(activeModalAtom)?.kind === "s
 /** スキャン完了後に、記録・要対応・候補のキャッシュが最新になるたびに増える。開いているモーダルが着地タブを選び直す合図 */
 export const scanResultsRefreshedAtom = atom(0);
 
-/** 未登録候補のうち、選択から外したpath。既定は全選択で、新しく現れた候補は選択された状態で入る。
- *  モーダルを閉じても残す（開き直しで全選択に戻り、外した候補まで追加されるのを防ぐ）。 */
-export const scanCandidateDeselectedPathsAtom = atom<ReadonlySet<string>>(new Set<string>());
+/** 未登録候補の選択の上書き。キーに無い候補は、その行の既定（判断が要る行は選ばず、それ以外は選ぶ）に従う。
+ *  judged は上書きしたときに判断が要る行だったか。今の状態と食い違えば（取得で該当なし・失敗になった、RJコードを直した）上書きは捨てて既定に戻る。
+ *  モーダルを閉じても残す。 */
+export interface ScanCandidateSelectionOverride {
+  selected: boolean;
+  judged: boolean;
+}
+export const scanCandidateSelectionAtom = atom<ReadonlyMap<string, ScanCandidateSelectionOverride>>(
+  new Map(),
+);
 
 type JotaiStore = ReturnType<typeof createStore>;
 
 /** 候補のローカル状態（選択）を捨てる。root再設定で候補の集合が入れ替わるときに使う。 */
 export function clearScanCandidateLocalState(store: JotaiStore): void {
-  store.set(scanCandidateDeselectedPathsAtom, new Set());
+  store.set(scanCandidateSelectionAtom, new Map());
 }

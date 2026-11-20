@@ -12,7 +12,7 @@ import * as scanApi from "../../src/features/scan/api";
 import * as workApi from "../../src/entities/work/api";
 import * as scanEntityApi from "../../src/entities/scan/api";
 import * as scanCandidatesCache from "../../src/entities/scan/scanCandidatesCache";
-import { scanCandidateDeselectedPathsAtom } from "../../src/entities/scan/model/atoms";
+import { scanCandidateSelectionAtom } from "../../src/entities/scan/model/atoms";
 import { dlsiteJobStoreAtom } from "../../src/entities/dlsite/model/dlsiteJobStore";
 import { mockApi } from "../helpers/api";
 import { useScanCandidatesState } from "../../src/features/scan/model/useScanCandidatesCache";
@@ -46,6 +46,7 @@ const candidateB = buildScanCandidate({
   inferredTitle: "検出済み作品",
   audioFileCount: 2,
   rjCode: "RJ100001",
+  dlsite: { state: "fetched", title: "検出済みのDLsiteタイトル", cover: null },
 });
 
 async function renderTab(
@@ -304,7 +305,7 @@ describe("UnregisteredTab DLsite列と行の操作", () => {
   });
 
   it("状態ごとの表示と、取得済みはDLsiteのタイトルを主にフォルダー名を添える", async () => {
-    await renderTab([notFound, failed, fetched, candidateB]);
+    await renderTab([notFound, failed, fetched]);
     expect(screen.getByText("該当なし")).not.toBeNull();
     expect(screen.getByText("失敗")).not.toBeNull();
     expect(screen.getByText("取得済み")).not.toBeNull();
@@ -318,11 +319,11 @@ describe("UnregisteredTab DLsite列と行の操作", () => {
     expect(screen.getByPlaceholderText("RJコード")).not.toBeNull();
   });
 
-  it("「再試行」は単発の取得だけを始め、枠は「DLsiteから取得」のまま", async () => {
+  it("「再試行」は単発の取得だけを始め、まとめての進捗は出ない", async () => {
     const { job } = await renderTab([failed]);
     fireEvent.click(screen.getByRole("button", { name: "再試行" }));
     expect(job.startSingle).toHaveBeenCalledWith("RJ000404");
-    expect(screen.getByRole("button", { name: "DLsiteから取得" })).not.toBeNull();
+    expect(screen.queryByRole("button", { name: /DLsiteから取得/ })).toBeNull();
     expect(screen.queryByText(/取得中 \d/)).toBeNull();
   });
 
@@ -360,14 +361,14 @@ describe("UnregisteredTab DLsite列と行の操作", () => {
   });
 });
 
-describe("UnregisteredTab 取得の枠", () => {
+describe("UnregisteredTab 取得と進捗", () => {
   const first = buildScanCandidate({ path: "d/1", inferredTitle: "一", rjCode: "RJ000001" });
   const second = buildScanCandidate({ path: "d/2", inferredTitle: "二", rjCode: "RJ000002" });
 
   it("選択中で未取得のRJコードだけを対象に取得を始める", async () => {
     const { job } = await renderTab([first, second, candidateA]);
     expect(screen.getByText(/2件・約/)).not.toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "DLsiteから取得" }));
+    fireEvent.click(screen.getByRole("button", { name: "DLsiteから取得 2件" }));
     expect(job.startBulk).toHaveBeenCalledWith(["RJ000001", "RJ000002"]);
   });
 
@@ -388,13 +389,15 @@ describe("UnregisteredTab 取得の枠", () => {
       }));
     });
     expect(screen.getByRole("progressbar", { name: "DLsite取得の進捗" })).not.toBeNull();
-    expect(screen.queryByRole("button", { name: "DLsiteから取得" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "その他の操作" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /DLsiteから取得/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /件を追加/ })).toBeNull();
     expect(screen.getByRole("button", { name: "中止" })).not.toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "中止" }));
     expect(job.cancelBulk).toHaveBeenCalled();
   });
 
-  it("単発だけのジョブでは枠は変わらない", async () => {
+  it("単発だけのジョブでは進捗は出ず、選択に取得中の行があるあいだは追加も出ない", async () => {
     const { job } = await renderTab([first]);
     act(() => {
       job.setState((state) => ({
@@ -408,7 +411,9 @@ describe("UnregisteredTab 取得の枠", () => {
       }));
     });
     expect(screen.queryByRole("button", { name: "中止" })).toBeNull();
-    expect(screen.getByRole("button", { name: "DLsiteから取得" })).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "その他の操作" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /DLsiteから取得/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /件を追加/ })).toBeNull();
   });
 
   it("アンマウント後に開き直しても、ストアの進捗がそのまま出る", async () => {
@@ -433,7 +438,12 @@ describe("UnregisteredTab 取得の枠", () => {
         createElement(
           JotaiProvider,
           { store },
-          createElement(UnregisteredTab, { candidates: [first], onRegistered: vi.fn() }),
+          createElement(UnregisteredTab, {
+            candidates: [first],
+            status: "ready",
+            onRetry: () => {},
+            onRegistered: vi.fn(),
+          }),
         ),
       ),
     );
@@ -478,6 +488,7 @@ describe("UnregisteredTab 除外", () => {
     const spy = vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
     await renderTab([problem, candidateB]);
     fireEvent.click(screen.getByRole("button", { name: "問題のある1件だけ表示" }));
+    fireEvent.click(screen.getByLabelText("すべて選択"));
     fireEvent.click(screen.getByRole("button", { name: "除外" }));
     await waitFor(() => expect(spy).toHaveBeenCalledWith([problem.path]));
   });
@@ -490,7 +501,7 @@ describe("UnregisteredTab 除外", () => {
     });
     const { store } = await renderTab([candidateA, candidateB]);
     fireEvent.click(screen.getByLabelText(`「${candidateA.inferredTitle}」を選択`));
-    expect(store.get(scanCandidateDeselectedPathsAtom)).toEqual(new Set([candidateA.path]));
+    expect(store.get(scanCandidateSelectionAtom).get(candidateA.path)?.selected).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "1件を追加" }));
     await waitFor(() => expect(registerSpy).toHaveBeenCalled());
     expect(registerSpy.mock.calls[0]?.[0]).toEqual([candidateB.path]);
@@ -498,7 +509,7 @@ describe("UnregisteredTab 除外", () => {
 });
 
 describe("UnregisteredTab 追加", () => {
-  it("取得中の候補は追加の対象から外れ、DLsite情報なしの件数が出る", async () => {
+  it("選択に取得中の行があるあいだは追加を出さず、選択から外すと追加できる", async () => {
     const fetching = buildScanCandidate({
       path: "d/f",
       inferredTitle: "取得中",
@@ -510,7 +521,7 @@ describe("UnregisteredTab 追加", () => {
       interruptedBy: null,
     });
     const { job } = await renderTab([fetching, candidateB, candidateA]);
-    expect(screen.getByText("うち2件はDLsite情報なし")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "DLsiteから取得 1件" })).not.toBeNull();
     act(() => {
       job.setState((state) => ({
         ...state,
@@ -522,10 +533,63 @@ describe("UnregisteredTab 追加", () => {
         },
       }));
     });
-    expect(screen.getByText("うち1件はDLsite情報なし")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "その他の操作" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /DLsiteから取得/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /件を追加/ })).toBeNull();
+    fireEvent.click(screen.getByLabelText(`「${fetching.inferredTitle}」を選択`));
     fireEvent.click(screen.getByRole("button", { name: "2件を追加" }));
     await waitFor(() => expect(registerSpy).toHaveBeenCalled());
     expect(registerSpy.mock.calls[0]?.[0]).toEqual([candidateB.path, candidateA.path]);
+  });
+
+  it("未取得が選択にあれば主ボタンは取得で、▾の「取得せずに追加」で追加できる", async () => {
+    const unfetched = buildScanCandidate({
+      path: "d/u",
+      inferredTitle: "未取得",
+      rjCode: "RJ000002",
+    });
+    const registerSpy = vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
+      registered: [],
+      failures: [],
+      interruptedBy: new Error("x"),
+    });
+    await renderTab([unfetched, candidateB]);
+    expect(screen.queryByRole("button", { name: /件を追加/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "その他の操作" }));
+    expect(screen.getByRole("menuitem", { name: "項目を選んで追加…" })).toBeEnabled();
+    expect(screen.getByRole("menuitem", { name: "選択を除外" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("menuitem", { name: "取得せずに追加" }));
+    await waitFor(() => expect(registerSpy).toHaveBeenCalled());
+    expect(registerSpy.mock.calls[0]?.[0]).toEqual([unfetched.path, candidateB.path]);
+  });
+
+  it("▾の「選択を除外」は選択中の行を除外する", async () => {
+    const spy = vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
+    await renderTab([candidateA, candidateB]);
+    fireEvent.click(screen.getByLabelText(`「${candidateB.inferredTitle}」を選択`));
+    fireEvent.click(screen.getByRole("button", { name: "その他の操作" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "選択を除外" }));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith([candidateA.path]));
+  });
+
+  it("追加の対象にRJコードがあってDLsite情報のない行が含まれると、その件数を出す", async () => {
+    const failed = buildScanCandidate({
+      path: "d/failed",
+      inferredTitle: "失敗",
+      rjCode: "RJ000404",
+      dlsite: { state: "failed" },
+    });
+    await renderTab([failed, candidateB, candidateA]);
+    expect(screen.queryByText(/DLsite情報なし/)).toBeNull();
+    fireEvent.click(screen.getByLabelText(`「${failed.inferredTitle}」を選択`));
+    expect(screen.getByText("うち1件はDLsite情報なし")).not.toBeNull();
+  });
+
+  it("フッターの左に選択の件数を出す", async () => {
+    await renderTab([candidateA, candidateB]);
+    expect(screen.getByText("件を選択").textContent).toBe("2件を選択");
+    fireEvent.click(screen.getByLabelText(`「${candidateA.inferredTitle}」を選択`));
+    expect(screen.getByText("件を選択").textContent).toBe("1件を選択");
   });
 
   it("RJコードの無い候補だけなら「DLsite情報なし」を出さない", async () => {
@@ -583,9 +647,10 @@ describe("UnregisteredTab 追加", () => {
       ).not.toBeNull(),
     );
     expect(onRegistered).toHaveBeenCalledWith({
-      registeredCount: 1,
+      registeredTitles: [candidateA.inferredTitle],
+      coverSkippedTitles: [],
       failedCount: 0,
-      coverSkippedCount: 0,
+      remainingCount: 1,
       interrupted: true,
     });
   });
@@ -602,9 +667,10 @@ describe("UnregisteredTab 追加", () => {
       expect(screen.getByText(/通信エラー|ライブラリへの追加に失敗/)).not.toBeNull(),
     );
     expect(onRegistered).toHaveBeenCalledWith({
-      registeredCount: 0,
+      registeredTitles: [],
+      coverSkippedTitles: [],
       failedCount: 0,
-      coverSkippedCount: 0,
+      remainingCount: 1,
       interrupted: true,
     });
   });
@@ -619,14 +685,15 @@ describe("UnregisteredTab 追加", () => {
     fireEvent.click(screen.getByRole("button", { name: "1件を追加" }));
     await waitFor(() => expect(screen.getByText("配下に登録済み作品が1件あります")).not.toBeNull());
     expect(onRegistered).toHaveBeenCalledWith({
-      registeredCount: 0,
+      registeredTitles: [],
+      coverSkippedTitles: [],
       failedCount: 1,
-      coverSkippedCount: 0,
+      remainingCount: 1,
       interrupted: false,
     });
   });
 
-  it("カバーを適用できなかった件数をonRegisteredへ渡す", async () => {
+  it("追加した作品名と、カバーを適用できなかった作品名をonRegisteredへ渡す。タイトルを反映するなら取得済みのDLsiteタイトルを使う", async () => {
     vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
       registered: [
         { path: candidateA.path, workId: "w-a", coverSkipped: "not_cached" },
@@ -639,9 +706,10 @@ describe("UnregisteredTab 追加", () => {
     fireEvent.click(screen.getByRole("button", { name: "2件を追加" }));
     await waitFor(() =>
       expect(onRegistered).toHaveBeenCalledWith({
-        registeredCount: 2,
+        registeredTitles: [candidateA.inferredTitle, "検出済みのDLsiteタイトル"],
+        coverSkippedTitles: [candidateA.inferredTitle],
         failedCount: 0,
-        coverSkippedCount: 1,
+        remainingCount: 0,
         interrupted: false,
       }),
     );
@@ -706,9 +774,10 @@ describe("UnregisteredTab 追加", () => {
     });
     await waitFor(() =>
       expect(onRegistered).toHaveBeenCalledWith({
-        registeredCount: 1,
+        registeredTitles: [candidateA.inferredTitle],
+        coverSkippedTitles: [],
         failedCount: 1,
-        coverSkippedCount: 0,
+        remainingCount: 1,
         interrupted: false,
       }),
     );

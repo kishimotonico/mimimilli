@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef } from "react";
 import Button from "../../../../../shared/ui/Button";
 
 interface UnregisteredToolbarProps {
@@ -13,8 +13,6 @@ interface UnregisteredToolbarProps {
   problemCount: number;
   onlyProblems: boolean;
   onToggleOnlyProblems: () => void;
-  /** 右側の取得の枠 */
-  slot: ReactNode;
 }
 
 export default function UnregisteredToolbar({
@@ -28,7 +26,6 @@ export default function UnregisteredToolbar({
   problemCount,
   onlyProblems,
   onToggleOnlyProblems,
-  slot,
 }: UnregisteredToolbarProps) {
   const checkboxRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -36,7 +33,7 @@ export default function UnregisteredToolbar({
   }, [partiallySelected]);
 
   return (
-    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line-soft px-[18px] py-2">
+    <div className="flex shrink-0 items-center gap-3 border-b border-line-soft px-[18px] py-2">
       <div className="flex min-w-0 items-center gap-3">
         <label className="flex items-center gap-2 font-jp text-body text-ink-1">
           <input
@@ -61,7 +58,6 @@ export default function UnregisteredToolbar({
           </button>
         )}
       </div>
-      {slot}
     </div>
   );
 }

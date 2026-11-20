@@ -16,6 +16,8 @@ interface SplitButtonProps {
   onClick: () => void;
   items: SplitButtonItem[];
   disabled?: boolean;
+  /** 主ボタンだけを無効にする。▾のメニューは使える */
+  primaryDisabled?: boolean;
   variant?: ButtonVariant;
   size?: ButtonSize;
   menuLabel?: string;
@@ -30,6 +32,7 @@ export default function SplitButton({
   onClick,
   items,
   disabled = false,
+  primaryDisabled = false,
   variant = "primary",
   size = "sm",
   menuLabel = "その他の操作",
@@ -62,10 +65,10 @@ export default function SplitButton({
     >
       <button
         type="button"
-        disabled={disabled}
+        disabled={disabled || primaryDisabled}
         onClick={onClick}
         className={buttonClass(variant, size, {
-          disabled,
+          disabled: disabled || primaryDisabled,
           className: "flex-1 justify-center rounded-r-none pr-3",
         })}
       >

@@ -1,26 +1,21 @@
-import { DLSITE_FETCH_ESTIMATE_MS_PER_CODE } from "@mimimilli/shared";
+import type { ReactNode } from "react";
 import { formatDlsiteFetchEstimate } from "../../../../../entities/dlsite/model/dlsiteBulkFrame";
 import { useDlsiteBulkFrame } from "../../../../../entities/dlsite/useDlsiteJob";
 import Button from "../../../../../shared/ui/Button";
 
-interface DlsiteFetchSlotProps {
-  targetCount: number;
-  busy: boolean;
-  onStart: () => void;
+interface DlsiteFetchProgressProps {
   onCancel: () => void;
+  /** 進捗がないときに枠の右端（主ボタンの側）へ寄せて出すもの */
+  idleHint?: ReactNode;
 }
 
-/** 高さ・幅固定の枠。取得ボタンと、まとめての取得の進捗を同じ場所で入れ替える。 */
-export default function DlsiteFetchSlot({
-  targetCount,
-  busy,
-  onStart,
-  onCancel,
-}: DlsiteFetchSlotProps) {
+/** フッターの主ボタンの位置に出る、まとめての取得の進捗と中止。幅を常に確保し、出入りで周りがずれない。 */
+export default function DlsiteFetchProgress({ onCancel, idleHint }: DlsiteFetchProgressProps) {
   const frame = useDlsiteBulkFrame();
   return (
-    <div className="flex h-[30px] w-[340px] shrink-0 items-center justify-end gap-3">
-      {frame.kind === "progress" ? (
+    <div className="flex h-[30px] w-[300px] shrink-0 items-center justify-end gap-3">
+      {frame.kind !== "progress" && idleHint}
+      {frame.kind === "progress" && (
         <>
           <div className="flex min-w-0 flex-col items-end gap-1">
             <span className="font-jp text-secondary text-ink-1">
@@ -49,18 +44,6 @@ export default function DlsiteFetchSlot({
           </div>
           <Button variant="danger-quiet" disabled={!frame.cancellable} onClick={onCancel}>
             中止
-          </Button>
-        </>
-      ) : (
-        <>
-          {targetCount > 0 && (
-            <span className="font-jp text-caption text-ink-2">
-              {targetCount}件・
-              {formatDlsiteFetchEstimate(targetCount * DLSITE_FETCH_ESTIMATE_MS_PER_CODE)}
-            </span>
-          )}
-          <Button variant="ghost" disabled={busy || targetCount === 0} onClick={onStart}>
-            DLsiteから取得
           </Button>
         </>
       )}

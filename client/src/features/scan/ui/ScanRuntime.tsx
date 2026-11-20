@@ -13,6 +13,7 @@ import { nextSeen, scanEntrySeenAtom } from "../model/scanEntrySeen";
 import { SCAN_FAILED_FALLBACK_REASON } from "../model/scanStatusView";
 import { scanModalOpenAtom, scanResultsRefreshedAtom } from "../../../entities/scan/model/atoms";
 import { useScanJobState, useScanJobStore } from "../../../entities/scan/useScanJob";
+import { useScanSelectionPruning } from "../model/useScanSelectionPruning";
 import { useToast } from "../../../shared/ui/useToast";
 
 // スキャンジョブ（scanJobStore）の終端・開始イベントとエラー状態を、トースト・キャッシュ更新へつなぐ。
@@ -25,6 +26,7 @@ export default function ScanRuntime() {
   const errorToast = useToast();
   const failureToast = useToast();
   const error = useScanJobState((state) => state.error);
+  useScanSelectionPruning();
 
   useEffect(
     () =>

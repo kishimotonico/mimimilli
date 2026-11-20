@@ -14,21 +14,22 @@ import { excludeScanCandidates, setScanCandidateRjCode, SCAN_QUERY_KEYS } from "
 import { restoreScanCandidateExclusions } from "../../../../../entities/scan/api";
 import { refreshScanCandidates } from "../../../../../entities/scan/scanCandidatesCache";
 import { useRegisterScanCandidatesMutation } from "../../../../../entities/work/model/workMutations";
-import { scanCandidateDeselectedPathsAtom } from "../../../../../entities/scan/model/atoms";
+import { scanCandidateSelectionAtom } from "../../../../../entities/scan/model/atoms";
 import { useDlsiteJobState, useDlsiteJobStore } from "../../../../../entities/dlsite/useDlsiteJob";
 import { candidateDlsiteDisplay } from "../../../model/unregisteredDlsite";
 import {
-  fetchTargetCodes,
+  addTargets,
+  footerPlan,
   isProblemDisplay,
+  isRowSelected,
   missingDlsiteCount,
   problemCount,
-  registerTargets,
+  selectionOverride,
   type CandidateRowModel,
 } from "../../../model/unregisteredSelection";
 import type { ScanListStatus } from "../../../model/scanListStatus";
 import ScanListState from "../ScanListState";
 import type { CandidatesRegisteredResult } from "../types";
-import DlsiteFetchSlot from "./DlsiteFetchSlot";
 import UnregisteredFooter from "./UnregisteredFooter";
 import UnregisteredListHeader from "./UnregisteredListHeader";
 import UnregisteredRow, { type UnregisteredRowHandlers } from "./UnregisteredRow";
@@ -58,7 +59,7 @@ export default function UnregisteredTab({
   const queryClient = useQueryClient();
   const jobStore = useDlsiteJobStore();
   const jobState = useDlsiteJobState((state) => state);
-  const [deselectedPaths, setDeselectedPaths] = useAtom(scanCandidateDeselectedPathsAtom);
+  const [selection, setSelection] = useAtom(scanCandidateSelectionAtom);
   const [fieldErrors, setFieldErrors] = useState<ReadonlyMap<string, RjCodeFieldError>>(
     () => new Map(),
   );
@@ -87,16 +88,16 @@ export default function UnregisteredTab({
     [allRows, filtering],
   );
   const selectedVisible = useMemo(
-    () => visibleRows.filter(({ candidate }) => !deselectedPaths.has(candidate.path)),
-    [visibleRows, deselectedPaths],
+    () => visibleRows.filter((row) => isRowSelected(row, selection)),
+    [visibleRows, selection],
   );
   // 値を確定できていない行は、選択済みでも取得・追加の対象から外す。
   const operableRows = useMemo(
     () => selectedVisible.filter(({ candidate }) => !fieldErrors.has(candidate.path)),
     [selectedVisible, fieldErrors],
   );
-  const fetchCodes = useMemo(() => fetchTargetCodes(operableRows), [operableRows]);
-  const registerRows = useMemo(() => registerTargets(operableRows), [operableRows]);
+  const plan = useMemo(() => footerPlan(operableRows), [operableRows]);
+  const registerRows = useMemo(() => addTargets(operableRows), [operableRows]);
   const missingCount = missingDlsiteCount(registerRows);
 
   const allSelected = visibleRows.length > 0 && selectedVisible.length === visibleRows.length;
@@ -105,6 +106,14 @@ export default function UnregisteredTab({
   const registerMutation = useRegisterScanCandidatesMutation();
   const register = async (apply: DlsiteRegistrationApply) => {
     const paths = registerRows.map(({ candidate }) => candidate.path);
+    const titleOf = ({ candidate, display }: CandidateRowModel) =>
+      apply.title && display.state === "fetched" && display.title
+        ? display.title
+        : candidate.inferredTitle;
+    const titleByPath = new Map(registerRows.map((row) => [row.candidate.path, titleOf(row)]));
+    const titlesOf = (entries: readonly { path: ScanCandidate["path"] }[]) =>
+      entries.map((entry) => titleByPath.get(entry.path) ?? entry.path);
+    const remainingBefore = candidates.length;
     const outcome = await registerMutation.mutateAsync({ paths, apply });
     const { interruptedBy } = outcome;
     if (interruptedBy) {
@@ -122,9 +131,12 @@ export default function UnregisteredTab({
     }
     if (isCandidatesStale(interruptedBy)) await refreshScanCandidates(queryClient).catch(() => {});
     onRegistered({
-      registeredCount: outcome.registered.length,
+      registeredTitles: titlesOf(outcome.registered),
+      coverSkippedTitles: titlesOf(
+        outcome.registered.filter((entry) => entry.coverSkipped !== null),
+      ),
       failedCount: outcome.failures.length,
-      coverSkippedCount: outcome.registered.filter((entry) => entry.coverSkipped !== null).length,
+      remainingCount: remainingBefore - outcome.registered.length,
       interrupted: interruptedBy !== null,
     });
   };
@@ -237,15 +249,18 @@ export default function UnregisteredTab({
     clearFieldError(path);
     setEditingPath(null);
   }, []);
+  const allRowsRef = useRef(allRows);
+  useEffect(() => {
+    allRowsRef.current = allRows;
+  }, [allRows]);
   const toggleRow = useCallback(
     (path: string) =>
-      setDeselectedPaths((previous) => {
-        const next = new Set(previous);
-        if (next.has(path)) next.delete(path);
-        else next.add(path);
-        return next;
+      setSelection((previous) => {
+        const row = allRowsRef.current.find(({ candidate }) => candidate.path === path);
+        if (!row) return previous;
+        return new Map(previous).set(path, selectionOverride(row, !isRowSelected(row, previous)));
       }),
-    [setDeselectedPaths],
+    [setSelection],
   );
 
   const startSingle = useCallback(
@@ -268,19 +283,21 @@ export default function UnregisteredTab({
   );
 
   const toggleAll = () =>
-    setDeselectedPaths((previous) => {
-      const next = new Set(previous);
-      for (const { candidate } of visibleRows) {
-        if (allSelected) next.add(candidate.path);
-        else next.delete(candidate.path);
-      }
+    setSelection((previous) => {
+      const next = new Map(previous);
+      for (const row of visibleRows)
+        next.set(row.candidate.path, selectionOverride(row, !allSelected));
       return next;
     });
 
   const startBulk = async () => {
-    const result = await jobStore.startBulk(fetchCodes);
+    if (plan.kind !== "fetch") return;
+    const result = await jobStore.startBulk(plan.codes);
     setErrorMessage(result.ok ? null : result.error);
   };
+
+  const excludeSelected = () =>
+    excludeMutation.mutate(selectedVisible.map(({ candidate }) => candidate.path));
 
   const { virtualItems, wrapperStyle, getItemStyle } = useVirtualList({
     count: visibleRows.length,
@@ -299,20 +316,10 @@ export default function UnregisteredTab({
         onToggleAll={toggleAll}
         excludeCount={selectedVisible.length}
         busy={busy}
-        onExclude={() =>
-          excludeMutation.mutate(selectedVisible.map(({ candidate }) => candidate.path))
-        }
+        onExclude={excludeSelected}
         problemCount={problems}
         onlyProblems={filtering}
         onToggleOnlyProblems={() => setOnlyProblems((value) => !value)}
-        slot={
-          <DlsiteFetchSlot
-            targetCount={fetchCodes.length}
-            busy={busy}
-            onStart={() => void startBulk()}
-            onCancel={() => void jobStore.cancelBulk()}
-          />
-        }
       />
       <ScanListState status={status} emptyMessage="未登録の候補はありません" onRetry={onRetry}>
         <section aria-label="未登録の候補" className="flex min-h-0 flex-1 flex-col">
@@ -342,7 +349,7 @@ export default function UnregisteredTab({
                       <UnregisteredRow
                         candidate={candidate}
                         display={display}
-                        selected={!deselectedPaths.has(candidate.path)}
+                        selected={isRowSelected(row, selection)}
                         editing={editingPath === candidate.path}
                         error={fieldErrors.get(candidate.path)}
                         busy={busy}
@@ -364,10 +371,15 @@ export default function UnregisteredTab({
           </p>
         )}
         <UnregisteredFooter
-          registerCount={registerRows.length}
+          plan={plan}
+          selectedCount={selectedVisible.length}
+          addCount={registerRows.length}
           missingDlsiteCount={missingCount}
           busy={busy}
+          onFetch={() => void startBulk()}
+          onCancelFetch={() => void jobStore.cancelBulk()}
           onRegister={(apply) => void register(apply)}
+          onExclude={excludeSelected}
         />
       </ScanListState>
     </div>

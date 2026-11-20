@@ -193,6 +193,7 @@ const candidateDetected: ScanCandidate = buildScanCandidate({
   audioFileCount: 2,
   audioBreakdown: [{ extension: "mp3", count: 2 }],
   rjCode: "RJ100001",
+  dlsite: { state: "fetched", title: "検出済みDLsiteタイトル", cover: null },
 });
 const candidateUndetected: ScanCandidate = buildScanCandidate({
   path: "dlsite/未検出作品",
@@ -1035,10 +1036,31 @@ describe("ScanModal", () => {
     await waitFor(() =>
       expect(screen.getByRole("tabpanel", { name: /^新規作品/ })).toBeInTheDocument(),
     );
+    expect(screen.getByText("「検出済みDLsiteタイトル」を追加しました。")).toBeInTheDocument();
     expect(screen.queryByText(/追加できず|止まりました/)).toBeNull();
   });
 
-  it("全件追加に成功してもカバーを適用できなかった作品があれば、新規作品へ移りつつ件数つきの警告トーストを出す", async () => {
+  it("追加のあと未登録に候補が残るときは、新規作品へ移らず未登録にとどまる", async () => {
+    registerReply = buildScanCandidatesRegisterResponse({
+      registered: [{ path: candidateDetected.path, workId: "w-detected", coverSkipped: null }],
+    });
+    renderModal({ candidates: [candidateDetected, candidateUndetected] });
+    await showUnregisteredList();
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    fireEvent.click(
+      within(unregistered).getByRole("checkbox", {
+        name: `「${candidateUndetected.inferredTitle}」を選択`,
+      }),
+    );
+    fireEvent.click(within(unregistered).getByRole("button", { name: "1件を追加" }));
+    await waitFor(() =>
+      expect(screen.getByText("「検出済みDLsiteタイトル」を追加しました。")).toBeInTheDocument(),
+    );
+    expect(screen.getByRole("tabpanel", { name: /^未登録/ })).toBeInTheDocument();
+    expect(screen.queryByRole("tabpanel", { name: /^新規作品/ })).toBeNull();
+  });
+
+  it("全件追加に成功してもカバーを適用できなかった作品があれば、新規作品へ移りつつ作品名つきの警告トーストを出す", async () => {
     registerReply = buildScanCandidatesRegisterResponse({
       registered: [
         { path: candidateDetected.path, workId: "w-detected", coverSkipped: "not_cached" },
@@ -1051,13 +1073,15 @@ describe("ScanModal", () => {
     fireEvent.click(within(unregistered).getByRole("button", { name: "2件を追加" }));
     await waitFor(() =>
       expect(
-        screen.getByText("2件を追加しました。うち1件はカバーを適用できませんでした。"),
+        screen.getByText(
+          "「検出済みDLsiteタイトル」他1件を追加しました。「検出済みDLsiteタイトル」はカバーを適用できませんでした。",
+        ),
       ).toBeInTheDocument(),
     );
     expect(screen.getByRole("tabpanel", { name: /^新規作品/ })).toBeInTheDocument();
   });
 
-  it("一部失敗の通知には、カバーを適用できなかった件数を添える", async () => {
+  it("一部失敗の通知には、カバーを適用できなかった作品名を添える", async () => {
     registerReply = buildScanCandidatesRegisterResponse({
       registered: [
         { path: candidateDetected.path, workId: "w-detected", coverSkipped: "unreadable" },
@@ -1071,7 +1095,7 @@ describe("ScanModal", () => {
     await waitFor(() =>
       expect(
         screen.getByText(
-          "1件を追加しました。1件は追加できず、未登録タブに残っています。うち1件はカバーを適用できませんでした。",
+          "「検出済みDLsiteタイトル」を追加しました。1件は追加できず、未登録タブに残っています。「検出済みDLsiteタイトル」はカバーを適用できませんでした。",
         ),
       ).toBeInTheDocument(),
     );
@@ -1094,7 +1118,7 @@ describe("ScanModal", () => {
     expect(screen.queryByRole("tabpanel", { name: /^新規作品/ })).toBeNull();
   });
 
-  it("途中で止まったときは追加できた件数つきの警告トーストを出して未登録タブにとどまる", async () => {
+  it("途中で止まったときは追加できた作品名つきの警告トーストを出して未登録タブにとどまる", async () => {
     const registerSpy = vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
       registered: [{ path: candidateDetected.path, workId: "w-detected", coverSkipped: null }],
       failures: [],
@@ -1106,7 +1130,9 @@ describe("ScanModal", () => {
     const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
     fireEvent.click(within(unregistered).getByRole("button", { name: "2件を追加" }));
     await waitFor(() =>
-      expect(screen.getByText("1件を追加して止まりました。")).toBeInTheDocument(),
+      expect(
+        screen.getByText("「検出済みDLsiteタイトル」を追加して止まりました。"),
+      ).toBeInTheDocument(),
     );
     expect(screen.getByRole("tabpanel", { name: /^未登録/ })).toBeInTheDocument();
     expect(screen.queryByRole("tabpanel", { name: /^新規作品/ })).toBeNull();
@@ -1150,7 +1176,9 @@ describe("ScanModal", () => {
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["works"] }));
     await waitFor(() =>
       expect(
-        screen.getByText("1件を追加しました。1件は追加できず、未登録タブに残っています。"),
+        screen.getByText(
+          "「検出済みDLsiteタイトル」を追加しました。1件は追加できず、未登録タブに残っています。",
+        ),
       ).toBeInTheDocument(),
     );
     expect(screen.getByRole("tabpanel", { name: /^未登録/ })).toBeInTheDocument();
@@ -1225,7 +1253,11 @@ describe("ScanModal", () => {
         name: `「${candidateDetected.inferredTitle}」を選択`,
       }),
     );
-    fireEvent.click(within(unregistered).getByRole("button", { name: "1件を追加" }));
+    expect(
+      within(unregistered).getByRole("button", { name: "DLsiteから取得 1件" }),
+    ).toBeInTheDocument();
+    fireEvent.click(within(unregistered).getByRole("button", { name: "その他の操作" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "取得せずに追加" }));
 
     await waitFor(() =>
       expect(api.requestsTo("POST /api/scan/candidates/register")).toHaveLength(1),
