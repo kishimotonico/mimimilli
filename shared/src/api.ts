@@ -84,7 +84,6 @@ export const worksPageSchema = z.object({
   total: z.number().int().nonnegative(),
   stats: collectionStatsSchema,
   seed: z.number().int().min(0).max(0x7fffffff).optional(),
-  dataIntegrityWarning: dataIntegrityWarningSchema.optional(),
 });
 export type WorksPage = z.infer<typeof worksPageSchema>;
 

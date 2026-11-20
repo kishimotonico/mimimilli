@@ -142,13 +142,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
 
   return {
     async queryWorks(params: WorksQuery): Promise<WorksPage> {
-      const page = toWorksPage(
-        applyWorksQuery(composeWorks(state), params),
-        requireFixtureRoot(state),
-      );
-      return state.dataIntegrityWarning
-        ? { ...page, dataIntegrityWarning: state.dataIntegrityWarning }
-        : page;
+      return toWorksPage(applyWorksQuery(composeWorks(state), params), requireFixtureRoot(state));
     },
 
     getWorkRegisterPreview,

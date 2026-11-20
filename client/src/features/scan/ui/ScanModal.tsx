@@ -7,10 +7,7 @@ import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
 import { useToast } from "../../../shared/ui/useToast";
 import { useScanJobStore, useScanning } from "../../../entities/scan/useScanJob";
-import {
-  scanDiagnosticsQueryOptions,
-  scanRecordQueryOptions,
-} from "../../../entities/scan/queryOptions";
+import { scanDiagnosticsQueryOptions } from "../../../entities/scan/queryOptions";
 import { useScanCandidatesCache } from "../model/useScanCandidatesCache";
 import ScanSidebar from "./scanModal/ScanSidebar";
 import UnregisteredTab from "./scanModal/unregistered/UnregisteredTab";
@@ -70,9 +67,6 @@ export default function ScanModal({
     setActiveTab("newWorks");
   };
 
-  // 直近のスキャンの記録（サーバーのメモリ。次のスキャンかサーバー再起動まで）。
-  const scanRecordQuery = useQuery(scanRecordQueryOptions);
-
   const candidates = useScanCandidatesCache();
 
   // 診断はFilesでの解決や登録解除を随時反映する必要があるため、スキャン時点のスナップショットではなく
@@ -81,10 +75,7 @@ export default function ScanModal({
 
   const statusView = useScanStatusView(lastScanTime);
 
-  const needsAttentionRows = buildNeedsAttentionRows({
-    diagnostics: diagnosticsQuery.data,
-    record: scanRecordQuery.data,
-  });
+  const needsAttentionRows = buildNeedsAttentionRows(diagnosticsQuery.data);
 
   const counts: Partial<Record<ScanTabKey, number>> = {
     unregistered: candidates.length,
@@ -125,12 +116,9 @@ export default function ScanModal({
           {activeTab === "needsAttention" && (
             <NeedsAttentionTab
               rows={needsAttentionRows}
-              loading={diagnosticsQuery.isPending || scanRecordQuery.isPending}
-              error={diagnosticsQuery.isError || scanRecordQuery.isError}
-              onRetry={() => {
-                if (diagnosticsQuery.isError) void diagnosticsQuery.refetch();
-                if (scanRecordQuery.isError) void scanRecordQuery.refetch();
-              }}
+              loading={diagnosticsQuery.isPending}
+              error={diagnosticsQuery.isError}
+              onRetry={() => void diagnosticsQuery.refetch()}
               onOpenFiles={onOpenFiles}
               onOpenWorkDetail={onOpenWorkDetail}
             />

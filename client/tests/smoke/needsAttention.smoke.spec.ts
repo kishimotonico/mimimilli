@@ -27,6 +27,7 @@ test("要対応の5種類が直すもの→行方不明の順に並び、件数�
     "アクセス不可",
     "データ不整合",
     "行方不明",
+    "行方不明",
   ]);
   await expect(panel.getByText("mimimilli.json 4行目: カンマが足りない")).toBeVisible();
   await expect(panel.getByText(/RJコード|DLsite/)).toHaveCount(0);
@@ -41,12 +42,13 @@ test("読み直すと行が消え、登録を解除は確認のあとで行が�
   await panel.getByRole("button", { name: "この作品を読み直す" }).click();
   await expect(panel.getByText("データ不整合", { exact: true })).toBeHidden();
 
-  await panel.getByRole("button", { name: "登録を解除" }).click();
+  await expect(panel.getByText("行方不明", { exact: true })).toHaveCount(2);
+  await panel.getByRole("button", { name: "登録を解除" }).first().click();
   await page
     .getByRole("alertdialog", { name: "登録を解除" })
     .getByRole("button", { name: "解除する" })
     .click();
-  await expect(panel.getByText("行方不明", { exact: true })).toBeHidden();
+  await expect(panel.getByText("行方不明", { exact: true })).toHaveCount(1);
 
   assertNoErrors(tracker);
 });

@@ -44,7 +44,7 @@ function setup() {
 describe("rootReconfigurationController", () => {
   beforeEach(() => {
     api = mockApi({
-      [CANDIDATES_ROUTE]: { candidates: [] },
+      [CANDIDATES_ROUTE]: { scanCompleted: true, candidates: [] },
     });
   });
 

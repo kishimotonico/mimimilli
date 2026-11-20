@@ -36,7 +36,7 @@ for (const [kind, build] of Object.entries(builders)) {
     try {
       const res = await app.request("/api/scan/candidates");
       assert.equal(res.status, 200);
-      assert.deepEqual(await res.json(), { candidates: [] });
+      assert.deepEqual(await res.json(), { scanCompleted: false, candidates: [] });
     } finally {
       await app.shutdown();
     }

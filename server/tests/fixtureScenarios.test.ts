@@ -38,31 +38,37 @@ test("シナリオ省略時は default として動作する", async () => {
   assert.ok(body.items.length > 0);
 });
 
-test("new-work: スキャン結果に新規作品・新たな行方不明・読み取れなかったパスが含まれる", async () => {
+test("new-work: スキャン結果に新規作品・読み取れなかったパスが含まれ、行方不明は診断に出る", async () => {
   const adapter = createFixtureAdapter({ scenario: "new-work" });
 
   const first = await runScan(adapter);
   assert.equal(first.startedWithEmptyCatalog, false);
   assert.deepEqual(first.insertedWorkIds, ["RJ501011", "RJ501001", "RJ501003"]);
+  const diagnostics = await adapter.listScanDiagnostics();
   assert.deepEqual(
-    first.missingWorks.map((work) => work.workId),
-    ["RJ501008"],
+    diagnostics.missingWorks.map((work) => work.workId),
+    ["RJ501008", "RJ501010"],
   );
-  assert.equal(first.missingWorks[0]?.title, "ツンデレ後輩との放課後トレーニング【ボイスドラマ】");
   assert.equal(
-    first.missingWorks[0]?.previousPath,
+    diagnostics.missingWorks[0]?.title,
+    "ツンデレ後輩との放課後トレーニング【ボイスドラマ】",
+  );
+  assert.equal(
+    diagnostics.missingWorks[0]?.previousPath,
     "dlsite/月白製作所/RJ501008_ツンデレ後輩との放課後トレーニング",
   );
   assert.deepEqual(first.unreadablePaths, ["権限なし/フォルダー"]);
   assert.equal((await adapter.getWork("RJ501008"))?.status, "missing");
 
-  // シナリオの結果は最初のスキャンだけ。2回目以降は今回の変化（なければ空）を返す
+  // 今回の変化は最初のスキャンだけ。行方不明とアクセス不可は直るまで残る
   const second = await runScan(adapter);
-  assert.deepEqual(second.missingWorks, []);
   assert.deepEqual(second.insertedWorkIds, []);
   assert.deepEqual(second.updatedWorks, []);
-  assert.deepEqual(second.unreadablePaths, []);
-  assert.equal(second.dataIntegrityWarning, undefined);
+  assert.deepEqual(second.unreadablePaths, ["権限なし/フォルダー"]);
+  assert.deepEqual(
+    (await adapter.listScanDiagnostics()).missingWorks.map((work) => work.workId),
+    ["RJ501008", "RJ501010"],
+  );
 
   // 新規作品自体は works 一覧に存在する（スキャンで見つかった扱い）
   assert.ok(await adapter.getWork("RJ501011"));
@@ -197,61 +203,36 @@ test("identity-conflict: 単一ファイル形式の重複メタファイルと�
   assert.deepEqual(diagnostics.identityConflicts, [
     {
       kind: "identity_conflict",
+      registeredTitle: "FANZA単一ファイル作品（ID重複）",
       workId: "d00002",
       paths: ["fanza/d00002.mimimilli.json", "copies/d00002.mimimilli.json"],
     },
   ]);
 });
 
-test("errors: dataIntegrityWarningがWorksPage・スキャン結果・エクスポート・スマートフォルダー・DLsite一括のいずれからも取得できる", async () => {
-  // real adapterの意味論（DB破損行があればクエリのたびに毎回付く劣化状態の表示）に
-  // 合わせ、劣化状態を確認するためのシナリオ errors に置く。new-work・default等の
-  // 既定シナリオへ置くとsmoke・worktree確認の土台が常時バナー込みになってしまうため避ける
+test("errors: データ不整合は診断・エクスポートから取得できる", async () => {
+  // 劣化状態を確認するためのシナリオ errors に置く。new-work・default等の既定シナリオへ置くと
+  // smoke・worktree確認の土台が常時バナー込みになってしまうため避ける
   const adapter = createFixtureAdapter({ scenario: "errors" });
 
-  const worksPage = await adapter.queryWorks({
-    q: "",
-    tags: { tags: [], yearValue: null },
-    tagOp: "AND",
-    sort: "id-asc",
-  });
-  assert.deepEqual(worksPage.dataIntegrityWarning, {
+  const diagnostics = await adapter.listScanDiagnostics();
+  assert.deepEqual(diagnostics.dataIntegrityWorkIds, ["RJ501099"]);
+
+  const exported = await adapter.exportLibrary();
+  assert.deepEqual(exported.dataIntegrityWarning, {
     skippedCount: 1,
     skippedWorkIds: ["RJ501099"],
   });
-
-  const scanResult = await runScan(adapter);
-  assert.deepEqual(scanResult.dataIntegrityWarning, worksPage.dataIntegrityWarning);
-
-  const exported = await adapter.exportLibrary();
-  assert.deepEqual(exported.dataIntegrityWarning, worksPage.dataIntegrityWarning);
-
-  // errorsシナリオはスマートフォルダーを持たないため、evalSmartFolderへの伝播確認用に
-  // その場で1件作る
-  const smartFolder = await adapter.createSmartFolder({
-    name: "全件",
-    rules: [],
-    sort: "added-desc",
-  });
-  const smartFolderWorks = await adapter.evalSmartFolder(smartFolder.id, {
-    tags: { tags: [], yearValue: null },
-    tagOp: "AND",
-    page: 1,
-    limit: 50,
-  });
-  assert.deepEqual(smartFolderWorks?.dataIntegrityWarning, worksPage.dataIntegrityWarning);
 });
 
-test("new-work・default: dataIntegrityWarningは付かない", async () => {
+test("new-work・default: データ不整合は無い", async () => {
   for (const scenario of [undefined, "new-work"] as const) {
     const adapter = createFixtureAdapter({ scenario });
-    const worksPage = await adapter.queryWorks({
-      q: "",
-      tags: { tags: [], yearValue: null },
-      tagOp: "AND",
-      sort: "id-asc",
-    });
-    assert.equal(worksPage.dataIntegrityWarning, undefined, `scenario=${scenario ?? "default"}`);
+    assert.deepEqual(
+      (await adapter.listScanDiagnostics()).dataIntegrityWorkIds,
+      [],
+      `scenario=${scenario ?? "default"}`,
+    );
   }
 });
 
@@ -584,14 +565,15 @@ test("needs-attention: スキャン後に要対応の5種類が揃い、読み�
   const adapter = createFixtureAdapter({ scenario: "needs-attention" });
 
   const result = await runScan(adapter);
-  assert.deepEqual(
-    result.missingWorks.map((work) => work.workId),
-    ["RJ501008"],
-  );
   assert.deepEqual(result.unreadablePaths, [workspacePath("権限なし/フォルダー")]);
-  assert.deepEqual(result.dataIntegrityWarning?.skippedWorkIds, ["RJ501099"]);
 
   const diagnostics = await adapter.listScanDiagnostics();
+  assert.deepEqual(
+    diagnostics.missingWorks.map((work) => work.workId),
+    ["RJ501008", "RJ501010"],
+  );
+  assert.deepEqual(diagnostics.unreadablePaths, ["権限なし/フォルダー"]);
+  assert.deepEqual(diagnostics.dataIntegrityWorkIds, ["RJ501099"]);
   assert.equal(diagnostics.identityConflicts.length, 1);
   assert.deepEqual(
     diagnostics.invalidMetaFiles.map((file) => file.message),
@@ -599,5 +581,5 @@ test("needs-attention: スキャン後に要対応の5種類が揃い、読み�
   );
 
   assert.equal(await adapter.reloadWork("RJ501099"), true);
-  assert.equal((await runScan(adapter)).dataIntegrityWarning, undefined);
+  assert.deepEqual((await adapter.listScanDiagnostics()).dataIntegrityWorkIds, []);
 });

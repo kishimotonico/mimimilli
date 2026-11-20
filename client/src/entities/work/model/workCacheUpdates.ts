@@ -55,6 +55,7 @@ async function updateCachesAfterSourceMutation(
   await Promise.all([
     invalidateWorkDetail(queryClient, result.snapshot.id),
     invalidateLibraryViews(queryClient),
+    queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.diagnostics() }),
   ]);
 }
 
@@ -185,6 +186,7 @@ export async function updateCachesAfterDlsiteFetch(
       },
     }),
     invalidateLibraryViews(queryClient),
+    queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.diagnostics() }),
   ]);
 }
 

@@ -10,6 +10,7 @@ import type {
   StoredSettings,
 } from "../../adapter/index.ts";
 import { z } from "zod";
+import type { ScanDiagnostics } from "@mimimilli/shared";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import { type DbLocation } from "./db.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
@@ -38,7 +39,12 @@ export function createSettingsScanMethods(deps: {
   database: DbLocation;
   query: Pick<
     WorkQueryRepository,
-    "listSummaries" | "listMissingWorksWithRjCode" | "listWorkPhysicalPaths"
+    | "listSummaries"
+    | "listMissingWorksWithRjCode"
+    | "listWorkPhysicalPaths"
+    | "listDataIntegritySkips"
+    | "listMissingWorks"
+    | "getWorkTitles"
   >;
   catalog: Pick<
     CatalogWorkRepository,
@@ -46,6 +52,7 @@ export function createSettingsScanMethods(deps: {
     | "setScanState"
     | "listIdentityConflicts"
     | "listInvalidMetaFiles"
+    | "listUnreadablePaths"
     | "clearDiagnostics"
     | "deleteWorksOutsideRoot"
   >;
@@ -225,10 +232,19 @@ export function createSettingsScanMethods(deps: {
       return scanRoot(requireRoot(), scanOptions ?? {});
     },
 
-    async listScanDiagnostics() {
+    async listScanDiagnostics(): Promise<ScanDiagnostics> {
+      const root = requireRoot();
+      const conflicts = catalog.listIdentityConflicts();
+      const titles = query.getWorkTitles(conflicts.map((conflict) => conflict.workId));
       return {
-        identityConflicts: catalog.listIdentityConflicts(),
+        identityConflicts: conflicts.map((conflict) => ({
+          ...conflict,
+          registeredTitle: titles.get(conflict.workId) ?? null,
+        })),
         invalidMetaFiles: catalog.listInvalidMetaFiles(),
+        unreadablePaths: catalog.listUnreadablePaths(),
+        dataIntegrityWorkIds: query.listDataIntegritySkips().map((skip) => skip.workId),
+        missingWorks: query.listMissingWorks(root),
       };
     },
     ...candidateMaterials,

@@ -102,15 +102,20 @@ export class ScanSession {
     });
   }
 
-  async listCandidates(): Promise<ScanCandidateBody[]> {
-    if (this.pool.size === 0) return [];
+  /** scanCompleted が false のとき候補は空で、スキャンが完了して候補が0件のときとは別の状態 */
+  async listCandidates(): Promise<{ scanCompleted: boolean; candidates: ScanCandidateBody[] }> {
+    const scanCompleted = this.record.hasFinishedScan();
+    if (this.pool.size === 0) return { scanCompleted, candidates: [] };
     const [isCandidate, describe] = await Promise.all([
       this.adapter.candidateAvailability(),
       this.adapter.describeCandidates(),
     ]);
-    return [...this.pool.values()]
-      .filter(isCandidate)
-      .map((folder) => this.toCandidate(folder, describe));
+    return {
+      scanCompleted,
+      candidates: [...this.pool.values()]
+        .filter(isCandidate)
+        .map((folder) => this.toCandidate(folder, describe)),
+    };
   }
 
   private toCandidate(

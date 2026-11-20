@@ -227,7 +227,7 @@ describe("scan api", () => {
   });
 
   it("getScanRecord: 未スキャンの空の記録を返す", async () => {
-    const empty = { finishedAt: null, updatedWorks: [], missingWorks: [], unreadablePaths: [] };
+    const empty = { finishedAt: null, updatedWorks: [] };
     mockFetch.mockResolvedValue(makeResponse(empty));
     await expect(scanEntityApi.getScanRecord()).resolves.toEqual(empty);
     expect(mockFetch).toHaveBeenCalledWith("/api/scan/last");

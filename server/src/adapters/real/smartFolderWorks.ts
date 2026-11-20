@@ -11,7 +11,7 @@ import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { toWorksPage } from "../../core/worksQuery.ts";
 import type { SmartFolderEvalQuery } from "@mimimilli/shared";
 import { getCategoryLogger } from "../../lib/logger.ts";
-import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
+import { logDataIntegritySkips } from "./dataIntegrity.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 
 const smartFolderLogger = getCategoryLogger("http");
@@ -38,10 +38,8 @@ export function querySmartFolderWorks(
   }
   const { summaries, skipped } = query.listSmartFolderCandidateSummaries(folder.rules);
   logDataIntegritySkips(smartFolderLogger, "smart-folder-works", skipped);
-  const dataIntegrityWarning = toDataIntegrityWarning(skipped);
   const page = evalSmartFolder(folder, summaries, evalQuery);
-  const worksPage = toWorksPage(page, root);
-  return dataIntegrityWarning ? { ...worksPage, dataIntegrityWarning } : worksPage;
+  return toWorksPage(page, root);
 }
 
 /** 未保存のドラフトルールをチップ絞り込みなしで評価し、一致件数だけ返す（POST /smart-folders/preview） */

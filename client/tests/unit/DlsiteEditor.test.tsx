@@ -77,7 +77,7 @@ describe("DlsiteEditor", () => {
       "POST /api/dlsite/:id/apply": (request) => applyDlsiteInfo(request),
       "PATCH /api/dlsite/:id": (request) => updateDlsiteState(request),
       "GET /api/settings": buildSettings(),
-      "GET /api/scan/candidates": { candidates: [] },
+      "GET /api/scan/candidates": { scanCompleted: true, candidates: [] },
     });
     HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
       this.open = true;

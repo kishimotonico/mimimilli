@@ -1,9 +1,4 @@
-import type { MissingWork, ScanDiagnostics, ScanRecord, WorkspacePath } from "@mimimilli/shared";
-
-export interface NeedsAttentionSource {
-  diagnostics: ScanDiagnostics | undefined;
-  record: ScanRecord | undefined;
-}
+import type { MissingWork, ScanDiagnostics, WorkspacePath } from "@mimimilli/shared";
 
 export type NeedsAttentionRow =
   | { kind: "identityConflict"; key: string; workId: string; paths: WorkspacePath[] }
@@ -19,10 +14,9 @@ function sortedBy<T>(items: readonly T[], keyOf: (item: T) => string): T[] {
 }
 
 /** 表示順は ID重複 → 読み取り失敗 → アクセス不可 → データ不整合 → 行方不明。種類の中は名前順 */
-export function buildNeedsAttentionRows({
-  diagnostics,
-  record,
-}: NeedsAttentionSource): NeedsAttentionRow[] {
+export function buildNeedsAttentionRows(
+  diagnostics: ScanDiagnostics | undefined,
+): NeedsAttentionRow[] {
   return [
     ...sortedBy(diagnostics?.identityConflicts ?? [], (c) => c.paths[0] ?? c.workId).map(
       (conflict): NeedsAttentionRow => ({
@@ -40,17 +34,17 @@ export function buildNeedsAttentionRows({
         message: file.message,
       }),
     ),
-    ...sortedBy(record?.unreadablePaths ?? [], (path) => path).map(
+    ...sortedBy(diagnostics?.unreadablePaths ?? [], (path) => path).map(
       (path): NeedsAttentionRow => ({ kind: "unreadablePath", key: `unreadable:${path}`, path }),
     ),
-    ...sortedBy(record?.dataIntegrityWarning?.skippedWorkIds ?? [], (id) => id).map(
+    ...sortedBy(diagnostics?.dataIntegrityWorkIds ?? [], (id) => id).map(
       (workId): NeedsAttentionRow => ({
         kind: "dataIntegrity",
         key: `integrity:${workId}`,
         workId,
       }),
     ),
-    ...sortedBy(record?.missingWorks ?? [], (work) => work.title).map(
+    ...sortedBy(diagnostics?.missingWorks ?? [], (work) => work.title).map(
       (work): NeedsAttentionRow => ({
         ...work,
         kind: "missingWork",

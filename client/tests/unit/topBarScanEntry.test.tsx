@@ -18,6 +18,7 @@ import {
   buildScanJobSnapshot,
   buildScanRecord,
 } from "../helpers/builders";
+import { workspacePath } from "@mimimilli/shared";
 import { seedAppMode } from "../helpers/route";
 
 const SEEN_KEY = "mimimilli:scanEntrySeen";
@@ -25,11 +26,13 @@ const UNREADABLE_KEY = "unreadable:壊れたフォルダー";
 
 const candidate = buildScanCandidate({ path: "未登録作品", inferredTitle: "未登録作品" });
 const otherCandidate = buildScanCandidate({ path: "別の作品", inferredTitle: "別の作品" });
-const unreadableRecord = buildScanRecord({ unreadablePaths: ["壊れたフォルダー"] });
+const unreadableDiagnostics = buildScanDiagnostics({
+  unreadablePaths: [workspacePath("壊れたフォルダー")],
+});
 
 interface Seed {
   candidates?: ReturnType<typeof buildScanCandidate>[];
-  record?: ReturnType<typeof buildScanRecord>;
+  diagnostics?: ReturnType<typeof buildScanDiagnostics>;
   scanJob?: ReturnType<typeof createFakeScanJobStore>;
   dlsiteJob?: ReturnType<typeof createFakeDlsiteJobStore>;
   seen?: { candidates: string[]; needsAttention: string[]; changes: string[] };
@@ -46,13 +49,13 @@ function renderTopBar(seed: Seed = {}) {
     workId: `w${i}`,
     changes: [{ kind: "meta" as const }],
   }));
-  queryClient.setQueryData(
-    SCAN_QUERY_KEYS.last(),
-    seed.record ?? buildScanRecord({ updatedWorks }),
-  );
+  queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord({ updatedWorks }));
   queryClient.setQueryData(WORK_QUERY_KEYS.scanNewCount(), seed.changes?.newCount ?? 0);
   if (!seed.diagnosticsPending) {
-    queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
+    queryClient.setQueryData(
+      SCAN_QUERY_KEYS.diagnostics(),
+      seed.diagnostics ?? buildScanDiagnostics(),
+    );
   }
   if (seed.seen) localStorage.setItem(SEEN_KEY, JSON.stringify(seed.seen));
 
@@ -104,7 +107,7 @@ describe("TopBar のスキャン入口", () => {
     localStorage.clear();
     api = mockApi(
       appShellRoutes({
-        "GET /api/scan/candidates": { candidates: [candidate] },
+        "GET /api/scan/candidates": { scanCompleted: true, candidates: [candidate] },
         "GET /api/scan/diagnostics": () => new Promise(() => {}),
       }),
     );
@@ -283,7 +286,7 @@ describe("TopBar のスキャン入口", () => {
     it("要対応の新しい項目でも点を出す", () => {
       renderTopBar({
         candidates: [],
-        record: unreadableRecord,
+        diagnostics: unreadableDiagnostics,
         seen: { candidates: [], needsAttention: [], changes: [] },
       });
 
@@ -293,7 +296,7 @@ describe("TopBar のスキャン入口", () => {
     it("見た要対応の項目には点を出さない", () => {
       renderTopBar({
         candidates: [],
-        record: unreadableRecord,
+        diagnostics: unreadableDiagnostics,
         seen: { candidates: [], needsAttention: [UNREADABLE_KEY], changes: [] },
       });
 
@@ -334,7 +337,7 @@ describe("TopBar のスキャン入口", () => {
     it("読み込み中の集合で記憶を上書きしない", async () => {
       const { store, queryClient } = renderTopBar({
         candidates: [candidate],
-        record: unreadableRecord,
+        diagnostics: unreadableDiagnostics,
         diagnosticsPending: true,
         seen: { candidates: [], needsAttention: [UNREADABLE_KEY], changes: [] },
       });

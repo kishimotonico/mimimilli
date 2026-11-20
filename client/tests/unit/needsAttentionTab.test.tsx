@@ -12,11 +12,12 @@ import GlobalToast from "../../src/app/ui/GlobalToast";
 import { apiError, apiNoContent, mockApi } from "../helpers/api";
 import { buildScanDiagnostics, buildScanRecord } from "../helpers/builders";
 
-const rows = buildNeedsAttentionRows({
-  diagnostics: buildScanDiagnostics({
+const rows = buildNeedsAttentionRows(
+  buildScanDiagnostics({
     identityConflicts: [
       {
         kind: "identity_conflict",
+        registeredTitle: "登録済みの作品",
         workId: "RJ501001",
         paths: [workspacePath("dlsite/a"), workspacePath("dlsite/b")],
       },
@@ -27,15 +28,13 @@ const rows = buildNeedsAttentionRows({
         message: "mimimilli.json 12行目: カンマが足りない",
       },
     ],
-  }),
-  record: buildScanRecord({
     unreadablePaths: [workspacePath("locked")],
-    dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["work-int"] },
+    dataIntegrityWorkIds: ["work-int"],
     missingWorks: [
       { workId: "work-miss", title: "消えた作品", previousPath: workspacePath("old/place") },
     ],
   }),
-});
+);
 
 function renderTab(overrides: Partial<NeedsAttentionTabProps> = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -143,7 +142,7 @@ describe("NeedsAttentionTab", () => {
     const user = userEvent.setup();
     const api = mockApi({
       "POST /api/works/work-int/reload": apiNoContent(),
-      "GET /api/scan/candidates": { candidates: [] },
+      "GET /api/scan/candidates": { scanCompleted: true, candidates: [] },
       "GET /api/scan/diagnostics": buildScanDiagnostics(),
       "GET /api/scan/last": buildScanRecord(),
     });
@@ -173,7 +172,7 @@ describe("NeedsAttentionTab", () => {
     const user = userEvent.setup();
     const api = mockApi({
       "DELETE /api/works/work-miss": apiNoContent(),
-      "GET /api/scan/candidates": { candidates: [] },
+      "GET /api/scan/candidates": { scanCompleted: true, candidates: [] },
       "GET /api/scan/diagnostics": buildScanDiagnostics(),
       "GET /api/scan/last": buildScanRecord(),
     });
@@ -182,6 +181,19 @@ describe("NeedsAttentionTab", () => {
     expect(api.requestsTo("DELETE /api/works/work-miss")).toHaveLength(0);
     await user.click(await screen.findByRole("button", { name: "解除する" }));
     await waitFor(() => expect(api.requestsTo("DELETE /api/works/work-miss")).toHaveLength(1));
+  });
+
+  it("rootの外にあった行方不明の作品は、タイトルだけを出しパスは出さない", () => {
+    renderTab({
+      rows: buildNeedsAttentionRows(
+        buildScanDiagnostics({
+          missingWorks: [{ workId: "work-out", title: "外にあった作品", previousPath: null }],
+        }),
+      ),
+    });
+    expect(screen.getByRole("button", { name: "外にあった作品" })).toBeInTheDocument();
+    expect(screen.queryByText("null")).toBeNull();
+    expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(2);
   });
 
   it("行が無ければ空状態、読み込み中・失敗は状態表示にする", async () => {

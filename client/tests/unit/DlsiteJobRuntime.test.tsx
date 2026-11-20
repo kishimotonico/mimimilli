@@ -49,7 +49,7 @@ describe("DlsiteJobRuntime", () => {
     mockApi({
       "GET /api/scan/candidates": () => {
         candidateRequests += 1;
-        return { candidates: [] };
+        return { scanCompleted: true, candidates: [] };
       },
     });
   });
@@ -179,7 +179,7 @@ describe("DlsiteJobRuntime", () => {
 
 describe("DlsiteJobRuntime と実ストア", () => {
   it("再接続のスナップショットで単発の終端を知っても、同じRJコードの作品の詳細を無効化する", async () => {
-    mockApi({ "GET /api/scan/candidates": () => ({ candidates: [] }) });
+    mockApi({ "GET /api/scan/candidates": () => ({ scanCompleted: true, candidates: [] }) });
     const source = new EventTarget() as unknown as EventSource;
     const running = (revision: number) => ({
       revision,

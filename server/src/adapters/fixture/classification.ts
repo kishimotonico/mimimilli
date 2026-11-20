@@ -113,13 +113,10 @@ export function createClassificationMethods(state: FixtureState): Classification
     async evalSmartFolder(id: string, query: SmartFolderEvalQuery): Promise<WorksPage | null> {
       const folder = state.smartFolders.find((f) => f.id === id);
       if (!folder) return null;
-      const page = toWorksPage(
+      return toWorksPage(
         evalSmartFolder(folder, composeWorks(state), query),
         requireFixtureRoot(state),
       );
-      return state.dataIntegrityWarning
-        ? { ...page, dataIntegrityWarning: state.dataIntegrityWarning }
-        : page;
     },
 
     async previewSmartFolderRuleCount(rules: SmartFolderRule[]): Promise<number> {

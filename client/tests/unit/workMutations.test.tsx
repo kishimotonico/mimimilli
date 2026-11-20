@@ -118,7 +118,7 @@ describe("正本変更の失敗", () => {
 describe("画面の後処理の順序", () => {
   it("mutate 単位の onSuccess は必須更新の完了後に呼ばれる", async () => {
     vi.spyOn(workApi, "deleteWork").mockResolvedValue(undefined);
-    mockApi({ "GET /api/scan/candidates": { candidates: [] } });
+    mockApi({ "GET /api/scan/candidates": { scanCompleted: true, candidates: [] } });
     const { queryClient, wrapper, isInvalidated } = setup();
     const { result } = renderHook(() => useUnregisterWorkMutation(), { wrapper });
     const observed: { detailRemoved: boolean; listInvalidated: boolean }[] = [];

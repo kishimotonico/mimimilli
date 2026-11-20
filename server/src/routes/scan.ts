@@ -75,9 +75,10 @@ export function scanRoute(
 
   app.get("/scan/candidates", async (c) => {
     const dlsiteRevision = dlsite.revision();
-    const candidates = await jobs.session.listCandidates();
+    const { scanCompleted, candidates } = await jobs.session.listCandidates();
     return c.json(
       scanCandidatesResponseSchema.parse({
+        scanCompleted,
         candidates: candidates.map((candidate) => ({ ...candidate, dlsiteRevision })),
       }),
     );

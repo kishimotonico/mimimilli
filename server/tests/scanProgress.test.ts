@@ -60,7 +60,6 @@ const emptyResult = {
   registered: 0,
   insertedWorkIds: [],
   startedWithEmptyCatalog: false,
-  missingWorks: [],
   updatedWorks: [],
   unreadablePaths: [],
   errors: 0,
@@ -177,8 +176,6 @@ test("GET /scan/last は未スキャンなら finishedAt が null の空の記�
   assert.deepEqual(await empty.json(), {
     finishedAt: null,
     updatedWorks: [],
-    missingWorks: [],
-    unreadablePaths: [],
   });
   assert.equal((await (await app.request("/api/works?scanRecord=new")).json()).total, 0);
 
@@ -190,11 +187,13 @@ test("GET /scan/last は未スキャンなら finishedAt が null の空の記�
     body.updatedWorks.map((work: { workId: string }) => work.workId),
     ["RJ501007", "RJ501002", "RJ501004"],
   );
+  assert.deepEqual(Object.keys(body).sort(), ["finishedAt", "updatedWorks"]);
+  const diagnostics = await (await app.request("/api/scan/diagnostics")).json();
   assert.deepEqual(
-    body.missingWorks.map((work: { workId: string }) => work.workId),
-    ["RJ501008"],
+    diagnostics.missingWorks.map((work: { workId: string }) => work.workId),
+    ["RJ501008", "RJ501010"],
   );
-  assert.deepEqual(body.unreadablePaths, ["権限なし/フォルダー"]);
+  assert.deepEqual(diagnostics.unreadablePaths, ["権限なし/フォルダー"]);
   const created = await (await app.request("/api/works?scanRecord=new&sort=id-asc")).json();
   assert.deepEqual(
     created.items.map((item: { id: string }) => item.id),
@@ -480,7 +479,6 @@ test("スキャンが中止されると、実行中に候補から追加した�
       registered: 0,
       insertedWorkIds: [],
       startedWithEmptyCatalog: false,
-      missingWorks: [],
       updatedWorks: [],
       errors: 0,
       missing: 0,

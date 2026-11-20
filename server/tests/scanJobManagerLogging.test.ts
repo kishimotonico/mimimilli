@@ -11,7 +11,6 @@ const emptyResult: ScanResult = {
   registered: 0,
   insertedWorkIds: [],
   startedWithEmptyCatalog: false,
-  missingWorks: [],
   updatedWorks: [],
   unreadablePaths: [],
   errors: 0,
@@ -67,14 +66,12 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
     registered: 4,
     insertedWorkIds: ["RJ501011", "RJ501012"],
     startedWithEmptyCatalog: false,
-    missingWorks: [],
     updatedWorks: [],
     errors: 1,
     missing: 3,
     skipped: 6,
     coverErrors: 7,
     unreadablePaths,
-    dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["bad-work"] },
   };
   const adapter = withStubAdapter({
     scan: () => Promise.resolve(scanExecutionOf(result)),
@@ -102,7 +99,6 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
     assert.equal(properties.coverErrors, 7);
     assert.equal(properties.unreadablePathsCount, 12);
     assert.deepEqual(properties.unreadablePathsSample, unreadablePaths.slice(0, 10));
-    assert.equal(properties.dataIntegrityWarning, true);
     assert.equal("insertedWorkIds" in properties, false);
   });
 });

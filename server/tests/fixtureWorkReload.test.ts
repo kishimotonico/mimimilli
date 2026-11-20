@@ -5,11 +5,14 @@ import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { createApp } from "./helpers/testApp.ts";
 import { pollUntil } from "./helpers/poll.ts";
 
-test("データ不整合の作品を読み直すと、GET /scan/last の dataIntegrityWarning から消える", async () => {
+test("データ不整合の作品を読み直すと、GET /scan/diagnostics のデータ不整合から消える", async () => {
   const app = createApp(createFixtureAdapter({ scenario: "errors" }));
-  const lastWarning = async () =>
-    ((await (await app.request("/api/scan/last")).json()) as { dataIntegrityWarning?: unknown })
-      .dataIntegrityWarning;
+  const integrityIds = async () =>
+    (
+      (await (await app.request("/api/scan/diagnostics")).json()) as {
+        dataIntegrityWorkIds: string[];
+      }
+    ).dataIntegrityWorkIds;
   const scan = async () => {
     const started = await app.request("/api/scan", { method: "POST" });
     const { job } = (await started.json()) as { job: { id: string } };
@@ -21,14 +24,14 @@ test("データ不整合の作品を読み直すと、GET /scan/last の dataInt
   };
 
   await scan();
-  assert.deepEqual(await lastWarning(), { skippedCount: 1, skippedWorkIds: ["RJ501099"] });
+  assert.deepEqual(await integrityIds(), ["RJ501099"]);
 
   const res = await app.request("/api/works/RJ501099/reload", { method: "POST" });
   assert.equal(res.status, 204);
-  assert.equal(await lastWarning(), undefined);
+  assert.deepEqual(await integrityIds(), []);
 
   await scan();
-  assert.equal(await lastWarning(), undefined);
+  assert.deepEqual(await integrityIds(), []);
 });
 
 test("存在しない作品の読み直しは404", async () => {

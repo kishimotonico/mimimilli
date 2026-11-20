@@ -23,6 +23,7 @@ import {
   audioProbeCache,
   identityConflicts,
   invalidMetaFiles,
+  unreadablePaths,
   playlists as catalogPlaylists,
   scanState,
   tags,
@@ -94,6 +95,22 @@ export class CatalogWorkRepository {
     for (const file of files) {
       this.db.catalog.insert(invalidMetaFiles).values(file).onConflictDoNothing().run();
     }
+  }
+
+  replaceUnreadablePaths(paths: WorkspacePath[]): void {
+    this.db.catalog.delete(unreadablePaths).run();
+    for (const path of paths) {
+      this.db.catalog.insert(unreadablePaths).values({ path }).onConflictDoNothing().run();
+    }
+  }
+
+  listUnreadablePaths(): WorkspacePath[] {
+    return this.db.catalog
+      .select()
+      .from(unreadablePaths)
+      .orderBy(unreadablePaths.path)
+      .all()
+      .map((row) => workspacePath(row.path));
   }
 
   listInvalidMetaFiles(): InvalidMetaFile[] {
@@ -177,6 +194,7 @@ export class CatalogWorkRepository {
     this.db.transaction(() => {
       this.db.catalog.delete(identityConflicts).run();
       this.db.catalog.delete(invalidMetaFiles).run();
+      this.db.catalog.delete(unreadablePaths).run();
     });
   }
 

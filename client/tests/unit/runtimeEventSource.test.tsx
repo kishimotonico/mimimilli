@@ -139,7 +139,8 @@ describe("ScanRuntime EventSource ownership", () => {
   it("起動時に未登録候補を GET /scan/candidates から1回取得し、取得済みなら取り直さない", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.endsWith("/scan/candidates")) return response({ candidates: [candidate] });
+      if (url.endsWith("/scan/candidates"))
+        return response({ scanCompleted: true, candidates: [candidate] });
       return shell(input, init);
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -176,7 +177,7 @@ describe("ScanRuntime EventSource ownership", () => {
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(completedJob);
         if (url.endsWith("/scan/candidates")) {
-          return response({ candidates: [candidate] });
+          return response({ scanCompleted: true, candidates: [candidate] });
         }
         return shell(input, init);
       }),

@@ -27,7 +27,9 @@ function readCache(queryClient: QueryClient): ScanCandidate[] | undefined {
 
 describe("fetchScanCandidates", () => {
   it("サーバーから候補一覧を取得する", async () => {
-    mockApi({ "GET /api/scan/candidates": { candidates: [candidateA, candidateB] } });
+    mockApi({
+      "GET /api/scan/candidates": { scanCompleted: true, candidates: [candidateA, candidateB] },
+    });
 
     await expect(fetchScanCandidates()).resolves.toEqual([candidateA, candidateB]);
   });
@@ -35,7 +37,9 @@ describe("fetchScanCandidates", () => {
 
 describe("refreshScanCandidates", () => {
   it("取得結果をクエリキャッシュへ反映する", async () => {
-    mockApi({ "GET /api/scan/candidates": { candidates: [candidateA, candidateB] } });
+    mockApi({
+      "GET /api/scan/candidates": { scanCompleted: true, candidates: [candidateA, candidateB] },
+    });
 
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const result = await refreshScanCandidates(queryClient);
@@ -56,9 +60,9 @@ describe("refreshScanCandidates", () => {
         callCount += 1;
         if (callCount === 1) {
           await firstGate;
-          return { candidates: [candidateA] };
+          return { scanCompleted: true, candidates: [candidateA] };
         }
-        return { candidates: [candidateB] };
+        return { scanCompleted: true, candidates: [candidateB] };
       },
     });
 
@@ -82,7 +86,7 @@ describe("refreshScanCandidates", () => {
       "GET /api/scan/candidates": async () => {
         callCount += 1;
         await new Promise((resolve) => setTimeout(resolve, 20));
-        return { candidates: [candidateA] };
+        return { scanCompleted: true, candidates: [candidateA] };
       },
     });
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -104,10 +108,10 @@ describe("refreshScanCandidates", () => {
         callCount += 1;
         if (callCount === 1) {
           await firstGate.promise;
-          return { candidates: [original, candidateB] };
+          return { scanCompleted: true, candidates: [original, candidateB] };
         }
         await secondGate.promise;
-        return { candidates: [fixed, candidateB] };
+        return { scanCompleted: true, candidates: [fixed, candidateB] };
       },
     });
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

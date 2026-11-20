@@ -272,7 +272,7 @@ export function createWorkMethods(deps: {
       if (outcome.status !== "published") {
         throw new SourceConflictError(SOURCE_RELOAD_FAILED_MESSAGE);
       }
-      if (query.listSummaries([id]).summaries.length === 0) {
+      if (query.listDataIntegritySkips([id]).length > 0) {
         throw new SourceConflictError(SOURCE_RELOAD_UNRESOLVED_MESSAGE);
       }
       return true;

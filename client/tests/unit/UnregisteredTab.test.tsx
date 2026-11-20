@@ -27,7 +27,7 @@ import {
 let restoreSize: () => void;
 beforeEach(() => {
   restoreSize = mockUnregisteredListSize();
-  mockApi({ "GET /api/scan/candidates": { candidates: [] } });
+  mockApi({ "GET /api/scan/candidates": { scanCompleted: true, candidates: [] } });
 });
 
 afterEach(() => {
@@ -645,7 +645,7 @@ describe("UnregisteredTab 追加", () => {
     const api = mockApi({
       "GET /api/scan/candidates": async () => {
         await refreshGate;
-        return { candidates: [candidateB] };
+        return { scanCompleted: true, candidates: [candidateB] };
       },
     });
     const key = scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY;
@@ -673,7 +673,9 @@ describe("UnregisteredTab 追加", () => {
         resolveRegister = resolve;
       }),
     );
-    const api = mockApi({ "GET /api/scan/candidates": { candidates: [candidateB] } });
+    const api = mockApi({
+      "GET /api/scan/candidates": { scanCompleted: true, candidates: [candidateB] },
+    });
     const { onRegistered, unmount, queryClient } = await renderTab([candidateA, candidateB]);
     queryClient.setQueryData(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY, [
       candidateA,
@@ -745,9 +747,9 @@ describe("UnregisteredTab 取り直し中のRJコード修正", () => {
         calls += 1;
         if (calls === 1) {
           await firstGate.promise;
-          return { candidates: [candidateA] };
+          return { scanCompleted: true, candidates: [candidateA] };
         }
-        return { candidates: [fixed] };
+        return { scanCompleted: true, candidates: [fixed] };
       },
     });
     vi.spyOn(scanApi, "setScanCandidateRjCode").mockResolvedValue(fixed);

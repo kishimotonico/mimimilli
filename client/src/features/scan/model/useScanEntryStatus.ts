@@ -36,8 +36,8 @@ export function useScanEntryStatus(): { ring: ScanEntryRing; unseen: boolean } {
     () => ({
       candidates: candidatesLoaded ? candidates.map((candidate) => candidate.path) : null,
       needsAttention:
-        record !== undefined && diagnostics !== undefined
-          ? buildNeedsAttentionRows({ diagnostics, record }).map((row) => row.key)
+        diagnostics !== undefined
+          ? buildNeedsAttentionRows(diagnostics).map((row) => row.key)
           : null,
       changes:
         record !== undefined && newCount !== undefined

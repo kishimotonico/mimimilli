@@ -125,9 +125,11 @@ function TargetCell({
       return (
         <div className="flex flex-col gap-0.5">
           <WorkTitleLink workId={row.workId} title={row.title} onOpen={onOpenWorkDetail} />
-          <span className="mll-selectable break-all font-mono text-mono text-ink-3">
-            {row.previousPath}
-          </span>
+          {row.previousPath !== null && (
+            <span className="mll-selectable break-all font-mono text-mono text-ink-3">
+              {row.previousPath}
+            </span>
+          )}
         </div>
       );
   }

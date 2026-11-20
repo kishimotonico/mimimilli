@@ -75,6 +75,9 @@ export type RawWorkListRow = {
   metaPath: string;
   bookmarked: number;
   lastPlayedAt: string | null;
+  addedAt: string;
+  errorMessage: string | null;
+  urlsJson: string;
   dlsiteStateJson: string | null;
 };
 
@@ -189,7 +192,8 @@ export function defaultPlaylistOf<P extends { id: string; tracks: unknown[] }>(
   return playlist;
 }
 
-export function rowToSummary(
+/** 保存された行が読めるかを検証し、読めたら要約を返す。読めない行は PersistentDataError */
+export function validateWorkRow(
   row: SummaryRow,
   tagNames: string[],
   dlsite: DlsiteState,
@@ -229,6 +233,7 @@ export function rowToWorkListItem(
   dlsite: DlsiteState,
   root: string,
 ): WorkListItem {
+  validateWorkRow({ ...row, bookmarked: row.bookmarked !== 0 }, tagNames, dlsite);
   return parseRecord(
     workListItemSchema,
     {

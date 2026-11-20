@@ -94,7 +94,7 @@ function createTestQueryClient() {
 }
 
 function renderApp() {
-  mockApi({ "GET /api/scan/candidates": { candidates: [] } });
+  mockApi({ "GET /api/scan/candidates": { scanCompleted: true, candidates: [] } });
   const queryClient = createTestQueryClient();
   const store = createStore();
   const scanJob = createFakeScanJobStore();

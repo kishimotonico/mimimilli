@@ -530,8 +530,9 @@ test("FilesでID重複を表示し、確認して別の作品として取り込�
   const scanDialog = page.getByRole("dialog", { name: "スキャン" });
   await scanDialog.getByRole("tab", { name: /^要対応/ }).click();
   const attention = scanDialog.getByRole("tabpanel", { name: "要対応" });
-  await expect(attention.getByRole("row", { name: /夜想曲スタジオ/ })).toBeHidden();
+  await expect(attention.getByRole("row", { name: /ID重複/ })).toBeHidden();
   await expect(attention.getByRole("row", { name: /copies\// })).toBeHidden();
+  await expect(attention.getByRole("row", { name: /お気に入りだった朗読劇/ })).toBeVisible();
 
   assertNoErrors(tracker);
 });

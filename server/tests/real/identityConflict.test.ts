@@ -71,7 +71,12 @@ test("重複Work IDはmimimilli.jsonを変更せず、catalog公開せずに全p
 
   assert.equal(result.registered, 0);
   assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, [
-    { kind: "identity_conflict", workId: WORK_ID, paths: ["work-a", "work-z"] },
+    {
+      kind: "identity_conflict",
+      registeredTitle: null,
+      workId: WORK_ID,
+      paths: ["work-a", "work-z"],
+    },
   ]);
   assert.equal(readFileSync(first, "utf-8"), before[0]);
   assert.equal(readFileSync(second, "utf-8"), before[1]);
@@ -185,7 +190,12 @@ test("壊れたコピーのcandidateIdで既存作品の投影を乗っ取らな
   assert.equal(ownerAfter?.physicalPath, ownerBefore!.physicalPath);
   assert.equal(ownerAfter?.status, "ok");
   assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, [
-    { kind: "identity_conflict", workId: WORK_ID, paths: ["work-copy", "work-owner"] },
+    {
+      kind: "identity_conflict",
+      registeredTitle: "元作品",
+      workId: WORK_ID,
+      paths: ["work-copy", "work-owner"],
+    },
   ]);
   assert.equal((await adapter.listScanDiagnostics()).invalidMetaFiles.length, 1);
   assert.equal(
@@ -266,7 +276,12 @@ test("登録解除すると該当pathがidentity_conflict診断から消え、�
   makeWork(root, "work-a-copy", "重複コピー");
   await runScan(adapter, { full: true });
   assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, [
-    { kind: "identity_conflict", workId: WORK_ID, paths: ["work-a-copy", "work-z-owner"] },
+    {
+      kind: "identity_conflict",
+      registeredTitle: "既存投影",
+      workId: WORK_ID,
+      paths: ["work-a-copy", "work-z-owner"],
+    },
   ]);
 
   const app = directory.ownFn(createApp(adapter), (a) => a.shutdown());
@@ -293,6 +308,7 @@ test("登録解除しても残りpathが2以上なら診断は残り、該当pat
   assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, [
     {
       kind: "identity_conflict",
+      registeredTitle: "既存投影",
       workId: WORK_ID,
       paths: ["work-copy-1", "work-copy-2", "work-owner"],
     },
@@ -303,7 +319,12 @@ test("登録解除しても残りpathが2以上なら診断は残り、該当pat
   assert.equal(response.status, 204);
 
   assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, [
-    { kind: "identity_conflict", workId: WORK_ID, paths: ["work-copy-1", "work-copy-2"] },
+    {
+      kind: "identity_conflict",
+      registeredTitle: null,
+      workId: WORK_ID,
+      paths: ["work-copy-1", "work-copy-2"],
+    },
   ]);
 });
 
@@ -328,6 +349,7 @@ test("root外を指すmissing作品を単体登録解除しても成功し、他
   assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, [
     {
       kind: "identity_conflict",
+      registeredTitle: "新root作品",
       workId: OTHER_WORK_ID,
       paths: ["work-other-copy", "work-other-owner"],
     },
@@ -470,7 +492,12 @@ test("有効な同IDが2つある状態で壊れた3つ目のコピーはinvalid
   await runScan(adapter, { full: true });
 
   assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, [
-    { kind: "identity_conflict", workId: WORK_ID, paths: ["work-a", "work-b"] },
+    {
+      kind: "identity_conflict",
+      registeredTitle: null,
+      workId: WORK_ID,
+      paths: ["work-a", "work-b"],
+    },
   ]);
   assert.deepEqual(
     (await adapter.listScanDiagnostics()).invalidMetaFiles.map((file) => file.path),
@@ -562,5 +589,8 @@ test("root変更の開始で旧rootの診断が消え、再スキャン前に別
   assert.deepEqual(await adapter.listScanDiagnostics(), {
     identityConflicts: [],
     invalidMetaFiles: [],
+    unreadablePaths: [],
+    dataIntegrityWorkIds: [],
+    missingWorks: [],
   });
 });

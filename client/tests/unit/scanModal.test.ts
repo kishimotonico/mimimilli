@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 
 import {
   type ScanCandidate,
   type ScanJobSnapshot,
+  type ScanDiagnostics,
   type ScanRecord,
   type Work,
   type WorkEditSnapshot,
@@ -161,7 +162,7 @@ beforeEach(() => {
       excludedCandidates = excludedCandidates.filter((entry) => !paths.includes(entry.path));
       return apiNoContent();
     },
-    "GET /api/scan/candidates": () => ({ candidates: serverCandidates }),
+    "GET /api/scan/candidates": () => ({ scanCompleted: true, candidates: serverCandidates }),
     "GET /api/scan/candidates/exclusions": { paths: [] },
     "GET /api/scan/last": () => apiNoContent(),
     "GET /api/scan/diagnostics": buildScanDiagnostics(),
@@ -215,8 +216,9 @@ function createRunningJob(
 }
 
 type ModalOverrides = Partial<Parameters<typeof ScanModal>[0]> & {
-  /** ScanModal 自身が SCAN_QUERY_KEYS.last() を購読するため、query cache 経由で渡す */
+  /** 新規作品・更新済みの記録は SCAN_QUERY_KEYS.last()、要対応は SCAN_QUERY_KEYS.diagnostics() の query cache から読まれる */
   record?: ScanRecord;
+  diagnostics?: ScanDiagnostics;
   /** 候補は GET /scan/candidates 由来の query cache から読まれる */
   candidates?: ScanCandidate[];
 };
@@ -229,7 +231,11 @@ function createTestQueryClient() {
 
 function seedScanQueries(
   queryClient: QueryClient,
-  { record, candidates }: { record?: ScanRecord; candidates?: ScanCandidate[] },
+  {
+    record,
+    candidates,
+    diagnostics,
+  }: { record?: ScanRecord; candidates?: ScanCandidate[]; diagnostics?: ScanDiagnostics },
 ) {
   if (record !== undefined) {
     queryClient.setQueryData(SCAN_QUERY_KEYS.last(), record);
@@ -239,9 +245,11 @@ function seedScanQueries(
   } else if (queryClient.getQueryData(SCAN_QUERY_KEYS.candidates()) === undefined) {
     queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), []);
   }
-  // ID重複の診断（常に最新を購読する）。未シードだとテストごとに実fetchへ
+  // 要対応の診断（常に最新を購読する）。未シードだとテストごとに実fetchへ
   // 落ちてしまうため、明示的な指定がなければ空で固定する。
-  if (queryClient.getQueryData(SCAN_QUERY_KEYS.diagnostics()) === undefined) {
+  if (diagnostics !== undefined) {
+    queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), diagnostics);
+  } else if (queryClient.getQueryData(SCAN_QUERY_KEYS.diagnostics()) === undefined) {
     queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
   }
 }
@@ -260,12 +268,13 @@ function renderModal(
   const onCancel = scanJob.cancel;
   store.set(scanJobStoreAtom, scanJob);
 
-  const { record, candidates, ...rest } = overrides;
+  const { record, candidates, diagnostics, ...rest } = overrides;
   serverCandidates = candidates ?? [];
   const queryClient = createTestQueryClient();
   seedScanQueries(queryClient, {
     record: record !== undefined ? record : scanRecord,
     candidates,
+    diagnostics,
   });
 
   const modalProps = {
@@ -296,8 +305,17 @@ function renderModal(
   );
 
   const rerenderModal = (newOverrides: ModalOverrides = {}) => {
-    const { record: newRecord, candidates: newCandidates, ...newRest } = newOverrides;
-    seedScanQueries(queryClient, { record: newRecord, candidates: newCandidates });
+    const {
+      record: newRecord,
+      candidates: newCandidates,
+      diagnostics: newDiagnostics,
+      ...newRest
+    } = newOverrides;
+    seedScanQueries(queryClient, {
+      record: newRecord,
+      candidates: newCandidates,
+      diagnostics: newDiagnostics,
+    });
     view.rerender(
       createElement(
         QueryClientProvider,
@@ -428,15 +446,15 @@ describe("ScanModal", () => {
 
   it("要対応の件数は直すものだけを数え、行方不明は数えない", () => {
     const missing = { workId: "m1", title: "m1", previousPath: workspacePath("m1") };
-    renderModal({ record: buildScanRecord({ missingWorks: [missing] }) });
+    renderModal({ diagnostics: buildScanDiagnostics({ missingWorks: [missing] }) });
     expect(screen.getByRole("tab", { name: "要対応" })).toBeInTheDocument();
     cleanup();
 
     renderModal({
-      record: buildScanRecord({
+      diagnostics: buildScanDiagnostics({
         missingWorks: [missing],
         unreadablePaths: [workspacePath("locked")],
-        dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["w1"] },
+        dataIntegrityWorkIds: ["w1"],
       }),
     });
     expect(screen.getByRole("tab", { name: "要対応（2件）" })).toBeInTheDocument();

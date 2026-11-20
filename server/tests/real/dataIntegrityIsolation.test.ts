@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
 import { eq } from "drizzle-orm";
+import { EMPTY_TAG_FILTERS } from "@mimimilli/shared";
 import { createApp } from "../helpers/testApp.ts";
+import { Scanner } from "../../src/adapters/real/scanner.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { tags, works } from "../../src/adapters/real/catalogSchema.ts";
-import { Scanner } from "../../src/adapters/real/scanner.ts";
 import { querySmartFolderWorks } from "../../src/adapters/real/smartFolderWorks.ts";
 import { createWorkRepos, makeWork, upsertTestWork } from "../helpers/workTestUtils.ts";
 import { makeTestDirectory, makeTestScope } from "../helpers/sampleLibrary.ts";
@@ -95,11 +96,35 @@ test("ルールベース smart folder は壊れた候補を除外して WorksPag
     page.items.map((item) => item.id),
     [goodId],
   );
-  assert.equal(page.dataIntegrityWarning?.skippedCount, 1);
-  assert.deepEqual(page.dataIntegrityWarning?.skippedWorkIds, [badId]);
+  assert.deepEqual(
+    query.listDataIntegritySkips().map((skip) => skip.workId),
+    [badId],
+  );
 });
 
-test("スキャン finalize は壊れた作品があっても ScanResult を返す", async (t) => {
+test("診断のデータ不整合は作品一覧から外れる作品と同じ", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
+  const { query, catalog, user } = createWorkRepos(db);
+  upsertTestWork(catalog, user, makeWork({ id: "work-good" }));
+  upsertTestWork(catalog, user, makeWork({ id: "work-bad" }));
+  db.catalog.update(works).set({ status: "unknown" }).where(eq(works.id, "work-bad")).run();
+  const page = query.queryWorks(
+    { q: "", tags: EMPTY_TAG_FILTERS, tagOp: "AND", sort: "id-asc" },
+    "/library",
+  );
+  assert.deepEqual(
+    page.items.map((item) => item.id),
+    ["work-good"],
+  );
+  assert.deepEqual(
+    query.listDataIntegritySkips().map((skip) => skip.workId),
+    ["work-bad"],
+  );
+});
+
+test("スキャン finalize は壊れた作品があっても例外にならず、その作品が診断に載る", async (t) => {
   const scope = makeTestScope();
   t.after(scope.cleanup);
   const db = scope.own(openDb({ kind: "memory" }));
@@ -109,16 +134,19 @@ test("スキャン finalize は壊れた作品があっても ScanResult を返�
   t.after(scanRoot.cleanup);
   const scanner = new Scanner(db, repos);
   const { result } = await scanner.scan(scanRoot.path, { full: true });
-  assert.equal(result.dataIntegrityWarning?.skippedCount, 1);
-  assert.deepEqual(result.dataIntegrityWarning?.skippedWorkIds, [badId]);
+  assert.equal(result.registered, 0);
+  assert.deepEqual(
+    repos.query.listDataIntegritySkips().map((skip) => skip.workId),
+    [badId],
+  );
 });
 
-test("HTTP smart folder は dataIntegrityWarning を返す", async (t) => {
+test("HTTP smart folder は壊れた作品を除外する", async (t) => {
   const directory = makeTestDirectory("sf-integrity");
   t.after(directory.cleanup);
   const db = directory.own(openFileDb(directory.path));
   const { catalog, user } = createWorkRepos(db);
-  const { goodId, badId } = seedCorruptedPair(catalog, user, db);
+  const { goodId } = seedCorruptedPair(catalog, user, db);
   user.setUserSetting("root_folder", "/library");
   const folder = user.createSmartFolder({
     name: "タグ一致",
@@ -138,17 +166,14 @@ test("HTTP smart folder は dataIntegrityWarning を返す", async (t) => {
   assert.equal(res.status, 200);
   const body = (await res.json()) as {
     items: Array<{ id: string }>;
-    dataIntegrityWarning?: { skippedCount: number; skippedWorkIds: string[] };
   };
   assert.deepEqual(
     body.items.map((item) => item.id),
     [goodId],
   );
-  assert.equal(body.dataIntegrityWarning?.skippedCount, 1);
-  assert.deepEqual(body.dataIntegrityWarning?.skippedWorkIds, [badId]);
 });
 
-test("GET /api/works は不正な status の作品を除外し dataIntegrityWarning を返す", async (t) => {
+test("GET /api/works は不正な status の作品を除外し、診断のデータ不整合に載る", async (t) => {
   const directory = makeTestDirectory("works-query-integrity");
   t.after(directory.cleanup);
   const db = directory.own(openFileDb(directory.path));
@@ -166,13 +191,12 @@ test("GET /api/works は不正な status の作品を除外し dataIntegrityWarn
   const body = (await res.json()) as {
     items: Array<{ id: string }>;
     total: number;
-    dataIntegrityWarning?: { skippedCount: number; skippedWorkIds: string[] };
   };
   assert.deepEqual(
     body.items.map((item) => item.id),
     [goodId],
   );
   assert.equal(body.total, 2);
-  assert.equal(body.dataIntegrityWarning?.skippedCount, 1);
-  assert.deepEqual(body.dataIntegrityWarning?.skippedWorkIds, [badId]);
+  const diagnostics = await (await app.request("/api/scan/diagnostics")).json();
+  assert.deepEqual(diagnostics.dataIntegrityWorkIds, [badId]);
 });
