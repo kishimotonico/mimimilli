@@ -180,8 +180,16 @@ test("GET /api/works は不正な status の作品を除外し、診断のデー
   const { catalog, user } = createWorkRepos(db);
   const goodId = "work-good";
   const badId = "work-bad";
-  upsertTestWork(catalog, user, makeWork({ id: goodId, tags: nts(["cv/正常"]) }));
-  upsertTestWork(catalog, user, makeWork({ id: badId, tags: nts(["cv/正常"]) }));
+  upsertTestWork(
+    catalog,
+    user,
+    makeWork({ id: goodId, title: "正常な作品", tags: nts(["cv/正常"]) }),
+  );
+  upsertTestWork(
+    catalog,
+    user,
+    makeWork({ id: badId, title: "壊れた作品", tags: nts(["cv/正常"]) }),
+  );
   db.catalog.update(works).set({ status: "unknown" }).where(eq(works.id, badId)).run();
   user.setUserSetting("root_folder", "/library");
   const adapter = fileAdapter(directory);
@@ -198,5 +206,24 @@ test("GET /api/works は不正な status の作品を除外し、診断のデー
   );
   assert.equal(body.total, 2);
   const diagnostics = await (await app.request("/api/scan/diagnostics")).json();
-  assert.deepEqual(diagnostics.dataIntegrityWorkIds, [badId]);
+  assert.deepEqual(
+    diagnostics.dataIntegrityWorks.map((work: { workId: string }) => work.workId),
+    [badId],
+  );
+});
+
+test("データ不整合の作品名が文字列でなくても診断は読めて、作品名は null になる", async (t) => {
+  const directory = makeTestDirectory("works-query-integrity-blob-title");
+  t.after(directory.cleanup);
+  const db = directory.own(openFileDb(directory.path));
+  const { catalog, user } = createWorkRepos(db);
+  const badId = "work-bad";
+  upsertTestWork(catalog, user, makeWork({ id: badId, tags: nts(["cv/正常"]) }));
+  db.catalog.update(works).set({ status: "unknown" }).where(eq(works.id, badId)).run();
+  db.sqlite.run("UPDATE main.works SET title = X'00FF' WHERE id = ?", [badId]);
+  user.setUserSetting("root_folder", "/library");
+  const app = createApp(fileAdapter(directory));
+  const res = await app.request("/api/scan/diagnostics");
+  assert.equal(res.status, 200);
+  assert.deepEqual((await res.json()).dataIntegrityWorks, [{ workId: badId, title: null }]);
 });

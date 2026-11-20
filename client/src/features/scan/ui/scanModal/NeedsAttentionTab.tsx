@@ -1,17 +1,13 @@
-import { useState } from "react";
 import type { WorkspacePath } from "@mimimilli/shared";
-import {
-  useReloadWorkMutation,
-  useUnregisterWorkMutation,
-} from "../../../../entities/work/model/workMutations";
-import { apiErrorMessage } from "../../../../shared/lib/apiError";
-import Button from "../../../../shared/ui/Button";
-import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import StatusLabel from "../../../../shared/ui/StatusLabel";
-import { useToast } from "../../../../shared/ui/useToast";
 import { isFixable, type NeedsAttentionRow } from "../../model/needsAttention";
 import { deriveScanListStatus } from "../../model/scanListStatus";
 import ScanListState from "./ScanListState";
+import {
+  ReassignIdentityButton,
+  ReloadWorkButton,
+  UnregisterWorkButton,
+} from "./NeedsAttentionActions";
 import { PathLink, WorkTitleLink } from "./ScanLinks";
 
 export interface NeedsAttentionTabProps {
@@ -101,9 +97,33 @@ function TargetCell({
   switch (row.kind) {
     case "identityConflict":
       return (
-        <div className="flex flex-col gap-0.5">
-          {row.paths.map((path) => (
-            <PathLink key={path} path={path} onOpen={onOpenFiles} />
+        <div className="flex flex-col gap-1">
+          {row.registered && (
+            <div className="flex flex-col gap-0.5">
+              <SideLabel>登録済み</SideLabel>
+              {row.registered.path !== null && (
+                <PathLink path={row.registered.path} onOpen={onOpenFiles} />
+              )}
+              <div className="flex min-w-0 items-baseline gap-2">
+                {row.registered.title !== null && (
+                  <WorkTitleLink
+                    workId={row.workId}
+                    title={row.registered.title}
+                    onOpen={onOpenWorkDetail}
+                  />
+                )}
+                <span className={ID_CLASS}>作品ID {row.workId}</span>
+              </div>
+            </div>
+          )}
+          {row.unregisteredPaths.map((path) => (
+            <div key={path} className="flex flex-col gap-0.5">
+              <SideLabel>未登録</SideLabel>
+              <div className="flex min-w-0 items-center gap-2">
+                <PathLink path={path} onOpen={onOpenFiles} />
+                <ReassignIdentityButton path={path} />
+              </div>
+            </div>
           ))}
         </div>
       );
@@ -111,7 +131,12 @@ function TargetCell({
     case "unreadablePath":
       return <PathLink path={row.path} onOpen={onOpenFiles} />;
     case "dataIntegrity":
-      return <span className={ID_CLASS}>{row.workId}</span>;
+      return (
+        <div className="flex flex-col gap-0.5">
+          {row.title !== null && <span className="font-jp text-body text-ink-0">{row.title}</span>}
+          <span className={ID_CLASS}>{row.workId}</span>
+        </div>
+      );
     case "missingWork":
       return (
         <div className="flex flex-col gap-0.5">
@@ -129,7 +154,7 @@ function TargetCell({
 function whatHappened(row: NeedsAttentionRow): string {
   switch (row.kind) {
     case "identityConflict":
-      return "同じ作品IDの作品情報ファイルが複数ある";
+      return `同じ作品ID ${row.workId} の作品情報ファイルが複数ある`;
     case "invalidMetaFile":
       return row.message;
     case "unreadablePath":
@@ -144,61 +169,18 @@ function whatHappened(row: NeedsAttentionRow): string {
 function RecommendedAction({ row }: { row: NeedsAttentionRow }) {
   switch (row.kind) {
     case "identityConflict":
-      return "どちらかを消すか、Filesで別の作品として取り込む";
+      return "どちらかを消すか、取り込む";
     case "invalidMetaFile":
       return "ファイルを直す";
     case "unreadablePath":
       return "アクセス権を確認";
     case "dataIntegrity":
-      return <ReloadWorkButton workId={row.workId} />;
+      return <ReloadWorkButton workId={row.workId} label={row.title ?? row.workId} />;
     case "missingWork":
       return <UnregisterWorkButton workId={row.workId} title={row.title} />;
   }
 }
 
-function ReloadWorkButton({ workId }: { workId: string }) {
-  const toast = useToast();
-  const mutation = useReloadWorkMutation();
-  const reload = async () => {
-    try {
-      await mutation.mutateAsync(workId);
-    } catch (cause) {
-      toast.error(apiErrorMessage(cause, "作品を読み直せませんでした"));
-    }
-  };
-  return (
-    <Button size="sm" disabled={mutation.isPending} onClick={() => void reload()}>
-      この作品を読み直す
-    </Button>
-  );
-}
-
-function UnregisterWorkButton({ workId, title }: { workId: string; title: string }) {
-  const toast = useToast();
-  const mutation = useUnregisterWorkMutation();
-  const [confirming, setConfirming] = useState(false);
-  const unregister = async () => {
-    try {
-      await mutation.mutateAsync(workId);
-    } catch (cause) {
-      toast.error(apiErrorMessage(cause, "登録を解除できませんでした"));
-    }
-    setConfirming(false);
-  };
-  return (
-    <>
-      <Button size="sm" disabled={mutation.isPending} onClick={() => setConfirming(true)}>
-        登録を解除
-      </Button>
-      {confirming && (
-        <ConfirmDialog
-          title="登録を解除"
-          message={`「${title}」をライブラリから外します。タグや再生履歴は消えます。`}
-          confirmLabel="解除する"
-          onConfirm={() => void unregister()}
-          onCancel={() => setConfirming(false)}
-        />
-      )}
-    </>
-  );
+function SideLabel({ children }: { children: string }) {
+  return <span className="font-sans text-label font-semibold text-ink-3">{children}</span>;
 }

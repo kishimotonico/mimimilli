@@ -479,17 +479,25 @@ export class WorkQueryRepository {
     }));
   }
 
-  getWorkTitles(workIds: string[]): Map<string, string> {
-    const titles = new Map<string, string>();
+  /** 保存値の検証を通さずに読む作品名と作品情報ファイルのパス。文字列でない値は null */
+  getWorkIdentities(
+    workIds: string[],
+  ): Map<string, { title: string | null; metaPath: string | null }> {
+    const identities = new Map<string, { title: string | null; metaPath: string | null }>();
     for (const idsChunk of chunk(workIds, SQLITE_IN_CHUNK_SIZE)) {
       const rows = this.db.sqlite
         .query(
-          `SELECT id, title FROM main.works WHERE id IN (${inClausePlaceholders(idsChunk.length)})`,
+          `SELECT id, title, meta_path AS metaPath FROM main.works WHERE id IN (${inClausePlaceholders(idsChunk.length)})`,
         )
-        .all(...idsChunk) as Array<{ id: string; title: string }>;
-      for (const row of rows) titles.set(row.id, row.title);
+        .all(...idsChunk) as Array<{ id: string; title: unknown; metaPath: unknown }>;
+      for (const row of rows) {
+        identities.set(row.id, {
+          title: typeof row.title === "string" ? row.title : null,
+          metaPath: typeof row.metaPath === "string" ? row.metaPath : null,
+        });
+      }
     }
-    return titles;
+    return identities;
   }
 
   /** DLsite連携のRJコードが一致する作品のID。投影更新の対象を引く */

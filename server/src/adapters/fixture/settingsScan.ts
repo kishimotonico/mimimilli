@@ -12,6 +12,7 @@ import type {
 } from "../../adapter/index.ts";
 import type { FixtureWorkRecord } from "./data.ts";
 import { isFsPathWithin, normalizeFsPath } from "./fsResolve.ts";
+import { identityConflictMetaPathOf } from "./identityConflictPaths.ts";
 import { checkWorkPlacement } from "./playback.ts";
 import { FIXTURE_UNREADABLE_ROOT } from "./scenarios.ts";
 import {
@@ -196,13 +197,23 @@ export function createSettingsScanMethods(
     async listScanDiagnostics(): Promise<ScanDiagnostics> {
       const rootAbs = normalizeFsPath(requireFixtureRoot(state));
       return {
-        identityConflicts: state.identityConflicts.map((conflict) => ({
-          ...conflict,
-          registeredTitle: state.works.find((work) => work.id === conflict.workId)?.title ?? null,
-        })),
+        identityConflicts: state.identityConflicts.map((conflict) => {
+          const owner = state.works.find((work) => work.id === conflict.workId);
+          return {
+            ...conflict,
+            registeredTitle: owner?.title ?? null,
+            registeredPath:
+              conflict.paths.find(
+                (path) => identityConflictMetaPathOf(rootAbs, path) === owner?.metaPath,
+              ) ?? null,
+          };
+        }),
         invalidMetaFiles: state.invalidMetaFiles,
         unreadablePaths: state.scanUnreadablePaths,
-        dataIntegrityWorkIds: state.dataIntegrityWarning?.skippedWorkIds ?? [],
+        dataIntegrityWorks: (state.dataIntegrityWarning?.skippedWorkIds ?? []).map((workId) => ({
+          workId,
+          title: state.dataIntegrityTitles[workId] ?? null,
+        })),
         missingWorks: state.works
           .filter((work) => work.status === "missing")
           .map((work) => ({

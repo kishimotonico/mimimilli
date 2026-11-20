@@ -1,10 +1,22 @@
 import type { MissingWork, ScanDiagnostics, WorkspacePath } from "@mimimilli/shared";
 
+/** ID重複の登録済みの側。title は読めないとき null、path は診断のパスにないとき null */
+export interface RegisteredSide {
+  title: string | null;
+  path: WorkspacePath | null;
+}
+
 export type NeedsAttentionRow =
-  | { kind: "identityConflict"; key: string; workId: string; paths: WorkspacePath[] }
+  | {
+      kind: "identityConflict";
+      key: string;
+      workId: string;
+      registered: RegisteredSide | null;
+      unregisteredPaths: WorkspacePath[];
+    }
   | { kind: "invalidMetaFile"; key: string; path: WorkspacePath; message: string }
   | { kind: "unreadablePath"; key: string; path: WorkspacePath }
-  | { kind: "dataIntegrity"; key: string; workId: string }
+  | { kind: "dataIntegrity"; key: string; workId: string; title: string | null }
   | ({ kind: "missingWork"; key: string } & MissingWork);
 
 const collator = new Intl.Collator("ja", { numeric: true });
@@ -23,7 +35,11 @@ export function buildNeedsAttentionRows(
         kind: "identityConflict",
         key: `identity:${conflict.workId}`,
         workId: conflict.workId,
-        paths: conflict.paths,
+        registered:
+          conflict.registeredTitle === null && conflict.registeredPath === null
+            ? null
+            : { title: conflict.registeredTitle, path: conflict.registeredPath },
+        unregisteredPaths: conflict.paths.filter((path) => path !== conflict.registeredPath),
       }),
     ),
     ...sortedBy(diagnostics?.invalidMetaFiles ?? [], (f) => f.path).map(
@@ -37,11 +53,12 @@ export function buildNeedsAttentionRows(
     ...sortedBy(diagnostics?.unreadablePaths ?? [], (path) => path).map(
       (path): NeedsAttentionRow => ({ kind: "unreadablePath", key: `unreadable:${path}`, path }),
     ),
-    ...sortedBy(diagnostics?.dataIntegrityWorkIds ?? [], (id) => id).map(
-      (workId): NeedsAttentionRow => ({
+    ...sortedBy(diagnostics?.dataIntegrityWorks ?? [], (work) => work.title ?? work.workId).map(
+      (work): NeedsAttentionRow => ({
         kind: "dataIntegrity",
-        key: `integrity:${workId}`,
-        workId,
+        key: `integrity:${work.workId}`,
+        workId: work.workId,
+        title: work.title,
       }),
     ),
     ...sortedBy(diagnostics?.missingWorks ?? [], (work) => work.title).map(

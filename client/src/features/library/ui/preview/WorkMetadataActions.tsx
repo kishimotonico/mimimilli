@@ -154,7 +154,7 @@ export function WorkMetadataActions({
                 }}
               >
                 <I.trash size={13} />
-                <span className="min-w-0 flex-1 truncate">作品登録を解除</span>
+                <span className="min-w-0 flex-1 truncate">登録解除</span>
               </button>
             </div>
           </div>

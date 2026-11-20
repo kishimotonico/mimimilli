@@ -4,6 +4,7 @@ import {
   computeDlsiteWorkDiff,
   defaultDlsiteApplySelection,
   detectRjCode,
+  pathBaseName,
   type DlsiteApplySelectionInput,
   type DlsiteCoverChange,
   type DlsitePreview,
@@ -37,14 +38,9 @@ import {
 } from "../../../../entities/work/model/workMutations";
 import { useToast } from "../../../../shared/ui/useToast";
 
-function folderNameOf(physicalPath: string): string {
-  const cut = Math.max(physicalPath.lastIndexOf("/"), physicalPath.lastIndexOf("\\"));
-  return cut < 0 ? physicalPath : physicalPath.slice(cut + 1);
-}
-
 function initialRjCode(snapshot: WorkEditSnapshot): string {
   if (snapshot.dlsite.rjCode !== null) return snapshot.dlsite.rjCode;
-  return detectRjCode([folderNameOf(snapshot.physicalPath), snapshot.title]) ?? "";
+  return detectRjCode([pathBaseName(snapshot.physicalPath), snapshot.title]) ?? "";
 }
 
 const UNAVAILABLE_REASON_LABEL: Record<DlsiteUnavailableReason, string> = {

@@ -157,11 +157,19 @@ export const identityConflictSchema = z.object({
 });
 export type IdentityConflict = z.infer<typeof identityConflictSchema>;
 
-/** ID重複。registeredTitle は同じ作品IDで登録済みの作品のタイトル。登録済みの作品がないときは null */
+/** ID重複。registeredTitle・registeredPath は同じ作品IDで登録済みの作品のタイトル（文字列として読めなければ null）と、paths のうちその作品の作品情報ファイルがあるもの。登録済みの作品がないときは null */
 export const identityConflictDiagnosticSchema = identityConflictSchema.extend({
   registeredTitle: z.string().nullable(),
+  registeredPath: workspacePathSchema.nullable(),
 });
 export type IdentityConflictDiagnostic = z.infer<typeof identityConflictDiagnosticSchema>;
+
+/** データ不整合の作品。title は保存された値の検証を通さずに読む作品名。文字列として読めないときは null */
+export const dataIntegrityWorkSchema = z.object({
+  workId: z.string(),
+  title: z.string().nullable(),
+});
+export type DataIntegrityWork = z.infer<typeof dataIntegrityWorkSchema>;
 
 /** GET /scan/diagnostics の返却値。要対応の現在状態で、すべて保存済みのデータから導く。 */
 export const scanDiagnosticsSchema = z.object({
@@ -170,8 +178,8 @@ export const scanDiagnosticsSchema = z.object({
   invalidMetaFiles: z.array(invalidMetaFileSchema),
   /** 直近に完了したスキャンで開けなかったフォルダーのroot相対path */
   unreadablePaths: z.array(workspacePathSchema),
-  /** 保存された値を読めず、作品一覧・スマートフォルダー・エクスポートから外れる作品の作品ID。保存された行の検証に通らない作品すべて */
-  dataIntegrityWorkIds: z.array(z.string()),
+  /** 保存された値を読めず、作品一覧・スマートフォルダー・エクスポートから外れる作品。保存された行の検証に通らない作品すべて */
+  dataIntegrityWorks: z.array(dataIntegrityWorkSchema),
   /** 状態が missing の作品すべて。ライブラリのエラー表示と同じ集合 */
   missingWorks: z.array(missingWorkSchema),
 });

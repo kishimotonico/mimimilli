@@ -325,7 +325,7 @@ export type ExportResponse = z.infer<typeof exportResponseSchema>;
 
 // ── エラー形式 ───────────────────────────────────────────────
 // 4xx/5xx は常にこの形で返す。ステータスコードと code の対応:
-//   404 not_found / 400 invalid_request / 403 forbidden / 415 unsupported_media_type / 409 conflict|source_changed|dlsite_refetch_required|root_reconfiguring
+//   404 not_found / 400 invalid_request / 403 forbidden / 415 unsupported_media_type / 409 conflict|source_changed|dlsite_refetch_required|reload_unresolved|root_reconfiguring
 //   / 502 parse_error|error / 503 offline / 500 internal
 // 本文サイズ超過の 413 は Bun が本文なしで返すため、この形式にならない
 
@@ -339,6 +339,7 @@ export const apiErrorSchema = z.object({
       "conflict",
       "source_changed",
       "dlsite_refetch_required",
+      "reload_unresolved",
       "root_reconfiguring",
       "internal",
     ]),

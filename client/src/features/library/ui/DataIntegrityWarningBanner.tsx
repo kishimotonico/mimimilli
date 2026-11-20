@@ -20,7 +20,7 @@ export function DataIntegrityWarningBanner() {
       </output>
     );
   }
-  const skippedCount = diagnostics.data?.dataIntegrityWorkIds.length ?? 0;
+  const skippedCount = diagnostics.data?.dataIntegrityWorks.length ?? 0;
   if (skippedCount === 0) return null;
   return (
     <output className={BANNER_CLASS}>

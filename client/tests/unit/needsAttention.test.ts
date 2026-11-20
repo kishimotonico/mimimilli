@@ -8,12 +8,14 @@ const diagnostics = buildScanDiagnostics({
     {
       kind: "identity_conflict",
       registeredTitle: "登録済みの作品",
+      registeredPath: workspacePath("b/a"),
       workId: "dup",
       paths: [workspacePath("b/a"), workspacePath("b/b")],
     },
     {
       kind: "identity_conflict",
       registeredTitle: null,
+      registeredPath: null,
       workId: "dup2",
       paths: [workspacePath("a/a"), workspacePath("a/b")],
     },
@@ -22,7 +24,10 @@ const diagnostics = buildScanDiagnostics({
     { path: workspacePath("x/mimimilli.json"), message: "mimimilli.json 4行目: カンマが足りない" },
   ],
   unreadablePaths: [workspacePath("secret"), workspacePath("locked")],
-  dataIntegrityWorkIds: ["w2", "w1"],
+  dataIntegrityWorks: [
+    { workId: "w2", title: null },
+    { workId: "w1", title: null },
+  ],
   missingWorks: [
     { workId: "m1", title: "いない作品", previousPath: workspacePath("gone") },
     { workId: "m2", title: "あの作品", previousPath: workspacePath("gone2") },
@@ -49,6 +54,26 @@ describe("buildNeedsAttentionRows", () => {
     const rows = buildNeedsAttentionRows(diagnostics);
     expect(rows.filter((row) => row.kind === "dataIntegrity")).toHaveLength(2);
     expect(rows.filter((row) => row.kind === "missingWork")).toHaveLength(2);
+  });
+
+  it("ID重複の登録済みの側は、作品名が読めなくても登録済みのパスがあれば残る", () => {
+    const rows = buildNeedsAttentionRows(
+      buildScanDiagnostics({
+        identityConflicts: [
+          {
+            kind: "identity_conflict",
+            registeredTitle: null,
+            registeredPath: workspacePath("a"),
+            workId: "d",
+            paths: [workspacePath("a"), workspacePath("b")],
+          },
+        ],
+      }),
+    );
+    expect(rows[0]).toMatchObject({
+      registered: { title: null, path: "a" },
+      unregisteredPaths: ["b"],
+    });
   });
 
   it("診断が未取得なら、行は無いものとして組む", () => {

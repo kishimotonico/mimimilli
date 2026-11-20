@@ -96,7 +96,7 @@ export default function FilePreviewWorkActions({
     try {
       await unregisterMutation.mutateAsync(workId);
     } catch (cause) {
-      toast.error(apiErrorMessage(cause, "作品登録の解除に失敗しました"));
+      toast.error(apiErrorMessage(cause, "登録解除に失敗しました"));
       return;
     }
     setShowUnregisterConfirm(false);
@@ -175,7 +175,7 @@ export default function FilePreviewWorkActions({
           setShowUnregisterConfirm(true);
         }}
       >
-        作品登録を解除
+        登録解除
       </Button>
     ) : null;
 
@@ -230,7 +230,7 @@ export default function FilePreviewWorkActions({
 
       {showUnregisterConfirm && (
         <ConfirmDialog
-          title="作品登録を解除"
+          title="登録解除"
           message={
             isSingleFileWorkEntry
               ? "このファイルの作品データ（再生履歴・タグを含む）と管理ファイル（.mimimilli.json）を削除します。音声ファイル自体は削除されません。"

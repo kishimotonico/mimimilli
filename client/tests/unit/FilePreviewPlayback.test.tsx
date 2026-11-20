@@ -114,6 +114,7 @@ describe("FilePreview ID重複（単一ファイル形式）", () => {
         {
           kind: "identity_conflict",
           registeredTitle: null,
+          registeredPath: null,
           workId: "w1",
           paths: ["a/single.mimimilli.json", metaPath],
         },
@@ -135,6 +136,7 @@ describe("FilePreview ID重複（単一ファイル形式）", () => {
         {
           kind: "identity_conflict",
           registeredTitle: null,
+          registeredPath: null,
           workId: "w1",
           paths: ["a/single.mimimilli.json", metaPath],
         },
@@ -154,6 +156,7 @@ describe("FilePreview ID重複（単一ファイル形式）", () => {
     const conflict: IdentityConflict = {
       kind: "identity_conflict",
       registeredTitle: null,
+      registeredPath: null,
       workId: "w1",
       paths: ["a/single.mimimilli.json", metaPath],
     };

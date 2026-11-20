@@ -204,6 +204,7 @@ test("identity-conflict: 単一ファイル形式の重複メタファイルと�
     {
       kind: "identity_conflict",
       registeredTitle: "FANZA単一ファイル作品（ID重複）",
+      registeredPath: "fanza/d00002.mimimilli.json",
       workId: "d00002",
       paths: ["fanza/d00002.mimimilli.json", "copies/d00002.mimimilli.json"],
     },
@@ -216,7 +217,9 @@ test("errors: データ不整合は診断・エクスポートから取得でき
   const adapter = createFixtureAdapter({ scenario: "errors" });
 
   const diagnostics = await adapter.listScanDiagnostics();
-  assert.deepEqual(diagnostics.dataIntegrityWorkIds, ["RJ501099"]);
+  assert.deepEqual(diagnostics.dataIntegrityWorks, [
+    { workId: "RJ501099", title: "タグの値が壊れた作品" },
+  ]);
 
   const exported = await adapter.exportLibrary();
   assert.deepEqual(exported.dataIntegrityWarning, {
@@ -229,7 +232,7 @@ test("new-work・default: データ不整合は無い", async () => {
   for (const scenario of [undefined, "new-work"] as const) {
     const adapter = createFixtureAdapter({ scenario });
     assert.deepEqual(
-      (await adapter.listScanDiagnostics()).dataIntegrityWorkIds,
+      (await adapter.listScanDiagnostics()).dataIntegrityWorks,
       [],
       `scenario=${scenario ?? "default"}`,
     );
@@ -316,6 +319,34 @@ test("errors: エラー・行方不明の作品のみが含まれる", async () 
   }
   const statuses = new Set(items.map((w: { status: string }) => w.status));
   assert.ok(statuses.has("error") || statuses.has("missing"));
+});
+
+test("identity-conflict-unregistered: 登録済みの作品が無いID重複は、再採番で新しい作品として取り込め、診断が消える", async () => {
+  const app = buildApp("identity-conflict-unregistered");
+  const before = await (await app.request("/api/scan/diagnostics")).json();
+  assert.deepEqual(before.identityConflicts, [
+    {
+      kind: "identity_conflict",
+      workId: "unregistered-id",
+      paths: ["copies/first-copy", "copies/second-copy"],
+      registeredTitle: null,
+      registeredPath: null,
+    },
+  ]);
+
+  const res = await app.request("/api/works/identity-conflicts/reassign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: "copies/first-copy" }),
+  });
+  assert.equal(res.status, 201);
+  const { snapshot } = await res.json();
+  assert.notEqual(snapshot.id, "unregistered-id");
+  assert.equal(snapshot.title, "first-copy");
+  assert.equal((await app.request(`/api/works/${snapshot.id}`)).status, 200);
+
+  const after = await (await app.request("/api/scan/diagnostics")).json();
+  assert.deepEqual(after.identityConflicts, []);
 });
 
 test("全シナリオ: rootFolderが作品のphysicalPathの前方一致になっている（relativeToRootが正しく剥がせる前提）", () => {
@@ -573,7 +604,9 @@ test("needs-attention: スキャン後に要対応の5種類が揃い、読み�
     ["RJ501008", "RJ501010"],
   );
   assert.deepEqual(diagnostics.unreadablePaths, ["権限なし/フォルダー"]);
-  assert.deepEqual(diagnostics.dataIntegrityWorkIds, ["RJ501099"]);
+  assert.deepEqual(diagnostics.dataIntegrityWorks, [
+    { workId: "RJ501099", title: "タグの値が壊れた作品" },
+  ]);
   assert.equal(diagnostics.identityConflicts.length, 1);
   assert.deepEqual(
     diagnostics.invalidMetaFiles.map((file) => file.message),
@@ -581,5 +614,5 @@ test("needs-attention: スキャン後に要対応の5種類が揃い、読み�
   );
 
   assert.equal(await adapter.reloadWork("RJ501099"), true);
-  assert.deepEqual((await adapter.listScanDiagnostics()).dataIntegrityWorkIds, []);
+  assert.deepEqual((await adapter.listScanDiagnostics()).dataIntegrityWorks, []);
 });

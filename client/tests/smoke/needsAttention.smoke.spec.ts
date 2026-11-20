@@ -35,20 +35,22 @@ test("要対応の5種類が直すもの→行方不明の順に並び、件数�
   assertNoErrors(tracker);
 });
 
-test("読み直すと行が消え、登録を解除は確認のあとで行が消える", async ({ page }) => {
+test("読み直すと行が消え、登録解除は確認のあとで行が消える", async ({ page }) => {
   const tracker = trackErrors(page);
   const { panel } = await openNeedsAttention(page);
 
-  await panel.getByRole("button", { name: "この作品を読み直す" }).click();
+  await panel.getByRole("button", { name: "読み直す" }).click();
   await expect(panel.getByText("データ不整合", { exact: true })).toBeHidden();
+  await expect(page.getByText("「タグの値が壊れた作品」を読み直しました")).toBeVisible();
 
   await expect(panel.getByText("行方不明", { exact: true })).toHaveCount(2);
-  await panel.getByRole("button", { name: "登録を解除" }).first().click();
+  await panel.getByRole("button", { name: "登録解除" }).first().click();
   await page
-    .getByRole("alertdialog", { name: "登録を解除" })
+    .getByRole("alertdialog", { name: "登録解除" })
     .getByRole("button", { name: "解除する" })
     .click();
   await expect(panel.getByText("行方不明", { exact: true })).toHaveCount(1);
+  await expect(page.getByText(/を登録解除しました/)).toBeVisible();
 
   assertNoErrors(tracker);
 });
@@ -98,6 +100,28 @@ test("スキャン前に開くと件数のある要対応へ着地し、未登�
   const unregistered = dialog.getByRole("tabpanel", { name: /^未登録/ });
   await expect(unregistered.getByText("まだスキャンしていません")).toBeVisible();
   await expect(unregistered.getByRole("status").getByRole("button")).toHaveCount(0);
+
+  assertNoErrors(tracker);
+});
+
+test("ID重複は登録済みの側に作品名と作品IDを出し、未登録の側を別の作品として取り込むと行が消える", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  const { panel } = await openNeedsAttention(page);
+
+  const row = panel.locator("tbody tr").filter({ hasText: "ID重複" });
+  await expect(row.getByText("登録済み", { exact: true })).toBeVisible();
+  await expect(row.getByText("未登録", { exact: true })).toBeVisible();
+  await expect(row.getByText("作品ID RJ501001", { exact: true })).toBeVisible();
+
+  await row.getByRole("button", { name: "別の作品として取り込む" }).click();
+  await page
+    .getByRole("alertdialog", { name: "別の作品として取り込む" })
+    .getByRole("button", { name: "取り込む" })
+    .click();
+  await expect(panel.getByText("ID重複", { exact: true })).toBeHidden();
+  await expect(page.getByText(/を別の作品として取り込みました/)).toBeVisible();
 
   assertNoErrors(tracker);
 });

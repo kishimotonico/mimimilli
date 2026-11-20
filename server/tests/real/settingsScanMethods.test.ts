@@ -50,7 +50,7 @@ test("resolveRootFolder / beginRootReconfiguration は receiver なしで呼び�
     listWorkPhysicalPaths: () => new Set<string>(),
     listDataIntegritySkips: () => [],
     listMissingWorks: () => [],
-    getWorkTitles: () => new Map<string, string>(),
+    getWorkIdentities: () => new Map<string, { title: string; metaPath: string }>(),
   };
 
   try {

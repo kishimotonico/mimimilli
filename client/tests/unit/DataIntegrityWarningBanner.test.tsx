@@ -22,7 +22,12 @@ function renderBanner() {
 describe("DataIntegrityWarningBanner", () => {
   it("診断の件数ぶん、除外された作品数を出す", async () => {
     mockApi({
-      "GET /api/scan/diagnostics": buildScanDiagnostics({ dataIntegrityWorkIds: ["a", "b"] }),
+      "GET /api/scan/diagnostics": buildScanDiagnostics({
+        dataIntegrityWorks: [
+          { workId: "a", title: null },
+          { workId: "b", title: null },
+        ],
+      }),
     });
     renderBanner();
     expect(
@@ -51,7 +56,7 @@ describe("DataIntegrityWarningBanner", () => {
         calls += 1;
         return calls === 1
           ? apiError(500, "internal", "boom")
-          : buildScanDiagnostics({ dataIntegrityWorkIds: ["a"] });
+          : buildScanDiagnostics({ dataIntegrityWorks: [{ workId: "a", title: null }] });
       },
     });
     renderBanner();

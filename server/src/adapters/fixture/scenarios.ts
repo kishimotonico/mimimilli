@@ -29,6 +29,7 @@ export type FixtureScenarioId =
   | "empty"
   | "new-work"
   | "identity-conflict"
+  | "identity-conflict-unregistered"
   | "errors"
   | "large"
   | "scan-review"
@@ -40,6 +41,7 @@ export const SCENARIO_IDS: readonly FixtureScenarioId[] = [
   "empty",
   "new-work",
   "identity-conflict",
+  "identity-conflict-unregistered",
   "errors",
   "large",
   "scan-review",
@@ -77,6 +79,8 @@ export interface FixtureScenario {
   identityConflicts: IdentityConflict[];
   /** 一覧から除外した作品の報告。スキャン結果と作品一覧に付く */
   dataIntegrityWarning?: DataIntegrityWarning;
+  /** 一覧から除外した作品の作品名。catalogにある作品名で、保存値の検証を通らなくても読める */
+  dataIntegrityTitles?: Record<string, string>;
   /** rootの配下にないためcatalogから外れている作品。rootを戻すと同じIDで一覧へ戻る */
   detachedWorks: FixtureWorkRecord[];
   rootReconfiguration: FixtureRootReconfiguration | null;
@@ -231,6 +235,33 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
     };
   }
 
+  if (id === "identity-conflict-unregistered") {
+    return {
+      id,
+      works: cloneWorks(SEED_WORKS),
+      dlsiteLinkages: cloneDlsiteLinkages(),
+      dlsiteFetchFailures: cloneDlsiteFailures(nowMs),
+      smartFolders: cloneSmartFolders(smartFolders),
+      rootFolder: "/library",
+      lastScanTime: now,
+      scanInsertedWorkIds: [],
+      scanUpdatedWorks: [],
+      scanNewlyMissingWorkIds: [],
+      scanUnreadablePaths: [],
+      scanCandidates: [],
+      invalidMetaFiles: [],
+      identityConflicts: [
+        {
+          kind: "identity_conflict",
+          workId: "unregistered-id",
+          paths: [workspacePath("copies/first-copy"), workspacePath("copies/second-copy")],
+        },
+      ],
+      detachedWorks: [],
+      rootReconfiguration: null,
+    };
+  }
+
   if (id === "large") {
     const bulk = createBulkWorks(LARGE_SCENARIO_WORK_COUNT - SEED_WORKS.length, nowMs);
     const dlsiteLinkages = cloneDlsiteLinkages();
@@ -275,6 +306,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       invalidMetaFiles: [],
       identityConflicts: [],
       dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["RJ501099"] },
+      dataIntegrityTitles: { RJ501099: "タグの値が壊れた作品" },
       detachedWorks: [],
       rootReconfiguration: null,
     };
@@ -311,6 +343,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
         },
       ],
       dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["RJ501099"] },
+      dataIntegrityTitles: { RJ501099: "タグの値が壊れた作品" },
       detachedWorks: [],
       rootReconfiguration: null,
     };

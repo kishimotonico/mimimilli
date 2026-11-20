@@ -74,6 +74,7 @@ test("重複Work IDはmimimilli.jsonを変更せず、catalog公開せずに全p
     {
       kind: "identity_conflict",
       registeredTitle: null,
+      registeredPath: null,
       workId: WORK_ID,
       paths: ["work-a", "work-z"],
     },
@@ -193,6 +194,7 @@ test("壊れたコピーのcandidateIdで既存作品の投影を乗っ取らな
     {
       kind: "identity_conflict",
       registeredTitle: "元作品",
+      registeredPath: "work-owner",
       workId: WORK_ID,
       paths: ["work-copy", "work-owner"],
     },
@@ -279,6 +281,7 @@ test("登録解除すると該当pathがidentity_conflict診断から消え、�
     {
       kind: "identity_conflict",
       registeredTitle: "既存投影",
+      registeredPath: "work-z-owner",
       workId: WORK_ID,
       paths: ["work-a-copy", "work-z-owner"],
     },
@@ -309,6 +312,7 @@ test("登録解除しても残りpathが2以上なら診断は残り、該当pat
     {
       kind: "identity_conflict",
       registeredTitle: "既存投影",
+      registeredPath: "work-owner",
       workId: WORK_ID,
       paths: ["work-copy-1", "work-copy-2", "work-owner"],
     },
@@ -322,6 +326,7 @@ test("登録解除しても残りpathが2以上なら診断は残り、該当pat
     {
       kind: "identity_conflict",
       registeredTitle: null,
+      registeredPath: null,
       workId: WORK_ID,
       paths: ["work-copy-1", "work-copy-2"],
     },
@@ -350,6 +355,7 @@ test("root外を指すmissing作品を単体登録解除しても成功し、他
     {
       kind: "identity_conflict",
       registeredTitle: "新root作品",
+      registeredPath: "work-other-owner",
       workId: OTHER_WORK_ID,
       paths: ["work-other-copy", "work-other-owner"],
     },
@@ -495,6 +501,7 @@ test("有効な同IDが2つある状態で壊れた3つ目のコピーはinvalid
     {
       kind: "identity_conflict",
       registeredTitle: null,
+      registeredPath: null,
       workId: WORK_ID,
       paths: ["work-a", "work-b"],
     },
@@ -590,7 +597,7 @@ test("root変更の開始で旧rootの診断が消え、再スキャン前に別
     identityConflicts: [],
     invalidMetaFiles: [],
     unreadablePaths: [],
-    dataIntegrityWorkIds: [],
+    dataIntegrityWorks: [],
     missingWorks: [],
   });
 });

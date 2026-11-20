@@ -156,7 +156,7 @@ test("作品を選ぶとプレビューが開く（行方不明の状態表示�
   assertNoErrors(tracker);
 });
 
-test("詳細パネルの「その他」メニューから作品登録を解除できる（確認ダイアログ経由、パネルは閉じ一覧から消える）", async ({
+test("詳細パネルの「その他」メニューから登録解除できる（確認ダイアログ経由、パネルは閉じ一覧から消える）", async ({
   page,
 }) => {
   const tracker = trackErrors(page);
@@ -167,9 +167,9 @@ test("詳細パネルの「その他」メニューから作品登録を解除�
   const panel = page.locator(".mle-prv");
   await expect(panel).toBeVisible();
   await panel.getByRole("button", { name: "その他" }).click();
-  await panel.getByRole("menuitem", { name: "作品登録を解除" }).click();
+  await panel.getByRole("menuitem", { name: "登録解除" }).click();
 
-  const dialog = page.getByRole("alertdialog", { name: "登録を解除" });
+  const dialog = page.getByRole("alertdialog", { name: "登録解除" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "解除する" }).click();
 
@@ -177,7 +177,7 @@ test("詳細パネルの「その他」メニューから作品登録を解除�
   await expect(
     page.locator(".mll-results").getByText("添い寝カフェへようこそ", { exact: false }),
   ).toBeHidden();
-  await expect(page.getByText("の登録を解除しました", { exact: false })).toBeVisible();
+  await expect(page.getByText("を登録解除しました", { exact: false })).toBeVisible();
 
   assertNoErrors(tracker);
 });
@@ -621,7 +621,7 @@ test("Files: 未登録の音声ファイルを作品として登録できる", a
   const dialog = page.getByRole("dialog", { name: "このファイルを作品として登録" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "登録" }).click();
-  await expect(preview.getByRole("button", { name: "作品登録を解除" })).toBeVisible();
+  await expect(preview.getByRole("button", { name: "登録解除" })).toBeVisible();
 
   await page.getByRole("button", { name: "ライブラリ", exact: true }).click();
   await page.getByPlaceholder("ライブラリを検索（タイトル · CV · タグ · RJ ...）").fill("d00001");

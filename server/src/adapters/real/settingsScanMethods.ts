@@ -1,5 +1,5 @@
 import { realpathSync, statSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { requireConfiguredRoot } from "../../core/rootFolder.ts";
 import { InvalidRootFolderError } from "../../errors.ts";
 import type {
@@ -16,6 +16,7 @@ import { type DbLocation } from "./db.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
 import type { DlsiteParser } from "./dlsite.ts";
 import { createDlsiteProductResolver, readUsableDlsite } from "./dlsiteProductResolve.ts";
+import { identityConflictMetaPath } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
 import { createCandidateDlsiteSource } from "./scanCandidateDlsite.ts";
 import { createCandidateMaterials, resolveRootIdentity } from "./scanCandidateMaterials.ts";
@@ -44,7 +45,7 @@ export function createSettingsScanMethods(deps: {
     | "listWorkPhysicalPaths"
     | "listDataIntegritySkips"
     | "listMissingWorks"
-    | "getWorkTitles"
+    | "getWorkIdentities"
   >;
   catalog: Pick<
     CatalogWorkRepository,
@@ -235,15 +236,29 @@ export function createSettingsScanMethods(deps: {
     async listScanDiagnostics(): Promise<ScanDiagnostics> {
       const root = requireRoot();
       const conflicts = catalog.listIdentityConflicts();
-      const titles = query.getWorkTitles(conflicts.map((conflict) => conflict.workId));
+      const skips = query.listDataIntegritySkips();
+      const identities = query.getWorkIdentities([
+        ...conflicts.map((conflict) => conflict.workId),
+        ...skips.map((skip) => skip.workId),
+      ]);
       return {
-        identityConflicts: conflicts.map((conflict) => ({
-          ...conflict,
-          registeredTitle: titles.get(conflict.workId) ?? null,
-        })),
+        identityConflicts: conflicts.map((conflict) => {
+          const registered = identities.get(conflict.workId);
+          return {
+            ...conflict,
+            registeredTitle: registered?.title ?? null,
+            registeredPath:
+              conflict.paths.find(
+                (path) => identityConflictMetaPath(join(root, path)) === registered?.metaPath,
+              ) ?? null,
+          };
+        }),
         invalidMetaFiles: catalog.listInvalidMetaFiles(),
         unreadablePaths: catalog.listUnreadablePaths(),
-        dataIntegrityWorkIds: query.listDataIntegritySkips().map((skip) => skip.workId),
+        dataIntegrityWorks: skips.map((skip) => ({
+          workId: skip.workId,
+          title: identities.get(skip.workId)?.title ?? null,
+        })),
         missingWorks: query.listMissingWorks(root),
       };
     },

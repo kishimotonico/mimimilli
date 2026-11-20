@@ -31,9 +31,9 @@ import { MetaMutationReject, encodeMetaRaw, patchMetaFileCas, readMetaSource } f
 import {
   SOURCE_IDENTITY_MISMATCH_MESSAGE,
   SOURCE_RELOAD_FAILED_MESSAGE,
-  SOURCE_RELOAD_UNRESOLVED_MESSAGE,
   SourceChangedError,
   SourceConflictError,
+  SourceReloadUnresolvedError,
 } from "../../errors.ts";
 import { removeIdentityConflictPath } from "../../core/identityConflicts.ts";
 import { validateResumeRequest } from "../../core/resumeValidation.ts";
@@ -273,7 +273,7 @@ export function createWorkMethods(deps: {
         throw new SourceConflictError(SOURCE_RELOAD_FAILED_MESSAGE);
       }
       if (query.listDataIntegritySkips([id]).length > 0) {
-        throw new SourceConflictError(SOURCE_RELOAD_UNRESOLVED_MESSAGE);
+        throw new SourceReloadUnresolvedError();
       }
       return true;
     },

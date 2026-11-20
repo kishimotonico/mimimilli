@@ -172,7 +172,7 @@ export default function RegisterWorkDialog({
         {preview.descendantWorkCount > 0 && (
           <p className="mb-3 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_35%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_8%,transparent)] px-3 py-2 text-secondary leading-[1.6] text-ink-1">
             配下に登録済み作品が <b>{preview.descendantWorkCount}</b>{" "}
-            件あります。先に子作品の登録を解除してから親を登録してください。
+            件あります。先に子作品を登録解除してから親を登録してください。
           </p>
         )}
 

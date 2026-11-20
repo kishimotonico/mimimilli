@@ -42,7 +42,7 @@ describe("WorkStatusWarnings", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "登録を解除" }));
+    fireEvent.click(screen.getByRole("button", { name: "登録解除" }));
     expect(onDelete).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "Filesで開く" }));
     expect(onOpenFiles).toHaveBeenCalledTimes(1);
@@ -60,7 +60,7 @@ describe("WorkStatusWarnings", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "登録を解除" }));
+    fireEvent.click(screen.getByRole("button", { name: "登録解除" }));
     expect(onDelete).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "Filesで開く" }));
     expect(onOpenFiles).toHaveBeenCalledTimes(1);

@@ -116,13 +116,18 @@ test("fixture: 診断は5種類をスキャンを待たずに返し、ライブ�
     assert.equal(diagnostics.identityConflicts.length, 1);
     assert.equal(diagnostics.invalidMetaFiles.length, 1);
     assert.deepEqual(diagnostics.unreadablePaths, ["権限なし/フォルダー"]);
-    assert.deepEqual(diagnostics.dataIntegrityWorkIds, ["RJ501099"]);
+    assert.deepEqual(diagnostics.dataIntegrityWorks, [
+      { workId: "RJ501099", title: "タグの値が壊れた作品" },
+    ]);
     await assertMatchesLibrary(app);
 
     await runScan(adapter);
     const afterScan = await diagnosticsOf(app);
     assert.ok(afterScan.missingWorks.some((work) => work.workId === "RJ501008"));
     assert.equal(afterScan.identityConflicts[0]?.registeredTitle !== null, true);
+    const registeredPath = afterScan.identityConflicts[0]?.registeredPath;
+    assert.ok(registeredPath);
+    assert.ok(afterScan.identityConflicts[0]?.paths.includes(registeredPath));
     await assertMatchesLibrary(app);
   } finally {
     await app.shutdown();
@@ -159,6 +164,7 @@ test("real: 診断は行方不明をすべて返し、ライブラリの一覧�
       [ID_B],
     );
     assert.equal(diagnostics.identityConflicts[0]?.registeredTitle, "作品B");
+    assert.equal(diagnostics.identityConflicts[0]?.registeredPath, "b");
     await assertMatchesLibrary(app);
 
     rmSync(join(root, "a"), { recursive: true });
@@ -259,8 +265,8 @@ test("real: 読めない作品は、要対応のデータ不整合とライブ�
   const db = directory.own(openDb(database));
   const { catalog, user } = createWorkRepos(db);
   upsertTestWork(catalog, user, makeTestWork({ id: "work-good" }));
-  upsertTestWork(catalog, user, makeTestWork({ id: "work-bad-status" }));
-  upsertTestWork(catalog, user, makeTestWork({ id: "work-bad-urls" }));
+  upsertTestWork(catalog, user, makeTestWork({ id: "work-bad-status", title: "状態が壊れた作品" }));
+  upsertTestWork(catalog, user, makeTestWork({ id: "work-bad-urls", title: "URLが壊れた作品" }));
   db.catalog.update(works).set({ status: "unknown" }).where(eq(works.id, "work-bad-status")).run();
   db.catalog.update(works).set({ urlsJson: "{" }).where(eq(works.id, "work-bad-urls")).run();
   user.setUserSetting("root_folder", "/library");
@@ -274,10 +280,13 @@ test("real: 読めない作品は、要対応のデータ不整合とライブ�
   const app = createApp(adapter);
   try {
     const diagnostics = await diagnosticsOf(app);
-    assert.deepEqual([...diagnostics.dataIntegrityWorkIds].sort(), [
-      "work-bad-status",
-      "work-bad-urls",
-    ]);
+    assert.deepEqual(
+      [...diagnostics.dataIntegrityWorks].sort((a, b) => a.workId.localeCompare(b.workId)),
+      [
+        { workId: "work-bad-status", title: "状態が壊れた作品" },
+        { workId: "work-bad-urls", title: "URLが壊れた作品" },
+      ],
+    );
 
     const list = (await getJson(app, "/api/works?page=1&limit=500")).body;
     assert.deepEqual(
@@ -288,7 +297,12 @@ test("real: 読めない作品は、要対応のデータ不整合とライブ�
 
     const reloaded = await app.request("/api/works/work-bad-status/reload", { method: "POST" });
     assert.equal(reloaded.status, 409);
-    assert.ok((await diagnosticsOf(app)).dataIntegrityWorkIds.includes("work-bad-status"));
+    assert.equal((await reloaded.json()).error.code, "conflict");
+    assert.ok(
+      (await diagnosticsOf(app)).dataIntegrityWorks.some(
+        (work) => work.workId === "work-bad-status",
+      ),
+    );
   } finally {
     await app.shutdown();
   }

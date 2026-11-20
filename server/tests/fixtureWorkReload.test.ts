@@ -10,9 +10,9 @@ test("データ不整合の作品を読み直すと、GET /scan/diagnostics の�
   const integrityIds = async () =>
     (
       (await (await app.request("/api/scan/diagnostics")).json()) as {
-        dataIntegrityWorkIds: string[];
+        dataIntegrityWorks: Array<{ workId: string }>;
       }
-    ).dataIntegrityWorkIds;
+    ).dataIntegrityWorks.map((work) => work.workId);
   const scan = async () => {
     const started = await app.request("/api/scan", { method: "POST" });
     const { job } = (await started.json()) as { job: { id: string } };

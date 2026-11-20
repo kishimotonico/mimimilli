@@ -183,7 +183,7 @@ export async function reloadWork(workId: string): Promise<void> {
   await postVoid(`/works/${encodeURIComponent(workId)}/reload`);
 }
 
-/** 作品登録を解除する（DB・メタファイルのみ。物理ファイルは残す） */
+/** 作品を登録解除する（DB・メタファイルのみ。物理ファイルは残す） */
 export async function deleteWork(workId: string): Promise<void> {
   await deleteVoid(`/works/${encodeURIComponent(workId)}`);
 }

@@ -1,17 +1,13 @@
 import type { Work } from "@mimimilli/shared";
 import {
   detectRjCode,
+  pathBaseName,
   isDlsiteFetchFailed,
   isDlsiteParseFailed,
   isRjCodeMissing,
 } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import Button from "../../../../shared/ui/Button";
-
-function folderNameOf(physicalPath: string): string {
-  const cut = Math.max(physicalPath.lastIndexOf("/"), physicalPath.lastIndexOf("\\"));
-  return cut < 0 ? physicalPath : physicalPath.slice(cut + 1);
-}
 
 interface WorkStatusWarningsProps {
   work: Work;
@@ -27,7 +23,7 @@ export function WorkStatusWarnings({
   onOpenFiles,
 }: WorkStatusWarningsProps) {
   const detectedRjCode = isRjCodeMissing(work.dlsite)
-    ? detectRjCode([folderNameOf(work.physicalPath), work.title])
+    ? detectRjCode([pathBaseName(work.physicalPath), work.title])
     : null;
 
   return (
@@ -51,7 +47,7 @@ export function WorkStatusWarnings({
                 className="text-[color:var(--r-coral)]"
                 onClick={onDelete}
               >
-                登録を解除
+                登録解除
               </Button>
             </div>
           </div>
@@ -80,7 +76,7 @@ export function WorkStatusWarnings({
                 className="text-[color:var(--r-coral)]"
                 onClick={onDelete}
               >
-                登録を解除
+                登録解除
               </Button>
             </div>
           </div>

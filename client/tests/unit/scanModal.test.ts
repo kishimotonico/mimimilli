@@ -485,7 +485,7 @@ describe("ScanModal", () => {
       diagnostics: buildScanDiagnostics({
         missingWorks: [missing],
         unreadablePaths: [workspacePath("locked")],
-        dataIntegrityWorkIds: ["w1"],
+        dataIntegrityWorks: [{ workId: "w1", title: "壊れた作品" }],
       }),
     });
     expect(screen.getByRole("tab", { name: "要対応（3件）" })).toBeInTheDocument();

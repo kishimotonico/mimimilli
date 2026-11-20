@@ -58,9 +58,9 @@ async function setup(t: TestContext) {
   const integrityIds = async () =>
     (
       (await (await app.request("/api/scan/diagnostics")).json()) as {
-        dataIntegrityWorkIds: string[];
+        dataIntegrityWorks: Array<{ workId: string }>;
       }
-    ).dataIntegrityWorkIds;
+    ).dataIntegrityWorks.map((work) => work.workId);
   const listedIds = async () => {
     const page = (await (await app.request("/api/works")).json()) as {
       items: Array<{ id: string }>;
@@ -134,7 +134,9 @@ test("userの保存値が壊れていて読み直しでは直らないときは4
   await scanAndRead();
   assert.deepEqual(await listedIds(), [otherId]);
 
-  assert.equal((await reload(targetId)).status, 409);
+  const unresolved = await reload(targetId);
+  assert.equal(unresolved.status, 409);
+  assert.equal((await unresolved.json()).error.code, "reload_unresolved");
 
   assert.deepEqual(await listedIds(), [otherId]);
   assert.deepEqual(await integrityIds(), [targetId]);

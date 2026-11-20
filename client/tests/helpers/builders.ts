@@ -171,7 +171,7 @@ export function buildScanDiagnostics(overrides: Partial<ScanDiagnostics> = {}): 
     identityConflicts: [],
     invalidMetaFiles: [],
     unreadablePaths: [],
-    dataIntegrityWorkIds: [],
+    dataIntegrityWorks: [],
     missingWorks: [],
     ...overrides,
   });
