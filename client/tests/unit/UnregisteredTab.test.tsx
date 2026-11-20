@@ -100,7 +100,7 @@ async function renderUnmountableTab(candidates: ScanCandidate[]) {
 async function renderTab(
   candidates: ScanCandidate[] = [candidateA, candidateB],
   jobOverrides: Parameters<typeof createFakeDlsiteJobStore>[0] = {},
-  options: { pruning?: boolean } = {},
+  options: { pruning?: boolean; status?: "ready" | "notScanned" | "error" } = {},
 ) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const store = createStore();
@@ -120,7 +120,7 @@ async function renderTab(
           null,
           createElement(UnregisteredTab, {
             candidates: list,
-            status: "ready",
+            status: options.status ?? "ready",
             onRetry: () => {},
             onRegistered,
             onOpenFiles,
@@ -149,6 +149,20 @@ async function renderTab(
     rerenderWith: (l: ScanCandidate[]) => view.rerender(tree(l)),
   };
 }
+
+describe("UnregisteredTab ツールバー", () => {
+  it("未スキャンでも除外済みがあれば「除外済み」を出し、なければ帯ごと出さない", async () => {
+    const spy = vi.spyOn(scanEntityApi, "getScanCandidateExclusions").mockResolvedValue([]);
+    const view = await renderTab([], {}, { status: "notScanned" });
+    expect(screen.queryByRole("button", { name: /除外済み/ })).toBeNull();
+    expect(screen.queryByTestId("unregistered-toolbar")).toBeNull();
+    view.unmount();
+    spy.mockResolvedValue(["dlsite/除外した作品"]);
+    await renderTab([], {}, { status: "notScanned" });
+    expect(await screen.findByRole("button", { name: /除外済み/ })).toBeInTheDocument();
+    expect(screen.getByTestId("unregistered-toolbar")).toBeInTheDocument();
+  });
+});
 
 describe("UnregisteredTab 仮想リスト", () => {
   it("1000件でも見えている行だけを描画する", async () => {
@@ -520,7 +534,7 @@ describe("UnregisteredTab 取得と進捗", () => {
 
   it("選択中で未取得のRJコードだけを対象に取得を始める", async () => {
     const { job } = await renderTab([first, second, candidateA]);
-    expect(screen.getByText(/2件・約/)).not.toBeNull();
+    expect(screen.queryByText(/件・約/)).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "DLsiteから取得 2件" }));
     expect(job.start).toHaveBeenCalledWith(["RJ000001", "RJ000002"], false);
   });
@@ -739,6 +753,26 @@ describe("UnregisteredTab 除外", () => {
     fireEvent.click(screen.getByRole("button", { name: "「除外した作品」を未登録に戻す" }));
     await waitFor(() => expect(screen.getByText("除外した候補はありません")).not.toBeNull());
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "未登録" }));
+  });
+
+  it("フォーカスがメニューの外にあっても、Escはメニューだけを閉じて親のダイアログへ届かない", async () => {
+    await renderTab([candidateA, candidateB]);
+    const trigger = screen.getByRole("button", { name: `「${candidateA.inferredTitle}」の操作` });
+    fireEvent.click(trigger);
+    expect(screen.getByRole("menu")).not.toBeNull();
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(false);
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "その他の操作" }));
+    expect(screen.getByRole("menu")).not.toBeNull();
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(fireEvent.keyDown(document.body, { key: "Escape", isComposing: true })).toBe(true);
+    expect(screen.getByRole("menu")).not.toBeNull();
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(false);
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(true);
   });
 
   it("行メニューはEscで閉じて︙へフォーカスが戻り、Tabで外へ出ても閉じる", async () => {

@@ -12,9 +12,11 @@
 - `--acc` 系: アクセント（既定は柿色）。soft=淡色背景、line=枠線、ink=アクセント上の文字
 - riso 系（`--r-coral` / `-leaf` / `-mustard` / `-plum`）: カバーアートやマルチchミキサーの色分け用。リソグラフ風の彩度
 - タグカテゴリ色（`--cv-color` / `--circle-color` / `--series-color` / `--cat-color`）: 構造化タグ（`cv/` `サークル/` `シリーズ/` `カテゴリ/`）を視覚的に区別する専用色。フラットタグには使わない。値の実背景（`--paper-2`、hover時`--paper-3`）の両方で4.5:1以上を満たすよう明度を調整済み。色を変える場合は両背景で計算し直す
-- 状態の4区分（`StatusLabel`）: 完了＝`--state-success`、あなたの番（該当なし・失敗など）＝`--state-danger`、作業中＝`--ink-2`、対象外＝色なし。文字には `--ink-0` を混ぜて読める濃さにし、薄い背景が要るときは `color-mix()` でその場で作る。新しい色トークンは作らない
-- `--shadow-cover`: カバーアート専用の影（内側ハイライト付き）。通常の面には `--shadow-1/2/pop` を使う
+- 状態の4区分（`StatusLabel`）: 完了＝`--state-success`、あなたの番（該当なし・失敗など）＝`--state-danger`、作業中＝`--ink-2`、対象外＝色なし。文字色は混ぜずトークンそのものを使い、薄い背景が要るときは `color-mix()` でその場で作る。新しい色トークンは作らない。アイコンは完了＝丸チェック（`I.checkC`）、該当なし＝虫眼鏡×（`I.searchX`）、失敗＝警告（`I.err`）、連携済み＝リンク、未連携＝破線のリンク（`I.linkOff`）
+- `--shadow-cover`: カバーアート専用の影（内側ハイライト付き）。通常の面には `--shadow-1/2/pop`、モーダル（`Modal`）には `--shadow-modal` を使う
 - 影・暗幕の基底色: `--shadow-ink`（影・暗幕）、`--immersive-ink`（没入モードの暗幕）、`--immersive-text-shadow-ink`（没入モードの文字影）、`--shadow-black`（画像上アイコンの影）。影・暗幕の色はこれらから `color-mix(in oklch, var(--x) N%, transparent)` で透明度を付けて作り、`oklch` を直書きしない
+- `--cover-none`: 画像がないカバー枠の斜線パターン（`paper-2` / `paper-3` の縞）。カバーの代わりに枠だけ出す一覧の行で使う
+- チェックボックス: アプリ全体で `accent-color` を `--acc` にする（`shell/base.css`）
 - `--scrim`: モーダルの暗幕。`--shadow-ink` を透過したもので、モーダルの暗幕にはこれを使う
 
 ## テーマとアクセント
@@ -56,6 +58,7 @@
   - 付与した対象: `BarContent`（下部バー）・`PlayerTransportControls`（再生中タブ）・`PopupContent`（ポップアップ）・`NowPlayingImmersiveMiniControls`（没入モード）の各再生/一時停止・前後トラック・±10秒・ループ・チャンネル入替ボタン、`PopupContent`の速度トリガー（`mle-ratepill`、速度メニュー項目自体は`role="menu"`配下として除外）、`BarVolumePopover`の音量トリガー
   - 意図的に付与しなかった対象: 停止・展開・折りたたみ・「再生中の作品を表示」等のナビゲーション系ボタン（再生状態を切り替える操作ではないため）、`ABRepeatBar`のA/B地点設定ボタン（再生状態を切り替える連続操作ではなく、その場で状態を確定させる一回限りのアクションのため、標準のSpace活性化のままでよい）
 - Escapeはレイヤーごとに一段だけ閉じる（`TagCombobox`）。候補表示中のEscapeは候補だけを閉じ、ダイアログのcancelや親popoverのdismissへは伝播させない。候補が閉じているときのEscapeは、呼び出し元が渡した`onCancel`があればそれ（編集キャンセル等）を呼び、`onCancel`が無ければ何もせずネイティブ`<dialog>`のcancelへ素通しする
+- メニュー（行の⋮・主ボタンの▾）は、開いている間フォーカス位置に関係なくEscapeを先に取り（`useAnchoredPopover` の `consumeEscape`）、メニューだけを閉じる。親のダイアログへは届かない
 - IME変換中（`event.nativeEvent.isComposing`）はEscapeもEnterも無視する。変換の取り消し・確定はIME自身に任せ、候補の開閉・タグ確定・onCancelは発火させない
 
 ## 作品一覧・トラック一覧のキーボード操作
@@ -105,7 +108,7 @@
 設定モーダル・スキャンモーダル・スマートフォルダーエディタ・作品編集・DLsite適用プレビューは
 ネイティブ `<dialog>` + `showModal()` で実装しており、z-index ではなくブラウザの
 top layer によって最前面に重なる。開閉ライフサイクル・Escapeキャンセル・
-backdropクリックの共通処理は `client/src/shared/ui/useDialogModal.ts` に、外枠（サイズ・角丸・影・暗幕）と見出し・フッターは `client/src/shared/ui/Modal.tsx` の `Modal`・`ModalHeader`・`ModalFooter` に集約している。
+backdropクリックの共通処理は `client/src/shared/ui/useDialogModal.ts` に、外枠（サイズ・角丸14px・1pxの `--line`・`--shadow-modal`・暗幕）と見出し（高さ52px以上、タイトル14px・太字、左右の余白は本文と同じ18pxで左端をそろえる、閉じるは30px角）・フッターは `client/src/shared/ui/Modal.tsx` の `Modal`・`ModalHeader`・`ModalFooter` に集約している。
 フォーカストラップと「多重モーダル時は最前面のEscだけが効く」挙動は top layer の
 ブラウザ標準実装に任せる。Escape・×ボタン・backdropクリックの閉じ方は progressive
 dismissal に統一しており、3経路とも `useDialogModal` の `onClose` 1本に集約する。
@@ -174,9 +177,21 @@ action付きは10秒（`TOAST_ACTION_AUTO_DISMISS_MS`）で自動的に閉じる
 focus中はタイマーを止め、離れると残り時間から再開する。`variant="error"` だけは自動消滅
 せず、× ボタンでの手動クローズのみとする（エラーは読み落とし厳禁のため）。
 
-## スキャン画面の一覧状態
+## スキャン画面
 
-タブ一覧の読み込み中・失敗・未スキャン・0件は `ScanListState`（`CollectionStatus` の list）で出す。縦タブの件数は高さ18pxの枠を常に確保し、件数の有無で行の高さを変えない。状態欄の6状態・文言・トーストは [requirements-v4.md](requirements-v4.md) 8.2 に従う。
+タブ一覧の読み込み中・失敗・未スキャン・0件は `ScanListState`（`CollectionStatus` の list）で出す。状態欄の6状態・文言・トーストは [requirements-v4.md](requirements-v4.md) 8.2 に従う。見た目は合意モックの寸法を正とし、4タブで次を共有する。
+
+- 縦タブ: 幅180px、1行30px、文字は `text-body`。選択中は太字 `font-bold`・`ink-0`・`paper-2` 面・左2pxの `--acc` 線、非選択は `ink-1`。件数は高さ18pxの枠を常に確保して件数の有無で行の高さを変えず、数字は `text-secondary` `font-medium`、面は `paper-3`、要対応だけ `--state-danger` 11%の面と `--state-danger` の文字
+- 状態欄: 縦タブの下に高さ116pxで固定する。見出しは `text-secondary` `font-medium` `ink-2`、日時と理由は `text-secondary` `ink-1`。ボタンは `sm`（26px）
+- ツールバー: 高さ46px。未登録は左に絞り込みチップ・右に「除外済み」、更新済みは右に変化の種類のチップ。置くもののないタブには置かない
+- 絞り込みチップ（`ScanFilterChip`）: 高さ26pxの丸ピル、1pxの `--line`、文字は `text-control`。選択中だけ `--acc-soft` の面・`--acc-ink` の文字・`font-medium`
+- 一覧見出し（`LIST_HEADING_ROW_CLASS`）: 高さ30px、`paper-2` 面、上下に `--line-soft`、文字は `text-caption` `ink-2`。未登録では先頭の列に全選択のチェックを置く
+- 行: 高さ54px（要対応・更新済みは内容に合わせて伸びる）、文字は `text-body`。列は各タブの `layout.ts` の grid で見出しと行で共有する
+- カバー枠（`ScanCover`）: 36px角・角丸5px。画像がないときは `--cover-none` の斜線と1pxの `--line-soft`
+- メニュー（行の⋮・主ボタンの▾）: 幅180px以上、1pxの `--line`、角丸8px、項目は `text-body` `ink-0`、破壊的な項目だけ `--state-danger`。件数は項目の右端に添える。行のメニューはボタンの下に開き、入らないときだけ上へ反転する（`placement: "belowEnd"`）。開いている行のボタンに背景は付けない
+- フッター: 高さ58px、`paper-1` 面、上に `--line`。主ボタンは `md`（34px）
+
+要対応は種類・対象・起きていること・推奨アクションの4列（84px / 1fr / 0.7fr / 148px）。種類は `font-medium`で、直すものは `--state-danger`、行方不明は `ink-1`。対象の各行は高さ26pxで、ID重複は固定幅のラベル（登録済みは `--state-success`）とパスを並べる。起きていることは `text-body` `ink-0`、推奨アクションは `text-secondary` `ink-1` で、操作ボタンは推奨アクションの列にだけ置く。ID重複のボタンは対象の未登録の行と同じ高さに並べ、どのパスに効くかを横並びで示す。
 
 ## ライブラリ: チップ列・値一覧行・オーバーレイ
 
@@ -234,6 +249,7 @@ UI 全体は `client/src/styles/shell/index.css` の `@layer base` で `body { u
 
 - 一般的な意匠で足りるアイコンは `lucide-react` から取得して `I` に登録する。製品固有の意匠（`ratio11`・`gridJustified`・`loopOne`・`swapLR`・プレイヤー系の塗り表現など、一般カタログに対応がないもの）は自作を維持し、同じ `I` に追加する
 - stroke幅（1.5）・`currentColor`・`aria-hidden="true"` はアダプタ層（`Icon.tsx`）で固定する。呼び出し側やベンダー固有propsをこれらの値に触れさせない
+- 文字色は `tone`（既定＝ink-1、`muted`＝ink-2）で指定し、`className` で文字色を上書きしない。無効時は tone に関わらず ink-4
 - サイズは `IconButton` のサイズ契約（`sm`/`md`/`lg` = 箱26/30/38px、アイコン14/16/20px）に従う。呼び出し側で独自の数値を散らさない
 - SVGは装飾（`aria-hidden`）とし、意味は `IconButton` 側の `aria-label` が担う。名前を持たないアイコン単体での使用を避ける
 
@@ -273,5 +289,5 @@ UI 全体は `client/src/styles/shell/index.css` の `@layer base` で `body { u
 - プレイヤー展開ポップアップの占有高さを測り、グリッド末尾と右ペインにその分の余白を足して重なりを避ける — 画面下の大部分が空いて意味の分からないUIになる
 - 作品プレビューを一覧と並ぶレイアウト上の項目にし、狭幅では全幅オーバーレイへ切り替える — 開閉のたびに一覧が組み直されてちらつき、カードの寸法と列数も変わる。全幅の詳細は操作しづらく、狭幅はスマホ向けの画面構成で扱う
 - 軸レールの各軸に件数を出す — 値の個数か作品数か区別できない。表示のたびに軸数×スマートフォルダー数の全件集計が走る
-- ID重複の「別の作品として取り込む」を、推奨アクション列にまとめて並べる、または登録済みの側にも置く — どのパスに効くのか分からない。ボタンは未登録の各パスの右に置く
+- ID重複の「別の作品として取り込む」を、対象の列のパスの右に置く、または登録済みの側にも置く — 説明に近い列にボタンが混ざり、登録済みの側ではどのパスに効くのか分からない。推奨アクションの列に、未登録の各パスと同じ行位置で置く
 - ライブラリの不正なURLを自動で正当な画面へ戻し、トーストで知らせる — 不正なURLは404のまま見せる

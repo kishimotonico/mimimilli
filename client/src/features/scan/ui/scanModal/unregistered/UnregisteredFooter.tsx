@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
-import { DLSITE_FETCH_ESTIMATE_MS_PER_CODE, type DlsiteRegistrationApply } from "@mimimilli/shared";
-import { formatDlsiteFetchEstimate } from "../../../../../entities/dlsite/model/dlsiteFetchFrame";
+import type { DlsiteRegistrationApply } from "@mimimilli/shared";
 import SplitButton, { type SplitButtonItem } from "../../../../../shared/ui/SplitButton";
 import { ModalFooter } from "../../../../../shared/ui/Modal";
 import type { FooterPlan } from "../../../model/unregisteredSelection";
@@ -46,6 +45,7 @@ export default function UnregisteredFooter({
       label: "取得せずに追加",
       onSelect: () => onRegister(REGISTER_APPLY_ALL),
       disabled: !addable,
+      trailing: `${addCount}件`,
     });
   }
   items.push(
@@ -60,18 +60,18 @@ export default function UnregisteredFooter({
       label: "選択を除外",
       onSelect: onExclude,
       disabled: busy || selectedCount === 0,
+      danger: true,
+      trailing: `${selectedCount}件`,
     },
   );
 
-  const primaryWidth = "min-w-[200px]";
-
   return (
-    <ModalFooter className="gap-3">
+    <ModalFooter className="h-[58px] gap-3 border-line bg-paper-1 py-0">
       <span className="mr-auto whitespace-nowrap font-jp text-body text-ink-1">
         <span className="font-mono">{selectedCount}</span>件を選択
       </span>
       {plan.kind === "add" && missingDlsiteCount > 0 && (
-        <span className="font-jp text-secondary text-ink-2">
+        <span className="whitespace-nowrap font-jp text-secondary text-ink-2">
           うちDLsite情報なし{" "}
           <button
             type="button"
@@ -82,21 +82,12 @@ export default function UnregisteredFooter({
           </button>
         </span>
       )}
-      <DlsiteFetchProgress
-        onCancel={onCancelFetch}
-        idleHint={
-          plan.kind === "fetch" && (
-            <span className="font-jp text-caption text-ink-2">
-              {plan.codes.length}件・
-              {formatDlsiteFetchEstimate(plan.codes.length * DLSITE_FETCH_ESTIMATE_MS_PER_CODE)}
-            </span>
-          )
-        }
-      />
+      <DlsiteFetchProgress onCancel={onCancelFetch} />
       {plan.kind !== "waiting" && (
         <div ref={anchorRef} className="relative inline-flex">
           <SplitButton
-            className={primaryWidth}
+            size="md"
+            className="min-w-[200px]"
             disabled={busy || selectedCount === 0}
             primaryDisabled={plan.kind === "add" && !addable}
             onClick={() => (plan.kind === "fetch" ? onFetch() : onRegister(REGISTER_APPLY_ALL))}

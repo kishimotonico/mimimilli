@@ -63,7 +63,7 @@ export default function Modal({
       onCancel={dialog.handleCancel}
       onClick={(event) => dialog.handleBackdropClick(event, canBackdropClose)}
       className={cn(
-        "m-auto flex flex-col overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 font-jp text-ink-0 shadow-pop backdrop:bg-[var(--scrim)]",
+        "m-auto flex flex-col overflow-hidden rounded-4 border border-line bg-paper-1 font-jp text-ink-0 shadow-modal backdrop:bg-[var(--scrim)]",
         HEIGHT_CLASS[height],
         SIZE_CLASS[size],
       )}
@@ -100,11 +100,11 @@ export function ModalHeader({
   closeDisabled,
 }: ModalHeaderProps) {
   return (
-    <header className="flex shrink-0 items-center gap-2 border-b border-line-soft px-[18px] py-[14px]">
+    <header className="flex min-h-[52px] shrink-0 items-center gap-2 border-b border-line-soft px-[18px] py-1.5">
       {icon}
       <div className="min-w-0 flex-1">
         {eyebrow}
-        <h2 id={titleId} className={cn("font-sans text-[14px] font-semibold", eyebrow && "mt-0.5")}>
+        <h2 id={titleId} className={cn("font-sans text-[14px] font-bold", eyebrow && "mt-0.5")}>
           {title}
         </h2>
         {description}
@@ -113,7 +113,9 @@ export function ModalHeader({
         <IconButton
           icon={I.x}
           label="閉じる"
-          size="sm"
+          size="md"
+          tone="muted"
+          className="-mr-1.5"
           disabled={closeDisabled}
           onClick={onClose}
         />

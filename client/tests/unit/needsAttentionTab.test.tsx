@@ -68,8 +68,8 @@ function renderTab(overrides: Partial<NeedsAttentionTabProps> = {}) {
 }
 
 function rowOf(kind: string) {
-  const cell = screen.getByText(kind, { selector: "[data-tone]" });
-  return within(cell.closest("tr")!);
+  const cell = screen.getByText(kind, { selector: "[role=cell]" });
+  return within(cell.closest<HTMLElement>("[role=row]")!);
 }
 
 describe("NeedsAttentionTab", () => {
@@ -94,20 +94,19 @@ describe("NeedsAttentionTab", () => {
       "推奨アクション",
     ]);
     for (const kind of ["ID重複", "読み取り失敗", "アクセス不可", "データ不整合", "行方不明"]) {
-      expect(screen.getByText(kind, { selector: "[data-tone]" })).toBeInTheDocument();
+      expect(screen.getByText(kind, { selector: "[role=cell]" })).toBeInTheDocument();
     }
     expect(screen.queryByText(/RJコード|DLsite/)).toBeNull();
   });
 
   it("各種類の起きていることと推奨アクションを出す", () => {
     renderTab();
-    expect(
-      rowOf("ID重複").getByText("同じ作品ID RJ501001 の作品情報ファイルが複数ある"),
-    ).toBeInTheDocument();
-    expect(rowOf("ID重複").getByText("どちらかを消すか、取り込む")).toBeInTheDocument();
-    expect(
-      rowOf("読み取り失敗").getByText("mimimilli.json 12行目: カンマが足りない"),
-    ).toBeInTheDocument();
+    expect(rowOf("ID重複").getAllByRole("cell")[2]).toHaveTextContent(
+      "同じ作品ID RJ501001 の作品情報ファイルが複数ある",
+    );
+    expect(rowOf("読み取り失敗").getAllByRole("cell")[2]).toHaveTextContent(
+      "mimimilli.json 12行目: カンマが足りない",
+    );
     expect(rowOf("読み取り失敗").getByText("ファイルを直す")).toBeInTheDocument();
     expect(rowOf("アクセス不可").getByText("フォルダーを開く権限がない")).toBeInTheDocument();
     expect(rowOf("アクセス不可").getByText("アクセス権を確認")).toBeInTheDocument();
@@ -132,25 +131,72 @@ describe("NeedsAttentionTab", () => {
     ]);
   });
 
-  it("ID重複は登録済みの側に作品名と作品IDを出し、未登録の側の行にだけ取り込むボタンを置く", async () => {
-    const user = userEvent.setup();
-    const props = renderTab();
+  it("ID重複は登録済みと未登録のラベルをパスと同じ行に並べ、取り込むボタンは推奨アクションの列に置く", () => {
+    renderTab();
     const row = rowOf("ID重複");
-    expect(row.getByText("登録済み")).toBeInTheDocument();
-    expect(row.getByText("未登録")).toBeInTheDocument();
-    expect(row.getByText("作品ID RJ501001")).toBeInTheDocument();
+    const registered = row.getByText("登録済み").parentElement!;
+    expect(within(registered).getByRole("button", { name: "dlsite/a" })).toBeVisible();
+    const unregistered = row.getByText("未登録").parentElement!;
+    expect(within(unregistered).getByRole("button", { name: "dlsite/b" })).toBeVisible();
+    expect(row.queryByText("登録済みの作品")).toBeNull();
+    expect(row.queryByText("作品ID RJ501001")).toBeNull();
     const importButton = row.getByRole("button", { name: "別の作品として取り込む" });
-    expect(
-      within(importButton.parentElement!).getByRole("button", { name: "dlsite/b" }),
-    ).toBeVisible();
-    expect(
-      within(row.getByText("どちらかを消すか、取り込む").closest("td")!).queryByRole("button"),
-    ).toBeNull();
-    await user.click(row.getByRole("button", { name: "登録済みの作品" }));
-    expect(props.onOpenWorkDetail).toHaveBeenCalledWith("RJ501001");
+    const [, targetCell, , actionCell] = row.getAllByRole("cell");
+    expect(within(targetCell!).queryByRole("button", { name: /取り込む/ })).toBeNull();
+    expect(actionCell).toContainElement(importButton);
   });
 
-  it("登録済みの作品名が読めないID重複は、作品IDだけを出す", () => {
+  it("未登録パスが複数のID重複は、押したボタンの行のパスを確認ダイアログに出す", async () => {
+    const user = userEvent.setup();
+    mockApi({
+      "POST /api/works/identity-conflicts/reassign": buildWorkSourceMutationResult(),
+      "GET /api/scan/candidates": { scanCompleted: true, candidates: [] },
+      "GET /api/scan/diagnostics": buildScanDiagnostics(),
+      "GET /api/scan/last": buildScanRecord(),
+    });
+    renderTab({
+      rows: buildNeedsAttentionRows(
+        buildScanDiagnostics({
+          identityConflicts: [
+            {
+              kind: "identity_conflict",
+              registeredTitle: "登録済み",
+              registeredPath: workspacePath("reg/a"),
+              workId: "w",
+              paths: [workspacePath("reg/a"), workspacePath("copy/b"), workspacePath("copy/c")],
+            },
+          ],
+        }),
+      ),
+    });
+    const buttons = screen.getAllByRole("button", { name: "別の作品として取り込む" });
+    expect(buttons).toHaveLength(2);
+    await user.click(buttons[1]!);
+    expect(await screen.findByText(/「copy\/c」の作品IDを新しくして/)).toBeInTheDocument();
+  });
+
+  it("登録済みのパスが診断にないID重複は、作品名で作品詳細を開く", async () => {
+    const user = userEvent.setup();
+    const props = renderTab({
+      rows: buildNeedsAttentionRows(
+        buildScanDiagnostics({
+          identityConflicts: [
+            {
+              kind: "identity_conflict",
+              registeredTitle: "登録済みの作品",
+              registeredPath: null,
+              workId: "w",
+              paths: [workspacePath("x"), workspacePath("y")],
+            },
+          ],
+        }),
+      ),
+    });
+    await user.click(screen.getByRole("button", { name: "登録済みの作品" }));
+    expect(props.onOpenWorkDetail).toHaveBeenCalledWith("w");
+  });
+
+  it("登録済みの作品名が読めないID重複は、登録済みのパスを出す", () => {
     renderTab({
       rows: buildNeedsAttentionRows(
         buildScanDiagnostics({
@@ -166,10 +212,8 @@ describe("NeedsAttentionTab", () => {
         }),
       ),
     });
-    const row = rowOf("ID重複");
-    expect(row.getByText("登録済み")).toBeInTheDocument();
-    expect(row.getByText("作品ID w")).toBeInTheDocument();
-    expect(row.getByRole("button", { name: "x" })).toBeInTheDocument();
+    const registered = rowOf("ID重複").getByText("登録済み").parentElement!;
+    expect(within(registered).getByRole("button", { name: "x" })).toBeInTheDocument();
   });
 
   it("登録済みの作品が無いID重複は、すべてのパスを未登録として取り込める", () => {

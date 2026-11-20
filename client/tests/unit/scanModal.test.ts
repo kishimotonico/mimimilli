@@ -900,7 +900,7 @@ describe("ScanModal", () => {
       .getByRole("table", { name: "新規作品" })
       .querySelector<HTMLElement>(".overflow-y-auto");
     if (!scroller) throw new Error("scroller not found");
-    scroller.scrollTop = 52 * 495;
+    scroller.scrollTop = 54 * 495;
     fireEvent.scroll(scroller);
 
     await waitFor(() =>

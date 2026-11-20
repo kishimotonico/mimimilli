@@ -9,6 +9,7 @@ import type { CandidateDlsiteDisplay } from "../../../model/unregisteredDlsite";
 import { rowTitle } from "../../../model/unregisteredSelection";
 import DlsiteStateCell from "./DlsiteStateCell";
 import RjCodeCell, { type RjCodeCommitResult, type RjCodeFieldError } from "./RjCodeCell";
+import ScanCover from "../ScanCover";
 import { ROW_HEIGHT, UNREGISTERED_GRID_CLASS } from "./layout";
 
 export interface UnregisteredRowHandlers {
@@ -56,10 +57,7 @@ function missingWorkChip(
 function RowCover({ display }: { display: CandidateDlsiteDisplay }) {
   const cover = display.state === "fetched" ? display.cover : null;
   return (
-    <span
-      aria-hidden="true"
-      className="block size-9 shrink-0 overflow-hidden rounded-[4px] border border-line-soft bg-paper-2"
-    >
+    <ScanCover>
       {cover && (
         <img
           src={getDlsiteCoverUrl(cover)}
@@ -69,7 +67,7 @@ function RowCover({ display }: { display: CandidateDlsiteDisplay }) {
           className="size-full object-cover"
         />
       )}
-    </span>
+    </ScanCover>
   );
 }
 
@@ -97,6 +95,7 @@ function UnregisteredRowView({
       <div role="cell" className="flex items-center">
         <input
           type="checkbox"
+          className="size-3.5"
           aria-label={`「${title}」を選択`}
           checked={selected}
           disabled={busy || Boolean(error)}
@@ -106,13 +105,16 @@ function UnregisteredRowView({
       <div role="cell" className="flex items-center">
         <RowCover display={display} />
       </div>
-      <div role="cell" className="flex min-w-0 flex-col justify-center gap-0.5">
+      <div role="cell" className="flex min-w-0 flex-col justify-center gap-px leading-[1.45]">
         <span className="flex min-w-0 items-center gap-1.5">
           {flagged && (
             <I.err size={13} aria-hidden="true" className="shrink-0 text-[var(--state-danger)]" />
           )}
           <span
-            className={cn("truncate font-jp text-body text-ink-0", dlsiteTitle && "font-medium")}
+            className={cn(
+              "truncate font-jp text-body leading-[1.45] text-ink-0",
+              dlsiteTitle && "font-medium",
+            )}
             title={title}
           >
             {title}
@@ -120,7 +122,7 @@ function UnregisteredRowView({
           {chip && (
             <span
               title={chip.hover}
-              className="inline-flex h-[17px] max-w-[220px] shrink-0 items-center truncate rounded-[4px] bg-[color-mix(in_oklch,var(--state-danger)_11%,transparent)] px-1.5 font-jp text-caption font-medium text-[color-mix(in_oklch,var(--state-danger)_85%,var(--ink-0))]"
+              className="inline-flex h-[17px] max-w-[240px] shrink-0 items-center truncate rounded-[4px] bg-[color-mix(in_oklch,var(--state-danger)_11%,transparent)] px-[7px] font-jp text-caption font-medium text-[var(--state-danger)]"
             >
               {chip.label}
             </span>
@@ -144,7 +146,7 @@ function UnregisteredRowView({
       <div role="cell" className="flex items-center">
         <DlsiteStateCell display={display} hasCode={rjCode !== null} />
       </div>
-      <div role="cell" className="flex items-center justify-end">
+      <div role="cell" className="flex items-center justify-start">
         <RowMenu
           label={`「${title}」の操作`}
           disabled={busy}

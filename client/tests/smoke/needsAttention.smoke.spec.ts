@@ -20,7 +20,7 @@ test("要対応の5種類が直すもの→行方不明の順に並び、件数�
   const tracker = trackErrors(page);
   const { panel } = await openNeedsAttention(page);
 
-  const kinds = panel.locator("tbody tr td:first-child");
+  const kinds = panel.locator("[role=row] > [role=cell]:first-child");
   await expect(kinds).toHaveText([
     "ID重複",
     "読み取り失敗",
@@ -29,7 +29,9 @@ test("要対応の5種類が直すもの→行方不明の順に並び、件数�
     "行方不明",
     "行方不明",
   ]);
-  await expect(panel.getByText("mimimilli.json 4行目: カンマが足りない")).toBeVisible();
+  await expect(panel.getByRole("row", { name: /^読み取り失敗/ })).toContainText(
+    "mimimilli.json 4行目: カンマが足りない",
+  );
   await expect(panel.getByText(/RJコード|DLsite/)).toHaveCount(0);
 
   assertNoErrors(tracker);
@@ -104,18 +106,26 @@ test("スキャン前に開くと件数のある要対応へ着地し、未登�
   assertNoErrors(tracker);
 });
 
-test("ID重複は登録済みの側に作品名と作品IDを出し、未登録の側を別の作品として取り込むと行が消える", async ({
+test("ID重複は登録済みと未登録をラベルとパスの行で出し、取り込むボタンは未登録の行と同じ高さに並び、取り込むと行が消える", async ({
   page,
 }) => {
   const tracker = trackErrors(page);
   const { panel } = await openNeedsAttention(page);
 
-  const row = panel.locator("tbody tr").filter({ hasText: "ID重複" });
+  const row = panel.getByRole("row").filter({ hasText: "ID重複" });
   await expect(row.getByText("登録済み", { exact: true })).toBeVisible();
-  await expect(row.getByText("未登録", { exact: true })).toBeVisible();
-  await expect(row.getByText("作品ID RJ501001", { exact: true })).toBeVisible();
+  const unregisteredLabel = row.getByText("未登録", { exact: true });
+  await expect(unregisteredLabel).toBeVisible();
+  await expect(row.getByText("作品ID RJ501001", { exact: true })).toHaveCount(0);
 
-  await row.getByRole("button", { name: "別の作品として取り込む" }).click();
+  const importButton = row.getByRole("button", { name: "別の作品として取り込む" });
+  const labelBox = await unregisteredLabel.boundingBox();
+  const buttonBox = await importButton.boundingBox();
+  const centerY = (box: { y: number; height: number } | null) =>
+    box ? box.y + box.height / 2 : Number.NaN;
+  expect(Math.abs(centerY(labelBox) - centerY(buttonBox))).toBeLessThan(2);
+
+  await importButton.click();
   await page
     .getByRole("alertdialog", { name: "別の作品として取り込む" })
     .getByRole("button", { name: "取り込む" })

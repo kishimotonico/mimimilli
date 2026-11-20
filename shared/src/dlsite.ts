@@ -638,9 +638,6 @@ export function canonicalDlsiteProductCode(code: string): string {
   return code.trim().toUpperCase();
 }
 
-/** 1コードあたりの取得時間の目安。「N件・約M分」の表示に使う（測った速度は使わない） */
-export const DLSITE_FETCH_ESTIMATE_MS_PER_CODE = 2000;
-
 export const dlsiteJobCodeStateSchema = z.enum([
   "queued",
   "fetching",

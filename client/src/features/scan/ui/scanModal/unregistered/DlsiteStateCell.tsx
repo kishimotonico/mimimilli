@@ -26,13 +26,13 @@ export default function DlsiteStateCell({
       );
     case "fetched":
       return (
-        <StatusLabel tone="done" icon={I.check}>
+        <StatusLabel tone="done" icon={I.checkC}>
           取得済み
         </StatusLabel>
       );
     case "not_found":
       return (
-        <StatusLabel tone="attention" icon={I.err}>
+        <StatusLabel tone="attention" icon={I.searchX}>
           該当なし
         </StatusLabel>
       );

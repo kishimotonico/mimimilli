@@ -121,7 +121,7 @@ export default function ScanModal({
       <ModalHeader
         title="スキャン"
         titleId="scan-modal-title"
-        icon={<I.refresh size={14} className={cn("text-ink-3", scanning && "animate-spin")} />}
+        icon={<I.refresh size={15} className={cn("text-ink-2", scanning && "animate-spin")} />}
         onClose={onClose}
       />
 

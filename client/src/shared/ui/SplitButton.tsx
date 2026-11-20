@@ -1,4 +1,4 @@
-import { useCallback, useId, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useId, useState, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { buttonClass, type ButtonSize, type ButtonVariant } from "./Button";
 import { I } from "./Icon";
@@ -9,6 +9,10 @@ export interface SplitButtonItem {
   label: ReactNode;
   onSelect: () => void;
   disabled?: boolean;
+  /** 破壊的な操作。赤で出す */
+  danger?: boolean;
+  /** 右端に添える件数などの補足。名前には含めない */
+  trailing?: ReactNode;
 }
 
 interface SplitButtonProps {
@@ -47,22 +51,11 @@ export default function SplitButton({
     preferredWidth: 0,
     placement,
     onClose: close,
+    consumeEscape: true,
   });
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!open || event.key !== "Escape") return;
-    event.preventDefault();
-    event.stopPropagation();
-    close();
-  };
-
   return (
-    // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Escapeをメニューだけで受けるためのキー捕捉
-    <div
-      ref={setReference}
-      className={cn("relative inline-flex", className)}
-      onKeyDown={handleKeyDown}
-    >
+    <div ref={setReference} className={cn("relative inline-flex", className)}>
       <button
         type="button"
         disabled={disabled || primaryDisabled}
@@ -84,10 +77,10 @@ export default function SplitButton({
         onClick={() => setOpen((value) => !value)}
         className={buttonClass(variant, size, {
           disabled,
-          className: "rounded-l-none border-l border-paper-1/30 px-2",
+          className: "ml-px rounded-l-none pr-[9px] pl-[7px]",
         })}
       >
-        <I.chevD size={12} />
+        <I.chevD size={14} />
       </button>
       {open && (
         <div
@@ -95,7 +88,7 @@ export default function SplitButton({
           ref={setFloating}
           style={floatingStyles}
           role="menu"
-          className="z-10 min-w-[160px] rounded-[8px] border border-line-soft bg-paper-1 p-1 shadow-pop"
+          className="z-10 min-w-[180px] rounded-[8px] border border-line bg-paper-1 p-1 shadow-pop"
         >
           {items.map((item) => (
             <button
@@ -107,9 +100,17 @@ export default function SplitButton({
                 close();
                 item.onSelect();
               }}
-              className="flex w-full items-center rounded-[6px] px-2.5 py-1.5 text-left font-jp text-body text-ink-1 hover:bg-paper-2 hover:text-ink-0 disabled:cursor-not-allowed disabled:text-ink-4"
+              className={cn(
+                "flex w-full items-center justify-between gap-4 rounded-[5px] px-2.5 py-1.5 text-left font-jp text-body whitespace-nowrap hover:bg-paper-2 disabled:cursor-not-allowed disabled:text-ink-4",
+                item.danger ? "text-[var(--state-danger)]" : "text-ink-0",
+              )}
             >
               {item.label}
+              {item.trailing !== undefined && (
+                <span aria-hidden="true" className="font-mono text-secondary text-ink-2">
+                  {item.trailing}
+                </span>
+              )}
             </button>
           ))}
         </div>

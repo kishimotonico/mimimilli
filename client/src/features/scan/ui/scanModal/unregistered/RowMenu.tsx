@@ -17,41 +17,30 @@ export default function RowMenu({ label, disabled, onOpenFolder, onExclude }: Ro
   const menuId = useId();
   const close = useCallback(() => setOpen(false), []);
   const anchorRef = useRef<HTMLElement | null>(null);
-  const {
-    setReference,
-    setFloating,
-    floatingStyles,
-    close: closePopover,
-  } = useAnchoredPopover({
+  const { setReference, setFloating, floatingStyles } = useAnchoredPopover({
     isOpen: open,
     preferredWidth: 0,
-    placement: "above",
+    placement: "belowEnd",
     onClose: close,
     closeOnScroll: true,
     closeOnFocusOut: true,
+    consumeEscape: true,
   });
 
   return (
-    // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Escapeをメニューだけで受けるためのキー捕捉
     <div
       ref={(node) => {
         anchorRef.current = node;
         setReference(node);
       }}
       className="relative inline-flex"
-      onKeyDown={(event) => {
-        if (!open || event.key !== "Escape") return;
-        event.preventDefault();
-        event.stopPropagation();
-        closePopover("escape");
-      }}
     >
       <IconButton
-        icon={I.more}
+        icon={I.moreV}
         label={label}
         size="sm"
+        tone="muted"
         disabled={disabled}
-        active={open}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -64,7 +53,7 @@ export default function RowMenu({ label, disabled, onOpenFolder, onExclude }: Ro
             ref={setFloating}
             style={floatingStyles}
             role="menu"
-            className="z-10 min-w-[140px] rounded-[8px] border border-line-soft bg-paper-1 p-1 shadow-pop"
+            className="z-10 min-w-[180px] rounded-[8px] border border-line bg-paper-1 p-1 shadow-pop"
           >
             <MenuItem
               onSelect={() => {
@@ -104,8 +93,8 @@ function MenuItem({
       type="button"
       role="menuitem"
       onClick={onSelect}
-      className={`flex w-full items-center rounded-[6px] px-2.5 py-1.5 text-left font-jp text-body hover:bg-paper-2 ${
-        danger ? "text-[var(--state-danger)]" : "text-ink-1 hover:text-ink-0"
+      className={`flex w-full items-center rounded-[5px] px-2.5 py-1.5 text-left font-jp text-body whitespace-nowrap hover:bg-paper-2 ${
+        danger ? "text-[var(--state-danger)]" : "text-ink-0"
       }`}
     >
       {children}

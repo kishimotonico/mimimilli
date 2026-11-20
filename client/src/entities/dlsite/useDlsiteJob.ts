@@ -17,12 +17,7 @@ export function useDlsiteJobState<T>(selector: (state: DlsiteJobState) => T): T 
 
 function sameFrame(a: DlsiteFetchFrame, b: DlsiteFetchFrame): boolean {
   if (a.kind === "idle" || b.kind === "idle") return a.kind === b.kind;
-  return (
-    a.processed === b.processed &&
-    a.total === b.total &&
-    a.remainingMs === b.remainingMs &&
-    a.cancellable === b.cancellable
-  );
+  return a.processed === b.processed && a.total === b.total && a.cancellable === b.cancellable;
 }
 
 const frameByState = new WeakMap<DlsiteJobState, DlsiteFetchFrame>();

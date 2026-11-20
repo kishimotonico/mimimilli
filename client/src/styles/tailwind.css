@@ -45,6 +45,7 @@
   --shadow-1: var(--shadow-1);
   --shadow-2: var(--shadow-2);
   --shadow-pop: var(--shadow-pop);
+  --shadow-modal: var(--shadow-modal);
   --shadow-cover: var(--shadow-cover);
 }
 

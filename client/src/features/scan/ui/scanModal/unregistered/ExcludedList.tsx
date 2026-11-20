@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { pathBaseName } from "@mimimilli/shared";
+import { detectRjCode, pathBaseName } from "@mimimilli/shared";
+import { cn } from "../../../../../shared/lib/cn";
+import { LIST_HEADING_ROW_CLASS } from "../listHeading";
 import Button from "../../../../../shared/ui/Button";
 import CollectionStatus from "../../../../../shared/ui/CollectionStatus";
 import { I } from "../../../../../shared/ui/Icon";
+
+const EXCLUDED_GRID_CLASS =
+  "grid items-center gap-x-3 px-[18px] [grid-template-columns:minmax(0,1fr)_120px_60px]";
 
 interface ExcludedListProps {
   paths: readonly string[];
@@ -27,45 +32,67 @@ export default function ExcludedList({ paths, onBack, onRestore }: ExcludedListP
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center gap-3 border-b border-line-soft px-[18px] py-2">
-        <Button ref={backRef} variant="quiet" icon={I.arrowL} onClick={onBack}>
+      <div className="flex h-[46px] shrink-0 items-center gap-2.5 px-[18px]">
+        <Button
+          ref={backRef}
+          variant="quiet"
+          className="px-[9px] font-normal"
+          icon={I.chevL}
+          onClick={onBack}
+        >
           未登録
         </Button>
-        <span className="font-jp text-body font-semibold text-ink-0">
+        <span className="font-jp text-body font-bold text-ink-0">
           除外済み <span className="font-mono font-normal text-ink-2">{paths.length}</span>
         </span>
       </div>
       {paths.length === 0 ? (
         <CollectionStatus variant="list" kind="empty" message="除外した候補はありません" />
       ) : (
-        <ul
-          aria-label="除外済みの候補"
-          className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0"
-        >
-          {paths.map((path) => (
-            <li
-              key={path}
-              className="flex items-center gap-3 border-b border-line-soft px-[18px] py-2"
-            >
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate font-jp text-body text-ink-0" title={pathBaseName(path)}>
-                  {pathBaseName(path)}
-                </span>
-                <span className="truncate font-mono text-secondary text-ink-2" title={path}>
-                  {path}
-                </span>
-              </span>
-              <Button
-                variant="ghost"
-                aria-label={`「${pathBaseName(path)}」を未登録に戻す`}
-                disabled={restoring}
-                onClick={() => void restore(path)}
+        <>
+          <div className={cn(EXCLUDED_GRID_CLASS, LIST_HEADING_ROW_CLASS)}>
+            <span>フォルダー</span>
+            <span>RJコード</span>
+            <span />
+          </div>
+          <ul
+            aria-label="除外済みの候補"
+            className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0"
+          >
+            {paths.map((path) => (
+              <li
+                key={path}
+                className={cn(
+                  EXCLUDED_GRID_CLASS,
+                  "h-[54px] border-b border-line-soft hover:bg-paper-2",
+                )}
               >
-                戻す
-              </Button>
-            </li>
-          ))}
-        </ul>
+                <span className="flex min-w-0 flex-col gap-px leading-[1.45]">
+                  <span
+                    className="truncate font-jp text-body text-ink-0"
+                    title={pathBaseName(path)}
+                  >
+                    {pathBaseName(path)}
+                  </span>
+                  <span className="truncate font-mono text-secondary text-ink-2" title={path}>
+                    {path}
+                  </span>
+                </span>
+                <span className="font-mono text-body text-ink-1">
+                  {detectRjCode([pathBaseName(path)]) ?? "—"}
+                </span>
+                <Button
+                  variant="ghost"
+                  aria-label={`「${pathBaseName(path)}」を未登録に戻す`}
+                  disabled={restoring}
+                  onClick={() => void restore(path)}
+                >
+                  戻す
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   );

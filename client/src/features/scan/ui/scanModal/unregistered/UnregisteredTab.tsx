@@ -114,7 +114,7 @@ export default function UnregisteredTab({
     excluding,
     restore: restoreExclusions,
   } = useCandidateExclusions({ onExcludeError: setErrorMessage });
-  const toolbarRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const refocusToolbarRef = useRef(false);
   const closeExcluded = () => {
     refocusToolbarRef.current = true;
@@ -123,10 +123,11 @@ export default function UnregisteredTab({
   useEffect(() => {
     if (showExcluded || !refocusToolbarRef.current) return;
     refocusToolbarRef.current = false;
-    const toolbar = toolbarRef.current;
+    const panel = panelRef.current;
     const target =
-      toolbar?.querySelector<HTMLElement>("[data-excluded-trigger]") ??
-      toolbar?.querySelector<HTMLElement>("input:not(:disabled), button:not(:disabled)");
+      panel?.querySelector<HTMLElement>("[data-excluded-trigger]") ??
+      panel?.querySelector<HTMLElement>("[data-select-all]:not(:disabled)") ??
+      panel?.querySelector<HTMLElement>("input:not(:disabled), button:not(:disabled)");
     target?.focus();
   }, [showExcluded]);
 
@@ -325,16 +326,12 @@ export default function UnregisteredTab({
         />
       )}
       <div
+        ref={panelRef}
         inert={showExcluded}
         className={showExcluded ? "hidden" : "flex min-h-0 flex-1 flex-col"}
       >
-        <div ref={toolbarRef} className="contents">
+        {(status === "ready" || status === "empty" || exclusions.length > 0) && (
           <UnregisteredToolbar
-            allSelected={allSelected}
-            partiallySelected={partiallySelected}
-            selectAllDisabled={selectableCount === 0}
-            onToggleAll={toggleAll}
-            busy={busy}
             excludedCount={exclusions.length}
             onShowExcluded={() => setShowExcluded(true)}
             problemCount={problems}
@@ -344,7 +341,7 @@ export default function UnregisteredTab({
             }
             onClearFilter={() => setFilter(null)}
           />
-        </div>
+        )}
         <ScanListState status={status} emptyMessage="未登録の候補はありません" onRetry={onRetry}>
           <section aria-label="未登録の候補" className="flex min-h-0 flex-1 flex-col">
             <div
@@ -354,7 +351,12 @@ export default function UnregisteredTab({
               aria-rowcount={visibleRows.length + 1}
               className="flex min-h-0 flex-1 flex-col"
             >
-              <UnregisteredListHeader />
+              <UnregisteredListHeader
+                allSelected={allSelected}
+                partiallySelected={partiallySelected}
+                selectAllDisabled={busy || selectableCount === 0}
+                onToggleAll={toggleAll}
+              />
               <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
                 <div
                   // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 仮想リストの行群は tbody にできないため role=rowgroup で与える

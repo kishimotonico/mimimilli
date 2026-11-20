@@ -5,10 +5,7 @@ import type {
   DlsiteJobState,
 } from "../../src/entities/dlsite/model/dlsiteJobStore";
 import { candidateDlsiteDisplay } from "../../src/features/scan/model/unregisteredDlsite";
-import {
-  dlsiteFetchFrame,
-  formatDlsiteFetchEstimate,
-} from "../../src/entities/dlsite/model/dlsiteFetchFrame";
+import { dlsiteFetchFrame } from "../../src/entities/dlsite/model/dlsiteFetchFrame";
 
 const cover = { key: "k", version: "v" } as never;
 
@@ -156,7 +153,7 @@ describe("dlsiteFetchFrame", () => {
     ).toEqual({ kind: "idle" });
   });
 
-  it("進行中は n/N と残り時間と中止可否を出す", () => {
+  it("進行中は n/N と中止可否を出す", () => {
     const progress = { processed: 2, total: 5 };
     const base = jobState({ RJ000001: { state: "queued" } }, { progress });
     const frame = dlsiteFetchFrame(base);
@@ -164,7 +161,6 @@ describe("dlsiteFetchFrame", () => {
       kind: "progress",
       processed: 2,
       total: 5,
-      remainingMs: 6000,
       cancellable: true,
     });
   });
@@ -187,19 +183,7 @@ describe("dlsiteFetchFrame", () => {
       kind: "progress",
       processed: 0,
       total: 30,
-      remainingMs: 60_000,
       cancellable: false,
     });
-  });
-});
-
-describe("formatDlsiteFetchEstimate", () => {
-  it.each([
-    [2000, "約2秒"],
-    [59_000, "約59秒"],
-    [60_000, "約1分"],
-    [150_000, "約3分"],
-  ])("%dms は %s", (ms, text) => {
-    expect(formatDlsiteFetchEstimate(ms)).toBe(text);
   });
 });

@@ -19,9 +19,9 @@ export function PathLink({ path, onOpen, display = path, className }: PathLinkPr
       dir="rtl"
       title={`Filesで開く: ${path}`}
       onClick={() => onOpen(path)}
-      className={cn(LINK_CLASS, "font-mono text-mono text-ink-2", className)}
+      className={cn(LINK_CLASS, "text-ink-2", className)}
     >
-      <bdi>{display}</bdi>
+      <bdi className="font-mono text-mono leading-4">{display}</bdi>
     </button>
   );
 }

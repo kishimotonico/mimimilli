@@ -21,24 +21,24 @@ export default function UpdatedWorkRow({
   return (
     <div
       role="row"
-      className={cn(UPDATED_GRID_CLASS, "items-start border-b border-line-soft py-2")}
+      className={cn(UPDATED_GRID_CLASS, "items-start border-b border-line-soft py-[9px]")}
     >
-      <div role="cell" className="flex min-w-0 flex-col gap-0.5">
+      <div role="cell" className="flex min-w-0 flex-col gap-px leading-[1.45]">
         <WorkTitleLink workId={work.id} title={work.title} onOpen={onOpenWorkDetail} />
         <PathLink path={work.relativePath} onOpen={onOpenFiles} />
       </div>
-      <div role="cell" className="flex min-w-0 flex-col gap-1">
+      <div role="cell" className="flex min-w-0 flex-col gap-[3px]">
         {describeWorkChanges(changes).map((change) => (
           <div
             key={change.kind}
-            className="flex min-w-0 items-center gap-1.5 font-jp text-secondary text-ink-1"
+            className="flex min-w-0 items-center gap-1.5 font-jp text-secondary leading-[18px] text-ink-1"
           >
             <change.icon size={12} className="shrink-0 text-ink-3" />
             <span className="shrink-0">{change.label}</span>
             {change.detail && (
               <span
                 title={change.title}
-                className="min-w-0 truncate font-mono text-mono text-ink-3"
+                className="min-w-0 truncate font-mono text-caption text-ink-2"
               >
                 {change.detail}
               </span>

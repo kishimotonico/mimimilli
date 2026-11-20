@@ -6,13 +6,13 @@ import { scanRecordQueryOptions } from "../../../../../entities/scan/queryOption
 import { cn } from "../../../../../shared/lib/cn";
 import { useVirtualList } from "../../../../../shared/ui/useVirtualList";
 import { deriveScanListStatus } from "../../../model/scanListStatus";
+import { LIST_HEADING_ROW_CLASS } from "../listHeading";
 import ScanListState from "../ScanListState";
 import { useScanRecordWorks } from "../useScanRecordWorks";
 import ChangeKindFilter from "./ChangeKindFilter";
 import { UPDATED_GRID_CLASS, UPDATED_ROW_ESTIMATE } from "./layout";
 import UpdatedWorkRow from "./UpdatedWorkRow";
 
-const HEADING_CLASS = "font-sans text-label font-semibold text-ink-2";
 const NO_CHANGES: readonly WorkChange[] = [];
 
 interface UpdatedWorksTabProps {
@@ -79,19 +79,9 @@ export default function UpdatedWorksTab({ onOpenFiles, onOpenWorkDetail }: Updat
           className="flex min-h-0 flex-1 flex-col"
         >
           <div role="rowgroup" className="shrink-0">
-            <div
-              role="row"
-              className={cn(
-                UPDATED_GRID_CLASS,
-                "h-[30px] items-center border-b border-line-soft bg-paper-0",
-              )}
-            >
-              <span role="columnheader" className={HEADING_CLASS}>
-                作品
-              </span>
-              <span role="columnheader" className={HEADING_CLASS}>
-                変更内容
-              </span>
+            <div role="row" className={cn(UPDATED_GRID_CLASS, LIST_HEADING_ROW_CLASS)}>
+              <span role="columnheader">作品</span>
+              <span role="columnheader">変更内容</span>
             </div>
           </div>
           <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">

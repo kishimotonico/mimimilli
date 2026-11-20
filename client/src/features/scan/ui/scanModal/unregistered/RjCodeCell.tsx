@@ -20,7 +20,7 @@ interface RjCodeCellProps {
   onCancel: () => void;
 }
 
-const CELL_BOX = "box-border w-full min-w-0 rounded-[4px] px-1.5 font-mono text-mono";
+const CELL_BOX = "box-border w-full min-w-0 rounded-[6px] px-[7px] font-mono text-body";
 
 export default function RjCodeCell({
   rjCode,

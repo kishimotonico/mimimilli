@@ -60,6 +60,9 @@ body a {
   color: inherit;
   text-decoration: none;
 }
+input[type="checkbox"] {
+  accent-color: var(--acc);
+}
 body ul,
 body ol {
   list-style: none;

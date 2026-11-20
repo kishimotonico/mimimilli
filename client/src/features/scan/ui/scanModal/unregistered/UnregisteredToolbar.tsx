@@ -1,14 +1,8 @@
-import { useEffect, useRef } from "react";
 import Button from "../../../../../shared/ui/Button";
-import { cn } from "../../../../../shared/lib/cn";
 import { I } from "../../../../../shared/ui/Icon";
+import ScanFilterChip from "../ScanFilterChip";
 
 interface UnregisteredToolbarProps {
-  allSelected: boolean;
-  partiallySelected: boolean;
-  selectAllDisabled: boolean;
-  onToggleAll: () => void;
-  busy: boolean;
   excludedCount: number;
   onShowExcluded: () => void;
   /** 判断が要る候補の件数。0かつ絞り込み中でないときは出さない */
@@ -20,11 +14,6 @@ interface UnregisteredToolbarProps {
 }
 
 export default function UnregisteredToolbar({
-  allSelected,
-  partiallySelected,
-  selectAllDisabled,
-  onToggleAll,
-  busy,
   excludedCount,
   onShowExcluded,
   problemCount,
@@ -32,47 +21,44 @@ export default function UnregisteredToolbar({
   onFilterProblems,
   onClearFilter,
 }: UnregisteredToolbarProps) {
-  const checkboxRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (checkboxRef.current) checkboxRef.current.indeterminate = partiallySelected;
-  }, [partiallySelected]);
-
   return (
-    <div className="flex shrink-0 items-center gap-3 border-b border-line-soft px-[18px] py-2">
-      <div className="flex min-w-0 items-center gap-3">
-        <label className="flex items-center gap-2 font-jp text-body text-ink-1">
-          <input
-            ref={checkboxRef}
-            type="checkbox"
-            checked={allSelected}
-            disabled={busy || selectAllDisabled}
-            onChange={onToggleAll}
-          />
-          すべて選択
-        </label>
-        {filter?.kind === "noinfo" ? (
-          <FilterChip pressed count={filter.count} onClick={onClearFilter}>
-            DLsite情報なし
-          </FilterChip>
-        ) : filter?.kind === "problem" ? (
-          <FilterChip pressed count={filter.count} icon={PROBLEM_ICON} onClick={onClearFilter}>
+    <div
+      data-testid="unregistered-toolbar"
+      className="flex h-[46px] shrink-0 items-center gap-2.5 px-[18px]"
+    >
+      {filter?.kind === "noinfo" ? (
+        <ScanFilterChip pressed clearable count={filter.count} onClick={onClearFilter}>
+          DLsite情報なし
+        </ScanFilterChip>
+      ) : filter?.kind === "problem" ? (
+        <ScanFilterChip
+          pressed
+          clearable
+          count={filter.count}
+          icon={PROBLEM_ICON}
+          onClick={onClearFilter}
+        >
+          問題あり
+        </ScanFilterChip>
+      ) : (
+        problemCount > 0 && (
+          <ScanFilterChip
+            pressed={false}
+            count={problemCount}
+            icon={PROBLEM_ICON}
+            onClick={onFilterProblems}
+          >
             問題あり
-          </FilterChip>
-        ) : (
-          problemCount > 0 && (
-            <FilterChip
-              pressed={false}
-              count={problemCount}
-              icon={PROBLEM_ICON}
-              onClick={onFilterProblems}
-            >
-              問題あり
-            </FilterChip>
-          )
-        )}
-      </div>
+          </ScanFilterChip>
+        )
+      )}
       {excludedCount > 0 && (
-        <Button variant="quiet" className="ml-auto" data-excluded-trigger onClick={onShowExcluded}>
+        <Button
+          variant="quiet"
+          className="ml-auto px-2 font-normal"
+          data-excluded-trigger
+          onClick={onShowExcluded}
+        >
           除外済み <span className="font-mono tabular-nums">{excludedCount}</span>
         </Button>
       )}
@@ -81,36 +67,3 @@ export default function UnregisteredToolbar({
 }
 
 const PROBLEM_ICON = <I.err size={13} className="text-[var(--state-danger)]" aria-hidden="true" />;
-
-function FilterChip({
-  pressed,
-  count,
-  icon,
-  onClick,
-  children,
-}: {
-  pressed: boolean;
-  icon?: React.ReactNode;
-  count: number;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={pressed}
-      onClick={onClick}
-      className={cn(
-        "inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 font-jp text-control",
-        pressed
-          ? "border-transparent bg-acc-soft font-medium text-acc-ink"
-          : "border-line bg-paper-1 text-ink-1 hover:bg-paper-2",
-      )}
-    >
-      {icon}
-      {children}
-      <span className="font-mono tabular-nums">{count}</span>
-      {pressed && <I.x size={12} />}
-    </button>
-  );
-}

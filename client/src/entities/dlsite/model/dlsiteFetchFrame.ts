@@ -1,4 +1,3 @@
-import { DLSITE_FETCH_ESTIMATE_MS_PER_CODE } from "@mimimilli/shared";
 import type { DlsiteJobState } from "./dlsiteJobStore";
 
 export type DlsiteFetchFrame =
@@ -7,7 +6,6 @@ export type DlsiteFetchFrame =
       kind: "progress";
       processed: number;
       total: number;
-      remainingMs: number;
       cancellable: boolean;
     };
 
@@ -20,7 +18,6 @@ export function dlsiteFetchFrame(state: FrameJobState): DlsiteFetchFrame {
       kind: "progress",
       processed: 0,
       total: state.starting.total,
-      remainingMs: state.starting.total * DLSITE_FETCH_ESTIMATE_MS_PER_CODE,
       cancellable: false,
     };
   }
@@ -33,13 +30,6 @@ export function dlsiteFetchFrame(state: FrameJobState): DlsiteFetchFrame {
     kind: "progress",
     processed: job.progress.processed,
     total: job.progress.total,
-    remainingMs: (job.progress.total - job.progress.processed) * DLSITE_FETCH_ESTIMATE_MS_PER_CODE,
     cancellable: hasQueued && !state.cancelling,
   };
-}
-
-/** 取得にかかる時間の目安。1分未満は秒、以上は分（四捨五入） */
-export function formatDlsiteFetchEstimate(ms: number): string {
-  if (ms < 60_000) return `約${Math.max(1, Math.ceil(ms / 1000))}秒`;
-  return `約${Math.round(ms / 60_000)}分`;
 }

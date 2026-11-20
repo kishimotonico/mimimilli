@@ -7,13 +7,12 @@ import { SourceProjectionNotice } from "../../../../../entities/work/ui/SourcePr
 import { cn } from "../../../../../shared/lib/cn";
 import { useVirtualList } from "../../../../../shared/ui/useVirtualList";
 import { deriveScanListStatus } from "../../../model/scanListStatus";
+import { LIST_HEADING_ROW_CLASS } from "../listHeading";
 import ScanListState from "../ScanListState";
 import { useScanRecordWorks } from "../useScanRecordWorks";
 import { NEW_WORKS_GRID_CLASS, ROW_HEIGHT } from "./layout";
 import NewWorkRow from "./NewWorkRow";
 import { useInlineTitleEdit } from "./useInlineTitleEdit";
-
-const HEADING_CLASS = "font-sans text-label font-semibold text-ink-2";
 
 interface NewWorksTabProps {
   onOpenFiles: (path: WorkspacePath) => void;
@@ -60,22 +59,11 @@ export default function NewWorksTab({ onOpenFiles, onOpenWorkDetail }: NewWorksT
           className="flex min-h-0 flex-1 flex-col"
         >
           <div role="rowgroup" className="shrink-0">
-            <div
-              role="row"
-              className={cn(NEW_WORKS_GRID_CLASS, "h-[30px] border-b border-line-soft bg-paper-0")}
-            >
-              <span role="columnheader" className={HEADING_CLASS}>
-                カバー
-              </span>
-              <span role="columnheader" className={HEADING_CLASS}>
-                タイトル
-              </span>
-              <span role="columnheader" className={HEADING_CLASS}>
-                RJコード
-              </span>
-              <span role="columnheader" className={HEADING_CLASS}>
-                DLsite
-              </span>
+            <div role="row" className={cn(NEW_WORKS_GRID_CLASS, LIST_HEADING_ROW_CLASS)}>
+              <span role="columnheader">カバー</span>
+              <span role="columnheader">タイトル</span>
+              <span role="columnheader">RJコード</span>
+              <span role="columnheader">DLsite</span>
             </div>
           </div>
           <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">

@@ -23,8 +23,8 @@ interface ScanSidebarProps {
   onCancel: () => void;
 }
 
-const HEADING_CLASS = "font-sans text-label font-semibold tracking-[0.06em] text-ink-2";
-const VALUE_CLASS = "font-mono text-mono text-ink-2";
+const HEADING_CLASS = "h-[18px] font-jp text-secondary font-medium leading-[18px] text-ink-2";
+const VALUE_CLASS = "h-[18px] font-mono text-secondary leading-[18px] text-ink-1";
 
 export default function ScanSidebar({
   active,
@@ -40,7 +40,7 @@ export default function ScanSidebar({
   return (
     <nav
       aria-label="スキャン結果"
-      className="flex w-[160px] shrink-0 flex-col overflow-y-auto border-r border-line-soft py-3 pr-2.5"
+      className="flex w-[180px] shrink-0 flex-col overflow-y-auto border-r border-line-soft py-3 pr-2.5"
     >
       <div role="tablist" aria-orientation="vertical" className="flex flex-col gap-0.5">
         {SCAN_TAB_ORDER.map((tab) => (
@@ -54,13 +54,13 @@ export default function ScanSidebar({
         ))}
       </div>
 
-      <div className="mt-auto flex flex-col gap-2 border-t border-line-soft pt-2.5 pl-2.5">
-        <div className="relative h-[46px]">
+      <div className="mt-auto flex h-[116px] shrink-0 flex-col border-t border-line-soft pt-2.5 pl-2.5">
+        <div className="relative min-h-0 flex-1">
           <AnimatePresence initial={false} mode="wait">
             <SidebarStatus key={status.kind} status={status} />
           </AnimatePresence>
         </div>
-        <div className="relative h-9">
+        <div className="relative h-[26px] shrink-0">
           <AnimatePresence initial={false} mode="wait">
             {inProgress ? (
               <SidebarCancelButton
@@ -107,10 +107,10 @@ function ScanSidebarTab({
       aria-label={shownCount === null ? label : `${label}（${shownCount}件）`}
       onClick={() => onSelect(tab)}
       className={cn(
-        "flex items-center justify-between gap-2 rounded-r-[6px] py-1.5 pr-2 pl-2.5 text-left font-jp text-control transition-colors",
+        "flex h-[30px] items-center justify-between gap-2 rounded-r-[6px] pr-2 pl-3 text-left font-jp text-body transition-colors",
         selected
-          ? "bg-paper-2 font-semibold text-ink-0 shadow-[inset_2px_0_0_var(--acc)]"
-          : "text-ink-2 hover:bg-paper-2 hover:text-ink-0",
+          ? "bg-paper-2 font-bold text-ink-0 shadow-[inset_2px_0_0_var(--acc)]"
+          : "text-ink-1 hover:bg-paper-2 hover:text-ink-0",
       )}
     >
       <span aria-hidden="true" className="truncate">
@@ -120,10 +120,10 @@ function ScanSidebarTab({
         {shownCount !== null && (
           <span
             className={cn(
-              "inline-grid h-[18px] min-w-5 place-items-center rounded-pill px-1.5 font-mono text-caption font-semibold tabular-nums",
+              "inline-grid h-[18px] min-w-5 place-items-center rounded-pill px-1.5 font-mono text-secondary font-medium tabular-nums",
               tab === "needsAttention"
-                ? "bg-[color-mix(in_oklch,var(--state-danger)_20%,transparent)] text-[var(--state-danger)]"
-                : "bg-paper-3 text-ink-2",
+                ? "bg-[color-mix(in_oklch,var(--state-danger)_11%,transparent)] text-[var(--state-danger)]"
+                : "bg-paper-3 text-ink-1",
             )}
           >
             {shownCount}
@@ -152,13 +152,13 @@ function SidebarStartButton({
     <motion.div className="absolute inset-0" inert={!isPresent} {...v}>
       <SplitButton
         variant={primary ? "primary" : "ghost"}
-        size="lg"
+        size="sm"
         className="w-full"
         menuLabel="スキャンの方法"
         onClick={onStart}
         items={[{ key: "full", label: "すべての作品を読み直す", onSelect: onFullScan }]}
       >
-        <I.refresh size={12} />
+        <I.refresh size={14} />
         {status.kind === "failed" ? "再試行" : "スキャン"}
       </SplitButton>
     </motion.div>
@@ -176,7 +176,7 @@ function SidebarCancelButton({ disabled, onClick }: { disabled: boolean; onClick
       disabled={disabled}
       inert={!isPresent}
       {...v}
-      className={buttonClass("danger-quiet", "lg", {
+      className={buttonClass("danger-quiet", "sm", {
         disabled,
         className: "absolute inset-0 w-full justify-center",
       })}
@@ -243,7 +243,7 @@ function renderStatus(status: ScanStatusView): ReactNode {
             <I.err size={12} />
             スキャンできませんでした
           </p>
-          <p className="truncate font-jp text-caption text-ink-2" title={status.reason}>
+          <p className="truncate font-jp text-secondary text-ink-1" title={status.reason}>
             {status.reason}
           </p>
         </>
@@ -259,14 +259,14 @@ function ProgressRow({ progress, dim }: { progress: ScanProgress | null; dim: bo
   return (
     <>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="truncate font-mono text-caption text-ink-2">
+        <span className="truncate font-mono text-secondary text-ink-2">
           {progress ? scanPhaseLabel(progress.phase) : "準備中"}
         </span>
-        <span className="shrink-0 font-mono text-caption text-ink-2 tabular-nums">
+        <span className="shrink-0 font-mono text-secondary text-ink-2 tabular-nums">
           {progress && progress.total > 0 ? `${progress.processed}/${progress.total}` : "…"}
         </span>
       </div>
-      <div className="h-[3px] overflow-hidden rounded-full bg-paper-2">
+      <div className="h-1 overflow-hidden rounded-full bg-paper-3">
         <div
           className={cn(
             "h-full rounded-full bg-acc transition-[width] duration-300 ease-out",
