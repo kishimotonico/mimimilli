@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-11-20
-- 関連: [ADR-0033](0033-dlsite-fetch-before-register.md)（直したRJコードの寿命を本ADRで置き換え）、[ADR-0034](0034-scan-modal-restructure.md)（スキャン結果の寿命を本ADRで置き換え）、[ADR-0002](0002-mock-as-fixture-adapter.md)、backlog TASK-512
+- 関連: [ADR-0033](0033-dlsite-fetch-before-register.md)（直したRJコードの寿命を本ADRで置き換え）、[ADR-0034](0034-scan-modal-restructure.md)（スキャン結果の寿命を本ADRで置き換え）、[ADR-0002](0002-mock-as-fixture-adapter.md)、[ADR-0039](0039-scan-modal-current-problems-and-explicit-states.md)（記録の項目から行方不明・データ不整合を外す）、backlog TASK-512
 
 ## 文脈
 

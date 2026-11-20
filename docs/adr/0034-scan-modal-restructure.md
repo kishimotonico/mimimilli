@@ -1,6 +1,6 @@
 # ADR-0034: スキャン画面は今回のスキャンで見つかったものだけを扱う
 
-- ステータス: 承認
+- ステータス: 廃止（[ADR-0039](0039-scan-modal-current-problems-and-explicit-states.md)により置換）
 - 日付: 2026-11-19
 - 関連: [ADR-0017](0017-meta-source-projection-and-work-identity.md)（meta正本と投影）、[ADR-0028](0028-work-management-mutation-ownership.md)、[ADR-0029](0029-root-reconfiguration-workflow.md)（root再設定）、[ADR-0030](0030-job-progress-sse-current-state.md)（scanの完了結果の中身を本ADRで置き換え）、[ADR-0033](0033-dlsite-fetch-before-register.md)（DLsite取得と追加）、backlog TASK-511（実装）・DRAFT-70・DRAFT-72・DRAFT-77
 

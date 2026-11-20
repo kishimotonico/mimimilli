@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-11-20
-- 関連: [ADR-0028](0028-work-management-mutation-ownership.md)（必須更新の定義。候補の扱いを本ADRで置き換え）、[ADR-0033](0033-dlsite-fetch-before-register.md)（追加・適用でのカバーの扱いを本ADRで置き換え）、[ADR-0035](0035-dlsite-cover-name-from-placement.md)、backlog TASK-512
+- 関連: [ADR-0028](0028-work-management-mutation-ownership.md)（必須更新の定義。候補の扱いを本ADRで置き換え）、[ADR-0033](0033-dlsite-fetch-before-register.md)（追加・適用でのカバーの扱いを本ADRで置き換え）、[ADR-0035](0035-dlsite-cover-name-from-placement.md)、[ADR-0039](0039-scan-modal-current-problems-and-explicit-states.md)（候補の追加の警告と移る先を置き換え）、backlog TASK-512
 
 ## 文脈
 

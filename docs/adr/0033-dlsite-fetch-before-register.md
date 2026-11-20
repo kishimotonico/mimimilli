@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-11-19
-- 関連: [ADR-0017](0017-meta-source-projection-and-work-identity.md)（meta正本と投影）、[ADR-0027](0027-dlsite-meta-state-type-separation.md)（DLsite状態の型）、[ADR-0028](0028-work-management-mutation-ownership.md)（変更後のキャッシュ更新。DLsite関連の一部を本ADRで置き換え）、[ADR-0029](0029-root-reconfiguration-workflow.md)（root再設定。新規作品のDLsite取得への受け渡しを本ADRで置き換え）、[ADR-0030](0030-job-progress-sse-current-state.md)（ジョブ進捗SSE。DLsiteの契約を本ADRで置き換え）、[ADR-0034](0034-scan-modal-restructure.md)（スキャン画面の再構成）、backlog TASK-451（2026-09-22方針）・TASK-511（実装）、DRAFT-74（本ADRで解消）
+- 関連: [ADR-0017](0017-meta-source-projection-and-work-identity.md)（meta正本と投影）、[ADR-0027](0027-dlsite-meta-state-type-separation.md)（DLsite状態の型）、[ADR-0028](0028-work-management-mutation-ownership.md)（変更後のキャッシュ更新。DLsite関連の一部を本ADRで置き換え）、[ADR-0029](0029-root-reconfiguration-workflow.md)（root再設定。新規作品のDLsite取得への受け渡しを本ADRで置き換え）、[ADR-0030](0030-job-progress-sse-current-state.md)（ジョブ進捗SSE。DLsiteの契約を本ADRで置き換え）、[ADR-0034](0034-scan-modal-restructure.md)（スキャン画面の再構成）、[ADR-0039](0039-scan-modal-current-problems-and-explicit-states.md)（取得中の候補と追加の扱い、取得の進捗の置き場所を置き換え）、backlog TASK-451（2026-09-22方針）・TASK-511（実装）、DRAFT-74（本ADRで解消）
 
 ## 文脈
 
