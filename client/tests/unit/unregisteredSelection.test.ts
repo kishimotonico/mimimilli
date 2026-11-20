@@ -168,15 +168,6 @@ describe("judgmentCount", () => {
 });
 
 describe("pruneStaleOverrides", () => {
-  it("形式エラーの値が残っている行の上書きは、判断が要る行になっても消さない", () => {
-    const ok = row("a", "RJ000001", { state: "none" });
-    const overrides = new Map([["a", selectionOverride(ok, false)]]);
-    const invalid: CandidateRowModel = { ...ok, invalidRj: true };
-    expect(pruneStaleOverrides([invalid], overrides)).toBe(overrides);
-    expect(isRowSelected(invalid, overrides)).toBe(false);
-    expect(isRowSelected(ok, overrides)).toBe(false);
-  });
-
   const failed = row("a", "RJ000001", { state: "failed" });
   const fetching = row("a", "RJ000001", { state: "fetching" });
 

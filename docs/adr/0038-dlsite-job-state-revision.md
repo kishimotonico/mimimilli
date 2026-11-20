@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-11-20
-- 関連: [ADR-0030](0030-job-progress-sse-current-state.md)（接続世代と完了を失わない規則を本ADRで置き換え）、[ADR-0033](0033-dlsite-fetch-before-register.md)（候補の表示と終端の無効化を本ADRで置き換え）、[ADR-0036](0036-dlsite-cover-skipped-reason-and-candidate-refresh.md)、backlog TASK-512
+- 関連: [ADR-0030](0030-job-progress-sse-current-state.md)（接続世代と完了を失わない規則を本ADRで置き換え）、[ADR-0033](0033-dlsite-fetch-before-register.md)（候補の表示と終端の無効化を本ADRで置き換え）、[ADR-0036](0036-dlsite-cover-skipped-reason-and-candidate-refresh.md)、[ADR-0039](0039-scan-modal-current-problems-and-explicit-states.md)（単発の保留と無効化の置き換え）、backlog TASK-512
 
 ## 文脈
 

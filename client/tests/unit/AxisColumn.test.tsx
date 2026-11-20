@@ -49,6 +49,15 @@ describe("AxisColumn", () => {
     expect(screen.getByText("統計の取得に失敗しました")).toBeInTheDocument();
   });
 
+  it("エラー行は、エラー作品もデータ不整合も無いときだけ隠す", () => {
+    const { unmount } = renderAxisColumn({ errorViewCount: 0, dataIntegrityCount: 0 });
+    expect(screen.queryByRole("button", { name: /エラー/ })).toBeNull();
+    unmount();
+
+    renderAxisColumn({ errorViewCount: 0, dataIntegrityCount: 2 });
+    expect(screen.getByRole("button", { name: /エラー/ })).toBeInTheDocument();
+  });
+
   it("選択中のビュー項目に aria-current を付与する", () => {
     renderAxisColumn({
       activeAxis: "fav",

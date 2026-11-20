@@ -119,7 +119,9 @@ test("取得結果が該当なし・失敗の行は選択から外れ、追加�
   await expect(
     panel.getByRole("checkbox", { name: "「取得に失敗する作品」を選択" }),
   ).not.toBeChecked();
-  await expect(panel.getByRole("checkbox", { name: "「囁きの図書館」を選択" })).toBeChecked();
+  await expect(
+    panel.getByRole("checkbox", { name: "「（fixture）RJ000401」を選択" }),
+  ).toBeChecked();
 
   await panel.getByRole("button", { name: ADD_BUTTON }).click();
   await expect(page.getByText(/を追加しました/)).toBeVisible();

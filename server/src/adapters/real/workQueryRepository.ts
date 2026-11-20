@@ -10,6 +10,7 @@ import {
 } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
+  MissingWork,
   SmartFolderRule,
   Work,
   WorkPlacement,
@@ -91,6 +92,10 @@ const WORK_LIST_ROW_SELECT = `
           work_dlsite.state_json AS dlsiteStateJson
         ${WORKS_QUERY_FROM}
         LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id`;
+
+function previousPathOf(root: string, physicalPath: string): WorkspacePath | null {
+  return isPathWithin(root, physicalPath) ? relativeToRoot(physicalPath, root) : null;
+}
 
 export class WorkQueryRepository {
   private readonly db: Db;
@@ -459,9 +464,7 @@ export class WorkQueryRepository {
   }
 
   /** 状態が missing の作品。ライブラリのエラー表示の「行方不明」と同じ集合 */
-  listMissingWorks(
-    root: string,
-  ): Array<{ workId: string; title: string; previousPath: WorkspacePath | null }> {
+  listMissingWorks(root: string): MissingWork[] {
     const rows = this.db.sqlite
       .query(
         `SELECT works.id AS workId, works.title AS title, works.physical_path AS physicalPath
@@ -473,9 +476,7 @@ export class WorkQueryRepository {
     return rows.map((row) => ({
       workId: row.workId,
       title: row.title,
-      previousPath: isPathWithin(root, row.physicalPath)
-        ? relativeToRoot(row.physicalPath, root)
-        : null,
+      previousPath: previousPathOf(root, row.physicalPath),
     }));
   }
 
@@ -512,12 +513,7 @@ export class WorkQueryRepository {
   }
 
   /** 行方不明（missing）でRJコードを持つ作品。候補に「同じRJコードの行方不明の作品」を付記するために引く */
-  listMissingWorksWithRjCode(root: string): Array<{
-    rjCode: string;
-    workId: string;
-    title: string;
-    previousPath: WorkspacePath | null;
-  }> {
+  listMissingWorksWithRjCode(root: string): Array<MissingWork & { rjCode: string }> {
     const rows = this.db.sqlite
       .query(
         `SELECT upper(json_extract(work_dlsite.state_json, '$.rjCode')) AS rjCode,
@@ -532,7 +528,7 @@ export class WorkQueryRepository {
       .all() as Array<{ rjCode: string; workId: string; title: string; physicalPath: string }>;
     return rows.map(({ physicalPath, ...row }) => ({
       ...row,
-      previousPath: isPathWithin(root, physicalPath) ? relativeToRoot(physicalPath, root) : null,
+      previousPath: previousPathOf(root, physicalPath),
     }));
   }
 

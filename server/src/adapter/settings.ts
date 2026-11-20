@@ -3,7 +3,7 @@ import type {
   DlsiteRegistrationApply,
   DlsiteProductSummary,
   ScanCandidateFolder,
-  ScanCandidateMissingWork,
+  MissingWork,
   ScanDiagnostics,
   ScanProgressEvent,
   ScanResult,
@@ -35,7 +35,7 @@ export type CandidateAvailability = (folder: ScanCandidateFolder) => boolean;
 /** RJコードから、候補に載せるDLsite状態と行方不明作品を導く。DLsite状態は「取得中」を含まない */
 export type CandidateDescriber = (rjCode: string | null) => {
   dlsite: DlsiteProductSummary;
-  missingWorks: ScanCandidateMissingWork[];
+  missingWorks: MissingWork[];
 };
 
 export interface SettingsAdapter {

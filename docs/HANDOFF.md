@@ -14,7 +14,7 @@ DLsite/FANZA 等からダウンロードした音声作品（ASMR・ボイスド
 
 構造・境界・データフロー（Vite proxy / portless の開発時トポロジー含む）は [docs/ARCHITECTURE.md](ARCHITECTURE.md) を参照。HANDOFF 固有の補足:
 
-- fixture アダプタはシナリオ切替（`MIMIMILLI_MOCK_SCENARIO` = default/empty/new-work/identity-conflict/identity-conflict-unregistered/errors/large/scan-review/root-reconfiguration-failed）と**合成メディア**（無音WAV・SVGカバー、Range対応）を持つ。`large` は手書きシード11件 + 決定的生成989件の計1000件で、実ライブラリ規模の見え方を確認する用途
+- fixture アダプタはシナリオ切替（`MIMIMILLI_MOCK_SCENARIO` = default/empty/new-work/identity-conflict/identity-conflict-unregistered/errors/large/scan-review/needs-attention/root-reconfiguration-failed）と**合成メディア**（無音WAV・SVGカバー、Range対応）を持つ。`large` は手書きシード11件 + 決定的生成989件の計1000件で、実ライブラリ規模の見え方を確認する用途
 
 ### dev サーバーへの server/src 自動反映
 
@@ -97,7 +97,7 @@ smokeテストの注意:
 
 - `GET /works` は常にページングエンベロープ `{ items, total }` を返す（page/limit 省略時は page=1, limit=200）
 - 作品の変更系（`PATCH /works/:id`、タグの追加・削除など）は応答に `{ snapshot, projection }` を返す。`PATCH` は `sourceRevision` を要求する
-- `POST /scan` は 202 で `{ job }` を即返し（`Location: /api/scan/:id`）、実行中の二重 POST は 409（`active` 付き）。`GET /scan/active` は該当なしのとき 204。進捗は `GET /scan/:id/events` の SSE（[ADR-0030](adr/0030-job-progress-sse-current-state.md)）。`GET /scan/last` は常に200で直近のスキャンの記録（完了時刻・更新済み。未スキャンは完了時刻が null の空）を返し、新規作品・更新済みの作品本体は `GET /works?scanRecord=new|updated` から取る。要対応は `GET /scan/diagnostics` の `{ identityConflicts, invalidMetaFiles, unreadablePaths, dataIntegrityWorks, missingWorks }` を保存済みのデータから返す（ID重複は `registeredTitle`・`registeredPath`、データ不整合は `{ workId, title: string | null }`）。未登録候補は `GET /scan/candidates` の `{ scanCompleted, candidates }`（`scanCompleted` が false は起動後まだスキャンが完了していない状態）から取る
+- `POST /scan` は 202 で `{ job }` を即返し（`Location: /api/scan/:id`）、実行中の二重 POST は 409（`active` 付き）。`GET /scan/active` は該当なしのとき 204。進捗は `GET /scan/:id/events` の SSE（[ADR-0030](adr/0030-job-progress-sse-current-state.md)）。`GET /scan/last` は常に200で直近のスキャンの記録（完了時刻・更新済み。未スキャンは完了時刻が null の空）を返し、新規作品・更新済みの作品本体は `GET /works?scanRecord=new|updated`（更新済みは `scanChange` で変化の種類を絞れる）から取る。要対応は `GET /scan/diagnostics` の `{ identityConflicts, invalidMetaFiles, unreadablePaths, dataIntegrityWorks, missingWorks }` を保存済みのデータから返す（ID重複は `registeredTitle`・`registeredPath`、データ不整合は `{ workId, title: string | null }`）。未登録候補は `GET /scan/candidates` の `{ scanCompleted, candidates }`（`scanCompleted` が false は起動後まだスキャンが完了していない状態）から取る
 - `POST /works/:id/resume` は高頻度のため `PATCH /works/:id` と分離している
 - 音声は Range(206) 対応。カバーは `?w=128|256|512` でサムネイル（real は webp 化 + ディスクキャッシュ、fixture の SVG は原寸）
 

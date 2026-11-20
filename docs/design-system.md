@@ -174,11 +174,9 @@ action付きは10秒（`TOAST_ACTION_AUTO_DISMISS_MS`）で自動的に閉じる
 focus中はタイマーを止め、離れると残り時間から再開する。`variant="error"` だけは自動消滅
 せず、× ボタンでの手動クローズのみとする（エラーは読み落とし厳禁のため）。
 
-## スキャン画面の状態欄
+## スキャン画面の一覧状態
 
-完了を表す色（緑）は完了のときだけ使う。失敗は `--r-coral`。状態欄の6状態と文言は [requirements-v4.md](requirements-v4.md) 8.2 に従う。モーダルを閉じているあいだの終端は `ScanRuntime` がトーストで知らせ、`variant` は完了 `success`・中止 `info`・失敗 `error`（消えない）とする。どれも「開く」でモーダルを開く。
-
-スキャン画面のタブ一覧は `ScanListState` が読み込み中・読み込み失敗・まだスキャンしていません・0件を出し分ける（`CollectionStatus` の list を使う）。縦タブの件数は高さ18pxの枠を常に確保し、件数の有無で行の高さを変えない。
+タブ一覧の読み込み中・失敗・未スキャン・0件は `ScanListState`（`CollectionStatus` の list）で出す。縦タブの件数は高さ18pxの枠を常に確保し、件数の有無で行の高さを変えない。状態欄の6状態・文言・トーストは [requirements-v4.md](requirements-v4.md) 8.2 に従う。
 
 ## ライブラリ: チップ列・値一覧行・オーバーレイ
 

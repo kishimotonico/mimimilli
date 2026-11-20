@@ -11,7 +11,5 @@ export function useScanJobState<T>(selector: (state: ScanJobState) => T): T {
 }
 
 const selectScanning = isScanning;
-const selectScanProgress = (state: ScanJobState) => state.job?.progress ?? null;
 
 export const useScanning = () => useScanJobState(selectScanning);
-export const useScanProgress = () => useScanJobState(selectScanProgress);

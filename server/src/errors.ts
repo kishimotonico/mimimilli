@@ -94,7 +94,7 @@ export class WorkRegisterError extends Error {
 export function descendantsRegisteredError(count: number): WorkRegisterError {
   return new WorkRegisterError(
     "descendants_registered",
-    `配下に登録済み作品が${count}件あります。先に子作品の登録を解除してから親を登録してください`,
+    `配下に登録済み作品が${count}件あります。先に子作品を登録解除してから親を登録してください`,
     count,
   );
 }

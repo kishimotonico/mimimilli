@@ -18,14 +18,14 @@ export type ScanCandidateFolder = {
   detectedRjCode: string | null;
 };
 
-/** 同じRJコードを持つ、行方不明（catalogでmissing）の作品 */
-export const scanCandidateMissingWorkSchema = z.object({
+/** 状態が missing（行方不明）の作品。スキャン候補では同じRJコードを持つものを添える */
+export const missingWorkSchema = z.object({
   workId: z.string(),
   title: z.string(),
-  /** 行方不明になる前の作品フォルダーのroot相対path。rootの外にあった作品は null */
+  /** 行方不明になる前の作品フォルダー（単体音声作品は音声ファイル）のroot相対path。rootの外にあった作品は null */
   previousPath: workspacePathSchema.nullable(),
 });
-export type ScanCandidateMissingWork = z.infer<typeof scanCandidateMissingWorkSchema>;
+export type MissingWork = z.infer<typeof missingWorkSchema>;
 
 export const scanCandidateSchema = z.object({
   path: workspacePathSchema,
@@ -42,7 +42,7 @@ export const scanCandidateSchema = z.object({
   dlsite: dlsiteProductSummarySchema,
   /** dlsite を読む前にサーバーが読んだ、DLsite取得状態の revision。取得ジョブの終端の結果と新旧を比べる */
   dlsiteRevision: z.number().int().nonnegative(),
-  missingWorks: z.array(scanCandidateMissingWorkSchema),
+  missingWorks: z.array(missingWorkSchema),
 });
 export type ScanCandidate = z.infer<typeof scanCandidateSchema>;
 /** アダプタとスキャンセッションが組み立てる候補。dlsiteRevision はルートが付ける */
@@ -122,15 +122,6 @@ export const updatedWorkSchema = z.object({
   changes: z.array(workChangeSchema).min(1),
 });
 export type UpdatedWork = z.infer<typeof updatedWorkSchema>;
-
-/** 状態が missing の作品 */
-export const missingWorkSchema = z.object({
-  workId: z.string(),
-  title: z.string(),
-  /** 行方不明になる前の作品フォルダー（単体音声作品は音声ファイル）のroot相対path。rootの外にあった作品は null */
-  previousPath: workspacePathSchema.nullable(),
-});
-export type MissingWork = z.infer<typeof missingWorkSchema>;
 
 /** adapter が返すスキャン1回分の結果。HTTPには出さず、サーバーの記録（ScanRecord）の元になる */
 export interface ScanResult {

@@ -1,14 +1,14 @@
 import type { ScanJobSnapshot } from "@mimimilli/shared";
 import type { ScanProgress } from "../model";
 
-/** サイドバーの状態欄が出す6状態。まだスキャンしていない待機は at が null。 */
+/** サイドバーの状態欄が出す6状態。まだスキャンしていない待機は at が null。失敗は日時を持たない。 */
 export type ScanStatusView =
   | { kind: "idle"; at: string | null }
   | { kind: "running"; progress: ScanProgress | null }
   | { kind: "cancelling"; progress: ScanProgress | null }
   | { kind: "completed"; at: string | null }
   | { kind: "cancelled"; at: string | null }
-  | { kind: "failed"; at: string | null; reason: string };
+  | { kind: "failed"; reason: string };
 
 export const SCAN_FAILED_FALLBACK_REASON = "原因は不明です";
 
@@ -34,7 +34,6 @@ export function deriveScanStatusView(
     case "failed":
       return {
         kind: "failed",
-        at: job.finishedAt ?? lastScanTime,
         reason: job.error ?? SCAN_FAILED_FALLBACK_REASON,
       };
   }

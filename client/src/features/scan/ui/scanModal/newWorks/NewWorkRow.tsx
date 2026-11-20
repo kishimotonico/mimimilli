@@ -58,7 +58,7 @@ export default function NewWorkRow({ work, edit, onOpenFiles, onOpenWorkDetail }
               className={cn(
                 EDIT_FIELD_CLASS,
                 "w-full bg-paper-2 text-ink-0 disabled:opacity-60",
-                editError ? "border-[var(--r-coral)]" : "border-acc",
+                editError ? "border-[var(--state-danger)]" : "border-acc",
               )}
             />
           ) : (
@@ -87,7 +87,7 @@ export default function NewWorkRow({ work, edit, onOpenFiles, onOpenWorkDetail }
         {editError ? (
           <span
             role="alert"
-            className="mll-selectable truncate px-1.5 font-jp text-caption text-[var(--r-coral)]"
+            className="mll-selectable truncate px-1.5 font-jp text-caption text-[var(--state-danger)]"
           >
             {editError}
           </span>

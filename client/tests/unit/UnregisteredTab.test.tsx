@@ -292,7 +292,7 @@ describe("UnregisteredTab RJコード編集", () => {
     const header = screen.getByLabelText("すべて選択") as HTMLInputElement;
     expect(header.checked).toBe(true);
     fireEvent.click(header);
-    expect(screen.getByLabelText(`「${candidateB.inferredTitle}」を選択`)).not.toBeChecked();
+    expect(screen.getByLabelText(`「${candidateB.dlsite.title}」を選択`)).not.toBeChecked();
     expect(header.checked).toBe(false);
     expect(header.indeterminate).toBe(false);
     expect(screen.getByText("件を選択").textContent).toBe("0件を選択");
@@ -482,6 +482,19 @@ describe("UnregisteredTab DLsite列と行の操作", () => {
     const chip = screen.getByText("行方不明: 元の作品");
     expect(chip).toHaveAttribute("title", "行方不明の作品: 元の作品\n最後のパス: old/元の作品");
     expect(screen.getByText("行方不明")).toHaveAttribute("title", "行方不明の作品: 同名");
+  });
+
+  it("行方不明の作品と同じRJコードの行は既定で未選択になり、ほかの行は選択済みになる", async () => {
+    const withMissing = buildScanCandidate({
+      path: "d/m",
+      inferredTitle: "移動した作品",
+      rjCode: "RJ501010",
+      missingWorks: [{ workId: "w1", title: "元の作品", previousPath: "old/元の作品" }],
+    });
+    const plain = buildScanCandidate({ path: "d/p", inferredTitle: "ふつうの作品" });
+    await renderTab([withMissing, plain]);
+    expect(screen.getByLabelText("「移動した作品」を選択")).not.toBeChecked();
+    expect(screen.getByLabelText("「ふつうの作品」を選択")).toBeChecked();
   });
 
   it("「問題あり」は押した時点の行で固定され、チェックを外しても行は消えない。外すと戻る", async () => {
@@ -869,7 +882,7 @@ describe("UnregisteredTab 追加", () => {
   it("▾の「選択を除外」は選択中の行を除外する", async () => {
     const spy = vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
     await renderTab([candidateA, candidateB]);
-    fireEvent.click(screen.getByLabelText(`「${candidateB.inferredTitle}」を選択`));
+    fireEvent.click(screen.getByLabelText(`「${candidateB.dlsite.title}」を選択`));
     fireEvent.click(screen.getByRole("button", { name: "その他の操作" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "選択を除外" }));
     await waitFor(() => expect(spy).toHaveBeenCalledWith([candidateA.path]));
@@ -897,11 +910,11 @@ describe("UnregisteredTab 追加", () => {
     });
     await renderTab([fetchedRow, candidateA]);
     fireEvent.click(screen.getByRole("button", { name: "1" }));
-    expect(screen.queryByLabelText(`「${fetchedRow.inferredTitle}」を選択`)).toBeNull();
+    expect(screen.queryByLabelText("「t」を選択")).toBeNull();
     fireEvent.click(screen.getByLabelText(`「${candidateA.inferredTitle}」を選択`));
     expect(screen.getByLabelText(`「${candidateA.inferredTitle}」を選択`)).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /DLsite情報なし/ }));
-    expect(screen.getByLabelText(`「${fetchedRow.inferredTitle}」を選択`)).not.toBeNull();
+    expect(screen.getByLabelText("「t」を選択")).not.toBeNull();
   });
 
   it("フッターの左に選択の件数を出す", async () => {

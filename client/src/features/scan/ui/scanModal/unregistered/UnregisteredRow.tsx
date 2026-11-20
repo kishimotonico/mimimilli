@@ -97,7 +97,7 @@ function UnregisteredRowView({
       <div role="cell" className="flex items-center">
         <input
           type="checkbox"
-          aria-label={`「${candidate.inferredTitle}」を選択`}
+          aria-label={`「${title}」を選択`}
           checked={selected}
           disabled={busy || Boolean(error)}
           onChange={() => handlers.onToggle(path)}

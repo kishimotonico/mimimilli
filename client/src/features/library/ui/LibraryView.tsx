@@ -43,6 +43,7 @@ export default function LibraryView({ dockedBarActive }: LibraryViewProps) {
 
   const {
     errorViewCount,
+    dataIntegrityCount,
     libraryStats,
     facetItems,
     isFacetLoading,
@@ -94,6 +95,7 @@ export default function LibraryView({ dockedBarActive }: LibraryViewProps) {
         smartFolders={smartFolders}
         selectedTags={nav.selectedTags}
         errorViewCount={errorViewCount}
+        dataIntegrityCount={dataIntegrityCount}
         stats={libraryStats}
         onSelectAxis={nav.setAxis}
         onToggleTag={nav.toggleTag}

@@ -44,7 +44,7 @@ export function isRowSelected(row: CandidateRowModel, overrides: SelectionOverri
   return override && overrideApplies(row, override) ? override.selected : !needsJudgment(row);
 }
 
-/** 判断が要るかどうか、またはRJコードが上書きの時と食い違った行の上書きを消す。形式エラーの値が残っている行は、直すか戻すまでの一時的な状態なので消さない。変わらなければ同じ Map を返す。 */
+/** 判断が要るかどうか、またはRJコードが上書きの時と食い違った行の上書きを消す。変わらなければ同じ Map を返す。 */
 export function pruneStaleOverrides(
   rows: readonly CandidateRowModel[],
   overrides: SelectionOverrides,
@@ -52,7 +52,7 @@ export function pruneStaleOverrides(
   let next: Map<string, ScanCandidateSelectionOverride> | null = null;
   for (const row of rows) {
     const override = overrides.get(row.candidate.path);
-    if (!override || row.invalidRj || overrideApplies(row, override)) continue;
+    if (!override || overrideApplies(row, override)) continue;
     next ??= new Map(overrides);
     next.delete(row.candidate.path);
   }

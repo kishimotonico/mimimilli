@@ -1256,7 +1256,7 @@ describe("ScanModal", () => {
 
     fireEvent.click(
       within(unregistered).getByRole("checkbox", {
-        name: `「${candidateDetected.inferredTitle}」を選択`,
+        name: `「${candidateDetected.dlsite.title}」を選択`,
       }),
     );
     expect(

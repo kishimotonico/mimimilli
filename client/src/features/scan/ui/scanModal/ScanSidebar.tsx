@@ -122,7 +122,7 @@ function ScanSidebarTab({
             className={cn(
               "inline-grid h-[18px] min-w-5 place-items-center rounded-pill px-1.5 font-mono text-caption font-semibold tabular-nums",
               tab === "needsAttention"
-                ? "bg-[color-mix(in_oklch,var(--r-coral)_20%,transparent)] text-[var(--r-coral)]"
+                ? "bg-[color-mix(in_oklch,var(--state-danger)_20%,transparent)] text-[var(--state-danger)]"
                 : "bg-paper-3 text-ink-2",
             )}
           >
@@ -222,7 +222,7 @@ function renderStatus(status: ScanStatusView): ReactNode {
     case "completed":
       return (
         <>
-          <p className={cn(HEADING_CLASS, "flex items-center gap-1 text-[var(--r-leaf)]")}>
+          <p className={cn(HEADING_CLASS, "flex items-center gap-1 text-[var(--state-success)]")}>
             <I.check size={12} />
             スキャン完了
           </p>
@@ -239,7 +239,7 @@ function renderStatus(status: ScanStatusView): ReactNode {
     case "failed":
       return (
         <>
-          <p className={cn(HEADING_CLASS, "flex items-center gap-1 text-[var(--r-coral)]")}>
+          <p className={cn(HEADING_CLASS, "flex items-center gap-1 text-[var(--state-danger)]")}>
             <I.err size={12} />
             スキャンできませんでした
           </p>
