@@ -551,6 +551,7 @@ describe("ScanModal", () => {
           fail
             ? apiError(500, "internal", "失敗")
             : { scanCompleted: true, candidates: [candidateDetected] },
+        "GET /api/scan/candidates/exclusions": { paths: [] },
         "GET /api/scan/last": () => scanRecord,
         "GET /api/scan/diagnostics": buildScanDiagnostics(),
         "GET /api/works": () => buildWorksPage([], { total: 0 }),
@@ -1212,7 +1213,12 @@ describe("ScanModal", () => {
     await showUnregisteredList();
     const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
     await expect.poll(() => unregistered.textContent).toContain(candidateUndetected.inferredTitle);
-    fireEvent.click(within(unregistered).getByRole("button", { name: "除外" }));
+    fireEvent.click(
+      within(unregistered).getByRole("button", {
+        name: `「${candidateUndetected.inferredTitle}」の操作`,
+      }),
+    );
+    fireEvent.click(screen.getByRole("menuitem", { name: "除外" }));
 
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith({
@@ -1278,18 +1284,22 @@ describe("ScanModal", () => {
     await expect.poll(() => unregistered.textContent).toContain(candidateUndetected.inferredTitle);
 
     fireEvent.click(
-      within(unregistered).getByRole("checkbox", {
-        name: `「${candidateDetected.inferredTitle}」を選択`,
+      within(unregistered).getByRole("button", {
+        name: `「${candidateUndetected.inferredTitle}」の操作`,
       }),
     );
-    fireEvent.click(within(unregistered).getByRole("button", { name: "除外" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "除外" }));
 
     await waitFor(() =>
       expect(api.requestsTo("POST /api/scan/candidates/exclude")[0]?.body).toEqual({
         paths: [candidateUndetected.path],
       }),
     );
-    await waitFor(() => expect(screen.getByText("1件を候補から外しました")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByText(`「${candidateUndetected.inferredTitle}」を除外しました`),
+      ).toBeInTheDocument(),
+    );
     expect(screen.queryByText(candidateUndetected.inferredTitle)).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "元に戻す" }));

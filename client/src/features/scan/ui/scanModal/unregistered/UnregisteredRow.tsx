@@ -3,8 +3,10 @@ import { memo } from "react";
 import type { ScanCandidate } from "@mimimilli/shared";
 import { getDlsiteCoverUrl } from "../../../../../entities/dlsite/dlsiteCoverUrl";
 import { I } from "../../../../../shared/ui/Icon";
+import RowMenu from "./RowMenu";
 import { cn } from "../../../../../shared/lib/cn";
 import type { CandidateDlsiteDisplay } from "../../../model/unregisteredDlsite";
+import { rowTitle } from "../../../model/unregisteredSelection";
 import DlsiteStateCell from "./DlsiteStateCell";
 import RjCodeCell, { type RjCodeCommitResult, type RjCodeFieldError } from "./RjCodeCell";
 import { ROW_HEIGHT, UNREGISTERED_GRID_CLASS } from "./layout";
@@ -14,6 +16,8 @@ export interface UnregisteredRowHandlers {
   onStartEdit: (path: string) => void;
   onCommitEdit: (path: string, value: string) => RjCodeCommitResult;
   onCancelEdit: (path: string) => void;
+  onExclude: (path: string) => void;
+  onOpenFolder: (path: ScanCandidate["path"]) => void;
 }
 
 interface UnregisteredRowProps {
@@ -81,7 +85,7 @@ function UnregisteredRowView({
 }: UnregisteredRowProps) {
   const { path, rjCode } = candidate;
   const dlsiteTitle = display.state === "fetched" ? display.title : null;
-  const title = dlsiteTitle ?? candidate.inferredTitle;
+  const title = rowTitle({ candidate, display });
   const chip = missingWorkChip(candidate, title);
 
   return (
@@ -139,6 +143,14 @@ function UnregisteredRowView({
       </div>
       <div role="cell" className="flex items-center">
         <DlsiteStateCell display={display} hasCode={rjCode !== null} />
+      </div>
+      <div role="cell" className="flex items-center justify-end">
+        <RowMenu
+          label={`「${title}」の操作`}
+          disabled={busy}
+          onOpenFolder={() => handlers.onOpenFolder(path)}
+          onExclude={() => handlers.onExclude(path)}
+        />
       </div>
     </div>
   );

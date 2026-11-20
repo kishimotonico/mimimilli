@@ -26,6 +26,9 @@ export default function UnregisteredListHeader() {
         <span role="columnheader" className={HEADING_CLASS}>
           DLsite
         </span>
+        <span role="columnheader">
+          <span className="sr-only">操作</span>
+        </span>
       </div>
     </div>
   );

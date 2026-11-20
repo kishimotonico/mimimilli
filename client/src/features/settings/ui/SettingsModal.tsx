@@ -4,7 +4,6 @@ import Button from "../../../shared/ui/Button";
 import TextInput from "../../../shared/ui/TextInput";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
 import TagPrefixSettings from "./TagPrefixSettings";
-import ExcludedFoldersSettings from "./ExcludedFoldersSettings";
 import Modal, { ModalHeader } from "../../../shared/ui/Modal";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
@@ -132,9 +131,6 @@ export default function SettingsModal({ onClose, onChangeFolder, onExport }: Set
             </div>
           )}
         </div>
-
-        {/* 候補から外したフォルダー */}
-        <ExcludedFoldersSettings />
 
         {/* Tag prefixes（ADR-0005） */}
         <TagPrefixSettings />

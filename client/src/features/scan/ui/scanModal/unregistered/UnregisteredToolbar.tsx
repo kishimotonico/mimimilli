@@ -8,9 +8,9 @@ interface UnregisteredToolbarProps {
   partiallySelected: boolean;
   selectAllDisabled: boolean;
   onToggleAll: () => void;
-  excludeCount: number;
   busy: boolean;
-  onExclude: () => void;
+  excludedCount: number;
+  onShowExcluded: () => void;
   /** 判断が要る候補の件数。0かつ絞り込み中でないときは出さない */
   problemCount: number;
   /** 押した時点の行で固定した絞り込み。null は絞り込みなし */
@@ -24,9 +24,9 @@ export default function UnregisteredToolbar({
   partiallySelected,
   selectAllDisabled,
   onToggleAll,
-  excludeCount,
   busy,
-  onExclude,
+  excludedCount,
+  onShowExcluded,
   problemCount,
   filter,
   onFilterProblems,
@@ -50,9 +50,6 @@ export default function UnregisteredToolbar({
           />
           すべて選択
         </label>
-        <Button variant="quiet" disabled={busy || excludeCount === 0} onClick={onExclude}>
-          除外
-        </Button>
         {filter?.kind === "noinfo" ? (
           <FilterChip pressed count={filter.count} onClick={onClearFilter}>
             DLsite情報なし
@@ -74,6 +71,11 @@ export default function UnregisteredToolbar({
           )
         )}
       </div>
+      {excludedCount > 0 && (
+        <Button variant="quiet" className="ml-auto" data-excluded-trigger onClick={onShowExcluded}>
+          除外済み <span className="font-mono tabular-nums">{excludedCount}</span>
+        </Button>
+      )}
     </div>
   );
 }

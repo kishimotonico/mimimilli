@@ -28,7 +28,10 @@ import {
 let restoreSize: () => void;
 beforeEach(() => {
   restoreSize = mockUnregisteredListSize();
-  mockApi({ "GET /api/scan/candidates": { scanCompleted: true, candidates: [] } });
+  mockApi({
+    "GET /api/scan/candidates": { scanCompleted: true, candidates: [] },
+    "GET /api/scan/candidates/exclusions": { paths: [] },
+  });
 });
 
 afterEach(() => {
@@ -55,6 +58,45 @@ function PruningProbe() {
   return null;
 }
 
+async function renderUnmountableTab(candidates: ScanCandidate[]) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const store = createStore();
+  store.set(dlsiteJobStoreAtom, createFakeDlsiteJobStore({}));
+  const tree = (mounted: boolean) =>
+    createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(
+        JotaiProvider,
+        { store },
+        createElement(
+          Fragment,
+          null,
+          mounted
+            ? createElement(UnregisteredTab, {
+                candidates,
+                status: "ready",
+                onRetry: () => {},
+                onRegistered: () => {},
+                onOpenFiles: () => {},
+              })
+            : null,
+          createElement(GlobalToast, {
+            onOpenScan: () => {},
+            onOpenScanNeedsAttention: () => {},
+            onRetrySkippedTrack: () => {},
+          }),
+        ),
+      ),
+    );
+  const view = render(tree(true));
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    flushUnregisteredListSize();
+  });
+  return { rerender: (mounted: boolean) => view.rerender(tree(mounted)) };
+}
+
 async function renderTab(
   candidates: ScanCandidate[] = [candidateA, candidateB],
   jobOverrides: Parameters<typeof createFakeDlsiteJobStore>[0] = {},
@@ -65,6 +107,7 @@ async function renderTab(
   const job = createFakeDlsiteJobStore(jobOverrides);
   store.set(dlsiteJobStoreAtom, job);
   const onRegistered = vi.fn();
+  const onOpenFiles = vi.fn();
   const tree = (list: ScanCandidate[]) =>
     createElement(
       QueryClientProvider,
@@ -80,6 +123,7 @@ async function renderTab(
             status: "ready",
             onRetry: () => {},
             onRegistered,
+            onOpenFiles,
           }),
           options.pruning ? createElement(PruningProbe) : null,
           createElement(GlobalToast, {
@@ -98,6 +142,7 @@ async function renderTab(
   return {
     ...view,
     onRegistered,
+    onOpenFiles,
     queryClient,
     store,
     job,
@@ -569,7 +614,10 @@ describe("UnregisteredTab 取得と進捗", () => {
 });
 
 describe("UnregisteredTab 除外", () => {
-  it("行ごとの除外ボタンは無く、ツールバーの除外で選択中を除外して取り消せる", async () => {
+  const openRowMenu = (title: string) =>
+    fireEvent.click(screen.getByRole("button", { name: `「${title}」の操作` }));
+
+  it("ツールバーに除外ボタンは無く、行のメニューから除外して元に戻せる", async () => {
     vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
     const restoreSpy = vi
       .spyOn(scanEntityApi, "restoreScanCandidateExclusions")
@@ -580,19 +628,28 @@ describe("UnregisteredTab 除外", () => {
     });
     await renderTab([candidateA, candidateB]);
 
-    expect(screen.queryByRole("button", { name: /候補から外す/ })).toBeNull();
-    fireEvent.click(screen.getByLabelText(`「${candidateB.inferredTitle}」を選択`));
-    fireEvent.click(screen.getByRole("button", { name: "除外" }));
+    expect(screen.queryByRole("button", { name: "除外" })).toBeNull();
+    openRowMenu(candidateA.inferredTitle);
+    fireEvent.click(screen.getByRole("menuitem", { name: "除外" }));
 
     await waitFor(() =>
       expect(scanApi.excludeScanCandidates).toHaveBeenCalledWith([candidateA.path]),
     );
-    await waitFor(() => expect(screen.getByText("1件を候補から外しました")).not.toBeNull());
+    await waitFor(() => expect(screen.getByText("「未検出作品」を除外しました")).not.toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "元に戻す" }));
     await waitFor(() => expect(restoreSpy).toHaveBeenCalledWith([candidateA.path]));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "元に戻す" })).toBeNull());
   });
 
-  it("絞り込み中の「すべて選択」と除外は表示中の行だけに効く", async () => {
+  it("行のメニューの除外は、選択ではなくその行だけに効く", async () => {
+    const spy = vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
+    await renderTab([candidateA, candidateB]);
+    openRowMenu(candidateA.inferredTitle);
+    fireEvent.click(screen.getByRole("menuitem", { name: "除外" }));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith([candidateA.path]));
+  });
+
+  it("絞り込み中の「すべて選択」と▾の「選択を除外」は表示中の行だけに効き、トーストは作品名と件数を出す", async () => {
     const problem = buildScanCandidate({
       path: "d/p",
       inferredTitle: "問題作品",
@@ -603,8 +660,140 @@ describe("UnregisteredTab 除外", () => {
     await renderTab([problem, candidateB]);
     fireEvent.click(screen.getByRole("button", { name: /問題あり/ }));
     fireEvent.click(screen.getByLabelText("すべて選択"));
-    fireEvent.click(screen.getByRole("button", { name: "除外" }));
+    fireEvent.click(screen.getByRole("button", { name: "その他の操作" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "選択を除外" }));
     await waitFor(() => expect(spy).toHaveBeenCalledWith([problem.path]));
+    await waitFor(() => expect(screen.getByText("「問題作品」を除外しました")).not.toBeNull());
+  });
+
+  it("複数を除外したトーストは「A」他N件で出す", async () => {
+    vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
+    await renderTab([candidateA, candidateB]);
+    fireEvent.click(screen.getByRole("button", { name: "その他の操作" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "選択を除外" }));
+    await waitFor(() => expect(screen.getByText(/他1件を除外しました/)).not.toBeNull());
+  });
+
+  it("「除外済み N」から除外した候補の一覧を開き、行ごとに戻せる。0件なら出さない", async () => {
+    const getSpy = vi
+      .spyOn(scanEntityApi, "getScanCandidateExclusions")
+      .mockResolvedValue(["dlsite/除外した作品", "dlsite/もう一つ"]);
+    const restoreSpy = vi
+      .spyOn(scanEntityApi, "restoreScanCandidateExclusions")
+      .mockResolvedValue(undefined);
+    await renderTab([candidateA]);
+
+    fireEvent.click(await screen.findByRole("button", { name: /除外済み/ }));
+    expect(screen.getByRole("list", { name: "除外済みの候補" })).not.toBeNull();
+    getSpy.mockResolvedValue(["dlsite/もう一つ"]);
+    fireEvent.click(screen.getByRole("button", { name: "「除外した作品」を未登録に戻す" }));
+    await waitFor(() => expect(restoreSpy).toHaveBeenCalledWith(["dlsite/除外した作品"]));
+    await waitFor(() => expect(screen.queryByText("除外した作品")).toBeNull());
+
+    expect(screen.getByText("「除外した作品」を戻しました")).not.toBeNull();
+
+    getSpy.mockResolvedValue([]);
+    fireEvent.click(screen.getByRole("button", { name: "「もう一つ」を未登録に戻す" }));
+    await waitFor(() => expect(screen.getByText("除外した候補はありません")).not.toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "未登録" }));
+    expect(screen.queryByRole("button", { name: /除外済み/ })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByLabelText("すべて選択"));
+  });
+
+  it("除外済みの一覧を開くと「未登録」へフォーカスが移り、元の画面は操作できない。閉じると「除外済み N」へ戻る", async () => {
+    vi.spyOn(scanEntityApi, "getScanCandidateExclusions").mockResolvedValue([
+      "dlsite/除外した作品",
+    ]);
+    await renderTab([candidateA]);
+    const trigger = await screen.findByRole("button", { name: /除外済み/ });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const back = screen.getByRole("button", { name: "未登録" });
+    expect(document.activeElement).toBe(back);
+    expect(screen.getByLabelText("すべて選択").closest("[inert]")).not.toBeNull();
+    fireEvent.click(back);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: /除外済み/ }));
+  });
+
+  it("最後の1件を戻したら、フォーカスは「未登録」ボタンへ移る", async () => {
+    const getSpy = vi
+      .spyOn(scanEntityApi, "getScanCandidateExclusions")
+      .mockResolvedValue(["dlsite/除外した作品"]);
+    vi.spyOn(scanEntityApi, "restoreScanCandidateExclusions").mockResolvedValue(undefined);
+    await renderTab([candidateA]);
+    fireEvent.click(await screen.findByRole("button", { name: /除外済み/ }));
+    getSpy.mockResolvedValue([]);
+    fireEvent.click(screen.getByRole("button", { name: "「除外した作品」を未登録に戻す" }));
+    await waitFor(() => expect(screen.getByText("除外した候補はありません")).not.toBeNull());
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "未登録" }));
+  });
+
+  it("行メニューはEscで閉じて︙へフォーカスが戻り、Tabで外へ出ても閉じる", async () => {
+    await renderTab([candidateA, candidateB]);
+    const trigger = screen.getByRole("button", { name: `「${candidateA.inferredTitle}」の操作` });
+    fireEvent.click(trigger);
+    const item = screen.getByRole("menuitem", { name: "除外" });
+    item.focus();
+    fireEvent.keyDown(item, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    expect(document.activeElement).toBe(trigger);
+
+    fireEvent.click(trigger);
+    screen.getByRole("menuitem", { name: "除外" }).focus();
+    screen.getByLabelText("すべて選択").focus();
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+  });
+
+  it("行メニューの「フォルダーを開く」はその候補のパスでFilesを開く", async () => {
+    const { onOpenFiles } = await renderTab([candidateA]);
+    openRowMenu(candidateA.inferredTitle);
+    fireEvent.click(screen.getByRole("menuitem", { name: "フォルダーを開く" }));
+    expect(onOpenFiles).toHaveBeenCalledWith(candidateA.path);
+  });
+
+  it("除外が409（候補が古い）のときは、候補を取り直して選び直しを促す", async () => {
+    vi.spyOn(scanApi, "excludeScanCandidates").mockRejectedValue(
+      new ApiRequestError(409, "conflict", "stale"),
+    );
+    const refresh = vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue({
+      scanCompleted: true,
+      candidates: [],
+    });
+    await renderTab([candidateA]);
+    openRowMenu(candidateA.inferredTitle);
+    fireEvent.click(screen.getByRole("menuitem", { name: "除外" }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toContain("候補が更新されたため"),
+    );
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("候補が0件でも、除外済みがあれば「除外済み N」を出す", async () => {
+    vi.spyOn(scanEntityApi, "getScanCandidateExclusions").mockResolvedValue([
+      "dlsite/除外した作品",
+    ]);
+    await renderTab([]);
+    expect(await screen.findByRole("button", { name: /除外済み/ })).not.toBeNull();
+  });
+
+  it("最後の候補を除外してタブが外れても、トーストの「元に戻す」は動き、失敗の表示は消えない", async () => {
+    vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
+    const restoreSpy = vi
+      .spyOn(scanEntityApi, "restoreScanCandidateExclusions")
+      .mockRejectedValue(new Error("boom"));
+    vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue({
+      scanCompleted: true,
+      candidates: [],
+    });
+    const { rerender } = await renderUnmountableTab([candidateA]);
+    openRowMenu(candidateA.inferredTitle);
+    fireEvent.click(screen.getByRole("menuitem", { name: "除外" }));
+    await waitFor(() => expect(screen.getByText("「未検出作品」を除外しました")).not.toBeNull());
+
+    rerender(false);
+    fireEvent.click(screen.getByRole("button", { name: "元に戻す" }));
+    await waitFor(() => expect(restoreSpy).toHaveBeenCalledWith([candidateA.path]));
+    await waitFor(() => expect(screen.getByText("元に戻せませんでした")).not.toBeNull());
   });
 
   it("選択はatomに残り、外した候補は追加の対象にならない", async () => {
@@ -851,6 +1040,7 @@ describe("UnregisteredTab 追加", () => {
       releaseRefresh = resolve;
     });
     const api = mockApi({
+      "GET /api/scan/candidates/exclusions": { paths: [] },
       "GET /api/scan/candidates": async () => {
         await refreshGate;
         return { scanCompleted: true, candidates: [candidateB] };
@@ -859,7 +1049,7 @@ describe("UnregisteredTab 追加", () => {
     const key = scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY;
     const { queryClient, rerenderWith } = await renderTab([candidateA, candidateB]);
     queryClient.setQueryData(key, { scanCompleted: true, candidates: [candidateA, candidateB] });
-    queryClient.getQueryCache().subscribe(() => {
+    const unsubscribe = queryClient.getQueryCache().subscribe(() => {
       rerenderWith(queryClient.getQueryData<ScanCandidatesResponse>(key)?.candidates ?? []);
     });
     const addButton = () => screen.getByRole("button", { name: /件を追加/ });
@@ -872,6 +1062,7 @@ describe("UnregisteredTab 追加", () => {
     releaseRefresh();
     await waitFor(() => expect(screen.queryByText(candidateA.inferredTitle)).toBeNull());
     await waitFor(() => expect(addButton()).toBeEnabled());
+    unsubscribe();
   });
 
   it("追加リクエスト中にタブがアンマウントされても、候補が取り直されonRegisteredへ結果が届く", async () => {
@@ -882,6 +1073,7 @@ describe("UnregisteredTab 追加", () => {
       }),
     );
     const api = mockApi({
+      "GET /api/scan/candidates/exclusions": { paths: [] },
       "GET /api/scan/candidates": { scanCompleted: true, candidates: [candidateB] },
     });
     const { onRegistered, unmount, queryClient } = await renderTab([candidateA, candidateB]);
@@ -957,6 +1149,7 @@ describe("UnregisteredTab 取り直し中のRJコード修正", () => {
     const firstGate = Promise.withResolvers<void>();
     let calls = 0;
     mockApi({
+      "GET /api/scan/candidates/exclusions": { paths: [] },
       "GET /api/scan/candidates": async () => {
         calls += 1;
         if (calls === 1) {

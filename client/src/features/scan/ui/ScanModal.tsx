@@ -148,6 +148,7 @@ export default function ScanModal({
               status={candidatesStatus}
               onRetry={retryCandidates}
               onRegistered={handleUnregisteredRegistered}
+              onOpenFiles={onOpenFiles}
             />
           )}
           {activeTab === "needsAttention" && (

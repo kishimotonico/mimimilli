@@ -21,9 +21,6 @@ import {
   type ScanRecord,
   type StartScanRequest,
 } from "@mimimilli/shared";
-import { SCAN_CANDIDATE_EXCLUSIONS_QUERY_KEY } from "./queryKeys";
-
-export { SCAN_CANDIDATE_EXCLUSIONS_QUERY_KEY };
 
 export async function getScanCandidateExclusions(): Promise<string[]> {
   const { paths } = await getParsed(

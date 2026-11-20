@@ -124,6 +124,26 @@ describe("useDialogModal", () => {
     expect(document.activeElement).toBe(getByTestId("first"));
   });
 
+  it("inertの中や非表示の要素は循環の末尾に数えず、最後に辿れる要素から先頭へ回る", () => {
+    function InertTailDialog({ onClose }: { onClose: () => void }) {
+      const { dialogRef } = useDialogModal({ onClose });
+      return createElement(
+        "dialog",
+        { ref: dialogRef },
+        createElement("button", { "data-testid": "first" }, "first"),
+        createElement("button", { "data-testid": "last" }, "last"),
+        createElement("div", { inert: true }, createElement("button", null, "hidden")),
+        createElement("div", { style: { display: "none" } }, createElement("button", null, "gone")),
+      );
+    }
+    const { getByTestId } = render(createElement(InertTailDialog, { onClose: vi.fn() }));
+    const last = getByTestId("last");
+    last.focus();
+    const event = fireEvent.keyDown(last, { key: "Tab", bubbles: true, cancelable: true });
+    expect(event).toBe(false);
+    expect(document.activeElement).toBe(getByTestId("first"));
+  });
+
   it("先頭要素からShift+TabするとBODYへ落とさず末尾要素へ循環する", () => {
     function FocusTrapDialog({ onClose }: { onClose: () => void }) {
       const { dialogRef } = useDialogModal({ onClose });

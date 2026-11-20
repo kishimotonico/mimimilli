@@ -9,6 +9,11 @@ export interface CandidateRowModel {
   invalidRj?: boolean;
 }
 
+/** 行に出す名前。取得済みでタイトルがあればDLsiteのタイトル、なければフォルダー名 */
+export function rowTitle({ candidate, display }: CandidateRowModel): string {
+  return display.state === "fetched" && display.title ? display.title : candidate.inferredTitle;
+}
+
 function isProblemDisplay(display: CandidateDlsiteDisplay): boolean {
   return display.state === "not_found" || display.state === "failed";
 }

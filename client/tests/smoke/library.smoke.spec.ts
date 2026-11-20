@@ -447,22 +447,24 @@ test("未登録タブでRJコードを編集でき、選んだ候補を除外し
   await expect(editRow.getByRole("button", { name: "RJ999999" })).toBeVisible();
 
   const excludeRowName = /^「候補」を選択/;
-  await unregistered.getByRole("checkbox", { name: "「未登録作品」を選択" }).uncheck();
-  await unregistered.getByRole("button", { name: "除外", exact: true }).click();
+  await unregistered.getByRole("button", { name: "「候補」の操作" }).click();
+  await page.getByRole("menuitem", { name: "除外", exact: true }).click();
   await expect(unregistered.getByRole("row", { name: excludeRowName })).toBeHidden();
 
-  await expect(dialog.getByText("1件を候補から外しました")).toBeVisible();
+  await expect(dialog.getByText("「候補」を除外しました")).toBeVisible();
   await dialog.getByRole("button", { name: "元に戻す" }).click();
   await expect(unregistered.getByRole("row", { name: excludeRowName })).toBeVisible();
   await dialog.getByRole("tab", { name: "新規作品" }).click();
   await expect(dialog.getByRole("tab", { name: "未登録（2件）" })).toBeVisible();
 
-  // 元に戻すのトーストはタブを離れると消えるため、除外での件数の減少は別のタブから確かめる
   await dialog.getByRole("tab", { name: /^未登録/ }).click();
-  await unregistered.getByRole("checkbox", { name: "「未登録作品」を選択" }).uncheck();
-  await unregistered.getByRole("button", { name: "除外", exact: true }).click();
-  await dialog.getByRole("tab", { name: "新規作品" }).click();
+  await unregistered.getByRole("button", { name: "「候補」の操作" }).click();
+  await page.getByRole("menuitem", { name: "除外", exact: true }).click();
   await expect(dialog.getByRole("tab", { name: "未登録（1件）" })).toBeVisible();
+
+  await unregistered.getByRole("button", { name: /^除外済み/ }).click();
+  await unregistered.getByRole("button", { name: /を未登録に戻す$/ }).click();
+  await expect(dialog.getByRole("tab", { name: "未登録（2件）" })).toBeVisible();
 
   assertNoErrors(tracker);
 });

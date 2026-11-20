@@ -3,15 +3,15 @@ import { useAtom } from "jotai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   rjCodeFormatSchema,
+  type WorkspacePath,
   type DlsiteRegistrationApply,
   type ScanCandidate,
 } from "@mimimilli/shared";
-import { ApiRequestError } from "../../../../../shared/api/http";
 import { apiErrorMessage } from "../../../../../shared/lib/apiError";
-import { useToast } from "../../../../../shared/ui/useToast";
 import { useVirtualList } from "../../../../../shared/ui/useVirtualList";
-import { excludeScanCandidates, setScanCandidateRjCode, SCAN_QUERY_KEYS } from "../../../api";
-import { restoreScanCandidateExclusions } from "../../../../../entities/scan/api";
+import { setScanCandidateRjCode } from "../../../api";
+import { isCandidatesStale, STALE_MESSAGE } from "../../../model/candidatesStale";
+import { useCandidateExclusions } from "../../../model/useCandidateExclusions";
 import { refreshScanCandidates } from "../../../../../entities/scan/scanCandidatesCache";
 import { useRegisterScanCandidatesMutation } from "../../../../../entities/work/model/workMutations";
 import { scanCandidateSelectionAtom } from "../../../../../entities/scan/model/atoms";
@@ -25,12 +25,14 @@ import {
   judgmentCount,
   missingDlsiteRows,
   needsJudgment,
+  rowTitle,
   selectionOverride,
   type CandidateRowModel,
 } from "../../../model/unregisteredSelection";
 import type { ScanListStatus } from "../../../model/scanListStatus";
 import ScanListState from "../ScanListState";
 import type { CandidatesRegisteredResult } from "../types";
+import ExcludedList from "./ExcludedList";
 import UnregisteredFooter from "./UnregisteredFooter";
 import UnregisteredListHeader from "./UnregisteredListHeader";
 import UnregisteredRow, { type UnregisteredRowHandlers } from "./UnregisteredRow";
@@ -43,6 +45,7 @@ export interface UnregisteredTabProps {
   status: ScanListStatus;
   onRetry: () => void;
   onRegistered: (result: CandidatesRegisteredResult) => void;
+  onOpenFiles: (path: WorkspacePath) => void;
 }
 
 interface RowFilter {
@@ -55,17 +58,12 @@ const pathsOf = (rows: readonly CandidateRowModel[]) =>
 
 const RJ_CODE_FORMAT_REASON = "RJ/VJ＋6〜8桁の数字";
 
-const STALE_MESSAGE = "候補が更新されたため表示を更新しました。選び直してください。";
-
-function isCandidatesStale(error: unknown): boolean {
-  return error instanceof ApiRequestError && error.status === 409;
-}
-
 export default function UnregisteredTab({
   candidates,
   status,
   onRetry,
   onRegistered,
+  onOpenFiles,
 }: UnregisteredTabProps) {
   const queryClient = useQueryClient();
   const jobStore = useDlsiteJobStore();
@@ -77,7 +75,7 @@ export default function UnregisteredTab({
   const [editingPath, setEditingPath] = useState<string | null>(null);
   const [filter, setFilter] = useState<RowFilter | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const toast = useToast();
+  const [showExcluded, setShowExcluded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const allRows = useMemo<CandidateRowModel[]>(
@@ -110,14 +108,37 @@ export default function UnregisteredTab({
   const allSelected = selectableCount > 0 && selectedVisible.length === selectableCount;
   const partiallySelected = selectedVisible.length > 0 && !allSelected;
 
+  const {
+    exclusions,
+    exclude,
+    excluding,
+    restore: restoreExclusions,
+  } = useCandidateExclusions({ onExcludeError: setErrorMessage });
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const refocusToolbarRef = useRef(false);
+  const closeExcluded = () => {
+    refocusToolbarRef.current = true;
+    setShowExcluded(false);
+  };
+  useEffect(() => {
+    if (showExcluded || !refocusToolbarRef.current) return;
+    refocusToolbarRef.current = false;
+    const toolbar = toolbarRef.current;
+    const target =
+      toolbar?.querySelector<HTMLElement>("[data-excluded-trigger]") ??
+      toolbar?.querySelector<HTMLElement>("input:not(:disabled), button:not(:disabled)");
+    target?.focus();
+  }, [showExcluded]);
+
   const registerMutation = useRegisterScanCandidatesMutation();
   const register = async (apply: DlsiteRegistrationApply) => {
     const paths = registerRows.map(({ candidate }) => candidate.path);
-    const titleOf = ({ candidate, display }: CandidateRowModel) =>
-      apply.title && display.state === "fetched" && display.title
-        ? display.title
-        : candidate.inferredTitle;
-    const titleByPath = new Map(registerRows.map((row) => [row.candidate.path, titleOf(row)]));
+    const titleByPath = new Map(
+      registerRows.map((row) => [
+        row.candidate.path,
+        apply.title ? rowTitle(row) : row.candidate.inferredTitle,
+      ]),
+    );
     const titlesOf = (entries: readonly { path: ScanCandidate["path"] }[]) =>
       entries.map((entry) => titleByPath.get(entry.path) ?? entry.path);
     const remainingBefore = candidates.length;
@@ -148,33 +169,6 @@ export default function UnregisteredTab({
     });
   };
 
-  const restoreMutation = useMutation({
-    mutationFn: (paths: string[]) => restoreScanCandidateExclusions(paths),
-    onSuccess: async () => {
-      toast.dismiss();
-      await refreshScanCandidates(queryClient).catch(() => {});
-    },
-    onError: (error) => setErrorMessage(apiErrorMessage(error, "取り消しに失敗しました")),
-  });
-
-  const excludeMutation = useMutation({
-    mutationFn: (paths: string[]) => excludeScanCandidates(paths),
-    onSuccess: async (_void, paths) => {
-      toast.show({
-        message: `${paths.length}件を候補から外しました`,
-        variant: "success",
-        actionLabel: "元に戻す",
-        onAction: () => restoreMutation.mutate(paths),
-        priority: "action",
-      });
-      await Promise.all([
-        refreshScanCandidates(queryClient).catch(() => {}),
-        queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidateExclusions() }),
-      ]);
-    },
-    onError: (error) => setErrorMessage(apiErrorMessage(error, "候補から外せませんでした")),
-  });
-
   const rjCodeMutation = useMutation({
     mutationFn: ({ path, rjCode }: { path: ScanCandidate["path"]; rjCode: string }) =>
       setScanCandidateRjCode(path, rjCode),
@@ -195,7 +189,7 @@ export default function UnregisteredTab({
     },
   });
 
-  const busy = registerMutation.isPending || excludeMutation.isPending || restoreMutation.isPending;
+  const busy = registerMutation.isPending || excluding;
 
   const clearFieldError = (path: string) => {
     setFieldErrors((previous) => {
@@ -211,6 +205,18 @@ export default function UnregisteredTab({
   const rjCodePendingRef = useRef(false);
   rjCodePendingRef.current = rjCodeMutation.isPending;
   const mutateRjCode = rjCodeMutation.mutate;
+
+  const excludeRows = useCallback(
+    (rows: readonly CandidateRowModel[]) => {
+      if (rows.length === 0) return;
+      setErrorMessage(null);
+      exclude({
+        paths: rows.map(({ candidate }) => candidate.path),
+        titles: rows.map(rowTitle),
+      });
+    },
+    [exclude],
+  );
 
   const commitEdit = useCallback(
     (path: string, rawValue: string): RjCodeCommitResult => {
@@ -276,8 +282,11 @@ export default function UnregisteredTab({
       onStartEdit: startEdit,
       onCommitEdit: commitEdit,
       onCancelEdit: cancelEdit,
+      onOpenFolder: onOpenFiles,
+      onExclude: (path) =>
+        excludeRows(allRowsRef.current.filter((row) => row.candidate.path === path)),
     }),
-    [toggleRow, startEdit, commitEdit, cancelEdit],
+    [toggleRow, startEdit, commitEdit, cancelEdit, excludeRows, onOpenFiles],
   );
 
   const toggleAll = () =>
@@ -296,8 +305,7 @@ export default function UnregisteredTab({
     setErrorMessage(result.ok ? null : result.error);
   };
 
-  const excludeSelected = () =>
-    excludeMutation.mutate(selectedVisible.map(({ candidate }) => candidate.path));
+  const excludeSelected = () => excludeRows(selectedVisible);
 
   const { virtualItems, wrapperStyle, getItemStyle } = useVirtualList({
     count: visibleRows.length,
@@ -309,84 +317,100 @@ export default function UnregisteredTab({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <UnregisteredToolbar
-        allSelected={allSelected}
-        partiallySelected={partiallySelected}
-        selectAllDisabled={selectableCount === 0}
-        onToggleAll={toggleAll}
-        excludeCount={selectedVisible.length}
-        busy={busy}
-        onExclude={excludeSelected}
-        problemCount={problems}
-        filter={filter && { kind: filter.kind, count: visibleRows.length }}
-        onFilterProblems={() =>
-          setFilter({ kind: "problem", paths: pathsOf(allRows.filter(needsJudgment)) })
-        }
-        onClearFilter={() => setFilter(null)}
-      />
-      <ScanListState status={status} emptyMessage="未登録の候補はありません" onRetry={onRetry}>
-        <section aria-label="未登録の候補" className="flex min-h-0 flex-1 flex-col">
-          <div
-            // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 仮想リストは行を絶対配置するため table 要素にできず、role=table で ARIA table 構造を与える
-            role="table"
-            aria-label="未登録の候補一覧"
-            aria-rowcount={visibleRows.length + 1}
-            className="flex min-h-0 flex-1 flex-col"
-          >
-            <UnregisteredListHeader />
-            <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-              <div
-                // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 仮想リストの行群は tbody にできないため role=rowgroup で与える
-                role="rowgroup"
-                style={wrapperStyle}
-              >
-                {virtualItems.map((virtualRow) => {
-                  const row = visibleRows[virtualRow.index];
-                  if (!row) return null;
-                  const { candidate, display } = row;
-                  return (
-                    <div
-                      key={candidate.path}
-                      style={{ ...getItemStyle(virtualRow), height: ROW_HEIGHT }}
-                    >
-                      <UnregisteredRow
-                        candidate={candidate}
-                        display={display}
-                        flagged={needsJudgment(row)}
-                        selected={isRowSelected(row, selection)}
-                        editing={editingPath === candidate.path}
-                        error={fieldErrors.get(candidate.path)}
-                        busy={busy}
-                        handlers={handlers}
-                      />
-                    </div>
-                  );
-                })}
+      {showExcluded && (
+        <ExcludedList
+          paths={exclusions}
+          onBack={closeExcluded}
+          onRestore={(path) => restoreExclusions([path])}
+        />
+      )}
+      <div
+        inert={showExcluded}
+        className={showExcluded ? "hidden" : "flex min-h-0 flex-1 flex-col"}
+      >
+        <div ref={toolbarRef} className="contents">
+          <UnregisteredToolbar
+            allSelected={allSelected}
+            partiallySelected={partiallySelected}
+            selectAllDisabled={selectableCount === 0}
+            onToggleAll={toggleAll}
+            busy={busy}
+            excludedCount={exclusions.length}
+            onShowExcluded={() => setShowExcluded(true)}
+            problemCount={problems}
+            filter={filter && { kind: filter.kind, count: visibleRows.length }}
+            onFilterProblems={() =>
+              setFilter({ kind: "problem", paths: pathsOf(allRows.filter(needsJudgment)) })
+            }
+            onClearFilter={() => setFilter(null)}
+          />
+        </div>
+        <ScanListState status={status} emptyMessage="未登録の候補はありません" onRetry={onRetry}>
+          <section aria-label="未登録の候補" className="flex min-h-0 flex-1 flex-col">
+            <div
+              // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 仮想リストは行を絶対配置するため table 要素にできず、role=table で ARIA table 構造を与える
+              role="table"
+              aria-label="未登録の候補一覧"
+              aria-rowcount={visibleRows.length + 1}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <UnregisteredListHeader />
+              <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+                <div
+                  // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 仮想リストの行群は tbody にできないため role=rowgroup で与える
+                  role="rowgroup"
+                  style={wrapperStyle}
+                >
+                  {virtualItems.map((virtualRow) => {
+                    const row = visibleRows[virtualRow.index];
+                    if (!row) return null;
+                    const { candidate, display } = row;
+                    return (
+                      <div
+                        key={candidate.path}
+                        style={{ ...getItemStyle(virtualRow), height: ROW_HEIGHT }}
+                      >
+                        <UnregisteredRow
+                          candidate={candidate}
+                          display={display}
+                          flagged={needsJudgment(row)}
+                          selected={isRowSelected(row, selection)}
+                          editing={editingPath === candidate.path}
+                          error={fieldErrors.get(candidate.path)}
+                          busy={busy}
+                          handlers={handlers}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
-        </section>
-        {errorMessage && (
-          <p
-            role="alert"
-            className="shrink-0 whitespace-pre-line border-t border-line-soft px-[18px] py-2 font-jp text-secondary text-[var(--state-danger)]"
-          >
-            {errorMessage}
-          </p>
-        )}
-        <UnregisteredFooter
-          plan={plan}
-          selectedCount={selectedVisible.length}
-          addCount={registerRows.length}
-          missingDlsiteCount={noDlsiteRows.length}
-          onFilterMissingDlsite={() => setFilter({ kind: "noinfo", paths: pathsOf(noDlsiteRows) })}
-          busy={busy}
-          onFetch={() => void startFetch()}
-          onCancelFetch={() => void jobStore.cancel()}
-          onRegister={(apply) => void register(apply)}
-          onExclude={excludeSelected}
-        />
-      </ScanListState>
+          </section>
+          {errorMessage && (
+            <p
+              role="alert"
+              className="shrink-0 whitespace-pre-line border-t border-line-soft px-[18px] py-2 font-jp text-secondary text-[var(--state-danger)]"
+            >
+              {errorMessage}
+            </p>
+          )}
+          <UnregisteredFooter
+            plan={plan}
+            selectedCount={selectedVisible.length}
+            addCount={registerRows.length}
+            missingDlsiteCount={noDlsiteRows.length}
+            onFilterMissingDlsite={() =>
+              setFilter({ kind: "noinfo", paths: pathsOf(noDlsiteRows) })
+            }
+            busy={busy}
+            onFetch={() => void startFetch()}
+            onCancelFetch={() => void jobStore.cancel()}
+            onRegister={(apply) => void register(apply)}
+            onExclude={excludeSelected}
+          />
+        </ScanListState>
+      </div>
     </div>
   );
 }

@@ -69,7 +69,7 @@ test("▾の「選択を除外」で選択中の行が消え、「項目を選�
   await panel.getByRole("checkbox", { name: "「囁きの図書館」を選択" }).uncheck();
   await panel.getByRole("button", { name: "その他の操作" }).click();
   await page.getByRole("menuitem", { name: "選択を除外" }).click();
-  await expect(page.getByText(/件を候補から外しました/)).toBeVisible();
+  await expect(page.getByText(/を除外しました/)).toBeVisible();
   await expect(panel.getByRole("row", { name: /囁きの図書館/ })).toBeVisible();
   await expect(panel.getByRole("row", { name: /カバーなし作品/ })).toBeHidden();
 
@@ -85,6 +85,22 @@ test("▾の「選択を除外」で選択中の行が消え、「項目を選�
     "true",
   );
   await expect(panel.getByRole("row", { name: /朗読劇/ })).toBeVisible();
+  assertNoErrors(tracker);
+});
+
+test("先頭の行の︙メニューから除外でき、「元に戻す」で戻るとトーストも消える", async ({ page }) => {
+  const tracker = trackErrors(page);
+  const { panel } = await openUnregistered(page);
+  const firstRow = panel.getByRole("row").nth(1);
+  const firstName = (await firstRow.getByRole("checkbox").getAttribute("aria-label")) ?? "";
+  await firstRow.getByRole("button", { name: /の操作$/ }).click();
+  await page.getByRole("menuitem", { name: "除外", exact: true }).click();
+  await expect(page.getByText(/を除外しました/)).toBeVisible();
+  await expect(panel.getByRole("checkbox", { name: firstName })).toBeHidden();
+
+  await page.getByRole("button", { name: "元に戻す" }).click();
+  await expect(panel.getByRole("checkbox", { name: firstName })).toBeVisible();
+  await expect(page.getByRole("button", { name: "元に戻す" })).toBeHidden();
   assertNoErrors(tracker);
 });
 

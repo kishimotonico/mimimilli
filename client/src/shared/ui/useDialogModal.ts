@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from "react";
 import type { MouseEvent as ReactMouseEvent, RefObject, SyntheticEvent } from "react";
 import { useSetAtom } from "jotai";
-import { FOCUSABLE_SELECTOR } from "./focusable";
+import { getTabbableElements } from "./focusable";
 import { openModalDialogsAtom } from "../model/openModalDialogsAtom";
 
 interface UseDialogModalOptions {
@@ -40,7 +40,7 @@ export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptio
     // dialog直下の要素（fixed配置のToastなど）も含めて対象にするため querySelector で毎回集める。
     const handleTabKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Tab") return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      const focusable = getTabbableElements(dialog);
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
