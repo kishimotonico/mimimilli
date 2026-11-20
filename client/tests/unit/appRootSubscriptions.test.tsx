@@ -286,8 +286,8 @@ describe("App root subscriptions", () => {
       const view = (processed: number) => ({
         jobId: "job-1",
         status: "running" as const,
-        codes: new Map([["RJ000001", { origin: "bulk" as const, state: "fetching" as const }]]),
-        bulk: { processed, total: 10 },
+        codes: new Map([["RJ000001", { state: "fetching" as const }]]),
+        progress: { processed, total: 10 },
       });
       act(() => {
         dlsiteJob.setState((state) => ({ ...state, job: view(1) }));

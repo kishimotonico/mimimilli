@@ -13,7 +13,7 @@ export type CandidateDlsiteDisplay =
   | { state: "not_found" }
   | { state: "failed" };
 
-type DisplayJobState = Pick<DlsiteJobState, "job" | "pendingSingles" | "results">;
+type DisplayJobState = Pick<DlsiteJobState, "job" | "results">;
 
 function displayOf(summary: DlsiteProductSummary): CandidateDlsiteDisplay {
   return summary.state === "fetched"
@@ -29,7 +29,6 @@ export function candidateDlsiteDisplay(
 ): CandidateDlsiteDisplay {
   if (candidate.rjCode === null) return { state: "none" };
   const code = canonicalDlsiteProductCode(candidate.rjCode);
-  if (job.pendingSingles.has(code)) return { state: "fetching" };
 
   const entry = job.job?.codes.get(code);
   if (

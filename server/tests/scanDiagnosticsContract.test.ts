@@ -17,7 +17,9 @@ import { Scanner } from "../src/adapters/real/scanner.ts";
 import { works } from "../src/adapters/real/catalogSchema.ts";
 import {
   createWorkRepos,
+  folderFixtureWork,
   makeWork as makeTestWork,
+  makeWorkSummary,
   upsertTestWork,
 } from "./helpers/workTestUtils.ts";
 import { createTestRealAdapter } from "./helpers/realAdapter.ts";
@@ -351,6 +353,28 @@ test("real: rootの外を指す行方不明の作品は previousPath が null �
   } finally {
     await app.shutdown();
   }
+});
+
+test("fixture: rootの外を指す行方不明の作品は previousPath が null になる", async () => {
+  const adapter = createFixtureAdapter({
+    scenario: "new-work",
+    works: [
+      folderFixtureWork(
+        makeWorkSummary({ id: "inside", status: "missing", physicalPath: "/library/inside" }),
+      ),
+      folderFixtureWork(
+        makeWorkSummary({
+          id: "posix-outside",
+          status: "missing",
+          physicalPath: "/elsewhere/work",
+        }),
+      ),
+    ],
+  });
+  const diagnostics = await adapter.listScanDiagnostics();
+  const byId = new Map(diagnostics.missingWorks.map((work) => [work.workId, work.previousPath]));
+  assert.equal(byId.get("inside"), "inside");
+  assert.equal(byId.get("posix-outside"), null);
 });
 
 test("fixture: root変更の開始で旧rootの診断が消える", async () => {

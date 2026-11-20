@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { formatDlsiteFetchEstimate } from "../../../../../entities/dlsite/model/dlsiteBulkFrame";
-import { useDlsiteBulkFrame } from "../../../../../entities/dlsite/useDlsiteJob";
+import { formatDlsiteFetchEstimate } from "../../../../../entities/dlsite/model/dlsiteFetchFrame";
+import { useDlsiteFetchFrame } from "../../../../../entities/dlsite/useDlsiteJob";
 import Button from "../../../../../shared/ui/Button";
 
 interface DlsiteFetchProgressProps {
@@ -9,9 +9,9 @@ interface DlsiteFetchProgressProps {
   idleHint?: ReactNode;
 }
 
-/** フッターの主ボタンの位置に出る、まとめての取得の進捗と中止。幅を常に確保し、出入りで周りがずれない。 */
+/** フッターの主ボタンの位置に出る、取得の進捗と中止。幅を常に確保し、出入りで周りがずれない。 */
 export default function DlsiteFetchProgress({ onCancel, idleHint }: DlsiteFetchProgressProps) {
-  const frame = useDlsiteBulkFrame();
+  const frame = useDlsiteFetchFrame();
   return (
     <div className="flex h-[30px] w-[300px] shrink-0 items-center justify-end gap-3">
       {frame.kind !== "progress" && idleHint}

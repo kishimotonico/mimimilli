@@ -2,7 +2,7 @@
 import { memo } from "react";
 import type { ScanCandidate } from "@mimimilli/shared";
 import { getDlsiteCoverUrl } from "../../../../../entities/dlsite/dlsiteCoverUrl";
-import Button from "../../../../../shared/ui/Button";
+import { I } from "../../../../../shared/ui/Icon";
 import { cn } from "../../../../../shared/lib/cn";
 import type { CandidateDlsiteDisplay } from "../../../model/unregisteredDlsite";
 import DlsiteStateCell from "./DlsiteStateCell";
@@ -14,12 +14,13 @@ export interface UnregisteredRowHandlers {
   onStartEdit: (path: string) => void;
   onCommitEdit: (path: string, value: string) => RjCodeCommitResult;
   onCancelEdit: (path: string) => void;
-  onFetchSingle: (rjCode: string) => void;
 }
 
 interface UnregisteredRowProps {
   candidate: ScanCandidate;
   display: CandidateDlsiteDisplay;
+  /** 判断が要る行 */
+  flagged: boolean;
   selected: boolean;
   editing: boolean;
   error: RjCodeFieldError | undefined;
@@ -27,15 +28,25 @@ interface UnregisteredRowProps {
   handlers: UnregisteredRowHandlers;
 }
 
-function missingWorkNote(candidate: ScanCandidate): { text: string; full: string } | null {
-  const titles = candidate.missingWorks.map((work) => work.title);
-  const first = titles[0];
+function missingWorkChip(
+  candidate: ScanCandidate,
+  shownTitle: string,
+): { label: string; hover: string } | null {
+  const [first, ...rest] = candidate.missingWorks;
   if (first === undefined) return null;
-  return {
-    text:
-      titles.length > 1 ? `行方不明: ${first} ほか${titles.length - 1}件` : `行方不明: ${first}`,
-    full: titles.join("\n"),
-  };
+  const label =
+    rest.length > 0
+      ? `行方不明 ${candidate.missingWorks.length}件`
+      : first.title === shownTitle
+        ? "行方不明"
+        : `行方不明: ${first.title}`;
+  const hover = candidate.missingWorks
+    .map(
+      (work) =>
+        `行方不明の作品: ${work.title}${work.previousPath ? `\n最後のパス: ${work.previousPath}` : ""}`,
+    )
+    .join("\n\n");
+  return { label, hover };
 }
 
 function RowCover({ display }: { display: CandidateDlsiteDisplay }) {
@@ -61,6 +72,7 @@ function RowCover({ display }: { display: CandidateDlsiteDisplay }) {
 function UnregisteredRowView({
   candidate,
   display,
+  flagged,
   selected,
   editing,
   error,
@@ -69,8 +81,8 @@ function UnregisteredRowView({
 }: UnregisteredRowProps) {
   const { path, rjCode } = candidate;
   const dlsiteTitle = display.state === "fetched" ? display.title : null;
-  const note = missingWorkNote(candidate);
-  const action = rowAction(candidate, display);
+  const title = dlsiteTitle ?? candidate.inferredTitle;
+  const chip = missingWorkChip(candidate, title);
 
   return (
     <div
@@ -84,7 +96,6 @@ function UnregisteredRowView({
           aria-label={`「${candidate.inferredTitle}」を選択`}
           checked={selected}
           disabled={busy || Boolean(error)}
-          title={error ? "値にエラーがあるため、直すまで追加の対象から外れます" : undefined}
           onChange={() => handlers.onToggle(path)}
         />
       </div>
@@ -92,22 +103,27 @@ function UnregisteredRowView({
         <RowCover display={display} />
       </div>
       <div role="cell" className="flex min-w-0 flex-col justify-center gap-0.5">
-        <span className="truncate font-jp text-body text-ink-0" title={dlsiteTitle ?? undefined}>
-          {dlsiteTitle ?? candidate.inferredTitle}
-        </span>
-        <span className="flex min-w-0 items-center gap-2 font-jp text-caption text-ink-2">
-          <span className="truncate">
-            {dlsiteTitle ? candidate.inferredTitle : `音声 ${candidate.audioFileCount}件`}
+        <span className="flex min-w-0 items-center gap-1.5">
+          {flagged && (
+            <I.err size={13} aria-hidden="true" className="shrink-0 text-[var(--state-danger)]" />
+          )}
+          <span
+            className={cn("truncate font-jp text-body text-ink-0", dlsiteTitle && "font-medium")}
+            title={title}
+          >
+            {title}
           </span>
-          {note && (
+          {chip && (
             <span
-              title={note.full}
-              className="shrink-0 truncate rounded-[3px] bg-paper-2 px-1.5 text-ink-1"
-              style={{ maxWidth: 220 }}
+              title={chip.hover}
+              className="inline-flex h-[17px] max-w-[220px] shrink-0 items-center truncate rounded-[4px] bg-[color-mix(in_oklch,var(--state-danger)_11%,transparent)] px-1.5 font-jp text-caption font-medium text-[color-mix(in_oklch,var(--state-danger)_85%,var(--ink-0))]"
             >
-              {note.text}
+              {chip.label}
             </span>
           )}
+        </span>
+        <span className="truncate font-mono text-secondary text-ink-2" title={path}>
+          {path}
         </span>
       </div>
       <div role="cell" className="flex min-w-0 flex-col justify-center">
@@ -122,37 +138,10 @@ function UnregisteredRowView({
         />
       </div>
       <div role="cell" className="flex items-center">
-        <DlsiteStateCell display={display} />
-      </div>
-      <div role="cell" className="flex items-center">
-        {action && (
-          <Button
-            variant="quiet"
-            disabled={busy}
-            onClick={() =>
-              action.kind === "fix"
-                ? handlers.onStartEdit(path)
-                : handlers.onFetchSingle(action.code)
-            }
-          >
-            {action.label}
-          </Button>
-        )}
+        <DlsiteStateCell display={display} hasCode={rjCode !== null} />
       </div>
     </div>
   );
-}
-
-type RowAction = { kind: "fix"; label: string } | { kind: "fetch"; label: string; code: string };
-
-function rowAction(candidate: ScanCandidate, display: CandidateDlsiteDisplay): RowAction | null {
-  if (candidate.rjCode === null) return null;
-  if (display.state === "not_found") return { kind: "fix", label: "修正" };
-  if (display.state === "failed") return { kind: "fetch", label: "再試行", code: candidate.rjCode };
-  if (display.state === "none" && candidate.rjCodeEdited) {
-    return { kind: "fetch", label: "取得", code: candidate.rjCode };
-  }
-  return null;
 }
 
 function sameDisplay(a: CandidateDlsiteDisplay, b: CandidateDlsiteDisplay): boolean {
@@ -167,6 +156,7 @@ const UnregisteredRow = memo(
   UnregisteredRowView,
   (previous, next) =>
     previous.candidate === next.candidate &&
+    previous.flagged === next.flagged &&
     previous.selected === next.selected &&
     previous.editing === next.editing &&
     previous.error === next.error &&

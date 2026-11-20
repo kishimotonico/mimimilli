@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAtom, useAtomValue } from "jotai";
-import { useDlsiteBulkFrame } from "../../../entities/dlsite/useDlsiteJob";
+import { useDlsiteFetchFrame } from "../../../entities/dlsite/useDlsiteJob";
 import { scanModalOpenAtom } from "../../../entities/scan/model/atoms";
 import {
   scanDiagnosticsQueryOptions,
@@ -21,7 +21,7 @@ const INDETERMINATE: ScanEntryRing = { kind: "indeterminate" };
 /** 上のバーのスキャン入口が出す輪と点。モーダルを開いているあいだは見た扱いにして記憶する。 */
 export function useScanEntryStatus(): { ring: ScanEntryRing; unseen: boolean } {
   const scanning = useScanning();
-  const frame = useDlsiteBulkFrame();
+  const frame = useDlsiteFetchFrame();
   const open = useAtomValue(scanModalOpenAtom);
   const { candidates, status: candidatesStatus } = useScanCandidatesState();
   const candidatesLoaded = candidatesStatus === "loaded";

@@ -46,7 +46,7 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 
 **取得ジョブ**: スキャン・候補登録・作品登録・root再設定は取得を始めない。取得はユーザーが対象のproduct code（RJコード）を指定して `POST /dlsite/jobs` で始める。`DlsiteJobManager`（`server/src/dlsiteJobManager.ts`）がジョブを同時に1本だけ動かし、コードを1件ずつ `fetchDlsiteProduct`（real: `adapters/real/dlsiteMethods.ts`）で処理する。1件の処理は、作品ページの取得とキャッシュへの記録、カバーの先取り（ベストエフォート）、同じRJコードを持つ全作品の `work_dlsite.state_json` の再投影で、タイトル・タグ・カバー・`mimimilli.json` は変更しない。同期の単発取得（`POST /dlsite/:id/fetch`・`POST /dlsite/fetch-by-code`）も同じ処理を通る。
 
-起点（`bulk` / `single`）はproduct codeごとに持つ。実行中に受けた取得は同じジョブのキューへ合流し、単発は待機中の単発の末尾（まとめての前）、まとめては末尾に入る。待機中のまとめてを単発で取り直すと単発へ移り、取得を終えたコードの再取得はその要求の起点で取り直す。単発はキャッシュの失敗の記録を無視して取り直す（force）。中止は起点がまとめてで待機中のコードだけを外し、取得中のコードと単発は止めない。root再設定の開始時は、キューを起点を問わず捨てて取得中の処理を打ち切る。ジョブは永続化せず、サーバー再起動では再開しない。
+実行中に受けた取得は同じジョブのキューの末尾へ合流する。リクエストの `force` が true のコードは、キャッシュの失敗の記録を無視して取り直す。取得中のコードに force で取り直しを求めたときは、走行中の試行が終わりしだい取り直し、取得を終えたコードの再取得は force を引き継いで再キューする。取り直したコードも進捗の分母と中止の対象になる。中止は待機中のコードをすべて外し、取得中のコードは止めない。root再設定の開始時は、キューを捨てて取得中の処理を打ち切る。ジョブは永続化せず、サーバー再起動では再開しない。
 
 未登録の候補一覧（`GET /scan/candidates`）の `dlsite` はキャッシュ由来の状態（`none` / `fetched` / `not_found` / `failed`）だけで、取得中は含めない。取得中の行はクライアントがジョブのsnapshotとSSEから出す。
 
@@ -94,7 +94,7 @@ failure_kind（失敗記録側）と既定TTL。
 | `not_found`  | HTTP 404               | 3日   |
 | `error`      | 一時的なHTTP・通信障害 | 1時間 |
 
-TTLは `DEFAULT_DLSITE_CACHE_TTLS_MS`（`shared/src/dlsite.ts`）の定数で固定されている。通常取得の判断順序は、有効な失敗記録があればそれを返し（ネットワークへ出ない）、なければ有効なHTML snapshotを（保存済みの解析結果を使って）返し、どちらもなければネットワークへ出る。force（`?force=true`、取得ジョブの単発）は、有効な失敗記録と解析できないsnapshot（`parse_error`、またはokでも今のパーサーで解析できないもの）をmissとして扱い、ネットワークへ取り直す。TTL内で解析できるokのsnapshotはforceでもそのまま使い、ネットワークへ出ない。書き込みは通常時と同じ規則に従う。
+TTLは `DEFAULT_DLSITE_CACHE_TTLS_MS`（`shared/src/dlsite.ts`）の定数で固定されている。通常取得の判断順序は、有効な失敗記録があればそれを返し（ネットワークへ出ない）、なければ有効なHTML snapshotを（保存済みの解析結果を使って）返し、どちらもなければネットワークへ出る。force（`?force=true`、取得ジョブの `force: true`）は、有効な失敗記録と解析できないsnapshot（`parse_error`、またはokでも今のパーサーで解析できないもの）をmissとして扱い、ネットワークへ取り直す。TTL内で解析できるokのsnapshotはforceでもそのまま使い、ネットワークへ出ない。書き込みは通常時と同じ規則に従う。
 
 HTMLの転送・展開サイズには上限があり（既定2 MiB / 8 MiB、`DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES` / `DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES`）、gzip展開時にも `zlib` の `maxOutputLength` で同じ上限を渡してgzip bombを防ぐ。転送サイズの上限はHTTP応答にだけ課す。CLIのローカルファイルimportは転送を伴わないため、展開後サイズの上限だけで判定する。
 
@@ -217,7 +217,7 @@ importはHTML snapshotを成功記録として書き直すため、取り込ん�
 - `GET /media/dlsite-cover/:key` — DLsiteカバーキャッシュの配信。クライアントは応答の `cachedCover`（`key`・`version`）からURLを作る
 - `POST /dlsite/:id/apply` — 取得したDLsite情報のうち選択した項目を、キャッシュから読んで適用。`dlsite_refetch_required`（409）は再取得を促す
 - `PATCH /dlsite/:id` — RJコードの手動設定（空文字は「コードなし」の明示、`null` は受け付けない）、または `skipped` の切り替え
-- `POST /dlsite/jobs` — 取得ジョブを開始し、202 `{ revision, job }`（受け付けた直後の状態。`GET /dlsite/jobs/current` と同じ形）を返す。実行中ジョブがあればそのキューへ合流する。body は `{ origin: "bulk", productCodes }`（1〜1000件）か `{ origin: "single", productCode }`（失敗の記録を無視して取り直す）。オフライン設定では `offline`、サーバーの終了処理中は409（`conflict`）で拒否する
-- `GET /dlsite/jobs/current` — 常に200で `{ revision, job }`。`revision` はプロセス全体で単調に増える状態の新旧の値。`job` は `jobId`・`status`（`running` / `finished`）・コードごとの `origin`・`state`（`queued` / `fetching` / `fetched` / `not_found` / `failed`）・`revision`（そのコードが最後に変化した時点の値）・まとめての進捗 `bulk`。終端のコードは取得結果 `dlsite`（`fetched` はタイトルとカバー）も持つ。終了したジョブは次のジョブ開始まで残る。無ければ `job: null`
-- `DELETE /dlsite/jobs/:jobId/bulk` — 起点がまとめてで待機中のコードをキューから外し `{ removed }` を返す。IDが現在のジョブと違う・対象なしは `removed: 0`
+- `POST /dlsite/jobs` — 取得ジョブを開始し、202 `{ revision, job }`（受け付けた直後の状態。`GET /dlsite/jobs/current` と同じ形）を返す。実行中ジョブがあればそのキューへ合流する。body は `{ productCodes, force? }`（1〜1000件。`force` が true のとき失敗の記録を無視して取り直す。既定は false）。オフライン設定では `offline`、サーバーの終了処理中は409（`conflict`）で拒否する
+- `GET /dlsite/jobs/current` — 常に200で `{ revision, job }`。`revision` はプロセス全体で単調に増える状態の新旧の値。`job` は `jobId`・`status`（`running` / `finished`）・コードごとの `state`（`queued` / `fetching` / `fetched` / `not_found` / `failed`）・`revision`（そのコードが最後に変化した時点の値）・進捗 `progress`。終端のコードは取得結果 `dlsite`（`fetched` はタイトルとカバー）も持つ。終了したジョブは次のジョブ開始まで残る。無ければ `job: null`
+- `DELETE /dlsite/jobs/:jobId` — 待機中のコードをキューから外し `{ removed }` を返す。IDが現在のジョブと違う・対象なしは `removed: 0`
 - `GET /dlsite/jobs/events` — 取得ジョブの進捗SSE。接続直後に `snapshot`（`revision` と現在のジョブ、無ければ `job: null`）を送り、実行中なら以後 `code`（コードの現在状態。終端なら `dlsite` を含む）・`removed`（中止で外れたコード）・`finished`（`complete` / `aborted`）をlive配信して `finished` で閉じる。すべてのイベントが `revision` を持つ。15秒間隔で `ping` を送る

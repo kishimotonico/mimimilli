@@ -1,9 +1,9 @@
-// DLsite取得ジョブの開始・現在状態・まとめての中止。進捗はSSE（DLSITE_JOB_EVENTS_URL）で受ける。
+// DLsite取得ジョブの開始・現在状態・中止。進捗はSSE（DLSITE_JOB_EVENTS_URL）で受ける。
 import {
-  dlsiteJobCancelBulkResponseSchema,
+  dlsiteJobCancelResponseSchema,
   dlsiteJobStateSchema,
   dlsiteJobStartBodySchema,
-  type DlsiteJobCancelBulkResponse,
+  type DlsiteJobCancelResponse,
   type DlsiteJobStartBody,
   type DlsiteJobState,
 } from "@mimimilli/shared";
@@ -19,9 +19,6 @@ export function getCurrentDlsiteJob(): Promise<DlsiteJobState> {
   return getParsed(dlsiteJobStateSchema, "/dlsite/jobs/current");
 }
 
-export function cancelDlsiteJobBulk(jobId: string): Promise<DlsiteJobCancelBulkResponse> {
-  return deleteParsed(
-    dlsiteJobCancelBulkResponseSchema,
-    `/dlsite/jobs/${encodeURIComponent(jobId)}/bulk`,
-  );
+export function cancelDlsiteJob(jobId: string): Promise<DlsiteJobCancelResponse> {
+  return deleteParsed(dlsiteJobCancelResponseSchema, `/dlsite/jobs/${encodeURIComponent(jobId)}`);
 }

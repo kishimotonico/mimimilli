@@ -1,10 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type {
-  DlsiteJobBulkProgress,
+  DlsiteJobProgress,
   DlsiteJobCode,
   DlsiteJobCodeState,
   DlsiteJobEvent,
-  DlsiteJobOrigin,
   DlsiteJobSnapshot,
   DlsiteJobState,
   DlsiteTerminalProductSummary,
@@ -18,7 +17,6 @@ const dlsiteLogger = getCategoryLogger("dlsite");
 type Listener = (event: DlsiteJobEvent) => void;
 
 interface CodeEntry {
-  origin: DlsiteJobOrigin;
   /** 終端でないときの状態。終端は result が持つ */
   state: "queued" | "fetching";
   /** 直近の取得の結果。待機・取得中に戻ったら null */
@@ -26,7 +24,7 @@ interface CodeEntry {
   /** このコードが最後に変化した時点の revision */
   revision: number;
   force: boolean;
-  /** 取得中に単発で取り直しを求められた。走行中の試行を終端にせず、終わりしだい取り直す */
+  /** 取得中に force で取り直しを求められた。走行中の試行を終端にせず、終わりしだい取り直す */
   refetch: boolean;
   /** 走行中の試行がforceで走っているか */
   attemptForce: boolean;
@@ -44,15 +42,17 @@ interface Job {
   detached: boolean;
 }
 
-export type DlsiteJobRequest =
-  | { origin: "bulk"; productCodes: string[] }
-  | { origin: "single"; productCode: string };
+export interface DlsiteJobRequest {
+  productCodes: string[];
+  /** 失敗の記録と解析できないsnapshotを無視して取り直す */
+  force?: boolean;
+}
 
 const phaseOf = (entry: CodeEntry): DlsiteJobCodeState => entry.result?.state ?? entry.state;
 
 /**
  * DLsite取得ジョブ。同時に1本だけ動き、実行中に受けた取得は同じジョブのキューへ合流する。
- * 起点（まとめて／単発）はproduct codeごとに持つ。永続化せず、サーバー再起動では再開しない。
+ * 永続化せず、サーバー再起動では再開しない。
  */
 export class DlsiteJobManager {
   private readonly adapter: Pick<DlsiteAdapter, "fetchDlsiteProduct">;
@@ -89,9 +89,8 @@ export class DlsiteJobManager {
     if (this.shuttingDown) return null;
     let job = this.job;
     if (!job || job.status === "finished") job = this.createJob();
-    const codes =
-      request.origin === "bulk" ? [...new Set(request.productCodes)] : [request.productCode];
-    for (const code of codes) this.admit(job, code, request.origin);
+    const force = request.force === true;
+    for (const code of new Set(request.productCodes)) this.admit(job, code, force);
     this.ensureLoop(job);
     return this.getState();
   }
@@ -111,13 +110,13 @@ export class DlsiteJobManager {
     return { replay, live: true, unsubscribe: () => job.listeners.delete(listener) };
   }
 
-  /** 起点がまとめてで待機中のコードをキューから外す。取得中のコードと単発は止めない */
-  cancelBulk(jobId: string): number {
+  /** 待機中のコードをキューから外す。取得中のコードは止めない */
+  cancel(jobId: string): number {
     const job = this.job;
     if (!job || job.status !== "running" || job.jobId !== jobId) return 0;
     const removed: string[] = [];
     for (const [code, entry] of job.codes) {
-      if (entry.origin === "bulk" && phaseOf(entry) === "queued") removed.push(code);
+      if (phaseOf(entry) === "queued") removed.push(code);
     }
     if (removed.length === 0) return 0;
     const removedSet = new Set(removed);
@@ -128,12 +127,12 @@ export class DlsiteJobManager {
       revision: this.bump(),
       jobId,
       productCodes: removed,
-      bulk: this.bulkProgress(job),
+      progress: this.progressOf(job),
     });
     return removed.length;
   }
 
-  /** root再設定・テストリセット用。キューを起点を問わず捨て、実行中の取得を打ち切って終了を待つ */
+  /** root再設定・テストリセット用。キューを捨て、実行中の取得を打ち切って終了を待つ */
   async cancelActiveAndAwait(): Promise<void> {
     this.detach();
     await this.loop;
@@ -165,63 +164,39 @@ export class DlsiteJobManager {
     return job;
   }
 
-  private admit(job: Job, code: string, origin: DlsiteJobOrigin): void {
+  private admit(job: Job, code: string, force: boolean): void {
     const entry = job.codes.get(code);
     if (!entry) {
       const created: CodeEntry = {
-        origin,
         state: "queued",
         result: null,
         revision: 0,
-        force: origin === "single",
+        force,
         refetch: false,
         attemptForce: false,
       };
       job.codes.set(code, created);
-      this.enqueue(job, code, origin);
+      job.queue.push(code);
       this.emitCode(job, code, created);
       return;
     }
     const phase = phaseOf(entry);
     if (phase === "queued") {
-      if (origin === "single" && entry.origin === "bulk") {
-        entry.origin = "single";
-        entry.force = true;
-        job.queue = job.queue.filter((queued) => queued !== code);
-        this.enqueue(job, code, "single");
-        this.emitCode(job, code, entry);
-      } else if (origin === "single") {
-        entry.force = true;
-      }
+      if (force) entry.force = true;
       return;
     }
     if (phase === "fetching") {
-      if (origin === "single") {
-        const originChanged = entry.origin !== "single";
-        entry.origin = "single";
+      if (force) {
         entry.force = true;
         if (!entry.attemptForce) entry.refetch = true;
-        if (originChanged) this.emitCode(job, code, entry);
       }
       return;
     }
-    entry.origin = origin;
-    entry.force = origin === "single";
+    entry.force = force;
     entry.state = "queued";
     entry.result = null;
-    this.enqueue(job, code, origin);
+    job.queue.push(code);
     this.emitCode(job, code, entry);
-  }
-
-  /** 単発は待機中の単発の末尾（まとめての前）、まとめては末尾へ入れる */
-  private enqueue(job: Job, code: string, origin: DlsiteJobOrigin): void {
-    if (origin === "bulk") {
-      job.queue.push(code);
-      return;
-    }
-    const firstBulk = job.queue.findIndex((queued) => job.codes.get(queued)?.origin === "bulk");
-    if (firstBulk < 0) job.queue.push(code);
-    else job.queue.splice(firstBulk, 0, code);
   }
 
   private ensureLoop(job: Job): void {
@@ -291,13 +266,13 @@ export class DlsiteJobManager {
     this.emit(job, {
       type: "code",
       jobId: job.jobId,
-      bulk: this.bulkProgress(job),
+      progress: this.progressOf(job),
       ...this.codeOf(productCode, entry),
     });
   }
 
   private codeOf(productCode: string, entry: CodeEntry): DlsiteJobCode {
-    const base = { productCode, origin: entry.origin, revision: entry.revision };
+    const base = { productCode, revision: entry.revision };
     const { result } = entry;
     if (!result) return { ...base, state: entry.state };
     switch (result.state) {
@@ -314,11 +289,10 @@ export class DlsiteJobManager {
     for (const listener of job.listeners) listener(event);
   }
 
-  private bulkProgress(job: Job): DlsiteJobBulkProgress {
+  private progressOf(job: Job): DlsiteJobProgress {
     let processed = 0;
     let total = 0;
     for (const entry of job.codes.values()) {
-      if (entry.origin !== "bulk") continue;
       total += 1;
       if (entry.result) processed += 1;
     }
@@ -330,7 +304,7 @@ export class DlsiteJobManager {
       jobId: job.jobId,
       status: job.status,
       codes: [...job.codes].map(([productCode, entry]) => this.codeOf(productCode, entry)),
-      bulk: this.bulkProgress(job),
+      progress: this.progressOf(job),
     };
   }
 }

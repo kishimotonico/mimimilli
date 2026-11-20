@@ -1,5 +1,10 @@
 import { META_FILE_NAME, planDlsiteRegistration, relativeToRoot } from "@mimimilli/shared";
-import type { ScanCandidateFolder, ScanDiagnostics, ScanResult } from "@mimimilli/shared";
+import type {
+  ScanCandidateFolder,
+  ScanDiagnostics,
+  ScanResult,
+  WorkspacePath,
+} from "@mimimilli/shared";
 import type {
   CandidateAvailability,
   CandidateDescriber,
@@ -32,6 +37,14 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** 行方不明になる前のroot相対path。rootの外にあった作品は null */
+function previousPathOf(state: FixtureState, physicalPath: string): WorkspacePath | null {
+  const rootAbs = normalizeFsPath(requireFixtureRoot(state));
+  return isFsPathWithin(rootAbs, normalizeFsPath(physicalPath))
+    ? relativeToRoot(physicalPath, rootAbs)
+    : null;
+}
+
 function describeMissingWorks(state: FixtureState, rjCode: string | null) {
   if (!rjCode) return [];
   return state.works
@@ -40,7 +53,11 @@ function describeMissingWorks(state: FixtureState, rjCode: string | null) {
         work.status === "missing" &&
         dlsiteLinkageOf(state, work.id).rjCode?.toUpperCase() === rjCode,
     )
-    .map((work) => ({ workId: work.id, title: work.title }));
+    .map((work) => ({
+      workId: work.id,
+      title: work.title,
+      previousPath: previousPathOf(state, work.physicalPath),
+    }));
 }
 
 /** 除外と、登録済み作品（自分自身か祖先フォルダー）の候補を除く。登録状況の正は作品一覧 */
@@ -219,7 +236,7 @@ export function createSettingsScanMethods(
           .map((work) => ({
             workId: work.id,
             title: work.title,
-            previousPath: relativeToRoot(work.physicalPath, rootAbs),
+            previousPath: previousPathOf(state, work.physicalPath),
           })),
       };
     },

@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { DLSITE_FETCH_ESTIMATE_MS_PER_CODE, type DlsiteRegistrationApply } from "@mimimilli/shared";
-import { formatDlsiteFetchEstimate } from "../../../../../entities/dlsite/model/dlsiteBulkFrame";
+import { formatDlsiteFetchEstimate } from "../../../../../entities/dlsite/model/dlsiteFetchFrame";
 import SplitButton, { type SplitButtonItem } from "../../../../../shared/ui/SplitButton";
 import { ModalFooter } from "../../../../../shared/ui/Modal";
 import type { FooterPlan } from "../../../model/unregisteredSelection";
@@ -15,6 +15,7 @@ interface UnregisteredFooterProps {
   addCount: number;
   /** 追加の対象にDLsite情報のない行が含まれる件数 */
   missingDlsiteCount: number;
+  onFilterMissingDlsite: () => void;
   busy: boolean;
   onFetch: () => void;
   onCancelFetch: () => void;
@@ -27,6 +28,7 @@ export default function UnregisteredFooter({
   selectedCount,
   addCount,
   missingDlsiteCount,
+  onFilterMissingDlsite,
   busy,
   onFetch,
   onCancelFetch,
@@ -70,7 +72,14 @@ export default function UnregisteredFooter({
       </span>
       {plan.kind === "add" && missingDlsiteCount > 0 && (
         <span className="font-jp text-secondary text-ink-2">
-          うち{missingDlsiteCount}件はDLsite情報なし
+          うちDLsite情報なし{" "}
+          <button
+            type="button"
+            onClick={onFilterMissingDlsite}
+            className="font-mono text-acc-ink underline underline-offset-2 hover:text-ink-0"
+          >
+            {missingDlsiteCount}
+          </button>
         </span>
       )}
       <DlsiteFetchProgress

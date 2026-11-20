@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   addTargets,
-  fetchTargetCodes,
+  fetchTarget,
   footerPlan,
   isRowSelected,
-  missingDlsiteCount,
+  judgmentCount,
+  missingDlsiteRows,
   needsJudgment,
-  problemCount,
   pruneStaleOverrides,
   selectionOverride,
   type CandidateRowModel,
@@ -22,22 +22,27 @@ function row(
   return { candidate: buildScanCandidate({ path, rjCode }), display };
 }
 
-describe("fetchTargetCodes", () => {
-  it("RJコードがあって未取得のものだけを、コードの重複なしで返す", () => {
-    const rows = [
+describe("fetchTarget", () => {
+  it("RJコードがあって未取得・該当なし・失敗のものを、コードの重複なしで返す。該当なし・失敗があれば force", () => {
+    const base = [
       row("a", "RJ000001", { state: "none" }),
       row("b", "rj000001", { state: "none" }),
-      row("c", "RJ000002", { state: "failed" }),
       row("d", "RJ000003", { state: "fetching" }),
-      row("e", "RJ000004", { state: "not_found" }),
       row("f", "RJ000005", { state: "fetched", title: "t", cover: null }),
       row("g", null, { state: "none" }),
     ];
-    expect(fetchTargetCodes(rows)).toEqual(["RJ000001"]);
+    expect(fetchTarget(base)).toEqual({ codes: ["RJ000001"], force: false });
+    expect(
+      fetchTarget([
+        ...base,
+        row("c", "RJ000002", { state: "failed" }),
+        row("e", "RJ000004", { state: "not_found" }),
+      ]),
+    ).toEqual({ codes: ["RJ000001", "RJ000002", "RJ000004"], force: true });
   });
 });
 
-describe("missingDlsiteCount", () => {
+describe("missingDlsiteRows", () => {
   const rows = [
     row("a", "RJ000001", { state: "fetched", title: "t", cover: null }),
     row("b", "RJ000002", { state: "none" }),
@@ -46,14 +51,17 @@ describe("missingDlsiteCount", () => {
     row("f", null, { state: "none" }),
   ];
 
-  it("DLsite情報なしの件数は、RJコードがあって取得済みでないものだけを数える", () => {
-    expect(missingDlsiteCount(rows)).toBe(3);
+  it("DLsite情報なしの行は、取得済みでないもの。RJコードのない行も含む", () => {
+    expect(missingDlsiteRows(rows).map(({ candidate }) => candidate.path)).toEqual([
+      "b",
+      "c",
+      "d",
+      "f",
+    ]);
   });
 
-  it("対象がすべて取得済みかRJコードなしなら0", () => {
-    expect(missingDlsiteCount([rows[0] as CandidateRowModel, rows[4] as CandidateRowModel])).toBe(
-      0,
-    );
+  it("対象がすべて取得済みなら空", () => {
+    expect(missingDlsiteRows([rows[0] as CandidateRowModel])).toEqual([]);
   });
 });
 
@@ -67,13 +75,27 @@ describe("footerPlan / addTargets", () => {
     expect(footerPlan([fetched, unfetched, noCode])).toEqual({
       kind: "fetch",
       codes: ["RJ000002"],
+      force: false,
     });
     expect(footerPlan([fetched, noCode])).toEqual({ kind: "add" });
   });
 
+  it("該当なし・失敗の行が選択にあれば、取得の対象に含めて force で取り直す", () => {
+    const failed = row("e", "RJ000009", { state: "failed" });
+    expect(footerPlan([fetched, failed])).toEqual({
+      kind: "fetch",
+      codes: ["RJ000009"],
+      force: true,
+    });
+  });
+
   it("取得中の行が選択にあるあいだは追加にならない。未取得が残っていれば取得のまま", () => {
     expect(footerPlan([fetched, fetching])).toEqual({ kind: "waiting" });
-    expect(footerPlan([unfetched, fetching])).toEqual({ kind: "fetch", codes: ["RJ000002"] });
+    expect(footerPlan([unfetched, fetching])).toEqual({
+      kind: "fetch",
+      codes: ["RJ000002"],
+      force: false,
+    });
     expect(addTargets([fetched, fetching])).toEqual([]);
     expect(addTargets([fetched, noCode])).toEqual([fetched, noCode]);
   });
@@ -83,12 +105,12 @@ describe("needsJudgment / isRowSelected", () => {
   const ok = row("a", "RJ000001", { state: "none" });
   const notFound = row("b", "RJ000002", { state: "not_found" });
   const failed = row("c", "RJ000003", { state: "failed" });
-  const badCode = row("d", "RJ12", { state: "none" });
+  const badCode: CandidateRowModel = { ...row("d", null, { state: "none" }), invalidRj: true };
   const sameRj: CandidateRowModel = {
     candidate: buildScanCandidate({
       path: "e",
       rjCode: "RJ000005",
-      missingWorks: [{ workId: "w", title: "旧" }],
+      missingWorks: [{ workId: "w", title: "旧", previousPath: "old/path" }],
     }),
     display: { state: "none" },
   };
@@ -102,6 +124,9 @@ describe("needsJudgment / isRowSelected", () => {
       true,
     ]);
     expect(needsJudgment(row("f", null, { state: "none" }))).toBe(false);
+    expect(
+      isRowSelected(badCode, new Map([["d", { selected: true, judged: true, rjCode: null }]])),
+    ).toBe(false);
   });
 
   it("上書きが無ければ、判断の要る行は選ばず、それ以外は選ぶ", () => {
@@ -119,6 +144,10 @@ describe("needsJudgment / isRowSelected", () => {
     const nowFailed = row("a", "RJ000001", { state: "failed" });
     expect(isRowSelected(ok, overrides)).toBe(true);
     expect(isRowSelected(nowFailed, overrides)).toBe(false);
+    const deselectedOk = new Map([["a", selectionOverride(ok, false)]]);
+    const recoded = row("a", "RJ000009", { state: "none" });
+    expect(isRowSelected(recoded, deselectedOk)).toBe(true);
+    expect(pruneStaleOverrides([recoded], deselectedOk).size).toBe(0);
     const picked = new Map([["b", selectionOverride(notFound, true)]]);
     expect(isRowSelected(notFound, picked)).toBe(true);
     const deselected = new Map([["a", selectionOverride(ok, false)]]);
@@ -126,19 +155,28 @@ describe("needsJudgment / isRowSelected", () => {
   });
 });
 
-describe("problemCount", () => {
-  it("該当なしと失敗だけを数える", () => {
+describe("judgmentCount", () => {
+  it("判断が要る行だけを数える", () => {
     const rows = [
       row("a", "RJ000001", { state: "not_found" }),
       row("b", "RJ000002", { state: "failed" }),
       row("c", "RJ000003", { state: "none" }),
       row("d", "RJ000004", { state: "fetching" }),
     ];
-    expect(problemCount(rows)).toBe(2);
+    expect(judgmentCount(rows)).toBe(2);
   });
 });
 
 describe("pruneStaleOverrides", () => {
+  it("形式エラーの値が残っている行の上書きは、判断が要る行になっても消さない", () => {
+    const ok = row("a", "RJ000001", { state: "none" });
+    const overrides = new Map([["a", selectionOverride(ok, false)]]);
+    const invalid: CandidateRowModel = { ...ok, invalidRj: true };
+    expect(pruneStaleOverrides([invalid], overrides)).toBe(overrides);
+    expect(isRowSelected(invalid, overrides)).toBe(false);
+    expect(isRowSelected(ok, overrides)).toBe(false);
+  });
+
   const failed = row("a", "RJ000001", { state: "failed" });
   const fetching = row("a", "RJ000001", { state: "fetching" });
 

@@ -51,7 +51,7 @@ async function drainReader(reader: ReadableStreamDefaultReader<Uint8Array>): Pro
 test("GET /dlsite/jobs/events はsnapshotを先頭に、コードの状態とfinishedを順に配信して閉じる", async () => {
   const { manager, gates } = gatedManager();
   const app = routeApp(manager);
-  manager.start({ origin: "bulk", productCodes: ["RJ000001", "RJ000002"] });
+  manager.start({ productCodes: ["RJ000001", "RJ000002"] });
   await tick();
 
   const live = await app.request("/dlsite/jobs/events");
@@ -76,7 +76,7 @@ test("終了後の接続はfinishedのsnapshotを返してすぐ閉じ、ジョ�
   assert.match(empty, /event: snapshot/);
   assert.match(empty, /"job":null/);
 
-  manager.start({ origin: "single", productCode: "RJ000001" });
+  manager.start({ productCodes: ["RJ000001"] });
   await tick();
   gates[0]!("fetched");
   await tick();
@@ -87,7 +87,7 @@ test("終了後の接続はfinishedのsnapshotを返してすぐ閉じ、ジョ�
 test("SSE切断後の書込失敗でもhandlerが永久待機しない", async () => {
   const { manager, gates } = gatedManager();
   const app = routeApp(manager);
-  manager.start({ origin: "bulk", productCodes: ["RJ000001"] });
+  manager.start({ productCodes: ["RJ000001"] });
   await tick();
 
   const response = await app.request("/dlsite/jobs/events");
@@ -107,7 +107,7 @@ test("SSE切断後の書込失敗でもhandlerが永久待機しない", async (
 test("終端前の切断でもunsubscribeされ後続接続が成立する", async () => {
   const { manager, gates } = gatedManager();
   const app = routeApp(manager);
-  manager.start({ origin: "bulk", productCodes: ["RJ000001"] });
+  manager.start({ productCodes: ["RJ000001"] });
   await tick();
 
   const response = await app.request("/dlsite/jobs/events");
@@ -130,7 +130,7 @@ test("終端前の切断でもunsubscribeされ後続接続が成立する", asy
 test("無音の間もheartbeatのpingを送り続ける", async () => {
   const { manager } = gatedManager();
   const app = routeApp(manager, 10);
-  manager.start({ origin: "bulk", productCodes: ["RJ000001"] });
+  manager.start({ productCodes: ["RJ000001"] });
   await tick();
 
   const response = await app.request("/dlsite/jobs/events");
@@ -165,7 +165,7 @@ test("createApp経由で開始したジョブの進捗をSSEで全部受信す�
   await app.request("/api/dlsite/jobs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ origin: "bulk", productCodes: ["RJ000001"] }),
+    body: JSON.stringify({ productCodes: ["RJ000001"] }),
   });
   const stream = await app.request("/api/dlsite/jobs/events");
   assert.equal(stream.status, 200);
@@ -183,7 +183,7 @@ test("createApp ごとにDLsiteジョブ状態が隔離される", async () => {
   await appA.request("/api/dlsite/jobs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ origin: "single", productCode: "RJ000001" }),
+    body: JSON.stringify({ productCodes: ["RJ000001"] }),
   });
   await tick();
   assert.equal((await (await appB.request("/api/dlsite/jobs/current")).json()).job, null);

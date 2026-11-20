@@ -20,10 +20,11 @@ import { candidateDlsiteDisplay } from "../../../model/unregisteredDlsite";
 import {
   addTargets,
   footerPlan,
-  isProblemDisplay,
+  isRowSelectable,
   isRowSelected,
-  missingDlsiteCount,
-  problemCount,
+  judgmentCount,
+  missingDlsiteRows,
+  needsJudgment,
   selectionOverride,
   type CandidateRowModel,
 } from "../../../model/unregisteredSelection";
@@ -43,6 +44,16 @@ export interface UnregisteredTabProps {
   onRetry: () => void;
   onRegistered: (result: CandidatesRegisteredResult) => void;
 }
+
+interface RowFilter {
+  kind: "problem" | "noinfo";
+  paths: ReadonlySet<string>;
+}
+
+const pathsOf = (rows: readonly CandidateRowModel[]) =>
+  new Set(rows.map(({ candidate }) => candidate.path));
+
+const RJ_CODE_FORMAT_REASON = "RJ/VJ＋6〜8桁の数字";
 
 const STALE_MESSAGE = "候補が更新されたため表示を更新しました。選び直してください。";
 
@@ -64,7 +75,7 @@ export default function UnregisteredTab({
     () => new Map(),
   );
   const [editingPath, setEditingPath] = useState<string | null>(null);
-  const [onlyProblems, setOnlyProblems] = useState(false);
+  const [filter, setFilter] = useState<RowFilter | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const toast = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -74,33 +85,29 @@ export default function UnregisteredTab({
       candidates.map((candidate) => ({
         candidate,
         display: candidateDlsiteDisplay(candidate, jobState),
+        invalidRj: fieldErrors.has(candidate.path),
       })),
-    [candidates, jobState],
+    [candidates, jobState, fieldErrors],
   );
-  const problems = problemCount(allRows);
-  const filtering = onlyProblems && problems > 0;
-  useEffect(() => {
-    if (onlyProblems && problems === 0) setOnlyProblems(false);
-  }, [onlyProblems, problems]);
+  const problems = judgmentCount(allRows);
 
   const visibleRows = useMemo(
-    () => (filtering ? allRows.filter(({ display }) => isProblemDisplay(display)) : allRows),
-    [allRows, filtering],
+    () => (filter ? allRows.filter(({ candidate }) => filter.paths.has(candidate.path)) : allRows),
+    [allRows, filter],
   );
+  useEffect(() => {
+    if (filter && visibleRows.length === 0) setFilter(null);
+  }, [filter, visibleRows.length]);
   const selectedVisible = useMemo(
     () => visibleRows.filter((row) => isRowSelected(row, selection)),
     [visibleRows, selection],
   );
-  // 値を確定できていない行は、選択済みでも取得・追加の対象から外す。
-  const operableRows = useMemo(
-    () => selectedVisible.filter(({ candidate }) => !fieldErrors.has(candidate.path)),
-    [selectedVisible, fieldErrors],
-  );
-  const plan = useMemo(() => footerPlan(operableRows), [operableRows]);
-  const registerRows = useMemo(() => addTargets(operableRows), [operableRows]);
-  const missingCount = missingDlsiteCount(registerRows);
+  const plan = useMemo(() => footerPlan(selectedVisible), [selectedVisible]);
+  const registerRows = useMemo(() => addTargets(selectedVisible), [selectedVisible]);
+  const noDlsiteRows = useMemo(() => missingDlsiteRows(registerRows), [registerRows]);
 
-  const allSelected = visibleRows.length > 0 && selectedVisible.length === visibleRows.length;
+  const selectableCount = useMemo(() => visibleRows.filter(isRowSelectable).length, [visibleRows]);
+  const allSelected = selectableCount > 0 && selectedVisible.length === selectableCount;
   const partiallySelected = selectedVisible.length > 0 && !allSelected;
 
   const registerMutation = useRegisterScanCandidatesMutation();
@@ -228,7 +235,7 @@ export default function UnregisteredTab({
         setFieldErrors((previous) =>
           new Map(previous).set(path, {
             value: rawValue,
-            message: parsed.error.issues[0]?.message ?? "RJ/VJコードの形式が正しくありません",
+            message: RJ_CODE_FORMAT_REASON,
           }),
         );
         return "invalid";
@@ -263,36 +270,29 @@ export default function UnregisteredTab({
     [setSelection],
   );
 
-  const startSingle = useCallback(
-    async (rjCode: string) => {
-      const result = await jobStore.startSingle(rjCode);
-      setErrorMessage(result.ok ? null : result.error);
-    },
-    [jobStore],
-  );
-
   const handlers = useMemo<UnregisteredRowHandlers>(
     () => ({
       onToggle: toggleRow,
       onStartEdit: startEdit,
       onCommitEdit: commitEdit,
       onCancelEdit: cancelEdit,
-      onFetchSingle: (rjCode) => void startSingle(rjCode),
     }),
-    [toggleRow, startEdit, commitEdit, cancelEdit, startSingle],
+    [toggleRow, startEdit, commitEdit, cancelEdit],
   );
 
   const toggleAll = () =>
     setSelection((previous) => {
       const next = new Map(previous);
-      for (const row of visibleRows)
+      for (const row of visibleRows) {
+        if (!isRowSelectable(row)) continue;
         next.set(row.candidate.path, selectionOverride(row, !allSelected));
+      }
       return next;
     });
 
-  const startBulk = async () => {
+  const startFetch = async () => {
     if (plan.kind !== "fetch") return;
-    const result = await jobStore.startBulk(plan.codes);
+    const result = await jobStore.start(plan.codes, plan.force);
     setErrorMessage(result.ok ? null : result.error);
   };
 
@@ -303,7 +303,7 @@ export default function UnregisteredTab({
     count: visibleRows.length,
     estimateSize: ROW_HEIGHT,
     scrollRef,
-    resetKey: String(filtering),
+    resetKey: filter?.kind ?? "",
     resetScrollTop: true,
   });
 
@@ -312,14 +312,17 @@ export default function UnregisteredTab({
       <UnregisteredToolbar
         allSelected={allSelected}
         partiallySelected={partiallySelected}
-        selectAllDisabled={visibleRows.length === 0}
+        selectAllDisabled={selectableCount === 0}
         onToggleAll={toggleAll}
         excludeCount={selectedVisible.length}
         busy={busy}
         onExclude={excludeSelected}
         problemCount={problems}
-        onlyProblems={filtering}
-        onToggleOnlyProblems={() => setOnlyProblems((value) => !value)}
+        filter={filter && { kind: filter.kind, count: visibleRows.length }}
+        onFilterProblems={() =>
+          setFilter({ kind: "problem", paths: pathsOf(allRows.filter(needsJudgment)) })
+        }
+        onClearFilter={() => setFilter(null)}
       />
       <ScanListState status={status} emptyMessage="未登録の候補はありません" onRetry={onRetry}>
         <section aria-label="未登録の候補" className="flex min-h-0 flex-1 flex-col">
@@ -349,6 +352,7 @@ export default function UnregisteredTab({
                       <UnregisteredRow
                         candidate={candidate}
                         display={display}
+                        flagged={needsJudgment(row)}
                         selected={isRowSelected(row, selection)}
                         editing={editingPath === candidate.path}
                         error={fieldErrors.get(candidate.path)}
@@ -374,10 +378,11 @@ export default function UnregisteredTab({
           plan={plan}
           selectedCount={selectedVisible.length}
           addCount={registerRows.length}
-          missingDlsiteCount={missingCount}
+          missingDlsiteCount={noDlsiteRows.length}
+          onFilterMissingDlsite={() => setFilter({ kind: "noinfo", paths: pathsOf(noDlsiteRows) })}
           busy={busy}
-          onFetch={() => void startBulk()}
-          onCancelFetch={() => void jobStore.cancelBulk()}
+          onFetch={() => void startFetch()}
+          onCancelFetch={() => void jobStore.cancel()}
           onRegister={(apply) => void register(apply)}
           onExclude={excludeSelected}
         />

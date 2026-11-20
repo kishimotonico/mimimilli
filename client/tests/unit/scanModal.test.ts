@@ -567,7 +567,7 @@ describe("ScanModal", () => {
       fireEvent.click(within(tabpanel()).getByRole("button", { name: "再試行" }));
       await waitFor(() => expect(screen.getByRole("tab", { name: "未登録（1件）" })).toBeTruthy());
       await showUnregisteredList();
-      expect(within(tabpanel()).getByText(candidateDetected.inferredTitle)).toBeInTheDocument();
+      expect(within(tabpanel()).getByText("検出済みDLsiteタイトル")).toBeInTheDocument();
     });
 
     it("要対応は、スキャン前でも「まだスキャンしていません」を出さず、0件を出す", () => {

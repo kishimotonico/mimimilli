@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
 import Button from "../../../../../shared/ui/Button";
+import { cn } from "../../../../../shared/lib/cn";
+import { I } from "../../../../../shared/ui/Icon";
 
 interface UnregisteredToolbarProps {
   allSelected: boolean;
@@ -9,10 +11,12 @@ interface UnregisteredToolbarProps {
   excludeCount: number;
   busy: boolean;
   onExclude: () => void;
-  /** 問題のある候補の件数。0かつ絞り込み中でないときはリンクを出さない */
+  /** 判断が要る候補の件数。0かつ絞り込み中でないときは出さない */
   problemCount: number;
-  onlyProblems: boolean;
-  onToggleOnlyProblems: () => void;
+  /** 押した時点の行で固定した絞り込み。null は絞り込みなし */
+  filter: { kind: "problem" | "noinfo"; count: number } | null;
+  onFilterProblems: () => void;
+  onClearFilter: () => void;
 }
 
 export default function UnregisteredToolbar({
@@ -24,8 +28,9 @@ export default function UnregisteredToolbar({
   busy,
   onExclude,
   problemCount,
-  onlyProblems,
-  onToggleOnlyProblems,
+  filter,
+  onFilterProblems,
+  onClearFilter,
 }: UnregisteredToolbarProps) {
   const checkboxRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -48,16 +53,62 @@ export default function UnregisteredToolbar({
         <Button variant="quiet" disabled={busy || excludeCount === 0} onClick={onExclude}>
           除外
         </Button>
-        {(problemCount > 0 || onlyProblems) && (
-          <button
-            type="button"
-            onClick={onToggleOnlyProblems}
-            className="font-jp text-secondary text-acc-ink underline underline-offset-2 hover:text-ink-0"
-          >
-            {onlyProblems ? "すべて表示" : `問題のある${problemCount}件だけ表示`}
-          </button>
+        {filter?.kind === "noinfo" ? (
+          <FilterChip pressed count={filter.count} onClick={onClearFilter}>
+            DLsite情報なし
+          </FilterChip>
+        ) : filter?.kind === "problem" ? (
+          <FilterChip pressed count={filter.count} icon={PROBLEM_ICON} onClick={onClearFilter}>
+            問題あり
+          </FilterChip>
+        ) : (
+          problemCount > 0 && (
+            <FilterChip
+              pressed={false}
+              count={problemCount}
+              icon={PROBLEM_ICON}
+              onClick={onFilterProblems}
+            >
+              問題あり
+            </FilterChip>
+          )
         )}
       </div>
     </div>
+  );
+}
+
+const PROBLEM_ICON = <I.err size={13} className="text-[var(--state-danger)]" aria-hidden="true" />;
+
+function FilterChip({
+  pressed,
+  count,
+  icon,
+  onClick,
+  children,
+}: {
+  pressed: boolean;
+  icon?: React.ReactNode;
+  count: number;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 font-jp text-control",
+        pressed
+          ? "border-transparent bg-acc-soft font-medium text-acc-ink"
+          : "border-line bg-paper-1 text-ink-1 hover:bg-paper-2",
+      )}
+    >
+      {icon}
+      {children}
+      <span className="font-mono tabular-nums">{count}</span>
+      {pressed && <I.x size={12} />}
+    </button>
   );
 }

@@ -16,6 +16,7 @@ import { scanCandidateSelectionAtom } from "../../src/entities/scan/model/atoms"
 import { dlsiteJobStoreAtom } from "../../src/entities/dlsite/model/dlsiteJobStore";
 import { mockApi } from "../helpers/api";
 import { useScanCandidatesState } from "../../src/features/scan/model/useScanCandidatesCache";
+import { useScanSelectionPruning } from "../../src/features/scan/model/useScanSelectionPruning";
 import { buildScanCandidate } from "../helpers/builders";
 import { createFakeDlsiteJobStore } from "../helpers/fakeJobStores";
 import { clearResizeObservers } from "./setup";
@@ -49,9 +50,15 @@ const candidateB = buildScanCandidate({
   dlsite: { state: "fetched", title: "検出済みのDLsiteタイトル", cover: null },
 });
 
+function PruningProbe() {
+  useScanSelectionPruning();
+  return null;
+}
+
 async function renderTab(
   candidates: ScanCandidate[] = [candidateA, candidateB],
   jobOverrides: Parameters<typeof createFakeDlsiteJobStore>[0] = {},
+  options: { pruning?: boolean } = {},
 ) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const store = createStore();
@@ -74,6 +81,7 @@ async function renderTab(
             onRetry: () => {},
             onRegistered,
           }),
+          options.pruning ? createElement(PruningProbe) : null,
           createElement(GlobalToast, {
             onOpenScan: () => {},
             onOpenScanNeedsAttention: () => {},
@@ -141,15 +149,26 @@ describe("UnregisteredTab RJコード編集", () => {
     expect(document.activeElement).toBe(input);
   });
 
-  it("不正な値が残った行では、RJコード欄のtitleに理由が出る", async () => {
+  it("不正な値が残った行では、入力欄の下に短い理由が出て、Escで元に戻る", async () => {
     await renderTab([candidateA, candidateB]);
     fireEvent.click(screen.getAllByTitle("クリックしてRJコードを編集")[0]);
     const input = screen.getByPlaceholderText("RJコード");
     fireEvent.change(input, { target: { value: "abc123" } });
     fireEvent.keyDown(input, { key: "Enter" });
-    // 別の行の編集を始めると、元の行は表示に戻り、理由はtitleに残る
+    expect(screen.getByText(/RJ\/VJ＋6〜8桁の数字/)).not.toBeNull();
+    fireEvent.keyDown(screen.getByPlaceholderText("RJコード"), { key: "Escape" });
+    expect(screen.queryByText(/RJ\/VJ＋6〜8桁の数字/)).toBeNull();
+    expect(screen.getAllByTitle("クリックしてRJコードを編集")[0]).toHaveTextContent("—");
+  });
+
+  it("別の行の編集を始めても、不正な行の理由は残る", async () => {
+    await renderTab([candidateA, candidateB]);
+    fireEvent.click(screen.getAllByTitle("クリックしてRJコードを編集")[0]);
+    const input = screen.getByPlaceholderText("RJコード");
+    fireEvent.change(input, { target: { value: "abc123" } });
+    fireEvent.keyDown(input, { key: "Enter" });
     fireEvent.click(screen.getByTitle("クリックしてRJコードを編集"));
-    expect(screen.getByTitle(/RJ\/VJコードは/)).toHaveTextContent("abc123");
+    expect(screen.getByText(/RJ\/VJ＋6〜8桁の数字/)).not.toBeNull();
   });
 
   it("IME変換中のEnter・Escapeは確定・取消のどちらも行わない", async () => {
@@ -209,6 +228,63 @@ describe("UnregisteredTab RJコード編集", () => {
     await waitFor(() => expect(setSpy).toHaveBeenCalledWith(candidateA.path, "RJ200002"));
     await waitFor(() => expect(screen.queryByPlaceholderText("RJコード")).toBeNull());
     expect(refreshSpy).toHaveBeenCalledWith(queryClient, { replace: fixed });
+  });
+
+  it("形式エラーの行は未チェックの無効状態で数に入らず、すべて外すと全部外れてヘッダーも戻る", async () => {
+    await renderTab([candidateA, candidateB]);
+    fireEvent.click(screen.getAllByTitle("クリックしてRJコードを編集")[0]);
+    const input = screen.getByPlaceholderText("RJコード");
+    fireEvent.change(input, { target: { value: "abc123" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    const invalid = screen.getByLabelText(`「${candidateA.inferredTitle}」を選択`);
+    expect(invalid).toBeDisabled();
+    expect(invalid).not.toBeChecked();
+    expect(screen.getByText("件を選択").textContent).toBe("1件を選択");
+    expect(screen.getByRole("button", { name: "1件を追加" })).not.toBeNull();
+    expect(screen.getByRole("button", { name: /問題あり/ })).not.toBeNull();
+
+    const header = screen.getByLabelText("すべて選択") as HTMLInputElement;
+    expect(header.checked).toBe(true);
+    fireEvent.click(header);
+    expect(screen.getByLabelText(`「${candidateB.inferredTitle}」を選択`)).not.toBeChecked();
+    expect(header.checked).toBe(false);
+    expect(header.indeterminate).toBe(false);
+    expect(screen.getByText("件を選択").textContent).toBe("0件を選択");
+  });
+
+  it("RJコードを直した行は未取得に戻り、主ボタンが「DLsiteから取得」になる", async () => {
+    const failedRow = buildScanCandidate({
+      path: "d/fail",
+      inferredTitle: "失敗作品",
+      rjCode: "RJ000404",
+      dlsite: { state: "failed" },
+    });
+    vi.spyOn(scanApi, "setScanCandidateRjCode").mockResolvedValue({
+      ...failedRow,
+      rjCode: "RJ000405",
+      rjCodeEdited: true,
+      dlsite: { state: "none" },
+    });
+    vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue({
+      scanCompleted: true,
+      candidates: [],
+    });
+    const { rerenderWith } = await renderTab([failedRow, candidateB]);
+    expect(screen.getByRole("button", { name: /件を追加/ })).not.toBeNull();
+
+    fireEvent.click(screen.getByText("RJ000404"));
+    const input = screen.getByPlaceholderText("RJコード");
+    fireEvent.change(input, { target: { value: "RJ000405" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(scanApi.setScanCandidateRjCode).toHaveBeenCalled());
+    rerenderWith([
+      { ...failedRow, rjCode: "RJ000405", rjCodeEdited: true, dlsite: { state: "none" } },
+      candidateB,
+    ]);
+
+    expect(screen.getByRole("button", { name: "DLsiteから取得 1件" })).not.toBeNull();
+    expect(screen.getByLabelText(`「${failedRow.inferredTitle}」を選択`)).toBeChecked();
   });
 
   it("RJコードを空にして確定すると、空文字で修正APIを呼ぶ", async () => {
@@ -304,60 +380,79 @@ describe("UnregisteredTab DLsite列と行の操作", () => {
     },
   });
 
-  it("状態ごとの表示と、取得済みはDLsiteのタイトルを主にフォルダー名を添える", async () => {
-    await renderTab([notFound, failed, fetched]);
+  it("状態ごとの表示。取得済みはDLsiteのタイトル、それ以外はフォルダー名で、2行目にパスが出る", async () => {
+    const unfetched = buildScanCandidate({
+      path: "d/un",
+      inferredTitle: "未取得作品",
+      rjCode: "RJ000402",
+    });
+    await renderTab([notFound, failed, fetched, unfetched, candidateA]);
     expect(screen.getByText("該当なし")).not.toBeNull();
     expect(screen.getByText("失敗")).not.toBeNull();
     expect(screen.getByText("取得済み")).not.toBeNull();
+    expect(screen.getByText("未取得")).not.toBeNull();
+    expect(screen.getByText("—", { selector: "span.text-ink-3" })).not.toBeNull();
     expect(screen.getByText("DLsiteのタイトル")).not.toBeNull();
-    expect(screen.getByText("フォルダー名")).not.toBeNull();
+    expect(screen.queryByText("フォルダー名")).toBeNull();
+    expect(screen.getByText("d/ok")).not.toBeNull();
+    expect(screen.getByText("未取得作品")).toHaveAttribute("title", "未取得作品");
   });
 
-  it("「修正」はRJコード欄を編集状態にする", async () => {
-    await renderTab([notFound]);
-    fireEvent.click(screen.getByRole("button", { name: "修正" }));
-    expect(screen.getByPlaceholderText("RJコード")).not.toBeNull();
-  });
-
-  it("「再試行」は単発の取得だけを始め、まとめての進捗は出ない", async () => {
-    const { job } = await renderTab([failed]);
-    fireEvent.click(screen.getByRole("button", { name: "再試行" }));
-    expect(job.startSingle).toHaveBeenCalledWith("RJ000404");
-    expect(screen.queryByRole("button", { name: /DLsiteから取得/ })).toBeNull();
-    expect(screen.queryByText(/取得中 \d/)).toBeNull();
-  });
-
-  it("RJコードを直した行（未取得）に「取得」が出て単発で取得する", async () => {
+  it("行の中に「修正」「再試行」「取得」のボタンは無い", async () => {
     const edited = buildScanCandidate({
       path: "d/edited",
       inferredTitle: "直した作品",
       rjCode: "RJ000777",
       rjCodeEdited: true,
     });
-    const { job } = await renderTab([edited, candidateB]);
-    expect(screen.getAllByRole("button", { name: "取得" })).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: "取得" }));
-    expect(job.startSingle).toHaveBeenCalledWith("RJ000777");
+    await renderTab([notFound, failed, edited]);
+    for (const name of ["修正", "再試行", "取得"]) {
+      expect(screen.queryByRole("button", { name })).toBeNull();
+    }
   });
 
-  it("行方不明の作品と同じRJコードの行に注記が出る", async () => {
+  it("失敗・該当なしの行は、選び直して主ボタンを押すと force で取り直す", async () => {
+    const { job } = await renderTab([failed, notFound, candidateB]);
+    fireEvent.click(screen.getByLabelText(`「${failed.inferredTitle}」を選択`));
+    expect(screen.getByRole("button", { name: "DLsiteから取得 1件" })).not.toBeNull();
+    fireEvent.click(screen.getByLabelText(`「${notFound.inferredTitle}」を選択`));
+    fireEvent.click(screen.getByRole("button", { name: "DLsiteから取得 2件" }));
+    expect(job.start).toHaveBeenCalledWith(["RJ000404", "RJ000403"], true);
+  });
+
+  it("行方不明の作品と同じRJコードの行に「行方不明」のチップが出て、旧作品の情報はhoverで出る", async () => {
     const withMissing = buildScanCandidate({
       path: "d/m",
       inferredTitle: "移動した作品",
       rjCode: "RJ501010",
-      missingWorks: [{ workId: "w1", title: "元の作品" }],
+      missingWorks: [{ workId: "w1", title: "元の作品", previousPath: "old/元の作品" }],
     });
-    await renderTab([withMissing]);
-    expect(screen.getByText("行方不明: 元の作品")).not.toBeNull();
+    const sameTitle = buildScanCandidate({
+      path: "d/s",
+      inferredTitle: "同名",
+      rjCode: "RJ501011",
+      missingWorks: [{ workId: "w2", title: "同名", previousPath: null }],
+    });
+    await renderTab([withMissing, sameTitle]);
+    const chip = screen.getByText("行方不明: 元の作品");
+    expect(chip).toHaveAttribute("title", "行方不明の作品: 元の作品\n最後のパス: old/元の作品");
+    expect(screen.getByText("行方不明")).toHaveAttribute("title", "行方不明の作品: 同名");
   });
 
-  it("問題のある候補だけを表示して、すべて表示に戻せる。問題が無ければリンクは出ない", async () => {
+  it("「問題あり」は押した時点の行で固定され、チェックを外しても行は消えない。外すと戻る", async () => {
     await renderTab([notFound, failed, fetched]);
-    fireEvent.click(screen.getByRole("button", { name: "問題のある2件だけ表示" }));
+    fireEvent.click(screen.getByRole("button", { name: /問題あり/ }));
     expect(screen.queryByText("DLsiteのタイトル")).toBeNull();
+    fireEvent.click(screen.getByLabelText(`「${failed.inferredTitle}」を選択`));
     expect(screen.getByText("失敗作品")).not.toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "すべて表示" }));
+    expect(screen.getByText("該当なし作品")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /問題あり/ }));
     expect(screen.getByText("DLsiteのタイトル")).not.toBeNull();
+  });
+
+  it("判断が要る行が無ければ「問題あり」は出ない", async () => {
+    await renderTab([candidateA, candidateB]);
+    expect(screen.queryByRole("button", { name: /問題あり/ })).toBeNull();
   });
 });
 
@@ -369,10 +464,48 @@ describe("UnregisteredTab 取得と進捗", () => {
     const { job } = await renderTab([first, second, candidateA]);
     expect(screen.getByText(/2件・約/)).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "DLsiteから取得 2件" }));
-    expect(job.startBulk).toHaveBeenCalledWith(["RJ000001", "RJ000002"]);
+    expect(job.start).toHaveBeenCalledWith(["RJ000001", "RJ000002"], false);
   });
 
-  it("まとめての取得中は枠が進捗と中止に替わり、単発の取得では替わらない", async () => {
+  it("取り直した失敗の行を中止すると、失敗の表示に戻って未選択になる", async () => {
+    const failedRow = buildScanCandidate({
+      path: "d/fail",
+      inferredTitle: "失敗作品",
+      rjCode: "RJ000404",
+      dlsite: { state: "failed" },
+    });
+    const { job, queryClient } = await renderTab([failedRow], {}, { pruning: true });
+    queryClient.setQueryData(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY, {
+      scanCompleted: true,
+      candidates: [failedRow],
+    });
+    const checkbox = () => screen.getByLabelText(`「${failedRow.inferredTitle}」を選択`);
+    fireEvent.click(checkbox());
+    expect(checkbox()).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "DLsiteから取得 1件" }));
+    expect(job.start).toHaveBeenCalledWith(["RJ000404"], true);
+
+    act(() => {
+      job.setState((state) => ({
+        ...state,
+        job: {
+          jobId: "j",
+          status: "running",
+          codes: new Map([["RJ000404", { state: "fetching" }]]),
+          progress: { processed: 0, total: 1 },
+        },
+      }));
+    });
+    expect(screen.getByText("取得中")).not.toBeNull();
+    act(() => {
+      job.setState((state) => ({ ...state, job: null }));
+    });
+
+    expect(screen.getByText("失敗")).not.toBeNull();
+    expect(checkbox()).not.toBeChecked();
+  });
+
+  it("取得中は枠が進捗と中止に替わる", async () => {
     const { job } = await renderTab([first, second]);
     act(() => {
       job.setState((state) => ({
@@ -381,10 +514,10 @@ describe("UnregisteredTab 取得と進捗", () => {
           jobId: "j",
           status: "running",
           codes: new Map([
-            ["RJ000001", { origin: "bulk", state: "fetching" }],
-            ["RJ000002", { origin: "bulk", state: "queued" }],
+            ["RJ000001", { state: "fetching" }],
+            ["RJ000002", { state: "queued" }],
           ]),
-          bulk: { processed: 0, total: 2 },
+          progress: { processed: 0, total: 2 },
         },
       }));
     });
@@ -394,26 +527,7 @@ describe("UnregisteredTab 取得と進捗", () => {
     expect(screen.queryByRole("button", { name: /件を追加/ })).toBeNull();
     expect(screen.getByRole("button", { name: "中止" })).not.toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "中止" }));
-    expect(job.cancelBulk).toHaveBeenCalled();
-  });
-
-  it("単発だけのジョブでは進捗は出ず、選択に取得中の行があるあいだは追加も出ない", async () => {
-    const { job } = await renderTab([first]);
-    act(() => {
-      job.setState((state) => ({
-        ...state,
-        job: {
-          jobId: "j",
-          status: "running",
-          codes: new Map([["RJ000001", { origin: "single", state: "fetching" }]]),
-          bulk: { processed: 0, total: 0 },
-        },
-      }));
-    });
-    expect(screen.queryByRole("button", { name: "中止" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "その他の操作" })).toBeNull();
-    expect(screen.queryByRole("button", { name: /DLsiteから取得/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /件を追加/ })).toBeNull();
+    expect(job.cancel).toHaveBeenCalled();
   });
 
   it("アンマウント後に開き直しても、ストアの進捗がそのまま出る", async () => {
@@ -424,8 +538,8 @@ describe("UnregisteredTab 取得と進捗", () => {
         job: {
           jobId: "j",
           status: "running",
-          codes: new Map([["RJ000001", { origin: "bulk", state: "queued" }]]),
-          bulk: { processed: 0, total: 1 },
+          codes: new Map([["RJ000001", { state: "queued" }]]),
+          progress: { processed: 0, total: 1 },
         },
       }));
     });
@@ -487,7 +601,7 @@ describe("UnregisteredTab 除外", () => {
     });
     const spy = vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
     await renderTab([problem, candidateB]);
-    fireEvent.click(screen.getByRole("button", { name: "問題のある1件だけ表示" }));
+    fireEvent.click(screen.getByRole("button", { name: /問題あり/ }));
     fireEvent.click(screen.getByLabelText("すべて選択"));
     fireEvent.click(screen.getByRole("button", { name: "除外" }));
     await waitFor(() => expect(spy).toHaveBeenCalledWith([problem.path]));
@@ -528,8 +642,8 @@ describe("UnregisteredTab 追加", () => {
         job: {
           jobId: "j",
           status: "running",
-          codes: new Map([["RJ000001", { origin: "bulk", state: "fetching" }]]),
-          bulk: { processed: 0, total: 1 },
+          codes: new Map([["RJ000001", { state: "fetching" }]]),
+          progress: { processed: 0, total: 1 },
         },
       }));
     });
@@ -572,17 +686,33 @@ describe("UnregisteredTab 追加", () => {
     await waitFor(() => expect(spy).toHaveBeenCalledWith([candidateA.path]));
   });
 
-  it("追加の対象にRJコードがあってDLsite情報のない行が含まれると、その件数を出す", async () => {
-    const failed = buildScanCandidate({
-      path: "d/failed",
-      inferredTitle: "失敗",
-      rjCode: "RJ000404",
-      dlsite: { state: "failed" },
+  it("追加の対象にDLsite情報のない行が含まれると、その件数を出す。取得済みだけなら出さない", async () => {
+    const fetchedRow = buildScanCandidate({
+      path: "d/ok",
+      inferredTitle: "取得済み作品",
+      rjCode: "RJ000401",
+      dlsite: { state: "fetched", title: "t", cover: null },
     });
-    await renderTab([failed, candidateB, candidateA]);
+    await renderTab([fetchedRow, candidateA]);
+    expect(screen.getByText(/DLsite情報なし/)).not.toBeNull();
+    fireEvent.click(screen.getByLabelText(`「${candidateA.inferredTitle}」を選択`));
     expect(screen.queryByText(/DLsite情報なし/)).toBeNull();
-    fireEvent.click(screen.getByLabelText(`「${failed.inferredTitle}」を選択`));
-    expect(screen.getByText("うち1件はDLsite情報なし")).not.toBeNull();
+  });
+
+  it("「うちDLsite情報なし N」を押すとその行に絞り込み、チェックを外しても行は消えない", async () => {
+    const fetchedRow = buildScanCandidate({
+      path: "d/ok",
+      inferredTitle: "取得済み作品",
+      rjCode: "RJ000401",
+      dlsite: { state: "fetched", title: "t", cover: null },
+    });
+    await renderTab([fetchedRow, candidateA]);
+    fireEvent.click(screen.getByRole("button", { name: "1" }));
+    expect(screen.queryByLabelText(`「${fetchedRow.inferredTitle}」を選択`)).toBeNull();
+    fireEvent.click(screen.getByLabelText(`「${candidateA.inferredTitle}」を選択`));
+    expect(screen.getByLabelText(`「${candidateA.inferredTitle}」を選択`)).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /DLsite情報なし/ }));
+    expect(screen.getByLabelText(`「${fetchedRow.inferredTitle}」を選択`)).not.toBeNull();
   });
 
   it("フッターの左に選択の件数を出す", async () => {
@@ -590,11 +720,6 @@ describe("UnregisteredTab 追加", () => {
     expect(screen.getByText("件を選択").textContent).toBe("2件を選択");
     fireEvent.click(screen.getByLabelText(`「${candidateA.inferredTitle}」を選択`));
     expect(screen.getByText("件を選択").textContent).toBe("1件を選択");
-  });
-
-  it("RJコードの無い候補だけなら「DLsite情報なし」を出さない", async () => {
-    await renderTab([candidateA]);
-    expect(screen.queryByText(/DLsite情報なし/)).toBeNull();
   });
 
   it("項目を選んで追加では、外した項目がfalseで送られる", async () => {
@@ -799,7 +924,7 @@ describe("UnregisteredTab 終端表示", () => {
         jobId: "job-1",
         status: "finished" as const,
         codes: new Map(),
-        bulk: { processed: 0, total: 0 },
+        progress: { processed: 0, total: 0 },
       },
     });
     expect(refreshSpy).not.toHaveBeenCalled();

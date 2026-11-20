@@ -4,7 +4,6 @@ import {
   type DlsiteJobCode,
   type DlsiteJobCodeState,
   type DlsiteJobEvent,
-  type DlsiteJobOrigin,
   type DlsiteJobSnapshot,
   type DlsiteJobState,
 } from "@mimimilli/shared";
@@ -27,13 +26,8 @@ class FakeEventSource extends EventTarget {
 
 const TITLE = "タイトル";
 
-function code(
-  productCode: string,
-  state: DlsiteJobCodeState,
-  revision: number,
-  origin: DlsiteJobOrigin = "bulk",
-): DlsiteJobCode {
-  const base = { productCode, origin, revision };
+function code(productCode: string, state: DlsiteJobCodeState, revision: number): DlsiteJobCode {
+  const base = { productCode, revision };
   switch (state) {
     case "queued":
     case "fetching":
@@ -51,14 +45,13 @@ function snapshot(
   codes: DlsiteJobCode[] = [],
   status: DlsiteJobSnapshot["status"] = "running",
 ): DlsiteJobSnapshot {
-  const bulkCodes = codes.filter((entry) => entry.origin === "bulk");
   return {
     jobId,
     status,
     codes,
-    bulk: {
-      total: bulkCodes.length,
-      processed: bulkCodes.filter((entry) => entry.state !== "queued" && entry.state !== "fetching")
+    progress: {
+      total: codes.length,
+      processed: codes.filter((entry) => entry.state !== "queued" && entry.state !== "fetching")
         .length,
     },
   };
@@ -72,9 +65,9 @@ const serverState = (revision: number, job: DlsiteJobSnapshot | null): DlsiteJob
 function codeEvent(
   jobId: string,
   entry: DlsiteJobCode,
-  bulk = { processed: 0, total: 1 },
+  progress = { processed: 0, total: 1 },
 ): DlsiteJobEvent {
-  return { type: "code", jobId, bulk, ...entry };
+  return { type: "code", jobId, progress, ...entry };
 }
 
 function createHarness(overrides: Partial<DlsiteJobDeps> = {}) {
@@ -82,7 +75,7 @@ function createHarness(overrides: Partial<DlsiteJobDeps> = {}) {
   const deps: DlsiteJobDeps = {
     startJob: vi.fn(async () => serverState(1, snapshot("job-1", [code("RJ000001", "queued", 1)]))),
     getCurrent: vi.fn(async () => serverState(0, null)),
-    cancelBulk: vi.fn(async () => ({ removed: 0 })),
+    cancel: vi.fn(async () => ({ removed: 0 })),
     connect: () => {
       const source = new FakeEventSource();
       sources.push(source);
@@ -121,12 +114,12 @@ const codeState = (
 
 describe("dlsiteJobStore", () => {
   describe("開始", () => {
-    it("応答待ちの間に startBulk を2回呼んでも POST は1回", async () => {
+    it("応答待ちの間に start を2回呼んでも POST は1回", async () => {
       const gate = deferred<DlsiteJobState>();
       const { store, deps } = createHarness({ startJob: vi.fn(() => gate.promise) });
-      const first = store.startBulk(["RJ000001"]);
-      expect(store.getState().startingBulk).toEqual({ total: 1 });
-      await store.startBulk(["RJ000001"]);
+      const first = store.start(["RJ000001"], false);
+      expect(store.getState().starting).toEqual({ total: 1 });
+      await store.start(["RJ000001"], false);
       gate.resolve(serverState(1, snapshot("job-1")));
       await first;
       expect(deps.startJob).toHaveBeenCalledTimes(1);
@@ -138,20 +131,20 @@ describe("dlsiteJobStore", () => {
         .mockResolvedValueOnce(serverState(1, snapshot("job-1", [code("RJ100000", "queued", 1)])))
         .mockRejectedValueOnce(new ApiRequestError(500, "internal", "失敗しました"));
       const { store, last } = createHarness({ startJob });
-      const result = await store.startBulk(codesOf(2500));
+      const result = await store.start(codesOf(2500), false);
       const sizes = startJob.mock.calls.map(
         ([body]) => (body as { productCodes: string[] }).productCodes.length,
       );
       expect(sizes).toEqual([DLSITE_JOB_MAX_PRODUCT_CODES, DLSITE_JOB_MAX_PRODUCT_CODES]);
       expect(result).toEqual({ ok: false, error: "失敗しました" });
-      expect(store.getState().startingBulk).toBeNull();
+      expect(store.getState().starting).toBeNull();
       expect(store.getState().job?.jobId).toBe("job-1");
       expect(last().closed).toBe(false);
     });
 
     it("2500件は 1000/1000/500 の3回に分かれる", async () => {
       const { store, deps } = createHarness();
-      await store.startBulk(codesOf(2500));
+      await store.start(codesOf(2500), false);
       expect(
         vi
           .mocked(deps.startJob)
@@ -165,28 +158,28 @@ describe("dlsiteJobStore", () => {
         .mockResolvedValueOnce(serverState(1, snapshot("job-1", [code("RJ000001", "queued", 1)])))
         .mockResolvedValueOnce(serverState(5, snapshot("job-2", [code("RJ000002", "queued", 5)])));
       const { store, events } = createHarness({ startJob });
-      await store.startBulk(codesOf(1500));
+      await store.start(codesOf(1500), false);
       expect(events).toEqual([
-        { type: "codesSettled", codes: [{ code: "RJ000001", origin: "bulk", known: false }] },
+        { type: "codesSettled", codes: [{ code: "RJ000001", known: false }] },
         { type: "jobEnded", jobId: "job-1" },
       ]);
       expect(store.getState().job?.jobId).toBe("job-2");
     });
 
-    it("startingBulk は最後の分割POSTの応答を取り込んだ時点で外れる", async () => {
+    it("starting は最後の分割POSTの応答を取り込んだ時点で外れる", async () => {
       const gate = deferred<DlsiteJobState>();
       const startJob = vi
         .fn()
         .mockResolvedValueOnce(serverState(1, snapshot("job-1")))
         .mockImplementationOnce(() => gate.promise);
       const { store } = createHarness({ startJob });
-      const pending = store.startBulk(codesOf(1500));
+      const pending = store.start(codesOf(1500), false);
       await flush();
-      expect(store.getState().startingBulk).toEqual({ total: 1500 });
+      expect(store.getState().starting).toEqual({ total: 1500 });
       expect(store.getState().job?.jobId).toBe("job-1");
       gate.resolve(serverState(2, snapshot("job-1")));
       await pending;
-      expect(store.getState().startingBulk).toBeNull();
+      expect(store.getState().starting).toBeNull();
     });
 
     it("offline は error を返すが state.error には入れない", async () => {
@@ -194,26 +187,20 @@ describe("dlsiteJobStore", () => {
         throw new ApiRequestError(503, "offline", "オフラインです");
       });
       const { store } = createHarness({ startJob });
-      expect(await store.startBulk(["RJ000001"])).toEqual({ ok: false, error: "オフラインです" });
+      expect(await store.start(["RJ000001"], false)).toEqual({
+        ok: false,
+        error: "オフラインです",
+      });
       expect(store.getState().error).toBeNull();
-      expect(store.getState().startingBulk).toBeNull();
+      expect(store.getState().starting).toBeNull();
     });
   });
 
   describe("応答待ち中の reset", () => {
-    it.each([
-      [
-        "startBulk",
-        (store: ReturnType<typeof createHarness>["store"]) => store.startBulk(["RJ000001"]),
-      ],
-      [
-        "startSingle",
-        (store: ReturnType<typeof createHarness>["store"]) => store.startSingle("RJ000001"),
-      ],
-    ])("%s は応答前に reset すると SSE を開かない", async (_name, run) => {
+    it("start は応答前に reset すると SSE を開かない", async () => {
       const gate = deferred<DlsiteJobState>();
       const { store, sources } = createHarness({ startJob: vi.fn(() => gate.promise) });
-      const pending = run(store);
+      const pending = store.start(["RJ000001"], false);
       store.reset();
       gate.resolve(serverState(1, snapshot("job-1")));
       await pending;
@@ -245,7 +232,7 @@ describe("dlsiteJobStore", () => {
 
     it("reset のあとに古い接続から届いたイベントは無視する", async () => {
       const { store, events, last } = createHarness();
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       const stale = last();
       store.reset();
       dispatch(stale, {
@@ -262,12 +249,11 @@ describe("dlsiteJobStore", () => {
     it("reset の前に発行した応答は、revision が進んでいても取り込まない", async () => {
       const gate = deferred<DlsiteJobState>();
       const { store } = createHarness({ startJob: vi.fn(() => gate.promise) });
-      const pending = store.startSingle("RJ000001");
+      const pending = store.start(["RJ000001"], false);
       store.reset();
       gate.resolve(serverState(99, snapshot("job-1")));
       await pending;
       expect(store.getState().revision).toBe(0);
-      expect(store.getState().pendingSingles.size).toBe(0);
     });
   });
 
@@ -303,7 +289,7 @@ describe("dlsiteJobStore", () => {
   describe("サーバー状態の取り込み", () => {
     it("revision が進まない状態は捨てる", async () => {
       const { store, last } = createHarness();
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       dispatch(last(), {
         type: "snapshot",
         revision: 10,
@@ -327,7 +313,7 @@ describe("dlsiteJobStore", () => {
       const { store, last } = createHarness({
         getCurrent: vi.fn(async () => serverState(2, snapshot("job-1"))),
       });
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       for (let attempt = 0; attempt < 3; attempt += 1) {
         dispatch(last(), { type: "snapshot", revision: 0, job: null });
         last().readyState = 2;
@@ -340,14 +326,14 @@ describe("dlsiteJobStore", () => {
 
     it("古い null は新しいジョブを消さない", async () => {
       const { store, last } = createHarness();
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       dispatch(last(), { type: "snapshot", revision: 0, job: null });
       expect(store.getState().job?.jobId).toBe("job-1");
     });
 
-    it("code イベントで行の状態と bulk を更新し、終端状態なら codesSettled を出す", async () => {
+    it("code イベントで行の状態と progress を更新し、終端状態なら codesSettled を出す", async () => {
       const { store, events, last } = createHarness();
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       dispatch(last(), codeEvent("job-1", code("RJ000001", "fetching", 2)));
       expect(events).toEqual([]);
       dispatch(
@@ -355,15 +341,15 @@ describe("dlsiteJobStore", () => {
         codeEvent("job-1", code("RJ000001", "fetched", 3), { processed: 1, total: 1 }),
       );
       expect(codeState(store, "RJ000001")).toBe("fetched");
-      expect(store.getState().job?.bulk).toEqual({ processed: 1, total: 1 });
+      expect(store.getState().job?.progress).toEqual({ processed: 1, total: 1 });
       expect(events).toEqual([
-        { type: "codesSettled", codes: [{ code: "RJ000001", origin: "bulk", known: true }] },
+        { type: "codesSettled", codes: [{ code: "RJ000001", known: true }] },
       ]);
     });
 
     it("終端の結果は results に revision つきで残り、より新しい結果だけが置き換える", async () => {
       const { store, last } = createHarness();
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       dispatch(last(), codeEvent("job-1", code("RJ000001", "failed", 5)));
       expect(store.getState().results.get("RJ000001")).toEqual({
         dlsite: { state: "failed" },
@@ -383,18 +369,18 @@ describe("dlsiteJobStore", () => {
         .fn()
         .mockResolvedValueOnce(serverState(1, snapshot("job-1", [code("RJ000001", "queued", 1)])))
         .mockResolvedValueOnce(
-          serverState(40, snapshot("job-2", [code("RJ000002", "fetching", 40, "single")])),
+          serverState(40, snapshot("job-2", [code("RJ000002", "fetching", 40)])),
         );
       const { store, last } = createHarness({ startJob });
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       dispatch(last(), codeEvent("job-1", code("RJ000001", "fetched", 30)));
       dispatch(last(), { type: "finished", revision: 31, jobId: "job-1", reason: "complete" });
-      await store.startSingle("RJ000002");
+      await store.start(["RJ000002"], false);
       expect(store.getState().job?.jobId).toBe("job-2");
       expect(store.getState().results.get("RJ000001")?.revision).toBe(30);
     });
 
-    it("removed で codes と bulk が更新される", async () => {
+    it("removed で codes と progress が更新される", async () => {
       const { store, last } = createHarness({
         startJob: vi.fn(async () =>
           serverState(
@@ -403,23 +389,23 @@ describe("dlsiteJobStore", () => {
           ),
         ),
       });
-      await store.startBulk(["RJ000001", "RJ000002"]);
+      await store.start(["RJ000001", "RJ000002"], false);
       dispatch(last(), {
         type: "removed",
         revision: 2,
         jobId: "job-1",
         productCodes: ["RJ000002"],
-        bulk: { processed: 0, total: 1 },
+        progress: { processed: 0, total: 1 },
       });
       expect([...store.getState().job!.codes.keys()]).toEqual(["RJ000001"]);
-      expect(store.getState().job?.bulk).toEqual({ processed: 0, total: 1 });
+      expect(store.getState().job?.progress).toEqual({ processed: 0, total: 1 });
     });
   });
 
   describe("終端", () => {
     it("finished を2回・snapshot(finished)＋finished でも jobEnded は1回で、接続を閉じる", async () => {
       const { store, events, last } = createHarness();
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       const source = last();
       dispatch(source, {
         type: "snapshot",
@@ -444,7 +430,7 @@ describe("dlsiteJobStore", () => {
           ),
         ),
       });
-      await store.startBulk(["RJ000001", "RJ000002"]);
+      await store.start(["RJ000001", "RJ000002"], false);
       events.length = 0;
       dispatch(last(), { type: "finished", revision: 2, jobId: "job-1", reason: "aborted" });
       expect(events).toEqual([{ type: "jobEnded", jobId: "job-1" }]);
@@ -452,13 +438,13 @@ describe("dlsiteJobStore", () => {
 
     it("不正なイベントで接続を閉じ、job を null にして error を立て、終わりを通知する", async () => {
       const { store, events, last } = createHarness();
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       last().dispatchEvent(new MessageEvent("code", { data: JSON.stringify({ type: "code" }) }));
       expect(last().closed).toBe(true);
       expect(store.getState().job).toBeNull();
       expect(store.getState().error).not.toBeNull();
       expect(events).toEqual([
-        { type: "codesSettled", codes: [{ code: "RJ000001", origin: "bulk", known: false }] },
+        { type: "codesSettled", codes: [{ code: "RJ000001", known: false }] },
         { type: "jobEnded", jobId: "job-1" },
       ]);
       store.clearError();
@@ -467,7 +453,7 @@ describe("dlsiteJobStore", () => {
 
     it("JSON として解析できないイベントでも接続を閉じ、error を立てて追跡を終える", async () => {
       const { store, events, last } = createHarness();
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       last().dispatchEvent(new MessageEvent("code", { data: "{not json" }));
       expect(last().closed).toBe(true);
       expect(store.getState().job).toBeNull();
@@ -483,7 +469,7 @@ describe("dlsiteJobStore", () => {
           serverState(6, snapshot("job-1", [code("RJ000001", "fetched", 6)])),
         ),
       });
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       last().onerror?.(new Event("error"));
       await flush();
       expect(sources).toHaveLength(1);
@@ -494,7 +480,7 @@ describe("dlsiteJobStore", () => {
       const { store, sources, last } = createHarness({
         getCurrent: vi.fn(async () => serverState(2, snapshot("job-1"))),
       });
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       last().readyState = 2;
       last().onerror?.(new Event("error"));
       await flush();
@@ -506,12 +492,12 @@ describe("dlsiteJobStore", () => {
       const { store, events, last } = createHarness({
         getCurrent: vi.fn(async () => serverState(8, null)),
       });
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       events.length = 0;
       last().onerror?.(new Event("error"));
       await flush();
       expect(events).toEqual([
-        { type: "codesSettled", codes: [{ code: "RJ000001", origin: "bulk", known: false }] },
+        { type: "codesSettled", codes: [{ code: "RJ000001", known: false }] },
         { type: "jobEnded", jobId: "job-1" },
       ]);
       expect(store.getState().job).toBeNull();
@@ -521,7 +507,7 @@ describe("dlsiteJobStore", () => {
       const { store, events, sources, last } = createHarness({
         getCurrent: vi.fn(async () => serverState(9, snapshot("job-2"))),
       });
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       events.length = 0;
       last().onerror?.(new Event("error"));
       await flush();
@@ -530,7 +516,7 @@ describe("dlsiteJobStore", () => {
       expect(store.getState().job?.jobId).toBe("job-2");
     });
 
-    it("ジョブAの取得中に切断してジョブBで再接続すると、AのコードだけがXは単発・Yはまとめての結果不明になる", async () => {
+    it("ジョブAの取得中に切断してジョブBで再接続すると、Aの終端でないコードだけが結果不明になる", async () => {
       const { store, events, last } = createHarness({
         getCurrent: vi.fn(async () =>
           serverState(60, snapshot("job-b", [code("RJ000009", "fetching", 60)])),
@@ -539,14 +525,14 @@ describe("dlsiteJobStore", () => {
           serverState(
             40,
             snapshot("job-a", [
-              code("RJ000001", "fetching", 40, "single"),
+              code("RJ000001", "fetching", 40),
               code("RJ000002", "queued", 40),
               code("RJ000003", "fetched", 38),
             ]),
           ),
         ),
       });
-      await store.startSingle("RJ000001");
+      await store.start(["RJ000001"], false);
       events.length = 0;
       last().onerror?.(new Event("error"));
       await flush();
@@ -554,8 +540,8 @@ describe("dlsiteJobStore", () => {
         {
           type: "codesSettled",
           codes: [
-            { code: "RJ000001", origin: "single", known: false },
-            { code: "RJ000002", origin: "bulk", known: false },
+            { code: "RJ000001", known: false },
+            { code: "RJ000002", known: false },
           ],
         },
         { type: "jobEnded", jobId: "job-a" },
@@ -569,7 +555,7 @@ describe("dlsiteJobStore", () => {
         getCurrent: vi.fn(() => gate.promise),
         startJob: vi.fn(async () => serverState(40, snapshot("job-a"))),
       });
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       last().onerror?.(new Event("error"));
       dispatch(last(), {
         type: "snapshot",
@@ -586,7 +572,7 @@ describe("dlsiteJobStore", () => {
       const { store, events, last } = createHarness({
         getCurrent: vi.fn(async () => serverState(9, null)),
       });
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       events.length = 0;
       dispatch(last(), codeEvent("other", code("RJ000001", "fetched", 8)));
       await flush();
@@ -597,7 +583,7 @@ describe("dlsiteJobStore", () => {
       const { store, sources, last } = createHarness({
         getCurrent: vi.fn(async () => serverState(2, snapshot("job-1"))),
       });
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       for (let attempt = 0; attempt < 3; attempt += 1) {
         last().readyState = 2;
         last().onerror?.(new Event("error"));
@@ -614,7 +600,7 @@ describe("dlsiteJobStore", () => {
           throw new Error("network");
         }),
       });
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       last().onerror?.(new Event("error"));
       await flush();
       expect(store.getState().job?.jobId).toBe("job-1");
@@ -625,27 +611,27 @@ describe("dlsiteJobStore", () => {
       const { store, deps, last } = createHarness({
         getCurrent: vi.fn(async () => serverState(2, snapshot("job-1"))),
       });
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       last().onerror?.(new Event("error"));
       await flush();
       expect(deps.getCurrent).toHaveBeenCalledTimes(1);
     });
 
-    it("再接続のスナップショットで単発の取り直しの終端を知ると、状態が同じでも終端に達したコードとして通知する", async () => {
+    it("再接続のスナップショットで取り直しの終端を知ると、状態が同じでも終端に達したコードとして通知する", async () => {
       const { store, events, last } = createHarness({
         startJob: vi.fn(async () =>
-          serverState(30, snapshot("job-1", [code("RJ000001", "fetched", 30, "single")])),
+          serverState(30, snapshot("job-1", [code("RJ000001", "fetched", 30)])),
         ),
       });
-      await store.startSingle("RJ000001");
+      await store.start(["RJ000001"], false);
       events.length = 0;
       dispatch(last(), {
         type: "snapshot",
         revision: 42,
-        job: snapshot("job-1", [code("RJ000001", "fetched", 42, "single")]),
+        job: snapshot("job-1", [code("RJ000001", "fetched", 42)]),
       });
       expect(events).toEqual([
-        { type: "codesSettled", codes: [{ code: "RJ000001", origin: "single", known: true }] },
+        { type: "codesSettled", codes: [{ code: "RJ000001", known: true }] },
       ]);
       expect(store.getState().results.get("RJ000001")?.revision).toBe(42);
     });
@@ -661,16 +647,16 @@ describe("dlsiteJobStore", () => {
           throw rootReconfiguring();
         }),
       });
-      await post.store.startBulk(["RJ000001"]);
+      await post.store.start(["RJ000001"], false);
       expect(post.store.getState().error).toBeNull();
-      expect(post.store.getState().startingBulk).toBeNull();
+      expect(post.store.getState().starting).toBeNull();
 
       const get = createHarness({
         getCurrent: vi.fn(async () => {
           throw rootReconfiguring();
         }),
       });
-      await get.store.startBulk(["RJ000001"]);
+      await get.store.start(["RJ000001"], false);
       get.last().onerror?.(new Event("error"));
       await flush();
       expect(get.store.getState().job).toBeNull();
@@ -678,31 +664,30 @@ describe("dlsiteJobStore", () => {
       expect(get.last().closed).toBe(true);
 
       const del = createHarness({
-        cancelBulk: vi.fn(async () => {
+        cancel: vi.fn(async () => {
           throw rootReconfiguring();
         }),
         startJob: vi.fn(async () =>
           serverState(1, snapshot("job-1", [code("RJ000001", "queued", 1)])),
         ),
       });
-      await del.store.startBulk(["RJ000001"]);
-      await del.store.cancelBulk();
+      await del.store.start(["RJ000001"], false);
+      await del.store.cancel();
       expect(del.store.getState().job).toBeNull();
       expect(del.store.getState().error).toBeNull();
     });
 
-    it("startSingle の POST は reset して error を立てない", async () => {
+    it("2回目の start の POST は reset して error を立てない", async () => {
       const startJob = vi
         .fn()
         .mockResolvedValueOnce(serverState(1, snapshot("job-1", [code("RJ000001", "queued", 1)])))
         .mockRejectedValueOnce(new ApiRequestError(409, "root_reconfiguring", "再設定中です"));
       const { store, last } = createHarness({ startJob });
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       const source = last();
-      const result = await store.startSingle("RJ000002");
+      const result = await store.start(["RJ000002"], false);
       expect(result).toEqual({ ok: true });
       expect(store.getState().job).toBeNull();
-      expect(store.getState().pendingSingles.size).toBe(0);
       expect(store.getState().error).toBeNull();
       expect(source.closed).toBe(true);
     });
@@ -720,106 +705,26 @@ describe("dlsiteJobStore", () => {
     });
   });
 
-  describe("単発", () => {
-    it("POST の応答を待つあいだ pendingSingles に入り、応答を取り込むと外れる。失敗でも外れる", async () => {
+  describe("ジョブの乗り換え", () => {
+    it("2回目の start の応答が SSE の終端より遅れて届いても、ジョブを巻き戻さない", async () => {
       const gate = deferred<DlsiteJobState>();
-      const { store } = createHarness({ startJob: vi.fn(() => gate.promise) });
-      const pending = store.startSingle("rj000001");
-      expect(store.getState().pendingSingles.has("RJ000001")).toBe(true);
-      gate.resolve(serverState(3, snapshot("job-1", [code("RJ000001", "queued", 3, "single")])));
-      await pending;
-      expect(store.getState().pendingSingles.size).toBe(0);
-
-      const failing = createHarness({
-        startJob: vi.fn(async () => {
-          throw new ApiRequestError(500, "internal", "失敗しました");
-        }),
-      });
-      expect(await failing.store.startSingle("RJ000001")).toEqual({
-        ok: false,
-        error: "失敗しました",
-      });
-      expect(failing.store.getState().pendingSingles.size).toBe(0);
-    });
-
-    it("同じコードが保留中なら POST しない", async () => {
-      const gate = deferred<DlsiteJobState>();
-      const { store, deps } = createHarness({ startJob: vi.fn(() => gate.promise) });
-      const first = store.startSingle("RJ000001");
-      await store.startSingle("RJ000001");
-      gate.resolve(serverState(1, snapshot("job-1")));
-      await first;
-      expect(deps.startJob).toHaveBeenCalledTimes(1);
-    });
-
-    it("応答の revision がすでに取り込んだ状態と同じでも、応答が返れば保留は外れる", async () => {
-      const gate = deferred<DlsiteJobState>();
-      const { store, last } = createHarness({
-        startJob: vi
-          .fn()
-          .mockResolvedValueOnce(
-            serverState(10, snapshot("job-1", [code("RJ000009", "queued", 10)])),
-          )
-          .mockImplementationOnce(() => gate.promise),
-      });
-      await store.startBulk(["RJ000009"]);
-      const pending = store.startSingle("RJ000001");
-      dispatch(last(), codeEvent("job-1", code("RJ000001", "fetching", 21, "single")));
-      expect(store.getState().pendingSingles.has("RJ000001")).toBe(true);
-      gate.resolve(
-        serverState(
-          21,
-          snapshot("job-1", [
-            code("RJ000009", "queued", 10),
-            code("RJ000001", "fetching", 21, "single"),
-          ]),
-        ),
+      const startJob = vi
+        .fn()
+        .mockResolvedValueOnce(serverState(1, snapshot("job-1", [code("RJ000001", "queued", 1)])))
+        .mockImplementationOnce(() => gate.promise);
+      const { store, last } = createHarness({ startJob });
+      await store.start(["RJ000001"], false);
+      const pending = store.start(["RJ000001"], true);
+      await flush();
+      dispatch(last(), codeEvent("job-1", code("RJ000001", "queued", 21)));
+      dispatch(last(), codeEvent("job-1", code("RJ000001", "fetching", 22)));
+      dispatch(
+        last(),
+        codeEvent("job-1", code("RJ000001", "fetched", 23), { processed: 1, total: 1 }),
       );
-      await pending;
-      expect(store.getState().pendingSingles.size).toBe(0);
-      expect(codeState(store, "RJ000001")).toBe("fetching");
-    });
-
-    it("POST 中に再接続のスナップショットで古い終端を受けても、応答までは保留したまま", async () => {
-      const gate = deferred<DlsiteJobState>();
-      const { store, last } = createHarness({
-        startJob: vi
-          .fn()
-          .mockResolvedValueOnce(serverState(8, snapshot("job-1", [code("RJ000009", "queued", 8)])))
-          .mockImplementationOnce(() => gate.promise),
-      });
-      await store.startBulk(["RJ000009"]);
-      const pending = store.startSingle("RJ000001");
-      dispatch(last(), {
-        type: "snapshot",
-        revision: 10,
-        job: snapshot("job-1", [code("RJ000001", "fetched", 10, "single")]),
-      });
-      expect(store.getState().pendingSingles.has("RJ000001")).toBe(true);
-      gate.resolve(serverState(21, snapshot("job-1", [code("RJ000001", "queued", 21, "single")])));
-      await pending;
-      expect(store.getState().pendingSingles.size).toBe(0);
-    });
-
-    it("単発の終端が POST の応答より先に届いても、遅れて届いた応答でジョブを巻き戻さない（取得中のまま止まらない）", async () => {
-      const gate = deferred<DlsiteJobState>();
-      const { store, last } = createHarness({
-        startJob: vi
-          .fn()
-          .mockResolvedValueOnce(
-            serverState(10, snapshot("job-1", [code("RJ000001", "fetched", 10, "single")])),
-          )
-          .mockImplementationOnce(() => gate.promise),
-      });
-      await store.startBulk(["RJ000001"]);
-      const pending = store.startSingle("RJ000001");
-      dispatch(last(), codeEvent("job-1", code("RJ000001", "queued", 21, "single")));
-      dispatch(last(), codeEvent("job-1", code("RJ000001", "fetching", 22, "single")));
-      dispatch(last(), codeEvent("job-1", code("RJ000001", "fetched", 23, "single")));
       dispatch(last(), { type: "finished", revision: 24, jobId: "job-1", reason: "complete" });
-      gate.resolve(serverState(21, snapshot("job-1", [code("RJ000001", "queued", 21, "single")])));
+      gate.resolve(serverState(21, snapshot("job-1", [code("RJ000001", "queued", 21)])));
       await pending;
-      expect(store.getState().pendingSingles.size).toBe(0);
       expect(codeState(store, "RJ000001")).toBe("fetched");
       expect(store.getState().job?.status).toBe("finished");
       expect(store.getState().revision).toBe(24);
@@ -831,48 +736,32 @@ describe("dlsiteJobStore", () => {
           .fn()
           .mockResolvedValueOnce(serverState(1, snapshot("job-1", [code("RJ000001", "queued", 1)])))
           .mockResolvedValueOnce(
-            serverState(9, snapshot("job-2", [code("RJ000002", "queued", 9, "single")])),
+            serverState(9, snapshot("job-2", [code("RJ000002", "queued", 9)])),
           ),
       });
-      await store.startBulk(["RJ000001"]);
+      await store.start(["RJ000001"], false);
       events.length = 0;
-      await store.startSingle("RJ000002");
+      await store.start(["RJ000002"], false);
       expect(events[0]).toEqual({
         type: "codesSettled",
-        codes: [{ code: "RJ000001", origin: "bulk", known: false }],
+        codes: [{ code: "RJ000001", known: false }],
       });
-      expect(store.getState().pendingSingles.size).toBe(0);
-    });
-
-    it("POST の応答を待つあいだは EventSource を開かない", async () => {
-      const gate = deferred<DlsiteJobState>();
-      const { store, sources } = createHarness({ startJob: vi.fn(() => gate.promise) });
-      const bulk = store.startBulk(["RJ000001"]);
-      const single = store.startSingle("RJ000002");
-      await flush();
-      expect(sources).toHaveLength(0);
-      gate.resolve(serverState(1, snapshot("job-1")));
-      await Promise.all([bulk, single]);
-      expect(sources.length).toBeGreaterThan(0);
     });
   });
 
   describe("中止", () => {
-    it("起点がまとめてで queued のコードが無ければ DELETE を送らない", async () => {
+    it("queued のコードが無ければ DELETE を送らない", async () => {
       const { store, deps } = createHarness({
         startJob: vi.fn(async () =>
           serverState(
             1,
-            snapshot("job-1", [
-              code("RJ000001", "fetching", 1),
-              code("RJ000002", "queued", 1, "single"),
-            ]),
+            snapshot("job-1", [code("RJ000001", "fetching", 1), code("RJ000002", "fetched", 1)]),
           ),
         ),
       });
-      await store.startBulk(["RJ000001"]);
-      await store.cancelBulk();
-      expect(deps.cancelBulk).not.toHaveBeenCalled();
+      await store.start(["RJ000001"], false);
+      await store.cancel();
+      expect(deps.cancel).not.toHaveBeenCalled();
     });
 
     it("DELETE を送り、cancelling は応答で戻る", async () => {
@@ -884,9 +773,9 @@ describe("dlsiteJobStore", () => {
           ),
         ),
       });
-      await store.startBulk(["RJ000001", "RJ000002"]);
-      await store.cancelBulk();
-      expect(deps.cancelBulk).toHaveBeenCalledWith("job-1");
+      await store.start(["RJ000001", "RJ000002"], false);
+      await store.cancel();
+      expect(deps.cancel).toHaveBeenCalledWith("job-1");
       expect(store.getState().cancelling).toBe(false);
     });
   });

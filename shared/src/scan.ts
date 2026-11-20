@@ -22,6 +22,8 @@ export type ScanCandidateFolder = {
 export const scanCandidateMissingWorkSchema = z.object({
   workId: z.string(),
   title: z.string(),
+  /** 行方不明になる前の作品フォルダーのroot相対path。rootの外にあった作品は null */
+  previousPath: workspacePathSchema.nullable(),
 });
 export type ScanCandidateMissingWork = z.infer<typeof scanCandidateMissingWorkSchema>;
 

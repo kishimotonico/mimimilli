@@ -512,11 +512,16 @@ export class WorkQueryRepository {
   }
 
   /** 行方不明（missing）でRJコードを持つ作品。候補に「同じRJコードの行方不明の作品」を付記するために引く */
-  listMissingWorksWithRjCode(): Array<{ rjCode: string; workId: string; title: string }> {
-    return this.db.sqlite
+  listMissingWorksWithRjCode(root: string): Array<{
+    rjCode: string;
+    workId: string;
+    title: string;
+    previousPath: WorkspacePath | null;
+  }> {
+    const rows = this.db.sqlite
       .query(
         `SELECT upper(json_extract(work_dlsite.state_json, '$.rjCode')) AS rjCode,
-                works.id AS workId, works.title AS title
+                works.id AS workId, works.title AS title, works.physical_path AS physicalPath
          FROM main.works
          INNER JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
          WHERE works.status = 'missing'
@@ -524,7 +529,11 @@ export class WorkQueryRepository {
            AND json_extract(work_dlsite.state_json, '$.rjCode') != ''
          ORDER BY works.title, works.id`,
       )
-      .all() as Array<{ rjCode: string; workId: string; title: string }>;
+      .all() as Array<{ rjCode: string; workId: string; title: string; physicalPath: string }>;
+    return rows.map(({ physicalPath, ...row }) => ({
+      ...row,
+      previousPath: isPathWithin(root, physicalPath) ? relativeToRoot(physicalPath, root) : null,
+    }));
   }
 
   getScanWorkMap() {

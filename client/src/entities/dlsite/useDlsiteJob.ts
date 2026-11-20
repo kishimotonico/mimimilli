@@ -1,6 +1,6 @@
 import { useStore } from "jotai";
 import { useStoreSelector } from "../../shared/lib/useStoreSelector";
-import { dlsiteBulkFrame, type DlsiteBulkFrame } from "./model/dlsiteBulkFrame";
+import { dlsiteFetchFrame, type DlsiteFetchFrame } from "./model/dlsiteFetchFrame";
 import {
   dlsiteJobStoreAtom,
   type DlsiteJobState,
@@ -15,7 +15,7 @@ export function useDlsiteJobState<T>(selector: (state: DlsiteJobState) => T): T 
   return useStoreSelector(useDlsiteJobStore(), selector);
 }
 
-function sameFrame(a: DlsiteBulkFrame, b: DlsiteBulkFrame): boolean {
+function sameFrame(a: DlsiteFetchFrame, b: DlsiteFetchFrame): boolean {
   if (a.kind === "idle" || b.kind === "idle") return a.kind === b.kind;
   return (
     a.processed === b.processed &&
@@ -25,15 +25,15 @@ function sameFrame(a: DlsiteBulkFrame, b: DlsiteBulkFrame): boolean {
   );
 }
 
-const frameByState = new WeakMap<DlsiteJobState, DlsiteBulkFrame>();
-const IDLE_FRAME: DlsiteBulkFrame = { kind: "idle" };
-const lastFrameByStore = new WeakMap<DlsiteJobStore, DlsiteBulkFrame>();
+const frameByState = new WeakMap<DlsiteJobState, DlsiteFetchFrame>();
+const IDLE_FRAME: DlsiteFetchFrame = { kind: "idle" };
+const lastFrameByStore = new WeakMap<DlsiteJobStore, DlsiteFetchFrame>();
 
 /** 同じ状態には同じ参照を返す（useSyncExternalStoreの契約）。内容が同じ枠も、同じストアでは同じ参照にそろえる。 */
-function selectBulkFrameOf(store: DlsiteJobStore, state: DlsiteJobState): DlsiteBulkFrame {
+function selectFetchFrameOf(store: DlsiteJobStore, state: DlsiteJobState): DlsiteFetchFrame {
   const memo = frameByState.get(state);
   if (memo) return memo;
-  const next = dlsiteBulkFrame(state);
+  const next = dlsiteFetchFrame(state);
   const previous = lastFrameByStore.get(store) ?? IDLE_FRAME;
   const frame = sameFrame(previous, next) ? previous : next;
   lastFrameByStore.set(store, frame);
@@ -41,7 +41,7 @@ function selectBulkFrameOf(store: DlsiteJobStore, state: DlsiteJobState): Dlsite
   return frame;
 }
 
-export function useDlsiteBulkFrame(): DlsiteBulkFrame {
+export function useDlsiteFetchFrame(): DlsiteFetchFrame {
   const store = useDlsiteJobStore();
-  return useStoreSelector(store, (state) => selectBulkFrameOf(store, state));
+  return useStoreSelector(store, (state) => selectFetchFrameOf(store, state));
 }

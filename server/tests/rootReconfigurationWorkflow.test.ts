@@ -41,7 +41,7 @@ test("受理済みリクエストのdrainが終わるまでジョブ取消・cat
   assert.deepEqual(order, ["drain-start", "drain-end", "scan-cancel"]);
 });
 
-test("root再設定の開始は、DLsite取得ジョブのキューを起点を問わずすべて捨てる", async () => {
+test("root再設定の開始は、DLsite取得ジョブのキューをすべて捨てる", async () => {
   const adapter = createFixtureAdapter({ rootRebuildStepMs: 1 });
   const dlsiteJobs = new DlsiteJobManager({
     fetchDlsiteProduct: (_code, options) =>
@@ -54,9 +54,9 @@ test("root再設定の開始は、DLsite取得ジョブのキューを起点を�
       }),
   });
   const scanJobs = new ScanJobManager(adapter);
-  dlsiteJobs.start({ origin: "bulk", productCodes: ["RJ000001", "RJ000002"] });
+  dlsiteJobs.start({ productCodes: ["RJ000001", "RJ000002"] });
   await new Promise((resolve) => setImmediate(resolve));
-  dlsiteJobs.start({ origin: "single", productCode: "RJ000010" });
+  dlsiteJobs.start({ productCodes: ["RJ000010"] });
   assert.equal(dlsiteJobs.getState().job?.codes.length, 3);
 
   const workflow = new RootReconfigurationWorkflow(adapter, scanJobs, dlsiteJobs, async () => {});

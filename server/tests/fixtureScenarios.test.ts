@@ -559,7 +559,7 @@ test("scan-review: 候補が取得状態ごとの表示になり、直した行�
       const response = await app.request("/api/dlsite/jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ origin: "bulk", productCodes }),
+        body: JSON.stringify({ productCodes }),
       });
       assert.equal(response.status, 202);
     };

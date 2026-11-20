@@ -31,28 +31,60 @@ export default function RjCodeCell({
   onCommit,
   onCancel,
 }: RjCodeCellProps) {
+  const message = error && (
+    <span role="alert" className="truncate font-jp text-caption text-[var(--state-danger)]">
+      {error.message}
+    </span>
+  );
   if (editing) {
     return (
-      <RjCodeInput
-        initialValue={error ? error.value : (rjCode ?? "")}
-        invalid={Boolean(error)}
-        onCommit={onCommit}
-        onCancel={onCancel}
-      />
+      <>
+        <RjCodeInput
+          initialValue={error ? error.value : (rjCode ?? "")}
+          invalid={Boolean(error)}
+          onCommit={onCommit}
+          onCancel={onCancel}
+        />
+        {message}
+      </>
     );
   }
   const shown = error ? error.value : rjCode;
+  return (
+    <>
+      <RjCodeButton
+        shown={shown}
+        invalid={Boolean(error)}
+        disabled={disabled}
+        onStartEdit={onStartEdit}
+      />
+      {message}
+    </>
+  );
+}
+
+function RjCodeButton({
+  shown,
+  invalid,
+  disabled,
+  onStartEdit,
+}: {
+  shown: string | null;
+  invalid: boolean;
+  disabled: boolean;
+  onStartEdit: () => void;
+}) {
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onStartEdit}
-      title={error?.message ?? "クリックしてRJコードを編集"}
+      title="クリックしてRJコードを編集"
       style={{ height: RJ_CELL_HEIGHT }}
       className={cn(
         CELL_BOX,
         "border border-transparent text-left hover:bg-paper-2",
-        error ? "text-[var(--state-danger)]" : shown ? "text-ink-1" : "text-ink-3",
+        invalid ? "text-[var(--state-danger)]" : shown ? "text-ink-1" : "text-ink-3",
       )}
     >
       {shown ?? "—"}

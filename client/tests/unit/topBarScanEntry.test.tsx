@@ -177,7 +177,7 @@ describe("TopBar のスキャン入口", () => {
             jobId: "job-1",
             status: "running",
             codes: new Map(),
-            bulk: { processed: 1, total: 4 },
+            progress: { processed: 1, total: 4 },
           },
         }),
       });
@@ -188,7 +188,7 @@ describe("TopBar のスキャン入口", () => {
     });
 
     it("まとめての取得の開始待ちは割合0の輪を出す", () => {
-      renderTopBar({ dlsiteJob: createFakeDlsiteJobStore({ startingBulk: { total: 10 } }) });
+      renderTopBar({ dlsiteJob: createFakeDlsiteJobStore({ starting: { total: 10 } }) });
 
       expect(ringKind()).toBe("determinate");
       expect(arcRatio()).toBe(0);
@@ -197,19 +197,10 @@ describe("TopBar のスキャン入口", () => {
     it("スキャン中にまとめての取得が重なっても回る弧にする", () => {
       renderTopBar({
         scanJob: createFakeScanJobStore({ job: buildScanJobSnapshot() }),
-        dlsiteJob: createFakeDlsiteJobStore({ startingBulk: { total: 10 } }),
+        dlsiteJob: createFakeDlsiteJobStore({ starting: { total: 10 } }),
       });
 
       expect(ringKind()).toBe("indeterminate");
-    });
-
-    it("単発の取得だけでは輪を出さない", () => {
-      renderTopBar({
-        dlsiteJob: createFakeDlsiteJobStore({ pendingSingles: new Set(["RJ000001"]) }),
-      });
-
-      expect(screen.queryByTestId("scan-entry-ring")).not.toBeInTheDocument();
-      expect(scanButton("スキャン")).toBeInTheDocument();
     });
   });
 

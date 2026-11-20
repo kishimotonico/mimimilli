@@ -54,8 +54,8 @@ describe("useScanSelectionPruning", () => {
         job: {
           jobId: "j",
           status: "running",
-          codes: new Map([["RJ000404", { origin: "single", state: "fetching" }]]),
-          bulk: { processed: 0, total: 0 },
+          codes: new Map([["RJ000404", { state: "fetching" }]]),
+          progress: { processed: 0, total: 0 },
         },
       }));
     });
