@@ -251,7 +251,7 @@ test("購読はsnapshotを返し、終端のfinishedで完了し、終了後も�
 });
 
 test("打ち切りはキューを全破棄してfinished(aborted)を送り、ジョブを切り離す", async () => {
-  const { manager, calls, events } = controlled();
+  const { manager, calls, events } = controlled(() => 1_700_000_000_000);
   const jobId = manager.start({ origin: "bulk", productCodes: ["RJ000001", "RJ000002"] })!.job!
     .jobId;
   manager.start({ origin: "single", productCode: "RJ000010" });
