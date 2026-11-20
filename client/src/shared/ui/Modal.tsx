@@ -100,7 +100,7 @@ export function ModalHeader({
   closeDisabled,
 }: ModalHeaderProps) {
   return (
-    <header className="flex min-h-[52px] shrink-0 items-center gap-2 border-b border-line-soft px-[18px] py-1.5">
+    <header className="flex min-h-[52px] shrink-0 items-center gap-2 border-b border-line-soft px-[18px] py-2.5">
       {icon}
       <div className="min-w-0 flex-1">
         {eyebrow}

@@ -1,5 +1,6 @@
 import { useCallback, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { MENU_PANEL_CLASS, MenuItem } from "../../../../../shared/ui/Menu";
 import IconButton from "../../../../../shared/ui/IconButton";
 import { I } from "../../../../../shared/ui/Icon";
 import { useAnchoredPopover } from "../../../../../shared/ui/useAnchoredPopover";
@@ -53,7 +54,7 @@ export default function RowMenu({ label, disabled, onOpenFolder, onExclude }: Ro
             ref={setFloating}
             style={floatingStyles}
             role="menu"
-            className="z-10 min-w-[180px] rounded-[8px] border border-line bg-paper-1 p-1 shadow-pop"
+            className={MENU_PANEL_CLASS}
           >
             <MenuItem
               onSelect={() => {
@@ -76,28 +77,5 @@ export default function RowMenu({ label, disabled, onOpenFolder, onExclude }: Ro
           anchorRef.current?.closest("dialog") ?? document.body,
         )}
     </div>
-  );
-}
-
-function MenuItem({
-  danger = false,
-  onSelect,
-  children,
-}: {
-  danger?: boolean;
-  onSelect: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={onSelect}
-      className={`flex w-full items-center rounded-[5px] px-2.5 py-1.5 text-left font-jp text-body whitespace-nowrap hover:bg-paper-2 ${
-        danger ? "text-[var(--state-danger)]" : "text-ink-0"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

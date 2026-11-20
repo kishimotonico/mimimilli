@@ -115,14 +115,14 @@ export default function UnregisteredTab({
     restore: restoreExclusions,
   } = useCandidateExclusions({ onExcludeError: setErrorMessage });
   const panelRef = useRef<HTMLDivElement>(null);
-  const refocusToolbarRef = useRef(false);
+  const refocusPanelRef = useRef(false);
   const closeExcluded = () => {
-    refocusToolbarRef.current = true;
+    refocusPanelRef.current = true;
     setShowExcluded(false);
   };
   useEffect(() => {
-    if (showExcluded || !refocusToolbarRef.current) return;
-    refocusToolbarRef.current = false;
+    if (showExcluded || !refocusPanelRef.current) return;
+    refocusPanelRef.current = false;
     const panel = panelRef.current;
     const target =
       panel?.querySelector<HTMLElement>("[data-excluded-trigger]") ??

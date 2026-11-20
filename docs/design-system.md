@@ -179,19 +179,17 @@ focus中はタイマーを止め、離れると残り時間から再開する。
 
 ## スキャン画面
 
-タブ一覧の読み込み中・失敗・未スキャン・0件は `ScanListState`（`CollectionStatus` の list）で出す。状態欄の6状態・文言・トーストは [requirements-v4.md](requirements-v4.md) 8.2 に従う。見た目は合意モックの寸法を正とし、4タブで次を共有する。
+タブ一覧の読み込み中・失敗・未スキャン・0件は `ScanListState`（`CollectionStatus` の list）で出す。状態欄の6状態・文言・トーストは [requirements-v4.md](requirements-v4.md) 8.2 に従う。寸法・文字サイズ・色は実装が正で、4タブで次の部品とトークンを共有する。
 
-- 縦タブ: 幅180px、1行30px、文字は `text-body`。選択中は太字 `font-bold`・`ink-0`・`paper-2` 面・左2pxの `--acc` 線、非選択は `ink-1`。件数は高さ18pxの枠を常に確保して件数の有無で行の高さを変えず、数字は `text-secondary` `font-medium`、面は `paper-3`、要対応だけ `--state-danger` 11%の面と `--state-danger` の文字
-- 状態欄: 縦タブの下に高さ116pxで固定する。見出しは `text-secondary` `font-medium` `ink-2`、日時と理由は `text-secondary` `ink-1`。ボタンは `sm`（26px）
-- ツールバー: 高さ46px。未登録は左に絞り込みチップ・右に「除外済み」、更新済みは右に変化の種類のチップ。置くもののないタブには置かない
-- 絞り込みチップ（`ScanFilterChip`）: 高さ26pxの丸ピル、1pxの `--line`、文字は `text-control`。選択中だけ `--acc-soft` の面・`--acc-ink` の文字・`font-medium`
-- 一覧見出し（`LIST_HEADING_ROW_CLASS`）: 高さ30px、`paper-2` 面、上下に `--line-soft`、文字は `text-caption` `ink-2`。未登録では先頭の列に全選択のチェックを置く
-- 行: 高さ54px（要対応・更新済みは内容に合わせて伸びる）、文字は `text-body`。列は各タブの `layout.ts` の grid で見出しと行で共有する
-- カバー枠（`ScanCover`）: 36px角・角丸5px。画像がないときは `--cover-none` の斜線と1pxの `--line-soft`
-- メニュー（行の⋮・主ボタンの▾）: 幅180px以上、1pxの `--line`、角丸8px、項目は `text-body` `ink-0`、破壊的な項目だけ `--state-danger`。件数は項目の右端に添える。行のメニューはボタンの下に開き、入らないときだけ上へ反転する（`placement: "belowEnd"`）。開いている行のボタンに背景は付けない
-- フッター: 高さ58px、`paper-1` 面、上に `--line`。主ボタンは `md`（34px）
+- 絞り込みチップは `ScanFilterChip`（未登録の「問題あり」「DLsite情報なし」、更新済みの変化の種類）。選択中だけアクセントの面にする
+- 一覧見出しは `LIST_HEADING_ROW_CLASS`。行の列は各タブの `layout.ts` の grid を見出しと行で共有する。未登録では見出しの先頭の列に全選択のチェックを置く
+- 画像がないカバー枠は `ScanCover`（`--cover-none` の斜線）に統一する。画像があるときも同じ枠でトリミングし、行ごとに大きさを変えない
+- 縦タブの件数は枠を常に確保し、件数の有無で行の高さを変えない。要対応のバッジだけ `--state-danger` 系の色にする
+- ツールバーは置くものがあるタブにだけ置く（未登録は絞り込みチップと「除外済み」、更新済みは変化の種類のチップ）。未登録は一覧が未スキャンや読み込み失敗でも、除外済みがあれば出す
+- メニュー（行の⋮・主ボタンの▾）は共有の `Menu`（`MENU_PANEL_CLASS`・`MenuItem`）で組む。破壊的な項目だけ赤、件数は項目の右端に添える。行のメニューはボタンの下に開き、入らないときだけ上へ反転する（`placement: "belowEnd"`）。開いている行のボタンに背景は付けない
+- フッターは共有の `ModalFooter` に、高さと上線の色（`--line`）だけを上書きする。主ボタンは `md`
 
-要対応は種類・対象・起きていること・推奨アクションの4列（84px / 1fr / 0.7fr / 148px）。種類は `font-medium`で、直すものは `--state-danger`、行方不明は `ink-1`。対象の各行は高さ26pxで、ID重複は固定幅のラベル（登録済みは `--state-success`）とパスを並べる。起きていることは `text-body` `ink-0`、推奨アクションは `text-secondary` `ink-1` で、操作ボタンは推奨アクションの列にだけ置く。ID重複のボタンは対象の未登録の行と同じ高さに並べ、どのパスに効くかを横並びで示す。
+要対応は種類・対象・起きていること・推奨アクションの4列。直す種類は `--state-danger`、行方不明は `ink-1` で出す。操作ボタンは推奨アクションの列にだけ置き、対象や起きていることの列には置かない。ID重複の対象は固定幅のラベル（登録済み・未登録）とパスを1行に並べ、ボタンは対象の未登録の行と同じ高さに並べて、どのパスに効くかを横並びで示す。パスやファイル名は等幅で出す。
 
 ## ライブラリ: チップ列・値一覧行・オーバーレイ
 
@@ -249,7 +247,7 @@ UI 全体は `client/src/styles/shell/index.css` の `@layer base` で `body { u
 
 - 一般的な意匠で足りるアイコンは `lucide-react` から取得して `I` に登録する。製品固有の意匠（`ratio11`・`gridJustified`・`loopOne`・`swapLR`・プレイヤー系の塗り表現など、一般カタログに対応がないもの）は自作を維持し、同じ `I` に追加する
 - stroke幅（1.5）・`currentColor`・`aria-hidden="true"` はアダプタ層（`Icon.tsx`）で固定する。呼び出し側やベンダー固有propsをこれらの値に触れさせない
-- 文字色は `tone`（既定＝ink-1、`muted`＝ink-2）で指定し、`className` で文字色を上書きしない。無効時は tone に関わらず ink-4
+- 文字色は `tone`（既定＝ink-1、`muted`＝ink-2でhoverにink-0、`faint`＝ink-3でhover/focusにink-1、`danger`＝hoverで `--state-danger`）で指定し、`className` で文字色を指定しない。無効時は tone に関わらず ink-4
 - サイズは `IconButton` のサイズ契約（`sm`/`md`/`lg` = 箱26/30/38px、アイコン14/16/20px）に従う。呼び出し側で独自の数値を散らさない
 - SVGは装飾（`aria-hidden`）とし、意味は `IconButton` 側の `aria-label` が担う。名前を持たないアイコン単体での使用を避ける
 

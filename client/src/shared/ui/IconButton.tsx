@@ -9,11 +9,13 @@ export type IconButtonSize = "xs" | "sm" | "md" | "lg";
 export type IconButtonVariant = "default" | "bare";
 
 // 有効時の文字色。無効時は tone に関わらず常に ink-4 が勝つ。
-export type IconButtonTone = "default" | "muted";
+export type IconButtonTone = "default" | "muted" | "faint" | "danger";
 
 const TONE_CLASS: Record<IconButtonTone, string> = {
   default: "text-ink-1",
-  muted: "text-ink-2",
+  muted: "text-ink-2 hover:text-ink-0",
+  faint: "text-ink-3 hover:text-ink-1 focus-visible:text-ink-1",
+  danger: "text-ink-1 hover:text-[var(--state-danger)]",
 };
 
 // 箱サイズ・角丸・アイコン描画サイズを対で固定し、呼び出し側での二重管理を無くす。
@@ -39,7 +41,7 @@ export interface IconButtonProps extends Omit<
   /** トグル状態。boolean を渡したときだけ aria-pressed を出す */
   active?: boolean;
   variant?: IconButtonVariant;
-  /** 有効時の文字色。`muted` は ink-2 */
+  /** 有効時の文字色。`muted` は ink-2（hoverで ink-0）、`faint` は ink-3（hover/focusで ink-1）、`danger` は hoverで赤 */
   tone?: IconButtonTone;
   ref?: Ref<HTMLButtonElement>;
 }

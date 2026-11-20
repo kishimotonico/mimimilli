@@ -116,6 +116,26 @@ describe("NeedsAttentionTab", () => {
     expect(rowOf("行方不明").getByText("前回あったフォルダーが見つからない")).toBeInTheDocument();
   });
 
+  it("行番号のない診断でも、ファイル名だけを等幅で出して文はそのまま出す", () => {
+    renderTab({
+      rows: buildNeedsAttentionRows(
+        buildScanDiagnostics({
+          invalidMetaFiles: [
+            {
+              path: workspacePath("a/b.mimimilli.json"),
+              message: "b.mimimilli.json: 作品ID x が別の作品情報ファイルと重複している",
+            },
+          ],
+        }),
+      ),
+    });
+    const cell = rowOf("読み取り失敗").getAllByRole("cell")[2]!;
+    expect(cell).toHaveTextContent(
+      "b.mimimilli.json: 作品ID x が別の作品情報ファイルと重複している",
+    );
+    expect(within(cell).getByText("b.mimimilli.json").className).toContain("font-mono");
+  });
+
   it("ID重複の各パス・読み取り失敗・アクセス不可のパスでFilesを開く", async () => {
     const user = userEvent.setup();
     const props = renderTab();

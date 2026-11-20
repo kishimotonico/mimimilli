@@ -1,4 +1,4 @@
-import type { WorkspacePath } from "@mimimilli/shared";
+import { pathBaseName, type WorkspacePath } from "@mimimilli/shared";
 import type { ReactNode } from "react";
 import { cn } from "../../../../shared/lib/cn";
 import { isFixable, type NeedsAttentionRow } from "../../model/needsAttention";
@@ -196,10 +196,11 @@ function whatHappened(row: NeedsAttentionRow): ReactNode {
         </>
       );
     case "invalidMetaFile": {
-      const [fileName = "", ...rest] = row.message.split(" ");
-      return rest.length > 0 ? (
+      const fileName = pathBaseName(row.path);
+      return row.message.startsWith(fileName) ? (
         <>
-          <Mono>{fileName}</Mono> {rest.join(" ")}
+          <Mono>{fileName}</Mono>
+          {row.message.slice(fileName.length)}
         </>
       ) : (
         row.message

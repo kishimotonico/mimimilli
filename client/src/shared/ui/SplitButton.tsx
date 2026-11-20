@@ -2,6 +2,7 @@ import { useCallback, useId, useState, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { buttonClass, type ButtonSize, type ButtonVariant } from "./Button";
 import { I } from "./Icon";
+import { MENU_PANEL_CLASS, MenuItem } from "./Menu";
 import { useAnchoredPopover, type PopoverPlacement } from "./useAnchoredPopover";
 
 export interface SplitButtonItem {
@@ -88,30 +89,21 @@ export default function SplitButton({
           ref={setFloating}
           style={floatingStyles}
           role="menu"
-          className="z-10 min-w-[180px] rounded-[8px] border border-line bg-paper-1 p-1 shadow-pop"
+          className={MENU_PANEL_CLASS}
         >
           {items.map((item) => (
-            <button
+            <MenuItem
               key={item.key}
-              type="button"
-              role="menuitem"
               disabled={item.disabled}
-              onClick={() => {
+              danger={item.danger}
+              trailing={item.trailing}
+              onSelect={() => {
                 close();
                 item.onSelect();
               }}
-              className={cn(
-                "flex w-full items-center justify-between gap-4 rounded-[5px] px-2.5 py-1.5 text-left font-jp text-body whitespace-nowrap hover:bg-paper-2 disabled:cursor-not-allowed disabled:text-ink-4",
-                item.danger ? "text-[var(--state-danger)]" : "text-ink-0",
-              )}
             >
               {item.label}
-              {item.trailing !== undefined && (
-                <span aria-hidden="true" className="font-mono text-secondary text-ink-2">
-                  {item.trailing}
-                </span>
-              )}
-            </button>
+            </MenuItem>
           ))}
         </div>
       )}

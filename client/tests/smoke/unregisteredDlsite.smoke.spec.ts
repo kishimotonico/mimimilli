@@ -88,6 +88,24 @@ test("▾の「選択を除外」で選択中の行が消え、「項目を選�
   assertNoErrors(tracker);
 });
 
+test("行の︙メニューはEscapeでメニューだけが閉じ、スキャンのダイアログは開いたまま", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  const { dialog, panel } = await openUnregistered(page);
+  const trigger = panel
+    .getByRole("row")
+    .nth(1)
+    .getByRole("button", { name: /の操作$/ });
+  await trigger.click();
+  await expect(page.getByRole("menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toBeHidden();
+  await expect(dialog).toBeVisible();
+  await expect(trigger).toBeFocused();
+  assertNoErrors(tracker);
+});
+
 test("先頭の行の︙メニューから除外でき、「元に戻す」で戻るとトーストも消える", async ({ page }) => {
   const tracker = trackErrors(page);
   const { panel } = await openUnregistered(page);

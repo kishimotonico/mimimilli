@@ -66,7 +66,7 @@ export default function UnregisteredFooter({
   );
 
   return (
-    <ModalFooter className="h-[58px] gap-3 border-line bg-paper-1 py-0">
+    <ModalFooter className="h-[58px] gap-3 border-line py-0">
       <span className="mr-auto whitespace-nowrap font-jp text-body text-ink-1">
         <span className="font-mono">{selectedCount}</span>件を選択
       </span>

@@ -4,14 +4,10 @@ import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
 import TextInput from "../../../shared/ui/TextInput";
 import { useInlineEditKeyDown } from "../../../shared/ui/useInlineEditKeyDown";
-import { cn } from "../../../shared/lib/cn";
 import { ColorSwatches } from "./ColorSwatches";
 
 const TOGGLE_LABEL_CLASS =
   "inline-flex items-center gap-1 font-sans text-secondary text-ink-2 cursor-pointer whitespace-nowrap";
-
-/** 行の上移動・下移動・削除ボタン共通。通常時は控えめな色、hover/focus時だけ濃くする */
-const ROW_ICON_CLASS = "text-ink-3 hover:text-ink-1 focus-visible:text-ink-1";
 
 /** 保護中の prefix を削除できない理由。削除ボタンの title に出す */
 const PROTECTED_DELETE_TITLE =
@@ -68,7 +64,8 @@ export default function TagPrefixRow({
           icon={I.chevD}
           label={`「${p.label}」を上へ移動`}
           size="xs"
-          className={cn("h-[13px] rotate-180", !moveUpDisabled && ROW_ICON_CLASS)}
+          tone="faint"
+          className="h-[13px] rotate-180"
           disabled={moveUpDisabled}
           onClick={onMoveUp}
         />
@@ -76,7 +73,8 @@ export default function TagPrefixRow({
           icon={I.chevD}
           label={`「${p.label}」を下へ移動`}
           size="xs"
-          className={cn("h-[13px]", !moveDownDisabled && ROW_ICON_CLASS)}
+          tone="faint"
+          className="h-[13px]"
           disabled={moveDownDisabled}
           onClick={onMoveDown}
         />
@@ -130,7 +128,7 @@ export default function TagPrefixRow({
         label={`prefix「${p.prefix}」を削除`}
         title={p.protected ? PROTECTED_DELETE_TITLE : undefined}
         size="xs"
-        className={deleteDisabled ? undefined : ROW_ICON_CLASS}
+        tone="faint"
         disabled={deleteDisabled}
         onClick={onRequestDelete}
       />
