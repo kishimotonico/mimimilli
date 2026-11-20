@@ -56,19 +56,22 @@ for (const subject of subjects) {
   test(`fetchDlsiteProduct（${subject.name}）: 取得できたコードはfetched、繰り返してもfetched`, async (t) => {
     const adapter = subject.create();
     t.after(() => adapter.close?.());
-    assert.equal(await adapter.fetchDlsiteProduct(OK_CODE, { force: false }), "fetched");
-    assert.equal(await adapter.fetchDlsiteProduct(OK_CODE, { force: false }), "fetched");
-    assert.equal(await adapter.fetchDlsiteProduct(OK_CODE, { force: true }), "fetched");
+    assert.equal((await adapter.fetchDlsiteProduct(OK_CODE, { force: false })).state, "fetched");
+    assert.equal((await adapter.fetchDlsiteProduct(OK_CODE, { force: false })).state, "fetched");
+    assert.equal((await adapter.fetchDlsiteProduct(OK_CODE, { force: true })).state, "fetched");
   });
 
   test(`fetchDlsiteProduct（${subject.name}）: 該当なしはnot_found、通信エラーはfailed`, async (t) => {
     const adapter = subject.create();
     t.after(() => adapter.close?.());
     assert.equal(
-      await adapter.fetchDlsiteProduct(subject.notFoundCode, { force: false }),
+      (await adapter.fetchDlsiteProduct(subject.notFoundCode, { force: false })).state,
       "not_found",
     );
-    assert.equal(await adapter.fetchDlsiteProduct(subject.errorCode, { force: false }), "failed");
+    assert.equal(
+      (await adapter.fetchDlsiteProduct(subject.errorCode, { force: false })).state,
+      "failed",
+    );
   });
 
   test(`fetchDlsiteProduct（${subject.name}）: 失敗の記録は再取得でも保たれ、forceでも同じ結果を取り直す`, async (t) => {
@@ -76,11 +79,11 @@ for (const subject of subjects) {
     t.after(() => adapter.close?.());
     await adapter.fetchDlsiteProduct(subject.notFoundCode, { force: false });
     assert.equal(
-      await adapter.fetchDlsiteProduct(subject.notFoundCode, { force: false }),
+      (await adapter.fetchDlsiteProduct(subject.notFoundCode, { force: false })).state,
       "not_found",
     );
     assert.equal(
-      await adapter.fetchDlsiteProduct(subject.notFoundCode, { force: true }),
+      (await adapter.fetchDlsiteProduct(subject.notFoundCode, { force: true })).state,
       "not_found",
     );
   });

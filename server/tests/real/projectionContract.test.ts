@@ -1,4 +1,5 @@
-import { REGISTER_ALL } from "../helpers/scanLibrary.ts";
+import { REGISTER_ALL, registerCandidates, runScan } from "../helpers/scanLibrary.ts";
+import { prepareSingleMeta } from "../../src/adapters/real/scanRegister.ts";
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -69,7 +70,9 @@ test("単作品投影はmimimilli.jsonのbytesを変えない", async (t) => {
   await scanner.scan(root);
   const before = readFileSync(metaPath);
 
-  const outcome = await scanner.projectMetaFile(metaPath, readMetaSource(metaPath));
+  const outcome = await scanner.projectPrepared(
+    prepareSingleMeta(metaPath, readMetaSource(metaPath)),
+  );
   assert.equal(outcome.status, "published");
   assert.equal(readFileSync(metaPath).equals(before), true);
   assert.equal((await getTestWork(db, id))?.dlsite.rjCode, null);
@@ -85,8 +88,9 @@ test("候補登録は検出コードを1回の正本書込みに含め、直後�
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
-  const registered = await adapter.registerScanCandidates(
+  await runScan(adapter);
+  const registered = await registerCandidates(
+    adapter,
     [workspacePath("RJ123456_自動検出作品")],
     REGISTER_ALL,
   );
@@ -97,7 +101,7 @@ test("候補登録は検出コードを1回の正本書込みに含め、直後�
   assert.equal(meta.dlsite.rjCode, "RJ123456");
   const before = readFileSync(metaPath);
 
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
   assert.equal(readFileSync(metaPath).equals(before), true);
 });
 
@@ -140,7 +144,7 @@ test("単作品投影は公開前にsourceが変わったらunpublishedで旧cat
     },
   });
   const snapshot = readMetaSource(metaPath);
-  const outcome = await scanner.projectMetaFile(metaPath, snapshot);
+  const outcome = await scanner.projectPrepared(prepareSingleMeta(metaPath, snapshot));
 
   assert.equal(outcome.status, "unpublished");
   if (outcome.status !== "unpublished") return;

@@ -1,4 +1,4 @@
-import { NO_DLSITE } from "../helpers/scanLibrary.ts";
+import { NO_DLSITE, runScan } from "../helpers/scanLibrary.ts";
 // 作品登録解除 API（DELETE /works/:id）の結合テスト。
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -443,7 +443,7 @@ test("スキャン: 退避のみ残存（catalogあり）でメタ正本を復�
   assert.ok(!existsSync(metaPath));
   assert.ok(existsSync(stagedPath));
 
-  await adapter.scan();
+  await runScan(adapter);
 
   assert.ok(existsSync(metaPath));
   assert.ok(!existsSync(stagedPath));
@@ -489,7 +489,7 @@ test("スキャン: 退避のみ残存（catalogなし）で孤児退避ファ�
   user.deleteWorkUserState(work.id);
   db.close();
 
-  await adapter.scan();
+  await runScan(adapter);
 
   assert.ok(!existsSync(stagedPath));
 });
@@ -526,7 +526,7 @@ test("スキャン: 正本と退避の併存では退避を削除し、その後
   assert.ok(existsSync(metaPath));
   assert.ok(existsSync(stagedPath));
 
-  await adapter.scan();
+  await runScan(adapter);
 
   assert.ok(existsSync(metaPath));
   assert.ok(!existsSync(stagedPath));
@@ -578,7 +578,7 @@ test(
     chmodSync(folder, 0o555);
     t.after(() => chmodSync(folder, 0o755));
 
-    const result = await adapter.scan();
+    const result = await runScan(adapter);
     assert.ok(result);
     assert.ok(existsSync(metaPath));
     assert.ok(existsSync(stagedPath));
@@ -600,7 +600,7 @@ test("スキャン: Work IDを読めない退避ファイルはスキップし�
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
 
   assert.ok(existsSync(stagedPath));
   assert.equal(readFileSync(stagedPath, "utf-8"), "{ not valid json");

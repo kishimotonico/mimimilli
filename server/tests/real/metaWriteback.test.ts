@@ -11,6 +11,7 @@ import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 import { nts } from "../helpers/tag.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
+import { runScan } from "../helpers/scanLibrary.ts";
 
 async function setup(t: TestContext) {
   const lib = makeSampleLibrary();
@@ -23,7 +24,7 @@ async function setup(t: TestContext) {
 
   const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, lib.root);
-  await adapter.scan();
+  await runScan(adapter);
   return { ...lib, adapter, metaPath };
 }
 
@@ -107,7 +108,7 @@ test("catalog再投影に失敗しても確定済みmimimilli.jsonは残り、sc
   assert.deepEqual(result?.projection, { status: "pending", reason: "error" });
   assert.equal(JSON.parse(readFileSync(metaPath, "utf-8")).title, "mimimilli.jsonだけは確定する");
   assert.equal((await adapter.getWork(existingWorkId))?.title, "既存メタの作品");
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
   assert.equal((await adapter.getWork(existingWorkId))?.title, "mimimilli.jsonだけは確定する");
 });
 
@@ -229,7 +230,7 @@ test("単一ファイル形式作品の patch が同居する mimimilli.json を
 
   const adapter = dir.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, dir.path);
-  await adapter.scan();
+  await runScan(adapter);
 
   const folderMetaBefore = readFileSync(folderMetaPath, "utf-8");
 

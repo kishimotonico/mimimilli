@@ -50,6 +50,7 @@ function renderPreview(
   api = mockApi({
     "GET /api/fs": buildFsListing(entries),
     "GET /api/scan/diagnostics": buildScanDiagnostics({ identityConflicts: diagnostics }),
+    "GET /api/scan/candidates": { candidates: [] },
     "GET /api/settings": settings,
     "POST /api/works/identity-conflicts/reassign": buildWorkSourceMutationResult(),
     ...routeOverrides,

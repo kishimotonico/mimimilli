@@ -4,25 +4,21 @@ import { requireConfiguredRoot } from "../../core/rootFolder.ts";
 import { InvalidRootFolderError } from "../../errors.ts";
 import type {
   RootReconfigurationRecord,
+  ScanExecution,
+  ScanExecutionResult,
   ScanOptions,
   StoredSettings,
 } from "../../adapter/index.ts";
-import type {
-  DlsiteRegistrationApply,
-  ScanCandidate,
-  ScanCandidatesRegisterResponse,
-  ScanResult,
-} from "@mimimilli/shared";
 import { z } from "zod";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import { type DbLocation } from "./db.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
+import type { DlsiteParser } from "./dlsite.ts";
 import { createDlsiteProductResolver, readUsableDlsite } from "./dlsiteProductResolve.ts";
 import { Scanner } from "./scanner.ts";
-import { createCandidateDlsiteSource, groupMissingWorksByRjCode } from "./scanCandidateDlsite.ts";
-import { ScanCandidateSession, type CandidateListContext } from "./scanCandidateSession.ts";
+import { createCandidateDlsiteSource } from "./scanCandidateDlsite.ts";
+import { createCandidateMaterials, resolveRootIdentity } from "./scanCandidateMaterials.ts";
 import { LAST_SCAN_TIME_KEY, scanAndFinalize } from "./scanFinalize.ts";
-import type { ScanExecutionResult } from "./scanTypes.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
@@ -40,7 +36,10 @@ type StoredRootReconfiguration = z.infer<typeof storedRootReconfigurationSchema>
 
 export function createSettingsScanMethods(deps: {
   database: DbLocation;
-  query: Pick<WorkQueryRepository, "listSummaries" | "listMissingWorksWithRjCode">;
+  query: Pick<
+    WorkQueryRepository,
+    "listSummaries" | "listMissingWorksWithRjCode" | "listWorkPhysicalPaths"
+  >;
   catalog: Pick<
     CatalogWorkRepository,
     | "getScanState"
@@ -63,6 +62,7 @@ export function createSettingsScanMethods(deps: {
   scanner: Scanner;
   thumbnailCacheDir: string;
   dlsiteCache: DlsiteCache;
+  parser: DlsiteParser;
   runFileScanInWorker: (
     database: Extract<DbLocation, { kind: "files" }>,
     root: string,
@@ -81,21 +81,30 @@ export function createSettingsScanMethods(deps: {
     dlsiteCache,
     runFileScanInWorker,
   } = deps;
-  let candidateSession = ScanCandidateSession.empty();
-  const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache);
+  const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache, deps.parser);
   const candidateDlsite = createCandidateDlsiteSource(dlsiteCache, resolveDlsiteProduct);
   const readUsableInfo = (productCode: string) =>
     readUsableDlsite(resolveDlsiteProduct, productCode)?.info ?? null;
-  const candidateListContext = (): CandidateListContext => ({
-    dlsite: candidateDlsite,
-    missingWorksByRjCode: groupMissingWorksByRjCode(query.listMissingWorksWithRjCode()),
-  });
   const requireRoot = (): string => requireConfiguredRoot(user.getUserSetting(KEY_ROOT_FOLDER));
+  const candidateMaterials = createCandidateMaterials({
+    getRoot: () => user.getUserSetting(KEY_ROOT_FOLDER),
+    requireRoot,
+    user,
+    query,
+    scanner,
+    dlsiteCache,
+    candidateDlsite,
+    readUsableInfo,
+  });
   const getSettings = async (): Promise<StoredSettings> => ({
     rootFolder: user.getUserSetting(KEY_ROOT_FOLDER),
     lastScanTime: catalog.getScanState(LAST_SCAN_TIME_KEY),
   });
-  const scanRoot = async (root: string, normalized: ScanOptions): Promise<ScanResult> => {
+  const scanRoot = async (root: string, normalized: ScanOptions): Promise<ScanExecution> => {
+    const withRootIdentity = (execution: ScanExecutionResult): ScanExecution => ({
+      ...execution,
+      rootIdentity: resolveRootIdentity(root),
+    });
     if (database.kind === "files") {
       const execution = await runFileScanInWorker(
         {
@@ -108,8 +117,7 @@ export function createSettingsScanMethods(deps: {
         dlsiteCache.config,
         normalized,
       );
-      candidateSession = ScanCandidateSession.fromPool(execution.candidatePool, root);
-      return execution.result;
+      return withRootIdentity(execution);
     }
     const execution = await scanAndFinalize({
       scanner,
@@ -124,8 +132,7 @@ export function createSettingsScanMethods(deps: {
         }
       },
     });
-    candidateSession = ScanCandidateSession.fromPool(execution.candidatePool, root);
-    return execution.result;
+    return withRootIdentity(execution);
   };
   return {
     getSettings,
@@ -176,7 +183,7 @@ export function createSettingsScanMethods(deps: {
         : { phase: "failed", rootFolder, message: stored.message };
     },
 
-    async beginRootReconfiguration(rootFolder: string): Promise<void> {
+    async beginRootReconfiguration(rootFolder: string): Promise<{ rootChanged: boolean }> {
       const previousRoot = user.getUserSetting(KEY_ROOT_FOLDER);
       const rootChanged = previousRoot !== null && previousRoot !== rootFolder;
       const running: StoredRootReconfiguration = { phase: "running" };
@@ -184,16 +191,14 @@ export function createSettingsScanMethods(deps: {
         { [KEY_ROOT_FOLDER]: rootFolder, [KEY_ROOT_RECONFIGURATION]: JSON.stringify(running) },
         { discardScanCandidateExclusions: rootChanged },
       );
-      if (rootChanged) {
-        candidateSession = ScanCandidateSession.empty();
-        catalog.clearDiagnostics();
-      }
+      if (rootChanged) catalog.clearDiagnostics();
+      return { rootChanged };
     },
 
     async rebuildCatalogForRoot(
       rootFolder: string,
       options: Omit<ScanOptions, "full">,
-    ): Promise<ScanResult> {
+    ): Promise<ScanExecution> {
       const removed = catalog.deleteWorksOutsideRoot(rootFolder);
       serverLogger.info("ルートフォルダー外の作品をカタログから削除しました", {
         rootFolder,
@@ -216,7 +221,7 @@ export function createSettingsScanMethods(deps: {
       return user.getUserSetting(KEY_ROOT_RECONFIGURATION_COMPLETED_AT);
     },
 
-    async scan(scanOptions?: ScanOptions): Promise<ScanResult> {
+    async scan(scanOptions?: ScanOptions): Promise<ScanExecution> {
       return scanRoot(requireRoot(), scanOptions ?? {});
     },
 
@@ -226,31 +231,15 @@ export function createSettingsScanMethods(deps: {
         invalidMetaFiles: catalog.listInvalidMetaFiles(),
       };
     },
-    async listScanCandidates(): Promise<ScanCandidate[]> {
-      return candidateSession.listCandidates(user, candidateListContext());
-    },
-    async setScanCandidateRjCode(path: string, rjCode: string | null): Promise<ScanCandidate> {
-      return candidateSession.setRjCode(requireRoot(), path, rjCode, user, candidateListContext());
-    },
-    async registerScanCandidates(
-      paths: string[],
-      apply: DlsiteRegistrationApply,
-    ): Promise<ScanCandidatesRegisterResponse> {
-      return candidateSession.registerCandidates(requireRoot(), paths, apply, {
-        scanner,
-        user,
-        dlsiteCache,
-        readUsableInfo,
-      });
-    },
+    ...candidateMaterials,
     async excludeScanCandidates(paths: string[]): Promise<void> {
-      await candidateSession.excludeCandidates(requireRoot(), paths, user);
+      user.excludeScanCandidates(paths);
     },
     async listScanCandidateExclusions(): Promise<string[]> {
-      return candidateSession.listExcludedCandidates(user);
+      return user.listScanCandidateExclusions();
     },
     async restoreScanCandidateExclusions(paths: string[]): Promise<void> {
-      candidateSession.restoreExcludedCandidates(paths, user);
+      user.restoreScanCandidateExclusions(paths);
     },
     requireRoot,
   };

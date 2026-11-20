@@ -11,7 +11,7 @@ import type {
 } from "@mimimilli/shared";
 import { errorMessage, detectRjCode, workspacePath, type WorkspacePath } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
-import type { ScanOptions } from "../../adapter/index.ts";
+import type { ScanExecutionResult, ScanOptions } from "../../adapter/index.ts";
 import { descendantsRegisteredError } from "../../errors.ts";
 import {
   MetaParseError,
@@ -51,7 +51,6 @@ import type {
   ProjectOutcome,
   RegisterWorkOptions,
   RestoreMetaPatch,
-  ScanExecutionResult,
 } from "./scanTypes.ts";
 import {
   assertNoIdentityConflict,
@@ -201,12 +200,12 @@ export class Scanner {
     };
     const diagnostics: ScanDiagnostics = { identityConflicts: [], invalidMetaFiles: [] };
 
+    const existingWorks = this.query.getScanWorkMap();
+    result.startedWithEmptyCatalog = existingWorks.size === 0;
     const tree = await this.walkPhase(root, emit, signal, abortToken, checkAbort);
     recoverStagedMetaFiles(root, tree, this.catalog);
     checkAbort();
     const seenIds: SeenMetaIds = { work: new Set() };
-    const existingWorks = this.query.getScanWorkMap();
-    result.startedWithEmptyCatalog = existingWorks.size === 0;
     const existingByMetaPath = new Map(
       [...existingWorks].map(([id, state]) => [state.metaPath, { id, state }]),
     );
@@ -480,8 +479,8 @@ export class Scanner {
         }
       }
     }
-    // スキャン開始時にcatalogにあった作品のうち今回見つからなかったものだけを missing にする。
-    // スキャン中に登録された作品は existingWorks に無いので missing にならない
+    // 走査前にcatalogにあった作品のうち今回見つからなかったものだけを missing にする。
+    // 走査中に登録された作品は existingWorks に無いので missing にならない
     const missingIds: string[] = [];
     const missingWorks: MissingWork[] = [];
     for (const [workId, state] of existingWorks) {
@@ -538,47 +537,67 @@ export class Scanner {
     );
   }
 
-  private async registerSingleWorkFromPrepared(prepared: PreparedMeta): Promise<ProjectOutcome> {
-    const snapshot = {
-      meta: prepared.meta,
-      bytes: prepared.bytes,
-      sourceRevision: prepared.revisions.sourceRevision,
-    };
+  /** 書き込み済みのメタを対象作品だけcatalogへ投影する。失敗してもメタは残る */
+  async projectPrepared(prepared: PreparedMeta): Promise<ProjectOutcome> {
+    return (await this.projectPreparedBatch([prepared]))[0]!;
+  }
+
+  /**
+   * 複数のメタを1回の公開で投影する。async の前処理をすべて済ませてから、同じトランザクションで公開する。
+   * missingWorkIds は同じトランザクションで missing にする。結果は prepared と同じ順
+   */
+  async projectPreparedBatch(
+    prepared: readonly PreparedMeta[],
+    missingWorkIds: string[] = [],
+  ): Promise<ProjectOutcome[]> {
+    const snapshotOf = (entry: PreparedMeta) => ({
+      meta: entry.meta,
+      bytes: entry.bytes,
+      sourceRevision: entry.revisions.sourceRevision,
+    });
     try {
       const existingWorks = this.query.getScanWorkMap();
       const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, () => {});
       const scanResult = emptyRegisterTracking();
       const seenIds: SeenMetaIds = { work: new Set() };
-      await this.invokeRegisterMetaFile({
-        prepared,
-        seenIds,
-        probeCache: new Map(),
-        batch,
-        existingWorks,
-        result: scanResult,
-        options: { full: true, idsAlreadyRegistered: false },
+      for (const entry of prepared) {
+        await this.invokeRegisterMetaFile({
+          prepared: entry,
+          seenIds,
+          probeCache: new Map(),
+          batch,
+          existingWorks,
+          result: scanResult,
+          options: { full: true, idsAlreadyRegistered: false },
+        });
+      }
+      const changedIds = new Set(batch.publishWork(missingWorkIds));
+      return prepared.map((entry): ProjectOutcome => {
+        if (changedIds.has(entry.meta.id)) {
+          return {
+            status: "unpublished",
+            reason: "source_changed",
+            snapshot: snapshotOf(entry),
+            currentSourceRevision: currentSourceRevision(entry.metaPath),
+          };
+        }
+        if (this.resolveRoot) {
+          this.catalog.removeInvalidMetaFile(
+            toPortableRelativePath(this.resolveRoot(), entry.metaPath),
+          );
+        }
+        return { status: "published", snapshot: snapshotOf(entry) };
       });
-      const changedIds = batch.publishWork();
-      if (changedIds.includes(prepared.meta.id)) {
-        return {
-          status: "unpublished",
-          reason: "source_changed",
-          snapshot,
-          currentSourceRevision: currentSourceRevision(prepared.metaPath),
-        };
-      }
-      if (this.resolveRoot) {
-        this.catalog.removeInvalidMetaFile(
-          toPortableRelativePath(this.resolveRoot(), prepared.metaPath),
-        );
-      }
-      return { status: "published", snapshot };
     } catch (error) {
       scanLogger.error("作品の一覧反映に失敗しました", {
-        workId: prepared.meta.id,
+        workIds: prepared.map((entry) => entry.meta.id),
         error: errorMessage(error),
       });
-      return { status: "unpublished", reason: "error", snapshot };
+      return prepared.map((entry) => ({
+        status: "unpublished",
+        reason: "error",
+        snapshot: snapshotOf(entry),
+      }));
     }
   }
 
@@ -628,10 +647,8 @@ export class Scanner {
     });
   }
 
-  async registerWork(
-    target: RegistrationTarget,
-    options: RegisterWorkOptions,
-  ): Promise<ProjectOutcome> {
+  /** 新しい作品のメタを書く。投影は projectPrepared で行う */
+  writeNewWorkMeta(target: RegistrationTarget, options: RegisterWorkOptions): PreparedMeta {
     if (target.placement.kind === "folder") this.assertNoRegisteredDescendants(target.physicalPath);
     const { metaPath } = target.placement;
     if (existsSync(metaPath)) {
@@ -650,21 +667,14 @@ export class Scanner {
       dlsite: options.dlsite,
     });
     const snapshot = writeMetaFile(metaPath, meta);
-    return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
+    return prepareSingleMeta(metaPath, snapshot);
   }
 
-  /** 確定済みmimimilli.jsonを入力に、対象作品だけをcatalogへ投影する。 */
-  async projectMetaFile(
-    metaPath: string,
-    snapshot: { meta: MetaFile; bytes: Buffer; sourceRevision: string },
-  ): Promise<ProjectOutcome> {
-    return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
-  }
-
-  async restoreWork(target: RegistrationTarget, patch: RestoreMetaPatch): Promise<ProjectOutcome> {
+  /** 孤立メタを復元用に更新する。投影は projectPrepared で行う */
+  writeRestoredWorkMeta(target: RegistrationTarget, patch: RestoreMetaPatch): PreparedMeta {
     if (target.placement.kind === "folder") this.assertNoRegisteredDescendants(target.physicalPath);
     const { metaPath } = target.placement;
     const snapshot = this.snapshotForRestore(target, patch);
-    return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
+    return prepareSingleMeta(metaPath, snapshot);
   }
 }

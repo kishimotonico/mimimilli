@@ -7,6 +7,7 @@ import type {
   WorkBookmarkPatch,
   WorkBookmarkResult,
   WorkCreateBody,
+  WorkCreateResponse,
   WorkEditSnapshot,
   WorkRegisterPreview,
   WorkSourceMutationResult,
@@ -20,11 +21,10 @@ import type {
 export interface WorkAdapter {
   queryWorks(params: WorksQuery): Promise<WorksPage>;
   getWorkRegisterPreview(path: WorkspacePath): Promise<WorkRegisterPreview | null>;
-  createWork(body: WorkCreateBody): Promise<WorkSourceMutationResult | null>;
-  /** replacedWorkId は、再採番で別IDに置き換わった（もう存在しない）作品のID。コピー側の再採番では null */
+  createWork(body: WorkCreateBody): Promise<WorkCreateResponse | null>;
   reassignIdentityConflict(
     body: IdentityConflictReassignBody,
-  ): Promise<(WorkSourceMutationResult & { replacedWorkId: string | null }) | null>;
+  ): Promise<WorkSourceMutationResult | null>;
   projectWorkSource(path: WorkspacePath): Promise<WorkSourceMutationResult | null>;
   /** 作品情報ファイルからこの作品だけを読み直して catalog を作り直す。存在しなければ false。直らないときは例外 */
   reloadWork(id: string): Promise<boolean>;
@@ -33,7 +33,9 @@ export interface WorkAdapter {
   /** status === "missing" の作品数 */
   countMissingWorks(): Promise<number>;
   /** status === "missing" の作品を全件登録解除する。一部失敗しても残りを続行する */
-  unregisterMissingWorks(): Promise<UnregisterMissingWorksResult & { deletedWorkIds: string[] }>;
+  unregisterMissingWorks(): Promise<UnregisterMissingWorksResult>;
+  /** 指定IDのうち、いま存在する作品のstatus。存在しないIDは含まない */
+  getWorkStatuses(ids: readonly string[]): Promise<Map<string, Work["status"]>>;
   getWork(id: string): Promise<Work | null>;
   /** 再生準備。対象作品を live probe し、総時間を catalog へ公開する。存在しなければ null */
   prepareWorkPlayback(id: string): Promise<Work | null>;

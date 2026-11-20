@@ -1,18 +1,10 @@
 import type {
   MetaFile,
   NormalizedTag,
-  ScanCandidateFolder,
-  ScanResult,
   UrlEntry,
   Work,
   WorkPlacementResolution,
 } from "@mimimilli/shared";
-
-/** スキャン実行の戻り値。候補プールは HTTP 契約の ScanResult とは分離する。 */
-export type ScanExecutionResult = {
-  result: ScanResult;
-  candidatePool: ScanCandidateFolder[];
-};
 import type { MetaParseError } from "./meta.ts";
 import type { CoverColumns, ScanWorkState } from "./workRowMapping.ts";
 import type { WorkRevisions } from "./fingerprint.ts";

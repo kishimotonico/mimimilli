@@ -6,6 +6,7 @@ import { Database } from "bun:sqlite";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
+import { runScan } from "../helpers/scanLibrary.ts";
 
 test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JOINで作品を読める", async (t) => {
   const library = makeSampleLibrary();
@@ -16,7 +17,7 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
 
   const adapter = library.own(createTestRealAdapter({ database }));
   await configureRoot(adapter, library.root);
-  await adapter.scan();
+  await runScan(adapter);
   const before = await adapter.getWork(library.existingWorkId);
   assert.ok(before);
   const addedAt = before.addedAt;
@@ -41,7 +42,7 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
     }),
   );
   await adapter.createSmartFolder({ name: "保持フォルダー", rules: [], sort: "added-desc" });
-  adapter.close();
+  await adapter.close();
 
   assert.ok(existsSync(catalogPath));
   assert.ok(existsSync(userPath));
@@ -92,7 +93,7 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
     rootFolder: library.root,
     lastScanTime: null,
   });
-  await rebuilt.scan();
+  await runScan(rebuilt);
 
   const after = await rebuilt.getWork(library.existingWorkId);
   assert.ok(after);

@@ -1,17 +1,14 @@
 import { randomUUID } from "node:crypto";
 import type {
-  DlsiteRegistrationApply,
   ScanJobEvent,
   ScanJobSnapshot,
   ScanDiagnostics,
-  ScanCandidate,
-  ScanCandidatesRegisterResponse,
   ScanProgressEvent,
   ScanResult,
 } from "@mimimilli/shared";
-import type { DataAdapter } from "./adapter/index.ts";
+import type { DataAdapter, ScanExecution } from "./adapter/index.ts";
 import { formatError, getCategoryLogger } from "./lib/logger.ts";
-import { ScanRecordStore } from "./scanRecord.ts";
+import { ScanSession } from "./scanSession.ts";
 
 const scanLogger = getCategoryLogger("scan");
 const UNREADABLE_PATH_LOG_SAMPLE_LIMIT = 10;
@@ -36,25 +33,23 @@ export class ActiveScanConflictError extends Error {
 
 export interface ScanJobManagerOptions {
   terminalLimit?: number;
-  /** 候補のRJコードが取得ジョブで待機中・取得中かどうか */
-  dlsiteInFlightState?: (productCode: string) => "queued" | "fetching" | null;
+  session?: ScanSession;
 }
 
 export class ScanJobManager {
   private readonly adapter: DataAdapter;
   private readonly terminalLimit: number;
-  private readonly dlsiteInFlightState: NonNullable<ScanJobManagerOptions["dlsiteInFlightState"]>;
   private readonly jobs = new Map<string, Job>();
   private activeId: string | null = null;
   private runCompletion: Promise<void> | null = null;
   private shuttingDown = false;
-  /** 直近のスキャンの記録。ディスクには永続化せず、次のスキャンかサーバー再起動まで保持する。 */
-  readonly record = new ScanRecordStore();
+  /** 直近のスキャンの結果（候補・記録）。ジョブの完了で公開する。 */
+  readonly session: ScanSession;
 
   constructor(adapter: DataAdapter, options: ScanJobManagerOptions = {}) {
     this.adapter = adapter;
+    this.session = options.session ?? new ScanSession(adapter);
     this.terminalLimit = options.terminalLimit ?? 16;
-    this.dlsiteInFlightState = options.dlsiteInFlightState ?? (() => null);
   }
 
   start(options?: { full?: boolean }): ScanJobSnapshot {
@@ -107,51 +102,8 @@ export class ScanJobManager {
     return this.get(this.activeId);
   }
 
-  /** ジョブ外で完了したスキャン（root再設定の構築）を、ジョブの完了と同じく記録へ反映する。 */
-  recordCompleted(result: ScanResult): void {
-    this.record.replace(result, new Date().toISOString());
-  }
-
   async listDiagnostics(): Promise<ScanDiagnostics> {
     return this.adapter.listScanDiagnostics();
-  }
-
-  async listCandidates(): Promise<ScanCandidate[]> {
-    return (await this.adapter.listScanCandidates()).map((candidate) =>
-      this.withInFlightDlsite(candidate),
-    );
-  }
-
-  async setCandidateRjCode(path: string, rjCode: string | null): Promise<ScanCandidate> {
-    return this.withInFlightDlsite(await this.adapter.setScanCandidateRjCode(path, rjCode));
-  }
-
-  private withInFlightDlsite(candidate: ScanCandidate): ScanCandidate {
-    if (candidate.rjCode === null || this.dlsiteInFlightState(candidate.rjCode) === null) {
-      return candidate;
-    }
-    return { ...candidate, dlsite: { state: "fetching" } };
-  }
-
-  async registerCandidates(
-    paths: string[],
-    apply: DlsiteRegistrationApply,
-  ): Promise<ScanCandidatesRegisterResponse> {
-    const response = await this.adapter.registerScanCandidates(paths, apply);
-    this.record.addNewWorks(response.registered.map((entry) => entry.workId));
-    return response;
-  }
-
-  async excludeCandidates(paths: string[]): Promise<void> {
-    await this.adapter.excludeScanCandidates(paths);
-  }
-
-  async listCandidateExclusions(): Promise<string[]> {
-    return this.adapter.listScanCandidateExclusions();
-  }
-
-  async restoreCandidateExclusions(paths: string[]): Promise<void> {
-    await this.adapter.restoreScanCandidateExclusions(paths);
   }
 
   cancel(id: string): ScanJobSnapshot | null {
@@ -198,7 +150,7 @@ export class ScanJobManager {
     if (job.controller.signal.aborted) return this.finishCancelled(job);
     job.snapshot.status = "running";
     job.snapshot.startedAt = new Date().toISOString();
-    this.record.beginScan();
+    this.session.record.beginScan();
     this.emit(job, { type: "state", snapshot: this.copy(job.snapshot) });
     try {
       const settings = await this.adapter.getSettings();
@@ -208,13 +160,13 @@ export class ScanJobManager {
         rootFolder: settings.rootFolder,
       });
       if (job.controller.signal.aborted) return this.finishCancelled(job);
-      const result = await this.adapter.scan({
+      const execution = await this.adapter.scan({
         full: job.full,
         signal: job.controller.signal,
         onProgress: (event) => this.progress(job, event),
       });
       if (job.controller.signal.aborted) this.finishCancelled(job);
-      else this.finishCompleted(job, result);
+      else this.finishCompleted(job, execution);
     } catch (error) {
       if (job.controller.signal.aborted) this.finishCancelled(job);
       else this.finishFailed(job, error);
@@ -237,15 +189,15 @@ export class ScanJobManager {
     this.emit(job, { type: "progress", progress: job.snapshot.progress });
   }
 
-  private finishCompleted(job: Job, result: ScanResult): void {
+  private finishCompleted(job: Job, execution: ScanExecution): void {
     if (this.isTerminal(job) || job.controller.signal.aborted) {
       this.finishCancelled(job);
       return;
     }
     job.snapshot.status = "completed";
     job.snapshot.finishedAt = new Date().toISOString();
-    this.record.replace(result, job.snapshot.finishedAt);
-    this.logScanCompleted(job, result);
+    this.session.publish(execution, job.snapshot.finishedAt);
+    this.logScanCompleted(job, execution.result);
     this.emit(job, { type: "completed", finishedAt: job.snapshot.finishedAt });
     this.deactivate(job);
     this.pruneTerminal();
@@ -258,7 +210,7 @@ export class ScanJobManager {
       return;
     }
     const message = error instanceof Error ? error.message : "サーバー内部エラーが発生しました";
-    this.record.endScan();
+    this.session.record.endScan();
     job.snapshot.status = "failed";
     job.snapshot.error = message;
     job.snapshot.finishedAt = new Date().toISOString();
@@ -274,7 +226,7 @@ export class ScanJobManager {
 
   private finishCancelled(job: Job): void {
     if (this.isTerminal(job)) return;
-    this.record.endScan();
+    this.session.record.endScan();
     job.snapshot.status = "cancelled";
     job.snapshot.finishedAt = new Date().toISOString();
     scanLogger.info("スキャンを取り消しました", {

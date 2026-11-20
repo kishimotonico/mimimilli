@@ -31,6 +31,7 @@ async function invalidateRegistrationViews(queryClient: QueryClient): Promise<vo
     queryClient.invalidateQueries({ queryKey: FILE_SYSTEM_QUERY_KEYS.all() }),
     queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.diagnostics() }),
     queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.last() }),
+    refreshScanCandidates(queryClient).catch(() => {}),
   ]);
 }
 

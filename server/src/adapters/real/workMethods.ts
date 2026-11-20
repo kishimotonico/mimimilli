@@ -1,4 +1,6 @@
 import { existsSync } from "node:fs";
+import { prepareSingleMeta } from "./scanRegister.ts";
+import type { PreparedMeta } from "./scanTypes.ts";
 import { join } from "node:path";
 import type {
   DataIntegrityWarning,
@@ -10,6 +12,7 @@ import type {
   WorkBookmarkPatch,
   WorkBookmarkResult,
   WorkCreateBody,
+  WorkCreateResponse,
   WorkEditSnapshot,
   WorkRegisterPreview,
   WorkSourceMutationResult,
@@ -22,6 +25,7 @@ import type {
 import { errorMessage, resolveWorkPlacement, tagEquals } from "@mimimilli/shared";
 import { type Db } from "./db.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
+import type { DlsiteParser } from "./dlsite.ts";
 import { createDlsiteProductResolver, readUsableDlsite } from "./dlsiteProductResolve.ts";
 import { MetaMutationReject, encodeMetaRaw, patchMetaFileCas, readMetaSource } from "./meta.ts";
 import {
@@ -63,9 +67,10 @@ export function createWorkMethods(deps: {
   scanner: Scanner;
   requireRoot: () => string;
   dlsiteCache: DlsiteCache;
+  parser: DlsiteParser;
 }) {
   const { db, query, catalog, user, scanner, requireRoot, dlsiteCache } = deps;
-  const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache);
+  const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache, deps.parser);
   const readUsableInfo = (productCode: string) =>
     readUsableDlsite(resolveDlsiteProduct, productCode)?.info ?? null;
 
@@ -90,6 +95,28 @@ export function createWorkMethods(deps: {
       });
     }
     catalog.replaceIdentityConflicts(diagnostics);
+  }
+
+  /** 旧IDを宣言している、再採番した以外のメタファイル（読めるもののうち先頭）。無ければ null */
+  function findRemainingDeclarer(
+    root: string,
+    workId: string,
+    conflictPaths: readonly string[],
+    reassignedPath: string,
+  ): PreparedMeta | null {
+    for (const path of conflictPaths) {
+      if (path === reassignedPath) continue;
+      const target = resolveWithin(root, join(root, path));
+      if (!target) continue;
+      const metaPath = identityConflictMetaPath(target);
+      try {
+        const declared = readMetaSource(metaPath);
+        if (declared.meta.id === workId) return prepareSingleMeta(metaPath, declared);
+      } catch {
+        continue;
+      }
+    }
+    return null;
   }
 
   function metaPathForTarget(target: string): string | null {
@@ -137,7 +164,7 @@ export function createWorkMethods(deps: {
       }
     },
 
-    async createWork(body: WorkCreateBody): Promise<WorkSourceMutationResult | null> {
+    async createWork(body: WorkCreateBody): Promise<WorkCreateResponse | null> {
       const root = requireRoot();
       return await createWorkFromPath({ db, query, catalog, user }, scanner, root, body, {
         dlsiteCache,
@@ -147,7 +174,7 @@ export function createWorkMethods(deps: {
 
     async reassignIdentityConflict(
       body: IdentityConflictReassignBody,
-    ): Promise<(WorkSourceMutationResult & { replacedWorkId: string | null }) | null> {
+    ): Promise<WorkSourceMutationResult | null> {
       const diagnostic = catalog
         .listIdentityConflicts()
         .find((candidate) => candidate.paths.includes(body.path));
@@ -165,22 +192,31 @@ export function createWorkMethods(deps: {
       }
       if (source.meta.id !== diagnostic.workId) return null;
 
-      const replacedWorkId =
-        query.getScanWorkMap().get(diagnostic.workId)?.metaPath === metaPath
-          ? diagnostic.workId
-          : null;
+      const reassignsOwnerRow =
+        query.getScanWorkMap().get(diagnostic.workId)?.metaPath === metaPath;
       const updated = patchMetaFileCas(metaPath, source.sourceRevision, {
         id: crypto.randomUUID(),
       });
       const physicalPath = resolveWorkPlacement(metaPath, updated.meta).physicalPath;
-      const outcome = await scanner.projectMetaFile(metaPath, updated);
+      // 旧IDの行は、旧IDを宣言している残りのメタファイルへ移す。無ければ次のスキャンと同じく missing にする
+      const rebound = reassignsOwnerRow
+        ? findRemainingDeclarer(root, diagnostic.workId, diagnostic.paths, body.path)
+        : null;
+      const [outcome, ...others] = await scanner.projectPreparedBatch(
+        [prepareSingleMeta(metaPath, updated), ...(rebound ? [rebound] : [])],
+        reassignsOwnerRow && !rebound ? [diagnostic.workId] : [],
+      );
+      for (const each of [outcome!, ...others]) {
+        if (each.status === "unpublished" && each.reason === "source_changed") {
+          throw new SourceChangedError();
+        }
+        if (each.status !== "published")
+          throw new SourceConflictError(SOURCE_RELOAD_FAILED_MESSAGE);
+      }
       catalog.replaceIdentityConflicts(
         removeIdentityConflictPath(catalog.listIdentityConflicts(), diagnostic.workId, body.path),
       );
-      return {
-        ...mutationResultFromOutcome(toEditSnapshot(updated, physicalPath), outcome),
-        replacedWorkId,
-      };
+      return mutationResultFromOutcome(toEditSnapshot(updated, physicalPath), outcome!);
     },
 
     async projectWorkSource(path: WorkspacePath): Promise<WorkSourceMutationResult | null> {
@@ -205,7 +241,7 @@ export function createWorkMethods(deps: {
         };
       }
       try {
-        const outcome = await scanner.projectMetaFile(metaPath, source);
+        const outcome = await scanner.projectPrepared(prepareSingleMeta(metaPath, source));
         return mutationResultFromOutcome(toEditSnapshot(source, physicalPath), outcome);
       } catch (error) {
         scanLogger.error("作品の一覧反映に失敗しました", {
@@ -229,7 +265,7 @@ export function createWorkMethods(deps: {
         mapMetaReadError(error);
       }
       if (source.meta.id !== id) throw new SourceConflictError(SOURCE_IDENTITY_MISMATCH_MESSAGE);
-      const outcome = await scanner.projectMetaFile(location.metaPath, source);
+      const outcome = await scanner.projectPrepared(prepareSingleMeta(location.metaPath, source));
       if (outcome.status === "unpublished" && outcome.reason === "source_changed") {
         throw new SourceChangedError();
       }
@@ -246,13 +282,15 @@ export function createWorkMethods(deps: {
       return unregisterWork(catalog, user, requireRoot(), id);
     },
 
+    async getWorkStatuses(ids: readonly string[]): Promise<Map<string, Work["status"]>> {
+      return query.getWorkStatuses(ids);
+    },
+
     async countMissingWorks(): Promise<number> {
       return query.countWorksByStatus("missing");
     },
 
-    async unregisterMissingWorks(): Promise<
-      UnregisterMissingWorksResult & { deletedWorkIds: string[] }
-    > {
+    async unregisterMissingWorks(): Promise<UnregisterMissingWorksResult> {
       const ids = query.listWorkIdsByStatus("missing");
       const root = requireRoot();
       const deletedWorkIds: string[] = [];
@@ -265,7 +303,7 @@ export function createWorkMethods(deps: {
           failedCount++;
         }
       }
-      return { deletedCount: deletedWorkIds.length, failedCount, deletedWorkIds };
+      return { deletedCount: deletedWorkIds.length, failedCount };
     },
 
     async patchWorkSource(

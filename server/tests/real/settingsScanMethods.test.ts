@@ -1,3 +1,4 @@
+import { DLSITE_PARSER } from "../../src/adapters/real/dlsite.ts";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -12,6 +13,7 @@ import type { Scanner } from "../../src/adapters/real/scanner.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
+import { runScan, listCandidates, excludeCandidates } from "../helpers/scanLibrary.ts";
 
 test("resolveRootFolder / beginRootReconfiguration は receiver なしで呼び出せる", async () => {
   const rootDir = mkdtempSync(join(tmpdir(), "mimimilli-settings-methods-"));
@@ -44,6 +46,7 @@ test("resolveRootFolder / beginRootReconfiguration は receiver なしで呼び�
       placements: new Map(),
     }),
     listMissingWorksWithRjCode: () => [],
+    listWorkPhysicalPaths: () => new Set<string>(),
   };
 
   try {
@@ -59,6 +62,7 @@ test("resolveRootFolder / beginRootReconfiguration は receiver なしで呼び�
       user,
       scanner: undefined as unknown as Scanner,
       thumbnailCacheDir: rootDir,
+      parser: DLSITE_PARSER,
       dlsiteCache,
       runFileScanInWorker: async () => {
         throw new Error("scan はこのテストで呼び出されません");
@@ -89,8 +93,8 @@ test("同一rootの再保存（正規化後一致）では候補除外を破棄�
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
-  await adapter.excludeScanCandidates(["候補"]);
+  await runScan(adapter);
+  await excludeCandidates(adapter, ["候補"]);
   assert.deepEqual(await adapter.listScanCandidateExclusions(), ["候補"]);
 
   // 同じパスを再度そのまま保存する（realpath正規化後は同一root）。
@@ -98,7 +102,7 @@ test("同一rootの再保存（正規化後一致）では候補除外を破棄�
   assert.deepEqual(await adapter.listScanCandidateExclusions(), ["候補"]);
 });
 
-test("異なるrootへの変更で候補除外とScanCandidateSessionを破棄する", async (t) => {
+test("異なるrootへの変更で候補除外とスキャン結果の候補を破棄する", async (t) => {
   const directory = makeTestDirectory("settings-root-change-discards-exclusions");
   t.after(directory.cleanup);
   const rootA = join(directory.path, "lib-a");
@@ -112,19 +116,19 @@ test("異なるrootへの変更で候補除外とScanCandidateSessionを破棄�
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, rootA);
-  await adapter.scan();
-  await adapter.excludeScanCandidates(["候補A"]);
+  await runScan(adapter);
+  await excludeCandidates(adapter, ["候補A"]);
   assert.deepEqual(await adapter.listScanCandidateExclusions(), ["候補A"]);
   assert.deepEqual(
-    (await adapter.listScanCandidates()).map((c) => c.path),
+    (await listCandidates(adapter)).map((c) => c.path),
     [],
   );
 
   await configureRoot(adapter, rootB);
 
   assert.deepEqual(await adapter.listScanCandidateExclusions(), []);
-  // rootA走査時のScanCandidateSessionも破棄され、rootBの再スキャン前は候補を返さない。
-  assert.deepEqual(await adapter.listScanCandidates(), []);
+  // rootA走査時の候補プールも破棄され、rootBの再スキャン前は候補を返さない。
+  assert.deepEqual(await listCandidates(adapter), []);
 });
 
 test("失敗したroot変更では候補除外を破棄しない", async (t) => {
@@ -137,8 +141,8 @@ test("失敗したroot変更では候補除外を破棄しない", async (t) => 
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
-  await adapter.excludeScanCandidates(["候補"]);
+  await runScan(adapter);
+  await excludeCandidates(adapter, ["候補"]);
   assert.deepEqual(await adapter.listScanCandidateExclusions(), ["候補"]);
 
   await assert.rejects(

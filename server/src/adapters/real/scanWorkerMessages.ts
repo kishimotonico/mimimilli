@@ -1,5 +1,5 @@
 import type { ScanProgressEvent } from "@mimimilli/shared";
-import type { ScanExecutionResult } from "./scanTypes.ts";
+import type { ScanExecutionResult } from "../../adapter/index.ts";
 
 /** worker → 親プロセスへ postMessage するメッセージ。 */
 export type ScanWorkerOutboundMessage =

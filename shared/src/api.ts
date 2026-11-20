@@ -1,7 +1,11 @@
 // エンドポイント横断の契約: 作品検索クエリ、ページングエンベロープ、部分更新、エラー形式。
 import { z } from "zod";
 import { dataIntegrityWarningSchema } from "./dataIntegrity.ts";
-import { dlsiteFetchErrorKindSchema, metaDlsiteStateSchema } from "./dlsite.ts";
+import {
+  dlsiteCoverSkipReasonSchema,
+  dlsiteFetchErrorKindSchema,
+  metaDlsiteStateSchema,
+} from "./dlsite.ts";
 import { smartFolderRuleSchema, sortIdSchema, viewIdSchema } from "./library.ts";
 import { normalizedTagArraySchema } from "./tagNormalize.ts";
 import {
@@ -176,6 +180,13 @@ export const workSourceMutationResultSchema = z.object({
 });
 export type WorkSourceMutationResult = z.infer<typeof workSourceMutationResultSchema>;
 
+/** カバーを適用する操作の結果。選んだカバーを適用しなかったときだけ理由が入る */
+const coverSkippedShape = { coverSkipped: dlsiteCoverSkipReasonSchema.nullable() };
+
+/** POST /api/dlsite/:id/apply のレスポンス */
+export const dlsiteApplyResponseSchema = workSourceMutationResultSchema.extend(coverSkippedShape);
+export type DlsiteApplyResponse = z.infer<typeof dlsiteApplyResponseSchema>;
+
 /** POST /api/works/projection。register-preview と同じ root 相対 path。 */
 export const workProjectionBodySchema = z.object({
   path: workspacePathSchema,
@@ -256,7 +267,7 @@ export const dlsiteFetchByCodeBodySchema = z.object({
 export type DlsiteFetchByCodeBody = z.infer<typeof dlsiteFetchByCodeBodySchema>;
 
 /** POST /api/works のレスポンス */
-export const workCreateResponseSchema = workSourceMutationResultSchema;
+export const workCreateResponseSchema = workSourceMutationResultSchema.extend(coverSkippedShape);
 export type WorkCreateResponse = z.infer<typeof workCreateResponseSchema>;
 
 export const identityConflictReassignBodySchema = z.object({

@@ -6,7 +6,7 @@ import {
   type DlsiteHtmlOutcome,
   type DlsiteWorkInfo,
 } from "@mimimilli/shared";
-import { DLSITE_PARSER_VERSION, parseDlsiteHtml } from "./dlsite.ts";
+import type { DlsiteParser } from "./dlsite.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
 
 type NonHtmlResolution = Exclude<DlsiteCacheResolutionHead, { kind: "html" }>;
@@ -19,6 +19,8 @@ export type DlsiteProductResolution =
       outcome: DlsiteHtmlOutcome;
       fetchedAt: number;
       expiresAt: number;
+      /** 解析結果の取得時刻とパーサー版の組。適用の照合値で、中身は呼び出し側が解釈しない */
+      revision: string;
       result: DlsiteFetchResult;
     };
 
@@ -30,15 +32,17 @@ export type DlsiteProductResolver = (productCode: string) => DlsiteProductResolu
  */
 export function createDlsiteProductResolver(
   cache: DlsiteCache,
-  parse: typeof parseDlsiteHtml = parseDlsiteHtml,
+  parser: DlsiteParser,
 ): DlsiteProductResolver {
   return (productCode) => {
     const key = productCode.trim().toUpperCase();
     const head = cache.resolveHead({ productCode: key });
     if (head.kind !== "html") return head;
+    const revision = `${head.fetchedAt}:${parser.version}`;
     if (head.outcome === "parse_error") {
       return {
         ...head,
+        revision,
         result: {
           ok: false,
           kind: "parse_error",
@@ -50,21 +54,21 @@ export function createDlsiteProductResolver(
     if (
       stored &&
       stored.contentFetchedAt === head.fetchedAt &&
-      stored.parserVersion === DLSITE_PARSER_VERSION
+      stored.parserVersion === parser.version
     ) {
-      return { ...head, result: { ok: true, info: stored.info } };
+      return { ...head, revision, result: { ok: true, info: stored.info } };
     }
     const resolution = cache.resolve({ productCode: key });
     if (resolution.kind !== "html") return resolution;
-    const result = parse(resolution.html, key);
+    const result = parser.parse(resolution.html, key);
     if (resolution.outcome === "ok" && result.ok) {
       cache.writeParsed({ productCode: key }, resolution.fetchedAt, {
-        parserVersion: DLSITE_PARSER_VERSION,
+        parserVersion: parser.version,
         info: result.info,
       });
     }
     const { html: _html, ...rest } = resolution;
-    return { ...rest, result };
+    return { ...rest, revision, result };
   };
 }
 
@@ -93,14 +97,14 @@ export function dlsiteFetchResultOfProductResolution(
 }
 
 /** 追加・適用で使えるDLsite情報。TTL内でoutcomeがokのsnapshotを解析できたときだけ返す。
- *  revision はsnapshotの取得時刻（ms） */
+ *  revision は解決結果の revision（取得時刻とパーサー版の組） */
 export function readUsableDlsite(
   resolve: DlsiteProductResolver,
   productCode: string,
-): { info: DlsiteWorkInfo; revision: number } | null {
+): { info: DlsiteWorkInfo; revision: string } | null {
   const resolution = resolve(productCode);
   if (resolution.kind !== "html" || !resolution.result.ok) return null;
   return dlsiteFetchStateOfProductResolution(resolution) === "fetched"
-    ? { info: resolution.result.info, revision: resolution.fetchedAt }
+    ? { info: resolution.result.info, revision: resolution.revision }
     : null;
 }

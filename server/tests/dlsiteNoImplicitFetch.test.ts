@@ -67,7 +67,7 @@ async function scanToCompletion(app: ReturnType<typeof createApp>) {
 }
 
 async function assertNoDlsiteJob(app: ReturnType<typeof createApp>) {
-  assert.deepEqual(await (await app.request("/api/dlsite/jobs/current")).json(), { job: null });
+  assert.equal((await (await app.request("/api/dlsite/jobs/current")).json()).job, null);
 }
 
 test("スキャン完了・候補登録・作品登録3経路・root再設定のどれもDLsiteへ通信せず、取得ジョブも作らない（real）", async (t) => {

@@ -31,6 +31,7 @@ function isTerminalEvent(event: ScanJobEvent): boolean {
 
 export function scanRoute(
   jobs: ScanJobManager,
+  dlsite: { revision: () => number },
   heartbeatIntervalMs: number = SSE_HEARTBEAT_INTERVAL_MS,
 ): Hono {
   const app = new Hono();
@@ -63,8 +64,8 @@ export function scanRoute(
     return job ? c.json(job) : c.body(null, 204);
   });
 
-  app.get("/scan/last", (c) => {
-    return c.json(scanRecordSchema.parse(jobs.record.snapshot()));
+  app.get("/scan/last", async (c) => {
+    return c.json(scanRecordSchema.parse(await jobs.session.recordSnapshot()));
   });
 
   app.get("/scan/diagnostics", async (c) => {
@@ -73,8 +74,13 @@ export function scanRoute(
   });
 
   app.get("/scan/candidates", async (c) => {
-    const candidates = await jobs.listCandidates();
-    return c.json(scanCandidatesResponseSchema.parse({ candidates }));
+    const dlsiteRevision = dlsite.revision();
+    const candidates = await jobs.session.listCandidates();
+    return c.json(
+      scanCandidatesResponseSchema.parse({
+        candidates: candidates.map((candidate) => ({ ...candidate, dlsiteRevision })),
+      }),
+    );
   });
 
   app.post("/scan/candidates/rj-code", async (c) => {
@@ -84,8 +90,11 @@ export function scanRoute(
       "候補のRJコードの内容が不正です",
     );
     try {
-      const candidate = await jobs.setCandidateRjCode(data.path, data.rjCode || null);
-      return c.json(scanCandidateRjCodeResponseSchema.parse({ candidate }));
+      const dlsiteRevision = dlsite.revision();
+      const candidate = await jobs.session.setRjCode(data.path, data.rjCode || null);
+      return c.json(
+        scanCandidateRjCodeResponseSchema.parse({ candidate: { ...candidate, dlsiteRevision } }),
+      );
     } catch (error) {
       if (error instanceof CandidatePoolChangedError) {
         conflict(error.message);
@@ -97,7 +106,7 @@ export function scanRoute(
   app.post("/scan/candidates/exclude", async (c) => {
     const data = await readJsonBody(c, scanCandidatesMutationSchema, "候補の除外内容が不正です");
     try {
-      await jobs.excludeCandidates(data.paths);
+      await jobs.session.excludeCandidates(data.paths);
     } catch (error) {
       if (error instanceof CandidatePoolChangedError) {
         conflict(error.message);
@@ -108,7 +117,7 @@ export function scanRoute(
   });
 
   app.get("/scan/candidates/exclusions", async (c) => {
-    const paths = await jobs.listCandidateExclusions();
+    const paths = await jobs.session.listExclusions();
     return c.json(scanCandidateExclusionsResponseSchema.parse({ paths }));
   });
 
@@ -118,7 +127,7 @@ export function scanRoute(
       scanCandidatesMutationSchema,
       "候補除外の解除内容が不正です",
     );
-    await jobs.restoreCandidateExclusions(data.paths);
+    await jobs.session.restoreExclusions(data.paths);
     return c.body(null, 204);
   });
 
@@ -129,7 +138,7 @@ export function scanRoute(
       "候補の登録内容が不正です",
     );
     try {
-      const result = await jobs.registerCandidates(data.paths, data.apply);
+      const result = await jobs.session.registerCandidates(data.paths, data.apply);
       return c.json(scanCandidatesRegisterResponseSchema.parse(result), 201);
     } catch (error) {
       if (error instanceof CandidatePoolChangedError) {

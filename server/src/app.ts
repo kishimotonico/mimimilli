@@ -18,6 +18,7 @@ import { rootReconfigurationRoute } from "./routes/rootReconfiguration.ts";
 import { scanRoute } from "./routes/scan.ts";
 import { DlsiteJobManager } from "./dlsiteJobManager.ts";
 import { RootReconfigurationWorkflow } from "./rootReconfiguration.ts";
+import type { ScanSession } from "./scanSession.ts";
 import { ScanJobManager } from "./scanJobManager.ts";
 import { settingsRoute } from "./routes/settings.ts";
 import { smartFoldersRoute } from "./routes/smartFolders.ts";
@@ -39,7 +40,12 @@ const ROOT_RECONFIGURATION_ALLOWED_REQUESTS = new Set([
   "POST /api/__test__/reset",
 ]);
 
-export type CreateAppOptions = { media?: MediaRouteOptions; staticDir?: string };
+export type CreateAppOptions = {
+  media?: MediaRouteOptions;
+  staticDir?: string;
+  /** 直近のスキャン結果の持ち主。未指定ならアプリが作る */
+  scanSession?: ScanSession;
+};
 
 export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}): App {
   const app = new Hono<AppEnv>();
@@ -72,9 +78,7 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
 
   const api = new Hono();
   const dlsiteJobs = new DlsiteJobManager(adapter);
-  const scanJobs = new ScanJobManager(adapter, {
-    dlsiteInFlightState: (productCode) => dlsiteJobs.getInFlightState(productCode),
-  });
+  const scanJobs = new ScanJobManager(adapter, { session: options.scanSession });
   const admittedRequestGate = new InFlightRequestGate();
   const rootReconfiguration = new RootReconfigurationWorkflow(adapter, scanJobs, dlsiteJobs, () =>
     admittedRequestGate.drain(),
@@ -89,8 +93,8 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
   );
   api.route("/", settingsRoute(adapter, rootReconfiguration));
   api.route("/", rootReconfigurationRoute(rootReconfiguration));
-  api.route("/", scanRoute(scanJobs));
-  api.route("/", worksRoute(adapter, scanJobs.record));
+  api.route("/", scanRoute(scanJobs, { revision: () => dlsiteJobs.revision }));
+  api.route("/", worksRoute(adapter, scanJobs.session.record));
   api.route("/", axesRoute(adapter));
   api.route("/", tagPrefixesRoute(adapter));
   api.route("/", smartFoldersRoute(adapter));
@@ -104,7 +108,7 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
       await rootReconfiguration.cancelActiveAndAwait();
       await scanJobs.cancelActiveAndAwait();
       await dlsiteJobs.cancelActiveAndAwait();
-      scanJobs.record.reset();
+      scanJobs.session.reset();
       resetFixtureState();
       return c.json({ ok: true });
     });

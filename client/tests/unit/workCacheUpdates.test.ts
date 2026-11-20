@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { mockApi } from "../helpers/api";
+import { beforeEach, describe, expect, it } from "vitest";
+import { apiError, mockApi } from "../helpers/api";
 import { buildScanCandidate } from "../helpers/builders";
 import { SCAN_CANDIDATES_QUERY_KEY } from "../../src/entities/scan/scanCandidatesCache";
 import { QueryClient, QueryObserver, type QueryKey } from "@tanstack/react-query";
@@ -27,6 +27,10 @@ import {
   updateCachesAfterSourceEdit,
   updateCachesAfterUnregistration,
 } from "../../src/entities/work/model/workCacheUpdates";
+
+beforeEach(() => {
+  mockApi({ "GET /api/scan/candidates": { candidates: [] } });
+});
 
 const playlistId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
@@ -214,12 +218,29 @@ describe("bookmark の必須更新", () => {
 });
 
 describe("登録・スキャン完了の必須更新", () => {
-  it("登録は一覧系・facet・タグ・SF（件数プレビューを含む）・FS・診断・スキャンの記録を無効化し、詳細と scan 候補は触らない", async () => {
+  it("登録は一覧系・facet・タグ・SF（件数プレビューを含む）・FS・診断・スキャンの記録を無効化し、詳細は触らない", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterRegistration(queryClient);
 
     expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(REGISTRATION_VIEWS));
+  });
+
+  it("登録・解除は、サーバーの応答で候補一覧を置き換え、取得に失敗しても reject しない", async () => {
+    const found = buildScanCandidate({ path: "戻った作品" });
+    const api = mockApi({ "GET /api/scan/candidates": { candidates: [found] } });
+    const queryClient = seededClient();
+
+    await updateCachesAfterUnregistration(queryClient, "w1");
+    expect(queryClient.getQueryData(KEYS.candidates)).toEqual([found]);
+
+    queryClient.setQueryData(KEYS.candidates, []);
+    await updateCachesAfterRegistration(queryClient);
+    expect(queryClient.getQueryData(KEYS.candidates)).toEqual([found]);
+    expect(api.requestsTo("GET /api/scan/candidates")).toHaveLength(2);
+
+    mockApi({ "GET /api/scan/candidates": apiError(500, "internal") });
+    await expect(updateCachesAfterRegistration(queryClient)).resolves.toBeUndefined();
   });
 
   it("スキャン完了は登録の集合に加えて全詳細を無効化する", async () => {

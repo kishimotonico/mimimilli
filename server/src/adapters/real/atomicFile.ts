@@ -97,6 +97,20 @@ export function commitTempFile(tmp: string, filePath: string): void {
   }
 }
 
+/** 既存の通常ファイル・symlinkを退避名へ移す。対象が無い・置換不可なら null。戻すときは退避名を restoreAsideFile へ */
+export function setAsideFile(filePath: string): string | null {
+  if (!isReplaceableFile(filePath)) return null;
+  const aside = join(dirname(filePath), `.${basename(filePath)}.${crypto.randomUUID()}.rollback`);
+  renameSync(filePath, aside);
+  return aside;
+}
+
+/** setAsideFile で退避したファイルを元の名前へ戻す。退避が無ければ filePath を消すだけ */
+export function restoreAsideFile(filePath: string, aside: string | null): void {
+  removeQuietly(filePath);
+  if (aside) renameSync(aside, filePath);
+}
+
 export function removeTempFile(tmp: string): void {
   removeQuietly(tmp);
 }

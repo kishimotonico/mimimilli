@@ -12,11 +12,10 @@ import * as scanApi from "../../src/features/scan/api";
 import * as workApi from "../../src/entities/work/api";
 import * as scanEntityApi from "../../src/entities/scan/api";
 import * as scanCandidatesCache from "../../src/entities/scan/scanCandidatesCache";
-import {
-  scanCandidateDeselectedPathsAtom,
-  scanCandidateHiddenPathsAtom,
-} from "../../src/entities/scan/model/atoms";
+import { scanCandidateDeselectedPathsAtom } from "../../src/entities/scan/model/atoms";
 import { dlsiteJobStoreAtom } from "../../src/entities/dlsite/model/dlsiteJobStore";
+import { mockApi } from "../helpers/api";
+import { useScanCandidatesCache } from "../../src/features/scan/model/useScanCandidatesCache";
 import { buildScanCandidate } from "../helpers/builders";
 import { createFakeDlsiteJobStore } from "../helpers/fakeJobStores";
 import { clearResizeObservers } from "./setup";
@@ -28,6 +27,7 @@ import {
 let restoreSize: () => void;
 beforeEach(() => {
   restoreSize = mockUnregisteredListSize();
+  mockApi({ "GET /api/scan/candidates": { candidates: [] } });
 });
 
 afterEach(() => {
@@ -162,7 +162,7 @@ describe("UnregisteredTab RJコード編集", () => {
 
   it("1行のRJコードが不正でも、正常な行だけを選んで追加できる", async () => {
     const registerSpy = vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
-      registered: [{ path: candidateB.path, workId: "w2" }],
+      registered: [{ path: candidateB.path, workId: "w2", coverSkipped: null }],
       failures: [],
       interruptedBy: null,
     });
@@ -186,6 +186,7 @@ describe("UnregisteredTab RJコード編集", () => {
   it("正しい値を確定すると修正APIを呼び、応答の候補で一覧キャッシュの行を置き換える", async () => {
     const fixed: ScanCandidate = { ...candidateA, rjCode: "RJ200002" };
     const setSpy = vi.spyOn(scanApi, "setScanCandidateRjCode").mockResolvedValue(fixed);
+    const refreshSpy = vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue([]);
     const { queryClient } = await renderTab([candidateA, candidateB]);
     queryClient.setQueryData(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY, [
       candidateA,
@@ -199,9 +200,7 @@ describe("UnregisteredTab RJコード編集", () => {
 
     await waitFor(() => expect(setSpy).toHaveBeenCalledWith(candidateA.path, "RJ200002"));
     await waitFor(() => expect(screen.queryByPlaceholderText("RJコード")).toBeNull());
-    expect(
-      queryClient.getQueryData<ScanCandidate[]>(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY),
-    ).toEqual([fixed, candidateB]);
+    expect(refreshSpy).toHaveBeenCalledWith(queryClient, { replace: fixed });
   });
 
   it("RJコードを空にして確定すると、空文字で修正APIを呼ぶ", async () => {
@@ -494,7 +493,7 @@ describe("UnregisteredTab 追加", () => {
       rjCode: "RJ000001",
     });
     const registerSpy = vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
-      registered: [{ path: candidateB.path, workId: "w" }],
+      registered: [{ path: candidateB.path, workId: "w", coverSkipped: null }],
       failures: [],
       interruptedBy: null,
     });
@@ -524,7 +523,7 @@ describe("UnregisteredTab 追加", () => {
 
   it("項目を選んで追加では、外した項目がfalseで送られる", async () => {
     const registerSpy = vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
-      registered: [{ path: candidateA.path, workId: "w" }],
+      registered: [{ path: candidateA.path, workId: "w", coverSkipped: null }],
       failures: [],
       interruptedBy: null,
     });
@@ -556,7 +555,7 @@ describe("UnregisteredTab 追加", () => {
 
   it("途中で候補変更が起きても、追加できた分はonRegisteredへ渡す", async () => {
     vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
-      registered: [{ path: candidateA.path, workId: "w-a" }],
+      registered: [{ path: candidateA.path, workId: "w-a", coverSkipped: null }],
       failures: [],
       interruptedBy: new ApiRequestError(409, "conflict", "候補が更新されました"),
     });
@@ -571,11 +570,12 @@ describe("UnregisteredTab 追加", () => {
     expect(onRegistered).toHaveBeenCalledWith({
       registeredCount: 1,
       failedCount: 0,
+      coverSkippedCount: 0,
       interrupted: true,
     });
   });
 
-  it("1件も追加できないまま止まったときはonRegisteredを呼ばず、失敗を表示する", async () => {
+  it("1件も追加できないまま止まったときは失敗を表示し、0件の結果をonRegisteredへ渡す", async () => {
     vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
       registered: [],
       failures: [],
@@ -586,32 +586,207 @@ describe("UnregisteredTab 追加", () => {
     await waitFor(() =>
       expect(screen.getByText(/通信エラー|ライブラリへの追加に失敗/)).not.toBeNull(),
     );
-    expect(onRegistered).not.toHaveBeenCalled();
+    expect(onRegistered).toHaveBeenCalledWith({
+      registeredCount: 0,
+      failedCount: 0,
+      coverSkippedCount: 0,
+      interrupted: true,
+    });
   });
 
-  it("追加リクエスト中にタブがアンマウントされても、非表示集合とonRegisteredへ結果が届く", async () => {
+  it("中断なしで全件失敗しても、失敗理由を表示し、0件の結果をonRegisteredへ渡す", async () => {
+    vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
+      registered: [],
+      failures: [{ path: candidateA.path, message: "配下に登録済み作品が1件あります" }],
+      interruptedBy: null,
+    });
+    const { onRegistered } = await renderTab([candidateA]);
+    fireEvent.click(screen.getByRole("button", { name: "1件を追加" }));
+    await waitFor(() => expect(screen.getByText("配下に登録済み作品が1件あります")).not.toBeNull());
+    expect(onRegistered).toHaveBeenCalledWith({
+      registeredCount: 0,
+      failedCount: 1,
+      coverSkippedCount: 0,
+      interrupted: false,
+    });
+  });
+
+  it("カバーを適用できなかった件数をonRegisteredへ渡す", async () => {
+    vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
+      registered: [
+        { path: candidateA.path, workId: "w-a", coverSkipped: "not_cached" },
+        { path: candidateB.path, workId: "w-b", coverSkipped: null },
+      ],
+      failures: [],
+      interruptedBy: null,
+    });
+    const { onRegistered } = await renderTab([candidateA, candidateB]);
+    fireEvent.click(screen.getByRole("button", { name: "2件を追加" }));
+    await waitFor(() =>
+      expect(onRegistered).toHaveBeenCalledWith({
+        registeredCount: 2,
+        failedCount: 0,
+        coverSkippedCount: 1,
+        interrupted: false,
+      }),
+    );
+  });
+
+  it("追加後は、候補が取り直されて行が消えるまで操作中のままになる", async () => {
+    vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
+      registered: [{ path: candidateA.path, workId: "w-a", coverSkipped: null }],
+      failures: [],
+      interruptedBy: null,
+    });
+    let releaseRefresh!: () => void;
+    const refreshGate = new Promise<void>((resolve) => {
+      releaseRefresh = resolve;
+    });
+    const api = mockApi({
+      "GET /api/scan/candidates": async () => {
+        await refreshGate;
+        return { candidates: [candidateB] };
+      },
+    });
+    const key = scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY;
+    const { queryClient, rerenderWith } = await renderTab([candidateA, candidateB]);
+    queryClient.setQueryData(key, [candidateA, candidateB]);
+    queryClient.getQueryCache().subscribe(() => {
+      rerenderWith(queryClient.getQueryData<ScanCandidate[]>(key) ?? []);
+    });
+    const addButton = () => screen.getByRole("button", { name: /件を追加/ });
+    fireEvent.click(addButton());
+
+    await waitFor(() => expect(api.requestsTo("GET /api/scan/candidates")).toHaveLength(1));
+    expect(addButton()).toBeDisabled();
+    expect(screen.getByText(candidateA.inferredTitle)).toBeInTheDocument();
+
+    releaseRefresh();
+    await waitFor(() => expect(screen.queryByText(candidateA.inferredTitle)).toBeNull());
+    await waitFor(() => expect(addButton()).toBeEnabled());
+  });
+
+  it("追加リクエスト中にタブがアンマウントされても、候補が取り直されonRegisteredへ結果が届く", async () => {
     let resolveRegister!: (response: ScanCandidatesRegisterOutcome) => void;
     vi.spyOn(workApi, "registerScanCandidates").mockReturnValue(
       new Promise((resolve) => {
         resolveRegister = resolve;
       }),
     );
-    const { onRegistered, unmount, store } = await renderTab([candidateA, candidateB]);
+    const api = mockApi({ "GET /api/scan/candidates": { candidates: [candidateB] } });
+    const { onRegistered, unmount, queryClient } = await renderTab([candidateA, candidateB]);
+    queryClient.setQueryData(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY, [
+      candidateA,
+      candidateB,
+    ]);
     fireEvent.click(screen.getByRole("button", { name: "2件を追加" }));
     await waitFor(() => expect(workApi.registerScanCandidates).toHaveBeenCalled());
     unmount();
     resolveRegister({
       interruptedBy: null,
-      registered: [{ path: candidateA.path, workId: "w-a" }],
+      registered: [{ path: candidateA.path, workId: "w-a", coverSkipped: null }],
       failures: [{ path: candidateB.path, message: "失敗" }],
     });
     await waitFor(() =>
       expect(onRegistered).toHaveBeenCalledWith({
         registeredCount: 1,
         failedCount: 1,
+        coverSkippedCount: 0,
         interrupted: false,
       }),
     );
-    expect(store.get(scanCandidateHiddenPathsAtom)).toEqual(new Set([candidateA.path]));
+    expect(api.requestsTo("GET /api/scan/candidates")).toHaveLength(1);
+    expect(queryClient.getQueryData(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY)).toEqual([
+      candidateB,
+    ]);
+  });
+});
+
+describe("UnregisteredTab 終端表示", () => {
+  it("終わったジョブがある状態で開いても候補を取り直さない", async () => {
+    const refreshSpy = vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue([]);
+    await renderTab([candidateB], {
+      job: {
+        jobId: "job-1",
+        status: "finished" as const,
+        codes: new Map(),
+        bulk: { processed: 0, total: 0 },
+      },
+    });
+    expect(refreshSpy).not.toHaveBeenCalled();
+  });
+
+  it("候補を取り直さなくても、ジョブで見た終端の結果が候補より新しければ行に出す", async () => {
+    const refreshSpy = vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue([]);
+    const candidate = { ...candidateB, rjCode: "RJ000777", dlsiteRevision: 5 };
+    await renderTab([candidate], {
+      results: new Map([
+        [
+          "RJ000777",
+          {
+            dlsite: { state: "fetched" as const, title: "取得したタイトル", cover: null },
+            revision: 30,
+          },
+        ],
+      ]),
+    });
+    expect(await screen.findByText("取得したタイトル")).toBeInTheDocument();
+    expect(refreshSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("UnregisteredTab 取り直し中のRJコード修正", () => {
+  it("スキャン完了後の取り直しが出ている間にRJコードを確定しても、遅れて返った古い応答で表示が戻らない", async () => {
+    const fixed: ScanCandidate = { ...candidateA, rjCode: "RJ200002", rjCodeEdited: true };
+    const firstGate = Promise.withResolvers<void>();
+    let calls = 0;
+    mockApi({
+      "GET /api/scan/candidates": async () => {
+        calls += 1;
+        if (calls === 1) {
+          await firstGate.promise;
+          return { candidates: [candidateA] };
+        }
+        return { candidates: [fixed] };
+      },
+    });
+    vi.spyOn(scanApi, "setScanCandidateRjCode").mockResolvedValue(fixed);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY, [candidateA]);
+    const store = createStore();
+    store.set(dlsiteJobStoreAtom, createFakeDlsiteJobStore());
+    function Connected() {
+      return createElement(UnregisteredTab, {
+        candidates: useScanCandidatesCache(),
+        onRegistered: () => {},
+      });
+    }
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(JotaiProvider, { store }, createElement(Connected)),
+      ),
+    );
+    await act(async () => {
+      flushUnregisteredListSize();
+    });
+
+    const refreshing = scanCandidatesCache.refreshScanCandidates(queryClient);
+    await waitFor(() => expect(calls).toBe(1));
+
+    fireEvent.click(screen.getByTitle("クリックしてRJコードを編集"));
+    const input = screen.getByPlaceholderText("RJコード");
+    fireEvent.change(input, { target: { value: "RJ200002" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(screen.getByText("RJ200002")).toBeInTheDocument());
+
+    firstGate.resolve();
+    await refreshing;
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(screen.getByText("RJ200002")).toBeInTheDocument();
+    expect(calls).toBe(2);
   });
 });

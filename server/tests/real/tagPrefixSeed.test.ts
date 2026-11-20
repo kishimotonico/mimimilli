@@ -29,7 +29,7 @@ test("初回起動で DEFAULT_TAG_PREFIXES が seed され、全削除後の再�
   assert.deepEqual(await adapter.listTagPrefixes(), []);
 
   // 再起動相当: 同じ DB ファイルでアダプタを作り直す
-  adapter.close();
+  await adapter.close();
   const reopened = directory.own(createTestRealAdapter({ database }));
   assert.deepEqual(await reopened.listTagPrefixes(), []);
 });

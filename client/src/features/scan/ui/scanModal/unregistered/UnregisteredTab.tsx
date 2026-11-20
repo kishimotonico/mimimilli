@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAtom, useSetAtom } from "jotai";
+import { useAtom } from "jotai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   rjCodeFormatSchema,
@@ -12,15 +12,9 @@ import { useToast } from "../../../../../shared/ui/useToast";
 import { useVirtualList } from "../../../../../shared/ui/useVirtualList";
 import { excludeScanCandidates, setScanCandidateRjCode, SCAN_QUERY_KEYS } from "../../../api";
 import { restoreScanCandidateExclusions } from "../../../../../entities/scan/api";
-import {
-  refreshScanCandidates,
-  replaceScanCandidate,
-} from "../../../../../entities/scan/scanCandidatesCache";
+import { refreshScanCandidates } from "../../../../../entities/scan/scanCandidatesCache";
 import { useRegisterScanCandidatesMutation } from "../../../../../entities/work/model/workMutations";
-import {
-  scanCandidateDeselectedPathsAtom,
-  scanCandidateHiddenPathsAtom,
-} from "../../../../../entities/scan/model/atoms";
+import { scanCandidateDeselectedPathsAtom } from "../../../../../entities/scan/model/atoms";
 import { useDlsiteJobState, useDlsiteJobStore } from "../../../../../entities/dlsite/useDlsiteJob";
 import { candidateDlsiteDisplay } from "../../../model/unregisteredDlsite";
 import {
@@ -55,7 +49,6 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   const queryClient = useQueryClient();
   const jobStore = useDlsiteJobStore();
   const jobState = useDlsiteJobState((state) => state);
-  const setHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
   const [deselectedPaths, setDeselectedPaths] = useAtom(scanCandidateDeselectedPathsAtom);
   const [fieldErrors, setFieldErrors] = useState<ReadonlyMap<string, RjCodeFieldError>>(
     () => new Map(),
@@ -119,26 +112,19 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
       );
     }
     if (isCandidatesStale(interruptedBy)) await refreshScanCandidates(queryClient).catch(() => {});
-    const registeredPaths = new Set(outcome.registered.map((entry) => entry.path));
-    setHiddenPaths((previous) => new Set([...previous, ...registeredPaths]));
-    if (registeredPaths.size === 0 && interruptedBy) return;
     onRegistered({
       registeredCount: outcome.registered.length,
       failedCount: outcome.failures.length,
+      coverSkippedCount: outcome.registered.filter((entry) => entry.coverSkipped !== null).length,
       interrupted: interruptedBy !== null,
     });
   };
 
   const restoreMutation = useMutation({
     mutationFn: (paths: string[]) => restoreScanCandidateExclusions(paths),
-    onSuccess: async (_void, paths) => {
+    onSuccess: async () => {
       toast.dismiss();
-      setHiddenPaths((previous) => {
-        const next = new Set(previous);
-        for (const path of paths) next.delete(path);
-        return next;
-      });
-      await refreshScanCandidates(queryClient);
+      await refreshScanCandidates(queryClient).catch(() => {});
     },
     onError: (error) => setErrorMessage(apiErrorMessage(error, "取り消しに失敗しました")),
   });
@@ -146,7 +132,6 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   const excludeMutation = useMutation({
     mutationFn: (paths: string[]) => excludeScanCandidates(paths),
     onSuccess: async (_void, paths) => {
-      setHiddenPaths((previous) => new Set([...previous, ...paths]));
       toast.show({
         message: `${paths.length}件を候補から外しました`,
         variant: "success",
@@ -154,7 +139,10 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
         onAction: () => restoreMutation.mutate(paths),
         priority: "action",
       });
-      await queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidateExclusions() });
+      await Promise.all([
+        refreshScanCandidates(queryClient).catch(() => {}),
+        queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidateExclusions() }),
+      ]);
     },
     onError: (error) => setErrorMessage(apiErrorMessage(error, "候補から外せませんでした")),
   });
@@ -163,7 +151,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     mutationFn: ({ path, rjCode }: { path: ScanCandidate["path"]; rjCode: string }) =>
       setScanCandidateRjCode(path, rjCode),
     onSuccess: (candidate) => {
-      replaceScanCandidate(queryClient, candidate);
+      void refreshScanCandidates(queryClient, { replace: candidate }).catch(() => {});
       clearFieldError(candidate.path);
       setEditingPath(null);
       setErrorMessage(null);

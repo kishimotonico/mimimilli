@@ -1,4 +1,4 @@
-import { NO_DLSITE } from "../helpers/scanLibrary.ts";
+import { NO_DLSITE, runScan } from "../helpers/scanLibrary.ts";
 // トラックの解決済み durationSec（resolveTrackDurationSec）の契約検証。
 // end-start / end有start無 / start有end無 / 両無 / 同一ファイル複数区間 / デフォルト外playlist /
 // probe失敗 の組み合わせを実データでカバーする。
@@ -75,7 +75,7 @@ test("durationSec: end-start / end有start無 / start有end無 / 両無 / 同一
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
 
   const work = await adapter.getWork(id);
   assert.ok(work);
@@ -176,7 +176,7 @@ test("startがファイル全体長以上のトラックは作品をerror状態�
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
 
   const work = await adapter.getWork(id);
   assert.ok(work);
@@ -240,7 +240,7 @@ test("end指定トラックでもstartがファイル全体長を超えていれ
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
 
   const work = await adapter.getWork(id);
   assert.ok(work);
@@ -293,7 +293,7 @@ test("endがファイル実測長をわずかに超えるだけの正常デー�
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
 
   const work = await adapter.getWork(id);
   assert.ok(work);
@@ -341,7 +341,7 @@ test("rescan無しのファイル差し替え後、getWorkはcatalogの総時間
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
 
   const beforeWork = await adapter.getWork(id);
   assert.ok(beforeWork);
@@ -404,7 +404,7 @@ test("rescan無しのファイル差し替え後、prepareWorkPlaybackは総時�
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
 
   writeWav(join(workDir, "whole.wav"), 8);
 

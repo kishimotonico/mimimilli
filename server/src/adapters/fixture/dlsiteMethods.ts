@@ -2,15 +2,15 @@ import {
   DEFAULT_DLSITE_CACHE_TTLS_MS,
   applyDlsiteStatePatch,
   planDlsiteApply,
-  dlsiteProductFetchOutcomeOfResult,
   hasRjCode,
 } from "@mimimilli/shared";
 import { DlsiteRefetchRequiredError } from "../../errors.ts";
 import type {
   DlsiteApplyBody,
+  DlsiteApplyResponse,
   DlsiteCachedCover,
   DlsiteFetchResult,
-  DlsiteProductFetchOutcome,
+  DlsiteTerminalProductSummary,
   DlsiteStateUpdateBody,
   DlsiteWorkFetchResult,
   DlsiteWorkInfo,
@@ -22,6 +22,7 @@ import {
   dlsiteFetchFailureFor,
   fixtureDlsiteCoverCached,
   fixtureDlsiteCoverKey,
+  fixtureDlsiteSummary,
   fixtureUsableDlsite,
   dlsiteLinkageOf,
   normalizeDlsiteCacheKey,
@@ -38,6 +39,12 @@ export const FIXTURE_DLSITE_NOT_FOUND_RJ_CODE = "RJ000403";
 
 /** このRJコードは取得済みになるが、カバーはキャッシュに置かれない（カバーの先取り失敗相当） */
 export const FIXTURE_DLSITE_NO_COVER_RJ_CODE = "RJ000402";
+
+/** このRJコードはDLsite側にカバーが無い（coverUrl が null） */
+export const FIXTURE_DLSITE_COVERLESS_RJ_CODE = "RJ000400";
+
+/** このRJコードは取得済みになり、カバーキャッシュには画像として読めないバイト列が置かれる */
+export const FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE = "RJ000406";
 
 const FIXTURE_COVER_BACKGROUNDS = ["#3b6ea8", "#a8573b", "#4a8f5a", "#8a4fa0", "#b58a2d"];
 
@@ -121,7 +128,10 @@ export function createDlsiteMethods(
       cvs: ["fixture CV"],
       genreTags: ["テスト"],
       ageRating: "全年齢",
-      coverUrl: `https://img.dlsite.jp/fixture/${key}_img_main.jpg`,
+      coverUrl:
+        key === FIXTURE_DLSITE_COVERLESS_RJ_CODE
+          ? null
+          : `https://img.dlsite.jp/fixture/${key}_img_main.jpg`,
       url: `https://www.dlsite.com/maniax/work/=/product_id/${key}.html`,
     };
     state.dlsiteFetchFailures.delete(key);
@@ -130,10 +140,11 @@ export function createDlsiteMethods(
       fetchedAt: now,
       expiresAt: now + DEFAULT_DLSITE_CACHE_TTLS_MS.ok,
     });
-    if (key !== FIXTURE_DLSITE_NO_COVER_RJ_CODE) {
-      state.dlsiteCovers.set(fixtureDlsiteCoverKey(info.coverUrl!), {
-        body: fixtureCoverImage(key),
-        contentType: "image/svg+xml",
+    if (info.coverUrl !== null && key !== FIXTURE_DLSITE_NO_COVER_RJ_CODE) {
+      const unreadable = key === FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE;
+      state.dlsiteCovers.set(fixtureDlsiteCoverKey(info.coverUrl), {
+        body: unreadable ? new TextEncoder().encode("not an image") : fixtureCoverImage(key),
+        contentType: unreadable ? "application/octet-stream" : "image/svg+xml",
         fetchedAt: now,
       });
     }
@@ -198,16 +209,13 @@ export function createDlsiteMethods(
     async fetchDlsiteProduct(
       productCode: string,
       fetchOptions: { force: boolean; signal?: AbortSignal },
-    ): Promise<DlsiteProductFetchOutcome> {
-      return dlsiteProductFetchOutcomeOfResult(
-        await fetchProduct(productCode, fetchOptions.force, fetchOptions.signal),
-      );
+    ): Promise<DlsiteTerminalProductSummary> {
+      await fetchProduct(productCode, fetchOptions.force, fetchOptions.signal);
+      const summary = fixtureDlsiteSummary(state, productCode);
+      return summary.state === "none" ? { state: "failed" } : summary;
     },
 
-    async dlsiteApply(
-      workId: string,
-      body: DlsiteApplyBody,
-    ): Promise<WorkSourceMutationResult | null> {
+    async dlsiteApply(workId: string, body: DlsiteApplyBody): Promise<DlsiteApplyResponse | null> {
       const work = state.works.find((w) => w.id === workId);
       if (!work) return null;
       requireFixtureRevision(state, workId, body.sourceRevision);
@@ -230,9 +238,11 @@ export function createDlsiteMethods(
       if (plan.title !== undefined) work.title = plan.title;
       if (plan.tags !== undefined) work.tags = plan.tags;
       if (plan.urls !== undefined) work.urls = plan.urls;
-      if (plan.applyCover) applyFixtureCachedCover(state, work, info.coverUrl);
+      const coverSkipped = body.apply.cover
+        ? applyFixtureCachedCover(state, work, info.coverUrl)
+        : null;
       setDlsiteLinkage(state, workId, plan.dlsite);
-      return fixtureSourceMutation(state, work);
+      return { ...fixtureSourceMutation(state, work), coverSkipped };
     },
 
     async updateDlsiteState(

@@ -8,7 +8,7 @@ import type { WorksPage } from "@mimimilli/shared";
 import { createApp } from "../helpers/testApp.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
-import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
+import { runScan, scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
 import {
   makeSampleLibrary,
   makeTestDirectory,
@@ -97,7 +97,7 @@ for (const escapeCase of ESCAPE_CASES) {
       const coverImage = escapeCase.prepare(ctx);
       rewriteCoverImage(ctx.workDir, coverImage);
 
-      const result = await ctx.adapter.scan();
+      const result = await runScan(ctx.adapter);
       assert.equal(result.skipped, 0);
       assert.equal(result.coverErrors, 1);
 
@@ -117,7 +117,7 @@ test("real: mediaRoot内の通常ファイルはこれまでどおり計測さ�
   writeSampleCover(join(ctx.workDir, "art", "inner.jpg"));
   rewriteCoverImage(ctx.workDir, "art/inner.jpg");
 
-  const result = await ctx.adapter.scan();
+  const result = await runScan(ctx.adapter);
   assert.equal(result.coverErrors, 0);
   const work = await ctx.adapter.getWork(ctx.workId);
   assert.deepEqual(work!.cover?.dimensions, { width: 6, height: 4 });

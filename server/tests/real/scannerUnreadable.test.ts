@@ -10,6 +10,7 @@ import { Scanner } from "../../src/adapters/real/scanner.ts";
 import { createWorkRepos, getTestWork } from "../helpers/workTestUtils.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
+import { runScan } from "../helpers/scanLibrary.ts";
 
 const skipOnWindows = process.platform === "win32" && "Windows の chmod は読取拒否にならない";
 
@@ -62,7 +63,7 @@ test(
 
     const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
     await configureRoot(adapter, root);
-    await adapter.scan();
+    await runScan(adapter);
 
     const workBefore = await adapter.getWork(workId);
     assert.equal(workBefore?.status, "ok");
@@ -70,7 +71,7 @@ test(
     const rootMode = statSync(root).mode & 0o777;
     t.after(() => chmodSync(root, rootMode));
     await withRestoredMode(root, rootMode, async () => {
-      await assert.rejects(adapter.scan(), /ルートフォルダーを読み取れません/);
+      await assert.rejects(runScan(adapter), /ルートフォルダーを読み取れません/);
     })();
 
     const workAfter = await adapter.getWork(workId);

@@ -353,7 +353,7 @@ describe("work api", () => {
     };
     const preview = {
       info: mockInfo,
-      infoRevision: 1_700_000_000_000,
+      infoRevision: "1700000000000:1",
       cachedCover: null,
       sourceRevision: "revision-1",
     };
@@ -542,7 +542,10 @@ describe("候補の追加の分割送信", () => {
       requestSizes.push(body.paths.length);
       expect(body.apply).toEqual(APPLY);
       return makeResponse(
-        { registered: body.paths.map((path) => ({ path, workId: `w-${path}` })), failures: [] },
+        {
+          registered: body.paths.map((path) => ({ path, workId: `w-${path}`, coverSkipped: null })),
+          failures: [],
+        },
         201,
       );
     });
@@ -565,7 +568,10 @@ describe("候補の追加の分割送信", () => {
       }
       const body = scanCandidatesRegisterRequestSchema.parse(JSON.parse(String(init?.body)));
       return makeResponse(
-        { registered: body.paths.map((path) => ({ path, workId: `w-${path}` })), failures: [] },
+        {
+          registered: body.paths.map((path) => ({ path, workId: `w-${path}`, coverSkipped: null })),
+          failures: [],
+        },
         201,
       );
     });

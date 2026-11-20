@@ -1,8 +1,17 @@
-import { REGISTER_ALL, NO_DLSITE } from "../helpers/scanLibrary.ts";
+import {
+  NO_DLSITE,
+  REGISTER_ALL,
+  excludeCandidates,
+  listCandidates,
+  registerCandidates,
+  runScan,
+} from "../helpers/scanLibrary.ts";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { spyOn } from "bun:test";
 import { test } from "node:test";
+import { Scanner } from "../../src/adapters/real/scanner.ts";
 import { workspacePath } from "@mimimilli/shared";
 import { createApp } from "../helpers/testApp.ts";
 import { CandidatePoolChangedError } from "../../src/errors.ts";
@@ -23,7 +32,7 @@ function snapshotTree(root: string): string[] {
   return snapshot.sort();
 }
 
-test("listScanCandidatesは最後のスキャン結果を返し、再帰走査しない", async (t) => {
+test("候補一覧は最後のスキャン結果を返し、再帰走査しない", async (t) => {
   const directory = makeTestDirectory("scan-candidates-cache");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");
@@ -33,9 +42,9 @@ test("listScanCandidatesは最後のスキャン結果を返し、再帰走査�
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
 
-  const before = await adapter.listScanCandidates();
+  const before = await listCandidates(adapter);
   assert.equal(before.length, 1);
   assert.equal(before[0]?.path, "初期候補");
 
@@ -43,12 +52,12 @@ test("listScanCandidatesは最後のスキャン結果を返し、再帰走査�
   mkdirSync(added, { recursive: true });
   writeWav(join(added, "track.wav"), 1);
 
-  const after = await adapter.listScanCandidates();
+  const after = await listCandidates(adapter);
   assert.deepEqual(after, before);
 
-  await adapter.scan();
+  await runScan(adapter);
   assert.deepEqual(
-    (await adapter.listScanCandidates()).map((candidate) => candidate.path).sort(),
+    (await listCandidates(adapter)).map((candidate) => candidate.path).sort(),
     ["初期候補", "走査後追加"].sort(),
   );
 });
@@ -67,16 +76,16 @@ test("選択した候補だけを登録し、除外した候補は以後返さ�
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
   const beforeScan = snapshotTree(root);
-  await adapter.scan();
+  await runScan(adapter);
   assert.deepEqual(
-    (await adapter.listScanCandidates()).map((candidate) => candidate.path).sort(),
+    (await listCandidates(adapter)).map((candidate) => candidate.path).sort(),
     ["選択作品", "除外作品"].sort(),
   );
   assert.equal(existsSync(join(selected, "mimimilli.json")), false);
   assert.deepEqual(snapshotTree(root), beforeScan, "scanは候補フォルダーへ一切書き込まない");
 
-  await adapter.excludeScanCandidates(["除外作品"]);
-  assert.deepEqual(await adapter.listScanCandidates(), [
+  await excludeCandidates(adapter, ["除外作品"]);
+  assert.deepEqual(await listCandidates(adapter), [
     {
       path: "選択作品",
       inferredTitle: "選択作品",
@@ -89,13 +98,13 @@ test("選択した候補だけを登録し、除外した候補は以後返さ�
     },
   ]);
 
-  const result = await adapter.registerScanCandidates([workspacePath("選択作品")], REGISTER_ALL);
+  const result = await registerCandidates(adapter, [workspacePath("選択作品")], REGISTER_ALL);
   assert.equal(result.registered.length, 1);
   assert.deepEqual(result.failures, []);
   assert.equal(existsSync(join(selected, "mimimilli.json")), true);
   assert.equal(existsSync(join(excluded, "mimimilli.json")), false);
   await assert.rejects(
-    () => adapter.registerScanCandidates([workspacePath("選択作品")], REGISTER_ALL),
+    () => registerCandidates(adapter, [workspacePath("選択作品")], REGISTER_ALL),
     CandidatePoolChangedError,
   );
 });
@@ -114,25 +123,22 @@ test("root変更後の候補登録・除外はCandidatePoolChangedErrorで拒否
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, rootA);
-  await adapter.scan();
+  await runScan(adapter);
   assert.deepEqual(
-    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    (await listCandidates(adapter)).map((candidate) => candidate.path),
     ["同名候補"],
   );
 
   await configureRoot(adapter, rootB);
 
   await assert.rejects(
-    () => adapter.registerScanCandidates([workspacePath("同名候補")], REGISTER_ALL),
+    () => registerCandidates(adapter, [workspacePath("同名候補")], REGISTER_ALL),
     CandidatePoolChangedError,
   );
   assert.equal(existsSync(join(candidateDirA, "mimimilli.json")), false);
   assert.equal(existsSync(join(candidateDirB, "mimimilli.json")), false);
 
-  await assert.rejects(
-    () => adapter.excludeScanCandidates(["同名候補"]),
-    CandidatePoolChangedError,
-  );
+  await assert.rejects(() => excludeCandidates(adapter, ["同名候補"]), CandidatePoolChangedError);
 });
 
 test("rootフォルダー消失後の候補登録はCandidatePoolChangedError(409)で拒否する", async (t) => {
@@ -145,9 +151,9 @@ test("rootフォルダー消失後の候補登録はCandidatePoolChangedError(40
 
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
   assert.deepEqual(
-    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    (await listCandidates(adapter)).map((candidate) => candidate.path),
     ["候補作品"],
   );
 
@@ -178,7 +184,8 @@ test("stale候補を含む一括登録は書込み前に全件拒否する", asy
 
   await assert.rejects(
     () =>
-      adapter.registerScanCandidates(
+      registerCandidates(
+        adapter,
         [workspacePath("現在の候補"), workspacePath("古い候補")],
         REGISTER_ALL,
       ),
@@ -208,18 +215,18 @@ test("files-kind: 除外→再スキャン→除外解除で候補が復活す�
     }),
   );
   await configureRoot(adapter, root);
-  await adapter.scan();
-  await adapter.excludeScanCandidates(["除外対象"]);
+  await runScan(adapter);
+  await excludeCandidates(adapter, ["除外対象"]);
   assert.deepEqual(
-    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    (await listCandidates(adapter)).map((candidate) => candidate.path),
     ["他の作品"],
   );
 
-  await adapter.scan();
+  await runScan(adapter);
 
   await adapter.restoreScanCandidateExclusions(["除外対象"]);
   assert.deepEqual(
-    (await adapter.listScanCandidates()).map((candidate) => candidate.path).sort(),
+    (await listCandidates(adapter)).map((candidate) => candidate.path).sort(),
     ["他の作品", "除外対象"].sort(),
   );
 });
@@ -242,12 +249,12 @@ test("候補除外はuser DBを再オープンしても保持される", async (
   };
   const first = createTestRealAdapter(options);
   await configureRoot(first, root);
-  await first.scan();
-  await first.excludeScanCandidates(["除外対象"]);
-  first.close();
+  await runScan(first);
+  await excludeCandidates(first, ["除外対象"]);
+  await first.close();
 
   const reopened = directory.own(createTestRealAdapter(options));
-  assert.deepEqual(await reopened.listScanCandidates(), []);
+  assert.deepEqual(await listCandidates(reopened), []);
 });
 
 test("スキャン候補の親登録は配下の子作品がある場合に失敗し子は残る", async (t) => {
@@ -275,14 +282,11 @@ test("スキャン候補の親登録は配下の子作品がある場合に失�
   assert.equal(childRes.status, 201);
   const childWork = await childRes.json();
 
-  await adapter.scan();
-  const candidates = await adapter.listScanCandidates();
+  await runScan(adapter);
+  const candidates = await listCandidates(adapter);
   assert.ok(candidates.some((candidate) => candidate.path === "親フォルダー"));
 
-  const result = await adapter.registerScanCandidates(
-    [workspacePath("親フォルダー")],
-    REGISTER_ALL,
-  );
+  const result = await registerCandidates(adapter, [workspacePath("親フォルダー")], REGISTER_ALL);
   assert.deepEqual(result.registered, []);
   assert.equal(result.failures.length, 1);
   assert.match(result.failures[0]?.message ?? "", /配下に登録済み作品が1件あります/);
@@ -290,4 +294,37 @@ test("スキャン候補の親登録は配下の子作品がある場合に失�
   assert.ok(await adapter.getWork(childWork.snapshot.id));
   assert.equal(existsSync(join(child, "mimimilli.json")), true);
   assert.equal(existsSync(join(parent, "mimimilli.json")), false);
+});
+
+test("メタは書けたが投影が済んでいない候補は、候補一覧に戻らない", async (t) => {
+  const directory = makeTestDirectory("scan-candidates-written-meta");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const folder = join(root, "投影待ち");
+  mkdirSync(folder, { recursive: true });
+  writeWav(join(folder, "track.wav"), 1);
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  await configureRoot(adapter, root);
+  await runScan(adapter);
+  assert.deepEqual(
+    (await listCandidates(adapter)).map((candidate) => candidate.path),
+    ["投影待ち"],
+  );
+
+  const projection = spyOn(Scanner.prototype, "projectPrepared").mockImplementation(
+    async (prepared) => ({
+      status: "unpublished",
+      reason: "error",
+      snapshot: {
+        meta: prepared.meta,
+        bytes: prepared.bytes,
+        sourceRevision: prepared.revisions.sourceRevision,
+      },
+    }),
+  );
+  t.after(() => projection.mockRestore());
+  const result = await registerCandidates(adapter, ["投影待ち"], REGISTER_ALL);
+  assert.equal(result.registered.length, 1);
+  assert.ok(existsSync(join(folder, "mimimilli.json")));
+  assert.deepEqual(await listCandidates(adapter), []);
 });

@@ -314,10 +314,7 @@ export class CatalogWorkRepository {
     unverifiedIds: string[];
     missingIds: string[];
   }): void {
-    const run = (sql: string, ids: string[]): void => {
-      if (ids.length === 0) return;
-      this.db.sqlite.query(sql).run(JSON.stringify(ids));
-    };
+    const run = (sql: string, ids: string[]): void => this.runForIds(sql, ids);
     run(
       "UPDATE main.works SET verification_status = 'unverified' WHERE id IN (SELECT value FROM json_each(?))",
       input.unverifiedIds,
@@ -327,11 +324,21 @@ export class CatalogWorkRepository {
         "WHERE id IN (SELECT value FROM json_each(?)) AND verification_status <> 'unverified'",
       input.seenIds,
     );
-    run(
+    this.markWorksMissing(input.missingIds);
+  }
+
+  /** 指定した作品を missing にする（スキャンが見つからなかった作品と同じ扱い） */
+  markWorksMissing(ids: string[]): void {
+    this.runForIds(
       "UPDATE main.works SET status = 'missing', error_message = NULL, verification_status = 'verified' " +
         "WHERE id IN (SELECT value FROM json_each(?))",
-      input.missingIds,
+      ids,
     );
+  }
+
+  private runForIds(sql: string, ids: string[]): void {
+    if (ids.length === 0) return;
+    this.db.sqlite.query(sql).run(JSON.stringify(ids));
   }
 
   countByStatus(status: string): number {

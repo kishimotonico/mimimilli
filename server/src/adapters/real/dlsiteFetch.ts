@@ -4,12 +4,11 @@ import type { DlsiteFetchResult } from "@mimimilli/shared";
 import { DlsiteOfflineError } from "../../errors.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import {
-  DLSITE_PARSER_VERSION,
   fetchDlsiteCover,
   fetchDlsiteHtml,
   listDlsiteMissingFields,
   normalizeDlsiteCoverUrl,
-  parseDlsiteHtml,
+  type DlsiteParser,
 } from "./dlsite.ts";
 import {
   DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES,
@@ -43,6 +42,7 @@ export interface DlsiteFetchDeps {
   dlsiteRequestConfig: DlsiteRequestConfig;
   dlsiteScheduler: DlsiteScheduler;
   schedulerDependencies?: DlsiteSchedulerDependencies;
+  parser: DlsiteParser;
 }
 
 export function createDlsiteFetch(deps: DlsiteFetchDeps) {
@@ -52,6 +52,7 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     dlsiteRequestConfig,
     dlsiteScheduler,
     schedulerDependencies,
+    parser,
   } = deps;
   const dlsiteHtmlTransferBytes =
     dlsiteCacheOptions.maxTransferBytes ?? DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES;
@@ -112,9 +113,36 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
       dlsiteCoverMaximumBytes,
       dlsiteUserAgent,
     );
-  const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache);
+  const resolveDlsiteProduct = createDlsiteProductResolver(dlsiteCache, parser);
   const dlsiteFlightPool = new SharedFlightPool<DlsiteFetchAttempt>();
   const dlsiteCoverFlightPool = new SharedFlightPool<{ body: Uint8Array; normalizedUrl: string }>();
+  const activeFlights = new Set<Promise<unknown>>();
+  const shutdown = new AbortController();
+
+  /** 購読者が全員中止して返った後も続くflightを、閉じる側が中止できるよう控える */
+  function runTracked<T>(
+    pool: SharedFlightPool<T>,
+    key: string,
+    signal: AbortSignal | undefined,
+    execute: (flightSignal: AbortSignal) => Promise<T>,
+  ): Promise<T> {
+    return pool.run(key, signal, (flightSignal) => {
+      const flight = execute(AbortSignal.any([flightSignal, shutdown.signal]));
+      activeFlights.add(flight);
+      const forget = () => void activeFlights.delete(flight);
+      flight.then(forget, forget);
+      return flight;
+    });
+  }
+
+  /**
+   * 進行中のflightを中止し、巻き戻りを待つ。中止後のflightはキャッシュへ書かない。
+   * 中止に応えない通信を待つ上限は、終了処理の全体タイムアウトが持つ。
+   */
+  async function abortInFlight(): Promise<void> {
+    shutdown.abort();
+    await Promise.allSettled(activeFlights);
+  }
 
   function resolveCachedDlsiteAttempt(
     productCode: string,
@@ -174,9 +202,10 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
       throw error;
     }
     const flightKey = force ? `${key}:force` : key;
-    return dlsiteFlightPool.run(flightKey, signal, async (flightSignal) => {
+    return runTracked(dlsiteFlightPool, flightKey, signal, async (flightSignal) => {
       try {
         const response = await dlsiteHtmlFetcher(key, flightSignal);
+        throwIfAborted(flightSignal);
         if (response.status === 404) {
           dlsiteCache.recordFailure({ productCode: key, outcome: "not_found" });
           return {
@@ -199,16 +228,14 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
             httpAttempted: true,
           };
         }
-        const parsed = parseDlsiteHtml(response.body, key);
+        const parsed = parser.parse(response.body, key);
         dlsiteCache.recordSuccess({
           productCode: key,
           outcome: parsed.ok ? "ok" : "parse_error",
           contentType: response.contentType ?? "",
           html: response.body,
           transferSize: response.transferSize,
-          parsed: parsed.ok
-            ? { parserVersion: DLSITE_PARSER_VERSION, info: parsed.info }
-            : undefined,
+          parsed: parsed.ok ? { parserVersion: parser.version, info: parsed.info } : undefined,
         });
         logDlsiteParseResult(key, parsed, true);
         return { result: parsed, httpAttempted: true };
@@ -265,38 +292,35 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
       return { body: cached.body, normalizedUrl };
     }
     dlsiteScheduler.assertOnline();
-    try {
-      const image = await dlsiteCoverFlightPool.run(key, signal, (flightSignal) => {
-        const cachedInFlight = dlsiteCache.getCover(normalizedUrl);
-        if (cachedInFlight) {
-          logDlsiteEvent({
-            event: "dlsite_cache_hit",
-            resource: "cover",
-            key: normalizedUrl,
-            reason: "cached",
-          });
-          return Promise.resolve({ body: cachedInFlight.body, normalizedUrl });
-        }
+    const image = await runTracked(dlsiteCoverFlightPool, key, signal, (flightSignal) => {
+      const cachedInFlight = dlsiteCache.getCover(normalizedUrl);
+      if (cachedInFlight) {
         logDlsiteEvent({
-          event: "dlsite_cache_miss",
+          event: "dlsite_cache_hit",
           resource: "cover",
           key: normalizedUrl,
-          reason: "not_cached",
+          reason: "cached",
         });
-        return dlsiteCoverFetcher(normalizedUrl, flightSignal).then((fetched) => {
-          const finalUrl = normalizeDlsiteCoverUrl(fetched.finalUrl);
-          dlsiteCache.putCover(finalUrl, fetched.body, fetched.contentType);
-          if (finalUrl !== normalizedUrl) {
-            dlsiteCache.putCover(normalizedUrl, fetched.body, fetched.contentType);
-          }
-          return { body: fetched.body, normalizedUrl: finalUrl };
-        });
+        return Promise.resolve({ body: cachedInFlight.body, normalizedUrl });
+      }
+      logDlsiteEvent({
+        event: "dlsite_cache_miss",
+        resource: "cover",
+        key: normalizedUrl,
+        reason: "not_cached",
       });
-      throwIfAborted(signal, "DLsite取得は中止されました");
-      return image;
-    } finally {
-      await dlsiteScheduler.drain();
-    }
+      return dlsiteCoverFetcher(normalizedUrl, flightSignal).then((fetched) => {
+        throwIfAborted(flightSignal);
+        const finalUrl = normalizeDlsiteCoverUrl(fetched.finalUrl);
+        dlsiteCache.putCover(finalUrl, fetched.body, fetched.contentType);
+        if (finalUrl !== normalizedUrl) {
+          dlsiteCache.putCover(normalizedUrl, fetched.body, fetched.contentType);
+        }
+        return { body: fetched.body, normalizedUrl: finalUrl };
+      });
+    });
+    throwIfAborted(signal, "DLsite取得は中止されました");
+    return image;
   }
 
   /**
@@ -333,5 +357,6 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     fetchCachedDlsiteAttempt,
     fetchCachedDlsite,
     prefetchCover,
+    abortInFlight,
   };
 }

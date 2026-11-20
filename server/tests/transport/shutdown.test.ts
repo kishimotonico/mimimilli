@@ -13,6 +13,7 @@ import {
   runCleanupAndExit,
 } from "../../src/serverLifecycle.ts";
 import { serveFixtureTransport } from "./helpers.ts";
+import { scanExecutionOf } from "../helpers/scanLibrary.ts";
 
 const emptyScanResult = {
   registered: 0,
@@ -52,7 +53,7 @@ function createSlowScanFixture(): {
           "abort",
           () => {
             abortObserved = true;
-            resolve(emptyScanResult);
+            resolve(scanExecutionOf(emptyScanResult));
           },
           { once: true },
         );

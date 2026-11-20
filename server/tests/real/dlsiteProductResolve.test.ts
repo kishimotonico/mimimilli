@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import type { DlsiteWorkInfo } from "@mimimilli/shared";
 import {
+  DLSITE_PARSER,
   DLSITE_PARSER_VERSION,
   normalizeDlsiteCoverUrl,
   parseDlsiteHtml,
@@ -15,7 +16,7 @@ import {
 } from "../../src/adapters/real/dlsiteProductResolve.ts";
 import {
   createCandidateDlsiteSource,
-  deriveCandidateDlsite,
+  deriveDlsiteProductSummary,
 } from "../../src/adapters/real/scanCandidateDlsite.ts";
 import { sampleWorkHtml } from "../helpers/dlsiteTransport.ts";
 import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
@@ -68,19 +69,22 @@ test("取得時に解析結果を保存すると、候補の導出は何度で�
   const info = record(first);
   const { state, parse } = countingParse();
 
-  const source = createCandidateDlsiteSource(first, createDlsiteProductResolver(first, parse));
+  const source = createCandidateDlsiteSource(
+    first,
+    createDlsiteProductResolver(first, { version: DLSITE_PARSER_VERSION, parse }),
+  );
   const expected = { state: "fetched", title: info.title, cover: null };
-  assert.deepEqual(deriveCandidateDlsite(source, CODE), expected);
-  assert.deepEqual(deriveCandidateDlsite(source, CODE), expected);
+  assert.deepEqual(deriveDlsiteProductSummary(source, CODE), expected);
+  assert.deepEqual(deriveDlsiteProductSummary(source, CODE), expected);
   assert.equal(state.calls, 0);
 
   first.close();
   const restarted = open();
   const restartedSource = createCandidateDlsiteSource(
     restarted,
-    createDlsiteProductResolver(restarted, parse),
+    createDlsiteProductResolver(restarted, { version: DLSITE_PARSER_VERSION, parse }),
   );
-  assert.deepEqual(deriveCandidateDlsite(restartedSource, CODE), expected);
+  assert.deepEqual(deriveDlsiteProductSummary(restartedSource, CODE), expected);
   assert.equal(state.calls, 0);
 });
 
@@ -89,7 +93,7 @@ test("解析結果が無いsnapshotは1回だけ解析して書き戻し、以�
   const cache = open();
   const info = record(cache, { withParsed: false });
   const { state, parse } = countingParse();
-  const resolve = createDlsiteProductResolver(cache, parse);
+  const resolve = createDlsiteProductResolver(cache, { version: DLSITE_PARSER_VERSION, parse });
 
   for (let i = 0; i < 3; i++) {
     const resolution = resolve(CODE);
@@ -110,7 +114,7 @@ test("パーサーの版が違う解析結果は解析し直される", (t) => {
     info: { ...info, title: "古い解析結果" },
   });
   const { state, parse } = countingParse();
-  const resolve = createDlsiteProductResolver(cache, parse);
+  const resolve = createDlsiteProductResolver(cache, { version: DLSITE_PARSER_VERSION, parse });
 
   const resolution = resolve(CODE);
   assert.equal(
@@ -125,12 +129,15 @@ test("パーサーの版が違う解析結果は解析し直される", (t) => {
 test("snapshotが取り直されると、古い解析結果は使われず新しい内容を返す", (t) => {
   const { open, setClock } = setup(t);
   const cache = open();
-  const source = createCandidateDlsiteSource(cache);
+  const source = createCandidateDlsiteSource(
+    cache,
+    createDlsiteProductResolver(cache, DLSITE_PARSER),
+  );
   record(cache, { title: "前のタイトル" });
-  assert.equal(deriveCandidateDlsite(source, CODE).state, "fetched");
+  assert.equal(deriveDlsiteProductSummary(source, CODE).state, "fetched");
   setClock(1_010);
   record(cache, { title: "取り直したタイトル" });
-  assert.deepEqual(deriveCandidateDlsite(source, CODE), {
+  assert.deepEqual(deriveDlsiteProductSummary(source, CODE), {
     state: "fetched",
     title: "取り直したタイトル",
     cover: null,
@@ -140,8 +147,11 @@ test("snapshotが取り直されると、古い解析結果は使われず新し
 test("状態の導出: ok=取得済み、parse_error=失敗、失敗の記録、TTL切れ=未取得", (t) => {
   const { open, setClock } = setup(t);
   const cache = open();
-  const source = createCandidateDlsiteSource(cache);
-  const stateOf = (code: string) => deriveCandidateDlsite(source, code).state;
+  const source = createCandidateDlsiteSource(
+    cache,
+    createDlsiteProductResolver(cache, DLSITE_PARSER),
+  );
+  const stateOf = (code: string) => deriveDlsiteProductSummary(source, code).state;
 
   assert.equal(stateOf("RJ000009"), "none");
   record(cache);
@@ -180,9 +190,15 @@ test("outcomeがokでも解析できなくなったsnapshotは失敗になる", 
     contentType: HTML_CONTENT_TYPE,
     html: "<html><body>タイトルなし</body></html>",
   });
-  const resolution = createDlsiteProductResolver(cache)(CODE);
+  const resolution = createDlsiteProductResolver(cache, DLSITE_PARSER)(CODE);
   assert.equal(dlsiteFetchStateOfProductResolution(resolution), "failed");
-  assert.equal(deriveCandidateDlsite(createCandidateDlsiteSource(cache), CODE).state, "failed");
+  assert.equal(
+    deriveDlsiteProductSummary(
+      createCandidateDlsiteSource(cache, createDlsiteProductResolver(cache, DLSITE_PARSER)),
+      CODE,
+    ).state,
+    "failed",
+  );
 });
 
 test("カバーはキャッシュにあれば版つきで載り、無ければnull、後から入れれば次の導出で載る", (t) => {
@@ -190,16 +206,19 @@ test("カバーはキャッシュにあれば版つきで載り、無ければnu
   const cache = open();
   const info = record(cache);
   const coverUrl = normalizeDlsiteCoverUrl(info.coverUrl!);
-  const source = createCandidateDlsiteSource(cache);
+  const source = createCandidateDlsiteSource(
+    cache,
+    createDlsiteProductResolver(cache, DLSITE_PARSER),
+  );
 
-  assert.deepEqual(deriveCandidateDlsite(source, CODE), {
+  assert.deepEqual(deriveDlsiteProductSummary(source, CODE), {
     state: "fetched",
     title: info.title,
     cover: null,
   });
   setClock(1_005);
   cache.putCover(coverUrl, new Uint8Array([0xff, 0xd8, 0xff]), "image/jpeg");
-  assert.deepEqual(deriveCandidateDlsite(source, CODE), {
+  assert.deepEqual(deriveDlsiteProductSummary(source, CODE), {
     state: "fetched",
     title: info.title,
     cover: { key: DlsiteCache.coverKey(coverUrl), version: 1_005 },
@@ -208,8 +227,12 @@ test("カバーはキャッシュにあれば版つきで載り、無ければnu
 
 test("RJコードが無い候補は未取得", (t) => {
   const { open } = setup(t);
-  const source = createCandidateDlsiteSource(open());
-  assert.deepEqual(deriveCandidateDlsite(source, null), { state: "none" });
+  const cache = open();
+  const source = createCandidateDlsiteSource(
+    cache,
+    createDlsiteProductResolver(cache, DLSITE_PARSER),
+  );
+  assert.deepEqual(deriveDlsiteProductSummary(source, null), { state: "none" });
 });
 
 test("resolveHead は resolve と同じ判断を、本文を読まずに返す", (t) => {

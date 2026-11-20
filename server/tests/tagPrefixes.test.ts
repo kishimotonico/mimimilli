@@ -280,11 +280,39 @@ const contract = defineContract({
   },
 });
 
-const applyBody = (sourceRevision: string, tags: string[], infoRevision = 1) => ({
+const applyBody = (sourceRevision: string, tags: string[], infoRevision: string) => ({
   sourceRevision,
   infoRevision,
   apply: { title: false, cover: false, url: false, tags },
 });
+
+/** 形式だけ正しい版。タグ以外が正しいリクエストはスキーマを通り、適用の照合で409になる */
+const UNCHECKED_INFO_REVISION = "unchecked";
+
+/** 対照のリクエスト（タグだけ正しい）が409になることで、本体の400がタグの検証によるものだと示す */
+async function assertTagsRejected(
+  harness: ContractHarness,
+  validTags: string[],
+  badTags: string[],
+) {
+  const id = harness.workId("a");
+  const sourceRevision = await sourceRevisionOf(harness, id);
+  const control = await harness.send(
+    "POST",
+    `/api/dlsite/${id}/apply`,
+    applyBody(sourceRevision, validTags, UNCHECKED_INFO_REVISION),
+  );
+  assert.equal(control.status, 409);
+  assert.equal(control.body.error.code, "dlsite_refetch_required");
+
+  const applied = await harness.send(
+    "POST",
+    `/api/dlsite/${id}/apply`,
+    applyBody(sourceRevision, badTags, UNCHECKED_INFO_REVISION),
+  );
+  assert.equal(applied.status, 400);
+  assert.equal(applied.body.error.code, "invalid_request");
+}
 
 async function sourceRevisionOf(harness: ContractHarness, workId: string): Promise<string> {
   const { body } = await harness.json(`/api/works/${workId}/source`);
@@ -353,30 +381,12 @@ contract("POST /api/dlsite/:id/apply: apply.tags を正規化して保存する"
   assert.ok(work.body.tags.includes("genre/テスト"));
 });
 
-contract(
-  "POST /api/dlsite/:id/apply: 正規化後に空になる apply.tags は400で拒否する",
-  async (harness) => {
-    const id = harness.workId("a");
-    const applied = await harness.send(
-      "POST",
-      `/api/dlsite/${id}/apply`,
-      applyBody(await sourceRevisionOf(harness, id), ["genre/耳かき", "  "]),
-    );
-    assert.equal(applied.status, 400);
-  },
+contract("POST /api/dlsite/:id/apply: 正規化後に空になる apply.tags は400で拒否する", (harness) =>
+  assertTagsRejected(harness, ["genre/耳かき"], ["genre/耳かき", "  "]),
 );
 
-contract(
-  "POST /api/dlsite/:id/apply: 予約文字 @ 始まりの apply.tags は400で拒否する",
-  async (harness) => {
-    const id = harness.workId("a");
-    const applied = await harness.send(
-      "POST",
-      `/api/dlsite/${id}/apply`,
-      applyBody(await sourceRevisionOf(harness, id), ["@year/2024"]),
-    );
-    assert.equal(applied.status, 400);
-  },
+contract("POST /api/dlsite/:id/apply: 予約文字 @ 始まりの apply.tags は400で拒否する", (harness) =>
+  assertTagsRejected(harness, ["year/2024"], ["@year/2024"]),
 );
 
 contract("GET /api/tag-prefixes は初期定義を order 昇順で返す", async (harness) => {

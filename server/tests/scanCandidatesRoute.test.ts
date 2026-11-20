@@ -4,10 +4,11 @@ import {
   SCAN_CANDIDATE_REGISTER_MAX_PATHS,
   scanCandidateRjCodeRequestSchema,
   scanCandidateSchema,
-  scanCandidatesRegisterResponseSchema,
   workspacePath,
 } from "@mimimilli/shared";
-import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
+import type { DataAdapter } from "../src/adapter/index.ts";
+import { buildFixtureAdapterWithCandidates } from "./helpers/fixtureCandidates.ts";
+import { runScan } from "./helpers/scanLibrary.ts";
 import { createApp } from "./helpers/testApp.ts";
 import { pollUntil } from "./helpers/poll.ts";
 import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
@@ -34,6 +35,7 @@ const hasTarget = (candidates: Array<{ path: string }>) =>
 
 contract("候補一覧は未登録フォルダーの推定タイトルと音声内訳を返す", async (harness) => {
   const target = (await listCandidates(harness)).find((entry) => entry.path === TARGET);
+  assert.equal(typeof target?.dlsiteRevision, "number");
   assert.deepEqual(target, {
     path: TARGET,
     inferredTitle: "未登録作品",
@@ -42,9 +44,30 @@ contract("候補一覧は未登録フォルダーの推定タイトルと音声�
     rjCode: null,
     rjCodeEdited: false,
     dlsite: { state: "none" },
+    dlsiteRevision: target!.dlsiteRevision,
     missingWorks: [],
   });
 });
+
+contract(
+  "候補フローの外で登録したパスは、候補一覧にも再スキャン後の候補にも出ない",
+  async (harness) => {
+    assert.equal(hasTarget(await listCandidates(harness)), true);
+    const created = await harness.send("POST", "/api/works", {
+      path: "未登録作品",
+      title: "候補の外で登録",
+      rjCode: "",
+      applyCover: false,
+      applyUrl: false,
+    });
+    assert.equal(created.status, 201);
+    assert.equal(hasTarget(await listCandidates(harness)), false);
+
+    assert.equal((await harness.send("POST", "/api/scan")).status, 202);
+    await pollUntil(async () => (await harness.json("/api/scan")).body.status !== "running");
+    assert.equal(hasTarget(await listCandidates(harness)), false);
+  },
+);
 
 contract("候補を登録すると作品一覧に加わり、候補一覧から消える", async (harness) => {
   const registered = await harness.send("POST", "/api/scan/candidates/register", {
@@ -61,6 +84,22 @@ contract("候補を登録すると作品一覧に加わり、候補一覧から�
   assert.equal(work.status, 200);
   assert.equal(work.body.title, "未登録作品");
   assert.equal(hasTarget(await listCandidates(harness)), false);
+});
+
+contract("候補から追加した作品を登録解除すると、再スキャンなしで候補に戻る", async (harness) => {
+  const registered = await harness.send("POST", "/api/scan/candidates/register", {
+    paths: ["未登録作品"],
+    apply: { title: true, cover: true, tags: true, url: true },
+  });
+  assert.equal(registered.status, 201);
+  assert.equal(hasTarget(await listCandidates(harness)), false);
+
+  const removed = await harness.send(
+    "DELETE",
+    `/api/works/${registered.body.registered[0].workId}`,
+  );
+  assert.equal(removed.status, 204);
+  assert.equal(hasTarget(await listCandidates(harness)), true);
 });
 
 contract("候補の除外は一覧から隠し、除外解除で戻る", async (harness) => {
@@ -131,23 +170,21 @@ contract("除外してから戻しても、直したRJコードは残る", async
   assert.equal(listed?.rjCode, "RJ1234567");
 });
 
-contract(
-  "次のスキャンで、直したRJコードは破棄されフォルダー名から検出し直される",
-  async (harness) => {
-    await harness.send("POST", "/api/scan/candidates/rj-code", {
-      path: "未登録作品",
-      rjCode: "RJ1234567",
-    });
-    const started = await harness.send("POST", "/api/scan");
-    assert.equal(started.status, 202);
-    await pollUntil(async () => {
-      const job = await harness.json(`/api/scan/${started.body.job.id}`);
-      return job.body.status === "completed";
-    });
-    const listed = (await listCandidates(harness)).find((entry) => entry.path === TARGET);
-    assert.equal(listed?.rjCode, null);
-  },
-);
+contract("次のスキャンでも、候補に残っているフォルダーの直したRJコードは残る", async (harness) => {
+  await harness.send("POST", "/api/scan/candidates/rj-code", {
+    path: "未登録作品",
+    rjCode: "RJ1234567",
+  });
+  const started = await harness.send("POST", "/api/scan");
+  assert.equal(started.status, 202);
+  await pollUntil(async () => {
+    const job = await harness.json(`/api/scan/${started.body.job.id}`);
+    return job.body.status === "completed";
+  });
+  const listed = (await listCandidates(harness)).find((entry) => entry.path === TARGET);
+  assert.equal(listed?.rjCode, "RJ1234567");
+  assert.equal(listed?.rjCodeEdited, true);
+});
 
 contract("RJコード修正は候補にないパスを409で拒否する", async (harness) => {
   const response = await harness.send("POST", "/api/scan/candidates/rj-code", {
@@ -214,58 +251,60 @@ realContract("候補にないパスを含む登録・除外は409で拒否し、
 // リクエスト→adapter 引数）を fixture ベースで確認する。adapter の戻り値は両 adapter で
 // 一様には作れないため、上の contract では扱わない
 
-test("候補登録はDLsite取得ジョブを作らない", async () => {
-  const app = createApp({
-    ...createFixtureAdapter(),
-    registerScanCandidates: async () =>
-      scanCandidatesRegisterResponseSchema.parse({
-        registered: [
-          { path: "候補作品", workId: "work-a" },
-          { path: "候補作品-2", workId: "work-b" },
-        ],
-        failures: [],
-      }),
+type RegisterFolder = DataAdapter["registerCandidateFolder"];
+
+const APPLY_ALL = { title: true, cover: true, tags: true, url: true };
+
+/** 指定パスを候補プールに持つfixtureで、登録の素材だけを差し替えたアプリ。ルートの写像を確認する */
+async function appWithRegister(paths: string[], registerCandidateFolder: RegisterFolder) {
+  const adapter: DataAdapter = {
+    ...(await buildFixtureAdapterWithCandidates(
+      paths.map((path) => ({
+        path: workspacePath(path),
+        inferredTitle: path,
+        audioFileCount: 1,
+        audioBreakdown: [{ extension: "mp3", count: 1 }],
+        detectedRjCode: null,
+      })),
+    )),
+    registerCandidateFolder,
+  };
+  await runScan(adapter);
+  return createApp(adapter);
+}
+
+const postRegister = (app: ReturnType<typeof createApp>, paths: string[], apply = APPLY_ALL) =>
+  app.request("/api/scan/candidates/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ paths, apply }),
   });
 
+test("候補登録はDLsite取得ジョブを作らない", async () => {
+  const app = await appWithRegister(["候補作品"], async () => ({
+    workId: "work-a",
+    coverSkipped: null,
+  }));
   try {
-    const registered = await app.request("/api/scan/candidates/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        paths: ["候補作品"],
-        apply: { title: true, cover: true, tags: true, url: true },
-      }),
-    });
+    const registered = await postRegister(app, ["候補作品"]);
     assert.equal(registered.status, 201);
     await new Promise((resolve) => setImmediate(resolve));
-    assert.deepEqual(await (await app.request("/api/dlsite/jobs/current")).json(), { job: null });
+    assert.equal((await (await app.request("/api/dlsite/jobs/current")).json()).job, null);
   } finally {
     await app.shutdown();
   }
 });
 
 test("候補登録APIは部分失敗と全失敗を201で返す", async () => {
-  const fixture = createFixtureAdapter();
-  const app = createApp({
-    ...fixture,
-    registerScanCandidates: async () =>
-      scanCandidatesRegisterResponseSchema.parse({
-        registered: [{ path: "候補作品", workId: "work-ok" }],
-        failures: [{ path: "失敗作品", message: "catalogの投影に失敗しました" }],
-      }),
+  const app = await appWithRegister(["候補作品", "失敗作品"], async (folder) => {
+    if (folder.path === "失敗作品") throw new Error("catalogの投影に失敗しました");
+    return { workId: "work-ok", coverSkipped: null };
   });
   try {
-    const partial = await app.request("/api/scan/candidates/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        paths: ["候補作品"],
-        apply: { title: true, cover: true, tags: true, url: true },
-      }),
-    });
+    const partial = await postRegister(app, ["候補作品", "失敗作品"]);
     assert.equal(partial.status, 201);
     assert.deepEqual(await partial.json(), {
-      registered: [{ path: "候補作品", workId: "work-ok" }],
+      registered: [{ path: "候補作品", workId: "work-ok", coverSkipped: null }],
       failures: [{ path: "失敗作品", message: "catalogの投影に失敗しました" }],
     });
   } finally {
@@ -274,24 +313,11 @@ test("候補登録APIは部分失敗と全失敗を201で返す", async () => {
 });
 
 test("候補登録APIは全失敗を成功なしの結果として201で返す", async () => {
-  const fixture = createFixtureAdapter();
-  const app = createApp({
-    ...fixture,
-    registerScanCandidates: async () =>
-      scanCandidatesRegisterResponseSchema.parse({
-        registered: [],
-        failures: [{ path: "候補作品", message: "mimimilli.jsonの生成に失敗しました" }],
-      }),
+  const app = await appWithRegister(["候補作品"], async () => {
+    throw new Error("mimimilli.jsonの生成に失敗しました");
   });
   try {
-    const failed = await app.request("/api/scan/candidates/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        paths: ["候補作品"],
-        apply: { title: true, cover: true, tags: true, url: true },
-      }),
-    });
+    const failed = await postRegister(app, ["候補作品"]);
     assert.equal(failed.status, 201);
     assert.deepEqual(await failed.json(), {
       registered: [],
@@ -325,33 +351,28 @@ test("scanCandidateRjCodeRequestSchema: RJ/VJコードの形式を検証・正�
 
 test("候補APIは上限ちょうどの件数を受け付け、超えると400にする", async () => {
   const pathsOf = (count: number) => Array.from({ length: count }, (_, index) => `候補-${index}`);
-  const fixture = createFixtureAdapter();
-  let received: { paths: string[]; apply: unknown } | null = null;
-  const app = createApp({
-    ...fixture,
-    registerScanCandidates: async (paths, apply) => {
-      received = { paths, apply };
-      return { registered: [], failures: [] };
-    },
+  const atLimit = pathsOf(SCAN_CANDIDATE_REGISTER_MAX_PATHS);
+  const apply = { title: true, cover: false, tags: true, url: false };
+  const received: Array<{ path: string; apply: unknown }> = [];
+  const app = await appWithRegister(atLimit, async (folder, _rjCode, applied) => {
+    received.push({ path: folder.path, apply: applied });
+    return { workId: `work-${folder.path}`, coverSkipped: null };
   });
-  const post = (paths: string[]) =>
-    app.request("/api/scan/candidates/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paths, apply: { title: true, cover: false, tags: true, url: false } }),
-    });
   try {
-    const atLimit = pathsOf(SCAN_CANDIDATE_REGISTER_MAX_PATHS);
-    const accepted = await post(atLimit);
+    const accepted = await postRegister(app, atLimit, apply);
     assert.equal(accepted.status, 201);
-    assert.deepEqual(received, {
-      paths: atLimit,
-      apply: { title: true, cover: false, tags: true, url: false },
-    });
-    received = null;
-    const overLimit = await post(pathsOf(SCAN_CANDIDATE_REGISTER_MAX_PATHS + 1));
+    assert.deepEqual(
+      received,
+      atLimit.map((path) => ({ path, apply })),
+    );
+    received.length = 0;
+    const overLimit = await postRegister(
+      app,
+      pathsOf(SCAN_CANDIDATE_REGISTER_MAX_PATHS + 1),
+      apply,
+    );
     assert.equal(overLimit.status, 400);
-    assert.equal(received, null);
+    assert.deepEqual(received, []);
   } finally {
     await app.shutdown();
   }

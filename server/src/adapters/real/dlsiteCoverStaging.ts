@@ -1,14 +1,26 @@
-import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { CoverSaveError } from "../../errors.ts";
-import { commitTempFile, removeTempFile, writeTempFile } from "./atomicFile.ts";
+import {
+  commitTempFile,
+  removeTempFile,
+  restoreAsideFile,
+  setAsideFile,
+  writeTempFile,
+} from "./atomicFile.ts";
+import {
+  dlsiteCoverBaseName,
+  errorMessage,
+  type DlsiteCoverSkipReason,
+  type WorkPlacement,
+} from "@mimimilli/shared";
+import { getCategoryLogger } from "../../lib/logger.ts";
 import { normalizeDlsiteCoverUrl } from "./dlsite.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
 import { resolveWithin } from "./paths.ts";
 import { measureCoverDimensions } from "./thumbnailCache.ts";
 import type { CoverColumns } from "./workRowMapping.ts";
 
-const DLSITE_COVER_BASENAME = "dlsite_cover";
+const dlsiteLogger = getCategoryLogger("dlsite");
 
 const COVER_EXTENSION_BY_CONTENT_TYPE: Readonly<Record<string, string>> = {
   "image/jpeg": "jpg",
@@ -20,10 +32,8 @@ const COVER_EXTENSION_BY_CONTENT_TYPE: Readonly<Record<string, string>> = {
 export interface StagedCover {
   fileName: string;
   dimensions: NonNullable<CoverColumns["dimensions"]>;
-  commit(): void;
-  /** commit後に登録が失敗したとき、commitで新しく作ったカバーを消す */
-  rollback(): void;
-  discard(): void;
+  /** 最終名へ確定する。旧カバーは退避され、saveWithDlsiteCover が保存の成否で消すか戻す */
+  place(): void;
 }
 
 /** 先頭バイトから画像形式を判定する。判定できないときはnull */
@@ -40,33 +50,90 @@ export function sniffImageContentType(body: Uint8Array): string | null {
 }
 
 /**
- * カバーキャッシュにあるカバーを作品フォルダー内の一時ファイルへ置く。DLsiteへは取りに行かない。
- * 最終名への確定は呼び出し側が commit() で行う。キャッシュに無い・画像形式を判定できない・
- * ルート外の作品フォルダー・画像として読めない場合は null。
+ * キャッシュにあるカバーを作品の配置に沿った名前で保存する共通手順。
+ * ステージ → persist 内の place() で配置 → persist 失敗時は旧カバーへ戻す → 後始末。
+ * persist は、メタの保存まで含めて成否を決める処理。DLsiteへは取りに行かない。
+ * キャッシュに無い・画像形式を判定できない・ルート外の作品フォルダー・画像として読めないときは cover=null で persist を呼び、
+ * 選んだカバーを適用しなかった理由を coverSkipped に返す。coverUrl が無いときは理由を持たない。
  */
-export async function stageCachedDlsiteCover(
-  cache: Pick<DlsiteCache, "getCover">,
-  coverUrl: string,
-  workDir: string,
+export async function saveWithDlsiteCover<T>(
+  source: {
+    cache: Pick<DlsiteCache, "getCover">;
+    coverUrl: string | null | undefined;
+    /** 保存前のメタの coverImage。自分の配置から導いた名前で拡張子だけ違うときは、成功後に消す */
+    previousCoverImage?: string | null;
+  },
+  placement: WorkPlacement,
   root: string,
-): Promise<StagedCover | null> {
+  persist: (cover: StagedCover | null) => T | Promise<T>,
+): Promise<{ value: T; coverSkipped: DlsiteCoverSkipReason | null }> {
+  const outcome = source.coverUrl
+    ? await stageCachedDlsiteCover(source, source.coverUrl, placement, root)
+    : null;
+  const staged = outcome?.kind === "staged" ? outcome.handle : null;
+  const coverSkipped = outcome?.kind === "skipped" ? outcome.reason : null;
+  try {
+    const value = await persist(staged?.cover ?? null);
+    staged?.settle();
+    return { value, coverSkipped };
+  } catch (error) {
+    try {
+      staged?.revert();
+    } catch (revertError) {
+      dlsiteLogger.error("DLsiteカバーを元に戻せませんでした", {
+        error: errorMessage(revertError),
+      });
+    }
+    throw error;
+  } finally {
+    staged?.discard();
+  }
+}
+
+type StagingOutcome =
+  | { kind: "staged"; handle: StagingHandle }
+  | { kind: "skipped"; reason: DlsiteCoverSkipReason };
+
+function skipped(reason: DlsiteCoverSkipReason, mediaRoot?: string): StagingOutcome {
+  if (reason !== "not_cached") {
+    dlsiteLogger.warn("DLsiteカバーを反映しませんでした", { reason, mediaRoot });
+  }
+  return { kind: "skipped", reason };
+}
+
+interface StagingHandle {
+  cover: StagedCover;
+  /** 保存に成功したので退避した旧カバーを消す */
+  settle(): void;
+  /** 保存に失敗したので配置済みなら旧カバーへ戻す */
+  revert(): void;
+  discard(): void;
+}
+
+async function stageCachedDlsiteCover(
+  { cache, previousCoverImage }: Parameters<typeof saveWithDlsiteCover>[0],
+  coverUrl: string,
+  placement: WorkPlacement,
+  root: string,
+): Promise<StagingOutcome> {
   let normalizedUrl: string;
   try {
     normalizedUrl = normalizeDlsiteCoverUrl(coverUrl);
   } catch {
-    return null;
+    return skipped("not_cached");
   }
   const cached = cache.getCover(normalizedUrl);
-  if (!cached) return null;
+  if (!cached) return skipped("not_cached");
   const contentType = sniffImageContentType(cached.body);
   const extension = contentType ? COVER_EXTENSION_BY_CONTENT_TYPE[contentType] : undefined;
-  if (!extension) return null;
-  const realWorkDir = resolveWithin(root, workDir);
-  if (!realWorkDir) return null;
-  const fileName = `${DLSITE_COVER_BASENAME}.${extension}`;
+  if (!extension) return skipped("unreadable", placement.mediaRoot);
+  const realWorkDir = resolveWithin(root, placement.mediaRoot);
+  if (!realWorkDir) return skipped("outside_root", placement.mediaRoot);
+  const baseName = dlsiteCoverBaseName(placement);
+  const fileName = `${baseName}.${extension}`;
   let tmpPath: string;
   try {
-    tmpPath = writeTempFile(realWorkDir, DLSITE_COVER_BASENAME, cached.body);
+    tmpPath = writeTempFile(realWorkDir, baseName, cached.body);
   } catch (error) {
     throw new CoverSaveError({ cause: error });
   }
@@ -76,23 +143,41 @@ export async function stageCachedDlsiteCover(
   } finally {
     if (!dimensions) removeTempFile(tmpPath);
   }
-  if (!dimensions) return null;
+  if (!dimensions) return skipped("unreadable", placement.mediaRoot);
   const finalPath = join(realWorkDir, fileName);
-  let createdByCommit = false;
-  return {
-    fileName,
-    dimensions,
-    rollback: () => {
-      if (createdByCommit) removeTempFile(finalPath);
+  let placed = false;
+  let aside: string | null = null;
+  const handle: StagingHandle = {
+    cover: {
+      fileName,
+      dimensions,
+      place: () => {
+        try {
+          aside = setAsideFile(finalPath);
+          placed = true;
+          commitTempFile(tmpPath, finalPath);
+        } catch (error) {
+          throw new CoverSaveError({ cause: error });
+        }
+      },
     },
-    commit: () => {
-      try {
-        createdByCommit = !existsSync(finalPath);
-        commitTempFile(tmpPath, finalPath);
-      } catch (error) {
-        throw new CoverSaveError({ cause: error });
+    settle: () => {
+      if (aside) removeTempFile(aside);
+      if (
+        placed &&
+        previousCoverImage &&
+        previousCoverImage !== fileName &&
+        Object.values(COVER_EXTENSION_BY_CONTENT_TYPE).some(
+          (ext) => previousCoverImage === `${baseName}.${ext}`,
+        )
+      ) {
+        removeTempFile(join(realWorkDir, previousCoverImage));
       }
+    },
+    revert: () => {
+      if (placed) restoreAsideFile(finalPath, aside);
     },
     discard: () => removeTempFile(tmpPath),
   };
+  return { kind: "staged", handle };
 }

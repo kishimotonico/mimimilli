@@ -5,7 +5,7 @@ import { test } from "node:test";
 import type { ScanJobSnapshot, WorksPage } from "@mimimilli/shared";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { createApp } from "../helpers/testApp.ts";
-import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
+import { runScan, scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
 import { pollUntil } from "../helpers/poll.ts";
 import { runFileScanInWorker, terminateScanWorkers } from "../../src/adapters/real/scanRunner.ts";
@@ -43,7 +43,7 @@ test("file scan Workerの同期停止中もworks/Range mediaへ応答し、cance
   await configureRoot(seed, library.root);
   await scanAndRegisterCandidates(seed);
   const settingsBeforeCancel = await seed.getSettings();
-  seed.close();
+  await seed.close();
 
   const gateBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
   const gate = new Int32Array(gateBuffer);
@@ -132,7 +132,7 @@ test("app shutdown は同期停止中のfile scan Workerを終了まで待機す
   });
   await configureRoot(seed, library.root);
   await scanAndRegisterCandidates(seed);
-  seed.close();
+  await seed.close();
 
   const gateBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
   let ready!: () => void;
@@ -171,7 +171,7 @@ test("terminateScanWorkersはエラーログなしでAbortErrorとしてscanを�
   const thumbnailCacheDir = join(dataRoot, "thumbnails");
   const seed = createTestRealAdapter({ database, dataRoot, thumbnailCacheDir });
   await configureRoot(seed, library.root);
-  seed.close();
+  await seed.close();
 
   const gateBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
   let ready!: () => void;
@@ -214,7 +214,7 @@ test("file scan Workerはfull:trueをscannerへ伝播し全件再処理する", 
   await configureRoot(adapter, library.root);
   await scanAndRegisterCandidates(adapter);
 
-  const second = await adapter.scan({ full: true });
+  const second = await runScan(adapter, { full: true });
   assert.equal(second.skipped, 0);
   assert.equal(second.registered, 2);
 });
@@ -248,7 +248,7 @@ test("file scan WorkerはMIMIMILLI_DLSITE_CACHE_DBで解決したDLsiteキャッ
     createTestRealAdapter({ database, dataRoot, thumbnailCacheDir, dlsiteCache }),
   );
   await configureRoot(adapter, library.root);
-  await adapter.scan();
+  await runScan(adapter);
 
   const work = await adapter.getWork(library.existingWorkId);
   assert.equal(work?.dlsite.status, "not_found");

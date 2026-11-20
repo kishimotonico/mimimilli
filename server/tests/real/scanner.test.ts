@@ -1,8 +1,14 @@
-import { REGISTER_ALL } from "../helpers/scanLibrary.ts";
+import {
+  REGISTER_ALL,
+  listCandidates,
+  registerCandidates,
+  runScan,
+} from "../helpers/scanLibrary.ts";
 // real アダプタのスキャナー結合テスト。
 // サンプルライブラリ構成（tests/helpers/sampleLibrary.ts）:
 //   dlsite/RJ900001_テスト作品/ … メタなし（mp3/ に 2秒+3秒 の WAV、cover.jpg）→ 自動生成対象
 //   dlsite/RJ900002_既存メタ/   … mimimilli.json あり、トラック1本欠損 → status "error"
+import { prepareSingleMeta } from "../../src/adapters/real/scanRegister.ts";
 import assert from "node:assert/strict";
 import {
   existsSync,
@@ -36,9 +42,10 @@ async function setup(t: TestContext) {
   t.after(lib.cleanup);
   const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, lib.root);
-  await adapter.scan();
-  const result = await adapter.registerScanCandidates(
-    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+  await runScan(adapter);
+  const result = await registerCandidates(
+    adapter,
+    (await listCandidates(adapter)).map((candidate) => candidate.path),
     REGISTER_ALL,
   );
   const candidateWorkId = result.registered[0]!.workId;
@@ -54,7 +61,7 @@ function countWorkStates(db: Db): number {
 
 test("初回スキャン: 登録済みmimimilli.jsonを投影し、候補を自動登録しない", async (t) => {
   const { adapter, candidateWorkId, existingWorkId, root } = await setup(t);
-  const result = await adapter.scan();
+  const result = await runScan(adapter);
 
   assert.equal(result.registered, 1);
   assert.equal(result.insertedWorkIds.length, 0);
@@ -109,7 +116,7 @@ test("初回スキャン: 登録済みmimimilli.jsonを投影し、候補を自�
 
 test("DLsite状態: mimimilli.jsonのdlsite.statusに取得失敗の一時値が残っていると丸めず投影を更新しない", async (t) => {
   const { adapter, existingWorkId, root } = await setup(t);
-  await adapter.scan();
+  await runScan(adapter);
   const before = await adapter.getWork(existingWorkId);
   const metaPath = join(root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");
   const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
@@ -123,7 +130,7 @@ test("DLsite状態: mimimilli.jsonのdlsite.statusに取得失敗の一時値が
   };
   writeFileSync(metaPath, JSON.stringify(meta, null, 2));
 
-  await adapter.scan();
+  await runScan(adapter);
   assert.equal((await adapter.listScanDiagnostics()).invalidMetaFiles.length, 1);
   assert.equal(
     (await adapter.listScanDiagnostics()).invalidMetaFiles[0]?.path,
@@ -141,14 +148,14 @@ test("DLsite状態: mimimilli.jsonのdlsite.statusに取得失敗の一時値が
 
 test("移動追従: フォルダー移動後も同一 ID で path 更新・DB固有情報を保持", async (t) => {
   const { adapter, existingWorkId, root } = await setup(t);
-  await adapter.scan();
+  await runScan(adapter);
   await adapter.patchWorkBookmark(existingWorkId, { bookmarked: true });
 
   const oldDir = join(root, "dlsite", "RJ900002_既存メタ");
   const newDir = join(root, "RJ900002_移動先");
   renameSync(oldDir, newDir);
 
-  const result = await adapter.scan();
+  const result = await runScan(adapter);
   assert.equal(result.missing, 0);
 
   const work = await adapter.getWork(existingWorkId);
@@ -159,10 +166,10 @@ test("移動追従: フォルダー移動後も同一 ID で path 更新・DB固
 
 test("行方不明: フォルダー削除後の再スキャンで missing になる", async (t) => {
   const { adapter, existingWorkId, root } = await setup(t);
-  await adapter.scan();
+  await runScan(adapter);
 
   rmSync(join(root, "dlsite", "RJ900002_既存メタ"), { recursive: true });
-  const result = await adapter.scan();
+  const result = await runScan(adapter);
 
   assert.equal(result.missing, 1);
   const work = await adapter.getWork(existingWorkId);
@@ -198,7 +205,7 @@ test("UUID 重複: 後に検出された方が再採番されメタファイル�
   }
   const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  const result = await adapter.scan();
+  const result = await runScan(adapter);
 
   assert.equal(result.registered, 0);
   const metaA = JSON.parse(readFileSync(join(root, "work-a", "mimimilli.json"), "utf-8"));
@@ -221,7 +228,7 @@ test("メタ不正: 壊れた JSON は errors にカウントされスキャン�
   writeWav(join(brokenDir, "track.wav"), 1);
   writeFileSync(join(brokenDir, "mimimilli.json"), "{ これは JSON ではない");
 
-  const result = await adapter.scan();
+  const result = await runScan(adapter);
   assert.equal(result.errors, 1);
   assert.equal(result.registered, 1); // 既存メタ作品は通常どおり登録される
   // メタ不正フォルダーは「メタあり」扱いなので自動生成はされない
@@ -252,7 +259,7 @@ test("メタ不正: mimimilli.jsonのdlsite.statusに取得失敗の一時値（
     }),
   );
 
-  const result = await adapter.scan();
+  const result = await runScan(adapter);
   assert.equal(result.registered, 1); // 既存メタ作品は通常どおり登録される
   assert.equal(result.insertedWorkIds.length, 0);
   assert.equal((await adapter.listScanDiagnostics()).invalidMetaFiles.length, 1);
@@ -278,7 +285,7 @@ test("大量ディレクトリの走査中、walking フェーズの進捗イベ
   await configureRoot(adapter, root);
 
   const walkingEvents: { processed: number; total: number }[] = [];
-  await adapter.scan({
+  await runScan(adapter, {
     onProgress: (event) => {
       if (event.type === "progress" && event.phase === "walking") {
         walkingEvents.push({ processed: event.processed, total: event.total });
@@ -306,11 +313,11 @@ test("大量ディレクトリの走査中、walking フェーズの進捗イベ
 
 test("登録済み作品のメタが壊れた場合は missing ではなく error にする", async (t) => {
   const { adapter, existingWorkId, root } = await setup(t);
-  await adapter.scan();
+  await runScan(adapter);
   const metaPath = join(root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");
   writeFileSync(metaPath, "{ broken");
 
-  const result = await adapter.scan();
+  const result = await runScan(adapter);
   const work = await adapter.getWork(existingWorkId);
 
   assert.equal(result.errors, 1);
@@ -323,12 +330,12 @@ test("登録済み作品のメタが壊れた場合は missing ではなく erro
 
 test("増分スキャン: 完全未変更の作品は2回目以降スキップされる", async (t) => {
   const { adapter } = await setup(t);
-  const first = await adapter.scan();
+  const first = await runScan(adapter);
   assert.equal(first.skipped, 1);
   assert.equal(first.registered, 1);
   assert.equal(first.insertedWorkIds.length, 0);
 
-  const second = await adapter.scan();
+  const second = await runScan(adapter);
   assert.equal(second.registered, 1); // error状態の既存メタは毎回再評価
   assert.equal(second.insertedWorkIds.length, 0);
   assert.equal(second.skipped, 1); // 正常な自動生成メタのみスキップ
@@ -347,7 +354,7 @@ test("増分スキャン: スキップした作品もPlaylist/Trackとresumeを�
     await adapter.saveResume(workId, { playlistId: playlist.id, trackId: track.id, offsetSec: 1 }),
   );
 
-  const second = await adapter.scan();
+  const second = await runScan(adapter);
   assert.equal(second.skipped, 1);
   assert.deepEqual((await adapter.getWork(workId))?.resume, {
     playlistId: playlist.id,
@@ -358,13 +365,13 @@ test("増分スキャン: スキップした作品もPlaylist/Trackとresumeを�
 
 test("増分スキャン: source revisionが変わった不正mimimilli.jsonはerrorとして検出する", async (t) => {
   const { adapter, root } = await setup(t);
-  await adapter.scan();
+  await runScan(adapter);
   const metaPath = join(root, "dlsite", "RJ900001_テスト作品", "mimimilli.json");
   const meta = JSON.parse(readFileSync(metaPath, "utf-8")) as Record<string, unknown>;
   meta.createdAt = "これはISO日時ではない";
   writeFileSync(metaPath, JSON.stringify(meta, null, 2));
 
-  const second = await adapter.scan();
+  const second = await runScan(adapter);
   assert.equal(second.skipped, 0);
   assert.equal(second.errors, 1);
   assert.deepEqual(
@@ -463,7 +470,7 @@ test("増分スキャン: 音声削除時は fingerprint 不一致で再処理�
 
   rmSync(join(root, "dlsite", "RJ900001_テスト作品", "mp3", "01_intro.wav"));
 
-  const second = await adapter.scan();
+  const second = await runScan(adapter);
   assert.equal(second.skipped, 0);
   assert.equal(second.missing, 0);
 
@@ -484,7 +491,7 @@ test("増分スキャン: 音声 mtime/size 変更時は duration が再計算�
   // 01_intro.wav を 2秒 → 4秒 に差し替え、合計 duration が 2秒増えるはず
   writeWav(join(root, "dlsite", "RJ900001_テスト作品", "mp3", "01_intro.wav"), 4);
 
-  const second = await adapter.scan();
+  const second = await runScan(adapter);
   assert.equal(second.skipped, 0);
 
   const after = await adapter.getWork(generatedId);
@@ -498,22 +505,22 @@ test("増分スキャン: 音声 mtime/size 変更時は duration が再計算�
 
 test("増分スキャン: 音声のmtimeだけが変わっても再処理する", async (t) => {
   const { adapter, root } = await setup(t);
-  await adapter.scan();
+  await runScan(adapter);
   const audioPath = join(root, "dlsite", "RJ900001_テスト作品", "mp3", "01_intro.wav");
   utimesSync(audioPath, new Date(), new Date(Date.now() + 2_000));
 
-  const second = await adapter.scan();
+  const second = await runScan(adapter);
   assert.equal(second.skipped, 0);
   assert.equal(second.registered, 2);
 });
 
 test("増分スキャン: カバー画像の更新でも再処理する", async (t) => {
   const { adapter, root } = await setup(t);
-  await adapter.scan();
+  await runScan(adapter);
   const coverPath = join(root, "dlsite", "RJ900001_テスト作品", "cover.jpg");
   writeFileSync(coverPath, "updated cover image");
 
-  const second = await adapter.scan();
+  const second = await runScan(adapter);
   assert.equal(second.skipped, 0);
   assert.equal(second.registered, 2);
 });
@@ -523,7 +530,7 @@ test("カバー計測失敗: 画像が読めない場合は寸法NULLでcoverErr
   const coverPath = join(root, "dlsite", "RJ900001_テスト作品", "cover.jpg");
   writeFileSync(coverPath, "not an image");
 
-  const first = await adapter.scan();
+  const first = await runScan(adapter);
   assert.equal(first.coverErrors, 1);
   const generated = await adapter.getWork(candidateWorkId);
   // 画像はあるが計測失敗＝表示可能なカバー無しとしてnull投影する（0/1で埋めない）
@@ -532,21 +539,21 @@ test("カバー計測失敗: 画像が読めない場合は寸法NULLでcoverErr
   assert.equal(generated!.coverImage, "cover.jpg");
 
   // 寸法が欠損したままなのでearly skipは許可されず、次回スキャンでも再試行される
-  const second = await adapter.scan();
+  const second = await runScan(adapter);
   assert.equal(second.skipped, 0);
   assert.equal(second.coverErrors, 1);
 });
 
 test("増分スキャン: ディレクトリ移動を同一 UUID で追跡し fingerprint を再計算する", async (t) => {
   const { adapter, existingWorkId, root } = await setup(t);
-  await adapter.scan();
+  await runScan(adapter);
   await adapter.patchWorkBookmark(existingWorkId, { bookmarked: true });
 
   const oldDir = join(root, "dlsite", "RJ900002_既存メタ");
   const newDir = join(root, "RJ900002_移動先");
   renameSync(oldDir, newDir);
 
-  const second = await adapter.scan();
+  const second = await runScan(adapter);
   assert.equal(second.skipped, 1); // 自動生成作品は未変更のままスキップ
   assert.equal(second.missing, 0);
 
@@ -558,10 +565,10 @@ test("増分スキャン: ディレクトリ移動を同一 UUID で追跡し fi
 
 test("増分スキャン: registering 進捗の processed/total はスキップ含む全作品数が正しい", async (t) => {
   const { adapter } = await setup(t);
-  await adapter.scan();
+  await runScan(adapter);
 
   const events: Array<{ processed: number; total: number }> = [];
-  await adapter.scan({
+  await runScan(adapter, {
     onProgress: (event) => {
       if (event.type === "progress" && event.phase === "registering") {
         events.push({ processed: event.processed, total: event.total });
@@ -580,13 +587,13 @@ test("増分スキャン: registering 進捗の processed/total はスキップ�
 
 test("増分スキャン: error状態の作品はfingerprint一致でも再評価される", async (t) => {
   const { adapter, existingWorkId, root } = await setup(t);
-  await adapter.scan();
+  await runScan(adapter);
   const before = await adapter.getWork(existingWorkId);
   assert.equal(before?.status, "error");
 
   writeWav(join(root, "dlsite", "RJ900002_既存メタ", "missing.wav"), 1);
 
-  const second = await adapter.scan();
+  const second = await runScan(adapter);
   assert.equal(second.skipped, 1);
 
   const after = await adapter.getWork(existingWorkId);
@@ -596,9 +603,9 @@ test("増分スキャン: error状態の作品はfingerprint一致でも再評�
 
 test("強制フルスキャン: fingerprint一致作品も含め全件再処理する", async (t) => {
   const { adapter } = await setup(t);
-  await adapter.scan();
+  await runScan(adapter);
 
-  const second = await adapter.scan({ full: true });
+  const second = await runScan(adapter, { full: true });
   assert.equal(second.skipped, 0);
   assert.equal(second.registered, 2);
 });
@@ -662,7 +669,7 @@ test("error作品の再評価時はprobe cacheをバイパスし誤durationか�
 
 test("増分スキャン: 2回目に検出したduplicate UUIDはidentity conflictとして公開しない", async (t) => {
   const { adapter, root } = await setup(t);
-  await adapter.scan();
+  await runScan(adapter);
   const sourceDir = join(root, "dlsite", "RJ900001_テスト作品");
   const duplicateDir = join(root, "duplicate-work");
   mkdirSync(duplicateDir, { recursive: true });
@@ -692,7 +699,7 @@ test("増分スキャン: 2回目に検出したduplicate UUIDはidentity confli
   source.defaultPlaylistId = (source.playlists as Array<Record<string, unknown>>)[0]!.id;
   writeFileSync(join(duplicateDir, "mimimilli.json"), JSON.stringify(source, null, 2));
 
-  const second = await adapter.scan();
+  const second = await runScan(adapter);
   assert.equal(second.registered, 1);
   assert.equal(second.skipped, 0);
   const copiedMeta = JSON.parse(readFileSync(join(duplicateDir, "mimimilli.json"), "utf-8"));
@@ -972,7 +979,7 @@ test("単一作品再投影は他作品のpresenceとidentity conflict診断を�
   source.title = "a updated";
   writeFileSync(join(workA, "mimimilli.json"), JSON.stringify(source));
   const metaPath = join(workA, "mimimilli.json");
-  await scanner.projectMetaFile(metaPath, readMetaSource(metaPath));
+  await scanner.projectPrepared(prepareSingleMeta(metaPath, readMetaSource(metaPath)));
   assert.equal((await getTestWork(db, idB))?.status, "ok");
   assert.deepEqual(repos.catalog.listIdentityConflicts(), [
     { kind: "identity_conflict", workId: idB, paths: ["b", "copy"] },
@@ -1074,7 +1081,7 @@ test("formatVersionが未対応のmimimilli.jsonはinvalidMetaFilesに未対応�
   meta.formatVersion = 2;
   writeFileSync(metaPath, JSON.stringify(meta, null, 2));
 
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
 
   assert.equal((await adapter.listScanDiagnostics()).invalidMetaFiles.length, 1);
   assert.equal(

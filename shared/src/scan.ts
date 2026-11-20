@@ -2,7 +2,8 @@
 import { z } from "zod";
 import { dataIntegrityWarningSchema, type DataIntegrityWarning } from "./dataIntegrity.ts";
 import {
-  dlsiteCachedCoverSchema,
+  dlsiteCoverSkipReasonSchema,
+  dlsiteProductSummarySchema,
   dlsiteRegistrationApplySchema,
   rjCodeFormatSchema,
 } from "./dlsite.ts";
@@ -17,22 +18,6 @@ export type ScanCandidateFolder = {
   /** フォルダー名から検出したRJコード。未検出は null */
   detectedRjCode: string | null;
 };
-
-export const scanCandidateDlsiteSchema = z.discriminatedUnion("state", [
-  /** 未取得（キャッシュに無い・TTL切れ・RJコードなし） */
-  z.object({ state: z.literal("none") }),
-  /** 取得ジョブで待機中または取得中 */
-  z.object({ state: z.literal("fetching") }),
-  z.object({
-    state: z.literal("fetched"),
-    title: z.string(),
-    /** null はカバーの先取りに失敗してキャッシュに無い */
-    cover: dlsiteCachedCoverSchema.nullable(),
-  }),
-  z.object({ state: z.literal("not_found") }),
-  z.object({ state: z.literal("failed") }),
-]);
-export type ScanCandidateDlsite = z.infer<typeof scanCandidateDlsiteSchema>;
 
 /** 同じRJコードを持つ、行方不明（catalogでmissing）の作品 */
 export const scanCandidateMissingWorkSchema = z.object({
@@ -53,10 +38,14 @@ export const scanCandidateSchema = z.object({
   /** RJコードを直した上書きがある（コードなしに直した場合も含む） */
   rjCodeEdited: z.boolean(),
   /** rjCode が null のときは常に none */
-  dlsite: scanCandidateDlsiteSchema,
+  dlsite: dlsiteProductSummarySchema,
+  /** dlsite を読む前にサーバーが読んだ、DLsite取得状態の revision。取得ジョブの終端の結果と新旧を比べる */
+  dlsiteRevision: z.number().int().nonnegative(),
   missingWorks: z.array(scanCandidateMissingWorkSchema),
 });
 export type ScanCandidate = z.infer<typeof scanCandidateSchema>;
+/** アダプタとスキャンセッションが組み立てる候補。dlsiteRevision はルートが付ける */
+export type ScanCandidateBody = Omit<ScanCandidate, "dlsiteRevision">;
 
 export const invalidMetaFileSchema = z.object({
   path: workspacePathSchema,
@@ -94,6 +83,7 @@ export const scanCandidateExclusionsResponseSchema = z.object({
 export const scanCandidateRegistrationSchema = z.object({
   path: workspacePathSchema,
   workId: z.string(),
+  coverSkipped: dlsiteCoverSkipReasonSchema.nullable(),
 });
 export const scanCandidateRegistrationFailureSchema = z.object({
   path: workspacePathSchema,

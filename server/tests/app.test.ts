@@ -401,7 +401,7 @@ test("GET /api/dlsite/jobs/current は実行中・終了後のジョブをPOST�
   const app = createApp(createFixtureAdapter());
   const idle = await app.request("/api/dlsite/jobs/current");
   assert.equal(idle.status, 200);
-  assert.deepEqual(await idle.json(), { job: null });
+  assert.equal((await idle.json()).job, null);
 
   let release!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
@@ -409,20 +409,22 @@ test("GET /api/dlsite/jobs/current は実行中・終了後のジョブをPOST�
   adapter.fetchDlsiteProduct = async (_code, options) => {
     await gate;
     options.signal?.throwIfAborted();
-    return "fetched";
+    return { state: "fetched", title: "タイトル", cover: null };
   };
   const gatedApp = createApp(adapter);
 
   const start = await postJob(gatedApp, { origin: "bulk", productCodes: ["RJ000001"] });
   assert.equal(start.status, 202);
-  const { jobId } = await start.json();
+  const started = await start.json();
+  const jobId: string = started.job.jobId;
   assert.equal(typeof jobId, "string");
+  assert.equal(typeof started.revision, "number");
   await new Promise((resolve) => setImmediate(resolve));
   const running = await (await gatedApp.request("/api/dlsite/jobs/current")).json();
   assert.equal(running.job.status, "running");
   assert.equal(running.job.jobId, jobId);
   assert.deepEqual(running.job.codes, [
-    { productCode: "RJ000001", origin: "bulk", state: "fetching" },
+    { productCode: "RJ000001", origin: "bulk", state: "fetching", revision: running.revision },
   ]);
 
   release();
@@ -431,8 +433,16 @@ test("GET /api/dlsite/jobs/current は実行中・終了後のジョブをPOST�
   assert.equal(finished.job.status, "finished");
   assert.equal(finished.job.jobId, jobId);
   assert.deepEqual(finished.job.codes, [
-    { productCode: "RJ000001", origin: "bulk", state: "fetched" },
+    {
+      productCode: "RJ000001",
+      origin: "bulk",
+      state: "fetched",
+      revision: finished.job.codes[0].revision,
+      dlsite: { state: "fetched", title: "タイトル", cover: null },
+    },
   ]);
+  assert.ok(finished.revision > running.revision);
+  assert.ok(finished.revision > finished.job.codes[0].revision);
   assert.deepEqual(finished.job.bulk, { processed: 1, total: 1 });
 });
 
@@ -458,7 +468,7 @@ test("POST /api/dlsite/jobs は不正なコードを400で拒否し、オフラ�
   const offline = await postJob(app, { origin: "single", productCode: "RJ000001" });
   assert.equal(offline.status, 503);
   assert.equal((await offline.json()).error.code, "offline");
-  assert.deepEqual(await (await app.request("/api/dlsite/jobs/current")).json(), { job: null });
+  assert.equal((await (await app.request("/api/dlsite/jobs/current")).json()).job, null);
 });
 
 test("DELETE /api/dlsite/jobs/:jobId/bulk は待機中のまとめてだけを外し、別のIDや対象なしは removed: 0", async () => {
@@ -467,14 +477,14 @@ test("DELETE /api/dlsite/jobs/:jobId/bulk は待機中のまとめてだけを�
   const adapter = createFixtureAdapter();
   adapter.fetchDlsiteProduct = async () => {
     await gate;
-    return "fetched";
+    return { state: "fetched", title: "タイトル", cover: null };
   };
   const app = createApp(adapter);
   const start = await postJob(app, {
     origin: "bulk",
     productCodes: ["RJ000001", "RJ000002", "RJ000003"],
   });
-  const { jobId } = await start.json();
+  const jobId: string = (await start.json()).job.jobId;
   await new Promise((resolve) => setImmediate(resolve));
   const other = await app.request("/api/dlsite/jobs/other/bulk", { method: "DELETE" });
   assert.deepEqual(await other.json(), { removed: 0 });
@@ -542,7 +552,7 @@ test("POST /api/__test__/reset は実行中DLsite取得ジョブを打ち切っ�
   const reset = await app.request("/api/__test__/reset", { method: "POST" });
   assert.equal(reset.status, 200);
   assert.deepEqual(await reset.json(), { ok: true });
-  assert.deepEqual(await (await app.request("/api/dlsite/jobs/current")).json(), { job: null });
+  assert.equal((await (await app.request("/api/dlsite/jobs/current")).json()).job, null);
 
   const restart = await postJob(app, { origin: "single", productCode: "RJ000001" });
   assert.equal(restart.status, 202);

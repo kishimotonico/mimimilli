@@ -143,6 +143,7 @@ describe("NeedsAttentionTab", () => {
     const user = userEvent.setup();
     const api = mockApi({
       "POST /api/works/work-int/reload": apiNoContent(),
+      "GET /api/scan/candidates": { candidates: [] },
       "GET /api/scan/diagnostics": buildScanDiagnostics(),
       "GET /api/scan/last": buildScanRecord(),
     });
@@ -172,6 +173,7 @@ describe("NeedsAttentionTab", () => {
     const user = userEvent.setup();
     const api = mockApi({
       "DELETE /api/works/work-miss": apiNoContent(),
+      "GET /api/scan/candidates": { candidates: [] },
       "GET /api/scan/diagnostics": buildScanDiagnostics(),
       "GET /api/scan/last": buildScanRecord(),
     });

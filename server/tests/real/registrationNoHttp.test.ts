@@ -2,7 +2,9 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { spyOn } from "bun:test";
 import { test, type TestContext } from "node:test";
+import { Scanner } from "../../src/adapters/real/scanner.ts";
 import {
   emptyMetaDlsiteState,
   META_FILE_NAME,
@@ -21,6 +23,7 @@ import { configureRoot } from "../helpers/rootFolder.ts";
 import { makeTestDirectory, SAMPLE_COVER_JPEG_BASE64, writeWav } from "../helpers/sampleLibrary.ts";
 import { nts } from "../helpers/tag.ts";
 import { createApp } from "../helpers/testApp.ts";
+import { runScan, listCandidates, registerCandidates } from "../helpers/scanLibrary.ts";
 
 const CODE = "RJ900100";
 const CANDIDATE = "候補フォルダー";
@@ -79,7 +82,7 @@ async function setup(t: TestContext, options: Options = {}) {
   );
   const app = createApp(adapter);
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
   const post = (path: string, body: unknown) =>
     app.request(path, {
       method: "POST",
@@ -316,16 +319,17 @@ test("上限を超える件数の候補は、分割した追加で全件が作�
     }),
   );
   await configureRoot(adapter, root);
-  await adapter.scan();
-  const detected = (await adapter.listScanCandidates()).map((candidate) => candidate.rjCode);
+  await runScan(adapter);
+  const detected = (await listCandidates(adapter)).map((candidate) => candidate.rjCode);
   assert.equal(detected.length, total);
   for (const code of detected) assert.equal((await adapter.dlsiteFetchByCode(code!)).ok, true);
   const before = { ...counts };
 
-  const paths = (await adapter.listScanCandidates()).map((candidate) => candidate.path);
+  const paths = (await listCandidates(adapter)).map((candidate) => candidate.path);
   const registered = new Set<string>();
   for (let start = 0; start < paths.length; start += SCAN_CANDIDATE_REGISTER_MAX_PATHS) {
-    const result = await adapter.registerScanCandidates(
+    const result = await registerCandidates(
+      adapter,
       paths.slice(start, start + SCAN_CANDIDATE_REGISTER_MAX_PATHS),
       ALL,
     );
@@ -334,7 +338,7 @@ test("上限を超える件数の候補は、分割した追加で全件が作�
   }
   assert.equal(registered.size, total);
   assert.deepEqual(counts, before);
-  assert.deepEqual(await adapter.listScanCandidates(), []);
+  assert.deepEqual(await listCandidates(adapter), []);
 });
 
 test("候補の一括追加で一部が失敗しても、失敗した候補にカバーが残らない", async (t) => {
@@ -363,14 +367,22 @@ test("候補の一括追加で一部が失敗しても、失敗した候補に�
     }),
   );
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
   for (const code of ["RJ900201", "RJ900202"]) {
     assert.equal((await adapter.dlsiteFetchByCode(code)).ok, true);
   }
-  writeFileSync(join(root, "RJ900202_失敗", META_FILE_NAME), "occupied");
+  const original = Scanner.prototype.writeNewWorkMeta;
+  const writing = spyOn(Scanner.prototype, "writeNewWorkMeta").mockImplementation(
+    function (this: Scanner, target, options) {
+      if (target.physicalPath.endsWith("RJ900202_失敗")) throw new Error("メタを書けません");
+      return original.call(this, target, options);
+    },
+  );
+  t.after(() => writing.mockRestore());
 
-  const result = await adapter.registerScanCandidates(
-    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+  const result = await registerCandidates(
+    adapter,
+    (await listCandidates(adapter)).map((candidate) => candidate.path),
     ALL,
   );
   assert.equal(result.registered.length, 1);

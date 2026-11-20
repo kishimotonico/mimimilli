@@ -1,11 +1,13 @@
-// GET /works の scanRecord 絞り込みと、登録解除での記録の更新（worksRoute と ScanRecordStore の結線）。
+// GET /works の scanRecord 絞り込みと、登録解除した作品を記録が読むときに落とすこと（worksRoute・adapter・ScanRecordStore の結線）。
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Hono } from "hono";
 import { workspacePath, worksQuerySchema, type ScanResult } from "@mimimilli/shared";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { worksRoute } from "../src/routes/works.ts";
+import type { DataAdapter } from "../src/adapter/index.ts";
 import { ScanRecordStore } from "../src/scanRecord.ts";
+import { runScan } from "./helpers/scanLibrary.ts";
 
 function result(overrides: Partial<ScanResult>): ScanResult {
   return {
@@ -21,6 +23,11 @@ function result(overrides: Partial<ScanResult>): ScanResult {
     unreadablePaths: [],
     ...overrides,
   };
+}
+
+/** 記録を読むときの照合（ScanSession.recordSnapshot と同じ） */
+async function snapshotOf(adapter: DataAdapter, store: ScanRecordStore) {
+  return store.snapshot(await adapter.getWorkStatuses(store.snapshotWorkIds()));
 }
 
 function setup() {
@@ -80,24 +87,28 @@ test("scanRecord=updated は scanChange で変化の種類を絞れ、updated �
   assert.equal((await idsOf(app, "scanChange=moved")).status, 400);
 });
 
-test("DELETE /works/:id は記録の全項目から該当作品を外す", async () => {
-  const { store, app } = setup();
+test("DELETE /works/:id した作品は、記録を読むときにすべての項目から落ちる", async () => {
+  const { adapter, store, app } = setup();
   store.replace(
     result({
       insertedWorkIds: ["RJ501001"],
       updatedWorks: [{ workId: "RJ501001", changes: [{ kind: "meta" }] }],
-      missingWorks: [{ workId: "RJ501001", title: "t", previousPath: workspacePath("p") }],
       dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["RJ501001"] },
     }),
     "t",
   );
+  const before = await snapshotOf(adapter, store);
+  assert.equal(before.updatedWorks.length, 1);
+  assert.equal(before.dataIntegrityWarning?.skippedCount, 1);
+  assert.deepEqual((await idsOf(app, "scanRecord=new")).ids, ["RJ501001"]);
+
   const res = await app.request("/api/works/RJ501001", { method: "DELETE" });
   assert.equal(res.status, 204);
-  const snapshot = store.snapshot();
-  assert.deepEqual(store.workIds("new"), []);
-  assert.deepEqual(snapshot.updatedWorks, []);
-  assert.deepEqual(snapshot.missingWorks, []);
-  assert.equal(snapshot.dataIntegrityWarning, undefined);
+
+  const after = await snapshotOf(adapter, store);
+  assert.deepEqual(after.updatedWorks, []);
+  assert.equal(after.dataIntegrityWarning, undefined);
+  assert.deepEqual((await idsOf(app, "scanRecord=new")).ids, []);
 });
 
 async function reassignWithRecord(path: string) {
@@ -118,26 +129,29 @@ async function reassignWithRecord(path: string) {
   });
   assert.equal(res.status, 201);
   const body = (await res.json()) as { snapshot: { id: string } };
-  return { store, body };
+  return { adapter, app, store, body };
 }
 
-test("ID再採番で登録側の作品IDが置き換わったら、記録から古いIDの項目を外す", async () => {
-  const { store, body } = await reassignWithRecord(
+test("ID再採番で登録側を直すと、旧IDの作品はコピー側へ移り、記録の項目は残って移った作品を指す", async () => {
+  const { adapter, app, store, body } = await reassignWithRecord(
     "dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読",
   );
   assert.notEqual(body.snapshot.id, "RJ501001");
-  assert.equal("replacedWorkId" in body, false);
-  assert.deepEqual(store.workIds("new"), ["RJ501002"]);
-  assert.deepEqual(store.snapshot().updatedWorks, []);
+  assert.deepEqual((await idsOf(app, "scanRecord=new")).ids, ["RJ501001", "RJ501002"]);
+  assert.equal((await snapshotOf(adapter, store)).updatedWorks.length, 1);
+  const moved = await adapter.getWork("RJ501001");
+  assert.ok(moved?.physicalPath.includes("copies/"));
 });
 
 test("ID再採番でコピー側を直しても、登録側の作品の記録は残る", async () => {
-  const { store } = await reassignWithRecord("copies/RJ501001_夜更けの図書室で囁き朗読");
-  assert.deepEqual(store.workIds("new"), ["RJ501001", "RJ501002"]);
-  assert.equal(store.snapshot().updatedWorks.length, 1);
+  const { adapter, app, store } = await reassignWithRecord(
+    "copies/RJ501001_夜更けの図書室で囁き朗読",
+  );
+  assert.deepEqual((await idsOf(app, "scanRecord=new")).ids, ["RJ501001", "RJ501002"]);
+  assert.equal((await snapshotOf(adapter, store)).updatedWorks.length, 1);
 });
 
-test("POST /works/unregister-missing は解除した作品だけ記録から外す", async () => {
+test("POST /works/unregister-missing した作品は、記録の行方不明から落ちる", async () => {
   const { adapter, store, app } = setup();
   const missingId = (
     await adapter.queryWorks({
@@ -149,19 +163,15 @@ test("POST /works/unregister-missing は解除した作品だけ記録から外�
   assert.ok(missingId);
   store.replace(
     result({
-      missingWorks: [
-        { workId: missingId, title: "t", previousPath: workspacePath("p") },
-        { workId: "other", title: "o", previousPath: workspacePath("q") },
-      ],
+      missingWorks: [{ workId: missingId, title: "t", previousPath: workspacePath("p") }],
     }),
     "t",
   );
+  assert.equal((await snapshotOf(adapter, store)).missingWorks.length, 1);
+
   const res = await app.request("/api/works/unregister-missing", { method: "POST" });
   assert.equal(res.status, 200);
-  assert.deepEqual(
-    store.snapshot().missingWorks.map((work) => work.workId),
-    ["other"],
-  );
+  assert.deepEqual((await snapshotOf(adapter, store)).missingWorks, []);
 });
 
 test("fixtureのスキャンは、登録解除した新規作品を次のスキャンで記録へ戻さず、記録を今回の変化へ入れ替える", async () => {
@@ -169,7 +179,7 @@ test("fixtureのスキャンは、登録解除した新規作品を次のスキ�
   const store = new ScanRecordStore();
   const app = new Hono().route("/api", worksRoute(adapter, store));
 
-  const first = await adapter.scan();
+  const first = await runScan(adapter);
   store.replace(first, "t1");
   assert.deepEqual(store.workIds("new"), first.insertedWorkIds);
   assert.ok(first.insertedWorkIds.length > 0);
@@ -177,8 +187,8 @@ test("fixtureのスキャンは、登録解除した新規作品を次のスキ�
   const removed = first.insertedWorkIds[0]!;
   assert.equal((await app.request(`/api/works/${removed}`, { method: "DELETE" })).status, 204);
 
-  const second = await adapter.scan();
+  const second = await runScan(adapter);
   store.replace(second, "t2");
   assert.deepEqual(store.workIds("new"), []);
-  assert.deepEqual(store.snapshot().updatedWorks, []);
+  assert.deepEqual((await snapshotOf(adapter, store)).updatedWorks, []);
 });

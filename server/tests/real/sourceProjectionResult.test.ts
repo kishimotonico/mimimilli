@@ -1,4 +1,4 @@
-import { NO_DLSITE } from "../helpers/scanLibrary.ts";
+import { NO_DLSITE, runScan } from "../helpers/scanLibrary.ts";
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -52,7 +52,7 @@ async function setupLibrary(t: TestContext, name: string) {
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
   await configureRoot(adapter, root);
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
   return { app, adapter, root, workDir };
 }
 
@@ -299,7 +299,7 @@ test("登録がpendingで終わった作品がprojectionでpublishedになって
   });
   assert.equal(second.status, 200);
   assert.deepEqual((await second.json()).projection, { status: "published" });
-  assert.deepEqual(await (await app.request("/api/dlsite/jobs/current")).json(), { job: null });
+  assert.equal((await (await app.request("/api/dlsite/jobs/current")).json()).job, null);
 });
 
 test("projectionの再試行はDLsiteのHTTP取得を呼ばない", async (t) => {

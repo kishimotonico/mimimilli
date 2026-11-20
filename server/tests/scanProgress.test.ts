@@ -3,7 +3,8 @@ import { test } from "node:test";
 import { Hono } from "hono";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { createApp } from "./helpers/testApp.ts";
-import type { DataAdapter } from "../src/adapter/index.ts";
+import type { DataAdapter, ScanExecution } from "../src/adapter/index.ts";
+import { scanExecutionOf } from "./helpers/scanLibrary.ts";
 import { scanRoute } from "../src/routes/scan.ts";
 import { ScanJobManager } from "../src/scanJobManager.ts";
 import { pollUntil } from "./helpers/poll.ts";
@@ -25,8 +26,8 @@ function createGatedScanAdapter(): {
     resolveEmitProgress = resolve;
   });
   let finishScan!: () => void;
-  const scanDone = new Promise<typeof emptyResult>((resolve) => {
-    finishScan = () => resolve(emptyResult);
+  const scanDone = new Promise<ScanExecution>((resolve) => {
+    finishScan = () => resolve(scanExecutionOf(emptyResult));
   });
   const adapter: DataAdapter = {
     ...createFixtureAdapter(),
@@ -228,17 +229,17 @@ test("スキャン実行中に候補から追加した作品は、完了後の�
   const manager = createScanJobManager(adapter);
   const job = manager.start();
   await progressReady;
-  manager.record.addNewWorks(["added-during-scan"]);
+  manager.session.record.addNewWorks(["added-during-scan"]);
   finishScan();
   await pollUntil(() => manager.get(job.id)?.status === "completed");
-  assert.deepEqual(manager.record.workIds("new"), ["added-during-scan"]);
+  assert.deepEqual(manager.session.record.workIds("new"), ["added-during-scan"]);
 });
 
 test("job scoped SSEは接続時に現在snapshotをstateで1件送り、以後のprogressとterminalをid無しで配信する", async () => {
   const { adapter, progressReady, finishScan } = createGatedScanAdapter();
   const manager = createScanJobManager(adapter);
   const app = new Hono();
-  app.route("/", scanRoute(manager));
+  app.route("/", scanRoute(manager, { revision: () => 0 }));
   const job = manager.start();
   const emitProgress = await progressReady;
   emitProgress(1);
@@ -337,7 +338,7 @@ test("shutdown は実行中スキャンを取消して完了を待つ", async ()
           "abort",
           () => {
             abortObserved = true;
-            resolve(emptyResult);
+            resolve(scanExecutionOf(emptyResult));
           },
           { once: true },
         );
@@ -370,7 +371,7 @@ test("app.shutdown は実行中スキャンの完了後に解決する", async (
           "abort",
           () => {
             abortObserved = true;
-            resolve(emptyResult);
+            resolve(scanExecutionOf(emptyResult));
           },
           { once: true },
         );
@@ -405,7 +406,7 @@ test("同期的に重いadapterでもPOST応答のcall stackではscanを開始�
       while (performance.now() < until) {
         // 同期処理を模擬する。
       }
-      return Promise.resolve(emptyResult);
+      return Promise.resolve(scanExecutionOf(emptyResult));
     },
   } satisfies DataAdapter;
   const response = await createApp(adapter).request("/api/scan", { method: "POST" });
@@ -430,8 +431,8 @@ test("terminal上限を超えたjobは404相当のnullになる", async () => {
 
 test("進捗の無い区間でも一定間隔でpingを送り、完了時にハートビートを残さず閉じる", async () => {
   let finishScan!: () => void;
-  const scanDone = new Promise<typeof emptyResult>((resolve) => {
-    finishScan = () => resolve(emptyResult);
+  const scanDone = new Promise<ScanExecution>((resolve) => {
+    finishScan = () => resolve(scanExecutionOf(emptyResult));
   });
   const fixture = createFixtureAdapter();
   const adapter: DataAdapter = { ...fixture, scan: () => scanDone };
@@ -440,7 +441,7 @@ test("進捗の無い区間でも一定間隔でpingを送り、完了時にハ�
 
   // heartbeat間隔を20msに短縮したscanRouteだけを直に積んだ最小appでテストする
   const app = new Hono();
-  app.route("/", scanRoute(manager, 20));
+  app.route("/", scanRoute(manager, { revision: () => 0 }, 20));
 
   const response = await app.request(`/scan/${job.id}/events`);
   assert.equal(response.status, 200);
@@ -470,11 +471,11 @@ test("スキャンが中止されると、実行中に候補から追加した�
   const manager = createScanJobManager(adapter);
   const job = manager.start();
   await progressReady;
-  manager.record.addNewWorks(["added-during-scan"]);
+  manager.session.record.addNewWorks(["added-during-scan"]);
   manager.cancel(job.id);
   finishScan();
   await pollUntil(() => manager.get(job.id)?.status === "cancelled");
-  manager.record.replace(
+  manager.session.record.replace(
     {
       registered: 0,
       insertedWorkIds: [],
@@ -489,5 +490,5 @@ test("スキャンが中止されると、実行中に候補から追加した�
     },
     "t",
   );
-  assert.deepEqual(manager.record.workIds("new"), []);
+  assert.deepEqual(manager.session.record.workIds("new"), []);
 });

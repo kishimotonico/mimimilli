@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Hono } from "hono";
-import type { DlsiteProductFetchOutcome } from "@mimimilli/shared";
+import type { DlsiteTerminalProductSummary } from "@mimimilli/shared";
 import type { DataAdapter } from "../src/adapter/index.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { DlsiteJobManager } from "../src/dlsiteJobManager.ts";
@@ -9,11 +9,13 @@ import { dlsiteRoute } from "../src/routes/dlsite.ts";
 import { createApp } from "./helpers/testApp.ts";
 
 function gatedManager() {
-  const gates: Array<(outcome: DlsiteProductFetchOutcome) => void> = [];
+  const gates: Array<(outcome: "fetched" | "not_found" | "failed") => void> = [];
   const manager = new DlsiteJobManager({
     fetchDlsiteProduct: (_code, options) =>
-      new Promise<DlsiteProductFetchOutcome>((resolve, reject) => {
-        gates.push(resolve);
+      new Promise<DlsiteTerminalProductSummary>((resolve, reject) => {
+        gates.push((state) =>
+          resolve(state === "fetched" ? { state, title: "タイトル", cover: null } : { state }),
+        );
         options.signal?.addEventListener(
           "abort",
           () => reject(new DOMException("aborted", "AbortError")),
@@ -155,7 +157,7 @@ test("createApp経由で開始したジョブの進捗をSSEで全部受信す�
     ...createFixtureAdapter(),
     fetchDlsiteProduct: async () => {
       await gate;
-      return "fetched";
+      return { state: "fetched", title: "タイトル", cover: null };
     },
   };
   const app = createApp(adapter);
@@ -184,6 +186,6 @@ test("createApp ごとにDLsiteジョブ状態が隔離される", async () => {
     body: JSON.stringify({ origin: "single", productCode: "RJ000001" }),
   });
   await tick();
-  assert.deepEqual(await (await appB.request("/api/dlsite/jobs/current")).json(), { job: null });
+  assert.equal((await (await appB.request("/api/dlsite/jobs/current")).json()).job, null);
   assert.notEqual((await (await appA.request("/api/dlsite/jobs/current")).json()).job, null);
 });

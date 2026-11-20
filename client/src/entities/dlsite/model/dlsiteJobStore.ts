@@ -4,15 +4,17 @@ import {
   dlsiteJobEventSchema,
   canonicalDlsiteProductCode,
   type DlsiteJobBulkProgress,
+  type DlsiteJobCode,
   type DlsiteJobCodeState,
   type DlsiteJobOrigin,
   type DlsiteJobSnapshot,
+  type DlsiteJobState as DlsiteServerState,
+  type DlsiteTerminalProductSummary,
 } from "@mimimilli/shared";
 import {
   bindSseTransportError,
   bindTypedSseEvents,
   connectSse,
-  createSseGeneration,
   type SseConnection,
 } from "../../../shared/api/sseTransport";
 import {
@@ -29,10 +31,10 @@ import {
   startDlsiteJob,
 } from "../api";
 
-export interface DlsiteJobCodeView {
-  origin: DlsiteJobOrigin;
-  state: DlsiteJobCodeState;
-}
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+/** ミラーしたコードの状態。revision はそのコードが最後に変化した時点のサーバーの revision */
+export type DlsiteJobCodeView = DistributiveOmit<DlsiteJobCode, "productCode">;
 
 export interface DlsiteJobView {
   jobId: string;
@@ -42,23 +44,36 @@ export interface DlsiteJobView {
   bulk: DlsiteJobBulkProgress;
 }
 
+/** コードごとの最新の終端の結果。ジョブが入れ替わっても残す */
+export interface DlsiteCodeResult {
+  dlsite: DlsiteTerminalProductSummary;
+  revision: number;
+}
+
 export interface DlsiteJobState {
+  /** 取り込んだサーバー状態の revision。reset で 0 */
+  revision: number;
   job: DlsiteJobView | null;
+  results: ReadonlyMap<string, DlsiteCodeResult>;
   /** まとめての開始（分割POSTを含む）の応答待ち。枠をすぐ進捗に切り替えるため件数を持つ */
   startingBulk: { total: number } | null;
-  /** 単発の開始の応答待ち、または応答後にまだそのコードの状態を受け取っていないコード */
+  /** 単発の開始のPOSTの応答待ち */
   pendingSingles: ReadonlySet<string>;
   cancelling: boolean;
-  /** 終端後の候補一覧の再取得が済んだか。済むまでは終端状態を行に重ねる */
-  settled: boolean;
   error: string | null;
 }
 
+/** 終端に達したコード。known が false は、ミラーが別のジョブに替わるまで終わりを見なかったコード（結果は不明） */
+export interface DlsiteSettledCode {
+  code: string;
+  origin: DlsiteJobOrigin;
+  known: boolean;
+}
+
 export type DlsiteJobStoreEvent =
-  /** コードが終端状態になった（行の情報を候補一覧から取り直す契機。Runtimeが間引く） */
-  | { type: "codesTerminal"; jobId: string; origin: DlsiteJobOrigin; productCodes: string[] }
-  /** 追跡中のジョブが終わった。productCodes はこのジョブで終端に達したコードすべて */
-  | { type: "finished"; jobId: string; productCodes: string[] };
+  | { type: "codesSettled"; codes: DlsiteSettledCode[] }
+  /** ミラーのジョブが終わった、または消えた・別のジョブに替わった */
+  | { type: "jobEnded"; jobId: string };
 
 export type DlsiteJobActionResult = { ok: true } | { ok: false; error: string };
 
@@ -86,11 +101,12 @@ const MAX_EMPTY_REOPENS = 3;
 const EVENT_SOURCE_CLOSED = 2;
 
 export const INITIAL_DLSITE_JOB_STATE: DlsiteJobState = {
+  revision: 0,
   job: null,
+  results: new Map(),
   startingBulk: null,
   pendingSingles: new Set(),
   cancelling: false,
-  settled: true,
   error: null,
 };
 
@@ -99,10 +115,8 @@ export interface DlsiteJobStore extends ReadableStore<DlsiteJobState> {
   startBulk(productCodes: string[]): Promise<DlsiteJobActionResult>;
   startSingle(productCode: string): Promise<DlsiteJobActionResult>;
   cancelBulk(): Promise<DlsiteJobActionResult>;
-  /** サーバーで実行中のジョブがあれば追跡を始める。追跡中なら何もしない */
+  /** サーバーの現在の状態を取り込む。実行中のジョブがあれば追跡を始める */
   attach(): Promise<void>;
-  /** Runtimeが終端後の再取得を終えたら呼ぶ。jobIdが今の追跡と違えば無視 */
-  markSettled(jobId: string): void;
   clearError(): void;
   /** 接続を閉じてローカルの状態を空にする。サーバーのジョブには触れない */
   reset(): void;
@@ -118,19 +132,64 @@ function isTerminalCodeState(state: DlsiteJobCodeState): boolean {
 
 function toView(snapshot: DlsiteJobSnapshot): DlsiteJobView {
   const codes = new Map<string, DlsiteJobCodeView>();
-  for (const code of snapshot.codes) {
-    codes.set(canonicalDlsiteProductCode(code.productCode), {
-      origin: code.origin,
-      state: code.state,
-    });
+  for (const { productCode, ...view } of snapshot.codes) {
+    codes.set(canonicalDlsiteProductCode(productCode), view as DlsiteJobCodeView);
   }
   return { jobId: snapshot.jobId, status: snapshot.status, codes, bulk: snapshot.bulk };
 }
 
-function terminalCodesOf(job: DlsiteJobView): string[] {
-  const codes: string[] = [];
-  for (const [code, entry] of job.codes) if (isTerminalCodeState(entry.state)) codes.push(code);
-  return codes;
+function toServerView(state: DlsiteServerState): { revision: number; job: DlsiteJobView | null } {
+  return { revision: state.revision, job: state.job ? toView(state.job) : null };
+}
+
+/** 取り込む終端の結果。ジョブの外に持つので、ジョブが替わっても失われない */
+function mergeResults(
+  results: ReadonlyMap<string, DlsiteCodeResult>,
+  job: DlsiteJobView | null,
+): ReadonlyMap<string, DlsiteCodeResult> {
+  if (!job) return results;
+  let next: Map<string, DlsiteCodeResult> | null = null;
+  for (const [code, entry] of job.codes) {
+    if (!("dlsite" in entry)) continue;
+    if (entry.revision <= (results.get(code)?.revision ?? -1)) continue;
+    next ??= new Map(results);
+    next.set(code, { dlsite: entry.dlsite, revision: entry.revision });
+  }
+  return next ?? results;
+}
+
+/** 前後のミラーの差から、終端に達したコードとジョブの終わりを導く。最初の取り込み（前のミラーが無い）は通知しない */
+function transitionOf(
+  prev: DlsiteJobView | null,
+  next: DlsiteJobView | null,
+): DlsiteJobStoreEvent[] {
+  if (prev === null) return [];
+  const sameJob = next !== null && prev.jobId === next.jobId;
+  const reached: DlsiteSettledCode[] = [];
+  if (next) {
+    for (const [code, entry] of next.codes) {
+      if (!isTerminalCodeState(entry.state)) continue;
+      const before = sameJob ? prev.codes.get(code) : undefined;
+      if (!before || before.revision < entry.revision) {
+        reached.push({ code, origin: entry.origin, known: true });
+      }
+    }
+  }
+  if (!sameJob) {
+    for (const [code, entry] of prev.codes) {
+      if (!isTerminalCodeState(entry.state)) {
+        reached.push({ code, origin: entry.origin, known: false });
+      }
+    }
+  }
+  const ended = new Set<string>();
+  if (prev.status === "running" && !(sameJob && next.status === "running")) ended.add(prev.jobId);
+  if (next?.status === "finished" && !(sameJob && prev.status === "finished"))
+    ended.add(next.jobId);
+  const result: DlsiteJobStoreEvent[] = [];
+  if (reached.length > 0) result.push({ type: "codesSettled", codes: reached });
+  for (const jobId of ended) result.push({ type: "jobEnded", jobId });
+  return result;
 }
 
 function chunk<T>(items: readonly T[], size: number): T[][] {
@@ -141,196 +200,113 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
   return chunks;
 }
 
-/** サーバーの現在のジョブを写すだけの追跡。自分が始めたジョブかどうかは区別しない。 */
+/**
+ * サーバーの現在のジョブを写すだけの追跡。自分が始めたジョブかどうかは区別しない。
+ * サーバー状態は revision の大きい方だけを commit で取り込む。
+ */
 export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): DlsiteJobStore {
   const store = createExternalStore<DlsiteJobState>(INITIAL_DLSITE_JOB_STATE);
   const events = createEventEmitter<DlsiteJobStoreEvent>();
-  const generation = createSseGeneration();
-  const terminalHandled = new Set<string>();
-  /** resetでだけ進む。応答待ち中のresetを検知する */
+  /** resetでだけ進む。応答待ち中のresetを検知する。サーバーの revision では表せない、クライアントが状態を捨てた境界 */
   let epoch = 0;
-  let connection: SseConnection | null = null;
-  let trackedJobId: string | null = null;
-  let receivedForTracked = false;
-  let eventSeq = 0;
+  let connection: { sse: SseConnection; jobId: string } | null = null;
   let emptyReopens = 0;
-  let bulkPosting = false;
-  const inflightSingles = new Set<string>();
 
   const patch = (partial: Partial<DlsiteJobState>): void => {
     store.setState((state) => ({ ...state, ...partial }));
   };
 
   const closeConnection = (): void => {
-    connection?.close();
+    connection?.sse.close();
     connection = null;
   };
 
-  const clearStartingBulk = (): void => {
-    if (!bulkPosting && store.getState().startingBulk !== null) patch({ startingBulk: null });
-  };
-
-  const releasePendingSingles = (codes: Iterable<string>): void => {
-    const { pendingSingles } = store.getState();
-    let next: Set<string> | null = null;
-    for (const code of codes) {
-      if (pendingSingles.has(code) && !inflightSingles.has(code)) {
-        next ??= new Set(pendingSingles);
-        next.delete(code);
-      }
-    }
-    if (next) patch({ pendingSingles: next });
-  };
-
-  const applySnapshot = (snapshot: DlsiteJobSnapshot): void => {
-    const view = toView(snapshot);
-    receivedForTracked = true;
-    patch({ job: view, settled: view.status === "finished" ? store.getState().settled : false });
-    releasePendingSingles(view.codes.keys());
-    clearStartingBulk();
-  };
-
-  const terminate = (jobId: string): void => {
-    if (terminalHandled.has(jobId)) return;
-    terminalHandled.add(jobId);
-    const { job, pendingSingles } = store.getState();
-    const view = job?.jobId === jobId ? job : null;
-    const productCodes = view ? terminalCodesOf(view) : [];
-    if (trackedJobId === jobId) {
-      closeConnection();
-      generation.bump();
-      trackedJobId = null;
-    }
-    patch({
-      job: view ? { ...view, status: "finished" } : job,
-      settled: false,
-      pendingSingles: new Set([...pendingSingles].filter((code) => inflightSingles.has(code))),
-    });
-    clearStartingBulk();
-    events.emit({ type: "finished", jobId, productCodes });
-  };
-
-  const failTracking = (jobId: string, message: string): void => {
-    terminate(jobId);
-    patch({ job: null, error: message });
-  };
-
-  const reset = (): void => {
-    epoch += 1;
-    generation.bump();
+  function open(jobId: string): void {
     closeConnection();
-    trackedJobId = null;
-    receivedForTracked = false;
-    emptyReopens = 0;
-    bulkPosting = false;
-    inflightSingles.clear();
-    terminalHandled.clear();
-    store.setState(INITIAL_DLSITE_JOB_STATE);
-  };
-
-  const open = (jobId: string): void => {
-    closeConnection();
-    const token = generation.bump();
-    const local = deps.connect(DLSITE_JOB_EVENTS_URL);
+    const sse = deps.connect(DLSITE_JOB_EVENTS_URL);
+    const local = { sse, jobId };
     connection = local;
-    receivedForTracked = false;
-    const owned = (): boolean => generation.isCurrent(token) && trackedJobId === jobId;
+    const owned = (): boolean => connection === local;
 
     bindTypedSseEvents({
-      source: local.source,
+      source: sse.source,
       eventNames: ["snapshot", "code", "removed", "finished"],
       schema: dlsiteJobEventSchema,
       messages: EVENT_MESSAGES,
       onValidationFailure: (message) => {
-        if (owned()) failTracking(jobId, message);
+        if (owned()) abandon(message);
       },
       onValidatedEvent: (event) => {
         if (!owned()) return;
-        eventSeq += 1;
         if (event.type === "snapshot") {
-          handleSnapshot(jobId, event.job);
+          if (commit({ revision: event.revision, job: event.job ? toView(event.job) : null })) {
+            emptyReopens = 0;
+          }
           return;
         }
-        if (event.jobId !== jobId) {
-          void reconcile(token, jobId);
+        const { job } = store.getState();
+        if (!job || event.jobId !== job.jobId) {
+          void reconcile(local);
           return;
         }
         if (event.type === "finished") {
-          terminate(jobId);
+          if (commit({ revision: event.revision, job: { ...job, status: "finished" } })) {
+            emptyReopens = 0;
+          }
           return;
         }
-        const state = store.getState();
-        const job = state.job?.jobId === jobId ? state.job : null;
-        if (!job) return;
-        receivedForTracked = true;
-        emptyReopens = 0;
         const codes = new Map(job.codes);
         if (event.type === "code") {
-          const productCode = canonicalDlsiteProductCode(event.productCode);
-          codes.set(productCode, { origin: event.origin, state: event.state });
-          patch({ job: { ...job, codes, bulk: event.bulk } });
-          releasePendingSingles([productCode]);
-          clearStartingBulk();
-          if (isTerminalCodeState(event.state)) {
-            events.emit({
-              type: "codesTerminal",
-              jobId,
-              origin: event.origin,
-              productCodes: [productCode],
-            });
-          }
+          const { type: _type, jobId: _jobId, bulk: _bulk, productCode, ...view } = event;
+          codes.set(canonicalDlsiteProductCode(productCode), view as DlsiteJobCodeView);
         } else {
           for (const code of event.productCodes) codes.delete(canonicalDlsiteProductCode(code));
-          patch({ job: { ...job, codes, bulk: event.bulk } });
-          clearStartingBulk();
+        }
+        if (commit({ revision: event.revision, job: { ...job, codes, bulk: event.bulk } })) {
+          emptyReopens = 0;
         }
       },
     });
     bindSseTransportError({
-      source: local.source,
-      onConnectionError: () => void reconcile(token, jobId),
+      source: sse.source,
+      onConnectionError: () => void reconcile(local),
     });
-  };
-
-  function handleSnapshot(jobId: string, snapshot: DlsiteJobSnapshot | null): void {
-    if (snapshot === null) {
-      terminate(jobId);
-      return;
-    }
-    if (snapshot.jobId !== jobId) {
-      if (snapshot.status === "running") follow(snapshot.jobId, snapshot);
-      else terminate(jobId);
-      return;
-    }
-    emptyReopens = 0;
-    applySnapshot(snapshot);
-    if (snapshot.status === "finished") terminate(jobId);
   }
 
-  function follow(jobId: string, initial: DlsiteJobSnapshot | null = null): void {
-    if (trackedJobId === jobId && connection !== null) {
-      if (initial) applySnapshot(initial);
-      return;
-    }
-    if (trackedJobId !== null && trackedJobId !== jobId) terminate(trackedJobId);
-    terminalHandled.delete(jobId);
-    trackedJobId = jobId;
-    emptyReopens = 0;
+  /** 実行中のジョブがあれば接続し、なければ閉じる。接続の開閉はここだけで行う */
+  function syncConnection(): void {
+    const { job } = store.getState();
+    if (job?.status === "running") {
+      if (connection?.jobId !== job.jobId) open(job.jobId);
+    } else closeConnection();
+  }
+
+  /** サーバー状態の取り込み口。POST の応答・照会・SSE のすべてがここを通る。revision が進まなければ捨てる */
+  function commit(next: { revision: number; job: DlsiteJobView | null }): boolean {
     const state = store.getState();
-    if (initial) applySnapshot(initial);
-    else if (state.job?.jobId !== jobId) {
-      patch({
-        job: { jobId, status: "running", codes: new Map(), bulk: { processed: 0, total: 0 } },
-        settled: false,
-      });
-    }
-    open(jobId);
+    if (next.revision <= state.revision) return false;
+    const transition = transitionOf(state.job, next.job);
+    patch({
+      revision: next.revision,
+      job: next.job,
+      results: mergeResults(state.results, next.job),
+    });
+    syncConnection();
+    for (const event of transition) events.emit(event);
+    return true;
   }
 
-  async function reconcile(token: number, jobId: string): Promise<void> {
+  /** 追跡を諦める。結果が分からないコードを通知し、ジョブを手放してエラーを立てる */
+  function abandon(message: string): void {
+    const { job } = store.getState();
+    closeConnection();
+    patch({ job: null, error: message });
+    for (const event of transitionOf(job, null)) events.emit(event);
+  }
+
+  async function reconcile(local: { sse: SseConnection; jobId: string }): Promise<void> {
     const startEpoch = epoch;
-    const startSeq = eventSeq;
-    let current: DlsiteJobSnapshot | null;
+    let current: DlsiteServerState;
     try {
       current = await deps.getCurrent();
     } catch (cause) {
@@ -339,39 +315,30 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
         reset();
         return;
       }
-      if (generation.isCurrent(token) && trackedJobId === jobId) noteEmptyReopen(jobId);
+      if (connection === local) noteEmptyReopen(local);
       return;
     }
-    if (epoch !== startEpoch || !generation.isCurrent(token) || trackedJobId !== jobId) return;
-    if (current === null) {
-      terminate(jobId);
-      return;
-    }
-    if (current.jobId !== jobId) {
-      if (current.status === "running") follow(current.jobId, current);
-      else terminate(jobId);
-      return;
-    }
-    if (current.status === "finished") {
-      applySnapshot(current);
-      terminate(jobId);
-      return;
-    }
-    // 照会の発行後にSSEで同じジョブの状態を受け取っていたら、古い照会結果でコードを巻き戻さない
-    if (eventSeq !== startSeq) return;
-    applySnapshot(current);
-    noteEmptyReopen(jobId);
+    if (epoch !== startEpoch) return;
+    commit(toServerView(current));
+    if (connection === local) noteEmptyReopen(local);
   }
 
   /** 何も受け取らないまま閉じた状態が続くなら諦め、そうでなければ張り直す */
-  function noteEmptyReopen(jobId: string): void {
-    if (connection?.source.readyState !== EVENT_SOURCE_CLOSED) return;
+  function noteEmptyReopen(local: { sse: SseConnection; jobId: string }): void {
+    if (local.sse.source.readyState !== EVENT_SOURCE_CLOSED) return;
     emptyReopens += 1;
     if (emptyReopens >= MAX_EMPTY_REOPENS) {
-      failTracking(jobId, "DLsite取得の進捗を受け取れなくなりました");
+      abandon("DLsite取得の進捗を受け取れなくなりました");
       return;
     }
-    open(jobId);
+    open(local.jobId);
+  }
+
+  function reset(): void {
+    epoch += 1;
+    closeConnection();
+    emptyReopens = 0;
+    store.setState(INITIAL_DLSITE_JOB_STATE);
   }
 
   const actionError = (cause: unknown): DlsiteJobActionResult => {
@@ -391,8 +358,8 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
       const startEpoch = epoch;
       try {
         const current = await deps.getCurrent();
-        if (epoch !== startEpoch || trackedJobId !== null) return;
-        if (current?.status === "running") follow(current.jobId, current);
+        if (epoch !== startEpoch) return;
+        commit(toServerView(current));
       } catch (cause) {
         if (epoch === startEpoch && isRootReconfiguringError(cause)) reset();
       }
@@ -403,22 +370,19 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
       const codes = [...new Set(productCodes.map(canonicalDlsiteProductCode))];
       if (codes.length === 0) return { ok: true };
       const startEpoch = epoch;
-      bulkPosting = true;
       patch({ startingBulk: { total: codes.length } });
       try {
         for (const part of chunk(codes, DLSITE_JOB_MAX_PRODUCT_CODES)) {
-          const { jobId } = await deps.startJob({ origin: "bulk", productCodes: part });
+          const response = await deps.startJob({ origin: "bulk", productCodes: part });
           if (epoch !== startEpoch) return { ok: true };
-          follow(jobId);
+          commit(toServerView(response));
         }
       } catch (cause) {
         if (epoch !== startEpoch) return { ok: true };
-        bulkPosting = false;
-        clearStartingBulk();
+        patch({ startingBulk: null });
         return actionError(cause);
       }
-      bulkPosting = false;
-      if (receivedForTracked || trackedJobId === null) clearStartingBulk();
+      patch({ startingBulk: null });
       return { ok: true };
     },
 
@@ -426,27 +390,21 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
       const code = canonicalDlsiteProductCode(productCode);
       if (store.getState().pendingSingles.has(code)) return { ok: true };
       const startEpoch = epoch;
-      inflightSingles.add(code);
       patch({ pendingSingles: new Set(store.getState().pendingSingles).add(code) });
-      const drop = (): void => {
-        inflightSingles.delete(code);
+      const release = (): void => {
         const next = new Set(store.getState().pendingSingles);
         next.delete(code);
         patch({ pendingSingles: next });
       };
       try {
-        const { jobId } = await deps.startJob({ origin: "single", productCode: code });
+        const response = await deps.startJob({ origin: "single", productCode: code });
         if (epoch !== startEpoch) return { ok: true };
-        inflightSingles.delete(code);
-        follow(jobId);
-        // 応答より先に待機中・取得中の状態を受け取っていれば保留は不要。終端済みの状態が残るコードは、
-        // 取り直しの code イベントを受け取るまで保留する。
-        const entry = store.getState().job?.codes.get(code);
-        if (entry && !isTerminalCodeState(entry.state)) releasePendingSingles([code]);
+        commit(toServerView(response));
+        release();
         return { ok: true };
       } catch (cause) {
         if (epoch !== startEpoch) return { ok: true };
-        drop();
+        release();
         return actionError(cause);
       }
     },
@@ -469,11 +427,6 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
       } finally {
         if (epoch === startEpoch) patch({ cancelling: false });
       }
-    },
-
-    markSettled(jobId) {
-      const { job, settled } = store.getState();
-      if (job?.jobId === jobId && !settled) patch({ settled: true });
     },
 
     clearError: () => patch({ error: null }),

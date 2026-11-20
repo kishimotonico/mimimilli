@@ -1,25 +1,15 @@
-import {
-  META_FILE_NAME,
-  dlsiteFetchStateOfResolution,
-  planDlsiteRegistration,
-  relativeToRoot,
-} from "@mimimilli/shared";
+import { META_FILE_NAME, planDlsiteRegistration, relativeToRoot } from "@mimimilli/shared";
+import type { MissingWork, ScanCandidateFolder, ScanResult } from "@mimimilli/shared";
 import type {
-  MissingWork,
-  ScanCandidate,
-  ScanCandidateDlsite,
-  ScanCandidateFolder,
-  ScanCandidatesRegisterResponse,
-  ScanResult,
-} from "@mimimilli/shared";
-import type {
+  CandidateAvailability,
+  CandidateDescriber,
   RootReconfigurationAdapter,
   RootReconfigurationRecord,
+  ScanExecution,
   ScanOptions,
   SettingsAdapter,
   StoredSettings,
 } from "../../adapter/index.ts";
-import { CandidatePoolChangedError } from "../../errors.ts";
 import type { FixtureWorkRecord } from "./data.ts";
 import { isFsPathWithin, normalizeFsPath } from "./fsResolve.ts";
 import { checkWorkPlacement } from "./playback.ts";
@@ -27,8 +17,7 @@ import { FIXTURE_UNREADABLE_ROOT } from "./scenarios.ts";
 import {
   dlsiteLinkageOf,
   applyFixtureCachedCover,
-  fixtureDlsiteCoverKey,
-  fixtureDlsiteResolutionHead,
+  fixtureDlsiteSummary,
   fixtureUsableDlsite,
   requireFixtureRoot,
   setDlsiteLinkage,
@@ -42,54 +31,37 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** 直したコードがあればそれ、なければ検出したコード */
-function effectiveRjCode(state: FixtureState, folder: ScanCandidateFolder): string | null {
-  return state.scanCandidateRjCodeOverrides.has(folder.path)
-    ? (state.scanCandidateRjCodeOverrides.get(folder.path) ?? null)
-    : folder.detectedRjCode;
+function describeMissingWorks(state: FixtureState, rjCode: string | null) {
+  if (!rjCode) return [];
+  return state.works
+    .filter(
+      (work) =>
+        work.status === "missing" &&
+        dlsiteLinkageOf(state, work.id).rjCode?.toUpperCase() === rjCode,
+    )
+    .map((work) => ({ workId: work.id, title: work.title }));
 }
 
-function deriveDlsite(state: FixtureState, rjCode: string | null): ScanCandidateDlsite {
-  if (!rjCode) return { state: "none" };
-  const fetchState = dlsiteFetchStateOfResolution(fixtureDlsiteResolutionHead(state, rjCode));
-  if (fetchState !== "fetched") return { state: fetchState };
-  const fetched = state.dlsiteFetched.get(rjCode.toUpperCase());
-  if (!fetched) return { state: "none" };
-  const key = fetched.info.coverUrl ? fixtureDlsiteCoverKey(fetched.info.coverUrl) : null;
-  const cover = key ? state.dlsiteCovers.get(key) : undefined;
-  return {
-    state: "fetched",
-    title: fetched.info.title,
-    cover: key && cover ? { key, version: cover.fetchedAt } : null,
-  };
-}
-
-function toCandidate(state: FixtureState, folder: ScanCandidateFolder): ScanCandidate {
-  const rjCode = effectiveRjCode(state, folder);
-  const missingWorks = rjCode
-    ? state.works
-        .filter(
-          (work) =>
-            work.status === "missing" &&
-            dlsiteLinkageOf(state, work.id).rjCode?.toUpperCase() === rjCode,
-        )
-        .map((work) => ({ workId: work.id, title: work.title }))
-    : [];
-  return {
-    path: folder.path,
-    inferredTitle: folder.inferredTitle,
-    audioFileCount: folder.audioFileCount,
-    audioBreakdown: folder.audioBreakdown,
-    rjCode,
-    rjCodeEdited: state.scanCandidateRjCodeOverrides.has(folder.path),
-    dlsite: deriveDlsite(state, rjCode),
-    missingWorks,
-  };
-}
-
-function visibleFolders(state: FixtureState): ScanCandidateFolder[] {
+/** 除外と、登録済み作品（自分自身か祖先フォルダー）の候補を除く。登録状況の正は作品一覧 */
+function availabilityOf(state: FixtureState): CandidateAvailability {
   const excluded = new Set(state.scanCandidateExclusions);
-  return state.scanCandidates.filter((folder) => !excluded.has(folder.path));
+  const rootAbs = normalizeFsPath(requireFixtureRoot(state));
+  const workPaths = state.works.map((work) => normalizeFsPath(work.physicalPath));
+  return (folder) => {
+    if (excluded.has(folder.path)) return false;
+    const folderAbs = normalizeFsPath(`${rootAbs}/${folder.path}`);
+    return !workPaths.some((workPath) => isFsPathWithin(workPath, folderAbs));
+  };
+}
+
+/** 作品（自分自身か祖先フォルダー）に覆われたフォルダーは候補プールに入らない（realの走査と同じ） */
+function candidatePoolOf(state: FixtureState): ScanCandidateFolder[] {
+  const rootAbs = normalizeFsPath(requireFixtureRoot(state));
+  const workPaths = state.works.map((work) => normalizeFsPath(work.physicalPath));
+  return state.scanCandidatePool.filter((folder) => {
+    const folderAbs = normalizeFsPath(`${rootAbs}/${folder.path}`);
+    return !workPaths.some((workPath) => isFsPathWithin(workPath, folderAbs));
+  });
 }
 
 /** シナリオが指定した作品を行方不明にし、今回新たに行方不明になった作品として返す。 */
@@ -113,7 +85,7 @@ async function runPseudoScan(
   state: FixtureState,
   options: ScanOptions,
   stepMs: number,
-): Promise<ScanResult> {
+): Promise<ScanExecution> {
   const emit = options.onProgress ?? ((): void => {});
   const checkAbort = () => {
     if (options.signal?.aborted)
@@ -141,9 +113,7 @@ async function runPseudoScan(
   const missingWorks = scenario ? markScenarioMissingWorks(state) : [];
   state.works = state.works.map((work) => checkWorkPlacement(state, work));
   state.lastScanTime = new Date().toISOString();
-  state.scanCandidates = [...state.scanCandidatePool];
-  state.scanCandidateRjCodeOverrides.clear();
-  return {
+  const result: ScanResult = {
     registered: state.works.length,
     insertedWorkIds: scenario ? state.scanInsertedWorkIds : [],
     startedWithEmptyCatalog,
@@ -157,6 +127,11 @@ async function runPseudoScan(
     ...(scenario && state.dataIntegrityWarning
       ? { dataIntegrityWarning: state.dataIntegrityWarning }
       : {}),
+  };
+  return {
+    result,
+    candidatePool: candidatePoolOf(state),
+    rootIdentity: normalizeFsPath(requireFixtureRoot(state)),
   };
 }
 
@@ -191,17 +166,15 @@ export function createSettingsScanMethods(
       return { ...record, rootFolder: state.rootFolder };
     },
 
-    async beginRootReconfiguration(rootFolder: string): Promise<void> {
-      if (state.rootFolder !== null && state.rootFolder !== rootFolder) {
-        state.scanCandidateExclusions = [];
-        state.scanCandidates = [];
-        state.scanCandidateRjCodeOverrides.clear();
-      }
+    async beginRootReconfiguration(rootFolder: string): Promise<{ rootChanged: boolean }> {
+      const rootChanged = state.rootFolder !== null && state.rootFolder !== rootFolder;
+      if (rootChanged) state.scanCandidateExclusions = [];
       state.rootFolder = rootFolder;
       state.rootReconfiguration = { phase: "running" };
+      return { rootChanged };
     },
 
-    async rebuildCatalogForRoot(rootFolder, rebuildOptions): Promise<ScanResult> {
+    async rebuildCatalogForRoot(rootFolder, rebuildOptions): Promise<ScanExecution> {
       reattachWorksForRoot(state, rootFolder);
       if (rootFolder === FIXTURE_UNREADABLE_ROOT) {
         await sleep(rootRebuildStepMs);
@@ -223,7 +196,7 @@ export function createSettingsScanMethods(
       return state.rootReconfigurationCompletedAt;
     },
 
-    async scan(scanOptions?: ScanOptions): Promise<ScanResult> {
+    async scan(scanOptions?: ScanOptions): Promise<ScanExecution> {
       return runPseudoScan(state, scanOptions ?? {}, FIXTURE_SCAN_STEP_MS);
     },
 
@@ -233,72 +206,51 @@ export function createSettingsScanMethods(
         invalidMetaFiles: state.invalidMetaFiles,
       };
     },
-    async listScanCandidates(): Promise<ScanCandidate[]> {
-      return visibleFolders(state).map((folder) => toCandidate(state, folder));
+    async candidateRootIdentity(): Promise<string | null> {
+      return state.rootFolder === null ? null : normalizeFsPath(state.rootFolder);
     },
-    async setScanCandidateRjCode(path, rjCode): Promise<ScanCandidate> {
-      const folder = visibleFolders(state).find((candidate) => candidate.path === path);
-      if (!folder) throw new CandidatePoolChangedError();
-      if (rjCode === folder.detectedRjCode) state.scanCandidateRjCodeOverrides.delete(path);
-      else state.scanCandidateRjCodeOverrides.set(path, rjCode);
-      return toCandidate(state, folder);
+    async candidateAvailability(): Promise<CandidateAvailability> {
+      return availabilityOf(state);
     },
-    async registerScanCandidates(paths, apply): Promise<ScanCandidatesRegisterResponse> {
-      const candidatesByPath = new Map<string, ScanCandidateFolder>(
-        visibleFolders(state).map((candidate) => [candidate.path, candidate]),
-      );
-      if (paths.some((path) => !candidatesByPath.has(path))) throw new CandidatePoolChangedError();
-      const rootAbs = normalizeFsPath(requireFixtureRoot(state));
-      const now = new Date().toISOString();
-      // real adapter の registerCandidates（scanCandidateSession.ts）と同じ意味論: 登録した候補は
-      // 実際にcatalog（ここではstate.works）へ行が増える。作品一覧・スキャン結果一覧の
-      // 両方から見えて初めて「登録した」と言える。
-      const registered = paths.flatMap((path) => {
-        const candidate = candidatesByPath.get(path);
-        if (!candidate) return [];
-        const rjCode = state.scanCandidateRjCodeOverrides.has(candidate.path)
-          ? (state.scanCandidateRjCodeOverrides.get(candidate.path) ?? "")
-          : candidate.detectedRjCode;
-        const plan = planDlsiteRegistration({
-          rjCode,
-          info: rjCode ? (fixtureUsableDlsite(state, rjCode)?.info ?? null) : null,
-          title: candidate.inferredTitle,
-          tags: [],
-          apply,
-        });
-        const physicalPath = normalizeFsPath(`${rootAbs}/${candidate.path}`);
-        const work: FixtureWorkRecord = {
-          id: crypto.randomUUID(),
-          title: plan.title,
-          cover: null,
-          status: "ok",
-          physicalPath,
-          metaPath: `${physicalPath}/${META_FILE_NAME}`,
-          totalDurationSec: 0,
-          trackCount: candidate.audioFileCount,
-          addedAt: now,
-          errorMessage: null,
-          urls: plan.dlsiteUrl ? [plan.dlsiteUrl] : [],
-          tags: plan.tags,
-          bookmarked: false,
-          lastPlayedAt: null,
-        };
-        applyFixtureCachedCover(state, work, plan.coverUrl);
-        state.works.push(work);
-        setDlsiteLinkage(state, work.id, plan.dlsite);
-        return [{ path: candidate.path, workId: work.id }];
+    async describeCandidates(): Promise<CandidateDescriber> {
+      return (rjCode) => ({
+        dlsite: fixtureDlsiteSummary(state, rjCode),
+        missingWorks: describeMissingWorks(state, rjCode),
       });
-      const registeredPaths = new Set(registered.map((candidate) => candidate.path));
-      const unregistered = (candidate: ScanCandidateFolder) => !registeredPaths.has(candidate.path);
-      for (const path of registeredPaths) state.scanCandidateRjCodeOverrides.delete(path);
-      state.scanCandidatePool = state.scanCandidatePool.filter(unregistered);
-      state.scanCandidates = state.scanCandidates.filter(unregistered);
-      return { registered, failures: [] };
+    },
+    async registerCandidateFolder(folder, rjCode, apply) {
+      const rootAbs = normalizeFsPath(requireFixtureRoot(state));
+      const plan = planDlsiteRegistration({
+        rjCode,
+        info: rjCode ? (fixtureUsableDlsite(state, rjCode)?.info ?? null) : null,
+        title: folder.inferredTitle,
+        tags: [],
+        apply,
+      });
+      const physicalPath = normalizeFsPath(`${rootAbs}/${folder.path}`);
+      const work: FixtureWorkRecord = {
+        id: crypto.randomUUID(),
+        title: plan.title,
+        cover: null,
+        status: "ok",
+        physicalPath,
+        metaPath: `${physicalPath}/${META_FILE_NAME}`,
+        totalDurationSec: 0,
+        trackCount: folder.audioFileCount,
+        addedAt: new Date().toISOString(),
+        errorMessage: null,
+        urls: plan.dlsiteUrl ? [plan.dlsiteUrl] : [],
+        tags: plan.tags,
+        bookmarked: false,
+        lastPlayedAt: null,
+      };
+      const coverSkipped = applyFixtureCachedCover(state, work, plan.coverUrl);
+      state.works.push(work);
+      setDlsiteLinkage(state, work.id, plan.dlsite);
+      return { workId: work.id, coverSkipped };
     },
     async excludeScanCandidates(paths): Promise<void> {
-      // 除外は可逆な扱い（restoreScanCandidateExclusionsで戻せる）なので、
-      // state.scanCandidates 自体からは削除しない。一覧側（listScanCandidates/scan）が
-      // scanCandidateExclusions を都度フィルタして隠す。
+      // 除外は可逆な扱い（restoreScanCandidateExclusionsで戻せる）なので、候補プールからは外さない
       for (const path of paths) {
         if (!state.scanCandidateExclusions.includes(path)) {
           state.scanCandidateExclusions.push(path);

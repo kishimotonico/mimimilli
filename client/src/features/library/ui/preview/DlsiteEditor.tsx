@@ -321,7 +321,15 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
       });
       setProjection(result.projection);
       setFetched(null);
-      toast.show({ message: "DLsite情報を適用しました", variant: "success", priority: "notice" });
+      toast.show(
+        result.coverSkipped === null
+          ? { message: "DLsite情報を適用しました", variant: "success", priority: "notice" }
+          : {
+              message: "DLsite情報を適用しました。カバーは適用できませんでした",
+              variant: "warning",
+              priority: "notice",
+            },
+      );
     } catch (cause) {
       if (isDlsiteApplyStale(cause)) setFetched(null);
       setError(dlsiteApplyErrorMessage(cause));

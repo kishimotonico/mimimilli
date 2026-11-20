@@ -4,6 +4,7 @@ import {
   type WorkEditSnapshot,
   type WorkSourceMutationResult,
 } from "@mimimilli/shared";
+import { prepareSingleMeta } from "./scanRegister.ts";
 import {
   SOURCE_FILE_BROKEN_MESSAGE,
   SOURCE_FILE_MISSING_MESSAGE,
@@ -139,7 +140,9 @@ export async function projectVerifiedSource(
 ): Promise<WorkSourceMutationResult> {
   const snapshot = toEditSnapshot(verified.source, verified.physicalPath);
   try {
-    const outcome = await scanner.projectMetaFile(verified.metaPath, verified.source);
+    const outcome = await scanner.projectPrepared(
+      prepareSingleMeta(verified.metaPath, verified.source),
+    );
     return mutationResultFromOutcome(snapshot, outcome);
   } catch (error) {
     scanLogger.error("作品の一覧反映に失敗しました", {

@@ -69,10 +69,67 @@ describe("refreshScanCandidates", () => {
     firstRelease();
 
     const secondResult = await second;
-    await first;
+    expect(await first).toEqual([candidateB]);
 
     expect(callCount).toBe(2);
     expect(secondResult).toEqual([candidateB]);
     expect(readCache(queryClient)).toEqual([candidateB]);
+  });
+
+  it("キャッシュの破棄で打ち切られたら再フェッチせずに投げる", async () => {
+    let callCount = 0;
+    mockApi({
+      "GET /api/scan/candidates": async () => {
+        callCount += 1;
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return { candidates: [candidateA] };
+      },
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const refresh = refreshScanCandidates(queryClient);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    queryClient.removeQueries({ queryKey: SCAN_CANDIDATES_QUERY_KEY });
+    await expect(refresh).rejects.toThrow();
+    expect(callCount).toBe(1);
+  });
+
+  it("取得の実行中にRJコードを直した行を差し替えても、遅れて返った古い応答で巻き戻らず、待っていた側は直した後の取得を待つ", async () => {
+    const original = { ...candidateA, rjCode: "RJ000001" };
+    const fixed = { ...candidateA, rjCode: "RJ000002", rjCodeEdited: true };
+    const firstGate = Promise.withResolvers<void>();
+    const secondGate = Promise.withResolvers<void>();
+    let callCount = 0;
+    mockApi({
+      "GET /api/scan/candidates": async () => {
+        callCount += 1;
+        if (callCount === 1) {
+          await firstGate.promise;
+          return { candidates: [original, candidateB] };
+        }
+        await secondGate.promise;
+        return { candidates: [fixed, candidateB] };
+      },
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, [original, candidateB]);
+
+    const first = refreshScanCandidates(queryClient);
+    let firstSettled = false;
+    void first.then(() => (firstSettled = true));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const second = refreshScanCandidates(queryClient, { replace: fixed });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(readCache(queryClient)).toEqual([fixed, candidateB]);
+
+    firstGate.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(readCache(queryClient)).toEqual([fixed, candidateB]);
+    expect(firstSettled).toBe(false);
+
+    secondGate.resolve();
+    expect(await second).toEqual([fixed, candidateB]);
+    expect(await first).toEqual([fixed, candidateB]);
+    expect(callCount).toBe(2);
+    expect(readCache(queryClient)).toEqual([fixed, candidateB]);
   });
 });

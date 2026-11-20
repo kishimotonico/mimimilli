@@ -3,14 +3,14 @@ import { Hono } from "hono";
 import {
   dlsiteApplyBodySchema,
   dlsiteJobCancelBulkResponseSchema,
-  dlsiteJobCurrentResponseSchema,
+  dlsiteJobStateSchema,
   dlsiteJobStartBodySchema,
-  dlsiteJobStartResponseSchema,
   dlsitePreviewSchema,
   type DlsiteJobEvent,
   dlsiteFetchByCodeBodySchema,
   dlsiteFetchByCodeResponseSchema,
   dlsiteStateUpdateBodySchema,
+  dlsiteApplyResponseSchema,
   workSourceMutationResultSchema,
 } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter/index.ts";
@@ -109,7 +109,7 @@ export function dlsiteRoute(
       throwSourceCommandError(error);
     }
     if (!result) notFound(`作品が見つかりません: ${workId}`);
-    return c.json(workSourceMutationResultSchema.parse(result));
+    return c.json(dlsiteApplyResponseSchema.parse(result));
   });
 
   app.patch("/dlsite/:id", async (c) => {
@@ -136,14 +136,12 @@ export function dlsiteRoute(
     if (adapter.isDlsiteOffline()) {
       throw apiError("offline", "オフライン設定のためDLsiteから取得できません");
     }
-    const jobId = dlsiteJobs.start(data);
-    if (!jobId) throw apiError("conflict", "サーバーの終了処理中のためDLsite取得を開始できません");
-    return c.json(dlsiteJobStartResponseSchema.parse({ jobId }), 202);
+    const state = dlsiteJobs.start(data);
+    if (!state) throw apiError("conflict", "サーバーの終了処理中のためDLsite取得を開始できません");
+    return c.json(dlsiteJobStateSchema.parse(state), 202);
   });
 
-  app.get("/dlsite/jobs/current", (c) =>
-    c.json(dlsiteJobCurrentResponseSchema.parse({ job: dlsiteJobs.getSnapshot() })),
-  );
+  app.get("/dlsite/jobs/current", (c) => c.json(dlsiteJobStateSchema.parse(dlsiteJobs.getState())));
 
   app.delete("/dlsite/jobs/:jobId/bulk", (c) =>
     c.json(

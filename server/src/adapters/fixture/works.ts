@@ -19,6 +19,7 @@ import type {
   WorkCreateBody,
   WorkEditSnapshot,
   WorkRegisterPreview,
+  WorkCreateResponse,
   WorkSourceMutationResult,
   WorkSourcePatch,
   WorkspacePath,
@@ -43,7 +44,6 @@ import {
   coverColumnsOf,
   dlsiteLinkageOf,
   fixtureUsableDlsite,
-  reassignWorkId,
   removeWorks,
   setDlsiteLinkage,
   type FixtureState,
@@ -163,7 +163,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       return work ? buildFullWorkFromState(state, work) : null;
     },
 
-    async createWork(body: WorkCreateBody): Promise<WorkSourceMutationResult | null> {
+    async createWork(body: WorkCreateBody): Promise<WorkCreateResponse | null> {
       const preview = await getWorkRegisterPreview(body.path);
       if (!preview) return null;
       const rootAbs = normalizeFsPath(requireFixtureRoot(state));
@@ -200,7 +200,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
         bookmarked: false,
         lastPlayedAt: null,
       };
-      applyFixtureCachedCover(state, work, plan.coverUrl);
+      const coverSkipped = applyFixtureCachedCover(state, work, plan.coverUrl);
       const registered = checkWorkPlacement(state, work);
       state.works.push(registered);
       state.sourceRevisions.set(work.id, "fixture");
@@ -208,12 +208,13 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       return {
         snapshot: fixtureEditSnapshot(state, registered),
         projection: { status: "published" },
+        coverSkipped,
       };
     },
 
     async reassignIdentityConflict(
       body: IdentityConflictReassignBody,
-    ): Promise<(WorkSourceMutationResult & { replacedWorkId: string | null }) | null> {
+    ): Promise<WorkSourceMutationResult | null> {
       const diagnostic = state.identityConflicts.find((candidate) =>
         candidate.paths.includes(body.path),
       );
@@ -226,32 +227,43 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
         ? target
         : posix.join(target, META_FILE_NAME);
       const newId = crypto.randomUUID();
-      let reassigned: FixtureWorkRecord;
-      const replacedWorkId = metaPath === owner.metaPath ? diagnostic.workId : null;
-      if (metaPath === owner.metaPath) {
-        owner.id = newId;
-        owner.bookmarked = false;
-        owner.lastPlayedAt = null;
-        reassignWorkId(state, diagnostic.workId, newId);
-        state.resumes.delete(diagnostic.workId);
-        reassigned = owner;
-      } else {
-        const copy = checkWorkPlacement(state, {
-          ...owner,
-          id: newId,
-          metaPath,
+      const placementOf = (conflictTarget: string) => {
+        const conflictMetaPath = isSidecarMetaFileName(posix.basename(conflictTarget))
+          ? conflictTarget
+          : posix.join(conflictTarget, META_FILE_NAME);
+        return {
+          metaPath: conflictMetaPath,
           physicalPath:
-            workPlacementOf(metaPath).kind === "folder"
-              ? target
-              : posix.join(posix.dirname(target), posix.basename(owner.physicalPath)),
-          bookmarked: false,
-          lastPlayedAt: null,
-        });
-        copyWorkState(state, diagnostic.workId, newId);
-        state.sourceRevisions.set(newId, "fixture");
-        state.works.push(copy);
-        reassigned = copy;
+            workPlacementOf(conflictMetaPath).kind === "folder"
+              ? conflictTarget
+              : posix.join(posix.dirname(conflictTarget), posix.basename(owner.physicalPath)),
+        };
+      };
+      const reassigned = checkWorkPlacement(state, {
+        ...owner,
+        id: newId,
+        ...placementOf(target),
+        bookmarked: false,
+        lastPlayedAt: null,
+      });
+      copyWorkState(state, diagnostic.workId, newId);
+      state.sourceRevisions.set(newId, "fixture");
+      if (metaPath === owner.metaPath) {
+        // 旧IDの行は、旧IDを宣言している残りのメタファイルへ移る。無ければ行方不明（realと同じ）
+        const remaining = diagnostic.paths.find((path) => path !== body.path);
+        if (remaining) {
+          const moved = checkWorkPlacement(state, {
+            ...owner,
+            ...placementOf(normalizeFsPath(`${rootAbs}/${remaining}`)),
+          });
+          state.works = state.works.map((work) => (work === owner ? moved : work));
+        } else {
+          // 旧IDを宣言するメタファイルが残っていないので、次のスキャンと同じく行方不明にする
+          owner.status = "missing";
+          owner.errorMessage = null;
+        }
       }
+      state.works.push(reassigned);
       state.identityConflicts = removeIdentityConflictPath(
         state.identityConflicts,
         diagnostic.workId,
@@ -260,7 +272,6 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       return {
         snapshot: fixtureEditSnapshot(state, reassigned),
         projection: { status: "published" },
-        replacedWorkId,
       };
     },
 
@@ -292,19 +303,29 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       return true;
     },
 
+    async getWorkStatuses(ids: readonly string[]): Promise<Map<string, Work["status"]>> {
+      const wanted = new Set(ids);
+      const statuses = new Map<string, Work["status"]>(
+        state.works.filter((work) => wanted.has(work.id)).map((work) => [work.id, work.status]),
+      );
+      // データ不整合で一覧から除かれた作品も、catalogには存在する
+      for (const id of state.dataIntegrityWarning?.skippedWorkIds ?? []) {
+        if (wanted.has(id) && !statuses.has(id)) statuses.set(id, "error");
+      }
+      return statuses;
+    },
+
     async countMissingWorks(): Promise<number> {
       return state.works.filter((w) => w.status === "missing").length;
     },
 
-    async unregisterMissingWorks(): Promise<
-      UnregisterMissingWorksResult & { deletedWorkIds: string[] }
-    > {
+    async unregisterMissingWorks(): Promise<UnregisterMissingWorksResult> {
       const missingIds = new Set(
         state.works.filter((w) => w.status === "missing").map((w) => w.id),
       );
       for (const id of missingIds) removeIdentityConflictForWork(state, id);
       removeWorks(state, missingIds);
-      return { deletedCount: missingIds.size, failedCount: 0, deletedWorkIds: [...missingIds] };
+      return { deletedCount: missingIds.size, failedCount: 0 };
     },
 
     async getWorkEditSnapshot(id: string): Promise<WorkEditSnapshot | null> {

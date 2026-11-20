@@ -2,11 +2,11 @@
 import { existsSync, renameSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type {
-  DlsiteRegistrationPlan,
   DlsiteWorkInfo,
   MetaFile,
   WorkCreateBody,
   WorkRegisterPreview,
+  WorkCreateResponse,
   WorkSourceMutationResult,
 } from "@mimimilli/shared";
 import { isDlsiteUrl, planDlsiteRegistration } from "@mimimilli/shared";
@@ -24,7 +24,7 @@ import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import type { Scanner } from "./scanner.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
-import { stageCachedDlsiteCover, type StagedCover } from "./dlsiteCoverStaging.ts";
+import { saveWithDlsiteCover } from "./dlsiteCoverStaging.ts";
 import type { ProjectOutcome, RestoreMetaPatch } from "./scanTypes.ts";
 import {
   assertNoIdentityConflict,
@@ -216,7 +216,7 @@ export async function createWorkFromPath(
   root: string,
   body: WorkCreateBody,
   dlsiteDeps: WorkRegisterDlsite,
-): Promise<WorkSourceMutationResult> {
+): Promise<WorkCreateResponse> {
   const { query } = repos;
   const path = resolveWithin(root, join(root, body.path));
   const target = path ? registrationTargetOfPath(path) : null;
@@ -228,7 +228,6 @@ export async function createWorkFromPath(
   }
   assertRegistrationAllowed(registrationConflictCheck(query, target, root));
 
-  const assetDir = target.placement.mediaRoot;
   const rjCode = body.rjCode === "" ? null : body.rjCode;
   const info = rjCode ? dlsiteDeps.readUsableInfo(rjCode) : null;
   const plan = planDlsiteRegistration({
@@ -250,65 +249,58 @@ export async function createWorkFromPath(
     if (body.title !== meta.title) metaPatch.title = body.title;
     metaPatch.tags = body.tags;
 
-    let cover: StagedCover | null = null;
-    try {
-      if (info) {
-        cover = await stagePlannedCover(plan, dlsiteDeps, assetDir, root);
-        if (body.applyUrl) {
-          metaPatch.urls = [
-            ...meta.urls.filter((entry) => !isDlsiteUrl(entry.url)),
-            ...(plan.dlsiteUrl ? [plan.dlsiteUrl] : []),
-          ];
+    const { value: prepared, coverSkipped } = await saveWithDlsiteCover(
+      {
+        cache: dlsiteDeps.dlsiteCache,
+        coverUrl: info ? plan.coverUrl : null,
+        previousCoverImage: meta.coverImage,
+      },
+      target.placement,
+      root,
+      async (cover) => {
+        if (info) {
+          if (body.applyUrl) {
+            metaPatch.urls = [
+              ...meta.urls.filter((entry) => !isDlsiteUrl(entry.url)),
+              ...(plan.dlsiteUrl ? [plan.dlsiteUrl] : []),
+            ];
+          }
+          if (cover) metaPatch.coverImage = cover.fileName;
+          metaPatch.dlsite = plan.dlsite;
         }
-        if (cover) metaPatch.coverImage = cover.fileName;
-        metaPatch.dlsite = plan.dlsite;
-      }
-      cover?.commit();
-      try {
-        return mutationResultFromProjectOutcome(
-          await scanner.restoreWork(target, metaPatch),
-          target.physicalPath,
-        );
-      } catch (error) {
-        cover?.rollback();
-        throw error;
-      }
-    } finally {
-      cover?.discard();
-    }
-  }
-
-  let cover: StagedCover | null = null;
-  try {
-    cover = await stagePlannedCover(plan, dlsiteDeps, assetDir, root);
-    cover?.commit();
-    try {
-      return mutationResultFromProjectOutcome(
-        await scanner.registerWork(target, {
-          title: plan.title,
-          tags: plan.tags,
-          urls: plan.dlsiteUrl ? [plan.dlsiteUrl] : [],
-          coverImage: cover?.fileName,
-          dlsite: plan.dlsite,
-        }),
+        cover?.place();
+        return scanner.writeRestoredWorkMeta(target, metaPatch);
+      },
+    );
+    return {
+      ...mutationResultFromProjectOutcome(
+        await scanner.projectPrepared(prepared),
         target.physicalPath,
-      );
-    } catch (error) {
-      cover?.rollback();
-      throw error;
-    }
-  } finally {
-    cover?.discard();
+      ),
+      coverSkipped,
+    };
   }
-}
 
-function stagePlannedCover(
-  plan: DlsiteRegistrationPlan,
-  deps: WorkRegisterDlsite,
-  workDir: string,
-  root: string,
-): Promise<StagedCover | null> {
-  return plan.coverUrl
-    ? stageCachedDlsiteCover(deps.dlsiteCache, plan.coverUrl, workDir, root)
-    : Promise.resolve(null);
+  const { value: prepared, coverSkipped } = await saveWithDlsiteCover(
+    { cache: dlsiteDeps.dlsiteCache, coverUrl: plan.coverUrl },
+    target.placement,
+    root,
+    (cover) => {
+      cover?.place();
+      return scanner.writeNewWorkMeta(target, {
+        title: plan.title,
+        tags: plan.tags,
+        urls: plan.dlsiteUrl ? [plan.dlsiteUrl] : [],
+        coverImage: cover?.fileName,
+        dlsite: plan.dlsite,
+      });
+    },
+  );
+  return {
+    ...mutationResultFromProjectOutcome(
+      await scanner.projectPrepared(prepared),
+      target.physicalPath,
+    ),
+    coverSkipped,
+  };
 }

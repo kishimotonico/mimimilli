@@ -18,6 +18,7 @@ import { configureRoot } from "./rootFolder.ts";
 import { nts } from "./tag.ts";
 import { createTestRealAdapter } from "./realAdapter.ts";
 import { makeTestDirectory, writeWav } from "./sampleLibrary.ts";
+import { runScan } from "./scanLibrary.ts";
 
 export type AdapterKind = "fixture" | "real";
 export const ADAPTER_KINDS: readonly AdapterKind[] = ["fixture", "real"];
@@ -153,6 +154,7 @@ async function build(kind: AdapterKind, library: ContractLibrary): Promise<Built
       ...library.fixture,
       works: library.works.map(fixtureSeedWork),
     });
+    await runScan(adapter);
     const app = createApp(adapter);
     return { harness: wrap(kind, adapter, app), dispose: () => app.shutdown() };
   }
@@ -170,13 +172,13 @@ async function build(kind: AdapterKind, library: ContractLibrary): Promise<Built
     createTestRealAdapter({ ...library.real, database: { kind: "memory" } }),
   );
   await configureRoot(adapter, root);
-  await adapter.scan();
+  await runScan(adapter);
   const app = createApp(adapter);
   return {
     harness: wrap(kind, adapter, app),
     dispose: async () => {
       await app.shutdown();
-      directory.cleanup();
+      await directory.cleanup();
     },
   };
 }

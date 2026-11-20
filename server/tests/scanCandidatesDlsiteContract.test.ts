@@ -31,6 +31,7 @@ import { configureRoot } from "./helpers/rootFolder.ts";
 import { makeTestDirectory, writeWav } from "./helpers/sampleLibrary.ts";
 import { createApp } from "./helpers/testApp.ts";
 import { folderFixtureWork } from "./helpers/workTestUtils.ts";
+import { runScan } from "./helpers/scanLibrary.ts";
 
 const TARGET = "未登録作品";
 const OK_CODE = "RJ000001";
@@ -80,6 +81,7 @@ async function createSubject(
       works: [folderFixtureWork(missingFixtureWork())],
       dlsiteFetchDelayMs: options.hold ? 150 : 0,
     });
+    await runScan(adapter);
     const app = createApp(adapter);
     return {
       kind,
@@ -145,7 +147,7 @@ async function createSubject(
   const db = openDb({ kind: "files", catalogPath, userPath });
   db.sqlite.run("UPDATE main.works SET status = 'missing' WHERE id = ?", [missingId]);
   db.close();
-  await adapter.scan();
+  await runScan(adapter);
   return {
     kind,
     adapter,
@@ -157,7 +159,7 @@ async function createSubject(
     dispose: async () => {
       gate.resolve();
       await app.shutdown();
-      directory.cleanup();
+      await directory.cleanup();
     },
   };
 }
@@ -277,6 +279,23 @@ for (const kind of ["fixture", "real"] as const) {
     assert.deepEqual((await setRjCode(subject, subject.errorCode)).dlsite, { state: "failed" });
   });
 
+  contract(
+    "取得ジョブの終端の結果は、その直後の候補のdlsiteと一致し、候補のrevisionは終端以上になる",
+    async (subject) => {
+      for (const code of [OK_CODE, subject.noCoverCode, subject.notFoundCode, subject.errorCode]) {
+        await startJob(subject, code);
+        await waitJobFinished(subject);
+        const state = (await (await subject.app.request("/api/dlsite/jobs/current")).json()) as {
+          job: { codes: Array<{ productCode: string; revision: number; dlsite: unknown }> };
+        };
+        const terminal = state.job.codes.find((entry) => entry.productCode === code)!;
+        const candidate = await setRjCode(subject, code);
+        assert.deepEqual(candidate.dlsite, terminal.dlsite, code);
+        assert.ok(candidate.dlsiteRevision >= terminal.revision, code);
+      }
+    },
+  );
+
   contract("RJコードをなしに直した候補は、直す前の取得状態に関わらず未取得", async (subject) => {
     await fetchAndWait(subject, OK_CODE);
     await setRjCode(subject, OK_CODE);
@@ -298,13 +317,13 @@ for (const kind of ["fixture", "real"] as const) {
     },
   );
 
-  test(`取得中の候補はfetchingで、終わると取得済みになる (${kind})`, async () => {
+  test(`取得中の候補はキャッシュどおり未取得で、終わると取得済みになる (${kind})`, async () => {
     const subject = await createSubject(kind, { hold: true });
     try {
       await setRjCode(subject, OK_CODE);
       await startJob(subject, OK_CODE);
-      assert.deepEqual((await targetCandidate(subject)).dlsite, { state: "fetching" });
-      assert.deepEqual((await setRjCode(subject, OK_CODE)).dlsite, { state: "fetching" });
+      assert.deepEqual((await targetCandidate(subject)).dlsite, { state: "none" });
+      assert.deepEqual((await setRjCode(subject, OK_CODE)).dlsite, { state: "none" });
       subject.release();
       await waitJobFinished(subject);
       assert.equal((await targetCandidate(subject)).dlsite.state, "fetched");

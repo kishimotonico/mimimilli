@@ -7,7 +7,7 @@ import {
 } from "./coverSnapshot.ts";
 import { gcThumbnailCache } from "./thumbnailCache.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
-import type { ScanExecutionResult } from "./scanTypes.ts";
+import type { ScanExecutionResult } from "../../adapter/index.ts";
 import type { ScannerAbortHooks } from "./scanWalk.ts";
 import type { Scanner } from "./scanner.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";

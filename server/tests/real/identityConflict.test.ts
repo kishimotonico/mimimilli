@@ -12,6 +12,7 @@ import { createApp } from "../helpers/testApp.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
+import { runScan } from "../helpers/scanLibrary.ts";
 
 const WORK_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -66,7 +67,7 @@ test("重複Work IDはmimimilli.jsonを変更せず、catalog公開せずに全p
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
 
-  const result = await adapter.scan({ full: true });
+  const result = await runScan(adapter, { full: true });
 
   assert.equal(result.registered, 0);
   assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, [
@@ -92,10 +93,10 @@ test("既存投影は競合pathの順序にかかわらず保持し、解消後�
   const owner = makeWork(root, "work-z-owner", "既存投影");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
 
   const duplicate = makeWork(root, "work-a-copy", "新しい競合path");
-  const conflict = await adapter.scan({ full: true });
+  const conflict = await runScan(adapter, { full: true });
   assert.equal(conflict.registered, 0);
   assert.equal((await adapter.getWork(WORK_ID))?.title, "既存投影");
   assert.equal((await adapter.getWork(WORK_ID))?.physicalPath, join(root, "work-z-owner"));
@@ -105,7 +106,7 @@ test("既存投影は競合pathの順序にかかわらず保持し、解消後�
   ]);
 
   writeMeta(duplicate, "別作品", "22222222-2222-4222-8222-222222222222");
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
   assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, []);
   assert.equal((await adapter.getWork("22222222-2222-4222-8222-222222222222"))?.title, "別作品");
   assert.equal(readFileSync(owner, "utf-8").includes(WORK_ID), true);
@@ -120,7 +121,7 @@ test("identity_conflictの指定pathだけを別の作品として取り込み�
   const before = JSON.parse(readFileSync(copy, "utf-8"));
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
 
   const app = directory.ownFn(createApp(adapter), (a) => a.shutdown());
   const rejected = await app.request("/api/works/identity-conflicts/reassign", {
@@ -159,7 +160,7 @@ test("壊れたコピーのcandidateIdで既存作品の投影を乗っ取らな
   makeWork(root, "work-owner", "元作品");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
 
   const ownerBefore = await adapter.getWork(WORK_ID);
   assert.ok(ownerBefore);
@@ -178,7 +179,7 @@ test("壊れたコピーのcandidateIdで既存作品の投影を乗っ取らな
   "title": `,
   );
 
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
   const ownerAfter = await adapter.getWork(WORK_ID);
 
   assert.equal(ownerAfter?.physicalPath, ownerBefore!.physicalPath);
@@ -210,7 +211,7 @@ test("root変更後、旧rootの作品IDと衝突する壊れたメタがあっ�
   makeWork(rootA, "work-owner", "旧root作品");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, rootA);
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
 
   const ownerBefore = await adapter.getWork(WORK_ID);
   assert.ok(ownerBefore);
@@ -219,7 +220,7 @@ test("root変更後、旧rootの作品IDと衝突する壊れたメタがあっ�
 
   makeWork(rootB, "work-other", "新root作品", OTHER_WORK_ID);
   await configureRoot(adapter, rootB);
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
 
   const ownerAfterRootChange = await adapter.getWork(WORK_ID);
   assert.equal(ownerAfterRootChange?.status, "missing");
@@ -236,7 +237,7 @@ test("root変更後、旧rootの作品IDと衝突する壊れたメタがあっ�
   "title": `,
   );
 
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
 
   assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, []);
   assert.equal((await adapter.listScanDiagnostics()).invalidMetaFiles.length, 1);
@@ -260,10 +261,10 @@ test("登録解除すると該当pathがidentity_conflict診断から消え、�
   makeWork(root, "work-z-owner", "既存投影");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
 
   makeWork(root, "work-a-copy", "重複コピー");
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
   assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, [
     { kind: "identity_conflict", workId: WORK_ID, paths: ["work-a-copy", "work-z-owner"] },
   ]);
@@ -284,11 +285,11 @@ test("登録解除しても残りpathが2以上なら診断は残り、該当pat
   makeWork(root, "work-owner", "既存投影");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
 
   makeWork(root, "work-copy-1", "重複コピー1");
   makeWork(root, "work-copy-2", "重複コピー2");
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
   assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, [
     {
       kind: "identity_conflict",
@@ -315,15 +316,15 @@ test("root外を指すmissing作品を単体登録解除しても成功し、他
   makeWork(rootA, "work-owner", "旧root作品");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, rootA);
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
 
   makeWork(rootB, "work-other-owner", "新root作品", OTHER_WORK_ID);
   await configureRoot(adapter, rootB);
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
   assert.equal((await adapter.getWork(WORK_ID))?.status, "missing");
 
   makeWork(rootB, "work-other-copy", "新root複製", OTHER_WORK_ID);
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
   assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, [
     {
       kind: "identity_conflict",
@@ -351,10 +352,10 @@ test("root外を指すmissing作品はunregister-missing一括でも成功扱い
   mkdirSync(rootB, { recursive: true });
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, rootA);
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
 
   await configureRoot(adapter, rootB);
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
   assert.equal((await adapter.getWork(WORK_ID))?.status, "missing");
 
   const app = directory.ownFn(createApp(adapter), (a) => a.shutdown());
@@ -372,7 +373,7 @@ test("reassign対象のmimimilli.jsonが削除・破損していると構造化�
   const copy = makeWork(root, "work-copy", "複製側");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
 
   const app = directory.ownFn(createApp(adapter), (a) => a.shutdown());
 
@@ -404,7 +405,7 @@ test("同一ディレクトリの壊れたメタは従来どおり作品をerror
   const metaPath = makeWork(root, "work-a", "作品A");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
 
   writeFileSync(
     metaPath,
@@ -417,7 +418,7 @@ test("同一ディレクトリの壊れたメタは従来どおり作品をerror
 `,
   );
 
-  const result = await adapter.scan({ full: true });
+  const result = await runScan(adapter, { full: true });
   const work = await adapter.getWork(WORK_ID);
 
   assert.equal(result.errors, 1);
@@ -466,7 +467,7 @@ test("有効な同IDが2つある状態で壊れた3つ目のコピーはinvalid
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
 
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
 
   assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, [
     { kind: "identity_conflict", workId: WORK_ID, paths: ["work-a", "work-b"] },
@@ -488,7 +489,7 @@ test("読めないmimimilli.jsonは現在の診断として返り、再スキャ
   await configureRoot(adapter, root);
   const app = directory.ownFn(createApp(adapter), (a) => a.shutdown());
 
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
   const first = await (await app.request("/api/scan/diagnostics")).json();
   assert.deepEqual(
     first.invalidMetaFiles.map((file: { path: string }) => file.path),
@@ -497,7 +498,7 @@ test("読めないmimimilli.jsonは現在の診断として返り、再スキャ
   assert.deepEqual(first.identityConflicts, []);
 
   writeMeta(brokenPath, "直った作品");
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
   const second = await (await app.request("/api/scan/diagnostics")).json();
   assert.deepEqual(second.invalidMetaFiles, []);
 });
@@ -509,9 +510,9 @@ test("読めない作品情報を持つ作品を登録解除すると、診断�
   const metaPath = makeWork(root, "work", "作品");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
   writeFileSync(metaPath, "{");
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
   assert.equal((await adapter.getWork(WORK_ID))?.status, "error");
   assert.equal((await adapter.listScanDiagnostics()).invalidMetaFiles.length, 1);
 
@@ -530,7 +531,7 @@ test("読めなかったmimimilli.jsonを直してFilesから投影すると、�
   writeFileSync(metaPath, "{");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
   assert.equal((await adapter.listScanDiagnostics()).invalidMetaFiles.length, 1);
 
   writeMeta(metaPath, "直した作品");
@@ -551,7 +552,7 @@ test("root変更の開始で旧rootの診断が消え、再スキャン前に別
   makeWork(rootA, "copy-b", "B", "33333333-3333-4333-8333-333333333333");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, rootA);
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
   const before = await adapter.listScanDiagnostics();
   assert.equal(before.invalidMetaFiles.length, 1);
   assert.equal(before.identityConflicts.length, 1);

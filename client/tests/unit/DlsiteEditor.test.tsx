@@ -14,6 +14,7 @@ import {
   buildSettings,
   buildWork,
   buildWorkEditSnapshotOf,
+  buildDlsiteApplyResponse,
   buildWorkSourceMutationResult,
 } from "../helpers/builders";
 
@@ -76,7 +77,7 @@ describe("DlsiteEditor", () => {
       "POST /api/dlsite/:id/apply": (request) => applyDlsiteInfo(request),
       "PATCH /api/dlsite/:id": (request) => updateDlsiteState(request),
       "GET /api/settings": buildSettings(),
-      "GET /api/scan/candidates": [],
+      "GET /api/scan/candidates": { candidates: [] },
     });
     HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
       this.open = true;
@@ -93,7 +94,7 @@ describe("DlsiteEditor", () => {
     const preview = buildDlsitePreview();
     fetchDlsiteInfo.mockReturnValue(preview);
     applyDlsiteInfo.mockReturnValue(
-      buildWorkSourceMutationResult(makeSnapshot(makeWork({ title: "取得タイトル" }))),
+      buildDlsiteApplyResponse(makeSnapshot(makeWork({ title: "取得タイトル" }))),
     );
 
     renderEditor(work);
@@ -108,12 +109,30 @@ describe("DlsiteEditor", () => {
     await waitFor(() => expect(screen.getByText("DLsite情報を適用しました")).toBeInTheDocument());
   });
 
+  it("カバーを適用できなかったときは、成功の代わりにカバーの一文を添えた警告トーストを出す", async () => {
+    const work = makeWork();
+    fetchDlsiteInfo.mockReturnValue(buildDlsitePreview());
+    applyDlsiteInfo.mockReturnValue(buildDlsiteApplyResponse(makeSnapshot(work), "not_cached"));
+
+    renderEditor(work);
+    fireEvent.click(screen.getByRole("button", { name: "取得結果を確認" }));
+    await waitFor(() => expect(screen.getByText("DLsite情報の適用")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "選択内容を適用" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("DLsite情報を適用しました。カバーは適用できませんでした"),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("DLsite情報を適用しました")).not.toBeInTheDocument();
+  });
+
   it("適用で送る内容は版と選択だけで、既定は未設定の項目とタグの追加だけを選ぶ", async () => {
     const work = makeWork({ tags: ["サークル/旧サークル", "cv/既存"] });
     fetchDlsiteInfo.mockReturnValue(
       buildDlsitePreview({ title: "取得タイトル", circle: "夜想曲", cvs: ["既存", "新CV"] }),
     );
-    applyDlsiteInfo.mockReturnValue(buildWorkSourceMutationResult(makeSnapshot(work)));
+    applyDlsiteInfo.mockReturnValue(buildDlsiteApplyResponse(makeSnapshot(work)));
 
     renderEditor(work);
     fireEvent.click(screen.getByRole("button", { name: "取得結果を確認" }));
@@ -126,7 +145,7 @@ describe("DlsiteEditor", () => {
     await waitFor(() => expect(applyDlsiteInfo).toHaveBeenCalledTimes(1));
     expect(applyDlsiteInfo.mock.calls[0]![0].body).toEqual({
       sourceRevision: "rev-1",
-      infoRevision: 1_700_000_000_000,
+      infoRevision: "1700000000000:1",
       apply: { title: false, cover: true, url: true, tags: ["cv/新CV"] },
     });
   });

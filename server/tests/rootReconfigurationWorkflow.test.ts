@@ -6,6 +6,7 @@ import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { DlsiteJobManager } from "../src/dlsiteJobManager.ts";
 import { RootReconfigurationWorkflow } from "../src/rootReconfiguration.ts";
 import { ScanJobManager } from "../src/scanJobManager.ts";
+import { scanExecutionOf } from "./helpers/scanLibrary.ts";
 
 test("受理済みリクエストのdrainが終わるまでジョブ取消・catalog再構築を始めない", async () => {
   const adapter = createFixtureAdapter({ rootRebuildStepMs: 1 });
@@ -56,11 +57,11 @@ test("root再設定の開始は、DLsite取得ジョブのキューを起点を�
   dlsiteJobs.start({ origin: "bulk", productCodes: ["RJ000001", "RJ000002"] });
   await new Promise((resolve) => setImmediate(resolve));
   dlsiteJobs.start({ origin: "single", productCode: "RJ000010" });
-  assert.equal(dlsiteJobs.getSnapshot()?.codes.length, 3);
+  assert.equal(dlsiteJobs.getState().job?.codes.length, 3);
 
   const workflow = new RootReconfigurationWorkflow(adapter, scanJobs, dlsiteJobs, async () => {});
   await workflow.start("/library");
-  assert.equal(dlsiteJobs.getSnapshot(), null);
+  assert.equal(dlsiteJobs.getState().job, null);
   await workflow.shutdown();
 });
 
@@ -68,8 +69,8 @@ test("root再設定の開始でスキャンの記録を空にし、構築の完�
   const adapter = createFixtureAdapter({ scenario: "new-work", rootRebuildStepMs: 200 });
   const scanJobs = new ScanJobManager(adapter);
   const dlsiteJobs = new DlsiteJobManager(adapter);
-  scanJobs.record.addNewWorks(["stale"]);
-  scanJobs.record.replace(
+  scanJobs.session.record.addNewWorks(["stale"]);
+  scanJobs.session.record.replace(
     {
       registered: 0,
       insertedWorkIds: ["stale"],
@@ -87,21 +88,24 @@ test("root再設定の開始でスキャンの記録を空にし、構築の完�
 
   const workflow = new RootReconfigurationWorkflow(adapter, scanJobs, dlsiteJobs, async () => {});
   await workflow.start("/library/dlsite/夜想曲スタジオ");
-  assert.equal(scanJobs.record.snapshot().finishedAt, null);
+  assert.equal((await scanJobs.session.recordSnapshot()).finishedAt, null);
   await workflow.shutdown();
 
-  scanJobs.recordCompleted({
-    registered: 1,
-    insertedWorkIds: ["all-new-on-first-build"],
-    startedWithEmptyCatalog: true,
-    missingWorks: [],
-    updatedWorks: [],
-    errors: 0,
-    missing: 0,
-    skipped: 0,
-    coverErrors: 0,
-    unreadablePaths: [],
-  });
-  assert.deepEqual(scanJobs.record.workIds("new"), []);
-  assert.equal(typeof scanJobs.record.snapshot().finishedAt, "string");
+  scanJobs.session.publish(
+    scanExecutionOf({
+      registered: 1,
+      insertedWorkIds: ["all-new-on-first-build"],
+      startedWithEmptyCatalog: true,
+      missingWorks: [],
+      updatedWorks: [],
+      errors: 0,
+      missing: 0,
+      skipped: 0,
+      coverErrors: 0,
+      unreadablePaths: [],
+    }),
+    new Date().toISOString(),
+  );
+  assert.deepEqual(scanJobs.session.record.workIds("new"), []);
+  assert.equal(typeof (await scanJobs.session.recordSnapshot()).finishedAt, "string");
 });

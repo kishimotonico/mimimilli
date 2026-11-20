@@ -11,7 +11,7 @@ import { buildWorkPathIndex, findOwnerWork } from "../../src/adapters/real/fsBro
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
 import { createWorkRepos, makeWork } from "../helpers/workTestUtils.ts";
 import { createApp, type AppEnv } from "../helpers/testApp.ts";
-import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
+import { runScan, scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
 import { makeSampleLibrary, writeWav } from "../helpers/sampleLibrary.ts";
 import { makeTestScope } from "../helpers/sampleLibrary.ts";
 import { upsertTestWork } from "../helpers/workTestUtils.ts";
@@ -129,9 +129,9 @@ test("ID重複の対象になっているメタファイルだけが一覧に出
     writeFileSync(join(lib.root, dir, "single.mimimilli.json"), JSON.stringify(meta));
   };
   place("dup-a");
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
   place("dup-b");
-  await adapter.scan({ full: true });
+  await runScan(adapter, { full: true });
 
   const names = async (dir: string) => (await listing(app, dir)).entries.map((e) => e.name);
   assert.ok((await names("dup-a")).includes("single.mimimilli.json"));

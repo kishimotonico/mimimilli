@@ -12,6 +12,7 @@ import { makeSampleLibrary, makeTestDirectory } from "./helpers/sampleLibrary.ts
 import { nt, nts } from "./helpers/tag.ts";
 import { configureRoot } from "./helpers/rootFolder.ts";
 import { applyFetchedDlsite, fetchDlsiteForWork } from "./helpers/dlsiteApply.ts";
+import { runScan } from "./helpers/scanLibrary.ts";
 
 const FAST_DLSITE_REQUEST_CONFIG = {
   ...DEFAULT_DLSITE_REQUEST_CONFIG,
@@ -52,7 +53,7 @@ test("replace: 単体適用で明示的に選んだサークルは既存の同pr
     }),
   );
   await configureRoot(realAdapter, lib.root);
-  await realAdapter.scan();
+  await runScan(realAdapter);
   const realFetched = await fetchDlsiteForWork(realAdapter, lib.existingWorkId, "RJ900002");
   const realApplied = await applyFetchedDlsite(realAdapter, lib.existingWorkId, realFetched, {
     tags: nts(["サークル/満月堂"]),

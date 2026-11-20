@@ -11,9 +11,17 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { spyOn } from "bun:test";
 import { test, type TestContext } from "node:test";
+import { Scanner } from "../../src/adapters/real/scanner.ts";
 import sharp from "sharp";
-import { emptyMetaDlsiteState, META_FILE_NAME, type DlsiteApplyBodyInput } from "@mimimilli/shared";
+import {
+  emptyMetaDlsiteState,
+  META_FILE_NAME,
+  workPlacementOf,
+  type DlsiteApplyBodyInput,
+} from "@mimimilli/shared";
+import { saveWithDlsiteCover } from "../../src/adapters/real/dlsiteCoverStaging.ts";
 import { SourceChangedError } from "../../src/errors.ts";
 import { createApp } from "../helpers/testApp.ts";
 import { writeMetaFile } from "../../src/adapters/real/meta.ts";
@@ -34,6 +42,7 @@ import {
   SAMPLE_COVER_JPEG_BASE64,
   writeWav,
 } from "../helpers/sampleLibrary.ts";
+import { runScan } from "../helpers/scanLibrary.ts";
 
 const SENTINEL = Buffer.from("sentinel-not-an-image");
 const NOT_AN_IMAGE = new Uint8Array(Buffer.from("this-is-not-an-image"));
@@ -73,7 +82,7 @@ async function setup(t: TestContext, cover?: CoverTransport) {
     }),
   );
   await configureRoot(adapter, lib.root);
-  await adapter.scan();
+  await runScan(adapter);
   const workId = lib.existingWorkId;
   const workDir = (await adapter.getWork(workId))!.physicalPath;
   const rjCode = (await adapter.getWork(workId))!.dlsite.rjCode!;
@@ -130,6 +139,7 @@ test("作品フォルダーがルート外を指すsymlinkなら、ルート外�
   const result = await adapter.dlsiteApply(workId, await applyBody());
   assert.ok(result);
   assert.equal(result.snapshot.coverImage, null);
+  assert.equal(result.coverSkipped, "outside_root");
   assert.deepEqual(coverFilesIn(moved), []);
 });
 
@@ -139,6 +149,7 @@ test("画像として判定できないキャッシュのカバーは書かず�
   assert.ok(result);
   assert.equal(result.snapshot.coverImage, null);
   assert.equal(result.snapshot.dlsite.status, "applied");
+  assert.equal(result.coverSkipped, "unreadable");
   assert.deepEqual(coverFilesIn(workDir), []);
 });
 
@@ -152,6 +163,7 @@ test("カバーの拡張子はURLではなく画像の中身で決まる", async
   const result = await adapter.dlsiteApply(workId, await applyBody());
   assert.ok(result);
   assert.equal(result.snapshot.coverImage, "dlsite_cover.png");
+  assert.equal(result.coverSkipped, null);
   assert.ok(existsSync(join(workDir, "dlsite_cover.png")));
   assert.deepEqual(coverFilesIn(workDir), ["dlsite_cover.png"]);
 });
@@ -251,7 +263,9 @@ test("カバーがキャッシュに無いとき、登録も適用もカバー�
   const { folder, register } = await setupRegistration(t, "fail");
   const res = await register();
   assert.equal(res.status, 201);
-  assert.equal((await res.json()).snapshot.coverImage, null);
+  const registered = await res.json();
+  assert.equal(registered.snapshot.coverImage, null);
+  assert.equal(registered.coverSkipped, "not_cached");
   assert.deepEqual(coverFilesIn(folder), []);
 
   const { adapter, workId, workDir, applyBody } = await setup(t, "fail");
@@ -261,7 +275,8 @@ test("カバーがキャッシュに無いとき、登録も適用もカバー�
     body: JSON.stringify(await applyBody()),
   });
   assert.equal(apply.status, 200);
-  const { snapshot } = await apply.json();
+  const { snapshot, coverSkipped } = await apply.json();
+  assert.equal(coverSkipped, "not_cached");
   assert.equal(snapshot.coverImage, null);
   assert.equal(snapshot.dlsite.status, "applied");
   assert.equal(snapshot.urls.length, 1);
@@ -293,3 +308,191 @@ test(
     assert.equal((await apply.json()).error.code, "error");
   },
 );
+
+async function solidImage(color: string): Promise<Uint8Array> {
+  return new Uint8Array(
+    await sharp({ create: { width: 4, height: 4, channels: 3, background: color } })
+      .jpeg()
+      .toBuffer(),
+  );
+}
+
+test("同じフォルダーの単一ファイル作品は、それぞれ別名のカバーを持ち、互いに上書きしない", async (t) => {
+  const dir = makeTestDirectory("dlsite-cover-pair");
+  t.after(dir.cleanup);
+  const root = join(dir.path, "lib");
+  const folder = join(root, "pair");
+  mkdirSync(folder, { recursive: true });
+  writeWav(join(folder, "a.wav"), 1);
+  writeWav(join(folder, "b.wav"), 1);
+  const red = await solidImage("#ff0000");
+  const blue = await solidImage("#0000ff");
+  const adapter = dir.own(
+    createTestRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_REQUESTS,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => htmlResponse(sampleWorkHtml(code, { cover: true })),
+        cover: (url) => jpegResponse(url.includes("RJ900031") ? red : blue),
+      }),
+    }),
+  );
+  await configureRoot(adapter, root);
+  const app = createApp(adapter);
+  const register = async (file: string, rjCode: string) => {
+    assert.equal((await adapter.dlsiteFetchByCode(rjCode)).ok, true);
+    const res = await app.request("/api/works", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        path: `pair/${file}`,
+        title: file,
+        rjCode,
+        applyCover: true,
+        applyUrl: false,
+      }),
+    });
+    assert.equal(res.status, 201);
+    return (await res.json()).snapshot as { id: string; coverImage: string | null };
+  };
+  const a = await register("a.wav", "RJ900031");
+  const b = await register("b.wav", "RJ900032");
+
+  assert.equal(a.coverImage, "a.dlsite_cover.jpg");
+  assert.equal(b.coverImage, "b.dlsite_cover.jpg");
+  assert.deepEqual(coverFilesIn(folder).sort(), ["a.dlsite_cover.jpg", "b.dlsite_cover.jpg"]);
+  assert.deepEqual(readFileSync(join(folder, "a.dlsite_cover.jpg")), Buffer.from(red));
+  assert.deepEqual(readFileSync(join(folder, "b.dlsite_cover.jpg")), Buffer.from(blue));
+
+  const fetched = await fetchDlsiteForWork(adapter, a.id, "RJ900031");
+  const applied = await adapter.dlsiteApply(a.id, {
+    sourceRevision: (await adapter.getWorkEditSnapshot(a.id))!.sourceRevision,
+    infoRevision: fetched.infoRevision,
+    apply: { title: false, cover: true, url: false, tags: [] },
+  });
+  assert.equal(applied?.snapshot.coverImage, "a.dlsite_cover.jpg");
+  assert.deepEqual(readFileSync(join(folder, "a.dlsite_cover.jpg")), Buffer.from(red));
+  assert.deepEqual(readFileSync(join(folder, "b.dlsite_cover.jpg")), Buffer.from(blue));
+  assert.equal((await adapter.getWorkEditSnapshot(b.id))!.coverImage, "b.dlsite_cover.jpg");
+});
+
+const STAGING_COVER_URL =
+  "https://img.dlsite.jp/modpub/images2/work/doujin/RJ900000/RJ900041_img_main.jpg";
+
+async function stagingFixture(t: TestContext, placementMetaName: string) {
+  const dir = makeTestDirectory("dlsite-cover-staging");
+  t.after(dir.cleanup);
+  const root = join(dir.path, "lib");
+  mkdirSync(root, { recursive: true });
+  const body = await solidImage("#00ff00");
+  const source = {
+    cache: { getCover: () => ({ body, contentType: "image/jpeg", fetchedAt: 1 }) },
+    coverUrl: STAGING_COVER_URL,
+  } as unknown as Parameters<typeof saveWithDlsiteCover>[0];
+  return { root, body, source, placement: workPlacementOf(join(root, placementMetaName)) };
+}
+
+for (const [kind, metaName, coverName] of [
+  ["フォルダー作品", META_FILE_NAME, "dlsite_cover.jpg"],
+  ["単一ファイル作品", "a.mimimilli.json", "a.dlsite_cover.jpg"],
+] as const) {
+  test(`${kind}: メタ保存に失敗したら、配置した新しいカバーを消して旧カバーを戻す`, async (t) => {
+    const { root, source, placement } = await stagingFixture(t, metaName);
+    const finalPath = join(root, coverName);
+    writeFileSync(finalPath, SENTINEL);
+    await assert.rejects(
+      () =>
+        saveWithDlsiteCover(source, placement, root, (cover) => {
+          assert.equal(cover?.fileName, coverName);
+          cover?.place();
+          assert.notDeepEqual(readFileSync(finalPath), SENTINEL);
+          throw new Error("meta save failed");
+        }),
+      /meta save failed/,
+    );
+    assert.deepEqual(readFileSync(finalPath), SENTINEL);
+    assert.deepEqual(readdirSync(root), [coverName]);
+  });
+
+  test(`${kind}: 旧カバーが無いときにメタ保存に失敗したら、新しいカバーも残らない`, async (t) => {
+    const { root, source, placement } = await stagingFixture(t, metaName);
+    await assert.rejects(
+      () =>
+        saveWithDlsiteCover(source, placement, root, (cover) => {
+          cover?.place();
+          throw new Error("meta save failed");
+        }),
+      /meta save failed/,
+    );
+    assert.deepEqual(readdirSync(root), []);
+  });
+
+  test(`${kind}: メタ保存に成功したら新しいカバーに置き換わり、退避も残らない`, async (t) => {
+    const { root, body, source, placement } = await stagingFixture(t, metaName);
+    const finalPath = join(root, coverName);
+    writeFileSync(finalPath, SENTINEL);
+    await saveWithDlsiteCover(source, placement, root, (cover) => cover?.place());
+    assert.deepEqual(readFileSync(finalPath), Buffer.from(body));
+    assert.deepEqual(readdirSync(root), [coverName]);
+  });
+}
+
+test("自分の配置から導いた旧カバーが拡張子違いなら、保存に成功したあとで消す。旧固定名や他人のカバーは触らない", async (t) => {
+  const { root, body, source, placement } = await stagingFixture(t, "a.mimimilli.json");
+  writeFileSync(join(root, "a.dlsite_cover.png"), SENTINEL);
+  writeFileSync(join(root, "dlsite_cover.png"), SENTINEL);
+  writeFileSync(join(root, "user-cover.png"), SENTINEL);
+
+  await assert.rejects(
+    () =>
+      saveWithDlsiteCover(
+        { ...source, previousCoverImage: "a.dlsite_cover.png" },
+        placement,
+        root,
+        (cover) => {
+          cover?.place();
+          throw new Error("meta save failed");
+        },
+      ),
+    /meta save failed/,
+  );
+  assert.ok(existsSync(join(root, "a.dlsite_cover.png")));
+
+  await saveWithDlsiteCover(
+    { ...source, previousCoverImage: "a.dlsite_cover.png" },
+    placement,
+    root,
+    (cover) => cover?.place(),
+  );
+  assert.deepEqual(readFileSync(join(root, "a.dlsite_cover.jpg")), Buffer.from(body));
+  assert.equal(existsSync(join(root, "a.dlsite_cover.png")), false);
+  assert.ok(existsSync(join(root, "dlsite_cover.png")));
+
+  await saveWithDlsiteCover(
+    { ...source, previousCoverImage: "dlsite_cover.png" },
+    placement,
+    root,
+    (cover) => cover?.place(),
+  );
+  await saveWithDlsiteCover(
+    { ...source, previousCoverImage: "user-cover.png" },
+    placement,
+    root,
+    (cover) => cover?.place(),
+  );
+  assert.ok(existsSync(join(root, "dlsite_cover.png")));
+  assert.ok(existsSync(join(root, "user-cover.png")));
+});
+
+test("登録の投影が失敗しても、メタが指す新しいカバーは消えない", async (t) => {
+  const { folder, register } = await setupRegistration(t);
+  const projection = spyOn(Scanner.prototype, "projectPrepared").mockRejectedValue(
+    new Error("projection failed"),
+  );
+  t.after(() => projection.mockRestore());
+  const res = await register();
+  assert.notEqual(res.status, 201);
+  assert.deepEqual(coverFilesIn(folder), ["dlsite_cover.jpg"]);
+  const meta = JSON.parse(readFileSync(join(folder, META_FILE_NAME), "utf-8"));
+  assert.equal(meta.coverImage, "dlsite_cover.jpg");
+});

@@ -1,10 +1,17 @@
 import { createHash } from "node:crypto";
-import { DEFAULT_TAG_PREFIXES, projectDlsiteState, toDlsiteLinkageStatus } from "@mimimilli/shared";
+import {
+  DEFAULT_TAG_PREFIXES,
+  dlsiteFetchStateOfResolution,
+  projectDlsiteState,
+  toDlsiteLinkageStatus,
+} from "@mimimilli/shared";
 import type {
   DlsiteWorkInfo,
   DataIntegrityWarning,
   DlsiteCacheResolution,
   DlsiteCacheResolutionHead,
+  DlsiteCoverSkipReason,
+  DlsiteProductSummary,
   InvalidMetaFile,
   MetaDlsiteState,
   ResumeBody,
@@ -42,6 +49,9 @@ export interface PlaybackIds {
 export function requireFixtureRoot(state: FixtureState): string {
   return requireConfiguredRoot(state.rootFolder);
 }
+
+/** fixtureのパーサー版。realと違い、取得ごとの記録も差し替えもない固定値 */
+const FIXTURE_DLSITE_PARSER_VERSION = 1;
 
 export interface FixtureDlsiteFetched {
   info: DlsiteWorkInfo;
@@ -98,10 +108,6 @@ export interface FixtureState {
   identityConflicts: IdentityConflict[];
   /** scan() が見つける候補。rootを変えても変わらない（fixtureには物理FSがない） */
   scanCandidatePool: ScanCandidateFolder[];
-  /** 直近のscan以降に有効な候補session。root変更で破棄し、次のscanで作り直す */
-  scanCandidates: ScanCandidateFolder[];
-  /** 候補のRJコードの直し。値がnullのエントリはRJコードなしの明示。scanで破棄する */
-  scanCandidateRjCodeOverrides: Map<string, string | null>;
   invalidMetaFiles: InvalidMetaFile[];
   /** listSummaries でタグ等の不整合により除外した作品の報告 */
   dataIntegrityWarning: DataIntegrityWarning | undefined;
@@ -139,14 +145,6 @@ export function copyWorkState(state: FixtureState, fromId: string, toId: string)
   if (cover) state.coverColumns.set(toId, cover);
 }
 
-/** workのidを付け替え、作品に紐づく状態も新idへ移す。 */
-export function reassignWorkId(state: FixtureState, oldId: string, newId: string): void {
-  copyWorkState(state, oldId, newId);
-  state.dlsiteLinkages.delete(oldId);
-  state.playlistSpecs.delete(oldId);
-  state.coverColumns.delete(oldId);
-}
-
 /** rjCodeに対応するDLsite取得キャッシュの解決結果。realのDlsiteCache.resolveと同じくTTL切れはmiss扱い。 */
 export function dlsiteFetchFailureFor(
   state: FixtureState,
@@ -181,34 +179,69 @@ export function fixtureDlsiteResolutionHead(
 export function fixtureUsableDlsite(
   state: FixtureState,
   rjCode: string,
-): { info: DlsiteWorkInfo; revision: number } | null {
+): { info: DlsiteWorkInfo; revision: string } | null {
   if (fixtureDlsiteResolutionHead(state, rjCode).kind !== "html") return null;
   const fetched = state.dlsiteFetched.get(normalizeDlsiteCacheKey(rjCode));
-  return fetched ? { info: fetched.info, revision: fetched.fetchedAt } : null;
+  return fetched
+    ? { info: fetched.info, revision: `${fetched.fetchedAt}:${FIXTURE_DLSITE_PARSER_VERSION}` }
+    : null;
+}
+
+/** RJコードのDLsite取得状態の表示用の要約。スキャン候補と取得ジョブの終端が同じ規則で導く */
+export function fixtureDlsiteSummary(
+  state: FixtureState,
+  rjCode: string | null,
+): DlsiteProductSummary {
+  if (!rjCode) return { state: "none" };
+  const fetchState = dlsiteFetchStateOfResolution(fixtureDlsiteResolutionHead(state, rjCode));
+  if (fetchState !== "fetched") return { state: fetchState };
+  const fetched = state.dlsiteFetched.get(normalizeDlsiteCacheKey(rjCode));
+  if (!fetched) return { state: "none" };
+  const key = fetched.info.coverUrl ? fixtureDlsiteCoverKey(fetched.info.coverUrl) : null;
+  const cover = key ? state.dlsiteCovers.get(key) : undefined;
+  return {
+    state: "fetched",
+    title: fetched.info.title,
+    cover: key && cover ? { key, version: cover.fetchedAt } : null,
+  };
 }
 
 export function fixtureDlsiteCoverKey(coverUrl: string): string {
   return createHash("sha256").update(coverUrl).digest("hex");
 }
 
-/** カバーキャッシュにあるか。DLsiteへは取りに行かない */
-export function fixtureDlsiteCoverCached(state: FixtureState, coverUrl: string | null): boolean {
-  return coverUrl !== null && state.dlsiteCovers.has(fixtureDlsiteCoverKey(coverUrl));
+/** 選んだカバーを適用できない理由。適用できる・カバーが無いときは null。画像として読めないものは contentType が image/ でないキャッシュ */
+export function fixtureCoverSkipReason(
+  state: FixtureState,
+  coverUrl: string | null,
+): DlsiteCoverSkipReason | null {
+  if (coverUrl === null) return null;
+  const cached = state.dlsiteCovers.get(fixtureDlsiteCoverKey(coverUrl));
+  if (!cached) return "not_cached";
+  return cached.contentType.startsWith("image/") ? null : "unreadable";
 }
 
-/** キャッシュ済みのカバーを作品のカバーにする。キャッシュに無ければ何もしない */
+/** 適用できるカバーがキャッシュにあるか。DLsiteへは取りに行かない */
+export function fixtureDlsiteCoverCached(state: FixtureState, coverUrl: string | null): boolean {
+  return coverUrl !== null && fixtureCoverSkipReason(state, coverUrl) === null;
+}
+
+/** キャッシュ済みのカバーを作品のカバーにして、適用できなかった理由を返す。適用した・カバーが無いときは null */
 export function applyFixtureCachedCover(
   state: FixtureState,
   work: FixtureWorkRecord,
   coverUrl: string | null,
-): void {
-  if (coverUrl === null || !fixtureDlsiteCoverCached(state, coverUrl)) return;
+): DlsiteCoverSkipReason | null {
+  if (coverUrl === null) return null;
+  const skipped = fixtureCoverSkipReason(state, coverUrl);
+  if (skipped) return skipped;
   const columns: FixtureCoverColumns = {
     image: coverUrl,
     dimensions: work.cover?.dimensions ?? { width: 900, height: 900 },
   };
   state.coverColumns.set(work.id, columns);
   work.cover = fixtureCoverFromColumns(work, columns);
+  return null;
 }
 
 /** 作品レコードとlinkage・取得キャッシュから、API向けの合成済みWorkSummaryを読み出し時に組み立てる。
@@ -315,8 +348,6 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     scanCandidateExclusions: [],
     identityConflicts: options.identityConflicts ?? scenario.identityConflicts,
     scanCandidatePool: scenario.scanCandidates,
-    scanCandidates: scenario.scanCandidates,
-    scanCandidateRjCodeOverrides: new Map(),
     invalidMetaFiles: scenario.invalidMetaFiles,
     dataIntegrityWarning: scenario.dataIntegrityWarning,
     sourceRevisions: new Map([...works, ...detachedWorks].map((work) => [work.id, "fixture"])),

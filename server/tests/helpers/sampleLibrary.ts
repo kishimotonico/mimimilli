@@ -39,16 +39,18 @@ export function writeSampleCover(path: string): void {
 }
 
 export interface TestResourceScope {
-  own<T extends { close(): void }>(resource: T): T;
-  ownFn<T>(resource: T, close: (resource: T) => void): T;
-  cleanup(): void;
+  own<T extends { close(): void | Promise<void> }>(resource: T): T;
+  ownFn<T>(resource: T, close: (resource: T) => void | Promise<void>): T;
+  cleanup(): Promise<void>;
 }
 
-function runClosersSafely(closers: Array<() => void>): unknown | undefined {
+async function runClosersSafely(
+  closers: Array<() => void | Promise<void>>,
+): Promise<unknown | undefined> {
   let primaryError: unknown;
   for (let index = closers.length - 1; index >= 0; index -= 1) {
     try {
-      closers[index]!();
+      await closers[index]!();
     } catch (error) {
       if (primaryError === undefined) {
         primaryError = error;
@@ -61,18 +63,18 @@ function runClosersSafely(closers: Array<() => void>): unknown | undefined {
 }
 
 export function makeTestScope(): TestResourceScope {
-  const closers: Array<() => void> = [];
+  const closers: Array<() => void | Promise<void>> = [];
   return {
-    own<T extends { close(): void }>(resource: T): T {
+    own<T extends { close(): void | Promise<void> }>(resource: T): T {
       closers.push(() => resource.close());
       return resource;
     },
-    ownFn<T>(resource: T, close: (resource: T) => void): T {
+    ownFn<T>(resource: T, close: (resource: T) => void | Promise<void>): T {
       closers.push(() => close(resource));
       return resource;
     },
-    cleanup(): void {
-      const primaryError = runClosersSafely(closers);
+    async cleanup(): Promise<void> {
+      const primaryError = await runClosersSafely(closers);
       if (primaryError !== undefined) {
         throw primaryError;
       }

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DataAdapter } from "../../adapter/index.ts";
 import { openDb, type Db, type DbLocation } from "./db.ts";
+import { DLSITE_PARSER, type DlsiteParser } from "./dlsite.ts";
 import { DlsiteCache, type DlsiteCacheOptions } from "./dlsiteCache.ts";
 import { DEFAULT_DLSITE_REQUEST_CONFIG, type DlsiteRequestConfig } from "./dlsiteConfig.ts";
 import { DlsiteScheduler, type DlsiteSchedulerDependencies } from "./dlsiteScheduler.ts";
@@ -39,6 +40,8 @@ export interface RealAdapterOptions {
   dlsiteSchedulerDependencies?: DlsiteSchedulerDependencies;
   /** DLsiteレスポンスキャッシュ。 */
   dlsiteCache: DlsiteCacheOptions;
+  /** DLsite作品ページの解析。省略時は現在のパーサー */
+  dlsiteParser?: DlsiteParser;
 }
 
 export interface RealAdapterAssembly {
@@ -46,7 +49,7 @@ export interface RealAdapterAssembly {
 }
 
 export interface RealAdapter extends DataAdapter {
-  close(): void;
+  close(): Promise<void>;
 }
 
 export function createRealAdapter(
@@ -58,6 +61,7 @@ export function createRealAdapter(
     options.dbBackupDir === undefined ? undefined : { backupDir: options.dbBackupDir },
   );
   const dlsiteCache = new DlsiteCache(options.dlsiteCache);
+  const parser = options.dlsiteParser ?? DLSITE_PARSER;
   const query = new WorkQueryRepository(db);
   const catalog = new CatalogWorkRepository(db);
   const user = new UserWorkStateRepository(db);
@@ -86,15 +90,17 @@ export function createRealAdapter(
     scanner,
     thumbnailCacheDir,
     dlsiteCache,
+    parser,
     runFileScanInWorker: assembly.runFileScanInWorker ?? runFileScanInWorker,
   });
-  const dlsiteMethods = createDlsiteMethods({
+  const { abortDlsiteWork, ...dlsiteMethods } = createDlsiteMethods({
     db,
     query,
     catalog,
     scanner,
     dlsiteCache,
     dlsiteCacheOptions: options.dlsiteCache,
+    parser,
     dlsiteRequestConfig,
     dlsiteScheduler,
     schedulerDependencies: options.dlsiteSchedulerDependencies,
@@ -115,6 +121,7 @@ export function createRealAdapter(
     scanner,
     requireRoot,
     dlsiteCache,
+    parser,
   });
   const classificationMethods = createClassificationMethods({ query, user, requireRoot });
 
@@ -124,7 +131,8 @@ export function createRealAdapter(
     ...classificationMethods,
     ...coverMediaMethods,
     ...dlsiteMethods,
-    close(): void {
+    async close(): Promise<void> {
+      await abortDlsiteWork();
       dlsiteCache.close();
       db.close();
     },
