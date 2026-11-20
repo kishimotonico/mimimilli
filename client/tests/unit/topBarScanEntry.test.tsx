@@ -44,7 +44,11 @@ function renderTopBar(seed: Seed = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
   });
-  if (seed.candidates) queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), seed.candidates);
+  if (seed.candidates)
+    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), {
+      scanCompleted: true,
+      candidates: seed.candidates,
+    });
   const updatedWorks = Array.from({ length: seed.changes?.updatedCount ?? 0 }, (_, i) => ({
     workId: `w${i}`,
     changes: [{ kind: "meta" as const }],
@@ -245,7 +249,10 @@ describe("TopBar のスキャン入口", () => {
       await waitFor(() => expect(storedSeen().candidates).toEqual([candidate.path]));
 
       act(() =>
-        queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), [candidate, otherCandidate]),
+        queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), {
+          scanCompleted: true,
+          candidates: [candidate, otherCandidate],
+        }),
       );
 
       await waitFor(() =>
@@ -262,7 +269,10 @@ describe("TopBar のスキャン入口", () => {
       closeModal(store);
 
       act(() =>
-        queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), [candidate, otherCandidate]),
+        queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), {
+          scanCompleted: true,
+          candidates: [candidate, otherCandidate],
+        }),
       );
 
       await waitFor(() => expect(scanButton("スキャン（新しい項目あり）")).toBeInTheDocument());
@@ -278,7 +288,12 @@ describe("TopBar のスキャン入口", () => {
         },
       });
 
-      act(() => queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), [candidate]));
+      act(() =>
+        queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), {
+          scanCompleted: true,
+          candidates: [candidate],
+        }),
+      );
 
       expect(scanButton("スキャン")).toBeInTheDocument();
     });

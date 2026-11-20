@@ -6,6 +6,9 @@ import { activeModalAtom } from "../../../shared/model/activeModalAtom";
 /** ScanModal がマウント中かどうか。activeModalAtomから導出する（読み取り専用） */
 export const scanModalOpenAtom = atom((get) => get(activeModalAtom)?.kind === "scan");
 
+/** スキャン完了後に、記録・要対応・候補のキャッシュが最新になるたびに増える。開いているモーダルが着地タブを選び直す合図 */
+export const scanResultsRefreshedAtom = atom(0);
+
 /** 未登録候補のうち、選択から外したpath。既定は全選択で、新しく現れた候補は選択された状態で入る。
  *  モーダルを閉じても残す（開き直しで全選択に戻り、外した候補まで追加されるのを防ぐ）。 */
 export const scanCandidateDeselectedPathsAtom = atom<ReadonlySet<string>>(new Set<string>());

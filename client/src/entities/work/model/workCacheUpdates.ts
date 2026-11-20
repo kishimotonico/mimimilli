@@ -4,7 +4,7 @@
 import { hashKey, type Query, type QueryClient, type QueryKey } from "@tanstack/react-query";
 import {
   canonicalDlsiteProductCode,
-  type ScanCandidate,
+  type ScanCandidatesResponse,
   type Work,
   type WorkEditSnapshot,
   type WorkSourceMutationResult,
@@ -197,7 +197,8 @@ export async function updateCachesAfterDlsiteSyncFetch(
   rjCode: string,
 ): Promise<void> {
   const code = canonicalDlsiteProductCode(rjCode);
-  const cached = queryClient.getQueryData<ScanCandidate[]>(SCAN_CANDIDATES_QUERY_KEY) ?? [];
+  const cached =
+    queryClient.getQueryData<ScanCandidatesResponse>(SCAN_CANDIDATES_QUERY_KEY)?.candidates ?? [];
   const hasCandidate = cached.some(
     (candidate) =>
       candidate.rjCode !== null && canonicalDlsiteProductCode(candidate.rjCode) === code,

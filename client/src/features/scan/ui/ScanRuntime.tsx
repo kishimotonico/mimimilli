@@ -11,7 +11,7 @@ import { scanNewCountQueryOptions } from "../../../entities/work/scanNewCountQue
 import { composeScanChanges, scanChangesKeys, scanChangesMessage } from "../model/scanChanges";
 import { nextSeen, scanEntrySeenAtom } from "../model/scanEntrySeen";
 import { SCAN_FAILED_FALLBACK_REASON } from "../model/scanStatusView";
-import { scanModalOpenAtom } from "../../../entities/scan/model/atoms";
+import { scanModalOpenAtom, scanResultsRefreshedAtom } from "../../../entities/scan/model/atoms";
 import { useScanJobState, useScanJobStore } from "../../../entities/scan/useScanJob";
 import { useToast } from "../../../shared/ui/useToast";
 
@@ -82,6 +82,7 @@ export default function ScanRuntime() {
           ])
             .then(([record, newCount]) => composeScanChanges(record, newCount))
             .catch(() => null);
+          jotaiStore.set(scanResultsRefreshedAtom, (count) => count + 1);
           // 終端を見ていたあいだに開いて閉じたときも、見た扱いにする。
           if (changes && (openedAtFinish || scanModalOpen())) {
             jotaiStore.set(scanEntrySeenAtom, (seen) =>
@@ -107,9 +108,10 @@ export default function ScanRuntime() {
   );
 
   // 候補は明示的な取得でしか更新されないため、アプリ起動時に一度取得して未登録バッジを揃える。
+  // 失敗は候補クエリのエラー状態に残り、未登録タブが読み込み失敗として再試行つきで出す。
   useEffect(() => {
     if (queryClient.getQueryData(SCAN_QUERY_KEYS.candidates()) !== undefined) return;
-    void refreshScanCandidates(queryClient).catch(() => {});
+    refreshScanCandidates(queryClient).catch(() => undefined);
   }, [queryClient]);
 
   // リロード後も実行中のジョブへ再接続する

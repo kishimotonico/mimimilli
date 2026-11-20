@@ -236,11 +236,17 @@ describe("登録・スキャン完了の必須更新", () => {
     const queryClient = seededClient();
 
     await updateCachesAfterUnregistration(queryClient, "w1");
-    expect(queryClient.getQueryData(KEYS.candidates)).toEqual([found]);
+    expect(queryClient.getQueryData(KEYS.candidates)).toEqual({
+      scanCompleted: true,
+      candidates: [found],
+    });
 
     queryClient.setQueryData(KEYS.candidates, []);
     await updateCachesAfterRegistration(queryClient);
-    expect(queryClient.getQueryData(KEYS.candidates)).toEqual([found]);
+    expect(queryClient.getQueryData(KEYS.candidates)).toEqual({
+      scanCompleted: true,
+      candidates: [found],
+    });
     expect(api.requestsTo("GET /api/scan/candidates")).toHaveLength(2);
 
     mockApi({ "GET /api/scan/candidates": apiError(500, "internal") });
@@ -331,9 +337,10 @@ describe("DLsite の必須更新", () => {
         KEYS.detail1,
         makeWork({ dlsite: { ...emptyDlsiteState(), rjCode: "RJ000001" } }),
       );
-      queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, [
-        buildScanCandidate({ path: "a", rjCode: "RJ000002" }),
-      ]);
+      queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, {
+        scanCompleted: true,
+        candidates: [buildScanCandidate({ path: "a", rjCode: "RJ000002" })],
+      });
 
       await updateCachesAfterDlsiteSyncFetch(queryClient, "RJ000001");
 
@@ -346,9 +353,10 @@ describe("DLsite の必須更新", () => {
     it("キャッシュ済みの候補一覧に同じRJコードの候補があるときだけ、候補一覧を取り直す", async () => {
       const api = mockApi({ "GET /api/scan/candidates": { scanCompleted: true, candidates: [] } });
       const queryClient = seededClient();
-      queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, [
-        buildScanCandidate({ path: "a", rjCode: "rj000001" }),
-      ]);
+      queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, {
+        scanCompleted: true,
+        candidates: [buildScanCandidate({ path: "a", rjCode: "rj000001" })],
+      });
 
       await updateCachesAfterDlsiteSyncFetch(queryClient, "RJ000001");
 

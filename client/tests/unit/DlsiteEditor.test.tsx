@@ -248,9 +248,10 @@ describe("DlsiteEditor", () => {
   ])("取得後の候補一覧の取り直し: $name", async ({ rjCode, refetched }) => {
     fetchDlsiteInfo.mockReturnValue(buildDlsitePreview());
     const { queryClient } = renderEditor(makeWork());
-    queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, [
-      buildScanCandidate({ path: "候補", rjCode }),
-    ]);
+    queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, {
+      scanCompleted: true,
+      candidates: [buildScanCandidate({ path: "候補", rjCode })],
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "取得結果を確認" }));
     await waitFor(() => expect(screen.getByText("DLsite情報の適用")).toBeInTheDocument());

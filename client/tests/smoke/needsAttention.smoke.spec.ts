@@ -8,7 +8,7 @@ async function openNeedsAttention(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: "スキャン" }).click();
   const dialog = page.getByRole("dialog", { name: "スキャン" });
   await dialog.getByRole("button", { name: "スキャン", exact: true }).click();
-  await expect(dialog.getByRole("tab", { name: /^要対応（4件）/ })).toBeVisible({
+  await expect(dialog.getByRole("tab", { name: /^要対応（6件）/ })).toBeVisible({
     timeout: 15_000,
   });
   await dialog.getByRole("tab", { name: /^要対応/ }).click();
@@ -16,7 +16,7 @@ async function openNeedsAttention(page: import("@playwright/test").Page) {
   return { dialog, panel };
 }
 
-test("要対応の5種類が直すもの→行方不明の順に並び、件数は直すものだけを数える", async ({ page }) => {
+test("要対応の5種類が直すもの→行方不明の順に並び、件数は一覧の行数", async ({ page }) => {
   const tracker = trackErrors(page);
   const { panel } = await openNeedsAttention(page);
 
@@ -74,6 +74,30 @@ test("パスを押すとFilesで開く", async ({ page }) => {
     "aria-pressed",
     "true",
   );
+
+  assertNoErrors(tracker);
+});
+
+test("スキャン前に開くと件数のある要対応へ着地し、未登録は「まだスキャンしていません」を出す", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+  await page.getByRole("button", { name: "スキャン" }).click();
+  const dialog = page.getByRole("dialog", { name: "スキャン" });
+
+  await expect(dialog.getByRole("tab", { name: /^要対応（/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  const attention = dialog.getByRole("tabpanel", { name: /^要対応/ });
+  await expect(attention.getByRole("row", { name: /^ID重複/ })).toBeVisible();
+  await expect(attention.getByText("まだスキャンしていません")).toHaveCount(0);
+
+  await dialog.getByRole("tab", { name: /^未登録/ }).click();
+  const unregistered = dialog.getByRole("tabpanel", { name: /^未登録/ });
+  await expect(unregistered.getByText("まだスキャンしていません")).toBeVisible();
+  await expect(unregistered.getByRole("status").getByRole("button")).toHaveCount(0);
 
   assertNoErrors(tracker);
 });

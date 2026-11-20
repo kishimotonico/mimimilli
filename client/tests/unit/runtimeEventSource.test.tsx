@@ -148,7 +148,10 @@ describe("ScanRuntime EventSource ownership", () => {
     const { queryClient } = renderRuntime(createElement(ScanRuntime));
 
     await waitFor(() =>
-      expect(queryClient.getQueryData(SCAN_QUERY_KEYS.candidates())).toEqual([candidate]),
+      expect(queryClient.getQueryData(SCAN_QUERY_KEYS.candidates())).toEqual({
+        scanCompleted: true,
+        candidates: [candidate],
+      }),
     );
     const candidateCalls = () =>
       fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/scan/candidates"));
@@ -201,7 +204,10 @@ describe("ScanRuntime EventSource ownership", () => {
     // 候補の再取得は queryClient.fetchQuery 経由のため、invalidate のスパイではなく
     // 反映後のキャッシュ内容そのものを見る。
     await waitFor(() =>
-      expect(queryClient.getQueryData(SCAN_QUERY_KEYS.candidates())).toEqual([candidate]),
+      expect(queryClient.getQueryData(SCAN_QUERY_KEYS.candidates())).toEqual({
+        scanCompleted: true,
+        candidates: [candidate],
+      }),
     );
     expect(
       invalidate.mock.calls.filter(

@@ -54,11 +54,7 @@ export function buildNeedsAttentionRows(
   ];
 }
 
-/** 行方不明は利用者が直すものではないので、サイドバーの件数には数えない */
+/** 行方不明はファイルを直して消すものではないので、要対応の強調（attention）を付けない */
 export function isFixable(row: NeedsAttentionRow): boolean {
   return row.kind !== "missingWork";
-}
-
-export function countNeedsAttention(rows: readonly NeedsAttentionRow[]): number {
-  return rows.filter(isFixable).length;
 }

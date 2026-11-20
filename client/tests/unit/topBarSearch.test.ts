@@ -26,7 +26,7 @@ function renderTopBar(initialQuery = "") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
   });
-  queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), []);
+  queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), { scanCompleted: true, candidates: [] });
   queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
   queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
   queryClient.setQueryData(WORK_QUERY_KEYS.scanNewCount(), 0);
@@ -147,7 +147,7 @@ describe("TopBar の検索入力", () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
     });
-    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), []);
+    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), { scanCompleted: true, candidates: [] });
     queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
     queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
     queryClient.setQueryData(WORK_QUERY_KEYS.scanNewCount(), 0);
@@ -176,7 +176,7 @@ describe("TopBar の検索入力", () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
     });
-    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), []);
+    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), { scanCompleted: true, candidates: [] });
     queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
     queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
     queryClient.setQueryData(WORK_QUERY_KEYS.scanNewCount(), 0);

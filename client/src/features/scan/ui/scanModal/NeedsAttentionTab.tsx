@@ -6,11 +6,12 @@ import {
 } from "../../../../entities/work/model/workMutations";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import Button from "../../../../shared/ui/Button";
-import CollectionStatus from "../../../../shared/ui/CollectionStatus";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import StatusLabel from "../../../../shared/ui/StatusLabel";
 import { useToast } from "../../../../shared/ui/useToast";
 import { isFixable, type NeedsAttentionRow } from "../../model/needsAttention";
+import { deriveScanListStatus } from "../../model/scanListStatus";
+import ScanListState from "./ScanListState";
 import { PathLink, WorkTitleLink } from "./ScanLinks";
 
 export interface NeedsAttentionTabProps {
@@ -42,59 +43,49 @@ export default function NeedsAttentionTab({
   onOpenFiles,
   onOpenWorkDetail,
 }: NeedsAttentionTabProps) {
-  if (rows.length === 0) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        {error ? (
-          <CollectionStatus variant="list" kind="error" onRetry={onRetry} />
-        ) : loading ? (
-          <CollectionStatus variant="list" kind="loading" />
-        ) : (
-          <CollectionStatus variant="list" kind="empty" message="要対応の項目はありません" />
-        )}
-      </div>
-    );
-  }
+  const status = deriveScanListStatus({ loading, error, count: rows.length });
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-[18px] py-4">
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="bg-paper-0 text-left">
-            {HEADINGS.map((heading) => (
-              <th
-                key={heading}
-                className="border-b border-line-soft px-2.5 py-1.5 font-sans text-label font-semibold text-ink-2"
-              >
-                {heading}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.key} className="border-b border-line-soft">
-              <td className={CELL_CLASS}>
-                <StatusLabel tone={isFixable(row) ? "attention" : "none"}>
-                  {KIND_LABEL[row.kind]}
-                </StatusLabel>
-              </td>
-              <td className={CELL_CLASS}>
-                <TargetCell
-                  row={row}
-                  onOpenFiles={onOpenFiles}
-                  onOpenWorkDetail={onOpenWorkDetail}
-                />
-              </td>
-              <td className={CELL_CLASS}>{whatHappened(row)}</td>
-              <td className={CELL_CLASS}>
-                <RecommendedAction row={row} />
-              </td>
+    <ScanListState status={status} emptyMessage="要対応の項目はありません" onRetry={onRetry}>
+      <div className="min-h-0 flex-1 overflow-y-auto px-[18px] py-4">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-paper-0 text-left">
+              {HEADINGS.map((heading) => (
+                <th
+                  key={heading}
+                  className="border-b border-line-soft px-2.5 py-1.5 font-sans text-label font-semibold text-ink-2"
+                >
+                  {heading}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key} className="border-b border-line-soft">
+                <td className={CELL_CLASS}>
+                  <StatusLabel tone={isFixable(row) ? "attention" : "none"}>
+                    {KIND_LABEL[row.kind]}
+                  </StatusLabel>
+                </td>
+                <td className={CELL_CLASS}>
+                  <TargetCell
+                    row={row}
+                    onOpenFiles={onOpenFiles}
+                    onOpenWorkDetail={onOpenWorkDetail}
+                  />
+                </td>
+                <td className={CELL_CLASS}>{whatHappened(row)}</td>
+                <td className={CELL_CLASS}>
+                  <RecommendedAction row={row} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </ScanListState>
   );
 }
 

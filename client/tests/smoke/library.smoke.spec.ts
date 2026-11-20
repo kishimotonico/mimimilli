@@ -343,7 +343,9 @@ test("スキャンダイアログが開いて完了し、閉じられる", async
   await expect(dialog.getByRole("heading", { name: "スキャン", level: 2 })).toBeVisible();
 
   await dialog.getByRole("button", { name: "スキャン", exact: true }).click();
-  await expect(dialog.getByText("スキャン完了")).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.getByRole("tab", { name: /^新規作品（\d+件）/ })).toBeVisible({
+    timeout: 15_000,
+  });
 
   await dialog.getByRole("tab", { name: /^新規作品/ }).click();
   await expect(
@@ -365,7 +367,9 @@ test("更新済みタブで変更内容を種類別に絞り込め、作品タ�
   await page.getByRole("button", { name: "スキャン" }).click();
   const dialog = page.getByRole("dialog", { name: "スキャン" });
   await dialog.getByRole("button", { name: "スキャン", exact: true }).click();
-  await expect(dialog.getByText("スキャン完了")).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.getByRole("tab", { name: /^更新済み（\d+件）/ })).toBeVisible({
+    timeout: 15_000,
+  });
 
   await dialog.getByRole("tab", { name: "更新済み" }).click();
   const panel = dialog.getByRole("tabpanel", { name: "更新済み" });
@@ -400,7 +404,9 @@ test("新規作品タブでパスを押すとFilesが開き、スキャンモー
   await page.getByRole("button", { name: "スキャン" }).click();
   const dialog = page.getByRole("dialog", { name: "スキャン" });
   await dialog.getByRole("button", { name: "スキャン", exact: true }).click();
-  await expect(dialog.getByText("スキャン完了")).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.getByRole("tab", { name: /^新規作品（\d+件）/ })).toBeVisible({
+    timeout: 15_000,
+  });
 
   await dialog.getByRole("tab", { name: "新規作品" }).click();
   const panel = dialog.getByRole("tabpanel", { name: "新規作品" });
@@ -428,7 +434,8 @@ test("未登録タブでRJコードを編集でき、選んだ候補を除外し
   const dialog = page.getByRole("dialog", { name: "スキャン" });
   await dialog.getByRole("button", { name: "スキャン", exact: true }).click();
 
-  const unregistered = dialog.getByRole("tabpanel", { name: "未登録" });
+  await dialog.getByRole("tab", { name: /^未登録（/ }).click();
+  const unregistered = dialog.getByRole("tabpanel", { name: /^未登録/ });
   await expect(unregistered).toBeVisible({ timeout: 15_000 });
 
   // 行の accessible name は全セルの連結。行の識別は先頭セル（チェックボックスのラベル）へのアンカーで一意にする。
@@ -467,7 +474,8 @@ test("スキャン完了後に候補を選択登録でき、問題をFilesで確
   const dialog = page.getByRole("dialog", { name: "スキャン" });
   await dialog.getByRole("button", { name: "スキャン", exact: true }).click();
 
-  const unregistered = dialog.getByRole("tabpanel", { name: "未登録" });
+  await dialog.getByRole("tab", { name: /^未登録（/ }).click();
+  const unregistered = dialog.getByRole("tabpanel", { name: /^未登録/ });
   await expect(unregistered).toBeVisible({ timeout: 15_000 });
 
   await unregistered.getByRole("button", { name: "2件を追加" }).click();

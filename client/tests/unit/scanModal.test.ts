@@ -20,6 +20,8 @@ import * as workApi from "../../src/entities/work/api";
 import ScanModal from "../../src/features/scan/ui/ScanModal";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
+import { refreshScanCandidates } from "../../src/entities/scan/scanCandidatesCache";
+import { scanResultsRefreshedAtom } from "../../src/entities/scan/model/atoms";
 import { scanJobStoreAtom } from "../../src/entities/scan/model/scanJobStore";
 import {
   flushUnregisteredListSize,
@@ -221,6 +223,12 @@ type ModalOverrides = Partial<Parameters<typeof ScanModal>[0]> & {
   diagnostics?: ScanDiagnostics;
   /** 候補は GET /scan/candidates 由来の query cache から読まれる */
   candidates?: ScanCandidate[];
+  /** サイドバーの新規作品の件数。省略時は登録済みの新規作品の数 */
+  newCount?: number;
+  /** 起動後にスキャンが完了していない候補の応答にする */
+  scanNotCompleted?: boolean;
+  /** 読み込み中のまま（キャッシュを持たない）にする問い合わせ */
+  unseeded?: ("candidates" | "diagnostics" | "record")[];
 };
 
 function createTestQueryClient() {
@@ -235,15 +243,27 @@ function seedScanQueries(
     record,
     candidates,
     diagnostics,
-  }: { record?: ScanRecord; candidates?: ScanCandidate[]; diagnostics?: ScanDiagnostics },
+    newCount,
+    scanNotCompleted,
+  }: {
+    record?: ScanRecord;
+    candidates?: ScanCandidate[];
+    diagnostics?: ScanDiagnostics;
+    newCount?: number;
+    scanNotCompleted?: boolean;
+  },
 ) {
+  queryClient.setQueryData(WORK_QUERY_KEYS.scanNewCount(), newCount ?? worksById.size);
   if (record !== undefined) {
     queryClient.setQueryData(SCAN_QUERY_KEYS.last(), record);
   }
   if (candidates !== undefined) {
-    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), candidates);
+    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), {
+      scanCompleted: !scanNotCompleted,
+      candidates,
+    });
   } else if (queryClient.getQueryData(SCAN_QUERY_KEYS.candidates()) === undefined) {
-    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), []);
+    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), { scanCompleted: true, candidates: [] });
   }
   // 要対応の診断（常に最新を購読する）。未シードだとテストごとに実fetchへ
   // 落ちてしまうため、明示的な指定がなければ空で固定する。
@@ -268,14 +288,26 @@ function renderModal(
   const onCancel = scanJob.cancel;
   store.set(scanJobStoreAtom, scanJob);
 
-  const { record, candidates, diagnostics, ...rest } = overrides;
+  const { record, candidates, diagnostics, newCount, scanNotCompleted, unseeded, ...rest } =
+    overrides;
   serverCandidates = candidates ?? [];
   const queryClient = createTestQueryClient();
   seedScanQueries(queryClient, {
     record: record !== undefined ? record : scanRecord,
     candidates,
     diagnostics,
+    newCount,
+    scanNotCompleted,
   });
+  if (unseeded?.includes("candidates")) {
+    queryClient.removeQueries({ queryKey: SCAN_QUERY_KEYS.candidates() });
+  }
+  if (unseeded?.includes("record")) {
+    queryClient.removeQueries({ queryKey: SCAN_QUERY_KEYS.last() });
+  }
+  if (unseeded?.includes("diagnostics")) {
+    queryClient.removeQueries({ queryKey: SCAN_QUERY_KEYS.diagnostics() });
+  }
 
   const modalProps = {
     lastScanTime: null,
@@ -309,12 +341,14 @@ function renderModal(
       record: newRecord,
       candidates: newCandidates,
       diagnostics: newDiagnostics,
+      newCount: newNewCount,
       ...newRest
     } = newOverrides;
     seedScanQueries(queryClient, {
       record: newRecord,
       candidates: newCandidates,
       diagnostics: newDiagnostics,
+      newCount: newNewCount,
     });
     view.rerender(
       createElement(
@@ -426,30 +460,27 @@ describe("ScanModal", () => {
     expect(onStart).toHaveBeenCalledExactlyOnceWith({ full: true });
   });
 
-  it("縦タブは未登録・新規作品・要対応・更新済みの順で、件数は未登録と要対応だけに出る", () => {
+  it("縦タブは未登録・要対応・新規作品・更新済みの順で、すべてのタブに件数を出す", () => {
     renderModal({
       candidates: [candidateDetected, candidateUndetected],
+      diagnostics: buildScanDiagnostics({ unreadablePaths: [workspacePath("locked")] }),
+      newCount: 3,
       record: buildScanRecord({
         updatedWorks: [{ workId: "w1", changes: [{ kind: "meta" }] }],
       }),
     });
-    openTab("新規作品");
 
     const tabs = screen.getAllByRole("tab");
     expect(tabs.map((tab) => tab.getAttribute("aria-label"))).toEqual([
       "未登録（2件）",
-      "新規作品",
-      "要対応",
-      "更新済み",
+      "要対応（1件）",
+      "新規作品（3件）",
+      "更新済み（1件）",
     ]);
   });
 
-  it("要対応の件数は直すものだけを数え、行方不明は数えない", () => {
+  it("要対応の件数は行方不明も数える", () => {
     const missing = { workId: "m1", title: "m1", previousPath: workspacePath("m1") };
-    renderModal({ diagnostics: buildScanDiagnostics({ missingWorks: [missing] }) });
-    expect(screen.getByRole("tab", { name: "要対応" })).toBeInTheDocument();
-    cleanup();
-
     renderModal({
       diagnostics: buildScanDiagnostics({
         missingWorks: [missing],
@@ -457,16 +488,247 @@ describe("ScanModal", () => {
         dataIntegrityWorkIds: ["w1"],
       }),
     });
-    expect(screen.getByRole("tab", { name: "要対応（2件）" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "要対応（3件）" })).toBeInTheDocument();
   });
 
-  it("開いていないタブにだけ件数を出す", () => {
-    renderModal({ candidates: [candidateDetected, candidateUndetected] });
-    openTab("新規作品");
+  it("件数は0件のときは出さない", () => {
+    renderModal({ candidates: [], newCount: 0 });
 
+    for (const name of ["未登録", "要対応", "新規作品", "更新済み"]) {
+      expect(screen.getByRole("tab", { name })).toBeInTheDocument();
+    }
+  });
+
+  it("選択中のタブでも件数を消さない", () => {
+    renderModal({ candidates: [candidateDetected, candidateUndetected] });
+    expect(screen.getByRole("tab", { name: "未登録（2件）", selected: true })).toBeInTheDocument();
+
+    openTab("新規作品");
     expect(screen.getByRole("tab", { name: "未登録（2件）" })).toBeInTheDocument();
-    openTab("未登録");
-    expect(screen.getByRole("tab", { name: "未登録" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: "新規作品（1件）", selected: true }),
+    ).toBeInTheDocument();
+  });
+
+  it("件数の有無でタブの行の高さが変わらないよう、件数の場所を常に確保する", () => {
+    renderModal({ candidates: [candidateDetected] });
+
+    const slots = screen.getAllByRole("tab").map((tab) => tab.lastElementChild);
+    for (const slot of slots) expect(slot).toHaveClass("h-[18px]");
+  });
+
+  describe("一覧の状態", () => {
+    const tabpanel = () => screen.getByRole("tabpanel");
+
+    it("未登録は、起動後にスキャンが完了していなければ、候補が0件でも「まだスキャンしていません」を出す", () => {
+      renderModal({ candidates: [], newCount: 0, scanNotCompleted: true });
+
+      expect(within(tabpanel()).getByText("まだスキャンしていません")).toBeInTheDocument();
+      expect(within(tabpanel()).queryByText("未登録の候補はありません")).toBeNull();
+      expect(within(within(tabpanel()).getByRole("status")).queryByRole("button")).toBeNull();
+    });
+
+    it("未登録は、スキャンが完了して候補が0件なら「未登録の候補はありません」を出す", () => {
+      renderModal({ candidates: [], newCount: 0 });
+
+      expect(within(tabpanel()).getByText("未登録の候補はありません")).toBeInTheDocument();
+      expect(within(within(tabpanel()).getByRole("status")).queryByRole("button")).toBeNull();
+    });
+
+    it("未登録は、候補を読み込めていないあいだは空の表示を出さない", () => {
+      renderModal({ unseeded: ["candidates"], newCount: 0 });
+      openTab("未登録");
+
+      expect(within(tabpanel()).getByText("読み込み中...")).toBeInTheDocument();
+      expect(within(tabpanel()).queryByText("未登録の候補はありません")).toBeNull();
+    });
+
+    it("未登録は、候補の取得に失敗したら読み込み失敗を出し、再試行で候補を出す", async () => {
+      let fail = true;
+      mockApi({
+        "GET /api/scan/candidates": () =>
+          fail
+            ? apiError(500, "internal", "失敗")
+            : { scanCompleted: true, candidates: [candidateDetected] },
+        "GET /api/scan/last": () => scanRecord,
+        "GET /api/scan/diagnostics": buildScanDiagnostics(),
+        "GET /api/works": () => buildWorksPage([], { total: 0 }),
+      });
+      const { queryClient } = renderModal({ unseeded: ["candidates"], newCount: 0 });
+      await act(async () => {
+        await refreshScanCandidates(queryClient).catch(() => undefined);
+      });
+
+      expect(await within(tabpanel()).findByText("読み込みに失敗しました")).toBeInTheDocument();
+      expect(within(tabpanel()).queryByText("未登録の候補はありません")).toBeNull();
+
+      fail = false;
+      fireEvent.click(within(tabpanel()).getByRole("button", { name: "再試行" }));
+      await waitFor(() => expect(screen.getByRole("tab", { name: "未登録（1件）" })).toBeTruthy());
+      await showUnregisteredList();
+      expect(within(tabpanel()).getByText(candidateDetected.inferredTitle)).toBeInTheDocument();
+    });
+
+    it("要対応は、スキャン前でも「まだスキャンしていません」を出さず、0件を出す", () => {
+      renderModal({
+        candidates: [],
+        newCount: 0,
+        scanNotCompleted: true,
+        record: buildScanRecord({ finishedAt: null }),
+      });
+      openTab("要対応");
+
+      expect(within(tabpanel()).getByText("要対応の項目はありません")).toBeInTheDocument();
+      expect(within(tabpanel()).queryByText("まだスキャンしていません")).toBeNull();
+    });
+
+    it("要対応は、診断を読み込めていないあいだは空の表示を出さない", () => {
+      renderModal({ unseeded: ["diagnostics"], candidates: [candidateDetected] });
+      openTab("要対応");
+
+      expect(within(tabpanel()).getByText("読み込み中...")).toBeInTheDocument();
+      expect(within(tabpanel()).queryByText("要対応の項目はありません")).toBeNull();
+    });
+
+    it("新規作品と更新済みは、記録の完了時刻がなければ「まだスキャンしていません」を出す", async () => {
+      renderModal({ record: buildScanRecord({ finishedAt: null }), newCount: 0 });
+
+      openTab("新規作品");
+      expect(await within(tabpanel()).findByText("まだスキャンしていません")).toBeInTheDocument();
+      openTab("更新済み");
+      expect(await within(tabpanel()).findByText("まだスキャンしていません")).toBeInTheDocument();
+    });
+
+    it("新規作品と更新済みは、スキャンが完了して0件ならそれぞれの0件を出す", async () => {
+      worksById.clear();
+      renderModal({ newCount: 0, candidates: [] });
+
+      openTab("新規作品");
+      expect(await within(tabpanel()).findByText("新規作品はありません")).toBeInTheDocument();
+      openTab("更新済み");
+      expect(await within(tabpanel()).findByText("更新済みの作品はありません")).toBeInTheDocument();
+    });
+  });
+
+  describe("着地タブ", () => {
+    const selectedTab = () => screen.getByRole("tab", { selected: true }).textContent;
+
+    it("開いたときは件数のあるタブを未登録、要対応、新規作品、更新済みの順に探す", () => {
+      const attention = buildScanDiagnostics({ unreadablePaths: [workspacePath("locked")] });
+      const updated = buildScanRecord({
+        updatedWorks: [{ workId: "w1", changes: [{ kind: "meta" }] }],
+      });
+
+      renderModal({ candidates: [candidateDetected], diagnostics: attention, newCount: 1 });
+      expect(selectedTab()).toContain("未登録");
+      cleanup();
+
+      renderModal({ candidates: [], diagnostics: attention, newCount: 1 });
+      expect(selectedTab()).toContain("要対応");
+      cleanup();
+
+      renderModal({ candidates: [], newCount: 1, record: updated });
+      expect(selectedTab()).toContain("新規作品");
+      cleanup();
+
+      renderModal({ candidates: [], newCount: 0, record: updated });
+      expect(selectedTab()).toContain("更新済み");
+      cleanup();
+
+      renderModal({ candidates: [], newCount: 0 });
+      expect(selectedTab()).toContain("未登録");
+    });
+
+    it("件数が読めてから着地し、読めたあとは件数が変わっても勝手に移らない", async () => {
+      mockApi({ "GET /api/scan/diagnostics": () => new Promise<never>(() => {}) });
+      const { queryClient } = renderModal({
+        unseeded: ["diagnostics"],
+        candidates: [],
+        newCount: 0,
+      });
+      expect(screen.queryByRole("tab", { selected: true })).toBeNull();
+
+      act(() => {
+        queryClient.setQueryData(
+          SCAN_QUERY_KEYS.diagnostics(),
+          buildScanDiagnostics({ unreadablePaths: [workspacePath("locked")] }),
+        );
+      });
+      await waitFor(() => expect(selectedTab()).toContain("要対応"));
+
+      act(() => {
+        queryClient.setQueryData(WORK_QUERY_KEYS.scanNewCount(), 5);
+      });
+      expect(selectedTab()).toContain("要対応");
+    });
+
+    it("読み込み失敗は件数不明として扱い、残りの件数で着地を決める", async () => {
+      const attention = buildScanDiagnostics({ unreadablePaths: [workspacePath("locked")] });
+      const failing = (route: string) =>
+        mockApi({
+          "GET /api/scan/candidates": { scanCompleted: true, candidates: [] },
+          "GET /api/scan/diagnostics": attention,
+          "GET /api/scan/last": scanRecord,
+          "GET /api/settings": buildSettings(),
+          "GET /api/works": () => buildWorksPage([], { total: 0 }),
+          [route]: () => apiError(500, "internal", "失敗"),
+        });
+
+      failing("GET /api/scan/diagnostics");
+      renderModal({ unseeded: ["diagnostics"], candidates: [], newCount: 3 });
+      await waitFor(() => expect(selectedTab()).toContain("新規作品"));
+      cleanup();
+
+      failing("GET /api/scan/last");
+      renderModal({ unseeded: ["record"], candidates: [], diagnostics: attention, newCount: 0 });
+      await waitFor(() => expect(selectedTab()).toContain("要対応"));
+      cleanup();
+
+      failing("GET /api/scan/candidates");
+      const { queryClient } = renderModal({
+        unseeded: ["candidates"],
+        candidates: undefined,
+        diagnostics: attention,
+        newCount: 0,
+      });
+      await act(async () => {
+        await refreshScanCandidates(queryClient).catch(() => undefined);
+      });
+      await waitFor(() => expect(selectedTab()).toContain("要対応"));
+    });
+
+    it("スキャンの完了では、今のタブが空のときだけ着地の規則で移る", async () => {
+      const { queryClient, store } = renderModal({
+        candidates: [],
+        newCount: 0,
+        record: buildScanRecord({ finishedAt: null }),
+      });
+      expect(selectedTab()).toContain("未登録");
+
+      act(() => {
+        queryClient.setQueryData(WORK_QUERY_KEYS.scanNewCount(), 2);
+      });
+      await screen.findByRole("tab", { name: "新規作品（2件）" });
+      act(() => {
+        store.set(scanResultsRefreshedAtom, (count) => count + 1);
+      });
+
+      expect(selectedTab()).toContain("新規作品");
+    });
+
+    it("スキャンの完了でも、今のタブに件数があれば移らない", async () => {
+      const { queryClient, store } = renderModal({ candidates: [candidateDetected], newCount: 0 });
+
+      act(() => {
+        queryClient.setQueryData(WORK_QUERY_KEYS.scanNewCount(), 2);
+      });
+      await screen.findByRole("tab", { name: "新規作品（2件）" });
+      act(() => {
+        store.set(scanResultsRefreshedAtom, (count) => count + 1);
+      });
+
+      expect(selectedTab()).toContain("未登録");
+    });
   });
 
   it("最終スキャンの日時を年入りで出す", () => {
@@ -485,10 +747,17 @@ describe("ScanModal", () => {
     });
 
     it("まだスキャンしていないときは見出しを変え、スキャンボタンは主ボタンの見た目になる", () => {
-      renderModal({ lastScanTime: null });
+      renderModal({ lastScanTime: null, record: buildScanRecord({ finishedAt: null }) });
 
       expect(screen.getByText("まだスキャンしていません")).toBeInTheDocument();
       expect(screen.queryByText("最終スキャン")).toBeNull();
+      expect(screen.getByRole("button", { name: "スキャン" })).toHaveClass("bg-ink-0");
+    });
+
+    it("主ボタンの条件は永続の最終スキャン日時ではなく、起動後にスキャンが完了したかで決まる", () => {
+      renderModal({ lastScanTime: FINISHED_AT, record: buildScanRecord({ finishedAt: null }) });
+
+      expect(screen.getByText("最終スキャン")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "スキャン" })).toHaveClass("bg-ink-0");
     });
 
@@ -646,10 +915,12 @@ describe("ScanModal", () => {
     renderModal();
     openTab("新規作品");
 
-    await waitFor(() =>
-      expect(screen.getByText("新規作品の読み込みに失敗しました")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("読み込みに失敗しました")).toBeInTheDocument());
     expect(screen.queryByText(newWork.title)).toBeNull();
+
+    worksByIdFails = false;
+    fireEvent.click(screen.getByRole("button", { name: "再試行" }));
+    await waitForListed(newWork.title);
   });
 
   it("タイトル保存に失敗したときエラーを表示し、ローカル表示は更新されない", async () => {
@@ -1046,6 +1317,20 @@ describe("ScanModal", () => {
           .requestsTo("GET /api/works")
           .some((request) => request.url.searchParams.get("scanChange") === "moved"),
       ).toBe(true);
+    });
+
+    it("種類の絞り込みを切り替えても、ツールバーと前の行を残したまま取り直す", async () => {
+      renderModal({ record: updatedRecord() });
+      openTab("更新済み");
+      await waitForListed("更新u2");
+
+      fireEvent.click(screen.getByRole("button", { name: /^移動/ }));
+
+      expect(screen.getByRole("button", { name: /^移動/ })).toBeInTheDocument();
+      expect(screen.getByText("更新u2")).toBeInTheDocument();
+      expect(screen.queryByText("読み込み中...")).toBeNull();
+      await waitFor(() => expect(screen.queryByText("更新u2")).toBeNull());
+      expect(screen.getByRole("button", { name: /^移動/ })).toBeInTheDocument();
     });
 
     it("作品タイトルを押すと作品詳細を開く", async () => {

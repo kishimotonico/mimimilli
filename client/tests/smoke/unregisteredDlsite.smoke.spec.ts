@@ -8,7 +8,8 @@ async function openUnregistered(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: "スキャン" }).click();
   const dialog = page.getByRole("dialog", { name: "スキャン" });
   await dialog.getByRole("button", { name: "スキャン", exact: true }).click();
-  const panel = dialog.getByRole("tabpanel", { name: "未登録" });
+  await dialog.getByRole("tab", { name: /^未登録（/ }).click();
+  const panel = dialog.getByRole("tabpanel", { name: /^未登録/ });
   await expect(panel.getByRole("button", { name: "DLsiteから取得" })).toBeVisible({
     timeout: 15_000,
   });

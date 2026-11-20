@@ -111,7 +111,12 @@ describe("rootReconfigurationController", () => {
     controller.readyUiMounted();
 
     await vi.waitFor(() => expect(queryFn).toHaveBeenCalledTimes(2));
-    await vi.waitFor(() => expect(queryClient.getQueryData(SCAN_CANDIDATES_QUERY_KEY)).toEqual([]));
+    await vi.waitFor(() =>
+      expect(queryClient.getQueryData(SCAN_CANDIDATES_QUERY_KEY)).toEqual({
+        scanCompleted: true,
+        candidates: [],
+      }),
+    );
     expect(api.requestsTo(CANDIDATES_ROUTE)).toHaveLength(1);
     unsubscribe();
   });

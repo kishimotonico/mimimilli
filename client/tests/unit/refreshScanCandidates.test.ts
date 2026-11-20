@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
-import type { ScanCandidate } from "@mimimilli/shared";
+import type { ScanCandidate, ScanCandidatesResponse } from "@mimimilli/shared";
 import {
   fetchScanCandidates,
   refreshScanCandidates,
@@ -22,7 +22,7 @@ const candidateB = buildScanCandidate({
 });
 
 function readCache(queryClient: QueryClient): ScanCandidate[] | undefined {
-  return queryClient.getQueryData(SCAN_CANDIDATES_QUERY_KEY);
+  return queryClient.getQueryData<ScanCandidatesResponse>(SCAN_CANDIDATES_QUERY_KEY)?.candidates;
 }
 
 describe("fetchScanCandidates", () => {
@@ -31,7 +31,10 @@ describe("fetchScanCandidates", () => {
       "GET /api/scan/candidates": { scanCompleted: true, candidates: [candidateA, candidateB] },
     });
 
-    await expect(fetchScanCandidates()).resolves.toEqual([candidateA, candidateB]);
+    await expect(fetchScanCandidates()).resolves.toEqual({
+      scanCompleted: true,
+      candidates: [candidateA, candidateB],
+    });
   });
 });
 
@@ -44,7 +47,7 @@ describe("refreshScanCandidates", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const result = await refreshScanCandidates(queryClient);
 
-    expect(result).toEqual([candidateA, candidateB]);
+    expect(result.candidates).toEqual([candidateA, candidateB]);
     expect(readCache(queryClient)).toEqual([candidateA, candidateB]);
   });
 
@@ -73,10 +76,10 @@ describe("refreshScanCandidates", () => {
     firstRelease();
 
     const secondResult = await second;
-    expect(await first).toEqual([candidateB]);
+    expect((await first).candidates).toEqual([candidateB]);
 
     expect(callCount).toBe(2);
-    expect(secondResult).toEqual([candidateB]);
+    expect(secondResult.candidates).toEqual([candidateB]);
     expect(readCache(queryClient)).toEqual([candidateB]);
   });
 
@@ -115,7 +118,10 @@ describe("refreshScanCandidates", () => {
       },
     });
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, [original, candidateB]);
+    queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, {
+      scanCompleted: true,
+      candidates: [original, candidateB],
+    });
 
     const first = refreshScanCandidates(queryClient);
     let firstSettled = false;
@@ -131,8 +137,8 @@ describe("refreshScanCandidates", () => {
     expect(firstSettled).toBe(false);
 
     secondGate.resolve();
-    expect(await second).toEqual([fixed, candidateB]);
-    expect(await first).toEqual([fixed, candidateB]);
+    expect((await second).candidates).toEqual([fixed, candidateB]);
+    expect((await first).candidates).toEqual([fixed, candidateB]);
     expect(callCount).toBe(2);
     expect(readCache(queryClient)).toEqual([fixed, candidateB]);
   });

@@ -5,6 +5,8 @@ import type { WorkChange, WorkChangeKind, WorkspacePath } from "@mimimilli/share
 import { scanRecordQueryOptions } from "../../../../../entities/scan/queryOptions";
 import { cn } from "../../../../../shared/lib/cn";
 import { useVirtualList } from "../../../../../shared/ui/useVirtualList";
+import { deriveScanListStatus } from "../../../model/scanListStatus";
+import ScanListState from "../ScanListState";
 import { useScanRecordWorks } from "../useScanRecordWorks";
 import ChangeKindFilter from "./ChangeKindFilter";
 import { UPDATED_GRID_CLASS, UPDATED_ROW_ESTIMATE } from "./layout";
@@ -39,8 +41,8 @@ export default function UpdatedWorksTab({ onOpenFiles, onOpenWorkDetail }: Updat
     if (kind !== null && updatedWorks && counts[kind] === 0) setKind(null);
   }, [kind, counts, updatedWorks]);
 
-  const { works, total, loading, error, hasNextPage, isFetchingNextPage, fetchNextPage } =
-    useScanRecordWorks("updated", "更新済みの作品の読み込みに失敗しました", kind ?? undefined);
+  const { works, total, loading, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    useScanRecordWorks("updated", kind ?? undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { virtualizer, virtualItems, wrapperStyle, getItemStyle } = useVirtualList({
@@ -53,68 +55,70 @@ export default function UpdatedWorksTab({ onOpenFiles, onOpenWorkDetail }: Updat
   });
 
   const totalUpdated = updatedWorks?.length ?? 0;
-  if (error) {
-    return (
-      <p role="alert" className="px-[18px] py-4 font-jp text-body text-[var(--r-coral)]">
-        {error}
-      </p>
-    );
-  }
-  if (kind === null && totalUpdated === 0 && total === 0 && !loading && !recordQuery.isPending) {
-    return (
-      <p className="px-[18px] py-4 font-jp text-body text-ink-2">更新済みの作品はありません</p>
-    );
-  }
+  const status = deriveScanListStatus({
+    loading: loading || recordQuery.isPending,
+    error: error || (recordQuery.isError && recordQuery.data === undefined),
+    notScanned: recordQuery.data?.finishedAt === null,
+    count: totalUpdated,
+  });
+  const retry = () => {
+    if (recordQuery.isError) void recordQuery.refetch();
+    if (error) refetch();
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <ChangeKindFilter value={kind} total={totalUpdated} counts={counts} onChange={setKind} />
-      <div
-        role="table"
-        aria-label="更新済みの作品"
-        aria-rowcount={total + 1}
-        className="flex min-h-0 flex-1 flex-col"
-      >
-        <div role="rowgroup" className="shrink-0">
-          <div
-            role="row"
-            className={cn(
-              UPDATED_GRID_CLASS,
-              "h-[30px] items-center border-b border-line-soft bg-paper-0",
-            )}
-          >
-            <span role="columnheader" className={HEADING_CLASS}>
-              作品
-            </span>
-            <span role="columnheader" className={HEADING_CLASS}>
-              変更内容
-            </span>
+      {totalUpdated > 0 && (
+        <ChangeKindFilter value={kind} total={totalUpdated} counts={counts} onChange={setKind} />
+      )}
+      <ScanListState status={status} emptyMessage="更新済みの作品はありません" onRetry={retry}>
+        <div
+          role="table"
+          aria-label="更新済みの作品"
+          aria-rowcount={total + 1}
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          <div role="rowgroup" className="shrink-0">
+            <div
+              role="row"
+              className={cn(
+                UPDATED_GRID_CLASS,
+                "h-[30px] items-center border-b border-line-soft bg-paper-0",
+              )}
+            >
+              <span role="columnheader" className={HEADING_CLASS}>
+                作品
+              </span>
+              <span role="columnheader" className={HEADING_CLASS}>
+                変更内容
+              </span>
+            </div>
+          </div>
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+            <div role="rowgroup" style={wrapperStyle}>
+              {virtualItems.map((virtualRow) => {
+                const work = works[virtualRow.index];
+                if (!work) return null;
+                return (
+                  <div
+                    key={work.id}
+                    data-index={virtualRow.index}
+                    ref={virtualizer.measureElement}
+                    style={getItemStyle(virtualRow)}
+                  >
+                    <UpdatedWorkRow
+                      work={work}
+                      changes={changesByWork.get(work.id) ?? NO_CHANGES}
+                      onOpenFiles={onOpenFiles}
+                      onOpenWorkDetail={onOpenWorkDetail}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-          <div role="rowgroup" style={wrapperStyle}>
-            {virtualItems.map((virtualRow) => {
-              const work = works[virtualRow.index];
-              if (!work) return null;
-              return (
-                <div
-                  key={work.id}
-                  data-index={virtualRow.index}
-                  ref={virtualizer.measureElement}
-                  style={getItemStyle(virtualRow)}
-                >
-                  <UpdatedWorkRow
-                    work={work}
-                    changes={changesByWork.get(work.id) ?? NO_CHANGES}
-                    onOpenFiles={onOpenFiles}
-                    onOpenWorkDetail={onOpenWorkDetail}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+      </ScanListState>
     </div>
   );
 }

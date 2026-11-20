@@ -8,13 +8,16 @@ import { I } from "../../../../shared/ui/Icon";
 import SplitButton from "../../../../shared/ui/SplitButton";
 import { scanPhaseLabel, type ScanProgress } from "../../model";
 import type { ScanStatusView } from "../../model/scanStatusView";
-import { SCAN_TAB_LABEL, SCAN_TAB_ORDER, SCAN_TAB_WITH_COUNT, type ScanTabKey } from "./types";
+import type { ScanTabCounts } from "./scanTabs";
+import { SCAN_TAB_LABEL, SCAN_TAB_ORDER, type ScanTabKey } from "./types";
 
 interface ScanSidebarProps {
-  active: ScanTabKey;
+  active: ScanTabKey | null;
   onSelect: (tab: ScanTabKey) => void;
-  counts: Partial<Record<ScanTabKey, number>>;
+  counts: ScanTabCounts;
   status: ScanStatusView;
+  /** 起動後にスキャンが完了していない。スキャンボタンを主ボタンにする */
+  scanPending: boolean;
   onStart: () => void;
   onFullScan: () => void;
   onCancel: () => void;
@@ -28,6 +31,7 @@ export default function ScanSidebar({
   onSelect,
   counts,
   status,
+  scanPending,
   onStart,
   onFullScan,
   onCancel,
@@ -68,6 +72,7 @@ export default function ScanSidebar({
               <SidebarStartButton
                 key="start"
                 status={status}
+                primary={scanPending}
                 onStart={onStart}
                 onFullScan={onFullScan}
               />
@@ -87,12 +92,11 @@ function ScanSidebarTab({
 }: {
   tab: ScanTabKey;
   selected: boolean;
-  count: number | undefined;
+  count: number | null;
   onSelect: (tab: ScanTabKey) => void;
 }) {
   const label = SCAN_TAB_LABEL[tab];
-  const shownCount =
-    SCAN_TAB_WITH_COUNT.has(tab) && !selected && count !== undefined && count > 0 ? count : null;
+  const shownCount = count !== null && count > 0 ? count : null;
   return (
     <button
       type="button"
@@ -112,40 +116,42 @@ function ScanSidebarTab({
       <span aria-hidden="true" className="truncate">
         {label}
       </span>
-      {shownCount !== null && (
-        <span
-          aria-hidden="true"
-          className={cn(
-            "shrink-0 rounded-pill px-1.5 py-0.5 font-mono text-caption font-semibold tabular-nums",
-            tab === "needsAttention"
-              ? "bg-[color-mix(in_oklch,var(--r-coral)_20%,transparent)] text-[var(--r-coral)]"
-              : "bg-paper-3 text-ink-2",
-          )}
-        >
-          {shownCount}
-        </span>
-      )}
+      <span aria-hidden="true" className="inline-grid h-[18px] min-w-6 shrink-0 place-items-center">
+        {shownCount !== null && (
+          <span
+            className={cn(
+              "inline-grid h-[18px] min-w-5 place-items-center rounded-pill px-1.5 font-mono text-caption font-semibold tabular-nums",
+              tab === "needsAttention"
+                ? "bg-[color-mix(in_oklch,var(--r-coral)_20%,transparent)] text-[var(--r-coral)]"
+                : "bg-paper-3 text-ink-2",
+            )}
+          >
+            {shownCount}
+          </span>
+        )}
+      </span>
     </button>
   );
 }
 
 function SidebarStartButton({
   status,
+  primary,
   onStart,
   onFullScan,
 }: {
   status: ScanStatusView;
+  primary: boolean;
   onStart: () => void;
   onFullScan: () => void;
 }) {
   const { fade } = useMotionVariants();
   const isPresent = useIsPresent();
   const v = fade();
-  const neverScanned = status.kind === "idle" && status.at === null;
   return (
     <motion.div className="absolute inset-0" inert={!isPresent} {...v}>
       <SplitButton
-        variant={neverScanned ? "primary" : "ghost"}
+        variant={primary ? "primary" : "ghost"}
         size="lg"
         className="w-full"
         menuLabel="スキャンの方法"

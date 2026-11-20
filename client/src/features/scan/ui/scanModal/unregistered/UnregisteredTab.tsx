@@ -25,6 +25,8 @@ import {
   registerTargets,
   type CandidateRowModel,
 } from "../../../model/unregisteredSelection";
+import type { ScanListStatus } from "../../../model/scanListStatus";
+import ScanListState from "../ScanListState";
 import type { CandidatesRegisteredResult } from "../types";
 import DlsiteFetchSlot from "./DlsiteFetchSlot";
 import UnregisteredFooter from "./UnregisteredFooter";
@@ -36,6 +38,8 @@ import { ROW_HEIGHT } from "./layout";
 
 export interface UnregisteredTabProps {
   candidates: ScanCandidate[];
+  status: ScanListStatus;
+  onRetry: () => void;
   onRegistered: (result: CandidatesRegisteredResult) => void;
 }
 
@@ -45,7 +49,12 @@ function isCandidatesStale(error: unknown): boolean {
   return error instanceof ApiRequestError && error.status === 409;
 }
 
-export default function UnregisteredTab({ candidates, onRegistered }: UnregisteredTabProps) {
+export default function UnregisteredTab({
+  candidates,
+  status,
+  onRetry,
+  onRegistered,
+}: UnregisteredTabProps) {
   const queryClient = useQueryClient();
   const jobStore = useDlsiteJobStore();
   const jobState = useDlsiteJobState((state) => state);
@@ -281,12 +290,6 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     resetScrollTop: true,
   });
 
-  if (candidates.length === 0) {
-    return (
-      <p className="px-[18px] py-4 font-jp text-body text-ink-2">未登録の候補はありません。</p>
-    );
-  }
-
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <UnregisteredToolbar
@@ -311,60 +314,62 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
           />
         }
       />
-      <section aria-label="未登録の候補" className="flex min-h-0 flex-1 flex-col">
-        <div
-          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 仮想リストは行を絶対配置するため table 要素にできず、role=table で ARIA table 構造を与える
-          role="table"
-          aria-label="未登録の候補一覧"
-          aria-rowcount={visibleRows.length + 1}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <UnregisteredListHeader />
-          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-            <div
-              // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 仮想リストの行群は tbody にできないため role=rowgroup で与える
-              role="rowgroup"
-              style={wrapperStyle}
-            >
-              {virtualItems.map((virtualRow) => {
-                const row = visibleRows[virtualRow.index];
-                if (!row) return null;
-                const { candidate, display } = row;
-                return (
-                  <div
-                    key={candidate.path}
-                    style={{ ...getItemStyle(virtualRow), height: ROW_HEIGHT }}
-                  >
-                    <UnregisteredRow
-                      candidate={candidate}
-                      display={display}
-                      selected={!deselectedPaths.has(candidate.path)}
-                      editing={editingPath === candidate.path}
-                      error={fieldErrors.get(candidate.path)}
-                      busy={busy}
-                      handlers={handlers}
-                    />
-                  </div>
-                );
-              })}
+      <ScanListState status={status} emptyMessage="未登録の候補はありません" onRetry={onRetry}>
+        <section aria-label="未登録の候補" className="flex min-h-0 flex-1 flex-col">
+          <div
+            // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 仮想リストは行を絶対配置するため table 要素にできず、role=table で ARIA table 構造を与える
+            role="table"
+            aria-label="未登録の候補一覧"
+            aria-rowcount={visibleRows.length + 1}
+            className="flex min-h-0 flex-1 flex-col"
+          >
+            <UnregisteredListHeader />
+            <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+              <div
+                // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 仮想リストの行群は tbody にできないため role=rowgroup で与える
+                role="rowgroup"
+                style={wrapperStyle}
+              >
+                {virtualItems.map((virtualRow) => {
+                  const row = visibleRows[virtualRow.index];
+                  if (!row) return null;
+                  const { candidate, display } = row;
+                  return (
+                    <div
+                      key={candidate.path}
+                      style={{ ...getItemStyle(virtualRow), height: ROW_HEIGHT }}
+                    >
+                      <UnregisteredRow
+                        candidate={candidate}
+                        display={display}
+                        selected={!deselectedPaths.has(candidate.path)}
+                        editing={editingPath === candidate.path}
+                        error={fieldErrors.get(candidate.path)}
+                        busy={busy}
+                        handlers={handlers}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
-      </section>
-      {errorMessage && (
-        <p
-          role="alert"
-          className="shrink-0 whitespace-pre-line border-t border-line-soft px-[18px] py-2 font-jp text-secondary text-[var(--state-danger)]"
-        >
-          {errorMessage}
-        </p>
-      )}
-      <UnregisteredFooter
-        registerCount={registerRows.length}
-        missingDlsiteCount={missingCount}
-        busy={busy}
-        onRegister={(apply) => void register(apply)}
-      />
+        </section>
+        {errorMessage && (
+          <p
+            role="alert"
+            className="shrink-0 whitespace-pre-line border-t border-line-soft px-[18px] py-2 font-jp text-secondary text-[var(--state-danger)]"
+          >
+            {errorMessage}
+          </p>
+        )}
+        <UnregisteredFooter
+          registerCount={registerRows.length}
+          missingDlsiteCount={missingCount}
+          busy={busy}
+          onRegister={(apply) => void register(apply)}
+        />
+      </ScanListState>
     </div>
   );
 }

@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { workspacePath } from "@mimimilli/shared";
-import {
-  buildNeedsAttentionRows,
-  countNeedsAttention,
-} from "../../src/features/scan/model/needsAttention";
+import { buildNeedsAttentionRows } from "../../src/features/scan/model/needsAttention";
 import { buildScanDiagnostics } from "../helpers/builders";
 
 const diagnostics = buildScanDiagnostics({
@@ -61,32 +58,5 @@ describe("buildNeedsAttentionRows", () => {
   it("keyは一意", () => {
     const keys = buildNeedsAttentionRows(diagnostics).map((row) => row.key);
     expect(new Set(keys).size).toBe(keys.length);
-  });
-});
-
-describe("countNeedsAttention", () => {
-  it("直すものだけを数え、行方不明は数えない", () => {
-    expect(countNeedsAttention(buildNeedsAttentionRows(diagnostics))).toBe(7);
-    expect(
-      countNeedsAttention(
-        buildNeedsAttentionRows(buildScanDiagnostics({ missingWorks: diagnostics.missingWorks })),
-      ),
-    ).toBe(0);
-  });
-
-  it("ID重複はパス数に関わらず競合1件で1と数える", () => {
-    const rows = buildNeedsAttentionRows(
-      buildScanDiagnostics({
-        identityConflicts: [
-          {
-            kind: "identity_conflict",
-            registeredTitle: null,
-            workId: "d",
-            paths: [workspacePath("a"), workspacePath("b"), workspacePath("c")],
-          },
-        ],
-      }),
-    );
-    expect(countNeedsAttention(rows)).toBe(1);
   });
 });

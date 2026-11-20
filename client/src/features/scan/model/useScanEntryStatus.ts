@@ -23,7 +23,8 @@ export function useScanEntryStatus(): { ring: ScanEntryRing; unseen: boolean } {
   const scanning = useScanning();
   const frame = useDlsiteBulkFrame();
   const open = useAtomValue(scanModalOpenAtom);
-  const { candidates, loaded: candidatesLoaded } = useScanCandidatesState();
+  const { candidates, status: candidatesStatus } = useScanCandidatesState();
+  const candidatesLoaded = candidatesStatus === "loaded";
   const recordQuery = useQuery(scanRecordQueryOptions);
   const diagnosticsQuery = useQuery(scanDiagnosticsQueryOptions);
   const newCountQuery = useQuery(scanNewCountQueryOptions);

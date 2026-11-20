@@ -3,10 +3,11 @@
 
 export type ScanTabKey = "unregistered" | "newWorks" | "needsAttention" | "updated";
 
+/** サイドバーの並びであり、開いたときに件数のあるタブを探す順 */
 export const SCAN_TAB_ORDER: ScanTabKey[] = [
   "unregistered",
-  "newWorks",
   "needsAttention",
+  "newWorks",
   "updated",
 ];
 
@@ -16,12 +17,6 @@ export const SCAN_TAB_LABEL: Record<ScanTabKey, string> = {
   needsAttention: "要対応",
   updated: "更新済み",
 };
-
-/** 件数を出すタブ。開いているタブには出さない */
-export const SCAN_TAB_WITH_COUNT: ReadonlySet<ScanTabKey> = new Set([
-  "unregistered",
-  "needsAttention",
-]);
 
 /** UnregisteredTab が候補登録の成否をScanModalへ伝える契約。 */
 export interface CandidatesRegisteredResult {
