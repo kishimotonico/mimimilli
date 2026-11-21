@@ -8,6 +8,7 @@ import { useVirtualList } from "../../../../../shared/ui/useVirtualList";
 import { deriveScanListStatus } from "../../../model/scanListStatus";
 import { LIST_HEADING_ROW_CLASS } from "../listHeading";
 import ScanListState from "../ScanListState";
+import { useDisplayedScanListStatus } from "../useDisplayedScanListStatus";
 import { useScanRecordWorks } from "../useScanRecordWorks";
 import ChangeKindFilter from "./ChangeKindFilter";
 import { UPDATED_GRID_CLASS, UPDATED_ROW_ESTIMATE } from "./layout";
@@ -55,57 +56,65 @@ export default function UpdatedWorksTab({ onOpenFiles, onOpenWorkDetail }: Updat
   });
 
   const totalUpdated = updatedWorks?.length ?? 0;
-  const status = deriveScanListStatus({
-    loading: loading || recordQuery.isPending,
-    error: error || (recordQuery.isError && recordQuery.data === undefined),
-    notScanned: recordQuery.data?.finishedAt === null,
-    count: totalUpdated,
-  });
+  const status = useDisplayedScanListStatus(
+    deriveScanListStatus({
+      loading: loading || recordQuery.isPending,
+      error: error || (recordQuery.isError && recordQuery.data === undefined),
+      notScanned: recordQuery.data?.finishedAt === null,
+      count: totalUpdated,
+    }),
+  );
   const retry = () => {
     if (recordQuery.isError) void recordQuery.refetch();
     if (error) refetch();
   };
 
+  const chips = (
+    <ChangeKindFilter value={kind} total={totalUpdated} counts={counts} onChange={setKind} />
+  );
+  const chipsOutside = status !== "loading" && status !== "ready" && totalUpdated > 0;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {totalUpdated > 0 && (
-        <ChangeKindFilter value={kind} total={totalUpdated} counts={counts} onChange={setKind} />
-      )}
-      <ScanListState status={status} emptyMessage="更新済みの作品はありません" onRetry={retry}>
-        <div
-          role="table"
-          aria-label="更新済みの作品"
-          aria-rowcount={total + 1}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <div role="rowgroup" className="shrink-0">
-            <div role="row" className={cn(UPDATED_GRID_CLASS, LIST_HEADING_ROW_CLASS)}>
-              <span role="columnheader">作品</span>
-              <span role="columnheader">変更内容</span>
+      {chipsOutside && chips}
+      <ScanListState
+        status={status}
+        emptyMessage="更新済みの作品はありません"
+        onRetry={retry}
+        table={{ label: "更新済みの作品", rowCount: total + 1 }}
+        heading={
+          <>
+            {chips}
+            <div role="rowgroup" className="shrink-0">
+              <div role="row" className={cn(UPDATED_GRID_CLASS, LIST_HEADING_ROW_CLASS)}>
+                <span role="columnheader">作品</span>
+                <span role="columnheader">変更内容</span>
+              </div>
             </div>
-          </div>
-          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-            <div role="rowgroup" style={wrapperStyle}>
-              {virtualItems.map((virtualRow) => {
-                const work = works[virtualRow.index];
-                if (!work) return null;
-                return (
-                  <div
-                    key={work.id}
-                    data-index={virtualRow.index}
-                    ref={virtualizer.measureElement}
-                    style={getItemStyle(virtualRow)}
-                  >
-                    <UpdatedWorkRow
-                      work={work}
-                      changes={changesByWork.get(work.id) ?? NO_CHANGES}
-                      onOpenFiles={onOpenFiles}
-                      onOpenWorkDetail={onOpenWorkDetail}
-                    />
-                  </div>
-                );
-              })}
-            </div>
+          </>
+        }
+      >
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+          <div role="rowgroup" style={wrapperStyle}>
+            {virtualItems.map((virtualRow) => {
+              const work = works[virtualRow.index];
+              if (!work) return null;
+              return (
+                <div
+                  key={work.id}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
+                  style={getItemStyle(virtualRow)}
+                >
+                  <UpdatedWorkRow
+                    work={work}
+                    changes={changesByWork.get(work.id) ?? NO_CHANGES}
+                    onOpenFiles={onOpenFiles}
+                    onOpenWorkDetail={onOpenWorkDetail}
+                  />
+                </div>
+              );
+            })}
           </div>
         </div>
       </ScanListState>

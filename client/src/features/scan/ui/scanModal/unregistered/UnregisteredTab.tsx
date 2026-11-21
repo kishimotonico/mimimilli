@@ -31,6 +31,7 @@ import {
 } from "../../../model/unregisteredSelection";
 import type { ScanListStatus } from "../../../model/scanListStatus";
 import ScanListState from "../ScanListState";
+import { useDisplayedScanListStatus } from "../useDisplayedScanListStatus";
 import type { CandidatesRegisteredResult } from "../types";
 import ExcludedList from "./ExcludedList";
 import UnregisteredFooter from "./UnregisteredFooter";
@@ -60,11 +61,12 @@ const RJ_CODE_FORMAT_REASON = "RJ/VJ＋6〜8桁の数字";
 
 export default function UnregisteredTab({
   candidates,
-  status,
+  status: rawStatus,
   onRetry,
   onRegistered,
   onOpenFiles,
 }: UnregisteredTabProps) {
+  const status = useDisplayedScanListStatus(rawStatus);
   const queryClient = useQueryClient();
   const jobStore = useDlsiteJobStore();
   const jobState = useDlsiteJobState((state) => state);
@@ -316,6 +318,21 @@ export default function UnregisteredTab({
     resetScrollTop: true,
   });
 
+  const toolbar = (
+    <UnregisteredToolbar
+      excludedCount={exclusions.length}
+      onShowExcluded={() => setShowExcluded(true)}
+      problemCount={problems}
+      filter={filter && { kind: filter.kind, count: visibleRows.length }}
+      onFilterProblems={() =>
+        setFilter({ kind: "problem", paths: pathsOf(allRows.filter(needsJudgment)) })
+      }
+      onClearFilter={() => setFilter(null)}
+    />
+  );
+  const toolbarOutside =
+    status !== "loading" && status !== "ready" && (status === "empty" || exclusions.length > 0);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {showExcluded && (
@@ -330,88 +347,81 @@ export default function UnregisteredTab({
         inert={showExcluded}
         className={showExcluded ? "hidden" : "flex min-h-0 flex-1 flex-col"}
       >
-        {(status === "ready" || status === "empty" || exclusions.length > 0) && (
-          <UnregisteredToolbar
-            excludedCount={exclusions.length}
-            onShowExcluded={() => setShowExcluded(true)}
-            problemCount={problems}
-            filter={filter && { kind: filter.kind, count: visibleRows.length }}
-            onFilterProblems={() =>
-              setFilter({ kind: "problem", paths: pathsOf(allRows.filter(needsJudgment)) })
-            }
-            onClearFilter={() => setFilter(null)}
-          />
-        )}
-        <ScanListState status={status} emptyMessage="未登録の候補はありません" onRetry={onRetry}>
-          <section aria-label="未登録の候補" className="flex min-h-0 flex-1 flex-col">
-            <div
-              // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 仮想リストは行を絶対配置するため table 要素にできず、role=table で ARIA table 構造を与える
-              role="table"
-              aria-label="未登録の候補一覧"
-              aria-rowcount={visibleRows.length + 1}
-              className="flex min-h-0 flex-1 flex-col"
-            >
+        {toolbarOutside && toolbar}
+        <ScanListState
+          status={status}
+          emptyMessage="未登録の候補はありません"
+          onRetry={onRetry}
+          table={{ label: "未登録の候補一覧", rowCount: visibleRows.length + 1 }}
+          heading={
+            <>
+              {toolbar}
               <UnregisteredListHeader
                 allSelected={allSelected}
                 partiallySelected={partiallySelected}
                 selectAllDisabled={busy || selectableCount === 0}
                 onToggleAll={toggleAll}
               />
-              <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-                <div
-                  // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 仮想リストの行群は tbody にできないため role=rowgroup で与える
-                  role="rowgroup"
-                  style={wrapperStyle}
-                >
-                  {virtualItems.map((virtualRow) => {
-                    const row = visibleRows[virtualRow.index];
-                    if (!row) return null;
-                    const { candidate, display } = row;
-                    return (
-                      <div
-                        key={candidate.path}
-                        style={{ ...getItemStyle(virtualRow), height: ROW_HEIGHT }}
-                      >
-                        <UnregisteredRow
-                          candidate={candidate}
-                          display={display}
-                          flagged={needsJudgment(row)}
-                          selected={isRowSelected(row, selection)}
-                          editing={editingPath === candidate.path}
-                          error={fieldErrors.get(candidate.path)}
-                          busy={busy}
-                          handlers={handlers}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </section>
-          {errorMessage && (
-            <p
-              role="alert"
-              className="shrink-0 whitespace-pre-line border-t border-line-soft px-[18px] py-2 font-jp text-secondary text-[var(--state-danger)]"
+            </>
+          }
+        >
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+            <div
+              // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 仮想リストの行群は tbody にできないため role=rowgroup で与える
+              role="rowgroup"
+              style={wrapperStyle}
             >
-              {errorMessage}
-            </p>
-          )}
-          <UnregisteredFooter
-            plan={plan}
-            selectedCount={selectedVisible.length}
-            addCount={registerRows.length}
-            missingDlsiteCount={noDlsiteRows.length}
-            onFilterMissingDlsite={() =>
-              setFilter({ kind: "noinfo", paths: pathsOf(noDlsiteRows) })
-            }
-            busy={busy}
-            onFetch={() => void startFetch()}
-            onCancelFetch={() => void jobStore.cancel()}
-            onRegister={(apply) => void register(apply)}
-            onExclude={excludeSelected}
-          />
+              {virtualItems.map((virtualRow) => {
+                const row = visibleRows[virtualRow.index];
+                if (!row) return null;
+                const { candidate, display } = row;
+                return (
+                  <div
+                    key={candidate.path}
+                    style={{ ...getItemStyle(virtualRow), height: ROW_HEIGHT }}
+                  >
+                    <UnregisteredRow
+                      candidate={candidate}
+                      display={display}
+                      flagged={needsJudgment(row)}
+                      selected={isRowSelected(row, selection)}
+                      editing={editingPath === candidate.path}
+                      error={fieldErrors.get(candidate.path)}
+                      busy={busy}
+                      handlers={handlers}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </ScanListState>
+        {status === "ready" && (
+          <>
+            {errorMessage && (
+              <p
+                role="alert"
+                className="shrink-0 whitespace-pre-line border-t border-line-soft px-[18px] py-2 font-jp text-secondary text-[var(--state-danger)]"
+              >
+                {errorMessage}
+              </p>
+            )}
+            <UnregisteredFooter
+              plan={plan}
+              selectedCount={selectedVisible.length}
+              addCount={registerRows.length}
+              missingDlsiteCount={noDlsiteRows.length}
+              onFilterMissingDlsite={() =>
+                setFilter({ kind: "noinfo", paths: pathsOf(noDlsiteRows) })
+              }
+              busy={busy}
+              onFetch={() => void startFetch()}
+              onCancelFetch={() => void jobStore.cancel()}
+              onRegister={(apply) => void register(apply)}
+              onExclude={excludeSelected}
+            />
+          </>
+        )}
       </div>
     </div>
   );

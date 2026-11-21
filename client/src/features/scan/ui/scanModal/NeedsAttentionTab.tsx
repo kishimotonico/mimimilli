@@ -5,6 +5,7 @@ import { isFixable, type NeedsAttentionRow } from "../../model/needsAttention";
 import { deriveScanListStatus } from "../../model/scanListStatus";
 import { LIST_HEADING_ROW_CLASS } from "./listHeading";
 import ScanListState from "./ScanListState";
+import { useDisplayedScanListStatus } from "./useDisplayedScanListStatus";
 import {
   ReassignIdentityButton,
   ReloadWorkButton,
@@ -44,17 +45,18 @@ export default function NeedsAttentionTab({
   onOpenFiles,
   onOpenWorkDetail,
 }: NeedsAttentionTabProps) {
-  const status = deriveScanListStatus({ loading, error, count: rows.length });
+  const status = useDisplayedScanListStatus(
+    deriveScanListStatus({ loading, error, count: rows.length }),
+  );
 
   return (
-    <ScanListState status={status} emptyMessage="要対応の項目はありません" onRetry={onRetry}>
-      <div
-        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 行ごとに列の高さをそろえるため grid の div で組み、role で ARIA table 構造を与える
-        role="table"
-        aria-label="要対応"
-        className="flex min-h-0 flex-1 flex-col"
-      >
-        {/* oxlint-disable jsx-a11y/prefer-tag-over-role -- 同上 */}
+    <ScanListState
+      status={status}
+      emptyMessage="要対応の項目はありません"
+      onRetry={onRetry}
+      table={{ label: "要対応" }}
+      /* oxlint-disable jsx-a11y/prefer-tag-over-role -- 行ごとに列の高さをそろえるため grid の div で組み、role で ARIA table 構造を与える */
+      heading={
         <div role="rowgroup" className="shrink-0">
           <div role="row" className={cn(GRID_CLASS, LIST_HEADING_ROW_CLASS)}>
             {HEADINGS.map((heading) => (
@@ -64,43 +66,40 @@ export default function NeedsAttentionTab({
             ))}
           </div>
         </div>
-        <div role="rowgroup" className="min-h-0 flex-1 overflow-y-auto">
-          {rows.map((row) => (
-            <div
-              key={row.key}
-              role="row"
+      }
+    >
+      <div role="rowgroup" className="min-h-0 flex-1 overflow-y-auto">
+        {rows.map((row) => (
+          <div
+            key={row.key}
+            role="row"
+            className={cn(
+              GRID_CLASS,
+              "min-h-[54px] items-start border-b border-line-soft py-2.5 font-jp text-body",
+            )}
+          >
+            <span
+              role="cell"
               className={cn(
-                GRID_CLASS,
-                "min-h-[54px] items-start border-b border-line-soft py-2.5 font-jp text-body",
+                "whitespace-nowrap font-medium leading-[26px]",
+                isFixable(row) ? "text-[var(--state-danger)]" : "text-ink-1",
               )}
             >
-              <span
-                role="cell"
-                className={cn(
-                  "whitespace-nowrap font-medium leading-[26px]",
-                  isFixable(row) ? "text-[var(--state-danger)]" : "text-ink-1",
-                )}
-              >
-                {KIND_LABEL[row.kind]}
-              </span>
-              <div role="cell" className="min-w-0">
-                <TargetCell
-                  row={row}
-                  onOpenFiles={onOpenFiles}
-                  onOpenWorkDetail={onOpenWorkDetail}
-                />
-              </div>
-              <span role="cell" className="min-w-0 break-words pt-1 leading-normal text-ink-0">
-                {whatHappened(row)}
-              </span>
-              <div role="cell" className="min-w-0 text-secondary text-ink-1">
-                <RecommendedAction row={row} />
-              </div>
+              {KIND_LABEL[row.kind]}
+            </span>
+            <div role="cell" className="min-w-0">
+              <TargetCell row={row} onOpenFiles={onOpenFiles} onOpenWorkDetail={onOpenWorkDetail} />
             </div>
-          ))}
-        </div>
-        {/* oxlint-enable jsx-a11y/prefer-tag-over-role */}
+            <span role="cell" className="min-w-0 break-words pt-1 leading-normal text-ink-0">
+              {whatHappened(row)}
+            </span>
+            <div role="cell" className="min-w-0 text-secondary text-ink-1">
+              <RecommendedAction row={row} />
+            </div>
+          </div>
+        ))}
       </div>
+      {/* oxlint-enable jsx-a11y/prefer-tag-over-role */}
     </ScanListState>
   );
 }

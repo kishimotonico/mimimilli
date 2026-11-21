@@ -9,6 +9,7 @@ import { useVirtualList } from "../../../../../shared/ui/useVirtualList";
 import { deriveScanListStatus } from "../../../model/scanListStatus";
 import { LIST_HEADING_ROW_CLASS } from "../listHeading";
 import ScanListState from "../ScanListState";
+import { useDisplayedScanListStatus } from "../useDisplayedScanListStatus";
 import { useScanRecordWorks } from "../useScanRecordWorks";
 import { NEW_WORKS_GRID_CLASS, ROW_HEIGHT } from "./layout";
 import NewWorkRow from "./NewWorkRow";
@@ -33,31 +34,34 @@ export default function NewWorksTab({ onOpenFiles, onOpenWorkDetail }: NewWorksT
     infiniteScroll: { hasNextPage, isFetchingNextPage, onLoadMore: fetchNextPage },
   });
 
-  const status = deriveScanListStatus({
-    loading: loading || recordQuery.isPending,
-    error: error || (recordQuery.isError && recordQuery.data === undefined),
-    notScanned: recordQuery.data?.finishedAt === null,
-    count: total,
-  });
+  const status = useDisplayedScanListStatus(
+    deriveScanListStatus({
+      loading: loading || recordQuery.isPending,
+      error: error || (recordQuery.isError && recordQuery.data === undefined),
+      notScanned: recordQuery.data?.finishedAt === null,
+      count: total,
+    }),
+  );
   const retry = () => {
     if (recordQuery.isError) void recordQuery.refetch();
     if (error) refetch();
   };
 
   return (
-    <ScanListState status={status} emptyMessage="新規作品はありません" onRetry={retry}>
-      <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
+      {status === "ready" && (
         <SourceProjectionNotice
           projection={edit.projection}
           path={edit.projectionPath}
           onProjected={edit.applyProjected}
         />
-        <div
-          role="table"
-          aria-label="新規作品"
-          aria-rowcount={total + 1}
-          className="flex min-h-0 flex-1 flex-col"
-        >
+      )}
+      <ScanListState
+        status={status}
+        emptyMessage="新規作品はありません"
+        onRetry={retry}
+        table={{ label: "新規作品", rowCount: total + 1 }}
+        heading={
           <div role="rowgroup" className="shrink-0">
             <div role="row" className={cn(NEW_WORKS_GRID_CLASS, LIST_HEADING_ROW_CLASS)}>
               <span role="columnheader">カバー</span>
@@ -66,26 +70,27 @@ export default function NewWorksTab({ onOpenFiles, onOpenWorkDetail }: NewWorksT
               <span role="columnheader">DLsite</span>
             </div>
           </div>
-          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-            <div role="rowgroup" style={wrapperStyle}>
-              {virtualItems.map((virtualRow) => {
-                const work = works[virtualRow.index];
-                if (!work) return null;
-                return (
-                  <div key={work.id} style={{ ...getItemStyle(virtualRow), height: ROW_HEIGHT }}>
-                    <NewWorkRow
-                      work={work}
-                      edit={edit}
-                      onOpenFiles={onOpenFiles}
-                      onOpenWorkDetail={onOpenWorkDetail}
-                    />
-                  </div>
-                );
-              })}
-            </div>
+        }
+      >
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+          <div role="rowgroup" style={wrapperStyle}>
+            {virtualItems.map((virtualRow) => {
+              const work = works[virtualRow.index];
+              if (!work) return null;
+              return (
+                <div key={work.id} style={{ ...getItemStyle(virtualRow), height: ROW_HEIGHT }}>
+                  <NewWorkRow
+                    work={work}
+                    edit={edit}
+                    onOpenFiles={onOpenFiles}
+                    onOpenWorkDetail={onOpenWorkDetail}
+                  />
+                </div>
+              );
+            })}
           </div>
         </div>
-      </div>
-    </ScanListState>
+      </ScanListState>
+    </div>
   );
 }

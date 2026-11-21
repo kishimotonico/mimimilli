@@ -536,11 +536,18 @@ describe("ScanModal", () => {
       expect(within(within(tabpanel()).getByRole("status")).queryByRole("button")).toBeNull();
     });
 
-    it("未登録は、候補を読み込めていないあいだは空の表示を出さない", () => {
+    it("未登録は、候補を読み込めていないあいだは空の表示を出さない", async () => {
+      mockApi({
+        "GET /api/scan/candidates": () => new Promise<never>(() => {}),
+        "GET /api/scan/candidates/exclusions": { paths: [] },
+        "GET /api/scan/last": () => scanRecord,
+        "GET /api/scan/diagnostics": buildScanDiagnostics(),
+        "GET /api/works": () => buildWorksPage([], { total: 0 }),
+      });
       renderModal({ unseeded: ["candidates"], newCount: 0 });
       openTab("未登録");
 
-      expect(within(tabpanel()).getByText("読み込み中...")).toBeInTheDocument();
+      expect(await within(tabpanel()).findByText("読み込み中...")).toBeInTheDocument();
       expect(within(tabpanel()).queryByText("未登録の候補はありません")).toBeNull();
     });
 
@@ -584,11 +591,12 @@ describe("ScanModal", () => {
       expect(within(tabpanel()).queryByText("まだスキャンしていません")).toBeNull();
     });
 
-    it("要対応は、診断を読み込めていないあいだは空の表示を出さない", () => {
+    it("要対応は、診断を読み込めていないあいだは空の表示を出さない", async () => {
+      mockApi({ "GET /api/scan/diagnostics": () => new Promise<never>(() => {}) });
       renderModal({ unseeded: ["diagnostics"], candidates: [candidateDetected] });
       openTab("要対応");
 
-      expect(within(tabpanel()).getByText("読み込み中...")).toBeInTheDocument();
+      expect(await within(tabpanel()).findByText("読み込み中...")).toBeInTheDocument();
       expect(within(tabpanel()).queryByText("要対応の項目はありません")).toBeNull();
     });
 
