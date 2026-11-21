@@ -126,10 +126,7 @@ describe("needsJudgment / isRowSelected", () => {
     ]);
     expect(needsJudgment(row("f", null, { state: "none" }))).toBe(false);
     expect(
-      isRowSelected(
-        badCode,
-        new Map([["d", { selected: true, judged: true, rjCode: null, resultRevision: null }]]),
-      ),
+      isRowSelected(badCode, new Map([["d", { selected: true, judgment: "other", rjCode: null }]])),
     ).toBe(false);
   });
 
@@ -170,7 +167,7 @@ describe("judgmentCount", () => {
   });
 });
 
-describe("取得結果の revision と選択の上書き", () => {
+describe("判断の理由と選択の上書き", () => {
   const failed = row("a", "RJ000001", { state: "failed" }, 10);
   const picked = new Map([["a", selectionOverride(failed, true)]]);
 
@@ -200,5 +197,29 @@ describe("取得結果の revision と選択の上書き", () => {
     expect(isRowSelected(failedAgain, picked)).toBe(false);
     const retryFetching = row("a", "RJ000001", { state: "fetching" }, 10);
     expect(isRowSelected(retryFetching, picked)).toBe(true);
+  });
+
+  describe("行方不明の作品と同じRJコードの行", () => {
+    const missing = (display: CandidateDlsiteDisplay, resultRevision: number | null) => ({
+      ...row("m", "RJ000009", display, resultRevision),
+      candidate: buildScanCandidate({
+        path: "m",
+        rjCode: "RJ000009",
+        missingWorks: [{ workId: "w", title: "旧", previousPath: "old/path" }],
+      }),
+    });
+    const picked = new Map([["m", selectionOverride(missing({ state: "none" }, null), true)]]);
+
+    it("選んで取得し、成功しても選択が残る", () => {
+      expect(isRowSelected(missing({ state: "none" }, null), picked)).toBe(true);
+      expect(isRowSelected(missing({ state: "fetching" }, null), picked)).toBe(true);
+      expect(
+        isRowSelected(missing({ state: "fetched", title: "題", cover: null }, 20), picked),
+      ).toBe(true);
+    });
+
+    it("取得が失敗すると、失敗が判断の理由になって選択が外れる", () => {
+      expect(isRowSelected(missing({ state: "failed" }, 20), picked)).toBe(false);
+    });
   });
 });

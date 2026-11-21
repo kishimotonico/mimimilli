@@ -15,6 +15,8 @@ interface RjCodeCellProps {
   editing: boolean;
   error: RjCodeFieldError | undefined;
   disabled: boolean;
+  /** 保存の応答待ち。入力欄は値を変えられない */
+  saving: boolean;
   onStartEdit: () => void;
   onCommit: (value: string) => RjCodeCommitResult;
   onCancel: () => void;
@@ -27,6 +29,7 @@ export default function RjCodeCell({
   editing,
   error,
   disabled,
+  saving,
   onStartEdit,
   onCommit,
   onCancel,
@@ -42,6 +45,7 @@ export default function RjCodeCell({
         <RjCodeInput
           initialValue={error ? error.value : (rjCode ?? "")}
           invalid={Boolean(error)}
+          readOnly={saving}
           onCommit={onCommit}
           onCancel={onCancel}
         />
@@ -95,11 +99,13 @@ function RjCodeButton({
 function RjCodeInput({
   initialValue,
   invalid,
+  readOnly,
   onCommit,
   onCancel,
 }: {
   initialValue: string;
   invalid: boolean;
+  readOnly: boolean;
   onCommit: (value: string) => RjCodeCommitResult;
   onCancel: () => void;
 }) {
@@ -117,6 +123,7 @@ function RjCodeInput({
     <input
       ref={inputRef}
       value={value}
+      readOnly={readOnly}
       onChange={(event) => setValue(event.target.value)}
       onBlur={commit}
       onKeyDown={handleKeyDown}

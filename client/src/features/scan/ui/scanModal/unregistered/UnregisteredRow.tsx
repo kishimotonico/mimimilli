@@ -32,6 +32,8 @@ interface UnregisteredRowProps {
   busy: boolean;
   /** 別の行のRJコードを保存している間は、この行のRJコードの編集を始められない */
   rjCodeLocked: boolean;
+  /** この行のRJコードを保存している */
+  rjCodeSaving: boolean;
   handlers: UnregisteredRowHandlers;
 }
 
@@ -82,6 +84,7 @@ function UnregisteredRowView({
   error,
   busy,
   rjCodeLocked,
+  rjCodeSaving,
   handlers,
 }: UnregisteredRowProps) {
   const { path, rjCode } = candidate;
@@ -141,6 +144,7 @@ function UnregisteredRowView({
           editing={editing}
           error={error}
           disabled={busy || rjCodeLocked}
+          saving={rjCodeSaving}
           onStartEdit={() => handlers.onStartEdit(path)}
           onCommit={(value) => handlers.onCommitEdit(path, value)}
           onCancel={() => handlers.onCancelEdit(path)}
@@ -179,6 +183,7 @@ const UnregisteredRow = memo(
     previous.error === next.error &&
     previous.busy === next.busy &&
     previous.rjCodeLocked === next.rjCodeLocked &&
+    previous.rjCodeSaving === next.rjCodeSaving &&
     previous.handlers === next.handlers &&
     sameDisplay(previous.display, next.display),
 );

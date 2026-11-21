@@ -33,18 +33,19 @@ export function useNowPlayingImmersiveShell(
     focusTarget.current?.focus({ preventScroll: true });
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || e.defaultPrevented) return;
       if (document.querySelector(":modal")) return;
       e.preventDefault();
       onExitRef.current();
     };
-    document.addEventListener("keydown", handleKeyDown);
+    // 開いているポップオーバー（document で受ける）に先を譲るため、window で受ける
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
       shellSiblings.forEach((el, i) => {
         if (!wasInert[i]) el.removeAttribute("inert");
       });
-      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown);
       // 没入前のフォーカス元（カバー等）は通常表示側の AnimatePresence 境界ごと
       // アンマウントされていることがある。その場合は通常表示に必ず存在する
       // 切替アイコン（.mle-nowplaying__mode-toggle）へフォールバックする。

@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useStore } from "jotai";
+import { useLatest } from "../lib/useLatest";
 import { openModalDialogsAtom } from "../model/openModalDialogsAtom";
 
 interface Entry {
@@ -46,10 +47,8 @@ export function usePopoverEscape(
   getAnchor: () => HTMLElement | null,
   onEscape: () => void,
 ): void {
-  const getAnchorRef = useRef(getAnchor);
-  getAnchorRef.current = getAnchor;
-  const onEscapeRef = useRef(onEscape);
-  onEscapeRef.current = onEscape;
+  const getAnchorRef = useLatest(getAnchor);
+  const onEscapeRef = useLatest(onEscape);
   const store = useStore();
 
   useEffect(() => {
@@ -59,5 +58,5 @@ export function usePopoverEscape(
       close: () => onEscapeRef.current(),
       topmostModal: () => store.get(openModalDialogsAtom).slice(-1)[0] ?? null,
     });
-  }, [isOpen, store]);
+  }, [isOpen, store, getAnchorRef, onEscapeRef]);
 }

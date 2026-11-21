@@ -38,7 +38,7 @@ export default function UpdatedWorksTab({ onOpenFiles, onOpenWorkDetail }: Updat
     return { changesByWork: byWork, counts: kindCounts };
   }, [updatedWorks]);
 
-  // 件数が0になった種類の絞り込みは解除する
+  // 件数が0になった種類の絞り込みは、件数が戻っても復活しないよう state ごと解除する
   const kindGone = kind !== null && updatedWorks !== undefined && counts[kind] === 0;
   if (kindGone) setKind(null);
   const activeKind = kindGone ? null : kind;
@@ -109,7 +109,11 @@ export default function UpdatedWorksTab({ onOpenFiles, onOpenWorkDetail }: Updat
             })}
           </div>
           {nextPageError && (
-            <CollectionStatus variant="list" kind="error" onRetry={retryNextPage} />
+            <div role="row">
+              <div role="cell">
+                <CollectionStatus variant="list" kind="error" onRetry={retryNextPage} />
+              </div>
+            </div>
           )}
         </div>
       </ScanListState>

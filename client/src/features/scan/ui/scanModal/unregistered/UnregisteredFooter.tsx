@@ -39,6 +39,7 @@ export default function UnregisteredFooter({
   onExclude,
 }: UnregisteredFooterProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  // 主ボタンの役割が変わったら、項目選択を閉じる（戻ったときに開き直さない）
   const [pickerPlanKind, setPickerPlanKind] = useState(plan.kind);
   if (pickerPlanKind !== plan.kind) {
     setPickerPlanKind(plan.kind);

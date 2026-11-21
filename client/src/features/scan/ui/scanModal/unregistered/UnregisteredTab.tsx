@@ -95,7 +95,7 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
     () => (filter ? allRows.filter(({ candidate }) => filter.paths.has(candidate.path)) : allRows),
     [allRows, filter],
   );
-  // 固定した行がすべて無くなった絞り込みは解除する
+  // 固定した行がすべて無くなった絞り込みは、件数が戻っても復活しないよう state ごと解除する
   const filterGone = filter !== null && filteredRows.length === 0;
   if (filterGone) setFilter(null);
   const activeFilter = filterGone ? null : filter;
@@ -295,6 +295,7 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
                       error={fieldErrors.get(candidate.path)}
                       busy={busy}
                       rjCodeLocked={savingPath !== null && savingPath !== candidate.path}
+                      rjCodeSaving={savingPath === candidate.path}
                       handlers={handlers}
                     />
                   </div>

@@ -19,7 +19,14 @@ import NeedsAttentionTab from "./scanModal/NeedsAttentionTab";
 import NewWorksTab from "./scanModal/newWorks/NewWorksTab";
 import UpdatedWorksTab from "./scanModal/updated/UpdatedWorksTab";
 import { useNeedsAttentionRows } from "../model/useNeedsAttentionRows";
-import { computeScanTabCounts, landingTab, type ScanTabCounts } from "./scanModal/scanTabs";
+import {
+  computeScanTabCounts,
+  landingTab,
+  type ScanTabCounts,
+  type ScanTabPending,
+} from "./scanModal/scanTabs";
+import CollectionStatus from "../../../shared/ui/CollectionStatus";
+import { useDelayedLoading } from "../../../shared/ui/useDelayedLoading";
 import type { CandidatesRegisteredResult, ScanTabKey } from "./scanModal/types";
 
 interface ScanModalProps {
@@ -51,12 +58,14 @@ export default function ScanModal({
     newCount: newCountQuery.data,
     record: recordQuery.data,
   });
-  const countsSettled =
-    candidates.status !== "loading" &&
-    !needsAttention.loading &&
-    !recordQuery.isPending &&
-    !newCountQuery.isPending;
-  const [activeTab, setActiveTab] = useActiveTab(counts, countsSettled);
+  const pending: ScanTabPending = {
+    unregistered: candidates.status === "loading",
+    needsAttention: needsAttention.loading,
+    newWorks: newCountQuery.isPending,
+    updated: recordQuery.isPending,
+  };
+  const [activeTab, setActiveTab] = useActiveTab(counts, pending);
+  const landingLoading = useDelayedLoading(activeTab === null);
 
   const handleUnregisteredRegistered = ({
     registeredTitles,
@@ -88,7 +97,7 @@ export default function ScanModal({
       variant: coverNote ? "warning" : "success",
       priority: "notice",
     });
-    if (remainingCandidates === 0) setActiveTab("newWorks");
+    if (failedCount === 0 && !interrupted && remainingCandidates === 0) setActiveTab("newWorks");
   };
 
   const scanPending = recordQuery.data !== undefined && recordQuery.data.finishedAt === null;
@@ -122,6 +131,9 @@ export default function ScanModal({
           aria-labelledby={activeTab ? `scan-tab-${activeTab}` : undefined}
           className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
+          {activeTab === null && landingLoading === "visible" && (
+            <CollectionStatus variant="list" kind="loading" />
+          )}
           {activeTab === "unregistered" && (
             <UnregisteredTab
               onRegistered={handleUnregisteredRegistered}
@@ -143,25 +155,34 @@ export default function ScanModal({
   );
 }
 
-/** 開いたときは件数のあるタブへ着地する。件数がそろうまでは、どのタブも選ばない。
+/** 開いたときは件数のあるタブへ着地する。決まるまでは、どのタブも選ばない。
  *  スキャン完了後は、今のタブが空のときだけ同じ規則で移る。 */
 function useActiveTab(
   counts: ScanTabCounts,
-  settled: boolean,
+  pending: ScanTabPending,
 ): [ScanTabKey | null, (tab: ScanTabKey) => void] {
-  const [tab, setTab] = useState<ScanTabKey | null>(() => (settled ? landingTab(counts) : null));
+  const landing = landingTab(counts, pending);
+  const [tab, setTab] = useState<ScanTabKey | null>(landing);
   const refreshed = useAtomValue(scanResultsRefreshedAtom);
   const seenRefreshed = useRef(refreshed);
 
   useEffect(() => {
-    if (tab === null && settled) setTab(landingTab(counts));
-  }, [tab, settled, counts]);
+    if (tab === null && landing !== null) setTab(landing);
+  }, [tab, landing]);
 
+  // 完了を見たとき今のタブが空なら、着地が決まった時点で移る（後ろのタブの件数が未確定でも移動を落とさない）
+  const [moveNeeded, setMoveNeeded] = useState(false);
   useEffect(() => {
     if (seenRefreshed.current === refreshed) return;
     seenRefreshed.current = refreshed;
-    if (tab !== null && counts[tab] === 0) setTab(landingTab(counts));
+    if (tab !== null && counts[tab] === 0) setMoveNeeded(true);
   }, [refreshed, tab, counts]);
+
+  useEffect(() => {
+    if (!moveNeeded || landing === null) return;
+    setMoveNeeded(false);
+    if (tab !== null && counts[tab] === 0) setTab(landing);
+  }, [moveNeeded, landing, tab, counts]);
 
   return [tab, setTab];
 }

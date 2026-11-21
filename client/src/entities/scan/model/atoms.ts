@@ -10,15 +10,14 @@ export const scanModalOpenAtom = atom((get) => get(activeModalAtom)?.kind === "s
 export const scanResultsRefreshedAtom = atom(0);
 
 /** 未登録候補の選択の上書き。キーに無い候補は、その行の既定（判断が要る行は選ばず、それ以外は選ぶ）に従う。
- *  judged・rjCode・resultRevision は上書きしたときの行の状態。今の行と食い違えば（取得で該当なし・失敗になった、RJコードが変わった、取り直した）上書きは採らず既定に戻る。
- *  モーダルを閉じても残す。 */
+ *  judgment・rjCode は上書きしたときの行の状態。今の行と食い違えば（取得で該当なし・失敗になった、取り直して再び失敗した、RJコードが変わった）上書きは採らず既定に戻る。
+ *  モーダルを閉じても、候補から消えても残す（除外して戻した候補の選択が保たれる）。 */
 export interface ScanCandidateSelectionOverride {
   selected: boolean;
-  judged: boolean;
+  /** 判断が要る理由。要らなければ null */
+  judgment: string | null;
   /** 上書きしたときのRJコード */
   rjCode: string | null;
-  /** 上書きしたときに見ていた取得結果の revision。取得結果が無ければ null */
-  resultRevision: number | null;
 }
 export const scanCandidateSelectionAtom = atom<ReadonlyMap<string, ScanCandidateSelectionOverride>>(
   new Map(),

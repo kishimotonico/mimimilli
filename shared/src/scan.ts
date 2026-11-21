@@ -83,7 +83,7 @@ export const scanCandidatesRegisterRequestSchema = z.object({
     .refine((paths) => new Set(paths).size === paths.length, "候補パスが重複しています"),
   apply: dlsiteRegistrationApplySchema,
 });
-/** 除外済みの候補。rjCode はサーバーが持つ値で、直したRJコードがあればそれ。プールに無い候補は null */
+/** 除外済みの候補。rjCode はサーバーが持つ値で、直したRJコードがあればそれ。プールに無いパスはフォルダー名から検出した値（検出できなければ null） */
 export const scanCandidateExclusionSchema = z.object({
   path: workspacePathSchema,
   rjCode: z.string().nullable(),

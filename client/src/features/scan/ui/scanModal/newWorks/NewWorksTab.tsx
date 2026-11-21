@@ -82,7 +82,11 @@ export default function NewWorksTab({ onOpenFiles, onOpenWorkDetail }: NewWorksT
             })}
           </div>
           {nextPageError && (
-            <CollectionStatus variant="list" kind="error" onRetry={retryNextPage} />
+            <div role="row">
+              <div role="cell">
+                <CollectionStatus variant="list" kind="error" onRetry={retryNextPage} />
+              </div>
+            </div>
           )}
         </div>
       </ScanListState>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 import { useDismiss, useFloating, useInteractions } from "@floating-ui/react";
 import { FOCUSABLE_SELECTOR } from "./focusable";
+import { useLatest } from "../lib/useLatest";
 import { usePopoverEscape } from "./usePopoverEscape";
 
 export type PopoverCloseReason = "escape" | "outside" | "direct" | "scroll" | "focus-out";
@@ -76,8 +77,7 @@ export function usePopoverDismissal({
   closeOnScroll = false,
   closeOnFocusOut = false,
 }: UsePopoverDismissalOptions): UsePopoverDismissalResult {
-  const isOpenRef = useRef(isOpen);
-  isOpenRef.current = isOpen;
+  const isOpenRef = useLatest(isOpen);
   const closeInFlightRef = useRef(false);
 
   useEffect(() => {
@@ -91,7 +91,7 @@ export function usePopoverDismissal({
       refocusPopoverAnchorIfNeeded(anchorRef, boundaryRef, additionalBoundaryRefs);
       onClose(reason);
     },
-    [onClose, boundaryRef, additionalBoundaryRefs, anchorRef],
+    [onClose, boundaryRef, additionalBoundaryRefs, anchorRef, isOpenRef],
   );
 
   const { context, refs } = useFloating({

@@ -44,11 +44,14 @@ export function candidateDlsiteDisplay(
   return displayOf(candidate.dlsite);
 }
 
-/** 行が見ている取得結果の revision。選択の上書きが、取り直しで状態が入れ替わったかを知るのに使う */
+/** 行の表示に使った取得結果の revision（candidateDlsiteDisplay と同じく、候補とジョブの結果のうち大きい方）。選択の上書きが、取り直しで状態が入れ替わったかを知るのに使う */
 export function dlsiteResultRevision(
   candidate: ScanCandidate,
   job: DisplayJobState,
 ): number | null {
   if (candidate.rjCode === null) return null;
-  return job.results.get(canonicalDlsiteProductCode(candidate.rjCode))?.revision ?? null;
+  const result = job.results.get(canonicalDlsiteProductCode(candidate.rjCode));
+  return result && result.revision > candidate.dlsiteRevision
+    ? result.revision
+    : candidate.dlsiteRevision;
 }

@@ -39,16 +39,16 @@ export function isRowSelectable(row: CandidateRowModel): boolean {
 
 export type SelectionOverrides = ReadonlyMap<string, ScanCandidateSelectionOverride>;
 
-/** 上書きしたときの行と、判断が要るか・RJコードがそろっているときだけ採る。
- *  判断が要る行（失敗・該当なし）は、取得結果の revision もそろっているときだけ。取り直して再び失敗すれば revision が進み、上書きは外れる。
- *  判断が要らない行は結果が変わっても上書きを保つ（取得中に外した行が、取得の成功で選び直されない）。 */
+/** 判断が要らなければ null。判断の理由が取得結果（失敗・該当なし）ならその結果の revision まで含め、取り直して再び失敗すると別の値になる。
+ *  行方不明の作品と同じRJコードなどそれ以外の理由は、取得しても変わらない固定値。 */
+function judgmentKey(row: CandidateRowModel): string | null {
+  if (!needsJudgment(row)) return null;
+  return isProblemDisplay(row.display) ? `result:${row.resultRevision}` : "other";
+}
+
+/** 上書きしたときの行と、判断の理由・RJコードがそろっているときだけ採る。 */
 function overrideApplies(row: CandidateRowModel, override: ScanCandidateSelectionOverride) {
-  const judged = needsJudgment(row);
-  return (
-    override.judged === judged &&
-    override.rjCode === row.candidate.rjCode &&
-    (!judged || override.resultRevision === row.resultRevision)
-  );
+  return override.judgment === judgmentKey(row) && override.rjCode === row.candidate.rjCode;
 }
 
 export function isRowSelected(row: CandidateRowModel, overrides: SelectionOverrides): boolean {
@@ -63,9 +63,8 @@ export function selectionOverride(
 ): ScanCandidateSelectionOverride {
   return {
     selected,
-    judged: needsJudgment(row),
+    judgment: judgmentKey(row),
     rjCode: row.candidate.rjCode,
-    resultRevision: row.resultRevision,
   };
 }
 

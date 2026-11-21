@@ -4,7 +4,10 @@ import type {
   DlsiteJobCodeView,
   DlsiteJobState,
 } from "../../src/entities/dlsite/model/dlsiteJobStore";
-import { candidateDlsiteDisplay } from "../../src/features/scan/model/unregisteredDlsite";
+import {
+  candidateDlsiteDisplay,
+  dlsiteResultRevision,
+} from "../../src/features/scan/model/unregisteredDlsite";
 import { dlsiteFetchFrame } from "../../src/entities/dlsite/model/dlsiteFetchFrame";
 
 const cover = { key: "k", version: "v" } as never;
@@ -140,6 +143,20 @@ describe("candidateDlsiteDisplay", () => {
     expect(candidateDlsiteDisplay(candidate("RJ000001", { state: "failed" }), state)).toEqual({
       state: "fetching",
     });
+  });
+});
+
+describe("dlsiteResultRevision", () => {
+  const result = (revision: number) => ({
+    ...empty,
+    results: new Map([["RJ000001", { dlsite: { state: "failed" as const }, revision }]]),
+  });
+
+  it("表示に使う側（候補とジョブの結果のうち revision の大きい方）の revision を返す", () => {
+    const failed = candidate("RJ000001", { state: "failed" }, 15);
+    expect(dlsiteResultRevision(failed, result(12))).toBe(15);
+    expect(dlsiteResultRevision(failed, result(20))).toBe(20);
+    expect(dlsiteResultRevision(candidate(null, { state: "none" }, 15), result(20))).toBeNull();
   });
 });
 

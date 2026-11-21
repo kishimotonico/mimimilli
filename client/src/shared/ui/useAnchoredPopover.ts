@@ -19,6 +19,7 @@ import {
   useInteractions,
 } from "@floating-ui/react";
 import type { Boundary, Placement } from "@floating-ui/react";
+import { useLatest } from "../lib/useLatest";
 import { usePopoverEscape } from "./usePopoverEscape";
 import {
   isInsideBoundaries,
@@ -134,8 +135,7 @@ export function useAnchoredPopover({
 }: UseAnchoredPopoverOptions): UseAnchoredPopoverResult {
   const referenceRef = useRef<HTMLElement | null>(null);
   const floatingNodeRef = useRef<HTMLElement | null>(null);
-  const isOpenRef = useRef(isOpen);
-  isOpenRef.current = isOpen;
+  const isOpenRef = useLatest(isOpen);
   const closeInFlightRef = useRef(false);
   const [containerWidth, setContainerWidth] = useState(preferredWidth);
   const [popoverWidth, setPopoverWidth] = useState(preferredWidth);
@@ -160,7 +160,7 @@ export function useAnchoredPopover({
       refocusPopoverAnchorIfNeeded(referenceRef, boundaryRef, dismissalBoundaryRefs);
       onClose(reason);
     },
-    [onClose, boundaryRef, dismissalBoundaryRefs],
+    [onClose, boundaryRef, dismissalBoundaryRefs, isOpenRef],
   );
 
   const resolveBoundary = (): Boundary => {
