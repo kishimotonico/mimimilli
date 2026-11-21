@@ -1,5 +1,5 @@
-// スキャンモーダルの左リスト⇄各タブの境界契約。親（ScanModal）がデータ取得・状態を持ち、
-// 各タブコンポーネントはここで定義した props だけを受け取る。
+// スキャンモーダルの左リスト⇄各タブの境界契約。各タブは自分で必要なデータを読んで一覧の状態を導き、
+// 親（ScanModal）へは縦タブの件数と着地タブの判定に要るもの以外を渡さない。
 
 export type ScanTabKey = "unregistered" | "newWorks" | "needsAttention" | "updated";
 
@@ -24,8 +24,8 @@ export interface CandidatesRegisteredResult {
   /** 追加できた作品のうち、選んだカバーを適用できなかったもの */
   coverSkippedTitles: string[];
   failedCount: number;
-  /** 追加のあと未登録に残る候補の件数 */
-  remainingCount: number;
+  /** 追加のあとに取り直した、未登録に残る候補の件数。取り直せなかった・追加できたものがないときは null */
+  remainingCandidates: number | null;
   /** 途中で止まったか（候補の変更など） */
   interrupted: boolean;
 }

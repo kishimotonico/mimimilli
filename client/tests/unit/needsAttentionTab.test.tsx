@@ -3,11 +3,11 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { workspacePath } from "@mimimilli/shared";
+import { workspacePath, type ScanDiagnostics } from "@mimimilli/shared";
 import NeedsAttentionTab, {
   type NeedsAttentionTabProps,
 } from "../../src/features/scan/ui/scanModal/NeedsAttentionTab";
-import { buildNeedsAttentionRows } from "../../src/features/scan/model/needsAttention";
+import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import { apiError, apiNoContent, mockApi } from "../helpers/api";
 import {
@@ -16,41 +16,41 @@ import {
   buildWorkSourceMutationResult,
 } from "../helpers/builders";
 
-const rows = buildNeedsAttentionRows(
-  buildScanDiagnostics({
-    identityConflicts: [
-      {
-        kind: "identity_conflict",
-        registeredTitle: "登録済みの作品",
-        registeredPath: workspacePath("dlsite/a"),
-        workId: "RJ501001",
-        paths: [workspacePath("dlsite/a"), workspacePath("dlsite/b")],
-      },
-    ],
-    invalidMetaFiles: [
-      {
-        path: workspacePath("broken/mimimilli.json"),
-        message: "mimimilli.json 12行目: カンマが足りない",
-      },
-    ],
-    unreadablePaths: [workspacePath("locked")],
-    dataIntegrityWorks: [{ workId: "work-int", title: "壊れた作品" }],
-    missingWorks: [
-      { workId: "work-miss", title: "消えた作品", previousPath: workspacePath("old/place") },
-    ],
-  }),
-);
+const diagnostics = buildScanDiagnostics({
+  identityConflicts: [
+    {
+      kind: "identity_conflict",
+      registeredTitle: "登録済みの作品",
+      registeredPath: workspacePath("dlsite/a"),
+      workId: "RJ501001",
+      paths: [workspacePath("dlsite/a"), workspacePath("dlsite/b")],
+    },
+  ],
+  invalidMetaFiles: [
+    {
+      path: workspacePath("broken/mimimilli.json"),
+      message: "mimimilli.json 12行目: カンマが足りない",
+    },
+  ],
+  unreadablePaths: [workspacePath("locked")],
+  dataIntegrityWorks: [{ workId: "work-int", title: "壊れた作品" }],
+  missingWorks: [
+    { workId: "work-miss", title: "消えた作品", previousPath: workspacePath("old/place") },
+  ],
+});
 
-function renderTab(overrides: Partial<NeedsAttentionTabProps> = {}) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderTab(
+  overrides: Partial<NeedsAttentionTabProps> & { diagnostics?: ScanDiagnostics | null } = {},
+) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+  });
+  const { diagnostics: seeded = diagnostics, ...tabOverrides } = overrides;
+  if (seeded) queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), seeded);
   const props: NeedsAttentionTabProps = {
-    rows,
-    loading: false,
-    error: false,
-    onRetry: vi.fn(),
     onOpenFiles: vi.fn(),
     onOpenWorkDetail: vi.fn(),
-    ...overrides,
+    ...tabOverrides,
   };
   render(
     createElement(
@@ -118,16 +118,14 @@ describe("NeedsAttentionTab", () => {
 
   it("行番号のない診断でも、ファイル名だけを等幅で出して文はそのまま出す", () => {
     renderTab({
-      rows: buildNeedsAttentionRows(
-        buildScanDiagnostics({
-          invalidMetaFiles: [
-            {
-              path: workspacePath("a/b.mimimilli.json"),
-              message: "b.mimimilli.json: 作品ID x が別の作品情報ファイルと重複している",
-            },
-          ],
-        }),
-      ),
+      diagnostics: buildScanDiagnostics({
+        invalidMetaFiles: [
+          {
+            path: workspacePath("a/b.mimimilli.json"),
+            message: "b.mimimilli.json: 作品ID x が別の作品情報ファイルと重複している",
+          },
+        ],
+      }),
     });
     const cell = rowOf("読み取り失敗").getAllByRole("cell")[2]!;
     expect(cell).toHaveTextContent(
@@ -175,19 +173,17 @@ describe("NeedsAttentionTab", () => {
       "GET /api/scan/last": buildScanRecord(),
     });
     renderTab({
-      rows: buildNeedsAttentionRows(
-        buildScanDiagnostics({
-          identityConflicts: [
-            {
-              kind: "identity_conflict",
-              registeredTitle: "登録済み",
-              registeredPath: workspacePath("reg/a"),
-              workId: "w",
-              paths: [workspacePath("reg/a"), workspacePath("copy/b"), workspacePath("copy/c")],
-            },
-          ],
-        }),
-      ),
+      diagnostics: buildScanDiagnostics({
+        identityConflicts: [
+          {
+            kind: "identity_conflict",
+            registeredTitle: "登録済み",
+            registeredPath: workspacePath("reg/a"),
+            workId: "w",
+            paths: [workspacePath("reg/a"), workspacePath("copy/b"), workspacePath("copy/c")],
+          },
+        ],
+      }),
     });
     const buttons = screen.getAllByRole("button", { name: "別の作品として取り込む" });
     expect(buttons).toHaveLength(1);
@@ -198,19 +194,17 @@ describe("NeedsAttentionTab", () => {
   it("登録済みのパスが診断にないID重複は、作品名で作品詳細を開く", async () => {
     const user = userEvent.setup();
     const props = renderTab({
-      rows: buildNeedsAttentionRows(
-        buildScanDiagnostics({
-          identityConflicts: [
-            {
-              kind: "identity_conflict",
-              registeredTitle: "登録済みの作品",
-              registeredPath: null,
-              workId: "w",
-              paths: [workspacePath("x"), workspacePath("y")],
-            },
-          ],
-        }),
-      ),
+      diagnostics: buildScanDiagnostics({
+        identityConflicts: [
+          {
+            kind: "identity_conflict",
+            registeredTitle: "登録済みの作品",
+            registeredPath: null,
+            workId: "w",
+            paths: [workspacePath("x"), workspacePath("y")],
+          },
+        ],
+      }),
     });
     await user.click(screen.getByRole("button", { name: "登録済みの作品" }));
     expect(props.onOpenWorkDetail).toHaveBeenCalledWith("w");
@@ -218,19 +212,17 @@ describe("NeedsAttentionTab", () => {
 
   it("登録済みの作品名が読めないID重複は、登録済みのパスを出す", () => {
     renderTab({
-      rows: buildNeedsAttentionRows(
-        buildScanDiagnostics({
-          identityConflicts: [
-            {
-              kind: "identity_conflict",
-              registeredTitle: null,
-              registeredPath: workspacePath("x"),
-              workId: "w",
-              paths: [workspacePath("x"), workspacePath("y")],
-            },
-          ],
-        }),
-      ),
+      diagnostics: buildScanDiagnostics({
+        identityConflicts: [
+          {
+            kind: "identity_conflict",
+            registeredTitle: null,
+            registeredPath: workspacePath("x"),
+            workId: "w",
+            paths: [workspacePath("x"), workspacePath("y")],
+          },
+        ],
+      }),
     });
     const registered = rowOf("ID重複").getByText("登録済み").parentElement!;
     expect(within(registered).getByRole("button", { name: "x" })).toBeInTheDocument();
@@ -238,19 +230,17 @@ describe("NeedsAttentionTab", () => {
 
   it("登録済みの作品が無いID重複は、未登録として先頭のパスを取り込める", () => {
     renderTab({
-      rows: buildNeedsAttentionRows(
-        buildScanDiagnostics({
-          identityConflicts: [
-            {
-              kind: "identity_conflict",
-              registeredTitle: null,
-              registeredPath: null,
-              workId: "w",
-              paths: [workspacePath("x"), workspacePath("y")],
-            },
-          ],
-        }),
-      ),
+      diagnostics: buildScanDiagnostics({
+        identityConflicts: [
+          {
+            kind: "identity_conflict",
+            registeredTitle: null,
+            registeredPath: null,
+            workId: "w",
+            paths: [workspacePath("x"), workspacePath("y")],
+          },
+        ],
+      }),
     });
     expect(screen.queryByText("登録済み")).toBeNull();
     expect(screen.getAllByRole("button", { name: "別の作品として取り込む" })).toHaveLength(1);
@@ -265,22 +255,20 @@ describe("NeedsAttentionTab", () => {
       "GET /api/scan/last": buildScanRecord(),
     });
     renderTab({
-      rows: buildNeedsAttentionRows(
-        buildScanDiagnostics({
-          identityConflicts: [
-            {
-              kind: "identity_conflict",
-              registeredTitle: "単一",
-              registeredPath: workspacePath("a/single.mimimilli.json"),
-              workId: "w",
-              paths: [
-                workspacePath("a/single.mimimilli.json"),
-                workspacePath("b/single.mimimilli.json"),
-              ],
-            },
-          ],
-        }),
-      ),
+      diagnostics: buildScanDiagnostics({
+        identityConflicts: [
+          {
+            kind: "identity_conflict",
+            registeredTitle: "単一",
+            registeredPath: workspacePath("a/single.mimimilli.json"),
+            workId: "w",
+            paths: [
+              workspacePath("a/single.mimimilli.json"),
+              workspacePath("b/single.mimimilli.json"),
+            ],
+          },
+        ],
+      }),
     });
     await user.click(screen.getByRole("button", { name: "別の作品として取り込む" }));
     await user.click(await screen.findByRole("button", { name: "取り込む" }));
@@ -320,9 +308,9 @@ describe("NeedsAttentionTab", () => {
 
   it("データ不整合は作品名を出し、タイトルが読めないときは作品IDだけを出す", () => {
     renderTab({
-      rows: buildNeedsAttentionRows(
-        buildScanDiagnostics({ dataIntegrityWorks: [{ workId: "work-untitled", title: null }] }),
-      ),
+      diagnostics: buildScanDiagnostics({
+        dataIntegrityWorks: [{ workId: "work-untitled", title: null }],
+      }),
     });
     const row = rowOf("データ不整合");
     expect(row.getByText("work-untitled")).toBeInTheDocument();
@@ -409,11 +397,9 @@ describe("NeedsAttentionTab", () => {
 
   it("rootの外にあった行方不明の作品は、タイトルだけを出しパスは出さない", () => {
     renderTab({
-      rows: buildNeedsAttentionRows(
-        buildScanDiagnostics({
-          missingWorks: [{ workId: "work-out", title: "外にあった作品", previousPath: null }],
-        }),
-      ),
+      diagnostics: buildScanDiagnostics({
+        missingWorks: [{ workId: "work-out", title: "外にあった作品", previousPath: null }],
+      }),
     });
     expect(screen.getByRole("button", { name: "外にあった作品" })).toBeInTheDocument();
     expect(screen.queryByText("null")).toBeNull();
@@ -422,12 +408,12 @@ describe("NeedsAttentionTab", () => {
 
   it("行が無ければ空状態、読み込み中・失敗は状態表示にする", async () => {
     const user = userEvent.setup();
-    const empty = renderTab({ rows: [] });
+    renderTab({ diagnostics: buildScanDiagnostics() });
     expect(screen.getByText("要対応の項目はありません")).toBeInTheDocument();
     cleanup();
-    const failed = renderTab({ rows: [], error: true });
-    await user.click(screen.getByRole("button", { name: "再試行" }));
-    expect(failed.onRetry).toHaveBeenCalledOnce();
-    expect(empty.onRetry).not.toHaveBeenCalled();
+    const api = mockApi({ "GET /api/scan/diagnostics": apiError(500, "internal_error") });
+    renderTab({ diagnostics: null });
+    await user.click(await screen.findByRole("button", { name: "再試行" }));
+    await waitFor(() => expect(api.requestsTo("GET /api/scan/diagnostics")).toHaveLength(2));
   });
 });

@@ -26,7 +26,11 @@ export function createFakeScanJobStore(initial: Partial<ScanJobState> = {}) {
     clearError: vi.fn(),
     reset: vi.fn(),
     setState: store.setState,
-  } satisfies ScanJobStore & { setState: typeof store.setState };
+    emit: events.emit,
+  } satisfies ScanJobStore & {
+    setState: typeof store.setState;
+    emit: typeof events.emit;
+  };
   return fake;
 }
 

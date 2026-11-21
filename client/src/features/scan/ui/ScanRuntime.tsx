@@ -3,7 +3,7 @@ import { useStore } from "jotai";
 import { useEffect } from "react";
 import { SETTINGS_QUERY_KEYS } from "../../../entities/settings/queryKeys";
 import { SCAN_QUERY_KEYS } from "../api";
-import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
+import { refreshScanCandidatesQuietly } from "../../../entities/scan/scanCandidatesCache";
 import { updateCachesAfterLibraryScan } from "../../../entities/work/model/workCacheUpdates";
 import { activeModalAtom } from "../../../shared/model/activeModalAtom";
 import { scanRecordQueryOptions } from "../../../entities/scan/queryOptions";
@@ -113,7 +113,7 @@ export default function ScanRuntime() {
   // 失敗は候補クエリのエラー状態に残り、未登録タブが読み込み失敗として再試行つきで出す。
   useEffect(() => {
     if (queryClient.getQueryData(SCAN_QUERY_KEYS.candidates()) !== undefined) return;
-    refreshScanCandidates(queryClient).catch(() => undefined);
+    void refreshScanCandidatesQuietly(queryClient);
   }, [queryClient]);
 
   // リロード後も実行中のジョブへ再接続する

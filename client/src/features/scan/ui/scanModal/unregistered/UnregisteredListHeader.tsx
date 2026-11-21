@@ -30,7 +30,6 @@ export default function UnregisteredListHeader({
             ref={checkboxRef}
             type="checkbox"
             aria-label="すべて選択"
-            data-select-all
             className="size-3.5"
             checked={allSelected}
             disabled={selectAllDisabled}

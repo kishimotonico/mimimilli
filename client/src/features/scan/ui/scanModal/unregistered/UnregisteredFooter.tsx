@@ -16,6 +16,8 @@ interface UnregisteredFooterProps {
   missingDlsiteCount: number;
   onFilterMissingDlsite: () => void;
   busy: boolean;
+  /** RJコードを保存している間は、その値に依存する取得と追加を止める */
+  rjCodeSaving: boolean;
   onFetch: () => void;
   onCancelFetch: () => void;
   onRegister: (apply: DlsiteRegistrationApply) => void;
@@ -29,15 +31,21 @@ export default function UnregisteredFooter({
   missingDlsiteCount,
   onFilterMissingDlsite,
   busy,
+  rjCodeSaving,
   onFetch,
   onCancelFetch,
   onRegister,
   onExclude,
 }: UnregisteredFooterProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerPlanKind, setPickerPlanKind] = useState(plan.kind);
+  if (pickerPlanKind !== plan.kind) {
+    setPickerPlanKind(plan.kind);
+    setPickerOpen(false);
+  }
   const anchorRef = useRef<HTMLDivElement>(null);
 
-  const addable = !busy && addCount > 0;
+  const addable = !busy && !rjCodeSaving && addCount > 0;
   const items: SplitButtonItem[] = [];
   if (plan.kind === "fetch") {
     items.push({
@@ -89,7 +97,7 @@ export default function UnregisteredFooter({
             size="md"
             className="min-w-[200px]"
             disabled={busy || selectedCount === 0}
-            primaryDisabled={plan.kind === "add" && !addable}
+            primaryDisabled={rjCodeSaving || (plan.kind === "add" && !addable)}
             onClick={() => (plan.kind === "fetch" ? onFetch() : onRegister(REGISTER_APPLY_ALL))}
             items={items}
           >

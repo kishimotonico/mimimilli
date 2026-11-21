@@ -9,7 +9,7 @@ import { WORK_QUERY_KEYS } from "../../entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../entities/tag/queryKeys";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../entities/file-system/queryKeys";
-import { refreshScanCandidates } from "../../entities/scan/scanCandidatesCache";
+import { refreshScanCandidatesQuietly } from "../../entities/scan/scanCandidatesCache";
 
 // entities/scan/queryKeys.ts の全キー（last/candidates/candidateExclusions/diagnostics）は
 // すべて["scan", ...]配下なので、ルートの["scan"]だけで丸ごと対象にできる
@@ -121,7 +121,7 @@ export function createRootReconfigurationController(
     if (settings?.rootReconfiguration.status !== "idle") return;
     leavePending = false;
     resetReconfigurationAffectedQueries(queryClient);
-    void refreshScanCandidates(queryClient).catch(() => {});
+    void refreshScanCandidatesQuietly(queryClient);
   };
 
   return {

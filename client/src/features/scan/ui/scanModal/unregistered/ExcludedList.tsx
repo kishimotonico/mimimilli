@@ -11,12 +11,21 @@ const EXCLUDED_GRID_CLASS =
 
 interface ExcludedListProps {
   paths: readonly string[];
+  /** 除外済みを読めていない間は loading、失敗は error。読めたあとは loaded のまま */
+  status: "loading" | "error" | "loaded";
+  onRetry: () => void;
   onBack: () => void;
   onRestore: (path: string) => Promise<void>;
 }
 
 /** 除外した候補の一覧。行ごとに未登録の一覧へ戻せる。 */
-export default function ExcludedList({ paths, onBack, onRestore }: ExcludedListProps) {
+export default function ExcludedList({
+  paths,
+  status,
+  onRetry,
+  onBack,
+  onRestore,
+}: ExcludedListProps) {
   const [restoring, setRestoring] = useState(false);
   const backRef = useRef<HTMLButtonElement>(null);
   useEffect(() => backRef.current?.focus(), []);
@@ -43,10 +52,17 @@ export default function ExcludedList({ paths, onBack, onRestore }: ExcludedListP
           未登録
         </Button>
         <span className="font-jp text-body font-bold text-ink-0">
-          除外済み <span className="font-mono font-normal text-ink-2">{paths.length}</span>
+          除外済み{" "}
+          {status === "loaded" && (
+            <span className="font-mono font-normal text-ink-2">{paths.length}</span>
+          )}
         </span>
       </div>
-      {paths.length === 0 ? (
+      {status === "loading" ? (
+        <CollectionStatus variant="list" kind="loading" />
+      ) : status === "error" ? (
+        <CollectionStatus variant="list" kind="error" onRetry={onRetry} />
+      ) : paths.length === 0 ? (
         <CollectionStatus variant="list" kind="empty" message="除外した候補はありません" />
       ) : (
         <>

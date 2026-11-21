@@ -7,10 +7,12 @@ import {
   getScanCandidateExclusions,
   restoreScanCandidateExclusions,
 } from "../../../entities/scan/api";
-import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
+import { refreshScanCandidatesQuietly } from "../../../entities/scan/scanCandidatesCache";
 import { excludeScanCandidates, SCAN_QUERY_KEYS } from "../api";
 import { isCandidatesStale, STALE_MESSAGE } from "./candidatesStale";
 import { formatWorkNames } from "./formatWorkNames";
+
+const NO_EXCLUSIONS: string[] = [];
 
 interface UseCandidateExclusionsOptions {
   onExcludeError: (message: string) => void;
@@ -32,7 +34,7 @@ export function useCandidateExclusions({ onExcludeError }: UseCandidateExclusion
   const refresh = useCallback(
     () =>
       Promise.all([
-        refreshScanCandidates(queryClient).catch(() => {}),
+        refreshScanCandidatesQuietly(queryClient),
         queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidateExclusions() }),
       ]),
     [queryClient],
@@ -77,7 +79,7 @@ export function useCandidateExclusions({ onExcludeError }: UseCandidateExclusion
     onError: async (error) => {
       if (isCandidatesStale(error)) {
         onExcludeError(STALE_MESSAGE);
-        await refreshScanCandidates(queryClient).catch(() => {});
+        await refreshScanCandidatesQuietly(queryClient);
         return;
       }
       onExcludeError(apiErrorMessage(error, "除外できませんでした"));
@@ -97,8 +99,14 @@ export function useCandidateExclusions({ onExcludeError }: UseCandidateExclusion
     [restore, toast],
   );
 
+  const status: "loading" | "error" | "loaded" =
+    exclusionsQuery.data !== undefined ? "loaded" : exclusionsQuery.isError ? "error" : "loading";
+
   return {
-    exclusions: exclusionsQuery.data ?? [],
+    exclusions: exclusionsQuery.data ?? NO_EXCLUSIONS,
+    /** 読めたあとは、更新の失敗があっても loaded のまま */
+    status,
+    retry: () => void exclusionsQuery.refetch(),
     exclude: excludeMutation.mutate,
     excluding: excludeMutation.isPending,
     restore: restoreFromList,

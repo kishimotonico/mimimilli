@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
+import { refreshScanCandidatesQuietly } from "../../../entities/scan/scanCandidatesCache";
 import { updateCachesAfterDlsiteFetch } from "../../../entities/work/model/workCacheUpdates";
 import { useDlsiteJobState, useDlsiteJobStore } from "../../../entities/dlsite/useDlsiteJob";
 import { useToast } from "../../../shared/ui/useToast";
@@ -26,7 +26,7 @@ export default function DlsiteJobRuntime() {
       }
       for (const { code } of event.codes) pending.add(code);
       if (event.codes.some(({ known }) => !known)) {
-        void refreshScanCandidates(queryClient).catch(() => {});
+        void refreshScanCandidatesQuietly(queryClient);
       }
     });
     return unsubscribe;

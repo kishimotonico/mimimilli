@@ -73,3 +73,11 @@ export function refreshScanCandidates(
   latestRefreshes.set(queryClient, { ticket, promise: run });
   return run;
 }
+
+/** 取り直しの失敗を握り、失敗は候補クエリのエラー状態に任せる。失敗したときは null */
+export function refreshScanCandidatesQuietly(
+  queryClient: QueryClient,
+  options: { replace?: ScanCandidate } = {},
+): Promise<ScanCandidatesResponse | null> {
+  return refreshScanCandidates(queryClient, options).catch(() => null);
+}

@@ -2,11 +2,8 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScanListStatus } from "../../src/features/scan/model/scanListStatus";
 import ScanListState from "../../src/features/scan/ui/scanModal/ScanListState";
-import {
-  LOADING_DELAY_MS,
-  LOADING_MIN_VISIBLE_MS,
-  useDisplayedScanListStatus,
-} from "../../src/features/scan/ui/scanModal/useDisplayedScanListStatus";
+import { useDisplayedScanListStatus } from "../../src/features/scan/ui/scanModal/useDisplayedScanListStatus";
+import { LOADING_DELAY_MS, LOADING_MIN_VISIBLE_MS } from "../../src/shared/ui/useDelayedLoading";
 
 function Harness({ status }: { status: ScanListStatus }) {
   const displayed = useDisplayedScanListStatus(status);

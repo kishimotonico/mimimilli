@@ -2,6 +2,7 @@ import { pathBaseName, type WorkspacePath } from "@mimimilli/shared";
 import type { ReactNode } from "react";
 import { cn } from "../../../../shared/lib/cn";
 import { isFixable, type NeedsAttentionRow } from "../../model/needsAttention";
+import { useNeedsAttentionRows } from "../../model/useNeedsAttentionRows";
 import { deriveScanListStatus } from "../../model/scanListStatus";
 import { LIST_HEADING_ROW_CLASS } from "./listHeading";
 import ScanListState from "./ScanListState";
@@ -14,10 +15,6 @@ import {
 import { PathLink, WorkTitleLink } from "./ScanLinks";
 
 export interface NeedsAttentionTabProps {
-  rows: NeedsAttentionRow[];
-  loading: boolean;
-  error: boolean;
-  onRetry: () => void;
   onOpenFiles: (path: WorkspacePath) => void;
   onOpenWorkDetail: (workId: string) => void;
 }
@@ -30,6 +27,7 @@ const KIND_LABEL: Record<NeedsAttentionRow["kind"], string> = {
   missingWork: "行方不明",
 };
 
+const NO_ROWS: NeedsAttentionRow[] = [];
 const HEADINGS = ["種類", "対象", "起きていること", "推奨アクション"];
 const GRID_CLASS =
   "grid gap-x-3.5 px-[18px] [grid-template-columns:84px_minmax(0,1fr)_minmax(0,0.7fr)_148px]";
@@ -38,13 +36,10 @@ const LINES_CLASS = "flex min-w-0 flex-col gap-[3px]";
 const ID_CLASS = "mll-selectable truncate font-mono text-secondary text-ink-2";
 
 export default function NeedsAttentionTab({
-  rows,
-  loading,
-  error,
-  onRetry,
   onOpenFiles,
   onOpenWorkDetail,
 }: NeedsAttentionTabProps) {
+  const { rows = NO_ROWS, loading, error, retry } = useNeedsAttentionRows();
   const status = useDisplayedScanListStatus(
     deriveScanListStatus({ loading, error, count: rows.length }),
   );
@@ -53,7 +48,7 @@ export default function NeedsAttentionTab({
     <ScanListState
       status={status}
       emptyMessage="要対応の項目はありません"
-      onRetry={onRetry}
+      onRetry={retry}
       table={{ label: "要対応" }}
       /* oxlint-disable jsx-a11y/prefer-tag-over-role -- 行ごとに列の高さをそろえるため grid の div で組み、role で ARIA table 構造を与える */
       heading={

@@ -10,7 +10,7 @@ interface ScanListStateProps {
   onRetry: () => void;
   /** ready の一覧の ARIA table */
   table: { label: string; rowCount?: number };
-  /** 一覧の上に出す固定の帯。スケルトンと ready のときだけ、同じ位置に出す */
+  /** 列見出しの行。スケルトンと ready のときだけ、同じ位置に出す。スケルトン中は表の構造を持たない装飾 */
   heading?: ReactNode;
   children: ReactNode;
 }
@@ -30,7 +30,9 @@ export default function ScanListState({
     case "loading":
       return (
         <div className="flex min-h-0 flex-1 flex-col">
-          {heading}
+          <div inert className="shrink-0">
+            {heading}
+          </div>
           <div className="flex min-h-0 flex-1 flex-col">
             <CollectionStatus variant="list" kind="loading" />
           </div>

@@ -4,7 +4,7 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ApiRequestError } from "../../src/shared/api/http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type ScanCandidate, type ScanCandidatesResponse } from "@mimimilli/shared";
+import { type ScanCandidate } from "@mimimilli/shared";
 import type { ScanCandidatesRegisterOutcome } from "../../src/entities/work/api";
 import UnregisteredTab from "../../src/features/scan/ui/scanModal/unregistered/UnregisteredTab";
 import GlobalToast from "../../src/app/ui/GlobalToast";
@@ -15,7 +15,6 @@ import * as scanCandidatesCache from "../../src/entities/scan/scanCandidatesCach
 import { scanCandidateSelectionAtom } from "../../src/entities/scan/model/atoms";
 import { dlsiteJobStoreAtom } from "../../src/entities/dlsite/model/dlsiteJobStore";
 import { mockApi } from "../helpers/api";
-import { useScanCandidatesState } from "../../src/features/scan/model/useScanCandidatesCache";
 import { useScanSelectionPruning } from "../../src/features/scan/model/useScanSelectionPruning";
 import { buildScanCandidate } from "../helpers/builders";
 import { createFakeDlsiteJobStore } from "../helpers/fakeJobStores";
@@ -62,6 +61,10 @@ async function renderUnmountableTab(candidates: ScanCandidate[]) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const store = createStore();
   store.set(dlsiteJobStoreAtom, createFakeDlsiteJobStore({}));
+  queryClient.setQueryData(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY, {
+    scanCompleted: true,
+    candidates,
+  });
   const tree = (mounted: boolean) =>
     createElement(
       QueryClientProvider,
@@ -74,9 +77,6 @@ async function renderUnmountableTab(candidates: ScanCandidate[]) {
           null,
           mounted
             ? createElement(UnregisteredTab, {
-                candidates,
-                status: "ready",
-                onRetry: () => {},
                 onRegistered: () => {},
                 onOpenFiles: () => {},
               })
@@ -108,7 +108,13 @@ async function renderTab(
   store.set(dlsiteJobStoreAtom, job);
   const onRegistered = vi.fn();
   const onOpenFiles = vi.fn();
-  const tree = (list: ScanCandidate[]) =>
+  const seed = (list: ScanCandidate[]) =>
+    queryClient.setQueryData(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY, {
+      scanCompleted: options.status !== "notScanned",
+      candidates: list,
+    });
+  seed(candidates);
+  const tree = () =>
     createElement(
       QueryClientProvider,
       { client: queryClient },
@@ -119,9 +125,6 @@ async function renderTab(
           Fragment,
           null,
           createElement(UnregisteredTab, {
-            candidates: list,
-            status: options.status ?? "ready",
-            onRetry: () => {},
             onRegistered,
             onOpenFiles,
           }),
@@ -134,7 +137,7 @@ async function renderTab(
         ),
       ),
     );
-  const view = render(tree(candidates));
+  const view = render(tree());
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     flushUnregisteredListSize();
@@ -146,7 +149,11 @@ async function renderTab(
     queryClient,
     store,
     job,
-    rerenderWith: (l: ScanCandidate[]) => view.rerender(tree(l)),
+    rerenderWith: (list: ScanCandidate[]) =>
+      act(async () => {
+        seed(list);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }),
   };
 }
 
@@ -299,7 +306,7 @@ describe("UnregisteredTab RJコード編集", () => {
     const fixed: ScanCandidate = { ...candidateA, rjCode: "RJ200002" };
     const setSpy = vi.spyOn(scanApi, "setScanCandidateRjCode").mockResolvedValue(fixed);
     const refreshSpy = vi
-      .spyOn(scanCandidatesCache, "refreshScanCandidates")
+      .spyOn(scanCandidatesCache, "refreshScanCandidatesQuietly")
       .mockResolvedValue({ scanCompleted: true, candidates: [] });
     const { queryClient } = await renderTab([candidateA, candidateB]);
     queryClient.setQueryData(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY, {
@@ -353,7 +360,7 @@ describe("UnregisteredTab RJコード編集", () => {
       rjCodeEdited: true,
       dlsite: { state: "none" },
     });
-    vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue({
+    vi.spyOn(scanCandidatesCache, "refreshScanCandidatesQuietly").mockResolvedValue({
       scanCompleted: true,
       candidates: [],
     });
@@ -365,7 +372,7 @@ describe("UnregisteredTab RJコード編集", () => {
     fireEvent.change(input, { target: { value: "RJ000405" } });
     fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() => expect(scanApi.setScanCandidateRjCode).toHaveBeenCalled());
-    rerenderWith([
+    await rerenderWith([
       { ...failedRow, rjCode: "RJ000405", rjCodeEdited: true, dlsite: { state: "none" } },
       candidateB,
     ]);
@@ -404,7 +411,7 @@ describe("UnregisteredTab RJコード編集", () => {
       new ApiRequestError(409, "conflict", "候補プールが更新されました"),
     );
     const refreshSpy = vi
-      .spyOn(scanCandidatesCache, "refreshScanCandidates")
+      .spyOn(scanCandidatesCache, "refreshScanCandidatesQuietly")
       .mockResolvedValue({ scanCompleted: true, candidates: [] });
     await renderTab([candidateA]);
 
@@ -645,6 +652,10 @@ describe("UnregisteredTab 取得と進捗", () => {
     });
     unmount();
     const queryClient = new QueryClient();
+    queryClient.setQueryData(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY, {
+      scanCompleted: true,
+      candidates: [first],
+    });
     render(
       createElement(
         QueryClientProvider,
@@ -653,9 +664,6 @@ describe("UnregisteredTab 取得と進捗", () => {
           JotaiProvider,
           { store },
           createElement(UnregisteredTab, {
-            candidates: [first],
-            status: "ready",
-            onRetry: () => {},
             onRegistered: vi.fn(),
           }),
         ),
@@ -677,7 +685,7 @@ describe("UnregisteredTab 除外", () => {
     const restoreSpy = vi
       .spyOn(scanEntityApi, "restoreScanCandidateExclusions")
       .mockResolvedValue(undefined);
-    vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue({
+    vi.spyOn(scanCandidatesCache, "refreshScanCandidatesQuietly").mockResolvedValue({
       scanCompleted: true,
       candidates: [],
     });
@@ -730,6 +738,10 @@ describe("UnregisteredTab 除外", () => {
   });
 
   it("「除外済み N」から除外した候補の一覧を開き、行ごとに戻せる。0件なら出さない", async () => {
+    mockApi({
+      "GET /api/scan/candidates": { scanCompleted: true, candidates: [candidateA] },
+      "GET /api/scan/candidates/exclusions": { paths: [] },
+    });
     const getSpy = vi
       .spyOn(scanEntityApi, "getScanCandidateExclusions")
       .mockResolvedValue(["dlsite/除外した作品", "dlsite/もう一つ"]);
@@ -752,7 +764,9 @@ describe("UnregisteredTab 除外", () => {
     await waitFor(() => expect(screen.getByText("除外した候補はありません")).not.toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "未登録" }));
     expect(screen.queryByRole("button", { name: /除外済み/ })).toBeNull();
-    expect(document.activeElement).toBe(screen.getByLabelText("すべて選択"));
+    expect(document.activeElement).toBe(
+      screen.getByLabelText("すべて選択").closest('[tabindex="-1"]'),
+    );
   });
 
   it("除外済みの一覧を開くと「未登録」へフォーカスが移り、元の画面は操作できない。閉じると「除外済み N」へ戻る", async () => {
@@ -830,10 +844,12 @@ describe("UnregisteredTab 除外", () => {
     vi.spyOn(scanApi, "excludeScanCandidates").mockRejectedValue(
       new ApiRequestError(409, "conflict", "stale"),
     );
-    const refresh = vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue({
-      scanCompleted: true,
-      candidates: [],
-    });
+    const refresh = vi
+      .spyOn(scanCandidatesCache, "refreshScanCandidatesQuietly")
+      .mockResolvedValue({
+        scanCompleted: true,
+        candidates: [],
+      });
     await renderTab([candidateA]);
     openRowMenu(candidateA.inferredTitle);
     fireEvent.click(screen.getByRole("menuitem", { name: "除外" }));
@@ -856,7 +872,7 @@ describe("UnregisteredTab 除外", () => {
     const restoreSpy = vi
       .spyOn(scanEntityApi, "restoreScanCandidateExclusions")
       .mockRejectedValue(new Error("boom"));
-    vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue({
+    vi.spyOn(scanCandidatesCache, "refreshScanCandidatesQuietly").mockResolvedValue({
       scanCompleted: true,
       candidates: [],
     });
@@ -1024,7 +1040,7 @@ describe("UnregisteredTab 追加", () => {
       failures: [],
       interruptedBy: new ApiRequestError(409, "conflict", "候補が更新されました"),
     });
-    vi.spyOn(scanCandidatesCache, "refreshScanCandidates").mockResolvedValue({
+    vi.spyOn(scanCandidatesCache, "refreshScanCandidatesQuietly").mockResolvedValue({
       scanCompleted: true,
       candidates: [],
     });
@@ -1039,7 +1055,7 @@ describe("UnregisteredTab 追加", () => {
       registeredTitles: [candidateA.inferredTitle],
       coverSkippedTitles: [],
       failedCount: 0,
-      remainingCount: 1,
+      remainingCandidates: 0,
       interrupted: true,
     });
   });
@@ -1059,7 +1075,7 @@ describe("UnregisteredTab 追加", () => {
       registeredTitles: [],
       coverSkippedTitles: [],
       failedCount: 0,
-      remainingCount: 1,
+      remainingCandidates: null,
       interrupted: true,
     });
   });
@@ -1077,7 +1093,7 @@ describe("UnregisteredTab 追加", () => {
       registeredTitles: [],
       coverSkippedTitles: [],
       failedCount: 1,
-      remainingCount: 1,
+      remainingCandidates: null,
       interrupted: false,
     });
   });
@@ -1098,7 +1114,7 @@ describe("UnregisteredTab 追加", () => {
         registeredTitles: [candidateA.inferredTitle, "検出済みのDLsiteタイトル"],
         coverSkippedTitles: [candidateA.inferredTitle],
         failedCount: 0,
-        remainingCount: 0,
+        remainingCandidates: 0,
         interrupted: false,
       }),
     );
@@ -1121,12 +1137,7 @@ describe("UnregisteredTab 追加", () => {
         return { scanCompleted: true, candidates: [candidateB] };
       },
     });
-    const key = scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY;
-    const { queryClient, rerenderWith } = await renderTab([candidateA, candidateB]);
-    queryClient.setQueryData(key, { scanCompleted: true, candidates: [candidateA, candidateB] });
-    const unsubscribe = queryClient.getQueryCache().subscribe(() => {
-      rerenderWith(queryClient.getQueryData<ScanCandidatesResponse>(key)?.candidates ?? []);
-    });
+    await renderTab([candidateA, candidateB]);
     const addButton = () => screen.getByRole("button", { name: /件を追加/ });
     fireEvent.click(addButton());
 
@@ -1137,7 +1148,6 @@ describe("UnregisteredTab 追加", () => {
     releaseRefresh();
     await waitFor(() => expect(screen.queryByText(candidateA.inferredTitle)).toBeNull());
     await waitFor(() => expect(addButton()).toBeEnabled());
-    unsubscribe();
   });
 
   it("追加リクエスト中にタブがアンマウントされても、候補が取り直されonRegisteredへ結果が届く", async () => {
@@ -1169,7 +1179,7 @@ describe("UnregisteredTab 追加", () => {
         registeredTitles: [candidateA.inferredTitle],
         coverSkippedTitles: [],
         failedCount: 1,
-        remainingCount: 1,
+        remainingCandidates: 1,
         interrupted: false,
       }),
     );
@@ -1184,7 +1194,7 @@ describe("UnregisteredTab 追加", () => {
 describe("UnregisteredTab 終端表示", () => {
   it("終わったジョブがある状態で開いても候補を取り直さない", async () => {
     const refreshSpy = vi
-      .spyOn(scanCandidatesCache, "refreshScanCandidates")
+      .spyOn(scanCandidatesCache, "refreshScanCandidatesQuietly")
       .mockResolvedValue({ scanCompleted: true, candidates: [] });
     await renderTab([candidateB], {
       job: {
@@ -1199,7 +1209,7 @@ describe("UnregisteredTab 終端表示", () => {
 
   it("候補を取り直さなくても、ジョブで見た終端の結果が候補より新しければ行に出す", async () => {
     const refreshSpy = vi
-      .spyOn(scanCandidatesCache, "refreshScanCandidates")
+      .spyOn(scanCandidatesCache, "refreshScanCandidatesQuietly")
       .mockResolvedValue({ scanCompleted: true, candidates: [] });
     const candidate = { ...candidateB, rjCode: "RJ000777", dlsiteRevision: 5 };
     await renderTab([candidate], {
@@ -1244,9 +1254,6 @@ describe("UnregisteredTab 取り直し中のRJコード修正", () => {
     store.set(dlsiteJobStoreAtom, createFakeDlsiteJobStore());
     function Connected() {
       return createElement(UnregisteredTab, {
-        candidates: useScanCandidatesState().candidates,
-        status: "ready",
-        onRetry: () => {},
         onRegistered: () => {},
       });
     }
@@ -1277,5 +1284,51 @@ describe("UnregisteredTab 取り直し中のRJコード修正", () => {
     });
     expect(screen.getByText("RJ200002")).toBeInTheDocument();
     expect(calls).toBe(2);
+  });
+});
+
+describe("UnregisteredTab RJコード保存中の操作", () => {
+  it("保存の応答を待つあいだは別の行の編集を始められず、取得と追加も止まる。応答後は戻る", async () => {
+    const gate = Promise.withResolvers<ScanCandidate>();
+    vi.spyOn(scanApi, "setScanCandidateRjCode").mockReturnValue(gate.promise);
+    vi.spyOn(scanCandidatesCache, "refreshScanCandidatesQuietly").mockResolvedValue({
+      scanCompleted: true,
+      candidates: [],
+    });
+    await renderTab([candidateA, candidateB]);
+
+    fireEvent.click(screen.getAllByTitle("クリックしてRJコードを編集")[0]);
+    const input = screen.getByPlaceholderText("RJコード");
+    fireEvent.change(input, { target: { value: "RJ200002" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    const other = await screen.findByTitle("クリックしてRJコードを編集");
+    expect(other).toBeDisabled();
+    expect(screen.getByRole("button", { name: /DLsiteから取得|件を追加/ })).toBeDisabled();
+    expect(screen.getByLabelText("すべて選択")).toBeEnabled();
+    for (const checkbox of screen.getAllByRole("checkbox", { name: /を選択/ })) {
+      expect(checkbox).toBeEnabled();
+    }
+    expect(screen.getAllByRole("button", { name: /の操作/ })[0]).toBeEnabled();
+
+    await act(async () => gate.resolve({ ...candidateA, rjCode: "RJ200002" }));
+    await waitFor(() => expect(screen.queryByPlaceholderText("RJコード")).toBeNull());
+    expect(screen.getAllByTitle("クリックしてRJコードを編集")[0]).toBeEnabled();
+  });
+});
+
+describe("UnregisteredTab 除外済みの取得失敗", () => {
+  it("取得に失敗したときも「除外済み」を出し、一覧の中で再試行できる", async () => {
+    const spy = vi
+      .spyOn(scanEntityApi, "getScanCandidateExclusions")
+      .mockRejectedValue(new ApiRequestError(500, "internal_error", "失敗"));
+    await renderTab([candidateA, candidateB]);
+
+    fireEvent.click(await screen.findByRole("button", { name: /除外済み/ }));
+    expect(screen.getByText("読み込みに失敗しました")).toBeInTheDocument();
+
+    spy.mockResolvedValue(["dlsite/除外した作品"]);
+    fireEvent.click(screen.getByRole("button", { name: "再試行" }));
+    expect(await screen.findByRole("list", { name: "除外済みの候補" })).toBeInTheDocument();
   });
 });

@@ -50,6 +50,7 @@ let worksByIdFails = false;
 let patchWorkSourceReply: (request: ApiRequest) => unknown;
 let registerReply: unknown;
 let serverCandidates: ScanCandidate[] = [];
+let appearedDuringRegister: ScanCandidate[] = [];
 let excludedCandidates: ScanCandidate[] = [];
 const updatedFixture: ScanRecord["updatedWorks"] = [
   {
@@ -116,6 +117,7 @@ beforeEach(() => {
   patchWorkSourceReply = saveTitleReply;
   registerReply = buildScanCandidatesRegisterResponse();
   serverCandidates = [];
+  appearedDuringRegister = [];
   excludedCandidates = [];
   api = mockApi({
     "GET /api/works": ({ url }) => {
@@ -139,7 +141,16 @@ beforeEach(() => {
       params.id === work.id ? work : apiError(404, "not_found", `work not found: ${params.id}`),
     "GET /api/works/:id/source": () => scanSnapshot(work.title),
     "PATCH /api/works/:id": (request) => patchWorkSourceReply(request),
-    "POST /api/scan/candidates/register": () => registerReply,
+    "POST /api/scan/candidates/register": () => {
+      const registered = new Set(
+        (registerReply as { registered: { path: string }[] }).registered.map((entry) => entry.path),
+      );
+      serverCandidates = [
+        ...serverCandidates.filter((entry) => !registered.has(entry.path)),
+        ...appearedDuringRegister,
+      ];
+      return registerReply;
+    },
     "POST /api/scan/candidates/rj-code": ({ body }) => {
       const { path, rjCode } = body as { path: string; rjCode: string };
       const base = serverCandidates.find((candidate) => candidate.path === path);
@@ -806,7 +817,9 @@ describe("ScanModal", () => {
         );
 
         act(() => {
-          scanJob.setState({ job: terminal({ status: "completed" }), error: null });
+          const finished = terminal({ status: "completed" });
+          scanJob.setState({ job: finished, error: null });
+          scanJob.emit({ type: "terminal", job: finished });
         });
         await act(async () => {
           await vi.advanceTimersByTimeAsync(400);
@@ -1067,6 +1080,21 @@ describe("ScanModal", () => {
     );
     expect(screen.getByText("「検出済みDLsiteタイトル」を追加しました。")).toBeInTheDocument();
     expect(screen.queryByText(/追加できず|止まりました/)).toBeNull();
+  });
+
+  it("追加の間に新しい候補が現れて取り直した候補が空でないときは、新規作品へ移らない", async () => {
+    registerReply = buildScanCandidatesRegisterResponse({
+      registered: [{ path: candidateDetected.path, workId: "w-detected", coverSkipped: null }],
+    });
+    appearedDuringRegister = [candidateUndetected];
+    renderModal({ candidates: [candidateDetected] });
+    await showUnregisteredList();
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    fireEvent.click(within(unregistered).getByRole("button", { name: "1件を追加" }));
+    await waitFor(() =>
+      expect(screen.getByText("「検出済みDLsiteタイトル」を追加しました。")).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("tabpanel", { name: /^新規作品/ })).toBeNull();
   });
 
   it("追加のあと未登録に候補が残るときは、新規作品へ移らず未登録にとどまる", async () => {
@@ -1405,7 +1433,7 @@ describe("ScanModal", () => {
       ).toBe(true);
     });
 
-    it("種類の絞り込みを切り替えても、ツールバーと前の行を残したまま取り直す", async () => {
+    it("種類の絞り込みを切り替えても、ツールバーは残し、前の条件の行は出さない", async () => {
       renderModal({ record: updatedRecord() });
       openTab("更新済み");
       await waitForListed("更新u2");
@@ -1413,9 +1441,9 @@ describe("ScanModal", () => {
       fireEvent.click(screen.getByRole("button", { name: /^移動/ }));
 
       expect(screen.getByRole("button", { name: /^移動/ })).toBeInTheDocument();
-      expect(screen.getByText("更新u2")).toBeInTheDocument();
-      expect(screen.queryByText("読み込み中...")).toBeNull();
-      await waitFor(() => expect(screen.queryByText("更新u2")).toBeNull());
+      expect(screen.queryByText("更新u2")).toBeNull();
+      await waitForListed("更新u1");
+      expect(screen.queryByText("更新u2")).toBeNull();
       expect(screen.getByRole("button", { name: /^移動/ })).toBeInTheDocument();
     });
 

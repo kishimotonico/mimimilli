@@ -1,6 +1,6 @@
 import type { WorkspacePath } from "@mimimilli/shared";
 import { useEffect, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useAtomValue } from "jotai";
 import Modal, { ModalHeader } from "../../../shared/ui/Modal";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
@@ -9,22 +9,16 @@ import { I } from "../../../shared/ui/Icon";
 import { useToast } from "../../../shared/ui/useToast";
 import { useScanJobStore, useScanning } from "../../../entities/scan/useScanJob";
 import { scanResultsRefreshedAtom } from "../../../entities/scan/model/atoms";
-import {
-  scanDiagnosticsQueryOptions,
-  scanRecordQueryOptions,
-} from "../../../entities/scan/queryOptions";
-import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
+import { scanRecordQueryOptions } from "../../../entities/scan/queryOptions";
 import { scanNewCountQueryOptions } from "../../../entities/work/scanNewCountQueryOptions";
 import { useScanCandidatesState } from "../model/useScanCandidatesCache";
 import { formatWorkNames } from "../model/formatWorkNames";
-import { deriveScanListStatus } from "../model/scanListStatus";
 import ScanSidebar from "./scanModal/ScanSidebar";
 import UnregisteredTab from "./scanModal/unregistered/UnregisteredTab";
 import NeedsAttentionTab from "./scanModal/NeedsAttentionTab";
 import NewWorksTab from "./scanModal/newWorks/NewWorksTab";
 import UpdatedWorksTab from "./scanModal/updated/UpdatedWorksTab";
-import { useScanStatusView } from "./scanModal/useScanStatusView";
-import { buildNeedsAttentionRows } from "../model/needsAttention";
+import { useNeedsAttentionRows } from "../model/useNeedsAttentionRows";
 import { computeScanTabCounts, landingTab, type ScanTabCounts } from "./scanModal/scanTabs";
 import type { CandidatesRegisteredResult, ScanTabKey } from "./scanModal/types";
 
@@ -45,28 +39,21 @@ export default function ScanModal({
   const { start, cancel } = useScanJobStore();
   const toast = useToast();
 
-  const queryClient = useQueryClient();
   const candidates = useScanCandidatesState();
 
-  // 診断はFilesでの解決や登録解除を随時反映する必要があるため、スキャン時点のスナップショットではなく
-  // 常に最新を購読する。作品変更後のキャッシュ更新が同じキーを無効化する。
-  const diagnosticsQuery = useQuery(scanDiagnosticsQueryOptions);
+  const needsAttention = useNeedsAttentionRows();
   const recordQuery = useQuery(scanRecordQueryOptions);
   const newCountQuery = useQuery(scanNewCountQueryOptions);
 
-  const statusView = useScanStatusView(lastScanTime);
-
-  const needsAttentionRows = buildNeedsAttentionRows(diagnosticsQuery.data);
-
   const counts = computeScanTabCounts({
     candidates: candidates.response ?? undefined,
-    diagnostics: diagnosticsQuery.data,
+    needsAttention: needsAttention.rows?.length,
     newCount: newCountQuery.data,
     record: recordQuery.data,
   });
   const countsSettled =
     candidates.status !== "loading" &&
-    !diagnosticsQuery.isPending &&
+    !needsAttention.loading &&
     !recordQuery.isPending &&
     !newCountQuery.isPending;
   const [activeTab, setActiveTab] = useActiveTab(counts, countsSettled);
@@ -75,7 +62,7 @@ export default function ScanModal({
     registeredTitles,
     coverSkippedTitles,
     failedCount,
-    remainingCount,
+    remainingCandidates,
     interrupted,
   }: CandidatesRegisteredResult) => {
     if (registeredTitles.length === 0) return;
@@ -101,16 +88,9 @@ export default function ScanModal({
       variant: coverNote ? "warning" : "success",
       priority: "notice",
     });
-    if (remainingCount <= 0) setActiveTab("newWorks");
+    if (remainingCandidates === 0) setActiveTab("newWorks");
   };
 
-  const retryCandidates = () => void refreshScanCandidates(queryClient).catch(() => undefined);
-  const candidatesStatus = deriveScanListStatus({
-    loading: candidates.status === "loading",
-    error: candidates.status === "error",
-    notScanned: !candidates.scanCompleted,
-    count: candidates.candidates.length,
-  });
   const scanPending = recordQuery.data !== undefined && recordQuery.data.finishedAt === null;
 
   // スキャン実行中でも閉じられる。スキャン自体はバックグラウンドで継続する。
@@ -130,7 +110,7 @@ export default function ScanModal({
           active={activeTab}
           onSelect={setActiveTab}
           counts={counts}
-          status={statusView}
+          lastScanTime={lastScanTime}
           scanPending={scanPending}
           onStart={() => void start()}
           onFullScan={() => void start({ full: true })}
@@ -144,22 +124,12 @@ export default function ScanModal({
         >
           {activeTab === "unregistered" && (
             <UnregisteredTab
-              candidates={candidates.candidates}
-              status={candidatesStatus}
-              onRetry={retryCandidates}
               onRegistered={handleUnregisteredRegistered}
               onOpenFiles={onOpenFiles}
             />
           )}
           {activeTab === "needsAttention" && (
-            <NeedsAttentionTab
-              rows={needsAttentionRows}
-              loading={diagnosticsQuery.isPending}
-              error={diagnosticsQuery.isError && diagnosticsQuery.data === undefined}
-              onRetry={() => void diagnosticsQuery.refetch()}
-              onOpenFiles={onOpenFiles}
-              onOpenWorkDetail={onOpenWorkDetail}
-            />
+            <NeedsAttentionTab onOpenFiles={onOpenFiles} onOpenWorkDetail={onOpenWorkDetail} />
           )}
           {activeTab === "newWorks" && (
             <NewWorksTab onOpenFiles={onOpenFiles} onOpenWorkDetail={onOpenWorkDetail} />

@@ -1,12 +1,10 @@
 /* oxlint-disable jsx-a11y/prefer-tag-over-role -- 仮想リストは行を絶対配置するため table 要素にできず、ARIA table 構造を role で与える */
 import type { WorkspacePath } from "@mimimilli/shared";
 import { useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { scanRecordQueryOptions } from "../../../../../entities/scan/queryOptions";
 import { SourceProjectionNotice } from "../../../../../entities/work/ui/SourceProjectionNotice";
 import { cn } from "../../../../../shared/lib/cn";
+import CollectionStatus from "../../../../../shared/ui/CollectionStatus";
 import { useVirtualList } from "../../../../../shared/ui/useVirtualList";
-import { deriveScanListStatus } from "../../../model/scanListStatus";
 import { LIST_HEADING_ROW_CLASS } from "../listHeading";
 import ScanListState from "../ScanListState";
 import { useDisplayedScanListStatus } from "../useDisplayedScanListStatus";
@@ -21,9 +19,16 @@ interface NewWorksTabProps {
 }
 
 export default function NewWorksTab({ onOpenFiles, onOpenWorkDetail }: NewWorksTabProps) {
-  const recordQuery = useQuery(scanRecordQueryOptions);
-  const { works, total, loading, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
-    useScanRecordWorks("new");
+  const {
+    works,
+    total,
+    status: rawStatus,
+    retry,
+    nextPageError,
+    retryNextPage,
+    infiniteScroll,
+  } = useScanRecordWorks("new");
+  const status = useDisplayedScanListStatus(rawStatus);
   const edit = useInlineTitleEdit();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -31,21 +36,8 @@ export default function NewWorksTab({ onOpenFiles, onOpenWorkDetail }: NewWorksT
     count: works.length,
     estimateSize: ROW_HEIGHT,
     scrollRef,
-    infiniteScroll: { hasNextPage, isFetchingNextPage, onLoadMore: fetchNextPage },
+    infiniteScroll,
   });
-
-  const status = useDisplayedScanListStatus(
-    deriveScanListStatus({
-      loading: loading || recordQuery.isPending,
-      error: error || (recordQuery.isError && recordQuery.data === undefined),
-      notScanned: recordQuery.data?.finishedAt === null,
-      count: total,
-    }),
-  );
-  const retry = () => {
-    if (recordQuery.isError) void recordQuery.refetch();
-    if (error) refetch();
-  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -89,6 +81,9 @@ export default function NewWorksTab({ onOpenFiles, onOpenWorkDetail }: NewWorksT
               );
             })}
           </div>
+          {nextPageError && (
+            <CollectionStatus variant="list" kind="error" onRetry={retryNextPage} />
+          )}
         </div>
       </ScanListState>
     </div>

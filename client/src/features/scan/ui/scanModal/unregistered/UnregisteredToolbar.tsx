@@ -1,9 +1,14 @@
+import type { Ref } from "react";
 import Button from "../../../../../shared/ui/Button";
 import { I } from "../../../../../shared/ui/Icon";
 import ScanFilterChip from "../ScanFilterChip";
 
 interface UnregisteredToolbarProps {
+  /** 除外済みの件数。0かつ取得失敗でもないときは入口を出さない */
   excludedCount: number;
+  /** 除外済みを読めなかった。0件と区別して入口を出し、一覧の中で再試行できるようにする */
+  excludedFailed: boolean;
+  excludedTriggerRef: Ref<HTMLButtonElement>;
   onShowExcluded: () => void;
   /** 判断が要る候補の件数。0かつ絞り込み中でないときは出さない */
   problemCount: number;
@@ -13,29 +18,18 @@ interface UnregisteredToolbarProps {
   onClearFilter: () => void;
 }
 
-type ToolbarContentInput = Pick<
-  UnregisteredToolbarProps,
-  "excludedCount" | "problemCount" | "filter"
->;
-
-/** 帯に載せるものがあるか。無ければ帯ごと出さない */
-export function hasUnregisteredToolbarContent({
-  excludedCount,
-  problemCount,
-  filter,
-}: ToolbarContentInput): boolean {
-  return problemCount > 0 || filter !== null || excludedCount > 0;
-}
-
 export default function UnregisteredToolbar({
   excludedCount,
+  excludedFailed,
+  excludedTriggerRef,
   onShowExcluded,
   problemCount,
   filter,
   onFilterProblems,
   onClearFilter,
 }: UnregisteredToolbarProps) {
-  if (!hasUnregisteredToolbarContent({ excludedCount, problemCount, filter })) return null;
+  const hasExcluded = excludedCount > 0 || excludedFailed;
+  if (problemCount === 0 && filter === null && !hasExcluded) return null;
   return (
     <div
       data-testid="unregistered-toolbar"
@@ -67,14 +61,15 @@ export default function UnregisteredToolbar({
           </ScanFilterChip>
         )
       )}
-      {excludedCount > 0 && (
+      {hasExcluded && (
         <Button
+          ref={excludedTriggerRef}
           variant="quiet"
           className="ml-auto px-2 font-normal"
-          data-excluded-trigger
           onClick={onShowExcluded}
         >
-          除外済み <span className="font-mono tabular-nums">{excludedCount}</span>
+          除外済み{" "}
+          {!excludedFailed && <span className="font-mono tabular-nums">{excludedCount}</span>}
         </Button>
       )}
     </div>

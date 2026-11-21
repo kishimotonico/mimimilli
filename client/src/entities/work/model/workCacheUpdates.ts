@@ -14,7 +14,11 @@ import { SMART_FOLDER_QUERY_KEYS } from "../../smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../tag/queryKeys";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../file-system/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../scan/queryKeys";
-import { refreshScanCandidates, SCAN_CANDIDATES_QUERY_KEY } from "../../scan/scanCandidatesCache";
+import {
+  refreshScanCandidates,
+  refreshScanCandidatesQuietly,
+  SCAN_CANDIDATES_QUERY_KEY,
+} from "../../scan/scanCandidatesCache";
 
 async function invalidateLibraryViews(queryClient: QueryClient): Promise<void> {
   await Promise.all([
@@ -25,14 +29,17 @@ async function invalidateLibraryViews(queryClient: QueryClient): Promise<void> {
   ]);
 }
 
-async function invalidateRegistrationViews(queryClient: QueryClient): Promise<void> {
-  await Promise.all([
+async function invalidateRegistrationViews(
+  queryClient: QueryClient,
+): Promise<ScanCandidatesResponse | null> {
+  const [, , , , candidates] = await Promise.all([
     invalidateLibraryViews(queryClient),
     queryClient.invalidateQueries({ queryKey: FILE_SYSTEM_QUERY_KEYS.all() }),
     queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.diagnostics() }),
     queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.last() }),
-    refreshScanCandidates(queryClient).catch(() => {}),
+    refreshScanCandidatesQuietly(queryClient),
   ]);
+  return candidates;
 }
 
 function invalidateWorkDetail(queryClient: QueryClient, workId: string): Promise<void> {
@@ -104,8 +111,10 @@ export async function updateCachesAfterBookmark(
   });
 }
 
-/** 登録（候補一括・Files 単体）の成功後 */
-export function updateCachesAfterRegistration(queryClient: QueryClient): Promise<void> {
+/** 登録（候補一括・Files 単体）の成功後。取り直した候補を返す。取り直せなかったときは null */
+export function updateCachesAfterRegistration(
+  queryClient: QueryClient,
+): Promise<ScanCandidatesResponse | null> {
   return invalidateRegistrationViews(queryClient);
 }
 

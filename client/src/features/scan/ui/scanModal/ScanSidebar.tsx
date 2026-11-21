@@ -8,6 +8,7 @@ import { I } from "../../../../shared/ui/Icon";
 import SplitButton from "../../../../shared/ui/SplitButton";
 import { scanPhaseLabel, type ScanProgress } from "../../model";
 import type { ScanStatusView } from "../../model/scanStatusView";
+import { useScanStatusView } from "./useScanStatusView";
 import type { ScanTabCounts } from "./scanTabs";
 import { SCAN_TAB_LABEL, SCAN_TAB_ORDER, type ScanTabKey } from "./types";
 
@@ -15,7 +16,7 @@ interface ScanSidebarProps {
   active: ScanTabKey | null;
   onSelect: (tab: ScanTabKey) => void;
   counts: ScanTabCounts;
-  status: ScanStatusView;
+  lastScanTime: string | null;
   /** 起動後にスキャンが完了していない。スキャンボタンを主ボタンにする */
   scanPending: boolean;
   onStart: () => void;
@@ -30,13 +31,12 @@ export default function ScanSidebar({
   active,
   onSelect,
   counts,
-  status,
+  lastScanTime,
   scanPending,
   onStart,
   onFullScan,
   onCancel,
 }: ScanSidebarProps) {
-  const inProgress = status.kind === "running" || status.kind === "cancelling";
   return (
     <nav
       aria-label="スキャン結果"
@@ -54,33 +54,54 @@ export default function ScanSidebar({
         ))}
       </div>
 
-      <div className="mt-auto flex h-[116px] shrink-0 flex-col border-t border-line-soft pt-2.5 pl-2.5">
-        <div className="relative min-h-0 flex-1">
-          <AnimatePresence initial={false} mode="wait">
-            <SidebarStatus key={status.kind} status={status} />
-          </AnimatePresence>
-        </div>
-        <div className="relative h-[26px] shrink-0">
-          <AnimatePresence initial={false} mode="wait">
-            {inProgress ? (
-              <SidebarCancelButton
-                key="cancel"
-                disabled={status.kind === "cancelling"}
-                onClick={onCancel}
-              />
-            ) : (
-              <SidebarStartButton
-                key="start"
-                status={status}
-                primary={scanPending}
-                onStart={onStart}
-                onFullScan={onFullScan}
-              />
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
+      <ScanSidebarControls
+        lastScanTime={lastScanTime}
+        scanPending={scanPending}
+        onStart={onStart}
+        onFullScan={onFullScan}
+        onCancel={onCancel}
+      />
     </nav>
+  );
+}
+
+/** 状態欄と開始・中止のボタン。進捗の購読はここに閉じ、タブの一覧を描き直さない。 */
+function ScanSidebarControls({
+  lastScanTime,
+  scanPending,
+  onStart,
+  onFullScan,
+  onCancel,
+}: Pick<ScanSidebarProps, "lastScanTime" | "scanPending" | "onStart" | "onFullScan" | "onCancel">) {
+  const status = useScanStatusView(lastScanTime);
+  const inProgress = status.kind === "running" || status.kind === "cancelling";
+  return (
+    <div className="mt-auto flex h-[116px] shrink-0 flex-col border-t border-line-soft pt-2.5 pl-2.5">
+      <div className="relative min-h-0 flex-1">
+        <AnimatePresence initial={false} mode="wait">
+          <SidebarStatus key={status.kind} status={status} />
+        </AnimatePresence>
+      </div>
+      <div className="relative h-[26px] shrink-0">
+        <AnimatePresence initial={false} mode="wait">
+          {inProgress ? (
+            <SidebarCancelButton
+              key="cancel"
+              disabled={status.kind === "cancelling"}
+              onClick={onCancel}
+            />
+          ) : (
+            <SidebarStartButton
+              key="start"
+              status={status}
+              primary={scanPending}
+              onStart={onStart}
+              onFullScan={onFullScan}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
   );
 }
 

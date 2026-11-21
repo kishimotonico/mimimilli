@@ -1,11 +1,11 @@
 /* oxlint-disable jsx-a11y/prefer-tag-over-role -- 仮想リストは行を絶対配置するため table 要素にできず、ARIA table 構造を role で与える */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { WorkChange, WorkChangeKind, WorkspacePath } from "@mimimilli/shared";
 import { scanRecordQueryOptions } from "../../../../../entities/scan/queryOptions";
 import { cn } from "../../../../../shared/lib/cn";
+import CollectionStatus from "../../../../../shared/ui/CollectionStatus";
 import { useVirtualList } from "../../../../../shared/ui/useVirtualList";
-import { deriveScanListStatus } from "../../../model/scanListStatus";
 import { LIST_HEADING_ROW_CLASS } from "../listHeading";
 import ScanListState from "../ScanListState";
 import { useDisplayedScanListStatus } from "../useDisplayedScanListStatus";
@@ -38,60 +38,52 @@ export default function UpdatedWorksTab({ onOpenFiles, onOpenWorkDetail }: Updat
     return { changesByWork: byWork, counts: kindCounts };
   }, [updatedWorks]);
 
-  useEffect(() => {
-    if (kind !== null && updatedWorks && counts[kind] === 0) setKind(null);
-  }, [kind, counts, updatedWorks]);
+  // 件数が0になった種類の絞り込みは解除する
+  const kindGone = kind !== null && updatedWorks !== undefined && counts[kind] === 0;
+  if (kindGone) setKind(null);
+  const activeKind = kindGone ? null : kind;
 
-  const { works, total, loading, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
-    useScanRecordWorks("updated", kind ?? undefined);
+  const {
+    works,
+    total,
+    status: rawStatus,
+    retry,
+    nextPageError,
+    retryNextPage,
+    infiniteScroll,
+  } = useScanRecordWorks("updated", activeKind ?? undefined);
+  const status = useDisplayedScanListStatus(rawStatus);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { virtualizer, virtualItems, wrapperStyle, getItemStyle } = useVirtualList({
     count: works.length,
     estimateSize: UPDATED_ROW_ESTIMATE,
     scrollRef,
-    resetKey: kind ?? "all",
+    resetKey: activeKind ?? "all",
     resetScrollTop: true,
-    infiniteScroll: { hasNextPage, isFetchingNextPage, onLoadMore: fetchNextPage },
+    infiniteScroll,
   });
 
   const totalUpdated = updatedWorks?.length ?? 0;
-  const status = useDisplayedScanListStatus(
-    deriveScanListStatus({
-      loading: loading || recordQuery.isPending,
-      error: error || (recordQuery.isError && recordQuery.data === undefined),
-      notScanned: recordQuery.data?.finishedAt === null,
-      count: totalUpdated,
-    }),
-  );
-  const retry = () => {
-    if (recordQuery.isError) void recordQuery.refetch();
-    if (error) refetch();
-  };
-
   const chips = (
-    <ChangeKindFilter value={kind} total={totalUpdated} counts={counts} onChange={setKind} />
+    <ChangeKindFilter value={activeKind} total={totalUpdated} counts={counts} onChange={setKind} />
   );
-  const chipsOutside = status !== "loading" && status !== "ready" && totalUpdated > 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {chipsOutside && chips}
+      {totalUpdated > 0 && chips}
       <ScanListState
         status={status}
         emptyMessage="更新済みの作品はありません"
         onRetry={retry}
         table={{ label: "更新済みの作品", rowCount: total + 1 }}
         heading={
-          <>
-            {totalUpdated > 0 && chips}
-            <div role="rowgroup" className="shrink-0">
-              <div role="row" className={cn(UPDATED_GRID_CLASS, LIST_HEADING_ROW_CLASS)}>
-                <span role="columnheader">作品</span>
-                <span role="columnheader">変更内容</span>
-              </div>
+          <div role="rowgroup" className="shrink-0">
+            <div role="row" className={cn(UPDATED_GRID_CLASS, LIST_HEADING_ROW_CLASS)}>
+              <span role="columnheader">作品</span>
+              <span role="columnheader">変更内容</span>
             </div>
-          </>
+          </div>
         }
       >
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
@@ -116,6 +108,9 @@ export default function UpdatedWorksTab({ onOpenFiles, onOpenWorkDetail }: Updat
               );
             })}
           </div>
+          {nextPageError && (
+            <CollectionStatus variant="list" kind="error" onRetry={retryNextPage} />
+          )}
         </div>
       </ScanListState>
     </div>

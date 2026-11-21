@@ -242,7 +242,10 @@ describe("登録・スキャン完了の必須更新", () => {
     });
 
     queryClient.setQueryData(KEYS.candidates, []);
-    await updateCachesAfterRegistration(queryClient);
+    await expect(updateCachesAfterRegistration(queryClient)).resolves.toEqual({
+      scanCompleted: true,
+      candidates: [found],
+    });
     expect(queryClient.getQueryData(KEYS.candidates)).toEqual({
       scanCompleted: true,
       candidates: [found],
@@ -250,7 +253,7 @@ describe("登録・スキャン完了の必須更新", () => {
     expect(api.requestsTo("GET /api/scan/candidates")).toHaveLength(2);
 
     mockApi({ "GET /api/scan/candidates": apiError(500, "internal") });
-    await expect(updateCachesAfterRegistration(queryClient)).resolves.toBeUndefined();
+    await expect(updateCachesAfterRegistration(queryClient)).resolves.toBeNull();
   });
 
   it("スキャン完了は登録の集合に加えて全詳細を無効化する", async () => {
