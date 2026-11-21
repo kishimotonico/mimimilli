@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DlsiteRegistrationApply } from "@mimimilli/shared";
 import Button from "../../../../../shared/ui/Button";
 import { usePopoverDismissal } from "../../../../../shared/ui/usePopoverDismissal";
@@ -36,28 +36,19 @@ export default function RegisterFieldsPopover({
   const [apply, setApply] = useState<DlsiteRegistrationApply>(REGISTER_APPLY_ALL);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => ref.current?.querySelector("input")?.focus(), []);
-  const { close } = usePopoverDismissal({
+  usePopoverDismissal({
     isOpen: true,
     onClose,
     anchorRef,
     boundaryRef: anchorRef,
   });
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "Escape") return;
-    event.preventDefault();
-    event.stopPropagation();
-    close("escape");
-  };
-
   return (
-    // oxlint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/prefer-tag-over-role -- Escapeをポップオーバーだけで受けるためのキー捕捉
     <div
       ref={ref}
       // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- <dialog> はトップレイヤーに出るためモーダル内のアンカー付きポップオーバーに使えず、role=dialog で名前付きの操作領域にする
       role="dialog"
       aria-label="追加する項目"
-      onKeyDown={handleKeyDown}
       className="absolute right-0 bottom-full z-10 mb-2 flex w-[220px] flex-col gap-2 rounded-[8px] border border-line-soft bg-paper-1 p-3 shadow-pop"
     >
       {FIELDS.map(({ key, label }) => (

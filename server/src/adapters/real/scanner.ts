@@ -3,10 +3,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import type {
   IdentityConflict,
+  InvalidMetaFile,
   MetaFile,
-  MissingWork,
   ScanCandidateFolder,
-  ScanDiagnostics,
   ScanResult,
 } from "@mimimilli/shared";
 import { errorMessage, detectRjCode, workspacePath, type WorkspacePath } from "@mimimilli/shared";
@@ -23,6 +22,7 @@ import {
 } from "./meta.ts";
 import type { SeenMetaIds } from "./duplicateMetaIdRepair.ts";
 import { excludeDescendantPaths, identityConflictPathOf, toPortableRelativePath } from "./paths.ts";
+import { logDataIntegritySkips } from "./dataIntegrity.ts";
 import { isPathWithin } from "../../lib/path.ts";
 import { createProgressThrottle } from "./progressThrottle.ts";
 import { measureCoverDimensions, type CoverDimensions } from "./thumbnailCache.ts";
@@ -32,7 +32,6 @@ import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import { classifyWorkChanges } from "../../core/workChanges.ts";
 import type { ScanWorkState } from "./workRowMapping.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
-import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 import { naturalCompare } from "./naturalCompare.ts";
 import { createDraftMetaFile } from "./scanMetaDraft.ts";
 import { recoverStagedMetaFiles } from "./scanMetaStagingRecovery.ts";
@@ -147,6 +146,11 @@ export interface ScannerOptions {
   resolveRoot?: () => string;
 }
 
+interface ScanFindings {
+  identityConflicts: IdentityConflict[];
+  invalidMetaFiles: InvalidMetaFile[];
+}
+
 export class Scanner {
   private readonly db: Db;
   private readonly query: WorkQueryRepository;
@@ -190,7 +194,6 @@ export class Scanner {
       registered: 0,
       insertedWorkIds: [],
       startedWithEmptyCatalog: false,
-      missingWorks: [],
       updatedWorks: [],
       unreadablePaths: [],
       errors: 0,
@@ -198,7 +201,7 @@ export class Scanner {
       skipped: 0,
       coverErrors: 0,
     };
-    const diagnostics: ScanDiagnostics = { identityConflicts: [], invalidMetaFiles: [] };
+    const diagnostics: ScanFindings = { identityConflicts: [], invalidMetaFiles: [] };
 
     const existingWorks = this.query.getScanWorkMap();
     result.startedWithEmptyCatalog = existingWorks.size === 0;
@@ -272,7 +275,7 @@ export class Scanner {
     tree: WalkResult,
     existingWorks: Map<string, ScanWorkState>,
     full: boolean,
-    diagnostics: ScanDiagnostics,
+    diagnostics: ScanFindings,
     checkAbort: () => void,
   ): PreparedEntry[] {
     const inspections = inspectMetaFiles(tree.metaPaths, checkAbort);
@@ -295,7 +298,7 @@ export class Scanner {
     existingByMetaPath: Map<string, { id: string; state: ScanWorkState }>,
     batch: ScanUpsertBatch,
     result: ScanResult,
-    diagnostics: ScanDiagnostics,
+    diagnostics: ScanFindings,
     emit: NonNullable<ScanOptions["onProgress"]>,
     checkAbort: () => void,
   ): Promise<void> {
@@ -441,7 +444,7 @@ export class Scanner {
     existingWorks: Map<string, ScanWorkState>,
     batch: ScanUpsertBatch,
     result: ScanResult,
-    diagnostics: ScanDiagnostics,
+    diagnostics: ScanFindings,
     emit: NonNullable<ScanOptions["onProgress"]>,
     abortHooks: ScannerAbortHooks | undefined,
     checkAbort: () => void,
@@ -482,18 +485,8 @@ export class Scanner {
     // 走査前にcatalogにあった作品のうち今回見つからなかったものだけを missing にする。
     // 走査中に登録された作品は existingWorks に無いので missing にならない
     const missingIds: string[] = [];
-    const missingWorks: MissingWork[] = [];
-    for (const [workId, state] of existingWorks) {
-      if (seenIds.work.has(workId)) continue;
-      missingIds.push(workId);
-      if (state.status === "missing") continue;
-      // root外の作品は相対pathで示せないので、画面に出す行方不明の対象にしない
-      if (!isPathWithin(root, state.physicalPath)) continue;
-      missingWorks.push({
-        workId,
-        title: state.title,
-        previousPath: workspacePath(toPortableRelativePath(root, state.physicalPath)),
-      });
+    for (const workId of existingWorks.keys()) {
+      if (!seenIds.work.has(workId)) missingIds.push(workId);
     }
     batch.publishScanGeneration({
       seenIds: [...seenIds.work],
@@ -501,13 +494,10 @@ export class Scanner {
       missingIds,
       identityConflicts: diagnostics.identityConflicts,
       invalidMetaFiles: diagnostics.invalidMetaFiles,
+      unreadablePaths: result.unreadablePaths,
     });
-    result.missingWorks = missingWorks;
     result.missing = this.catalog.countByStatus("missing");
-    const { skipped } = this.query.listSummaries();
-    logDataIntegritySkips(scanLogger, "scan-finalize", skipped);
-    const dataIntegrityWarning = toDataIntegrityWarning(skipped);
-    if (dataIntegrityWarning) result.dataIntegrityWarning = dataIntegrityWarning;
+    logDataIntegritySkips(scanLogger, "scan-finalize", this.query.listDataIntegritySkips());
     emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
     return result;
   }

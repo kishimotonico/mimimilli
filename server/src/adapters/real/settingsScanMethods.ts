@@ -1,5 +1,5 @@
 import { realpathSync, statSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { requireConfiguredRoot } from "../../core/rootFolder.ts";
 import { InvalidRootFolderError } from "../../errors.ts";
 import type {
@@ -10,11 +10,13 @@ import type {
   StoredSettings,
 } from "../../adapter/index.ts";
 import { z } from "zod";
+import type { ScanDiagnostics } from "@mimimilli/shared";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import { type DbLocation } from "./db.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
 import type { DlsiteParser } from "./dlsite.ts";
 import { createDlsiteProductResolver, readUsableDlsite } from "./dlsiteProductResolve.ts";
+import { identityConflictMetaPath } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
 import { createCandidateDlsiteSource } from "./scanCandidateDlsite.ts";
 import { createCandidateMaterials, resolveRootIdentity } from "./scanCandidateMaterials.ts";
@@ -38,7 +40,12 @@ export function createSettingsScanMethods(deps: {
   database: DbLocation;
   query: Pick<
     WorkQueryRepository,
-    "listSummaries" | "listMissingWorksWithRjCode" | "listWorkPhysicalPaths"
+    | "listSummaries"
+    | "listMissingWorksWithRjCode"
+    | "listWorkPhysicalPaths"
+    | "listDataIntegritySkips"
+    | "listMissingWorks"
+    | "getWorkIdentities"
   >;
   catalog: Pick<
     CatalogWorkRepository,
@@ -46,6 +53,7 @@ export function createSettingsScanMethods(deps: {
     | "setScanState"
     | "listIdentityConflicts"
     | "listInvalidMetaFiles"
+    | "listUnreadablePaths"
     | "clearDiagnostics"
     | "deleteWorksOutsideRoot"
   >;
@@ -225,10 +233,33 @@ export function createSettingsScanMethods(deps: {
       return scanRoot(requireRoot(), scanOptions ?? {});
     },
 
-    async listScanDiagnostics() {
+    async listScanDiagnostics(): Promise<ScanDiagnostics> {
+      const root = requireRoot();
+      const conflicts = catalog.listIdentityConflicts();
+      const skips = query.listDataIntegritySkips();
+      const identities = query.getWorkIdentities([
+        ...conflicts.map((conflict) => conflict.workId),
+        ...skips.map((skip) => skip.workId),
+      ]);
       return {
-        identityConflicts: catalog.listIdentityConflicts(),
+        identityConflicts: conflicts.map((conflict) => {
+          const registered = identities.get(conflict.workId);
+          return {
+            ...conflict,
+            registeredTitle: registered?.title ?? null,
+            registeredPath:
+              conflict.paths.find(
+                (path) => identityConflictMetaPath(join(root, path)) === registered?.metaPath,
+              ) ?? null,
+          };
+        }),
         invalidMetaFiles: catalog.listInvalidMetaFiles(),
+        unreadablePaths: catalog.listUnreadablePaths(),
+        dataIntegrityWorks: skips.map((skip) => ({
+          workId: skip.workId,
+          title: identities.get(skip.workId)?.title ?? null,
+        })),
+        missingWorks: query.listMissingWorks(root),
       };
     },
     ...candidateMaterials,

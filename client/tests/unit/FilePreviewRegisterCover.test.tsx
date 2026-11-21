@@ -38,7 +38,7 @@ function renderPreview(coverSkipped: "not_cached" | null) {
   mockApi({
     "GET /api/fs": buildFsListing([buildFsEntry({ path: "a.mp3" })]),
     "GET /api/scan/diagnostics": buildScanDiagnostics(),
-    "GET /api/scan/candidates": { candidates: [] },
+    "GET /api/scan/candidates": { scanCompleted: true, candidates: [] },
     "GET /api/settings": settings,
     "GET /api/tags": [],
     "GET /api/tag-prefixes": [],

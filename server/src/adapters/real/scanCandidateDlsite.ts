@@ -1,8 +1,4 @@
-import type {
-  DlsiteCachedCover,
-  DlsiteProductSummary,
-  ScanCandidateMissingWork,
-} from "@mimimilli/shared";
+import type { DlsiteCachedCover, DlsiteProductSummary, MissingWork } from "@mimimilli/shared";
 import { normalizeDlsiteCoverUrl } from "./dlsite.ts";
 import { DlsiteCache } from "./dlsiteCache.ts";
 import {
@@ -54,12 +50,12 @@ export function cachedCoverOf(
 }
 
 export function groupMissingWorksByRjCode(
-  rows: ReadonlyArray<{ rjCode: string; workId: string; title: string }>,
-): Map<string, ScanCandidateMissingWork[]> {
-  const grouped = new Map<string, ScanCandidateMissingWork[]>();
-  for (const { rjCode, workId, title } of rows) {
+  rows: ReadonlyArray<{ rjCode: string } & MissingWork>,
+): Map<string, MissingWork[]> {
+  const grouped = new Map<string, MissingWork[]>();
+  for (const { rjCode, ...work } of rows) {
     const list = grouped.get(rjCode) ?? [];
-    list.push({ workId, title });
+    list.push(work);
     grouped.set(rjCode, list);
   }
   return grouped;

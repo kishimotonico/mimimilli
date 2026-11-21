@@ -1,5 +1,6 @@
 import { createElement, useRef } from "react";
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { PopupMenu } from "../../src/shared/ui/Menu";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useNowPlayingImmersiveShell } from "../../src/features/player/model/useNowPlayingImmersiveShell";
 
@@ -41,5 +42,31 @@ describe("useNowPlayingImmersiveShell", () => {
 
     expect(alreadyInert).toHaveAttribute("inert");
     expect(plainSibling).not.toHaveAttribute("inert");
+  });
+
+  it("開いているポップオーバーがあるEscapeはポップオーバーだけを閉じ、なければ没入を抜ける", () => {
+    const onExit = vi.fn();
+    function WithMenu() {
+      return createElement(
+        "div",
+        null,
+        createElement(Host, { active: true, onExit }),
+        createElement(
+          PopupMenu,
+          { items: [{ key: "a", label: "項目", onSelect: () => {} }], placement: "above" },
+          (trigger) => createElement("button", { type: "button", ...trigger }, "速度"),
+        ),
+      );
+    }
+    render(createElement(WithMenu));
+    fireEvent.click(screen.getByRole("button", { name: "速度" }));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(onExit).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(onExit).toHaveBeenCalledOnce();
   });
 });

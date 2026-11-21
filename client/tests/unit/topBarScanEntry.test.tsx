@@ -1,11 +1,12 @@
-import { act, createElement } from "react";
+import { act, createElement, Fragment } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { focusManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Provider as JotaiProvider, createStore } from "jotai";
+import { Provider as JotaiProvider, createStore, useAtomValue } from "jotai";
 import { beforeEach, describe, expect, it } from "vitest";
 import TopBar from "../../src/app/ui/TopBar";
 import { dlsiteJobStoreAtom } from "../../src/entities/dlsite/model/dlsiteJobStore";
 import { scanJobStoreAtom } from "../../src/entities/scan/model/scanJobStore";
+import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
 import { createFakeDlsiteJobStore, createFakeScanJobStore } from "../helpers/fakeJobStores";
@@ -17,21 +18,32 @@ import {
   buildScanJobSnapshot,
   buildScanRecord,
 } from "../helpers/builders";
+import { workspacePath } from "@mimimilli/shared";
 import { seedAppMode } from "../helpers/route";
+import ScanEntrySeenRecorder from "../../src/features/scan/ui/ScanEntrySeenRecorder";
+import { scanModalOpenAtom } from "../../src/entities/scan/model/atoms";
+
+// 「見た」の記憶は常駐の ScanRuntime が、スキャン画面を開いているあいだだけ書く。ここではその部分だけを TopBar と並べる。
+function SeenRecorder() {
+  return useAtomValue(scanModalOpenAtom) ? createElement(ScanEntrySeenRecorder) : null;
+}
 
 const SEEN_KEY = "mimimilli:scanEntrySeen";
 const UNREADABLE_KEY = "unreadable:壊れたフォルダー";
 
 const candidate = buildScanCandidate({ path: "未登録作品", inferredTitle: "未登録作品" });
 const otherCandidate = buildScanCandidate({ path: "別の作品", inferredTitle: "別の作品" });
-const unreadableRecord = buildScanRecord({ unreadablePaths: ["壊れたフォルダー"] });
+const unreadableDiagnostics = buildScanDiagnostics({
+  unreadablePaths: [workspacePath("壊れたフォルダー")],
+});
 
 interface Seed {
   candidates?: ReturnType<typeof buildScanCandidate>[];
-  record?: ReturnType<typeof buildScanRecord>;
+  diagnostics?: ReturnType<typeof buildScanDiagnostics>;
   scanJob?: ReturnType<typeof createFakeScanJobStore>;
   dlsiteJob?: ReturnType<typeof createFakeDlsiteJobStore>;
-  seen?: { candidates: string[]; needsAttention: string[] };
+  seen?: { candidates: string[]; needsAttention: string[]; changes: string[] };
+  changes?: { newCount: number; updatedCount: number };
   diagnosticsPending?: boolean;
 }
 
@@ -39,10 +51,22 @@ function renderTopBar(seed: Seed = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
   });
-  if (seed.candidates) queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), seed.candidates);
-  queryClient.setQueryData(SCAN_QUERY_KEYS.last(), seed.record ?? buildScanRecord());
+  if (seed.candidates)
+    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), {
+      scanCompleted: true,
+      candidates: seed.candidates,
+    });
+  const updatedWorks = Array.from({ length: seed.changes?.updatedCount ?? 0 }, (_, i) => ({
+    workId: `w${i}`,
+    changes: [{ kind: "meta" as const }],
+  }));
+  queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord({ updatedWorks }));
+  queryClient.setQueryData(WORK_QUERY_KEYS.scanNewCount(), seed.changes?.newCount ?? 0);
   if (!seed.diagnosticsPending) {
-    queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
+    queryClient.setQueryData(
+      SCAN_QUERY_KEYS.diagnostics(),
+      seed.diagnostics ?? buildScanDiagnostics(),
+    );
   }
   if (seed.seen) localStorage.setItem(SEEN_KEY, JSON.stringify(seed.seen));
 
@@ -55,7 +79,11 @@ function renderTopBar(seed: Seed = {}) {
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(JotaiProvider, { store }, createElement(TopBar)),
+      createElement(
+        JotaiProvider,
+        { store },
+        createElement(Fragment, null, createElement(TopBar), createElement(SeenRecorder)),
+      ),
     ),
   );
   return { queryClient, store };
@@ -75,7 +103,7 @@ function ringKind(): string | null {
   return screen.getByTestId("scan-entry-ring").getAttribute("data-ring");
 }
 
-function storedSeen(): { candidates: string[]; needsAttention: string[] } {
+function storedSeen(): { candidates: string[]; needsAttention: string[]; changes: string[] } {
   return JSON.parse(localStorage.getItem(SEEN_KEY) ?? "null");
 }
 
@@ -94,7 +122,7 @@ describe("TopBar のスキャン入口", () => {
     localStorage.clear();
     api = mockApi(
       appShellRoutes({
-        "GET /api/scan/candidates": { candidates: [candidate] },
+        "GET /api/scan/candidates": { scanCompleted: true, candidates: [candidate] },
         "GET /api/scan/diagnostics": () => new Promise(() => {}),
       }),
     );
@@ -125,7 +153,7 @@ describe("TopBar のスキャン入口", () => {
     it("候補があっても名前に件数を出さない", () => {
       renderTopBar({
         candidates: [candidate],
-        seen: { candidates: [candidate.path], needsAttention: [] },
+        seen: { candidates: [candidate.path], needsAttention: [], changes: [] },
       });
 
       expect(scanButton("スキャン")).toBeInTheDocument();
@@ -160,7 +188,7 @@ describe("TopBar のスキャン入口", () => {
             jobId: "job-1",
             status: "running",
             codes: new Map(),
-            bulk: { processed: 1, total: 4 },
+            progress: { processed: 1, total: 4 },
           },
         }),
       });
@@ -171,7 +199,7 @@ describe("TopBar のスキャン入口", () => {
     });
 
     it("まとめての取得の開始待ちは割合0の輪を出す", () => {
-      renderTopBar({ dlsiteJob: createFakeDlsiteJobStore({ startingBulk: { total: 10 } }) });
+      renderTopBar({ dlsiteJob: createFakeDlsiteJobStore({ starting: { total: 10 } }) });
 
       expect(ringKind()).toBe("determinate");
       expect(arcRatio()).toBe(0);
@@ -180,19 +208,10 @@ describe("TopBar のスキャン入口", () => {
     it("スキャン中にまとめての取得が重なっても回る弧にする", () => {
       renderTopBar({
         scanJob: createFakeScanJobStore({ job: buildScanJobSnapshot() }),
-        dlsiteJob: createFakeDlsiteJobStore({ startingBulk: { total: 10 } }),
+        dlsiteJob: createFakeDlsiteJobStore({ starting: { total: 10 } }),
       });
 
       expect(ringKind()).toBe("indeterminate");
-    });
-
-    it("単発の取得だけでは輪を出さない", () => {
-      renderTopBar({
-        dlsiteJob: createFakeDlsiteJobStore({ pendingSingles: new Set(["RJ000001"]) }),
-      });
-
-      expect(screen.queryByTestId("scan-entry-ring")).not.toBeInTheDocument();
-      expect(scanButton("スキャン")).toBeInTheDocument();
     });
   });
 
@@ -232,7 +251,10 @@ describe("TopBar のスキャン入口", () => {
       await waitFor(() => expect(storedSeen().candidates).toEqual([candidate.path]));
 
       act(() =>
-        queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), [candidate, otherCandidate]),
+        queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), {
+          scanCompleted: true,
+          candidates: [candidate, otherCandidate],
+        }),
       );
 
       await waitFor(() =>
@@ -249,7 +271,10 @@ describe("TopBar のスキャン入口", () => {
       closeModal(store);
 
       act(() =>
-        queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), [candidate, otherCandidate]),
+        queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), {
+          scanCompleted: true,
+          candidates: [candidate, otherCandidate],
+        }),
       );
 
       await waitFor(() => expect(scanButton("スキャン（新しい項目あり）")).toBeInTheDocument());
@@ -258,10 +283,19 @@ describe("TopBar のスキャン入口", () => {
     it("候補が減っただけでは点を出さない", () => {
       const { queryClient } = renderTopBar({
         candidates: [candidate, otherCandidate],
-        seen: { candidates: [candidate.path, otherCandidate.path].sort(), needsAttention: [] },
+        seen: {
+          candidates: [candidate.path, otherCandidate.path].sort(),
+          needsAttention: [],
+          changes: [],
+        },
       });
 
-      act(() => queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), [candidate]));
+      act(() =>
+        queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), {
+          scanCompleted: true,
+          candidates: [candidate],
+        }),
+      );
 
       expect(scanButton("スキャン")).toBeInTheDocument();
     });
@@ -269,8 +303,8 @@ describe("TopBar のスキャン入口", () => {
     it("要対応の新しい項目でも点を出す", () => {
       renderTopBar({
         candidates: [],
-        record: unreadableRecord,
-        seen: { candidates: [], needsAttention: [] },
+        diagnostics: unreadableDiagnostics,
+        seen: { candidates: [], needsAttention: [], changes: [] },
       });
 
       expect(scanButton("スキャン（新しい項目あり）")).toBeInTheDocument();
@@ -279,8 +313,32 @@ describe("TopBar のスキャン入口", () => {
     it("見た要対応の項目には点を出さない", () => {
       renderTopBar({
         candidates: [],
-        record: unreadableRecord,
-        seen: { candidates: [], needsAttention: [UNREADABLE_KEY] },
+        diagnostics: unreadableDiagnostics,
+        seen: { candidates: [], needsAttention: [UNREADABLE_KEY], changes: [] },
+      });
+
+      expect(scanButton("スキャン")).toBeInTheDocument();
+    });
+
+    it("スキャンで変化があれば点を出し、開くと消える。変化なしのスキャンでは出さない", async () => {
+      const { store } = renderTopBar({
+        candidates: [],
+        changes: { newCount: 2, updatedCount: 1 },
+        seen: { candidates: [], needsAttention: [], changes: [] },
+      });
+      expect(scanButton("スキャン（新しい項目あり）")).toBeInTheDocument();
+
+      openScan(store);
+      await waitFor(() => expect(storedSeen().changes).toEqual(["2026-01-01T00:00:00.000Z"]));
+      closeModal(store);
+      expect(scanButton("スキャン")).toBeInTheDocument();
+    });
+
+    it("変化のなかったスキャンでは点を出さない", () => {
+      renderTopBar({
+        candidates: [],
+        changes: { newCount: 0, updatedCount: 0 },
+        seen: { candidates: [], needsAttention: [], changes: [] },
       });
 
       expect(scanButton("スキャン")).toBeInTheDocument();
@@ -296,9 +354,9 @@ describe("TopBar のスキャン入口", () => {
     it("読み込み中の集合で記憶を上書きしない", async () => {
       const { store, queryClient } = renderTopBar({
         candidates: [candidate],
-        record: unreadableRecord,
+        diagnostics: unreadableDiagnostics,
         diagnosticsPending: true,
-        seen: { candidates: [], needsAttention: [UNREADABLE_KEY] },
+        seen: { candidates: [], needsAttention: [UNREADABLE_KEY], changes: [] },
       });
 
       openScan(store);

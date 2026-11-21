@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { workspacePath, type ScanResult } from "@mimimilli/shared";
 import { ScanRecordStore, type ExistingWorkStatuses } from "../src/scanRecord.ts";
 
-/** 記録した作品がすべて存在し、行方不明のままである状態 */
+/** 記録した作品がすべて存在する状態 */
 function allExist(store: ScanRecordStore): ExistingWorkStatuses {
   return new Map(store.snapshotWorkIds().map((id) => [id, "missing" as const]));
 }
@@ -13,7 +13,6 @@ function result(overrides: Partial<ScanResult> = {}): ScanResult {
     registered: 0,
     insertedWorkIds: [],
     startedWithEmptyCatalog: false,
-    missingWorks: [],
     updatedWorks: [],
     errors: 0,
     missing: 0,
@@ -29,8 +28,6 @@ test("未スキャンの記録は finishedAt が null の空", () => {
   assert.deepEqual(store.snapshot(allExist(store)), {
     finishedAt: null,
     updatedWorks: [],
-    missingWorks: [],
-    unreadablePaths: [],
   });
   assert.deepEqual(store.workIds("new"), []);
 });
@@ -80,32 +77,11 @@ test("updated は変化の種類で絞れる", () => {
   assert.deepEqual(store.workIds("updated", "meta"), ["f"]);
 });
 
-test("snapshot は存在しない作品を落とし、新たな行方不明は存在してかつ行方不明のままのものだけ残す", () => {
+test("snapshot は存在しない更新済みの作品を落とす", () => {
   const store = new ScanRecordStore();
-  store.replace(
-    result({
-      insertedWorkIds: ["w"],
-      updatedWorks: [{ workId: "w", changes: [{ kind: "meta" }] }],
-      missingWorks: [{ workId: "w", title: "t", previousPath: workspacePath("p") }],
-      dataIntegrityWarning: { skippedCount: 2, skippedWorkIds: ["w", "z"] },
-    }),
-    "t",
-  );
-
-  const gone = store.snapshot(new Map([["z", "ok"]]));
-  assert.deepEqual(gone.updatedWorks, []);
-  assert.deepEqual(gone.missingWorks, []);
-  assert.deepEqual(gone.dataIntegrityWarning, { skippedCount: 1, skippedWorkIds: ["z"] });
-
-  const restored = store.snapshot(new Map([["w", "ok"]]));
-  assert.equal(restored.updatedWorks.length, 1);
-  assert.deepEqual(restored.missingWorks, []);
-  assert.deepEqual(restored.dataIntegrityWarning, { skippedCount: 1, skippedWorkIds: ["w"] });
-
-  assert.equal(store.snapshot(new Map()).dataIntegrityWarning, undefined);
-  store.resolveDataIntegrity("z");
-  store.resolveDataIntegrity("w");
-  assert.equal(store.snapshot(allExist(store)).dataIntegrityWarning, undefined);
+  store.replace(result({ updatedWorks: [{ workId: "w", changes: [{ kind: "meta" }] }] }), "t");
+  assert.deepEqual(store.snapshot(new Map()).updatedWorks, []);
+  assert.equal(store.snapshot(new Map([["w", "ok"]])).updatedWorks.length, 1);
 });
 
 test("reset で空に戻る", () => {
@@ -116,37 +92,11 @@ test("reset で空に戻る", () => {
   assert.deepEqual(store.workIds("new"), []);
 });
 
-test("スキャン実行中に読み直しで直った作品は完了時の新しい記録に戻らない", () => {
-  const store = new ScanRecordStore();
-  store.beginScan();
-  store.resolveDataIntegrity("fixed");
-  store.replace(
-    result({ dataIntegrityWarning: { skippedCount: 2, skippedWorkIds: ["fixed", "other"] } }),
-    "t",
-  );
-  const snapshot = store.snapshot(allExist(store));
-  assert.deepEqual(snapshot.dataIntegrityWarning, { skippedCount: 1, skippedWorkIds: ["other"] });
-
-  store.replace(
-    result({ dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["fixed"] } }),
-    "t2",
-  );
-  assert.equal(store.snapshot(allExist(store)).dataIntegrityWarning?.skippedCount, 1);
-});
-
-test("中止・失敗でスキャンが終わると、実行中の引き継ぎ履歴は捨てられる", () => {
+test("中止・失敗でスキャンが終わると、実行中に追加した作品の履歴は捨てられる", () => {
   const store = new ScanRecordStore();
   store.beginScan();
   store.addNewWorks(["added"]);
-  store.resolveDataIntegrity("fixed");
   store.endScan();
-  store.replace(
-    result({
-      insertedWorkIds: ["inserted"],
-      dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["fixed"] },
-    }),
-    "t",
-  );
+  store.replace(result({ insertedWorkIds: ["inserted"] }), "t");
   assert.deepEqual(store.workIds("new"), ["inserted"]);
-  assert.equal(store.snapshot(allExist(store)).dataIntegrityWarning?.skippedCount, 1);
 });

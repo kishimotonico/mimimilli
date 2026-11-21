@@ -79,7 +79,9 @@ export function createCandidateMaterials(deps: {
     },
 
     async describeCandidates(): Promise<CandidateDescriber> {
-      const missingWorksByRjCode = groupMissingWorksByRjCode(query.listMissingWorksWithRjCode());
+      const missingWorksByRjCode = groupMissingWorksByRjCode(
+        query.listMissingWorksWithRjCode(requireRoot()),
+      );
       return (rjCode) => ({
         dlsite: deriveDlsiteProductSummary(deps.candidateDlsite, rjCode),
         missingWorks: rjCode ? (missingWorksByRjCode.get(rjCode) ?? []) : [],

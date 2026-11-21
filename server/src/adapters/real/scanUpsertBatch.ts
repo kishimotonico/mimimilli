@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { IdentityConflict, InvalidMetaFile, Work } from "@mimimilli/shared";
+import type { IdentityConflict, InvalidMetaFile, Work, WorkspacePath } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
@@ -99,6 +99,7 @@ export class ScanUpsertBatch {
     missingIds: string[];
     identityConflicts: IdentityConflict[];
     invalidMetaFiles: InvalidMetaFile[];
+    unreadablePaths: WorkspacePath[];
   }): void {
     this.checkAbort();
     this.db.userTransaction(() => {
@@ -119,6 +120,7 @@ export class ScanUpsertBatch {
       }
       this.catalog.replaceIdentityConflicts(input.identityConflicts);
       this.catalog.replaceInvalidMetaFiles(input.invalidMetaFiles);
+      this.catalog.replaceUnreadablePaths(input.unreadablePaths);
       this.catalog.applyScanVerdict(input);
     });
   }

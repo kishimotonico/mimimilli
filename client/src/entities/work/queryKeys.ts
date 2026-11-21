@@ -2,6 +2,7 @@ export const WORK_QUERY_KEYS = {
   all: () => ["works"] as const,
   list: (params: object) => ["works", params] as const,
   total: () => ["works", "total"] as const,
+  scanNewCount: () => ["works", "scanNewCount"] as const,
   errorViewCount: () => ["works", "errorViewCount"] as const,
   missingCount: () => ["works", "missingCount"] as const,
   allDetails: () => ["work"] as const,

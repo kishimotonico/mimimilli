@@ -156,7 +156,7 @@ test("作品を選ぶとプレビューが開く（行方不明の状態表示�
   assertNoErrors(tracker);
 });
 
-test("詳細パネルの「その他」メニューから作品登録を解除できる（確認ダイアログ経由、パネルは閉じ一覧から消える）", async ({
+test("詳細パネルの「その他」メニューから登録解除できる（確認ダイアログ経由、パネルは閉じ一覧から消える）", async ({
   page,
 }) => {
   const tracker = trackErrors(page);
@@ -167,9 +167,9 @@ test("詳細パネルの「その他」メニューから作品登録を解除�
   const panel = page.locator(".mle-prv");
   await expect(panel).toBeVisible();
   await panel.getByRole("button", { name: "その他" }).click();
-  await panel.getByRole("menuitem", { name: "作品登録を解除" }).click();
+  await panel.getByRole("menuitem", { name: "登録解除" }).click();
 
-  const dialog = page.getByRole("alertdialog", { name: "登録を解除" });
+  const dialog = page.getByRole("alertdialog", { name: "登録解除" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "解除する" }).click();
 
@@ -177,7 +177,7 @@ test("詳細パネルの「その他」メニューから作品登録を解除�
   await expect(
     page.locator(".mll-results").getByText("添い寝カフェへようこそ", { exact: false }),
   ).toBeHidden();
-  await expect(page.getByText("の登録を解除しました", { exact: false })).toBeVisible();
+  await expect(page.getByText("を登録解除しました", { exact: false })).toBeVisible();
 
   assertNoErrors(tracker);
 });
@@ -343,7 +343,9 @@ test("スキャンダイアログが開いて完了し、閉じられる", async
   await expect(dialog.getByRole("heading", { name: "スキャン", level: 2 })).toBeVisible();
 
   await dialog.getByRole("button", { name: "スキャン", exact: true }).click();
-  await expect(dialog.getByText("完了しました")).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.getByRole("tab", { name: /^新規作品（\d+件）/ })).toBeVisible({
+    timeout: 15_000,
+  });
 
   await dialog.getByRole("tab", { name: /^新規作品/ }).click();
   await expect(
@@ -365,7 +367,9 @@ test("更新済みタブで変更内容を種類別に絞り込め、作品タ�
   await page.getByRole("button", { name: "スキャン" }).click();
   const dialog = page.getByRole("dialog", { name: "スキャン" });
   await dialog.getByRole("button", { name: "スキャン", exact: true }).click();
-  await expect(dialog.getByText("完了しました")).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.getByRole("tab", { name: /^更新済み（\d+件）/ })).toBeVisible({
+    timeout: 15_000,
+  });
 
   await dialog.getByRole("tab", { name: "更新済み" }).click();
   const panel = dialog.getByRole("tabpanel", { name: "更新済み" });
@@ -400,7 +404,9 @@ test("新規作品タブでパスを押すとFilesが開き、スキャンモー
   await page.getByRole("button", { name: "スキャン" }).click();
   const dialog = page.getByRole("dialog", { name: "スキャン" });
   await dialog.getByRole("button", { name: "スキャン", exact: true }).click();
-  await expect(dialog.getByText("完了しました")).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.getByRole("tab", { name: /^新規作品（\d+件）/ })).toBeVisible({
+    timeout: 15_000,
+  });
 
   await dialog.getByRole("tab", { name: "新規作品" }).click();
   const panel = dialog.getByRole("tabpanel", { name: "新規作品" });
@@ -428,7 +434,8 @@ test("未登録タブでRJコードを編集でき、選んだ候補を除外し
   const dialog = page.getByRole("dialog", { name: "スキャン" });
   await dialog.getByRole("button", { name: "スキャン", exact: true }).click();
 
-  const unregistered = dialog.getByRole("tabpanel", { name: "未登録" });
+  await dialog.getByRole("tab", { name: /^未登録（/ }).click();
+  const unregistered = dialog.getByRole("tabpanel", { name: /^未登録/ });
   await expect(unregistered).toBeVisible({ timeout: 15_000 });
 
   // 行の accessible name は全セルの連結。行の識別は先頭セル（チェックボックスのラベル）へのアンカーで一意にする。
@@ -440,22 +447,24 @@ test("未登録タブでRJコードを編集でき、選んだ候補を除外し
   await expect(editRow.getByRole("button", { name: "RJ999999" })).toBeVisible();
 
   const excludeRowName = /^「候補」を選択/;
-  await unregistered.getByRole("checkbox", { name: "「未登録作品」を選択" }).uncheck();
-  await unregistered.getByRole("button", { name: "除外", exact: true }).click();
+  await unregistered.getByRole("button", { name: "「候補」の操作" }).click();
+  await page.getByRole("menuitem", { name: "除外", exact: true }).click();
   await expect(unregistered.getByRole("row", { name: excludeRowName })).toBeHidden();
 
-  await expect(dialog.getByText("1件を候補から外しました")).toBeVisible();
+  await expect(dialog.getByText("「候補」を除外しました")).toBeVisible();
   await dialog.getByRole("button", { name: "元に戻す" }).click();
   await expect(unregistered.getByRole("row", { name: excludeRowName })).toBeVisible();
   await dialog.getByRole("tab", { name: "新規作品" }).click();
   await expect(dialog.getByRole("tab", { name: "未登録（2件）" })).toBeVisible();
 
-  // 元に戻すのトーストはタブを離れると消えるため、除外での件数の減少は別のタブから確かめる
   await dialog.getByRole("tab", { name: /^未登録/ }).click();
-  await unregistered.getByRole("checkbox", { name: "「未登録作品」を選択" }).uncheck();
-  await unregistered.getByRole("button", { name: "除外", exact: true }).click();
-  await dialog.getByRole("tab", { name: "新規作品" }).click();
+  await unregistered.getByRole("button", { name: "「候補」の操作" }).click();
+  await page.getByRole("menuitem", { name: "除外", exact: true }).click();
   await expect(dialog.getByRole("tab", { name: "未登録（1件）" })).toBeVisible();
+
+  await unregistered.getByRole("button", { name: /^除外済み/ }).click();
+  await unregistered.getByRole("button", { name: /を未登録に戻す$/ }).click();
+  await expect(dialog.getByRole("tab", { name: "未登録（2件）" })).toBeVisible();
 
   assertNoErrors(tracker);
 });
@@ -467,7 +476,8 @@ test("スキャン完了後に候補を選択登録でき、問題をFilesで確
   const dialog = page.getByRole("dialog", { name: "スキャン" });
   await dialog.getByRole("button", { name: "スキャン", exact: true }).click();
 
-  const unregistered = dialog.getByRole("tabpanel", { name: "未登録" });
+  await dialog.getByRole("tab", { name: /^未登録（/ }).click();
+  const unregistered = dialog.getByRole("tabpanel", { name: /^未登録/ });
   await expect(unregistered).toBeVisible({ timeout: 15_000 });
 
   await unregistered.getByRole("button", { name: "2件を追加" }).click();
@@ -530,8 +540,9 @@ test("FilesでID重複を表示し、確認して別の作品として取り込�
   const scanDialog = page.getByRole("dialog", { name: "スキャン" });
   await scanDialog.getByRole("tab", { name: /^要対応/ }).click();
   const attention = scanDialog.getByRole("tabpanel", { name: "要対応" });
-  await expect(attention.getByRole("row", { name: /夜想曲スタジオ/ })).toBeHidden();
+  await expect(attention.getByRole("row", { name: /ID重複/ })).toBeHidden();
   await expect(attention.getByRole("row", { name: /copies\// })).toBeHidden();
+  await expect(attention.getByRole("row", { name: /お気に入りだった朗読劇/ })).toBeVisible();
 
   assertNoErrors(tracker);
 });
@@ -612,7 +623,7 @@ test("Files: 未登録の音声ファイルを作品として登録できる", a
   const dialog = page.getByRole("dialog", { name: "このファイルを作品として登録" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "登録" }).click();
-  await expect(preview.getByRole("button", { name: "作品登録を解除" })).toBeVisible();
+  await expect(preview.getByRole("button", { name: "登録解除" })).toBeVisible();
 
   await page.getByRole("button", { name: "ライブラリ", exact: true }).click();
   await page.getByPlaceholder("ライブラリを検索（タイトル · CV · タグ · RJ ...）").fill("d00001");

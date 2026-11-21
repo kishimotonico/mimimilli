@@ -40,8 +40,10 @@ interface AxisColumnProps {
   tagPrefixes: TagPrefix[];
   smartFolders: SmartFolder[];
   selectedTags: NormalizedTag[];
-  /** エラービュー（status !== "ok"）の件数。0またはundefined（未取得）の間は軸レールから隠す */
+  /** エラービュー（status !== "ok"）の件数 */
   errorViewCount?: number;
+  /** 一覧から外れたデータ不整合の作品数。エラービューのバナーが辿り着く先なので、0件の作品でも入口を残す */
+  dataIntegrityCount?: number;
   /** ライブラリ全体の統計。軸レール下部に常時表示する */
   stats: CollectionStatsDisplay;
   /** 分類軸の元になる GET /tag-prefixes の取得失敗。無言でCV/サークル等の行が
@@ -115,6 +117,7 @@ export default function AxisColumn({
   smartFolders,
   selectedTags,
   errorViewCount,
+  dataIntegrityCount,
   stats,
   isTagPrefixesError,
   onSelectAxis,
@@ -125,8 +128,8 @@ export default function AxisColumn({
   onRetryTagPrefixes,
 }: AxisColumnProps) {
   const viewAxisRows = buildViewAxisRows()
-    .filter((ax) => ax.id !== "error" || !!errorViewCount)
-    .map((ax) => (ax.id === "error" ? { ...ax, badge: errorViewCount } : ax));
+    .filter((ax) => ax.id !== "error" || !!errorViewCount || !!dataIntegrityCount)
+    .map((ax) => (ax.id === "error" ? { ...ax, badge: errorViewCount || undefined } : ax));
   const facetAxisRows = buildFacetAxisRows(tagPrefixes);
   const {
     openKey: overlayAxis,

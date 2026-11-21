@@ -53,10 +53,14 @@ async function setup(t: TestContext) {
       };
       return current.status === "completed";
     });
-    return (await (await app.request("/api/scan/last")).json()) as {
-      dataIntegrityWarning?: { skippedCount: number; skippedWorkIds: string[] };
-    };
+    return integrityIds();
   };
+  const integrityIds = async () =>
+    (
+      (await (await app.request("/api/scan/diagnostics")).json()) as {
+        dataIntegrityWorks: Array<{ workId: string }>;
+      }
+    ).dataIntegrityWorks.map((work) => work.workId);
   const listedIds = async () => {
     const page = (await (await app.request("/api/works")).json()) as {
       items: Array<{ id: string }>;
@@ -64,40 +68,50 @@ async function setup(t: TestContext) {
     return page.items.map((item) => item.id);
   };
   const reload = (id: string) => app.request(`/api/works/${id}/reload`, { method: "POST" });
-  return { lib, app, targetId, otherId, corrupt, corruptUser, scanAndRead, listedIds, reload };
+  return {
+    lib,
+    app,
+    targetId,
+    otherId,
+    corrupt,
+    corruptUser,
+    scanAndRead,
+    integrityIds,
+    listedIds,
+    reload,
+  };
 }
 
-test("読み直すと、除外されていた作品が一覧へ戻り、スキャンの記録のデータ不整合から消える", async (t) => {
-  const { targetId, otherId, corrupt, scanAndRead, listedIds, reload } = await setup(t);
+test("読み直すと、除外されていた作品が一覧へ戻り、診断のデータ不整合から消える", async (t) => {
+  const { targetId, otherId, corrupt, scanAndRead, integrityIds, listedIds, reload } =
+    await setup(t);
   corrupt(targetId);
-  const last = await scanAndRead();
-  assert.deepEqual(last.dataIntegrityWarning?.skippedWorkIds, [targetId]);
+  assert.deepEqual(await scanAndRead(), [targetId]);
   assert.deepEqual(await listedIds(), [otherId]);
 
   const res = await reload(targetId);
   assert.equal(res.status, 204);
 
   assert.deepEqual((await listedIds()).sort(), [targetId, otherId].sort());
-  const after = await scanAndRead();
-  assert.equal(after.dataIntegrityWarning, undefined);
+  assert.deepEqual(await integrityIds(), []);
+  assert.deepEqual(await scanAndRead(), []);
 });
 
 test("読み直しで消えるのは対象だけで、ほかの除外された作品は残る", async (t) => {
-  const { app, targetId, otherId, corrupt, scanAndRead, listedIds, reload } = await setup(t);
+  const { targetId, otherId, corrupt, scanAndRead, integrityIds, listedIds, reload } =
+    await setup(t);
   corrupt(targetId);
   corrupt(otherId);
   await scanAndRead();
 
   assert.equal((await reload(targetId)).status, 204);
-  const last = (await (await app.request("/api/scan/last")).json()) as {
-    dataIntegrityWarning?: { skippedWorkIds: string[] };
-  };
-  assert.deepEqual(last.dataIntegrityWarning?.skippedWorkIds, [otherId]);
+  assert.deepEqual(await integrityIds(), [otherId]);
   assert.deepEqual(await listedIds(), [targetId]);
 });
 
 test("作品情報ファイルが無いと読み直しは失敗し、ほかの作品に影響しない", async (t) => {
-  const { lib, app, targetId, otherId, corrupt, scanAndRead, listedIds, reload } = await setup(t);
+  const { lib, targetId, otherId, corrupt, scanAndRead, integrityIds, listedIds, reload } =
+    await setup(t);
   corrupt(targetId);
   await scanAndRead();
   rmSync(join(lib.root, "dlsite", "RJ900002_既存メタ", "mimimilli.json"));
@@ -105,10 +119,7 @@ test("作品情報ファイルが無いと読み直しは失敗し、ほかの�
   const res = await reload(targetId);
   assert.equal(res.status, 409);
   assert.deepEqual(await listedIds(), [otherId]);
-  const last = (await (await app.request("/api/scan/last")).json()) as {
-    dataIntegrityWarning?: { skippedWorkIds: string[] };
-  };
-  assert.deepEqual(last.dataIntegrityWarning?.skippedWorkIds, [targetId]);
+  assert.deepEqual(await integrityIds(), [targetId]);
 });
 
 test("存在しない作品の読み直しは404", async (t) => {
@@ -116,17 +127,17 @@ test("存在しない作品の読み直しは404", async (t) => {
   assert.equal((await reload("no-such-work")).status, 404);
 });
 
-test("userの保存値が壊れていて読み直しでは直らないときは409で、記録の警告も残り、ほかの作品に影響しない", async (t) => {
-  const { app, targetId, otherId, corruptUser, scanAndRead, listedIds, reload } = await setup(t);
+test("userの保存値が壊れていて読み直しでは直らないときは409で、診断のデータ不整合も残り、ほかの作品に影響しない", async (t) => {
+  const { targetId, otherId, corruptUser, scanAndRead, integrityIds, listedIds, reload } =
+    await setup(t);
   corruptUser(targetId);
   await scanAndRead();
   assert.deepEqual(await listedIds(), [otherId]);
 
-  assert.equal((await reload(targetId)).status, 409);
+  const unresolved = await reload(targetId);
+  assert.equal(unresolved.status, 409);
+  assert.equal((await unresolved.json()).error.code, "reload_unresolved");
 
   assert.deepEqual(await listedIds(), [otherId]);
-  const last = (await (await app.request("/api/scan/last")).json()) as {
-    dataIntegrityWarning?: { skippedWorkIds: string[] };
-  };
-  assert.deepEqual(last.dataIntegrityWarning?.skippedWorkIds, [targetId]);
+  assert.deepEqual(await integrityIds(), [targetId]);
 });

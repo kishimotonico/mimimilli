@@ -83,7 +83,8 @@ export default function PopupContent({
             icon={I.x}
             label="再生を停止"
             onClick={onStop}
-            className="ml-1 hover:text-[var(--r-coral)]"
+            tone="danger"
+            className="ml-1"
           />
         </div>
       </div>

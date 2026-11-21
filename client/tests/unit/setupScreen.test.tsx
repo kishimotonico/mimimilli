@@ -57,7 +57,7 @@ beforeEach(() => {
     "GET /api/settings": SETUP_SETTINGS,
     "GET /api/scan/active": () => apiNoContent(),
     "GET /api/scan/last": () => apiNoContent(),
-    "GET /api/scan/candidates": { candidates: [] },
+    "GET /api/scan/candidates": { scanCompleted: true, candidates: [] },
     "POST /api/root-reconfiguration": () => startReply,
   });
 });

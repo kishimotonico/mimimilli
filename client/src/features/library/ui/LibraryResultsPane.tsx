@@ -59,9 +59,7 @@ export default function LibraryResultsPane({
 }: LibraryResultsPaneProps) {
   const resultsBanner = activeSmartFolder ? (
     <div className="flex flex-col gap-2">
-      {result.dataIntegrityWarning ? (
-        <DataIntegrityWarningBanner skippedCount={result.dataIntegrityWarning.skippedCount} />
-      ) : null}
+      <DataIntegrityWarningBanner />
       <SmartFolderView
         sf={activeSmartFolder}
         total={result.worksTotal}
@@ -71,12 +69,15 @@ export default function LibraryResultsPane({
       />
     </div>
   ) : isErrorView ? (
-    <ErrorViewBulkUnregisterBanner
-      missingCount={missingWorksCount}
-      onUnregistered={() => {
-        if (selectedWork?.status === "missing") nav.selectWork(null);
-      }}
-    />
+    <div className="flex flex-col gap-2">
+      <DataIntegrityWarningBanner />
+      <ErrorViewBulkUnregisterBanner
+        missingCount={missingWorksCount}
+        onUnregistered={() => {
+          if (selectedWork?.status === "missing") nav.selectWork(null);
+        }}
+      />
+    </div>
   ) : undefined;
 
   const workResultsProps: WorkResultsProps = {

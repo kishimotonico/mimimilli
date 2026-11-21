@@ -168,14 +168,14 @@ describe("WorkDetail: 再生ボタンの状態導出", () => {
   });
 });
 
-describe("WorkDetail: 作品登録の解除", () => {
+describe("WorkDetail: 登録解除", () => {
   it("その他メニューから解除を選び確認ダイアログで解除するとmutation.mutateAsyncを呼ぶ", () => {
     const mutateAsync = vi.fn(() => new Promise<void>(() => {}));
     renderDetail({ deleteMutation: makeDeleteMutationStub({ mutateAsync }) });
 
     fireEvent.click(screen.getByRole("button", { name: "その他" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "作品登録を解除" }));
-    expect(screen.getByRole("alertdialog", { name: "登録を解除" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
+    expect(screen.getByRole("alertdialog", { name: "登録解除" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "解除する" }));
     expect(mutateAsync).toHaveBeenCalledWith("w1");
@@ -186,7 +186,7 @@ describe("WorkDetail: 作品登録の解除", () => {
     renderDetail({ deleteMutation: makeDeleteMutationStub({ mutateAsync }) });
 
     fireEvent.click(screen.getByRole("button", { name: "その他" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "作品登録を解除" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
     fireEvent.click(screen.getByRole("button", { name: "キャンセル" }));
 
     expect(mutateAsync).not.toHaveBeenCalled();
@@ -204,14 +204,14 @@ describe("WorkDetail: 作品登録の解除", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "その他" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "作品登録を解除" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
     fireEvent.click(screen.getByRole("button", { name: "解除する" }));
 
     await waitFor(() => expect(onUnregistered).toHaveBeenCalledTimes(1));
     const requests = [...store.get(toastRequestsAtom).values()];
     expect(requests).toContainEqual(
       expect.objectContaining({
-        message: "「作品X」の登録を解除しました",
+        message: "「作品X」を登録解除しました",
         variant: "success",
       }),
     );
@@ -234,14 +234,14 @@ describe("WorkDetail: 作品登録の解除", () => {
     });
 
     fireEvent.click(screen.getByRole("button", { name: "その他" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "作品登録を解除" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
     fireEvent.click(screen.getByRole("button", { name: "解除する" }));
     view.unmount();
     resolveDelete();
 
     await waitFor(() => expect(onUnregistered).toHaveBeenCalledTimes(1));
     expect([...store.get(toastRequestsAtom).values()]).toContainEqual(
-      expect.objectContaining({ message: "「作品Y」の登録を解除しました" }),
+      expect.objectContaining({ message: "「作品Y」を登録解除しました" }),
     );
   });
 });

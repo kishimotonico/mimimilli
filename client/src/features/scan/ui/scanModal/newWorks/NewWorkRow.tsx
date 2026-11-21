@@ -7,6 +7,7 @@ import { I } from "../../../../../shared/ui/Icon";
 import StatusLabel from "../../../../../shared/ui/StatusLabel";
 import { useInlineEditKeyDown } from "../../../../../shared/ui/useInlineEditKeyDown";
 import { newWorkDlsiteLink } from "../../../model/newWorkDlsiteLink";
+import ScanCover from "../ScanCover";
 import { PathLink } from "../ScanLinks";
 import { EDIT_FIELD_CLASS, NEW_WORKS_GRID_CLASS, ROW_HEIGHT } from "./layout";
 import type { InlineTitleEdit } from "./useInlineTitleEdit";
@@ -34,18 +35,23 @@ export default function NewWorkRow({ work, edit, onOpenFiles, onOpenWorkDetail }
       className={cn(NEW_WORKS_GRID_CLASS, "group border-b border-line-soft")}
     >
       <div role="cell" className="flex items-center">
-        <CoverImg
-          id={work.id}
-          title={work.title}
-          cover={work.cover}
-          size={36}
-          radius={4}
-          requestWidth={selectFixedCoverThumbnailWidth(36, window.devicePixelRatio)}
-          loading="lazy"
-        />
+        <ScanCover>
+          {work.cover && (
+            <CoverImg
+              id={work.id}
+              title={work.title}
+              cover={work.cover}
+              size={36}
+              radius={0}
+              fit="fill"
+              requestWidth={selectFixedCoverThumbnailWidth(36, window.devicePixelRatio)}
+              loading="lazy"
+            />
+          )}
+        </ScanCover>
       </div>
-      <div role="cell" className="flex min-w-0 flex-col justify-center gap-0.5">
-        <div className="flex min-w-0 items-center gap-1">
+      <div role="cell" className="flex min-w-0 flex-col justify-center gap-px">
+        <div className="-ml-1.5 flex min-w-0 items-center gap-1">
           {editing ? (
             <input
               ref={edit.titleInputRef}
@@ -58,7 +64,7 @@ export default function NewWorkRow({ work, edit, onOpenFiles, onOpenWorkDetail }
               className={cn(
                 EDIT_FIELD_CLASS,
                 "w-full bg-paper-2 text-ink-0 disabled:opacity-60",
-                editError ? "border-[var(--r-coral)]" : "border-acc",
+                editError ? "border-[var(--state-danger)]" : "border-acc",
               )}
             />
           ) : (
@@ -87,17 +93,17 @@ export default function NewWorkRow({ work, edit, onOpenFiles, onOpenWorkDetail }
         {editError ? (
           <span
             role="alert"
-            className="mll-selectable truncate px-1.5 font-jp text-caption text-[var(--r-coral)]"
+            className="mll-selectable truncate font-jp text-caption text-[var(--state-danger)]"
           >
             {editError}
           </span>
         ) : (
-          <span className="flex min-w-0 px-1.5">
+          <span className="flex min-w-0">
             <PathLink path={work.relativePath} onOpen={onOpenFiles} />
           </span>
         )}
       </div>
-      <div role="cell" className="min-w-0 truncate font-mono text-mono text-ink-2">
+      <div role="cell" className="min-w-0 truncate font-mono text-body text-ink-1">
         {hasRjCode(work.dlsite) ? work.dlsite.rjCode : ""}
       </div>
       <div role="cell" className="flex items-center">
@@ -107,7 +113,7 @@ export default function NewWorkRow({ work, edit, onOpenFiles, onOpenWorkDetail }
           </StatusLabel>
         )}
         {link === "unlinked" && (
-          <StatusLabel tone="none" icon={I.linkOff} className="text-ink-3">
+          <StatusLabel tone="none" icon={I.linkOff} className="text-ink-2">
             未連携
           </StatusLabel>
         )}

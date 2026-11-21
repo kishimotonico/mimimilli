@@ -3,10 +3,9 @@ import {
   DLSITE_JOB_MAX_PRODUCT_CODES,
   dlsiteJobEventSchema,
   canonicalDlsiteProductCode,
-  type DlsiteJobBulkProgress,
+  type DlsiteJobProgress,
   type DlsiteJobCode,
   type DlsiteJobCodeState,
-  type DlsiteJobOrigin,
   type DlsiteJobSnapshot,
   type DlsiteJobState as DlsiteServerState,
   type DlsiteTerminalProductSummary,
@@ -25,7 +24,7 @@ import {
 import { formatUserError } from "../../../shared/lib/formatUserError";
 import { isRootReconfiguringError } from "../../settings/apiErrorHelpers";
 import {
-  cancelDlsiteJobBulk,
+  cancelDlsiteJob,
   DLSITE_JOB_EVENTS_URL,
   getCurrentDlsiteJob,
   startDlsiteJob,
@@ -39,9 +38,9 @@ export type DlsiteJobCodeView = DistributiveOmit<DlsiteJobCode, "productCode">;
 export interface DlsiteJobView {
   jobId: string;
   status: "running" | "finished";
-  /** 正規化したproduct code → 起点と状態 */
+  /** 正規化したproduct code → 状態 */
   codes: ReadonlyMap<string, DlsiteJobCodeView>;
-  bulk: DlsiteJobBulkProgress;
+  progress: DlsiteJobProgress;
 }
 
 /** コードごとの最新の終端の結果。ジョブが入れ替わっても残す */
@@ -55,10 +54,8 @@ export interface DlsiteJobState {
   revision: number;
   job: DlsiteJobView | null;
   results: ReadonlyMap<string, DlsiteCodeResult>;
-  /** まとめての開始（分割POSTを含む）の応答待ち。枠をすぐ進捗に切り替えるため件数を持つ */
-  startingBulk: { total: number } | null;
-  /** 単発の開始のPOSTの応答待ち */
-  pendingSingles: ReadonlySet<string>;
+  /** 開始（分割POSTを含む）の応答待ち。枠をすぐ進捗に切り替えるため件数を持つ */
+  starting: { total: number } | null;
   cancelling: boolean;
   error: string | null;
 }
@@ -66,7 +63,6 @@ export interface DlsiteJobState {
 /** 終端に達したコード。known が false は、ミラーが別のジョブに替わるまで終わりを見なかったコード（結果は不明） */
 export interface DlsiteSettledCode {
   code: string;
-  origin: DlsiteJobOrigin;
   known: boolean;
 }
 
@@ -80,14 +76,14 @@ export type DlsiteJobActionResult = { ok: true } | { ok: false; error: string };
 export interface DlsiteJobDeps {
   startJob: typeof startDlsiteJob;
   getCurrent: typeof getCurrentDlsiteJob;
-  cancelBulk: typeof cancelDlsiteJobBulk;
+  cancel: typeof cancelDlsiteJob;
   connect: (url: string) => SseConnection;
 }
 
 const DEFAULT_DEPS: DlsiteJobDeps = {
   startJob: (body) => startDlsiteJob(body),
   getCurrent: () => getCurrentDlsiteJob(),
-  cancelBulk: (jobId) => cancelDlsiteJobBulk(jobId),
+  cancel: (jobId) => cancelDlsiteJob(jobId),
   connect: (url) => connectSse(url),
 };
 
@@ -104,17 +100,15 @@ export const INITIAL_DLSITE_JOB_STATE: DlsiteJobState = {
   revision: 0,
   job: null,
   results: new Map(),
-  startingBulk: null,
-  pendingSingles: new Set(),
+  starting: null,
   cancelling: false,
   error: null,
 };
 
 export interface DlsiteJobStore extends ReadableStore<DlsiteJobState> {
   subscribeEvents(listener: (event: DlsiteJobStoreEvent) => void): () => void;
-  startBulk(productCodes: string[]): Promise<DlsiteJobActionResult>;
-  startSingle(productCode: string): Promise<DlsiteJobActionResult>;
-  cancelBulk(): Promise<DlsiteJobActionResult>;
+  start(productCodes: string[], force: boolean): Promise<DlsiteJobActionResult>;
+  cancel(): Promise<DlsiteJobActionResult>;
   /** サーバーの現在の状態を取り込む。実行中のジョブがあれば追跡を始める */
   attach(): Promise<void>;
   clearError(): void;
@@ -135,7 +129,7 @@ function toView(snapshot: DlsiteJobSnapshot): DlsiteJobView {
   for (const { productCode, ...view } of snapshot.codes) {
     codes.set(canonicalDlsiteProductCode(productCode), view as DlsiteJobCodeView);
   }
-  return { jobId: snapshot.jobId, status: snapshot.status, codes, bulk: snapshot.bulk };
+  return { jobId: snapshot.jobId, status: snapshot.status, codes, progress: snapshot.progress };
 }
 
 function toServerView(state: DlsiteServerState): { revision: number; job: DlsiteJobView | null } {
@@ -171,14 +165,14 @@ function transitionOf(
       if (!isTerminalCodeState(entry.state)) continue;
       const before = sameJob ? prev.codes.get(code) : undefined;
       if (!before || before.revision < entry.revision) {
-        reached.push({ code, origin: entry.origin, known: true });
+        reached.push({ code, known: true });
       }
     }
   }
   if (!sameJob) {
     for (const [code, entry] of prev.codes) {
       if (!isTerminalCodeState(entry.state)) {
-        reached.push({ code, origin: entry.origin, known: false });
+        reached.push({ code, known: false });
       }
     }
   }
@@ -257,12 +251,14 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
         }
         const codes = new Map(job.codes);
         if (event.type === "code") {
-          const { type: _type, jobId: _jobId, bulk: _bulk, productCode, ...view } = event;
+          const { type: _type, jobId: _jobId, progress: _progress, productCode, ...view } = event;
           codes.set(canonicalDlsiteProductCode(productCode), view as DlsiteJobCodeView);
         } else {
           for (const code of event.productCodes) codes.delete(canonicalDlsiteProductCode(code));
         }
-        if (commit({ revision: event.revision, job: { ...job, codes, bulk: event.bulk } })) {
+        if (
+          commit({ revision: event.revision, job: { ...job, codes, progress: event.progress } })
+        ) {
           emptyReopens = 0;
         }
       },
@@ -365,61 +361,36 @@ export function createDlsiteJobStore(deps: DlsiteJobDeps = DEFAULT_DEPS): Dlsite
       }
     },
 
-    async startBulk(productCodes) {
-      if (store.getState().startingBulk !== null) return { ok: true };
+    async start(productCodes, force) {
+      if (store.getState().starting !== null) return { ok: true };
       const codes = [...new Set(productCodes.map(canonicalDlsiteProductCode))];
       if (codes.length === 0) return { ok: true };
       const startEpoch = epoch;
-      patch({ startingBulk: { total: codes.length } });
+      patch({ starting: { total: codes.length } });
       try {
         for (const part of chunk(codes, DLSITE_JOB_MAX_PRODUCT_CODES)) {
-          const response = await deps.startJob({ origin: "bulk", productCodes: part });
+          const response = await deps.startJob({ productCodes: part, force });
           if (epoch !== startEpoch) return { ok: true };
           commit(toServerView(response));
         }
       } catch (cause) {
         if (epoch !== startEpoch) return { ok: true };
-        patch({ startingBulk: null });
+        patch({ starting: null });
         return actionError(cause);
       }
-      patch({ startingBulk: null });
+      patch({ starting: null });
       return { ok: true };
     },
 
-    async startSingle(productCode) {
-      const code = canonicalDlsiteProductCode(productCode);
-      if (store.getState().pendingSingles.has(code)) return { ok: true };
-      const startEpoch = epoch;
-      patch({ pendingSingles: new Set(store.getState().pendingSingles).add(code) });
-      const release = (): void => {
-        const next = new Set(store.getState().pendingSingles);
-        next.delete(code);
-        patch({ pendingSingles: next });
-      };
-      try {
-        const response = await deps.startJob({ origin: "single", productCode: code });
-        if (epoch !== startEpoch) return { ok: true };
-        commit(toServerView(response));
-        release();
-        return { ok: true };
-      } catch (cause) {
-        if (epoch !== startEpoch) return { ok: true };
-        release();
-        return actionError(cause);
-      }
-    },
-
-    async cancelBulk() {
+    async cancel() {
       const { job, cancelling } = store.getState();
       if (!job || job.status !== "running" || cancelling) return { ok: true };
-      const hasQueued = [...job.codes.values()].some(
-        (entry) => entry.origin === "bulk" && entry.state === "queued",
-      );
+      const hasQueued = [...job.codes.values()].some((entry) => entry.state === "queued");
       if (!hasQueued) return { ok: true };
       const startEpoch = epoch;
       patch({ cancelling: true });
       try {
-        await deps.cancelBulk(job.jobId);
+        await deps.cancel(job.jobId);
         return { ok: true };
       } catch (cause) {
         if (epoch !== startEpoch) return { ok: true };

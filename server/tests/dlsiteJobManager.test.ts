@@ -52,7 +52,6 @@ test("開始するとジョブIDを返し、キューを1件ずつ処理して�
   const { manager, calls } = controlled();
   assert.equal(manager.getState().job, null);
   const jobId = manager.start({
-    origin: "bulk",
     productCodes: ["RJ000001", "RJ000002", "RJ000003", "RJ000001"],
   })!.job!.jobId;
   assert.equal(typeof jobId, "string");
@@ -77,42 +76,34 @@ test("開始するとジョブIDを返し、キューを1件ずつ処理して�
     RJ000002: "not_found",
     RJ000003: "failed",
   });
-  assert.deepEqual(snapshot.bulk, { processed: 3, total: 3 });
+  assert.deepEqual(snapshot.progress, { processed: 3, total: 3 });
   assert.deepEqual(
     calls.map((call) => call.force),
     [false, false, false],
   );
 });
 
-test("実行中の取得は同じジョブへ合流し、コードごとの起点は変わらない", async () => {
+test("実行中の取得は同じジョブへ合流し、重複したコードは増えない", async () => {
   const { manager, calls } = controlled();
-  const first = manager.start({ origin: "bulk", productCodes: ["RJ000001", "RJ000002"] })!.job!
-    .jobId;
+  const first = manager.start({ productCodes: ["RJ000001", "RJ000002"] })!.job!.jobId;
   await tick();
-  const second = manager.start({ origin: "bulk", productCodes: ["RJ000002", "RJ000003"] })!.job!
-    .jobId;
+  const second = manager.start({ productCodes: ["RJ000002", "RJ000003"] })!.job!.jobId;
   assert.equal(second, first);
-  const bulkOnBulk = manager.start({ origin: "bulk", productCodes: ["RJ000001"] })!.job!.jobId;
-  assert.equal(bulkOnBulk, first);
+  assert.equal(manager.start({ productCodes: ["RJ000001"] })!.job!.jobId, first);
   assert.deepEqual(
-    manager.getState().job?.codes.map((code) => [code.productCode, code.origin]),
-    [
-      ["RJ000001", "bulk"],
-      ["RJ000002", "bulk"],
-      ["RJ000003", "bulk"],
-    ],
+    manager.getState().job?.codes.map((code) => code.productCode),
+    ["RJ000001", "RJ000002", "RJ000003"],
   );
   assert.equal(calls.length, 1);
   await manager.cancelActiveAndAwait();
 });
 
-test("単発は待機中の単発の末尾・まとめての前に入り、強制で取り直す", async () => {
+test("forceなしの要求は失敗の記録を使い、force付きは取り直す。合流したコードは末尾に入る", async () => {
   const { manager, calls } = controlled();
-  manager.start({ origin: "bulk", productCodes: ["RJ000001", "RJ000002", "RJ000003"] });
+  manager.start({ productCodes: ["RJ000001", "RJ000002", "RJ000003"] });
   await tick();
-  manager.start({ origin: "single", productCode: "RJ000010" });
-  manager.start({ origin: "single", productCode: "RJ000011" });
-  for (let index = 0; index < 5; index++) {
+  manager.start({ productCodes: ["RJ000010"], force: true });
+  for (let index = 0; index < 4; index++) {
     calls[index]!.settle("fetched");
     await tick();
   }
@@ -120,44 +111,23 @@ test("単発は待機中の単発の末尾・まとめての前に入り、強�
     calls.map((call) => [call.code, call.force]),
     [
       ["RJ000001", false],
-      ["RJ000010", true],
-      ["RJ000011", true],
       ["RJ000002", false],
       ["RJ000003", false],
+      ["RJ000010", true],
     ],
   );
 });
 
-test("待機中のまとめてを単発で取り直すと単発へ移り、まとめての中止で消えない", async () => {
-  const { manager, calls } = controlled();
-  const jobId = manager.start({
-    origin: "bulk",
-    productCodes: ["RJ000001", "RJ000002", "RJ000003"],
-  })!.job!.jobId;
-  await tick();
-  manager.start({ origin: "single", productCode: "RJ000003" });
-  assert.equal(manager.cancelBulk(jobId), 1);
-  assert.deepEqual(states(manager), { RJ000001: "fetching", RJ000003: "queued" });
-  calls[0]!.settle("fetched");
-  await tick();
-  assert.equal(calls[1]!.code, "RJ000003");
-  assert.equal(calls[1]!.force, true);
-  calls[1]!.settle("fetched");
-  await tick();
-  assert.equal(manager.getState().job?.status, "finished");
-  assert.deepEqual(manager.getState().job?.bulk, { processed: 1, total: 1 });
-});
-
-test("取得を終えたコードの再要求は、その要求の起点とforceで再キューされる", async () => {
-  const { manager, calls } = controlled();
-  manager.start({ origin: "bulk", productCodes: ["RJ000001", "RJ000002"] });
+test("取得を終えたコードのforce付き再要求は、forceで再キューされる。forceなしはforceなしで再キューされる", async () => {
+  const { manager, calls } = controlled(() => 1_700_000_000_000);
+  manager.start({ productCodes: ["RJ000001", "RJ000002"] });
   await tick();
   calls[0]!.settle("failed");
   await tick();
-  manager.start({ origin: "single", productCode: "RJ000001" });
+  manager.start({ productCodes: ["RJ000001"], force: true });
   assert.deepEqual(
     manager.getState().job?.codes.find((code) => code.productCode === "RJ000001"),
-    { productCode: "RJ000001", origin: "single", state: "queued", revision: manager.revision },
+    { productCode: "RJ000001", state: "queued", revision: manager.revision },
   );
   calls[1]!.settle("fetched");
   await tick();
@@ -168,12 +138,32 @@ test("取得を終えたコードの再要求は、その要求の起点とforce
   assert.equal(manager.getState().job?.status, "finished");
 });
 
-test("取得中のコードへの単発要求は、走行中の試行を終端にせずforceで取り直す", async () => {
+test("forceは失敗の記録を無視して取り直し、待機中・取得中のコードにも効く", async () => {
+  const { manager, calls } = controlled();
+  manager.start({ productCodes: ["RJ000001", "RJ000002"] });
+  await tick();
+  calls[0]!.settle("failed");
+  await tick();
+  manager.start({ productCodes: ["RJ000001", "RJ000002"], force: true });
+  calls[1]!.settle("failed");
+  await tick();
+  assert.equal(calls[2]!.code, "RJ000002");
+  assert.equal(calls[2]!.force, true);
+  calls[2]!.settle("fetched");
+  await tick();
+  assert.equal(calls[3]!.code, "RJ000001");
+  assert.equal(calls[3]!.force, true);
+  calls[3]!.settle("fetched");
+  await tick();
+  assert.equal(manager.getState().job?.status, "finished");
+});
+
+test("取得中のコードへのforce付き要求は、走行中の試行を終端にせずforceで取り直す", async () => {
   const { manager, calls, events } = controlled();
-  manager.start({ origin: "bulk", productCodes: ["RJ000001"] });
+  manager.start({ productCodes: ["RJ000001"] });
   manager.subscribe((event) => events.push(event));
   await tick();
-  manager.start({ origin: "single", productCode: "RJ000001" });
+  manager.start({ productCodes: ["RJ000001"], force: true });
   calls[0]!.settle("failed");
   await tick();
   assert.equal(calls.length, 2);
@@ -188,32 +178,28 @@ test("取得中のコードへの単発要求は、走行中の試行を終端�
   assert.deepEqual(terminalStates, ["fetched"]);
 });
 
-test("中止は起点がまとめてで待機中のコードだけを外し、取得中と単発は止めない", async () => {
-  const { manager, calls, events } = controlled();
+test("中止は待機中のコードを合流したものも含めて外し、取得中のコードは止めない", async () => {
+  const { manager, calls, events } = controlled(() => 1_700_000_000_000);
   const jobId = manager.start({
-    origin: "bulk",
     productCodes: ["RJ000001", "RJ000002", "RJ000003"],
   })!.job!.jobId;
   await tick();
-  manager.start({ origin: "single", productCode: "RJ000010" });
+  manager.start({ productCodes: ["RJ000010"], force: true });
   manager.subscribe((event) => events.push(event));
-  assert.equal(manager.cancelBulk("another-job"), 0);
-  assert.equal(manager.cancelBulk(jobId), 2);
+  assert.equal(manager.cancel("another-job"), 0);
+  assert.equal(manager.cancel(jobId), 3);
   assert.deepEqual(events.at(-1), {
     type: "removed",
     revision: manager.revision,
     jobId,
-    productCodes: ["RJ000002", "RJ000003"],
-    bulk: { processed: 0, total: 1 },
+    productCodes: ["RJ000002", "RJ000003", "RJ000010"],
+    progress: { processed: 0, total: 1 },
   });
   assert.equal(calls[0]!.signal?.aborted, false);
   calls[0]!.settle("fetched");
   await tick();
-  assert.equal(calls[1]!.code, "RJ000010");
-  calls[1]!.settle("fetched");
-  await tick();
   assert.equal(manager.getState().job?.status, "finished");
-  assert.equal(manager.cancelBulk(jobId), 0);
+  assert.equal(manager.cancel(jobId), 0);
 });
 
 test("購読はsnapshotを返し、終端のfinishedで完了し、終了後も次のジョブ開始までsnapshotを保つ", async () => {
@@ -222,7 +208,7 @@ test("購読はsnapshotを返し、終端のfinishedで完了し、終了後も�
   assert.deepEqual(idle.replay, [{ type: "snapshot", revision: manager.revision, job: null }]);
   assert.equal(idle.live, false);
 
-  const jobId = manager.start({ origin: "bulk", productCodes: ["RJ000001"] })!.job!.jobId;
+  const jobId = manager.start({ productCodes: ["RJ000001"] })!.job!.jobId;
   await tick();
   const live = manager.subscribe((event) => events.push(event));
   assert.equal(live.live, true);
@@ -245,16 +231,15 @@ test("購読はsnapshotを返し、終端のfinishedで完了し、終了後も�
   const replayed = after.replay[0];
   assert.equal(replayed?.type === "snapshot" ? replayed.job?.status : null, "finished");
 
-  const next = manager.start({ origin: "single", productCode: "RJ000002" })!.job!.jobId;
+  const next = manager.start({ productCodes: ["RJ000002"] })!.job!.jobId;
   assert.notEqual(next, jobId);
   await manager.cancelActiveAndAwait();
 });
 
 test("打ち切りはキューを全破棄してfinished(aborted)を送り、ジョブを切り離す", async () => {
-  const { manager, calls, events } = controlled();
-  const jobId = manager.start({ origin: "bulk", productCodes: ["RJ000001", "RJ000002"] })!.job!
-    .jobId;
-  manager.start({ origin: "single", productCode: "RJ000010" });
+  const { manager, calls, events } = controlled(() => 1_700_000_000_000);
+  const jobId = manager.start({ productCodes: ["RJ000001", "RJ000002"] })!.job!.jobId;
+  manager.start({ productCodes: ["RJ000010"] });
   await tick();
   manager.subscribe((event) => events.push(event));
   const aborting = manager.cancelActiveAndAwait();
@@ -270,10 +255,10 @@ test("打ち切りはキューを全破棄してfinished(aborted)を送り、ジ
 
 test("打ち切り中のstartは新しいジョブで処理され、古いループは何も送出しない", async () => {
   const { manager, calls, events } = controlled();
-  manager.start({ origin: "bulk", productCodes: ["RJ000001"] });
+  manager.start({ productCodes: ["RJ000001"] });
   await tick();
   const aborting = manager.cancelActiveAndAwait();
-  const jobId = manager.start({ origin: "single", productCode: "RJ000002" })!.job!.jobId;
+  const jobId = manager.start({ productCodes: ["RJ000002"] })!.job!.jobId;
   manager.subscribe((event) => events.push(event));
   await aborting;
   await tick();
@@ -288,7 +273,7 @@ test("打ち切り中のstartは新しいジョブで処理され、古いルー
 
 test("取得の例外はそのコードのfailedになり、ジョブは続く", async () => {
   const { manager, calls } = controlled();
-  manager.start({ origin: "bulk", productCodes: ["RJ000001", "RJ000002"] });
+  manager.start({ productCodes: ["RJ000001", "RJ000002"] });
   await tick();
   calls[0]!.fail(new Error("boom"));
   await tick();
@@ -299,19 +284,19 @@ test("取得の例外はそのコードのfailedになり、ジョブは続く",
 
 test("shutdownは実行中の取得を打ち切って完了を待ち、以降のstartを拒否する", async () => {
   const { manager, calls } = controlled();
-  manager.start({ origin: "bulk", productCodes: ["RJ000001", "RJ000002"] });
+  manager.start({ productCodes: ["RJ000001", "RJ000002"] });
   await tick();
   await manager.shutdown();
   assert.equal(calls[0]!.signal?.aborted, true);
   assert.equal(calls.length, 1);
-  assert.equal(manager.start({ origin: "single", productCode: "RJ000003" }), null);
+  assert.equal(manager.start({ productCodes: ["RJ000003"] }), null);
 });
 
-test("走行中の試行がすでにforceなら、同じ単発が来ても取り直しを立てない", async () => {
+test("走行中の試行がすでにforceなら、force付きの要求が重なっても取り直しを立てない", async () => {
   const { manager, calls } = controlled();
-  manager.start({ origin: "single", productCode: "RJ000001" });
+  manager.start({ productCodes: ["RJ000001"], force: true });
   await tick();
-  manager.start({ origin: "single", productCode: "RJ000001" });
+  manager.start({ productCodes: ["RJ000001"], force: true });
   calls[0]!.settle("fetched");
   await tick();
   assert.equal(calls.length, 1);
@@ -324,14 +309,14 @@ function terminalRevisions(events: DlsiteJobEvent[]): number[] {
 
 test("送るイベントのrevisionは、ジョブをまたいでも真に増える", async () => {
   const { manager, calls, events } = controlled();
-  manager.start({ origin: "bulk", productCodes: ["RJ000001", "RJ000002"] });
+  manager.start({ productCodes: ["RJ000001", "RJ000002"] });
   manager.subscribe((event) => events.push(event));
   await tick();
   calls[0]!.settle("fetched");
   await tick();
   calls[1]!.settle("failed");
   await tick();
-  manager.start({ origin: "single", productCode: "RJ000003" });
+  manager.start({ productCodes: ["RJ000003"] });
   manager.subscribe((event) => events.push(event));
   await tick();
   calls[2]!.settle("fetched");
@@ -345,7 +330,7 @@ test("送るイベントのrevisionは、ジョブをまたいでも真に増え
 
 test("snapshotとstateのrevisionは、最後に送ったイベントと一致する", async () => {
   const { manager, calls, events } = controlled();
-  manager.start({ origin: "bulk", productCodes: ["RJ000001"] });
+  manager.start({ productCodes: ["RJ000001"] });
   manager.subscribe((event) => events.push(event));
   await tick();
   calls[0]!.settle("fetched");
@@ -356,21 +341,34 @@ test("snapshotとstateのrevisionは、最後に送ったイベントと一致�
   assert.equal(replay.type === "snapshot" ? replay.revision : -1, manager.getState().revision);
 });
 
-test("見た目の変わらない単発の重ね掛けではrevisionを進めない", async () => {
+test("見た目の変わらない重ね掛けではrevisionを進めない", async () => {
   const { manager } = controlled();
-  manager.start({ origin: "bulk", productCodes: ["RJ000001", "RJ000002"] });
+  manager.start({ productCodes: ["RJ000001", "RJ000002"] });
   await tick();
-  manager.start({ origin: "single", productCode: "RJ000002" });
+  manager.start({ productCodes: ["RJ000002"] });
   const before = manager.revision;
-  manager.start({ origin: "single", productCode: "RJ000002" });
+  manager.start({ productCodes: ["RJ000002"] });
   assert.equal(manager.revision, before);
+  await manager.cancelActiveAndAwait();
+});
+
+test("見た目の変わらないforceの重ね掛けでは、待機中でも取得中でもrevisionを進めない", async () => {
+  const { manager, calls } = controlled();
+  manager.start({ productCodes: ["RJ000001", "RJ000002"] });
+  await tick();
+  const before = manager.revision;
+  manager.start({ productCodes: ["RJ000002"], force: true });
+  assert.equal(manager.revision, before);
+  manager.start({ productCodes: ["RJ000001"], force: true });
+  assert.equal(manager.revision, before);
+  assert.equal(calls.length, 1);
   await manager.cancelActiveAndAwait();
 });
 
 test("時計が止まっていてもrevisionは進み、新しいマネージャーの初期値は前の最後の値以上になる", async () => {
   let clock = 1_000;
   const first = controlled(() => clock);
-  first.manager.start({ origin: "single", productCode: "RJ000001" });
+  first.manager.start({ productCodes: ["RJ000001"] });
   await tick();
   first.calls[0]!.settle("fetched");
   await tick();
@@ -385,7 +383,6 @@ test("短時間に大量に進んでも、1ミリ秒後に作った新しいマ�
   const clock = 1_700_000_000_000;
   const first = controlled(() => clock);
   first.manager.start({
-    origin: "bulk",
     productCodes: Array.from({ length: 500 }, (_, index) => `RJ${String(100000 + index)}`),
   });
   const last = first.manager.revision;
@@ -398,7 +395,7 @@ test("短時間に大量に進んでも、1ミリ秒後に作った新しいマ�
 
 test("終端イベントとsnapshotはコードごとのrevisionと取得結果を運ぶ", async () => {
   const { manager, calls, events } = controlled();
-  manager.start({ origin: "bulk", productCodes: ["RJ000001", "RJ000002"] });
+  manager.start({ productCodes: ["RJ000001", "RJ000002"] });
   manager.subscribe((event) => events.push(event));
   await tick();
   calls[0]!.settle("fetched");
@@ -421,7 +418,7 @@ test("終端イベントとsnapshotはコードごとのrevisionと取得結果�
 
 test("打ち切りでジョブがnullになるとrevisionが進む（実行中・finished済みの両方）", async () => {
   const running = controlled();
-  running.manager.start({ origin: "single", productCode: "RJ000001" });
+  running.manager.start({ productCodes: ["RJ000001"] });
   await tick();
   const events: DlsiteJobEvent[] = [];
   running.manager.subscribe((event) => events.push(event));
@@ -433,7 +430,7 @@ test("打ち切りでジョブがnullになるとrevisionが進む（実行中�
   await aborting;
 
   const done = controlled();
-  done.manager.start({ origin: "single", productCode: "RJ000001" });
+  done.manager.start({ productCodes: ["RJ000001"] });
   await tick();
   done.calls[0]!.settle("fetched");
   await tick();
@@ -441,4 +438,31 @@ test("打ち切りでジョブがnullになるとrevisionが進む（実行中�
   await done.manager.cancelActiveAndAwait();
   assert.ok(done.manager.revision > before);
   assert.equal(done.manager.getState().job, null);
+});
+
+test("失敗したコードを（forceを含め）取り直して再び失敗すると、そのコードの終端の revision が進む", async () => {
+  const { manager, calls } = controlled();
+  const terminalRevision = () => {
+    const entry = manager.getState().job?.codes.find((code) => code.productCode === "RJ000001");
+    return entry && "dlsite" in entry ? entry.revision : null;
+  };
+  manager.start({ productCodes: ["RJ000001"] });
+  await tick();
+  calls[0]!.settle("failed");
+  await tick();
+  const first = terminalRevision();
+  assert.notEqual(first, null);
+
+  for (const force of [false, true]) {
+    manager.start({ productCodes: ["RJ000001"], force });
+    await tick();
+    calls.at(-1)!.settle("failed");
+    await tick();
+    const next = terminalRevision();
+    assert.ok(next !== null && next > first!, `force=${force}`);
+    manager.start({ productCodes: ["RJ000009"] });
+    await tick();
+    calls.at(-1)!.settle("fetched");
+    await tick();
+  }
 });

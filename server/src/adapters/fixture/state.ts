@@ -111,6 +111,7 @@ export interface FixtureState {
   invalidMetaFiles: InvalidMetaFile[];
   /** listSummaries でタグ等の不整合により除外した作品の報告 */
   dataIntegrityWarning: DataIntegrityWarning | undefined;
+  dataIntegrityTitles: Record<string, string>;
   /** 編集 snapshot の CAS トークン（ファイルが無い fixture 用） */
   sourceRevisions: Map<string, string>;
   sourceRevisionSeq: number;
@@ -350,6 +351,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     scanCandidatePool: scenario.scanCandidates,
     invalidMetaFiles: scenario.invalidMetaFiles,
     dataIntegrityWarning: scenario.dataIntegrityWarning,
+    dataIntegrityTitles: scenario.dataIntegrityTitles ?? {},
     sourceRevisions: new Map([...works, ...detachedWorks].map((work) => [work.id, "fixture"])),
     sourceRevisionSeq: 0,
   };

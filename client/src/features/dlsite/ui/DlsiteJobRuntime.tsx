@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
+import { refreshScanCandidatesQuietly } from "../../../entities/scan/scanCandidatesCache";
 import { updateCachesAfterDlsiteFetch } from "../../../entities/work/model/workCacheUpdates";
 import { useDlsiteJobState, useDlsiteJobStore } from "../../../entities/dlsite/useDlsiteJob";
 import { useToast } from "../../../shared/ui/useToast";
@@ -14,24 +14,19 @@ export default function DlsiteJobRuntime() {
   const error = useDlsiteJobState((state) => state.error);
 
   useEffect(() => {
-    /** まとめてのコードは、取得中の一覧を取り直し続けないよう、ジョブの終わりでまとめて無効化する */
-    const pendingBulk = new Set<string>();
-    const invalidate = (codes: readonly string[]) =>
-      void updateCachesAfterDlsiteFetch(queryClient, codes).catch(() => {});
+    /** 取得中の一覧を取り直し続けないよう、ジョブの終わりでまとめて無効化する */
+    const pending = new Set<string>();
     const unsubscribe = dlsiteJob.subscribeEvents((event) => {
       if (event.type === "jobEnded") {
-        if (pendingBulk.size > 0) invalidate([...pendingBulk]);
-        pendingBulk.clear();
+        if (pending.size > 0) {
+          void updateCachesAfterDlsiteFetch(queryClient, [...pending]).catch(() => {});
+        }
+        pending.clear();
         return;
       }
-      const single: string[] = [];
-      for (const { code, origin } of event.codes) {
-        if (origin === "single") single.push(code);
-        else pendingBulk.add(code);
-      }
-      if (single.length > 0) invalidate(single);
+      for (const { code } of event.codes) pending.add(code);
       if (event.codes.some(({ known }) => !known)) {
-        void refreshScanCandidates(queryClient).catch(() => {});
+        void refreshScanCandidatesQuietly(queryClient);
       }
     });
     return unsubscribe;

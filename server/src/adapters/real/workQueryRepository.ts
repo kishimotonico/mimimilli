@@ -2,6 +2,7 @@ import { sep } from "node:path";
 import { asc, eq } from "drizzle-orm";
 import {
   createRandomSeed,
+  relativeToRoot,
   isCoverUnmeasured,
   projectCoverKind,
   withNormalizeTagBatchCache,
@@ -9,16 +10,19 @@ import {
 } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
+  MissingWork,
   SmartFolderRule,
   Work,
   WorkPlacement,
+  WorkspacePath,
   WorksPage,
   WorksQuery,
 } from "@mimimilli/shared";
 import type { AxisFacetsQuery } from "@mimimilli/shared";
+import { isPathWithin } from "../../lib/path.ts";
 import { japaneseSortKey } from "../../core/japaneseSortKey.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
-import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
+import { logDataIntegritySkips } from "./dataIntegrity.ts";
 import type { Db } from "./db.ts";
 import { tags, workDlsite, workTags, works } from "./catalogSchema.ts";
 import {
@@ -57,7 +61,7 @@ import {
   type RawWorkListRow,
   type RawWorkRow,
   type SummaryRow,
-  rowToSummary,
+  validateWorkRow,
   rowToWorkListItem,
   type WorkDetailParts,
   type WorkRow,
@@ -67,6 +71,31 @@ import { statCoverSource } from "./coverDto.ts";
 import { deriveCoverVersion } from "../../adapter/media.ts";
 
 const queryWorksLogger = getCategoryLogger("http");
+
+const WORK_LIST_ROW_SELECT = `
+        SELECT
+          works.id,
+          works.title,
+          works.cover_image AS coverImage,
+          works.cover_width AS coverWidth,
+          works.cover_height AS coverHeight,
+          works.status,
+          works.total_duration_sec AS totalDurationSec,
+          works.track_count AS trackCount,
+          works.physical_path AS physicalPath,
+          works.meta_path AS metaPath,
+          works.error_message AS errorMessage,
+          works.urls_json AS urlsJson,
+          work_states.added_at AS addedAt,
+          work_states.bookmarked,
+          work_states.last_played_at AS lastPlayedAt,
+          work_dlsite.state_json AS dlsiteStateJson
+        ${WORKS_QUERY_FROM}
+        LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id`;
+
+function previousPathOf(root: string, physicalPath: string): WorkspacePath | null {
+  return isPathWithin(root, physicalPath) ? relativeToRoot(physicalPath, root) : null;
+}
 
 export class WorkQueryRepository {
   private readonly db: Db;
@@ -195,13 +224,11 @@ export class WorkQueryRepository {
     };
   }
 
-  listSummaries(workIds?: string[]): ListSummariesResult {
-    return withNormalizeTagBatchCache(() => {
-      if (workIds !== undefined && workIds.length === 0) {
-        return { summaries: [], skipped: [], unmeasuredCovers: [], placements: new Map() };
-      }
-
-      const baseSql = `
+  private loadSummaryRows(workIds: string[] | undefined): {
+    rows: RawSummaryListRow[];
+    tagsByWork: ReturnType<WorkQueryRepository["tagMap"]>;
+  } {
+    const baseSql = `
       SELECT
         works.id,
         works.title,
@@ -223,16 +250,24 @@ export class WorkQueryRepository {
       INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
       LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
     `;
-      const rows: RawSummaryListRow[] =
-        workIds === undefined
-          ? (this.db.sqlite.query(baseSql).all() as RawSummaryListRow[])
-          : chunk(workIds, SQLITE_IN_CHUNK_SIZE).flatMap(
-              (idsChunk) =>
-                this.db.sqlite
-                  .query(`${baseSql} WHERE works.id IN (${inClausePlaceholders(idsChunk.length)})`)
-                  .all(...idsChunk) as RawSummaryListRow[],
-            );
-      const tagsByWork = this.tagMap(workIds);
+    const rows: RawSummaryListRow[] =
+      workIds === undefined
+        ? (this.db.sqlite.query(baseSql).all() as RawSummaryListRow[])
+        : chunk(workIds, SQLITE_IN_CHUNK_SIZE).flatMap(
+            (idsChunk) =>
+              this.db.sqlite
+                .query(`${baseSql} WHERE works.id IN (${inClausePlaceholders(idsChunk.length)})`)
+                .all(...idsChunk) as RawSummaryListRow[],
+          );
+    return { rows, tagsByWork: this.tagMap(workIds) };
+  }
+
+  listSummaries(workIds?: string[]): ListSummariesResult {
+    return withNormalizeTagBatchCache(() => {
+      if (workIds !== undefined && workIds.length === 0) {
+        return { summaries: [], skipped: [], unmeasuredCovers: [], placements: new Map() };
+      }
+      const { rows, tagsByWork } = this.loadSummaryRows(workIds);
       const summaries: ListSummariesResult["summaries"] = [];
       const skipped: ListSummariesResult["skipped"] = [];
       const unmeasuredCovers: string[] = [];
@@ -241,7 +276,7 @@ export class WorkQueryRepository {
         try {
           const row: SummaryRow = { ...rawRow, bookmarked: rawRow.bookmarked !== 0 };
           summaries.push(
-            rowToSummary(
+            validateWorkRow(
               row,
               tagsByWork.get(row.id) ?? [],
               parseDlsiteStateJson(row.id, rawRow.dlsiteStateJson),
@@ -362,58 +397,91 @@ export class WorkQueryRepository {
           : [];
       const rows = this.db.sqlite
         .query(`
-        SELECT
-          works.id,
-          works.title,
-          works.cover_image AS coverImage,
-          works.cover_width AS coverWidth,
-          works.cover_height AS coverHeight,
-          works.status,
-          works.total_duration_sec AS totalDurationSec,
-          works.track_count AS trackCount,
-          works.physical_path AS physicalPath,
-          works.meta_path AS metaPath,
-          work_states.bookmarked,
-          work_states.last_played_at AS lastPlayedAt,
-          work_dlsite.state_json AS dlsiteStateJson
-        ${WORKS_QUERY_FROM}
-        LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
+        ${WORK_LIST_ROW_SELECT}
         ${whereSql}
         ORDER BY ${orderSql}
         ${paginationSql}
       `)
         .all(...bindings, ...orderBindings, ...paginationBindings) as RawWorkListRow[];
-      const workIds = rows.map((row) => row.id);
-      const tagsByWork = this.tagMap(workIds);
-      const items: WorksPage["items"] = [];
-      const skipped: ListSummariesResult["skipped"] = [];
-      for (const row of rows) {
-        try {
-          items.push(
-            rowToWorkListItem(
-              row,
-              tagsByWork.get(row.id) ?? [],
-              parseDlsiteStateJson(row.id, row.dlsiteStateJson),
-              root,
-            ),
-          );
-        } catch (error) {
-          if (error instanceof PersistentDataError) {
-            skipped.push({ workId: row.id, reason: error.message });
-            continue;
-          }
-          throw error;
-        }
-      }
+      const { items, skipped } = this.mapWorkListRows(rows, root);
       logDataIntegritySkips(queryWorksLogger, "query-works", skipped);
-      const dataIntegrityWarning = toDataIntegrityWarning(skipped);
       const stats = { trackCount: statsRow.trackCount, durationSec: statsRow.durationSec };
-      const page: WorksPage =
-        seed === undefined
-          ? { items, total: statsRow.total, stats }
-          : { items, total: statsRow.total, stats, seed };
-      return dataIntegrityWarning ? { ...page, dataIntegrityWarning } : page;
+      return seed === undefined
+        ? { items, total: statsRow.total, stats }
+        : { items, total: statsRow.total, stats, seed };
     });
+  }
+
+  /** 一覧の行を作品に変換する。保存された値を読めない作品は skipped に分ける。行が読めるかの検証は validateWorkRow を通る */
+  private mapWorkListRows(
+    rows: RawWorkListRow[],
+    root: string,
+  ): { items: WorksPage["items"]; skipped: ListSummariesResult["skipped"] } {
+    const tagsByWork = this.tagMap(rows.map((row) => row.id));
+    const items: WorksPage["items"] = [];
+    const skipped: ListSummariesResult["skipped"] = [];
+    for (const row of rows) {
+      try {
+        items.push(
+          rowToWorkListItem(
+            row,
+            tagsByWork.get(row.id) ?? [],
+            parseDlsiteStateJson(row.id, row.dlsiteStateJson),
+            root,
+          ),
+        );
+      } catch (error) {
+        if (error instanceof PersistentDataError) {
+          skipped.push({ workId: row.id, reason: error.message });
+          continue;
+        }
+        throw error;
+      }
+    }
+    return { items, skipped };
+  }
+
+  /** 保存された値を読めず、作品一覧・スマートフォルダー・エクスポートから外れる作品。listSummaries と同じ検証で決まる */
+  listDataIntegritySkips(workIds?: string[]): ListSummariesResult["skipped"] {
+    return this.listSummaries(workIds).skipped;
+  }
+
+  /** 状態が missing の作品。ライブラリのエラー表示の「行方不明」と同じ集合 */
+  listMissingWorks(root: string): MissingWork[] {
+    const rows = this.db.sqlite
+      .query(
+        `SELECT works.id AS workId, works.title AS title, works.physical_path AS physicalPath
+         ${WORKS_QUERY_FROM}
+         WHERE works.status = 'missing'
+         ORDER BY works.title, works.id`,
+      )
+      .all() as Array<{ workId: string; title: string; physicalPath: string }>;
+    return rows.map((row) => ({
+      workId: row.workId,
+      title: row.title,
+      previousPath: previousPathOf(root, row.physicalPath),
+    }));
+  }
+
+  /** 保存値の検証を通さずに読む作品名と作品情報ファイルのパス。文字列でない値は null */
+  getWorkIdentities(
+    workIds: string[],
+  ): Map<string, { title: string | null; metaPath: string | null }> {
+    const identities = new Map<string, { title: string | null; metaPath: string | null }>();
+    for (const idsChunk of chunk(workIds, SQLITE_IN_CHUNK_SIZE)) {
+      const rows = this.db.sqlite
+        .query(
+          `SELECT id, title, meta_path AS metaPath FROM main.works WHERE id IN (${inClausePlaceholders(idsChunk.length)})`,
+        )
+        .all(...idsChunk) as Array<{ id: string; title: unknown; metaPath: unknown }>;
+      for (const row of rows) {
+        identities.set(row.id, {
+          title: typeof row.title === "string" ? row.title : null,
+          metaPath: typeof row.metaPath === "string" ? row.metaPath : null,
+        });
+      }
+    }
+    return identities;
   }
 
   /** DLsite連携のRJコードが一致する作品のID。投影更新の対象を引く */
@@ -428,11 +496,11 @@ export class WorkQueryRepository {
   }
 
   /** 行方不明（missing）でRJコードを持つ作品。候補に「同じRJコードの行方不明の作品」を付記するために引く */
-  listMissingWorksWithRjCode(): Array<{ rjCode: string; workId: string; title: string }> {
-    return this.db.sqlite
+  listMissingWorksWithRjCode(root: string): Array<MissingWork & { rjCode: string }> {
+    const rows = this.db.sqlite
       .query(
         `SELECT upper(json_extract(work_dlsite.state_json, '$.rjCode')) AS rjCode,
-                works.id AS workId, works.title AS title
+                works.id AS workId, works.title AS title, works.physical_path AS physicalPath
          FROM main.works
          INNER JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
          WHERE works.status = 'missing'
@@ -440,7 +508,11 @@ export class WorkQueryRepository {
            AND json_extract(work_dlsite.state_json, '$.rjCode') != ''
          ORDER BY works.title, works.id`,
       )
-      .all() as Array<{ rjCode: string; workId: string; title: string }>;
+      .all() as Array<{ rjCode: string; workId: string; title: string; physicalPath: string }>;
+    return rows.map(({ physicalPath, ...row }) => ({
+      ...row,
+      previousPath: previousPathOf(root, physicalPath),
+    }));
   }
 
   getScanWorkMap() {
@@ -607,14 +679,16 @@ export class WorkQueryRepository {
 
   countWorksByStatus(status: Work["status"]): number {
     const row = this.db.sqlite
-      .query(`SELECT COUNT(*) AS count FROM main.works WHERE status = ?`)
+      .query(`SELECT COUNT(*) AS count ${WORKS_QUERY_FROM} WHERE works.status = ?`)
       .get(status) as { count: number };
     return row.count;
   }
 
   listWorkIdsByStatus(status: Work["status"]): string[] {
     return (
-      this.db.sqlite.query(`SELECT id FROM main.works WHERE status = ?`).all(status) as Array<{
+      this.db.sqlite
+        .query(`SELECT works.id AS id ${WORKS_QUERY_FROM} WHERE works.status = ?`)
+        .all(status) as Array<{
         id: string;
       }>
     ).map((row) => row.id);

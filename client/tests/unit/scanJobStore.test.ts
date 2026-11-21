@@ -368,7 +368,7 @@ describe("scanJobStore", () => {
     expect(sources[0]!.closed).toBe(true);
   });
 
-  it("failedのjobはerrorを持ち、terminalを通知する", async () => {
+  it("failedのjobは理由をjob.errorに持ち、store.errorは立てずterminalを通知する", async () => {
     const failed: ScanJobSnapshot = {
       ...running,
       status: "failed",
@@ -378,7 +378,7 @@ describe("scanJobStore", () => {
     const { store, sources, events } = createHarness();
     await store.start();
     dispatch(sources[0]!, { type: "state", snapshot: failed });
-    expect(store.getState()).toEqual({ job: failed, error: "boom" });
+    expect(store.getState()).toEqual({ job: failed, error: null });
     expect(events).toContainEqual({ type: "terminal", job: failed });
   });
 });

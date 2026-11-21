@@ -1,12 +1,15 @@
 import { isCancelledError, type QueryClient } from "@tanstack/react-query";
-import { scanCandidatesResponseSchema, type ScanCandidate } from "@mimimilli/shared";
+import {
+  scanCandidatesResponseSchema,
+  type ScanCandidate,
+  type ScanCandidatesResponse,
+} from "@mimimilli/shared";
 import { getParsed } from "../../shared/api/http";
 
 export const SCAN_CANDIDATES_QUERY_KEY = ["scan", "candidates"] as const;
 
-export async function fetchScanCandidates(): Promise<ScanCandidate[]> {
-  const { candidates } = await getParsed(scanCandidatesResponseSchema, "/scan/candidates");
-  return candidates;
+export async function fetchScanCandidates(): Promise<ScanCandidatesResponse> {
+  return getParsed(scanCandidatesResponseSchema, "/scan/candidates");
 }
 
 /** 購読者がいなくても一覧が消えないよう gcTime を無限にする（モーダルを閉じて開き直しても残す） */
@@ -19,7 +22,7 @@ export const scanCandidatesQueryOptions = {
 
 const latestRefreshes = new WeakMap<
   QueryClient,
-  { ticket: symbol; promise: Promise<ScanCandidate[]> }
+  { ticket: symbol; promise: Promise<ScanCandidatesResponse> }
 >();
 
 /** サーバーから候補を明示的に取り直す。候補クエリは enabled:false のため、この呼び出し以外では
@@ -32,7 +35,7 @@ const latestRefreshes = new WeakMap<
 export function refreshScanCandidates(
   queryClient: QueryClient,
   options: { replace?: ScanCandidate } = {},
-): Promise<ScanCandidate[]> {
+): Promise<ScanCandidatesResponse> {
   const ticket = Symbol();
   const run = (async () => {
     const query = queryClient.getQueryCache().build(queryClient, scanCandidatesQueryOptions);
@@ -41,25 +44,40 @@ export function refreshScanCandidates(
     }
     const { replace } = options;
     if (replace) {
-      queryClient.setQueryData<ScanCandidate[]>(SCAN_CANDIDATES_QUERY_KEY, (previous) =>
-        previous?.map((entry) => (entry.path === replace.path ? replace : entry)),
+      queryClient.setQueryData<ScanCandidatesResponse>(SCAN_CANDIDATES_QUERY_KEY, (previous) =>
+        previous?.scanCompleted
+          ? {
+              ...previous,
+              candidates: previous.candidates.map((entry) =>
+                entry.path === replace.path ? replace : entry,
+              ),
+            }
+          : previous,
       );
     }
     const superseded = () => {
       const latest = latestRefreshes.get(queryClient);
       return latest && latest.ticket !== ticket ? latest : null;
     };
-    let candidates: ScanCandidate[];
+    let response: ScanCandidatesResponse;
     try {
-      candidates = await queryClient.fetchQuery(scanCandidatesQueryOptions);
+      response = await queryClient.fetchQuery(scanCandidatesQueryOptions);
     } catch (error) {
       const latest = superseded();
       if (isCancelledError(error) && latest) return latest.promise;
       throw error;
     }
     // キャッシュにデータがあると、打ち切られた取得は拒否されず打ち切り前のデータで解決する
-    return superseded()?.promise ?? candidates;
+    return superseded()?.promise ?? response;
   })();
   latestRefreshes.set(queryClient, { ticket, promise: run });
   return run;
+}
+
+/** 取り直しの失敗を握り、失敗は候補クエリのエラー状態に任せる。失敗したときは null */
+export function refreshScanCandidatesQuietly(
+  queryClient: QueryClient,
+  options: { replace?: ScanCandidate } = {},
+): Promise<ScanCandidatesResponse | null> {
+  return refreshScanCandidates(queryClient, options).catch(() => null);
 }

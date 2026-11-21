@@ -3,12 +3,9 @@ import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 import TextInput from "../../../shared/ui/TextInput";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
-import { useScanning, useScanProgressLabel } from "../../../entities/scan/useScanJob";
 import TagPrefixSettings from "./TagPrefixSettings";
-import ExcludedFoldersSettings from "./ExcludedFoldersSettings";
 import Modal, { ModalHeader } from "../../../shared/ui/Modal";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
-import { formatScanDateTime } from "../../../shared/lib/format";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 
 const SECTION_CLASS = "flex flex-col gap-2";
@@ -17,25 +14,14 @@ const SECTION_LABEL_CLASS =
 const ROW_CLASS = "flex items-center gap-2";
 
 interface SettingsModalProps {
-  lastScanTime: string | null;
   onClose: () => void;
-  /** TopBarのスキャンボタンと同じくスキャンモーダルを開く（即時実行はしない） */
-  onOpenScan: () => void;
   /** 失敗時はrejectする。成功を待ってから編集フォームを閉じる */
   onChangeFolder: (path: string) => Promise<unknown>;
   onExport: () => void;
 }
 
-export default function SettingsModal({
-  lastScanTime,
-  onClose,
-  onOpenScan,
-  onChangeFolder,
-  onExport,
-}: SettingsModalProps) {
+export default function SettingsModal({ onClose, onChangeFolder, onExport }: SettingsModalProps) {
   const rootFolder = useRootFolder();
-  const scanning = useScanning();
-  const scanProgressLabel = useScanProgressLabel();
   const [isEditingFolder, setIsEditingFolder] = useState(false);
   const [folderDraft, setFolderDraft] = useState(rootFolder);
   const [savingFolder, setSavingFolder] = useState(false);
@@ -145,23 +131,6 @@ export default function SettingsModal({
             </div>
           )}
         </div>
-
-        {/* Scan */}
-        <div className={SECTION_CLASS}>
-          <span className={SECTION_LABEL_CLASS}>スキャン</span>
-          <div className={ROW_CLASS}>
-            <span className="flex-1 font-mono text-mono text-ink-2">
-              最終スキャン: {formatScanDateTime(lastScanTime)}
-            </span>
-            <Button variant="primary" size="md" onClick={onOpenScan}>
-              <I.refresh size={12} className={scanning ? "animate-spin" : undefined} />
-              {scanning ? (scanProgressLabel ?? "スキャン中...") : "スキャン"}
-            </Button>
-          </div>
-        </div>
-
-        {/* 候補から外したフォルダー */}
-        <ExcludedFoldersSettings />
 
         {/* Tag prefixes（ADR-0005） */}
         <TagPrefixSettings />

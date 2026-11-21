@@ -1,23 +1,20 @@
-import { useState } from "react";
-import type { WorkspacePath } from "@mimimilli/shared";
-import {
-  useReloadWorkMutation,
-  useUnregisterWorkMutation,
-} from "../../../../entities/work/model/workMutations";
-import { apiErrorMessage } from "../../../../shared/lib/apiError";
-import Button from "../../../../shared/ui/Button";
-import CollectionStatus from "../../../../shared/ui/CollectionStatus";
-import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
-import StatusLabel from "../../../../shared/ui/StatusLabel";
-import { useToast } from "../../../../shared/ui/useToast";
+import { pathBaseName, type WorkspacePath } from "@mimimilli/shared";
+import type { ReactNode } from "react";
+import { cn } from "../../../../shared/lib/cn";
 import { isFixable, type NeedsAttentionRow } from "../../model/needsAttention";
+import { useNeedsAttentionRows } from "../../model/useNeedsAttentionRows";
+import { deriveScanListStatus } from "../../model/scanListStatus";
+import { LIST_HEADING_ROW_CLASS } from "./listHeading";
+import ScanListState from "./ScanListState";
+import { useDisplayedScanListStatus } from "./useDisplayedScanListStatus";
+import {
+  ReassignIdentityButton,
+  ReloadWorkButton,
+  UnregisterWorkButton,
+} from "./NeedsAttentionActions";
 import { PathLink, WorkTitleLink } from "./ScanLinks";
 
 export interface NeedsAttentionTabProps {
-  rows: NeedsAttentionRow[];
-  loading: boolean;
-  error: boolean;
-  onRetry: () => void;
   onOpenFiles: (path: WorkspacePath) => void;
   onOpenWorkDetail: (workId: string) => void;
 }
@@ -30,71 +27,75 @@ const KIND_LABEL: Record<NeedsAttentionRow["kind"], string> = {
   missingWork: "行方不明",
 };
 
+const NO_ROWS: NeedsAttentionRow[] = [];
 const HEADINGS = ["種類", "対象", "起きていること", "推奨アクション"];
-const CELL_CLASS = "px-2.5 py-2 align-top font-jp text-secondary text-ink-1";
-const ID_CLASS = "mll-selectable break-all font-mono text-mono text-ink-1";
+const GRID_CLASS =
+  "grid gap-x-3.5 px-[18px] [grid-template-columns:84px_minmax(0,1fr)_minmax(0,0.7fr)_148px]";
+const LINE_CLASS = "flex h-[26px] min-w-0 items-center gap-2";
+const LINES_CLASS = "flex min-w-0 flex-col gap-[3px]";
+const ID_CLASS = "mll-selectable truncate font-mono text-secondary text-ink-2";
 
 export default function NeedsAttentionTab({
-  rows,
-  loading,
-  error,
-  onRetry,
   onOpenFiles,
   onOpenWorkDetail,
 }: NeedsAttentionTabProps) {
-  if (rows.length === 0) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        {error ? (
-          <CollectionStatus variant="list" kind="error" onRetry={onRetry} />
-        ) : loading ? (
-          <CollectionStatus variant="list" kind="loading" />
-        ) : (
-          <CollectionStatus variant="list" kind="empty" message="要対応の項目はありません" />
-        )}
-      </div>
-    );
-  }
+  const { rows = NO_ROWS, loading, error, retry } = useNeedsAttentionRows();
+  const status = useDisplayedScanListStatus(
+    deriveScanListStatus({ loading, error, count: rows.length }),
+  );
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-[18px] py-4">
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="bg-paper-0 text-left">
+    <ScanListState
+      status={status}
+      emptyMessage="要対応の項目はありません"
+      onRetry={retry}
+      table={{ label: "要対応" }}
+      /* oxlint-disable jsx-a11y/prefer-tag-over-role -- 行ごとに列の高さをそろえるため grid の div で組み、role で ARIA table 構造を与える */
+      heading={
+        <div role="rowgroup" className="shrink-0">
+          <div role="row" className={cn(GRID_CLASS, LIST_HEADING_ROW_CLASS)}>
             {HEADINGS.map((heading) => (
-              <th
-                key={heading}
-                className="border-b border-line-soft px-2.5 py-1.5 font-sans text-label font-semibold text-ink-2"
-              >
+              <span key={heading} role="columnheader">
                 {heading}
-              </th>
+              </span>
             ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.key} className="border-b border-line-soft">
-              <td className={CELL_CLASS}>
-                <StatusLabel tone={isFixable(row) ? "attention" : "none"}>
-                  {KIND_LABEL[row.kind]}
-                </StatusLabel>
-              </td>
-              <td className={CELL_CLASS}>
-                <TargetCell
-                  row={row}
-                  onOpenFiles={onOpenFiles}
-                  onOpenWorkDetail={onOpenWorkDetail}
-                />
-              </td>
-              <td className={CELL_CLASS}>{whatHappened(row)}</td>
-              <td className={CELL_CLASS}>
-                <RecommendedAction row={row} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </div>
+        </div>
+      }
+    >
+      <div role="rowgroup" className="min-h-0 flex-1 overflow-y-auto">
+        {rows.map((row) => (
+          <div
+            key={row.key}
+            role="row"
+            className={cn(
+              GRID_CLASS,
+              "min-h-[54px] items-start border-b border-line-soft py-2.5 font-jp text-body",
+            )}
+          >
+            <span
+              role="cell"
+              className={cn(
+                "whitespace-nowrap font-medium leading-[26px]",
+                isFixable(row) ? "text-[var(--state-danger)]" : "text-ink-1",
+              )}
+            >
+              {KIND_LABEL[row.kind]}
+            </span>
+            <div role="cell" className="min-w-0">
+              <TargetCell row={row} onOpenFiles={onOpenFiles} onOpenWorkDetail={onOpenWorkDetail} />
+            </div>
+            <span role="cell" className="min-w-0 break-words pt-1 leading-normal text-ink-0">
+              {whatHappened(row)}
+            </span>
+            <div role="cell" className="min-w-0 text-secondary text-ink-1">
+              <RecommendedAction row={row} />
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* oxlint-enable jsx-a11y/prefer-tag-over-role */}
+    </ScanListState>
   );
 }
 
@@ -110,35 +111,95 @@ function TargetCell({
   switch (row.kind) {
     case "identityConflict":
       return (
-        <div className="flex flex-col gap-0.5">
-          {row.paths.map((path) => (
-            <PathLink key={path} path={path} onOpen={onOpenFiles} />
+        <div className={LINES_CLASS}>
+          {row.registered && (
+            <div className={LINE_CLASS}>
+              <SideLabel registered>登録済み</SideLabel>
+              {row.registered.path !== null ? (
+                <PathLink path={row.registered.path} onOpen={onOpenFiles} />
+              ) : (
+                row.registered.title !== null && (
+                  <WorkTitleLink
+                    workId={row.workId}
+                    title={row.registered.title}
+                    onOpen={onOpenWorkDetail}
+                  />
+                )
+              )}
+            </div>
+          )}
+          {row.unregisteredPaths.map((path) => (
+            <div key={path} className={LINE_CLASS}>
+              <SideLabel>未登録</SideLabel>
+              <PathLink path={path} onOpen={onOpenFiles} />
+            </div>
           ))}
         </div>
       );
     case "invalidMetaFile":
     case "unreadablePath":
-      return <PathLink path={row.path} onOpen={onOpenFiles} />;
+      return (
+        <div className={LINE_CLASS}>
+          <PathLink path={row.path} onOpen={onOpenFiles} />
+        </div>
+      );
     case "dataIntegrity":
-      return <span className={ID_CLASS}>{row.workId}</span>;
+      return (
+        <div className={LINES_CLASS}>
+          {row.title !== null && (
+            <div className={LINE_CLASS}>
+              <span className="truncate text-ink-0">{row.title}</span>
+            </div>
+          )}
+          <div className={LINE_CLASS}>
+            <span className={ID_CLASS}>{row.workId}</span>
+          </div>
+        </div>
+      );
     case "missingWork":
       return (
-        <div className="flex flex-col gap-0.5">
-          <WorkTitleLink workId={row.workId} title={row.title} onOpen={onOpenWorkDetail} />
-          <span className="mll-selectable break-all font-mono text-mono text-ink-3">
-            {row.previousPath}
-          </span>
+        <div className={LINES_CLASS}>
+          <div className={LINE_CLASS}>
+            <WorkTitleLink workId={row.workId} title={row.title} onOpen={onOpenWorkDetail} />
+          </div>
+          {row.previousPath !== null && (
+            <div className={LINE_CLASS}>
+              <span
+                title={row.previousPath}
+                className="mll-selectable truncate font-mono text-secondary text-ink-3 line-through"
+              >
+                {row.previousPath}
+              </span>
+            </div>
+          )}
         </div>
       );
   }
 }
 
-function whatHappened(row: NeedsAttentionRow): string {
+function Mono({ children }: { children: ReactNode }) {
+  return <span className="font-mono text-secondary">{children}</span>;
+}
+
+function whatHappened(row: NeedsAttentionRow): ReactNode {
   switch (row.kind) {
     case "identityConflict":
-      return "同じ作品IDの作品情報ファイルが複数ある";
-    case "invalidMetaFile":
-      return row.message;
+      return (
+        <>
+          同じ作品ID <Mono>{row.workId}</Mono> の作品情報ファイルが複数ある
+        </>
+      );
+    case "invalidMetaFile": {
+      const fileName = pathBaseName(row.path);
+      return row.message.startsWith(fileName) ? (
+        <>
+          <Mono>{fileName}</Mono>
+          {row.message.slice(fileName.length)}
+        </>
+      ) : (
+        row.message
+      );
+    }
     case "unreadablePath":
       return "フォルダーを開く権限がない";
     case "dataIntegrity":
@@ -148,64 +209,49 @@ function whatHappened(row: NeedsAttentionRow): string {
   }
 }
 
+/** 操作の要る種類はボタンだけを、ない種類は短い文を置く。ID重複は未登録のパスの先頭の1つを取り込む */
 function RecommendedAction({ row }: { row: NeedsAttentionRow }) {
   switch (row.kind) {
-    case "identityConflict":
-      return "どちらかを消すか、Filesで別の作品として取り込む";
+    case "identityConflict": {
+      const [first] = row.unregisteredPaths;
+      return first === undefined ? null : (
+        <ActionLine>
+          <ReassignIdentityButton path={first} />
+        </ActionLine>
+      );
+    }
     case "invalidMetaFile":
-      return "ファイルを直す";
+      return <ActionLine>ファイルを直す</ActionLine>;
     case "unreadablePath":
-      return "アクセス権を確認";
+      return <ActionLine>アクセス権を確認</ActionLine>;
     case "dataIntegrity":
-      return <ReloadWorkButton workId={row.workId} />;
+      return (
+        <ActionLine>
+          <ReloadWorkButton workId={row.workId} label={row.title ?? row.workId} />
+        </ActionLine>
+      );
     case "missingWork":
-      return <UnregisterWorkButton workId={row.workId} title={row.title} />;
+      return (
+        <ActionLine>
+          <UnregisterWorkButton workId={row.workId} title={row.title} />
+        </ActionLine>
+      );
   }
 }
 
-function ReloadWorkButton({ workId }: { workId: string }) {
-  const toast = useToast();
-  const mutation = useReloadWorkMutation();
-  const reload = async () => {
-    try {
-      await mutation.mutateAsync(workId);
-    } catch (cause) {
-      toast.error(apiErrorMessage(cause, "作品を読み直せませんでした"));
-    }
-  };
-  return (
-    <Button size="sm" disabled={mutation.isPending} onClick={() => void reload()}>
-      この作品を読み直す
-    </Button>
-  );
+function ActionLine({ children }: { children: ReactNode }) {
+  return <div className="flex min-h-[26px] items-center">{children}</div>;
 }
 
-function UnregisterWorkButton({ workId, title }: { workId: string; title: string }) {
-  const toast = useToast();
-  const mutation = useUnregisterWorkMutation();
-  const [confirming, setConfirming] = useState(false);
-  const unregister = async () => {
-    try {
-      await mutation.mutateAsync(workId);
-    } catch (cause) {
-      toast.error(apiErrorMessage(cause, "登録を解除できませんでした"));
-    }
-    setConfirming(false);
-  };
+function SideLabel({ registered = false, children }: { registered?: boolean; children: string }) {
   return (
-    <>
-      <Button size="sm" disabled={mutation.isPending} onClick={() => setConfirming(true)}>
-        登録を解除
-      </Button>
-      {confirming && (
-        <ConfirmDialog
-          title="登録を解除"
-          message={`「${title}」をライブラリから外します。タグや再生履歴は消えます。`}
-          confirmLabel="解除する"
-          onConfirm={() => void unregister()}
-          onCancel={() => setConfirming(false)}
-        />
+    <span
+      className={cn(
+        "w-11 shrink-0 font-jp text-caption",
+        registered ? "font-medium text-[var(--state-success)]" : "text-ink-2",
       )}
-    </>
+    >
+      {children}
+    </span>
   );
 }

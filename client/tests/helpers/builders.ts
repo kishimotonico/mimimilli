@@ -167,15 +167,20 @@ export function buildSmartFolder(overrides: Partial<SmartFolder> = {}): SmartFol
 }
 
 export function buildScanDiagnostics(overrides: Partial<ScanDiagnostics> = {}): ScanDiagnostics {
-  return scanDiagnosticsSchema.parse({ identityConflicts: [], invalidMetaFiles: [], ...overrides });
+  return scanDiagnosticsSchema.parse({
+    identityConflicts: [],
+    invalidMetaFiles: [],
+    unreadablePaths: [],
+    dataIntegrityWorks: [],
+    missingWorks: [],
+    ...overrides,
+  });
 }
 
 export function buildScanRecord(overrides: Partial<ScanRecord> = {}): ScanRecord {
   return scanRecordSchema.parse({
     finishedAt: "2026-01-01T00:00:00.000Z",
     updatedWorks: [],
-    missingWorks: [],
-    unreadablePaths: [],
     ...overrides,
   });
 }

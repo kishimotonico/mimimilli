@@ -140,6 +140,11 @@ export const invalidMetaFiles = sqliteTable("invalid_meta_files", {
   message: text("message").notNull(),
 });
 
+/** スキャンで開けなかったフォルダーの再構築可能な診断投影。pathはroot相対のportable path。 */
+export const unreadablePaths = sqliteTable("unreadable_paths", {
+  path: text("path").primaryKey(),
+});
+
 /** 音声ファイル長のプローブ結果キャッシュ。durationSec は計測失敗時 NULL（未知。0 では埋めない）。 */
 export const audioProbeCache = sqliteTable("audio_probe_cache", {
   path: text("path").primaryKey(),

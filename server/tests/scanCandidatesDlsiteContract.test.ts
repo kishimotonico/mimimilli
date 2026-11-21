@@ -51,14 +51,20 @@ interface Subject {
 }
 
 const MISSING_WORK_TITLE = "旧作品";
+const OUTSIDE_CODE = "RJ900032";
+const OUTSIDE_TITLE = "外の作品";
 
-function missingFixtureWork(): WorkSummary {
+function missingFixtureWork(
+  overrides: { id?: string; title?: string; physicalPath?: string; rjCode?: string } = {},
+): WorkSummary {
+  const title = overrides.title ?? MISSING_WORK_TITLE;
+  const rjCode = overrides.rjCode ?? MISSING_CODE;
   return {
-    id: "missing-work",
-    title: MISSING_WORK_TITLE,
+    id: overrides.id ?? "missing-work",
+    title,
     cover: null,
     status: "missing",
-    physicalPath: "/library/旧作品",
+    physicalPath: overrides.physicalPath ?? `/library/${rjCode}_${title}`,
     totalDurationSec: 0,
     addedAt: "2025-01-01T00:00:00.000Z",
     errorMessage: null,
@@ -67,7 +73,7 @@ function missingFixtureWork(): WorkSummary {
     trackCount: 0,
     bookmarked: false,
     lastPlayedAt: null,
-    dlsite: { ...emptyDlsiteState(), rjCode: MISSING_CODE },
+    dlsite: { ...emptyDlsiteState(), rjCode },
   };
 }
 
@@ -78,7 +84,17 @@ async function createSubject(
   if (kind === "fixture") {
     const adapter = createFixtureAdapter({
       scenario: "new-work",
-      works: [folderFixtureWork(missingFixtureWork())],
+      works: [
+        folderFixtureWork(missingFixtureWork()),
+        folderFixtureWork(
+          missingFixtureWork({
+            id: "outside-work",
+            title: OUTSIDE_TITLE,
+            rjCode: OUTSIDE_CODE,
+            physicalPath: "/elsewhere/外の作品",
+          }),
+        ),
+      ],
       dlsiteFetchDelayMs: options.hold ? 150 : 0,
     });
     await runScan(adapter);
@@ -144,8 +160,28 @@ async function createSubject(
   });
   assert.equal(registered.status, 201);
   const missingId = ((await registered.json()) as { snapshot: { id: string } }).snapshot.id;
+  const outsideDir = join(root, `${OUTSIDE_CODE}_${OUTSIDE_TITLE}`);
+  mkdirSync(outsideDir, { recursive: true });
+  writeWav(join(outsideDir, "track.wav"), 1);
+  const outsideRegistered = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      path: `${OUTSIDE_CODE}_${OUTSIDE_TITLE}`,
+      title: OUTSIDE_TITLE,
+      rjCode: OUTSIDE_CODE,
+      applyCover: false,
+      applyUrl: false,
+    }),
+  });
+  assert.equal(outsideRegistered.status, 201);
+  const outsideId = ((await outsideRegistered.json()) as { snapshot: { id: string } }).snapshot.id;
   const db = openDb({ kind: "files", catalogPath, userPath });
   db.sqlite.run("UPDATE main.works SET status = 'missing' WHERE id = ?", [missingId]);
+  db.sqlite.run("UPDATE main.works SET status = 'missing', physical_path = ? WHERE id = ?", [
+    join(directory.path, "elsewhere", OUTSIDE_TITLE),
+    outsideId,
+  ]);
   db.close();
   await runScan(adapter);
   return {
@@ -190,7 +226,7 @@ async function targetCandidate(subject: Subject): Promise<ScanCandidate> {
 }
 
 async function startJob(subject: Subject, productCode: string): Promise<void> {
-  const response = await post(subject, "/api/dlsite/jobs", { origin: "single", productCode });
+  const response = await post(subject, "/api/dlsite/jobs", { productCodes: [productCode] });
   assert.equal(response.status, 202);
 }
 
@@ -305,17 +341,28 @@ for (const kind of ["fixture", "real"] as const) {
   });
 
   contract(
-    "行方不明の作品と同じRJコードの候補に、その作品のIDとタイトルが載る",
+    "行方不明の作品と同じRJコードの候補に、その作品のID・タイトル・最後のパスが載る",
     async (subject) => {
       assert.deepEqual((await targetCandidate(subject)).missingWorks, []);
       const candidate = await setRjCode(subject, MISSING_CODE);
       assert.equal(candidate.missingWorks.length, 1);
       assert.equal(candidate.missingWorks[0]?.title, MISSING_WORK_TITLE);
+      assert.equal(
+        candidate.missingWorks[0]?.previousPath,
+        `${MISSING_CODE}_${MISSING_WORK_TITLE}`,
+      );
       assert.ok(candidate.missingWorks[0]?.workId);
       const listed = await targetCandidate(subject);
       assert.deepEqual(listed.missingWorks, candidate.missingWorks);
     },
   );
+
+  contract("rootの外にあった行方不明の作品は、最後のパスが null になる", async (subject) => {
+    const candidate = await setRjCode(subject, OUTSIDE_CODE);
+    assert.equal(candidate.missingWorks.length, 1);
+    assert.equal(candidate.missingWorks[0]?.title, OUTSIDE_TITLE);
+    assert.equal(candidate.missingWorks[0]?.previousPath, null);
+  });
 
   test(`取得中の候補はキャッシュどおり未取得で、終わると取得済みになる (${kind})`, async () => {
     const subject = await createSubject(kind, { hold: true });

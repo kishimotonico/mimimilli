@@ -13,7 +13,7 @@ export type CandidateDlsiteDisplay =
   | { state: "not_found" }
   | { state: "failed" };
 
-type DisplayJobState = Pick<DlsiteJobState, "job" | "pendingSingles" | "results">;
+type DisplayJobState = Pick<DlsiteJobState, "job" | "results">;
 
 function displayOf(summary: DlsiteProductSummary): CandidateDlsiteDisplay {
   return summary.state === "fetched"
@@ -29,7 +29,6 @@ export function candidateDlsiteDisplay(
 ): CandidateDlsiteDisplay {
   if (candidate.rjCode === null) return { state: "none" };
   const code = canonicalDlsiteProductCode(candidate.rjCode);
-  if (job.pendingSingles.has(code)) return { state: "fetching" };
 
   const entry = job.job?.codes.get(code);
   if (
@@ -43,4 +42,14 @@ export function candidateDlsiteDisplay(
   const result = job.results.get(code);
   if (result && result.revision > candidate.dlsiteRevision) return displayOf(result.dlsite);
   return displayOf(candidate.dlsite);
+}
+
+/** そのコードをジョブが最後に終端にしたときの revision。ジョブで取得していないコードは null。
+ *  候補の dlsiteRevision は一覧を読んだ時点の全体の値で、候補を取り直すたびに進むので使わない。 */
+export function dlsiteResultRevision(
+  candidate: ScanCandidate,
+  job: DisplayJobState,
+): number | null {
+  if (candidate.rjCode === null) return null;
+  return job.results.get(canonicalDlsiteProductCode(candidate.rjCode))?.revision ?? null;
 }

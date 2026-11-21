@@ -78,7 +78,7 @@ describe("WorkMetadataActions", () => {
     });
   });
 
-  it("その他メニューから作品登録を解除を選ぶと onDelete を呼ぶ", () => {
+  it("その他メニューから登録解除を選ぶと onDelete を呼ぶ", () => {
     const onDelete = vi.fn();
     render(
       <WorkMetadataActions
@@ -91,7 +91,7 @@ describe("WorkMetadataActions", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "その他" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "作品登録を解除" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 

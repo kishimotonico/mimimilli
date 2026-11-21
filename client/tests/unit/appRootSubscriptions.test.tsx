@@ -94,7 +94,7 @@ function createTestQueryClient() {
 }
 
 function renderApp() {
-  mockApi({ "GET /api/scan/candidates": { candidates: [] } });
+  mockApi({ "GET /api/scan/candidates": { scanCompleted: true, candidates: [] } });
   const queryClient = createTestQueryClient();
   const store = createStore();
   const scanJob = createFakeScanJobStore();
@@ -286,8 +286,8 @@ describe("App root subscriptions", () => {
       const view = (processed: number) => ({
         jobId: "job-1",
         status: "running" as const,
-        codes: new Map([["RJ000001", { origin: "bulk" as const, state: "fetching" as const }]]),
-        bulk: { processed, total: 10 },
+        codes: new Map([["RJ000001", { state: "fetching" as const }]]),
+        progress: { processed, total: 10 },
       });
       act(() => {
         dlsiteJob.setState((state) => ({ ...state, job: view(1) }));

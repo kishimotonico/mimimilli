@@ -2,7 +2,7 @@ import { posix } from "node:path";
 import {
   META_FILE_NAME,
   isAudioFileName,
-  isSidecarMetaFileName,
+  META_SIDECAR_SUFFIX,
   planDlsiteRegistration,
   sidecarMetaFileName,
   tagEquals,
@@ -37,6 +37,7 @@ import { applyWorksQuery, toWorksPage } from "../../core/worksQuery.ts";
 import { isPathWithin } from "../../lib/path.ts";
 import { buildFullWorkFromState, checkWorkPlacement } from "./playback.ts";
 import { normalizeFsPath } from "./fsResolve.ts";
+import { metaPathOfTarget } from "./identityConflictPaths.ts";
 import {
   composeWorks,
   applyFixtureCachedCover,
@@ -142,13 +143,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
 
   return {
     async queryWorks(params: WorksQuery): Promise<WorksPage> {
-      const page = toWorksPage(
-        applyWorksQuery(composeWorks(state), params),
-        requireFixtureRoot(state),
-      );
-      return state.dataIntegrityWarning
-        ? { ...page, dataIntegrityWarning: state.dataIntegrityWarning }
-        : page;
+      return toWorksPage(applyWorksQuery(composeWorks(state), params), requireFixtureRoot(state));
     },
 
     getWorkRegisterPreview,
@@ -220,35 +215,51 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       );
       if (!diagnostic) return null;
       const owner = state.works.find((candidate) => candidate.id === diagnostic.workId);
-      if (!owner) return null;
       const rootAbs = normalizeFsPath(requireFixtureRoot(state));
       const target = normalizeFsPath(`${rootAbs}/${body.path}`);
-      const metaPath = isSidecarMetaFileName(posix.basename(target))
-        ? target
-        : posix.join(target, META_FILE_NAME);
+      const metaPath = metaPathOfTarget(target);
       const newId = crypto.randomUUID();
       const placementOf = (conflictTarget: string) => {
-        const conflictMetaPath = isSidecarMetaFileName(posix.basename(conflictTarget))
-          ? conflictTarget
-          : posix.join(conflictTarget, META_FILE_NAME);
+        const conflictMetaPath = metaPathOfTarget(conflictTarget);
+        const isFolder = workPlacementOf(conflictMetaPath).kind === "folder";
         return {
           metaPath: conflictMetaPath,
-          physicalPath:
-            workPlacementOf(conflictMetaPath).kind === "folder"
-              ? conflictTarget
-              : posix.join(posix.dirname(conflictTarget), posix.basename(owner.physicalPath)),
+          physicalPath: isFolder
+            ? conflictTarget
+            : posix.join(
+                posix.dirname(conflictTarget),
+                owner
+                  ? posix.basename(owner.physicalPath)
+                  : `${posix.basename(conflictTarget, META_SIDECAR_SUFFIX)}.mp3`,
+              ),
         };
       };
+      const template: FixtureWorkRecord = owner ?? {
+        id: newId,
+        title: posix.basename(target, META_SIDECAR_SUFFIX),
+        cover: null,
+        status: "ok",
+        physicalPath: target,
+        metaPath,
+        totalDurationSec: 0,
+        trackCount: workPlacementOf(metaPath).kind === "folder" ? 0 : 1,
+        addedAt: new Date().toISOString(),
+        errorMessage: null,
+        urls: [],
+        tags: [],
+        bookmarked: false,
+        lastPlayedAt: null,
+      };
       const reassigned = checkWorkPlacement(state, {
-        ...owner,
+        ...template,
         id: newId,
         ...placementOf(target),
         bookmarked: false,
         lastPlayedAt: null,
       });
-      copyWorkState(state, diagnostic.workId, newId);
+      if (owner) copyWorkState(state, diagnostic.workId, newId);
       state.sourceRevisions.set(newId, "fixture");
-      if (metaPath === owner.metaPath) {
+      if (owner && metaPath === owner.metaPath) {
         // 旧IDの行は、旧IDを宣言している残りのメタファイルへ移る。無ければ行方不明（realと同じ）
         const remaining = diagnostic.paths.find((path) => path !== body.path);
         if (remaining) {

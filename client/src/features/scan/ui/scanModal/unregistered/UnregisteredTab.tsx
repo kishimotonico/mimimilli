@@ -1,101 +1,143 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useAtom } from "jotai";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import {
-  rjCodeFormatSchema,
+  type WorkspacePath,
   type DlsiteRegistrationApply,
   type ScanCandidate,
 } from "@mimimilli/shared";
-import { ApiRequestError } from "../../../../../shared/api/http";
 import { apiErrorMessage } from "../../../../../shared/lib/apiError";
-import { useToast } from "../../../../../shared/ui/useToast";
+import { useLatest } from "../../../../../shared/lib/useLatest";
 import { useVirtualList } from "../../../../../shared/ui/useVirtualList";
-import { excludeScanCandidates, setScanCandidateRjCode, SCAN_QUERY_KEYS } from "../../../api";
-import { restoreScanCandidateExclusions } from "../../../../../entities/scan/api";
-import { refreshScanCandidates } from "../../../../../entities/scan/scanCandidatesCache";
+import { isCandidatesStale, STALE_MESSAGE } from "../../../model/candidatesStale";
+import { useCandidateExclusions } from "../../../model/useCandidateExclusions";
+import { useScanCandidatesState } from "../../../model/useScanCandidatesCache";
+import { refreshScanCandidatesQuietly } from "../../../../../entities/scan/scanCandidatesCache";
 import { useRegisterScanCandidatesMutation } from "../../../../../entities/work/model/workMutations";
-import { scanCandidateDeselectedPathsAtom } from "../../../../../entities/scan/model/atoms";
+import { scanCandidateSelectionAtom } from "../../../../../entities/scan/model/atoms";
 import { useDlsiteJobState, useDlsiteJobStore } from "../../../../../entities/dlsite/useDlsiteJob";
-import { candidateDlsiteDisplay } from "../../../model/unregisteredDlsite";
+import { candidateDlsiteDisplay, dlsiteResultRevision } from "../../../model/unregisteredDlsite";
 import {
-  fetchTargetCodes,
-  isProblemDisplay,
-  missingDlsiteCount,
-  problemCount,
-  registerTargets,
+  addTargets,
+  footerPlan,
+  isRowSelectable,
+  isRowSelected,
+  judgmentCount,
+  missingDlsiteRows,
+  needsJudgment,
+  rowTitle,
+  selectionOverride,
   type CandidateRowModel,
 } from "../../../model/unregisteredSelection";
+import { deriveScanListStatus } from "../../../model/scanListStatus";
+import ScanListState from "../ScanListState";
+import { useDisplayedScanListStatus } from "../useDisplayedScanListStatus";
 import type { CandidatesRegisteredResult } from "../types";
-import DlsiteFetchSlot from "./DlsiteFetchSlot";
+import ExcludedList from "./ExcludedList";
 import UnregisteredFooter from "./UnregisteredFooter";
 import UnregisteredListHeader from "./UnregisteredListHeader";
 import UnregisteredRow, { type UnregisteredRowHandlers } from "./UnregisteredRow";
 import UnregisteredToolbar from "./UnregisteredToolbar";
-import type { RjCodeCommitResult, RjCodeFieldError } from "./RjCodeCell";
+import { useRjCodeEditing } from "./useRjCodeEditing";
 import { ROW_HEIGHT } from "./layout";
 
 export interface UnregisteredTabProps {
-  candidates: ScanCandidate[];
   onRegistered: (result: CandidatesRegisteredResult) => void;
+  onOpenFiles: (path: WorkspacePath) => void;
 }
 
-const STALE_MESSAGE = "候補が更新されたため表示を更新しました。選び直してください。";
-
-function isCandidatesStale(error: unknown): boolean {
-  return error instanceof ApiRequestError && error.status === 409;
+interface RowFilter {
+  kind: "problem" | "noinfo";
+  paths: ReadonlySet<string>;
 }
 
-export default function UnregisteredTab({ candidates, onRegistered }: UnregisteredTabProps) {
+const pathsOf = (rows: readonly CandidateRowModel[]) =>
+  new Set(rows.map(({ candidate }) => candidate.path));
+
+export default function UnregisteredTab({ onRegistered, onOpenFiles }: UnregisteredTabProps) {
   const queryClient = useQueryClient();
+  const candidatesState = useScanCandidatesState();
+  const { candidates } = candidatesState;
+  const status = useDisplayedScanListStatus(
+    deriveScanListStatus({
+      loading: candidatesState.status === "loading",
+      error: candidatesState.status === "error",
+      notScanned: !candidatesState.scanCompleted,
+      count: candidates.length,
+    }),
+  );
+  const retryCandidates = () => void refreshScanCandidatesQuietly(queryClient);
   const jobStore = useDlsiteJobStore();
   const jobState = useDlsiteJobState((state) => state);
-  const [deselectedPaths, setDeselectedPaths] = useAtom(scanCandidateDeselectedPathsAtom);
-  const [fieldErrors, setFieldErrors] = useState<ReadonlyMap<string, RjCodeFieldError>>(
-    () => new Map(),
-  );
-  const [editingPath, setEditingPath] = useState<string | null>(null);
-  const [onlyProblems, setOnlyProblems] = useState(false);
+  const [selection, setSelection] = useAtom(scanCandidateSelectionAtom);
+  const [filter, setFilter] = useState<RowFilter | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const toast = useToast();
+  const [showExcluded, setShowExcluded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { editingPath, fieldErrors, savingPath, startEdit, commitEdit, cancelEdit } =
+    useRjCodeEditing({ candidates, onMessage: setErrorMessage });
 
   const allRows = useMemo<CandidateRowModel[]>(
     () =>
       candidates.map((candidate) => ({
         candidate,
         display: candidateDlsiteDisplay(candidate, jobState),
+        resultRevision: dlsiteResultRevision(candidate, jobState),
+        invalidRj: fieldErrors.has(candidate.path),
       })),
-    [candidates, jobState],
+    [candidates, jobState, fieldErrors],
   );
-  const problems = problemCount(allRows);
-  const filtering = onlyProblems && problems > 0;
-  useEffect(() => {
-    if (onlyProblems && problems === 0) setOnlyProblems(false);
-  }, [onlyProblems, problems]);
+  const allRowsRef = useLatest(allRows);
+  const problems = judgmentCount(allRows);
 
-  const visibleRows = useMemo(
-    () => (filtering ? allRows.filter(({ display }) => isProblemDisplay(display)) : allRows),
-    [allRows, filtering],
+  const filteredRows = useMemo(
+    () => (filter ? allRows.filter(({ candidate }) => filter.paths.has(candidate.path)) : allRows),
+    [allRows, filter],
   );
+  // 固定した行がすべて無くなった絞り込みは、件数が戻っても復活しないよう state ごと解除する
+  const filterGone = filter !== null && filteredRows.length === 0;
+  if (filterGone) setFilter(null);
+  const activeFilter = filterGone ? null : filter;
+  const visibleRows = activeFilter ? filteredRows : allRows;
   const selectedVisible = useMemo(
-    () => visibleRows.filter(({ candidate }) => !deselectedPaths.has(candidate.path)),
-    [visibleRows, deselectedPaths],
+    () => visibleRows.filter((row) => isRowSelected(row, selection)),
+    [visibleRows, selection],
   );
-  // 値を確定できていない行は、選択済みでも取得・追加の対象から外す。
-  const operableRows = useMemo(
-    () => selectedVisible.filter(({ candidate }) => !fieldErrors.has(candidate.path)),
-    [selectedVisible, fieldErrors],
-  );
-  const fetchCodes = useMemo(() => fetchTargetCodes(operableRows), [operableRows]);
-  const registerRows = useMemo(() => registerTargets(operableRows), [operableRows]);
-  const missingCount = missingDlsiteCount(registerRows);
+  const plan = useMemo(() => footerPlan(selectedVisible), [selectedVisible]);
+  const registerRows = useMemo(() => addTargets(selectedVisible), [selectedVisible]);
+  const noDlsiteRows = useMemo(() => missingDlsiteRows(registerRows), [registerRows]);
 
-  const allSelected = visibleRows.length > 0 && selectedVisible.length === visibleRows.length;
+  const selectableCount = useMemo(() => visibleRows.filter(isRowSelectable).length, [visibleRows]);
+  const allSelected = selectableCount > 0 && selectedVisible.length === selectableCount;
   const partiallySelected = selectedVisible.length > 0 && !allSelected;
+
+  const {
+    exclusions,
+    status: exclusionsStatus,
+    retry: retryExclusions,
+    exclude,
+    excluding,
+    restore: restoreExclusions,
+  } = useCandidateExclusions({ onExcludeError: setErrorMessage });
+  const panelRef = useRef<HTMLDivElement>(null);
+  const excludedTriggerRef = useRef<HTMLButtonElement>(null);
+  const closeExcluded = () => {
+    flushSync(() => setShowExcluded(false));
+    (excludedTriggerRef.current ?? panelRef.current)?.focus();
+  };
 
   const registerMutation = useRegisterScanCandidatesMutation();
   const register = async (apply: DlsiteRegistrationApply) => {
     const paths = registerRows.map(({ candidate }) => candidate.path);
+    const titleByPath = new Map(
+      registerRows.map((row) => [
+        row.candidate.path,
+        apply.title ? rowTitle(row) : row.candidate.inferredTitle,
+      ]),
+    );
+    const titlesOf = (entries: readonly { path: ScanCandidate["path"] }[]) =>
+      entries.map((entry) => titleByPath.get(entry.path) ?? entry.path);
     const outcome = await registerMutation.mutateAsync({ paths, apply });
     const { interruptedBy } = outcome;
     if (interruptedBy) {
@@ -111,140 +153,40 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
           : null,
       );
     }
-    if (isCandidatesStale(interruptedBy)) await refreshScanCandidates(queryClient).catch(() => {});
+    if (isCandidatesStale(interruptedBy)) await refreshScanCandidatesQuietly(queryClient);
     onRegistered({
-      registeredCount: outcome.registered.length,
+      registeredTitles: titlesOf(outcome.registered),
+      coverSkippedTitles: titlesOf(
+        outcome.registered.filter((entry) => entry.coverSkipped !== null),
+      ),
       failedCount: outcome.failures.length,
-      coverSkippedCount: outcome.registered.filter((entry) => entry.coverSkipped !== null).length,
+      remainingCandidates: outcome.refreshedCandidates?.candidates.length ?? null,
       interrupted: interruptedBy !== null,
     });
   };
 
-  const restoreMutation = useMutation({
-    mutationFn: (paths: string[]) => restoreScanCandidateExclusions(paths),
-    onSuccess: async () => {
-      toast.dismiss();
-      await refreshScanCandidates(queryClient).catch(() => {});
-    },
-    onError: (error) => setErrorMessage(apiErrorMessage(error, "取り消しに失敗しました")),
-  });
+  const busy = registerMutation.isPending || excluding;
 
-  const excludeMutation = useMutation({
-    mutationFn: (paths: string[]) => excludeScanCandidates(paths),
-    onSuccess: async (_void, paths) => {
-      toast.show({
-        message: `${paths.length}件を候補から外しました`,
-        variant: "success",
-        actionLabel: "元に戻す",
-        onAction: () => restoreMutation.mutate(paths),
-        priority: "action",
-      });
-      await Promise.all([
-        refreshScanCandidates(queryClient).catch(() => {}),
-        queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidateExclusions() }),
-      ]);
-    },
-    onError: (error) => setErrorMessage(apiErrorMessage(error, "候補から外せませんでした")),
-  });
-
-  const rjCodeMutation = useMutation({
-    mutationFn: ({ path, rjCode }: { path: ScanCandidate["path"]; rjCode: string }) =>
-      setScanCandidateRjCode(path, rjCode),
-    onSuccess: (candidate) => {
-      void refreshScanCandidates(queryClient, { replace: candidate }).catch(() => {});
-      clearFieldError(candidate.path);
-      setEditingPath(null);
+  const excludeRows = useCallback(
+    (rows: readonly CandidateRowModel[]) => {
+      if (rows.length === 0) return;
       setErrorMessage(null);
+      exclude({
+        paths: rows.map(({ candidate }) => candidate.path),
+        titles: rows.map(rowTitle),
+      });
     },
-    onError: async (error) => {
-      setErrorMessage(
-        isCandidatesStale(error)
-          ? STALE_MESSAGE
-          : apiErrorMessage(error, "RJコードを直せませんでした"),
-      );
-      setEditingPath(null);
-      if (isCandidatesStale(error)) await refreshScanCandidates(queryClient).catch(() => {});
-    },
-  });
-
-  const busy = registerMutation.isPending || excludeMutation.isPending || restoreMutation.isPending;
-
-  const clearFieldError = (path: string) => {
-    setFieldErrors((previous) => {
-      if (!previous.has(path)) return previous;
-      const next = new Map(previous);
-      next.delete(path);
-      return next;
-    });
-  };
-
-  const candidatesRef = useRef(candidates);
-  candidatesRef.current = candidates;
-  const rjCodePendingRef = useRef(false);
-  rjCodePendingRef.current = rjCodeMutation.isPending;
-  const mutateRjCode = rjCodeMutation.mutate;
-
-  const commitEdit = useCallback(
-    (path: string, rawValue: string): RjCodeCommitResult => {
-      if (rjCodePendingRef.current) return "done";
-      const candidate = candidatesRef.current.find((entry) => entry.path === path);
-      if (!candidate) {
-        setEditingPath(null);
-        return "done";
-      }
-      const trimmed = rawValue.trim();
-      if (trimmed === "") {
-        if (candidate.rjCode === null) {
-          clearFieldError(path);
-          setEditingPath(null);
-        } else {
-          mutateRjCode({ path: candidate.path, rjCode: "" });
-        }
-        return "done";
-      }
-      const parsed = rjCodeFormatSchema.safeParse(trimmed);
-      if (!parsed.success) {
-        setFieldErrors((previous) =>
-          new Map(previous).set(path, {
-            value: rawValue,
-            message: parsed.error.issues[0]?.message ?? "RJ/VJコードの形式が正しくありません",
-          }),
-        );
-        return "invalid";
-      }
-      if (parsed.data === candidate.rjCode) {
-        clearFieldError(path);
-        setEditingPath(null);
-        return "done";
-      }
-      mutateRjCode({ path: candidate.path, rjCode: parsed.data });
-      return "done";
-    },
-    [mutateRjCode],
+    [exclude],
   );
 
-  const startEdit = useCallback((path: string) => setEditingPath(path), []);
-  const cancelEdit = useCallback((path: string) => {
-    clearFieldError(path);
-    setEditingPath(null);
-  }, []);
   const toggleRow = useCallback(
     (path: string) =>
-      setDeselectedPaths((previous) => {
-        const next = new Set(previous);
-        if (next.has(path)) next.delete(path);
-        else next.add(path);
-        return next;
+      setSelection((previous) => {
+        const row = allRowsRef.current.find(({ candidate }) => candidate.path === path);
+        if (!row) return previous;
+        return new Map(previous).set(path, selectionOverride(row, !isRowSelected(row, previous)));
       }),
-    [setDeselectedPaths],
-  );
-
-  const startSingle = useCallback(
-    async (rjCode: string) => {
-      const result = await jobStore.startSingle(rjCode);
-      setErrorMessage(result.ok ? null : result.error);
-    },
-    [jobStore],
+    [setSelection, allRowsRef],
   );
 
   const handlers = useMemo<UnregisteredRowHandlers>(
@@ -253,73 +195,82 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
       onStartEdit: startEdit,
       onCommitEdit: commitEdit,
       onCancelEdit: cancelEdit,
-      onFetchSingle: (rjCode) => void startSingle(rjCode),
+      onOpenFolder: onOpenFiles,
+      onExclude: (path) =>
+        excludeRows(allRowsRef.current.filter((row) => row.candidate.path === path)),
     }),
-    [toggleRow, startEdit, commitEdit, cancelEdit, startSingle],
+    [toggleRow, startEdit, commitEdit, cancelEdit, excludeRows, onOpenFiles, allRowsRef],
   );
 
   const toggleAll = () =>
-    setDeselectedPaths((previous) => {
-      const next = new Set(previous);
-      for (const { candidate } of visibleRows) {
-        if (allSelected) next.add(candidate.path);
-        else next.delete(candidate.path);
+    setSelection((previous) => {
+      const next = new Map(previous);
+      for (const row of visibleRows) {
+        if (!isRowSelectable(row)) continue;
+        next.set(row.candidate.path, selectionOverride(row, !allSelected));
       }
       return next;
     });
 
-  const startBulk = async () => {
-    const result = await jobStore.startBulk(fetchCodes);
+  const startFetch = async () => {
+    if (plan.kind !== "fetch") return;
+    const result = await jobStore.start(plan.codes, plan.force);
     setErrorMessage(result.ok ? null : result.error);
   };
+
+  const excludeSelected = () => excludeRows(selectedVisible);
 
   const { virtualItems, wrapperStyle, getItemStyle } = useVirtualList({
     count: visibleRows.length,
     estimateSize: ROW_HEIGHT,
     scrollRef,
-    resetKey: String(filtering),
+    resetKey: activeFilter?.kind ?? "",
     resetScrollTop: true,
   });
 
-  if (candidates.length === 0) {
-    return (
-      <p className="px-[18px] py-4 font-jp text-body text-ink-2">未登録の候補はありません。</p>
-    );
-  }
-
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <UnregisteredToolbar
-        allSelected={allSelected}
-        partiallySelected={partiallySelected}
-        selectAllDisabled={visibleRows.length === 0}
-        onToggleAll={toggleAll}
-        excludeCount={selectedVisible.length}
-        busy={busy}
-        onExclude={() =>
-          excludeMutation.mutate(selectedVisible.map(({ candidate }) => candidate.path))
-        }
-        problemCount={problems}
-        onlyProblems={filtering}
-        onToggleOnlyProblems={() => setOnlyProblems((value) => !value)}
-        slot={
-          <DlsiteFetchSlot
-            targetCount={fetchCodes.length}
-            busy={busy}
-            onStart={() => void startBulk()}
-            onCancel={() => void jobStore.cancelBulk()}
-          />
-        }
-      />
-      <section aria-label="未登録の候補" className="flex min-h-0 flex-1 flex-col">
-        <div
-          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 仮想リストは行を絶対配置するため table 要素にできず、role=table で ARIA table 構造を与える
-          role="table"
-          aria-label="未登録の候補一覧"
-          aria-rowcount={visibleRows.length + 1}
-          className="flex min-h-0 flex-1 flex-col"
+      {showExcluded && (
+        <ExcludedList
+          exclusions={exclusions}
+          status={exclusionsStatus}
+          onRetry={retryExclusions}
+          onBack={closeExcluded}
+          onRestore={(path) => restoreExclusions([path])}
+        />
+      )}
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        inert={showExcluded}
+        className={showExcluded ? "hidden" : "flex min-h-0 flex-1 flex-col outline-none"}
+      >
+        <UnregisteredToolbar
+          excludedCount={exclusions.length}
+          excludedFailed={exclusionsStatus === "error"}
+          excludedTriggerRef={excludedTriggerRef}
+          onShowExcluded={() => setShowExcluded(true)}
+          problemCount={problems}
+          filter={activeFilter && { kind: activeFilter.kind, count: visibleRows.length }}
+          onFilterProblems={() =>
+            setFilter({ kind: "problem", paths: pathsOf(allRows.filter(needsJudgment)) })
+          }
+          onClearFilter={() => setFilter(null)}
+        />
+        <ScanListState
+          status={status}
+          emptyMessage="未登録の候補はありません"
+          onRetry={retryCandidates}
+          table={{ label: "未登録の候補一覧", rowCount: visibleRows.length + 1 }}
+          heading={
+            <UnregisteredListHeader
+              allSelected={allSelected}
+              partiallySelected={partiallySelected}
+              selectAllDisabled={busy || selectableCount === 0}
+              onToggleAll={toggleAll}
+            />
+          }
         >
-          <UnregisteredListHeader />
           <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
             <div
               // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 仮想リストの行群は tbody にできないため role=rowgroup で与える
@@ -338,10 +289,13 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
                     <UnregisteredRow
                       candidate={candidate}
                       display={display}
-                      selected={!deselectedPaths.has(candidate.path)}
+                      flagged={needsJudgment(row)}
+                      selected={isRowSelected(row, selection)}
                       editing={editingPath === candidate.path}
                       error={fieldErrors.get(candidate.path)}
                       busy={busy}
+                      rjCodeLocked={savingPath !== null && savingPath !== candidate.path}
+                      rjCodeSaving={savingPath === candidate.path}
                       handlers={handlers}
                     />
                   </div>
@@ -349,22 +303,35 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
               })}
             </div>
           </div>
-        </div>
-      </section>
-      {errorMessage && (
-        <p
-          role="alert"
-          className="shrink-0 whitespace-pre-line border-t border-line-soft px-[18px] py-2 font-jp text-secondary text-[var(--state-danger)]"
-        >
-          {errorMessage}
-        </p>
-      )}
-      <UnregisteredFooter
-        registerCount={registerRows.length}
-        missingDlsiteCount={missingCount}
-        busy={busy}
-        onRegister={(apply) => void register(apply)}
-      />
+        </ScanListState>
+        {status === "ready" && (
+          <>
+            {errorMessage && (
+              <p
+                role="alert"
+                className="shrink-0 whitespace-pre-line border-t border-line-soft px-[18px] py-2 font-jp text-secondary text-[var(--state-danger)]"
+              >
+                {errorMessage}
+              </p>
+            )}
+            <UnregisteredFooter
+              plan={plan}
+              selectedCount={selectedVisible.length}
+              addCount={registerRows.length}
+              missingDlsiteCount={noDlsiteRows.length}
+              onFilterMissingDlsite={() =>
+                setFilter({ kind: "noinfo", paths: pathsOf(noDlsiteRows) })
+              }
+              busy={busy}
+              rjCodeSaving={savingPath !== null}
+              onFetch={() => void startFetch()}
+              onCancelFetch={() => void jobStore.cancel()}
+              onRegister={(apply) => void register(apply)}
+              onExclude={excludeSelected}
+            />
+          </>
+        )}
+      </div>
     </div>
   );
 }

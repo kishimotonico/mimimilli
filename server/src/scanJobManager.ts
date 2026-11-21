@@ -257,7 +257,6 @@ export class ScanJobManager {
       coverErrors: result.coverErrors,
       unreadablePathsCount: unreadablePaths.length,
       unreadablePathsSample: unreadablePaths.slice(0, UNREADABLE_PATH_LOG_SAMPLE_LIMIT),
-      dataIntegrityWarning: result.dataIntegrityWarning !== undefined,
     });
   }
 

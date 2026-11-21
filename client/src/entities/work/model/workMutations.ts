@@ -16,6 +16,7 @@ import type {
   DlsiteStateUpdateBody,
   NormalizedTag,
   DlsiteRegistrationApply,
+  ScanCandidatesResponse,
   UnregisterMissingWorksResult,
   UrlEntry,
   WorkCreateBodyInput,
@@ -158,16 +159,24 @@ export function useRegisterWorkMutation() {
   });
 }
 
+export type ScanCandidatesRegisterResult = ScanCandidatesRegisterOutcome & {
+  /** 追加後に取り直した候補。追加できたものがない、または取り直せなかったときは null */
+  refreshedCandidates: ScanCandidatesResponse | null;
+};
+
 export function useRegisterScanCandidatesMutation() {
   const queryClient = useQueryClient();
   return useMutation<
-    ScanCandidatesRegisterOutcome,
+    ScanCandidatesRegisterResult,
     Error,
     { paths: string[]; apply: DlsiteRegistrationApply }
   >({
-    mutationFn: ({ paths, apply }) => registerScanCandidates(paths, apply),
-    onSuccess: (outcome) =>
-      outcome.registered.length > 0 ? updateCachesAfterRegistration(queryClient) : undefined,
+    mutationFn: async ({ paths, apply }) => {
+      const outcome = await registerScanCandidates(paths, apply);
+      const refreshedCandidates =
+        outcome.registered.length > 0 ? await updateCachesAfterRegistration(queryClient) : null;
+      return { ...outcome, refreshedCandidates };
+    },
   });
 }
 

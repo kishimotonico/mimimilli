@@ -13,7 +13,6 @@ const RESULT: ScanResult = {
   registered: 0,
   insertedWorkIds: [],
   startedWithEmptyCatalog: false,
-  missingWorks: [],
   updatedWorks: [],
   errors: 0,
   missing: 0,
@@ -77,7 +76,7 @@ function stubMaterials() {
 
 const ALL = { title: true, cover: true, tags: true, url: true };
 const find = async (session: ScanSession, path: string) =>
-  (await session.listCandidates()).find((candidate) => candidate.path === path);
+  (await session.listCandidates()).candidates.find((candidate) => candidate.path === path);
 
 test("直したRJコード（なしの明示を含む）は、同じフォルダーを含む次のスキャンの完了後も残る", async () => {
   const { session } = stubMaterials();
@@ -183,7 +182,7 @@ test("rootが変わる再設定では候補と直しを捨て、同じrootの再
   assert.equal((await find(session, "A"))?.rjCode, "RJ666666");
 
   session.beginRootReconfiguration(true);
-  assert.deepEqual(await session.listCandidates(), []);
+  assert.deepEqual(await session.listCandidates(), { scanCompleted: false, candidates: [] });
   session.publish(execution(["A"]), "t2");
   assert.equal((await find(session, "A"))?.rjCode, null);
 });
@@ -202,13 +201,15 @@ test("公開でプールと記録がまとめて差し替わる", async () => {
   const { session } = stubMaterials();
   session.publish(execution(["A"]), "2026-01-01T00:00:00.000Z");
   assert.equal((await session.recordSnapshot()).finishedAt, "2026-01-01T00:00:00.000Z");
+  const { scanCompleted, candidates } = await session.listCandidates();
+  assert.equal(scanCompleted, true);
   assert.deepEqual(
-    (await session.listCandidates()).map((candidate) => candidate.path),
+    candidates.map((candidate) => candidate.path),
     ["A"],
   );
 });
 
-test("記録は読むときにcatalogと照合し、スキャン中に消えた作品も、戻った作品の行方不明も落とす", async () => {
+test("記録は読むときにcatalogと照合し、スキャン中に消えた作品を落とす", async () => {
   const { state, session } = stubMaterials();
   session.publish(
     {
@@ -220,21 +221,11 @@ test("記録は読むときにcatalogと照合し、スキャン中に消えた�
           { workId: "gone", changes: [{ kind: "meta" }] },
           { workId: "kept", changes: [{ kind: "meta" }] },
         ],
-        missingWorks: [
-          { workId: "gone", title: "g", previousPath: workspacePath("g") },
-          { workId: "restored", title: "r", previousPath: workspacePath("r") },
-          { workId: "still", title: "s", previousPath: workspacePath("s") },
-        ],
-        dataIntegrityWarning: { skippedCount: 2, skippedWorkIds: ["gone", "kept"] },
       },
     },
     "t",
   );
-  state.workStatuses = new Map([
-    ["kept", "ok"],
-    ["restored", "ok"],
-    ["still", "missing"],
-  ]);
+  state.workStatuses = new Map([["kept", "ok"]]);
 
   const record = await session.recordSnapshot();
 
@@ -242,11 +233,6 @@ test("記録は読むときにcatalogと照合し、スキャン中に消えた�
     record.updatedWorks.map((work) => work.workId),
     ["kept"],
   );
-  assert.deepEqual(
-    record.missingWorks.map((work) => work.workId),
-    ["still"],
-  );
-  assert.deepEqual(record.dataIntegrityWarning, { skippedCount: 1, skippedWorkIds: ["kept"] });
 });
 
 test("記録の照合中にスキャンが完了しても、読み始めた時点の記録で答え、新しい記録は漏れずに次の読みへ出る", async () => {
@@ -296,4 +282,43 @@ test("記録の照合中にスキャンが完了しても、読み始めた時�
     second.updatedWorks.map((work) => work.workId),
     ["new"],
   );
+});
+
+test("scanCompleted が false のときは候補が空。同じrootの再設定は記録だけを捨て、候補のスキャンは完了したまま", async () => {
+  const { session } = stubMaterials();
+  session.publish(execution(["A", "B"]), "t1");
+
+  session.beginRootReconfiguration(false);
+  const afterReconfiguration = await session.listCandidates();
+  assert.equal(afterReconfiguration.scanCompleted, true);
+  assert.equal(afterReconfiguration.candidates.length, 2);
+  assert.equal((await session.recordSnapshot()).finishedAt, null);
+
+  session.beginRootReconfiguration(true);
+  assert.deepEqual(await session.listCandidates(), { scanCompleted: false, candidates: [] });
+  session.reset();
+  assert.deepEqual(await session.listCandidates(), { scanCompleted: false, candidates: [] });
+});
+
+test("除外一覧のRJコードは、直した値、候補の検出値、プールに無いパスはフォルダー名から検出した値の順で返す", async () => {
+  const { state, session } = stubMaterials();
+  state.unavailable.add("RJ123456_未スキャン");
+  assert.deepEqual(await session.listExclusions(), [
+    { path: "RJ123456_未スキャン", rjCode: "RJ123456" },
+  ]);
+
+  session.publish(
+    { ...execution([]), candidatePool: [folder("B", null), folder("RJ222222_C", "RJ222222")] },
+    "t1",
+  );
+  await session.setRjCode("B", "RJ999999");
+  state.unavailable.add("B");
+  state.unavailable.add("RJ222222_C");
+  state.unavailable.add("名前だけ");
+  assert.deepEqual(await session.listExclusions(), [
+    { path: "RJ123456_未スキャン", rjCode: "RJ123456" },
+    { path: "B", rjCode: "RJ999999" },
+    { path: "RJ222222_C", rjCode: "RJ222222" },
+    { path: "名前だけ", rjCode: null },
+  ]);
 });

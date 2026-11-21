@@ -1,5 +1,5 @@
 import { createElement, type ReactNode } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -77,7 +77,7 @@ describe("DlsiteEditor", () => {
       "POST /api/dlsite/:id/apply": (request) => applyDlsiteInfo(request),
       "PATCH /api/dlsite/:id": (request) => updateDlsiteState(request),
       "GET /api/settings": buildSettings(),
-      "GET /api/scan/candidates": { candidates: [] },
+      "GET /api/scan/candidates": { scanCompleted: true, candidates: [] },
     });
     HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
       this.open = true;
@@ -140,6 +140,9 @@ describe("DlsiteEditor", () => {
 
     expect(screen.getByLabelText(/^サークル\/夜想曲/)).not.toBeChecked();
     expect(screen.getByLabelText("cv/新CV")).toBeChecked();
+    const tagGroup = screen.getByRole("group", { name: "追加されるタグ" });
+    expect(within(tagGroup).getAllByRole("checkbox")).toHaveLength(2);
+    expect(within(tagGroup).getByLabelText("cv/新CV")).toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "選択内容を適用" }));
 
     await waitFor(() => expect(applyDlsiteInfo).toHaveBeenCalledTimes(1));
@@ -248,9 +251,10 @@ describe("DlsiteEditor", () => {
   ])("取得後の候補一覧の取り直し: $name", async ({ rjCode, refetched }) => {
     fetchDlsiteInfo.mockReturnValue(buildDlsitePreview());
     const { queryClient } = renderEditor(makeWork());
-    queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, [
-      buildScanCandidate({ path: "候補", rjCode }),
-    ]);
+    queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, {
+      scanCompleted: true,
+      candidates: [buildScanCandidate({ path: "候補", rjCode })],
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "取得結果を確認" }));
     await waitFor(() => expect(screen.getByText("DLsite情報の適用")).toBeInTheDocument());

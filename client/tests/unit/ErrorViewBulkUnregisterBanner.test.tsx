@@ -8,7 +8,7 @@ import * as workApi from "../../src/entities/work/api";
 import { ErrorViewBulkUnregisterBanner } from "../../src/features/library/ui/ErrorViewBulkUnregisterBanner";
 
 beforeEach(() => {
-  mockApi({ "GET /api/scan/candidates": { candidates: [] } });
+  mockApi({ "GET /api/scan/candidates": { scanCompleted: true, candidates: [] } });
   HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
     this.open = true;
   });

@@ -89,7 +89,8 @@ export function WorkEditTagsField({
               icon={I.add}
               label="タグを追加"
               size="xs"
-              className="bg-paper-2 text-ink-2 hover:bg-paper-3 hover:text-ink-0"
+              tone="muted"
+              className="bg-paper-2 hover:bg-paper-3"
               disabled={disabled}
               onClick={() => (isPopoverOpen ? close() : setIsPopoverOpen(true))}
             />

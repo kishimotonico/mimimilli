@@ -19,9 +19,9 @@ export const WORK_CHANGE_KIND_LABEL: Record<WorkChangeKind, string> = {
   files: "ファイル構成",
 };
 
-export const WORK_CHANGE_KIND_ICON: Record<WorkChangeKind, IconFC> = {
+const WORK_CHANGE_KIND_ICON: Record<WorkChangeKind, IconFC> = {
   moved: I.arrowR,
-  meta: I.text,
+  meta: I.textLines,
   files: I.audio,
 };
 

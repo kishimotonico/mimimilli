@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Hono } from "hono";
-import { workspacePath, worksQuerySchema, type ScanResult } from "@mimimilli/shared";
+import { workspacePath, type ScanResult } from "@mimimilli/shared";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { worksRoute } from "../src/routes/works.ts";
 import type { DataAdapter } from "../src/adapter/index.ts";
@@ -14,7 +14,6 @@ function result(overrides: Partial<ScanResult>): ScanResult {
     registered: 0,
     insertedWorkIds: [],
     startedWithEmptyCatalog: false,
-    missingWorks: [],
     updatedWorks: [],
     errors: 0,
     missing: 0,
@@ -93,13 +92,11 @@ test("DELETE /works/:id した作品は、記録を読むときにすべての�
     result({
       insertedWorkIds: ["RJ501001"],
       updatedWorks: [{ workId: "RJ501001", changes: [{ kind: "meta" }] }],
-      dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["RJ501001"] },
     }),
     "t",
   );
   const before = await snapshotOf(adapter, store);
   assert.equal(before.updatedWorks.length, 1);
-  assert.equal(before.dataIntegrityWarning?.skippedCount, 1);
   assert.deepEqual((await idsOf(app, "scanRecord=new")).ids, ["RJ501001"]);
 
   const res = await app.request("/api/works/RJ501001", { method: "DELETE" });
@@ -107,7 +104,6 @@ test("DELETE /works/:id した作品は、記録を読むときにすべての�
 
   const after = await snapshotOf(adapter, store);
   assert.deepEqual(after.updatedWorks, []);
-  assert.equal(after.dataIntegrityWarning, undefined);
   assert.deepEqual((await idsOf(app, "scanRecord=new")).ids, []);
 });
 
@@ -151,27 +147,13 @@ test("ID再採番でコピー側を直しても、登録側の作品の記録は
   assert.equal((await snapshotOf(adapter, store)).updatedWorks.length, 1);
 });
 
-test("POST /works/unregister-missing した作品は、記録の行方不明から落ちる", async () => {
-  const { adapter, store, app } = setup();
-  const missingId = (
-    await adapter.queryWorks({
-      ...worksQuerySchema.parse({}),
-      page: 1,
-      limit: 500,
-    })
-  ).items.find((item) => item.status === "missing")?.id;
-  assert.ok(missingId);
-  store.replace(
-    result({
-      missingWorks: [{ workId: missingId, title: "t", previousPath: workspacePath("p") }],
-    }),
-    "t",
-  );
-  assert.equal((await snapshotOf(adapter, store)).missingWorks.length, 1);
+test("POST /works/unregister-missing した作品は、診断の行方不明から落ちる", async () => {
+  const { adapter, app } = setup();
+  assert.ok((await adapter.listScanDiagnostics()).missingWorks.length > 0);
 
   const res = await app.request("/api/works/unregister-missing", { method: "POST" });
   assert.equal(res.status, 200);
-  assert.deepEqual((await snapshotOf(adapter, store)).missingWorks, []);
+  assert.deepEqual((await adapter.listScanDiagnostics()).missingWorks, []);
 });
 
 test("fixtureのスキャンは、登録解除した新規作品を次のスキャンで記録へ戻さず、記録を今回の変化へ入れ替える", async () => {

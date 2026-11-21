@@ -35,6 +35,7 @@ test("resolveRootFolder / beginRootReconfiguration は receiver なしで呼び�
     setScanState: () => undefined,
     listIdentityConflicts: () => [],
     listInvalidMetaFiles: () => [],
+    listUnreadablePaths: () => [],
     clearDiagnostics: () => undefined,
     deleteWorksOutsideRoot: () => 0,
   };
@@ -47,6 +48,9 @@ test("resolveRootFolder / beginRootReconfiguration は receiver なしで呼び�
     }),
     listMissingWorksWithRjCode: () => [],
     listWorkPhysicalPaths: () => new Set<string>(),
+    listDataIntegritySkips: () => [],
+    listMissingWorks: () => [],
+    getWorkIdentities: () => new Map<string, { title: string; metaPath: string }>(),
   };
 
   try {

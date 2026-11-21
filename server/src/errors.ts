@@ -40,8 +40,14 @@ export const SOURCE_LOCATION_MISMATCH_MESSAGE =
   "作品の場所が一致しないため、この操作は適用できません。";
 
 export const SOURCE_RELOAD_FAILED_MESSAGE = "作品を一覧へ反映できませんでした。";
-export const SOURCE_RELOAD_UNRESOLVED_MESSAGE =
-  "作品情報ファイルを読み直しても、この作品の保存値を直せませんでした。";
+
+/** 作品情報ファイルを読み直して投影し直しても、保存された値がまだ検証を通らない。HTTP は reload_unresolved。 */
+export class SourceReloadUnresolvedError extends Error {
+  constructor() {
+    super("作品情報ファイルを読み直しても、この作品の保存値を直せませんでした。");
+    this.name = "SourceReloadUnresolvedError";
+  }
+}
 
 /** JSON 不正・スキーマ不正・formatVersion 非対応。HTTP は parse_error。 */
 export class SourceParseError extends Error {
@@ -88,7 +94,7 @@ export class WorkRegisterError extends Error {
 export function descendantsRegisteredError(count: number): WorkRegisterError {
   return new WorkRegisterError(
     "descendants_registered",
-    `配下に登録済み作品が${count}件あります。先に子作品の登録を解除してから親を登録してください`,
+    `配下に登録済み作品が${count}件あります。先に子作品を登録解除してから親を登録してください`,
     count,
   );
 }

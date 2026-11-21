@@ -241,6 +241,8 @@ test("単一ファイル形式の壊れたメタのコピーはメタファイ�
   assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, [
     {
       kind: "identity_conflict",
+      registeredTitle: "single",
+      registeredPath: "a/single.mimimilli.json",
       workId: meta.id,
       paths: ["a/single.mimimilli.json", "b/single.mimimilli.json"],
     },

@@ -23,7 +23,7 @@ function appWithAdvancingRevision() {
     session: {
       listCandidates: async () => {
         revision += 1;
-        return [candidate];
+        return { scanCompleted: true, candidates: [candidate] };
       },
       setRjCode: async () => {
         revision += 1;

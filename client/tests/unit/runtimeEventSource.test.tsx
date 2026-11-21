@@ -6,7 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type ScanJobEvent, type ScanJobSnapshot } from "@mimimilli/shared";
 import { createApiHandler } from "../helpers/api";
 import { appShellRoutes } from "../helpers/appShellApi";
-import { buildScanCandidate, buildScanJobEvent, buildScanJobSnapshot } from "../helpers/builders";
+import {
+  buildScanCandidate,
+  buildScanJobEvent,
+  buildScanJobSnapshot,
+  buildScanRecord,
+} from "../helpers/builders";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import { scanJobStoreAtom } from "../../src/entities/scan/model/scanJobStore";
@@ -134,7 +139,8 @@ describe("ScanRuntime EventSource ownership", () => {
   it("起動時に未登録候補を GET /scan/candidates から1回取得し、取得済みなら取り直さない", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.endsWith("/scan/candidates")) return response({ candidates: [candidate] });
+      if (url.endsWith("/scan/candidates"))
+        return response({ scanCompleted: true, candidates: [candidate] });
       return shell(input, init);
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -142,7 +148,10 @@ describe("ScanRuntime EventSource ownership", () => {
     const { queryClient } = renderRuntime(createElement(ScanRuntime));
 
     await waitFor(() =>
-      expect(queryClient.getQueryData(SCAN_QUERY_KEYS.candidates())).toEqual([candidate]),
+      expect(queryClient.getQueryData(SCAN_QUERY_KEYS.candidates())).toEqual({
+        scanCompleted: true,
+        candidates: [candidate],
+      }),
     );
     const candidateCalls = () =>
       fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/scan/candidates"));
@@ -171,7 +180,7 @@ describe("ScanRuntime EventSource ownership", () => {
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(completedJob);
         if (url.endsWith("/scan/candidates")) {
-          return response({ candidates: [candidate] });
+          return response({ scanCompleted: true, candidates: [candidate] });
         }
         return shell(input, init);
       }),
@@ -195,7 +204,10 @@ describe("ScanRuntime EventSource ownership", () => {
     // 候補の再取得は queryClient.fetchQuery 経由のため、invalidate のスパイではなく
     // 反映後のキャッシュ内容そのものを見る。
     await waitFor(() =>
-      expect(queryClient.getQueryData(SCAN_QUERY_KEYS.candidates())).toEqual([candidate]),
+      expect(queryClient.getQueryData(SCAN_QUERY_KEYS.candidates())).toEqual({
+        scanCompleted: true,
+        candidates: [candidate],
+      }),
     );
     expect(
       invalidate.mock.calls.filter(
@@ -245,13 +257,14 @@ describe("ScanRuntime EventSource ownership", () => {
 });
 
 describe("ScanRuntime: 完了・中止トースト", () => {
-  it("スキャンモーダルが閉じていても、完了では件数つきのトーストを出さない", async () => {
+  it("スキャンモーダルが閉じていても、完了では今回の変化の件数つきのトーストを出す", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(completedJob);
+        if (url.endsWith("/scan/last")) return response(buildScanRecord());
         return shell(input, init);
       }),
     );
@@ -262,7 +275,9 @@ describe("ScanRuntime: 完了・中止トースト", () => {
     await waitFor(() =>
       expect(store.get(scanJobStoreAtom).getState().job?.status).toBe("completed"),
     );
-    expect(latestToastRequest(store)).toBeUndefined();
+    await waitFor(() =>
+      expect(latestToastRequest(store)?.message).toBe("スキャン完了・変化はありません"),
+    );
   });
 
   it("中止時は「スキャンを中止しました」トーストを出す", async () => {

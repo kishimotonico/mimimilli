@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { apiError, mockApi } from "../helpers/api";
-import { buildScanCandidate } from "../helpers/builders";
+import { buildScanCandidate, buildScanDiagnostics } from "../helpers/builders";
 import { SCAN_CANDIDATES_QUERY_KEY } from "../../src/entities/scan/scanCandidatesCache";
 import { QueryClient, QueryObserver, type QueryKey } from "@tanstack/react-query";
 import {
@@ -29,7 +29,7 @@ import {
 } from "../../src/entities/work/model/workCacheUpdates";
 
 beforeEach(() => {
-  mockApi({ "GET /api/scan/candidates": { candidates: [] } });
+  mockApi({ "GET /api/scan/candidates": { scanCompleted: true, candidates: [] } });
 });
 
 const playlistId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -114,7 +114,7 @@ function seededClient(): QueryClient {
   queryClient.setQueryData(KEYS.smartWorks, structuredClone(emptyPages));
   queryClient.setQueryData(KEYS.smartPreview, 3);
   queryClient.setQueryData(KEYS.fs, { entries: [] });
-  queryClient.setQueryData(KEYS.diagnostics, { identityConflicts: [], invalidMetaFiles: [] });
+  queryClient.setQueryData(KEYS.diagnostics, buildScanDiagnostics());
   queryClient.setQueryData(KEYS.scanRecord, { finishedAt: null });
   queryClient.setQueryData(KEYS.candidates, []);
   return queryClient;
@@ -153,7 +153,9 @@ describe("meta 編集の必須更新", () => {
 
     await updateCachesAfterSourceEdit(queryClient, mutationResult("w1"));
 
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(["detail1", ...LIBRARY_VIEWS]));
+    expect(sorted(invalidatedKeys(queryClient))).toEqual(
+      sorted(["detail1", ...LIBRARY_VIEWS, "diagnostics"]),
+    );
     expect(queryClient.getQueryData(KEYS.source1)).toEqual(makeSnapshot("w1"));
   });
 });
@@ -228,19 +230,30 @@ describe("登録・スキャン完了の必須更新", () => {
 
   it("登録・解除は、サーバーの応答で候補一覧を置き換え、取得に失敗しても reject しない", async () => {
     const found = buildScanCandidate({ path: "戻った作品" });
-    const api = mockApi({ "GET /api/scan/candidates": { candidates: [found] } });
+    const api = mockApi({
+      "GET /api/scan/candidates": { scanCompleted: true, candidates: [found] },
+    });
     const queryClient = seededClient();
 
     await updateCachesAfterUnregistration(queryClient, "w1");
-    expect(queryClient.getQueryData(KEYS.candidates)).toEqual([found]);
+    expect(queryClient.getQueryData(KEYS.candidates)).toEqual({
+      scanCompleted: true,
+      candidates: [found],
+    });
 
     queryClient.setQueryData(KEYS.candidates, []);
-    await updateCachesAfterRegistration(queryClient);
-    expect(queryClient.getQueryData(KEYS.candidates)).toEqual([found]);
+    await expect(updateCachesAfterRegistration(queryClient)).resolves.toEqual({
+      scanCompleted: true,
+      candidates: [found],
+    });
+    expect(queryClient.getQueryData(KEYS.candidates)).toEqual({
+      scanCompleted: true,
+      candidates: [found],
+    });
     expect(api.requestsTo("GET /api/scan/candidates")).toHaveLength(2);
 
     mockApi({ "GET /api/scan/candidates": apiError(500, "internal") });
-    await expect(updateCachesAfterRegistration(queryClient)).resolves.toBeUndefined();
+    await expect(updateCachesAfterRegistration(queryClient)).resolves.toBeNull();
   });
 
   it("スキャン完了は登録の集合に加えて全詳細を無効化する", async () => {
@@ -296,7 +309,9 @@ describe("DLsite の必須更新", () => {
     await updateCachesAfterDlsiteLinkageChange(queryClient, mutationResult("w1"));
 
     expect(queryClient.getQueryData(KEYS.source1)).toEqual(makeSnapshot("w1"));
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(["detail1", ...LIBRARY_VIEWS]));
+    expect(sorted(invalidatedKeys(queryClient))).toEqual(
+      sorted(["detail1", ...LIBRARY_VIEWS, "diagnostics"]),
+    );
   });
 
   it("情報の取得は同じRJコードの詳細と一覧系を無効化し、別コードの詳細と source は残す", async () => {
@@ -312,33 +327,39 @@ describe("DLsite の必須更新", () => {
 
     await updateCachesAfterDlsiteFetch(queryClient, ["rj000001"]);
 
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(["detail1", ...LIBRARY_VIEWS]));
+    expect(sorted(invalidatedKeys(queryClient))).toEqual(
+      sorted(["detail1", ...LIBRARY_VIEWS, "diagnostics"]),
+    );
   });
 
   describe("DLsiteの同期取得", () => {
     it("同じRJコードの作品を無効化し、候補キャッシュに同じコードの候補が無ければ候補一覧は取り直さない", async () => {
-      const api = mockApi({ "GET /api/scan/candidates": { candidates: [] } });
+      const api = mockApi({ "GET /api/scan/candidates": { scanCompleted: true, candidates: [] } });
       const queryClient = seededClient();
       queryClient.setQueryData(
         KEYS.detail1,
         makeWork({ dlsite: { ...emptyDlsiteState(), rjCode: "RJ000001" } }),
       );
-      queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, [
-        buildScanCandidate({ path: "a", rjCode: "RJ000002" }),
-      ]);
+      queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, {
+        scanCompleted: true,
+        candidates: [buildScanCandidate({ path: "a", rjCode: "RJ000002" })],
+      });
 
       await updateCachesAfterDlsiteSyncFetch(queryClient, "RJ000001");
 
-      expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(["detail1", ...LIBRARY_VIEWS]));
+      expect(sorted(invalidatedKeys(queryClient))).toEqual(
+        sorted(["detail1", ...LIBRARY_VIEWS, "diagnostics"]),
+      );
       expect(api.requestsTo("GET /api/scan/candidates")).toHaveLength(0);
     });
 
     it("キャッシュ済みの候補一覧に同じRJコードの候補があるときだけ、候補一覧を取り直す", async () => {
-      const api = mockApi({ "GET /api/scan/candidates": { candidates: [] } });
+      const api = mockApi({ "GET /api/scan/candidates": { scanCompleted: true, candidates: [] } });
       const queryClient = seededClient();
-      queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, [
-        buildScanCandidate({ path: "a", rjCode: "rj000001" }),
-      ]);
+      queryClient.setQueryData(SCAN_CANDIDATES_QUERY_KEY, {
+        scanCompleted: true,
+        candidates: [buildScanCandidate({ path: "a", rjCode: "rj000001" })],
+      });
 
       await updateCachesAfterDlsiteSyncFetch(queryClient, "RJ000001");
 

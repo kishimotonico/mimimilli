@@ -6,9 +6,9 @@ import type { IconFC } from "./Icon";
 export type StatusTone = "done" | "work" | "attention" | "none";
 
 const TONE_CLASS: Record<StatusTone, string> = {
-  done: "text-[color-mix(in_oklch,var(--state-success)_78%,var(--ink-0))]",
+  done: "text-[var(--state-success)]",
   work: "text-ink-2",
-  attention: "text-[color-mix(in_oklch,var(--state-danger)_85%,var(--ink-0))]",
+  attention: "text-[var(--state-danger)]",
   none: "",
 };
 
@@ -37,7 +37,7 @@ export default function StatusLabel({
         className,
       )}
     >
-      {Icon && <Icon size={12} className={cn("shrink-0", spinning && "animate-spin")} />}
+      {Icon && <Icon size={13} className={cn("shrink-0", spinning && "animate-spin")} />}
       {children}
     </span>
   );

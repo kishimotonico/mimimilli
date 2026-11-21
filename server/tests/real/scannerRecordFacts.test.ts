@@ -62,7 +62,7 @@ test("catalogが空で始まったスキャンだけ startedWithEmptyCatalog に
   assert.deepEqual(second.insertedWorkIds, [ID_B]);
 });
 
-test("missingWorks は今回新たに行方不明になった作品だけで、旧パスとタイトルを持つ", async (t) => {
+test("診断の行方不明は、状態がmissingの作品すべてで、旧パスとタイトルを持つ", async (t) => {
   const directory = makeTestDirectory("scan-record-facts-missing");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");
@@ -71,12 +71,12 @@ test("missingWorks は今回新たに行方不明になった作品だけで、�
   writeWork(root, "c", ID_C, "作品C");
   const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await configureRoot(adapter, root);
-  const first = await runScan(adapter);
-  assert.deepEqual(first.missingWorks, []);
+  await runScan(adapter);
+  assert.deepEqual((await adapter.listScanDiagnostics()).missingWorks, []);
 
   rmSync(join(root, "sub/a"), { recursive: true });
   const second = await runScan(adapter);
-  assert.deepEqual(second.missingWorks, [
+  assert.deepEqual((await adapter.listScanDiagnostics()).missingWorks, [
     { workId: ID_A, title: "作品A", previousPath: workspacePath("sub/a") },
   ]);
   assert.equal(second.missing, 1);
@@ -84,16 +84,16 @@ test("missingWorks は今回新たに行方不明になった作品だけで、�
   rmSync(join(root, "b"), { recursive: true });
   const third = await runScan(adapter);
   assert.deepEqual(
-    third.missingWorks.map((work) => work.workId),
-    [ID_B],
+    (await adapter.listScanDiagnostics()).missingWorks.map((work) => work.workId),
+    [ID_A, ID_B],
   );
   assert.equal(third.missing, 2);
 
-  const fourth = await runScan(adapter);
-  assert.deepEqual(fourth.missingWorks, []);
+  await runScan(adapter);
+  assert.equal((await adapter.listScanDiagnostics()).missingWorks.length, 2);
 });
 
-test("スキャン中に登録された作品は missing にならず、missingWorks にも入らない", async (t) => {
+test("スキャン中に登録された作品は missing にならず、診断の行方不明にも入らない", async (t) => {
   const directory = makeTestDirectory("scan-record-facts-mid-scan");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");
@@ -110,7 +110,8 @@ test("スキャン中に登録された作品は missing にならず、missingW
   });
 
   assert.equal((await getTestWork(db, registeredDuringScan))?.status, "ok");
-  assert.deepEqual(result.missingWorks, []);
+  assert.deepEqual(repos.query.listMissingWorks(root), []);
+  assert.equal(result.missing, 0);
 });
 
 const CHAIN_LENGTH = 130;
@@ -159,8 +160,8 @@ async function scanRegisteringAtDepth(t: TestContext, depth: number) {
 
 test("走査が通過した後のフォルダーに走査中に登録した作品は、行方不明にならず、開始時の空判定も崩れない", async (t) => {
   const { adapter, result, workId } = await scanRegisteringAtDepth(t, 1);
-  assert.deepEqual(result.missingWorks, []);
   assert.equal(result.missing, 0);
+  assert.deepEqual((await adapter.listScanDiagnostics()).missingWorks, []);
   assert.equal(result.startedWithEmptyCatalog, true);
   const work = await adapter.getWork(workId);
   assert.equal(work?.status, "ok");
@@ -169,7 +170,7 @@ test("走査が通過した後のフォルダーに走査中に登録した作�
 
 test("走査がまだ通過していないフォルダーに走査中に登録した作品は、重複行・競合・状態の初期化を起こさない", async (t) => {
   const { adapter, result, workId } = await scanRegisteringAtDepth(t, CHAIN_LENGTH - 2);
-  assert.deepEqual(result.missingWorks, []);
+  assert.deepEqual((await adapter.listScanDiagnostics()).missingWorks, []);
   assert.deepEqual((await adapter.listScanDiagnostics()).identityConflicts, []);
   const work = await adapter.getWork(workId);
   assert.equal(work?.status, "ok");

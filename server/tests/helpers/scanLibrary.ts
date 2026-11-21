@@ -37,7 +37,9 @@ export async function runScan(adapter: SessionAdapter, options?: ScanOptions): P
 }
 
 export function listCandidates(adapter: SessionAdapter): Promise<ScanCandidateBody[]> {
-  return scanSessionOf(adapter).listCandidates();
+  return scanSessionOf(adapter)
+    .listCandidates()
+    .then(({ candidates }) => candidates);
 }
 
 export function setCandidateRjCode(

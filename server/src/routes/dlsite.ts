@@ -2,7 +2,7 @@
 import { Hono } from "hono";
 import {
   dlsiteApplyBodySchema,
-  dlsiteJobCancelBulkResponseSchema,
+  dlsiteJobCancelResponseSchema,
   dlsiteJobStateSchema,
   dlsiteJobStartBodySchema,
   dlsitePreviewSchema,
@@ -143,10 +143,10 @@ export function dlsiteRoute(
 
   app.get("/dlsite/jobs/current", (c) => c.json(dlsiteJobStateSchema.parse(dlsiteJobs.getState())));
 
-  app.delete("/dlsite/jobs/:jobId/bulk", (c) =>
+  app.delete("/dlsite/jobs/:jobId", (c) =>
     c.json(
-      dlsiteJobCancelBulkResponseSchema.parse({
-        removed: dlsiteJobs.cancelBulk(c.req.param("jobId")),
+      dlsiteJobCancelResponseSchema.parse({
+        removed: dlsiteJobs.cancel(c.req.param("jobId")),
       }),
     ),
   );

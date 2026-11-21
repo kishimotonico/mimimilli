@@ -18,6 +18,7 @@ import type { LibraryViewState } from "../../src/features/library/model/useLibra
 import { mockApi, type ApiMock } from "../helpers/api";
 import {
   buildResolvedPlaylist,
+  buildScanDiagnostics,
   buildSettings,
   buildWork,
   buildWorkEditSnapshotOf,
@@ -54,6 +55,7 @@ function installApi(total = WORKS_DEFAULT_PAGE_SIZE + 50) {
   const detailsById = new Map<string, Work>();
 
   const api = mockApi({
+    "GET /api/scan/diagnostics": buildScanDiagnostics(),
     "GET /api/works": ({ url }) => {
       const page = Number(url.searchParams.get("page") ?? 1);
       const pageSize = WORKS_DEFAULT_PAGE_SIZE;

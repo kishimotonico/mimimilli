@@ -108,11 +108,11 @@ export function WorkDetail({
     try {
       await deleteMutation.mutateAsync(work.id);
     } catch (cause) {
-      toast.error(apiErrorMessage(cause, "作品登録の解除に失敗しました"));
+      toast.error(apiErrorMessage(cause, "登録解除に失敗しました"));
       return;
     }
     toast.show({
-      message: `「${title}」の登録を解除しました`,
+      message: `「${title}」を登録解除しました`,
       variant: "success",
       priority: "notice",
       // 解除成功で画面遷移してWorkDetailが直後にアンマウントされるため、
@@ -283,7 +283,7 @@ export function WorkDetail({
       )}
       {isDeleteConfirmOpen && (
         <ConfirmDialog
-          title="登録を解除"
+          title="登録解除"
           message={`「${work.title}」をライブラリから外します。タグや再生履歴（mimimilli.json）は消え、音声などのファイルは残ります。`}
           confirmLabel="解除する"
           onConfirm={() => {

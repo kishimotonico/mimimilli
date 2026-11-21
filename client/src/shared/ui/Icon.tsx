@@ -1,17 +1,21 @@
 import React from "react";
 import type { LucideIcon } from "lucide-react";
 import {
+  AlignLeft,
   ArrowDownUp,
   ArrowLeft,
   ArrowRight,
   Bookmark,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
+  CircleCheck,
   Cog,
   Copy,
   Download,
   Ellipsis,
+  EllipsisVertical,
   ExternalLink,
   File,
   FileText,
@@ -26,7 +30,6 @@ import {
   Info,
   LayoutGrid,
   Link2,
-  Link2Off,
   List,
   Locate,
   Maximize,
@@ -36,6 +39,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  SearchX,
   Star,
   Trash2,
   User,
@@ -134,7 +138,16 @@ export const I = {
   fs: lucideIcon(Maximize),
   ext: lucideIcon(ExternalLink),
   link: lucideIcon(Link2),
-  linkOff: lucideIcon(Link2Off),
+  linkOff: (p) => (
+    <Svg
+      {...p}
+      style={{ strokeDasharray: "2.4 2.6", ...p.style }}
+      d={[
+        "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1",
+        "M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1",
+      ]}
+    />
+  ),
   home: lucideIcon(Home),
   folder: lucideIcon(Folder),
   folderO: lucideIcon(FolderOpen),
@@ -143,12 +156,15 @@ export const I = {
   audio: lucideIcon(Music),
   video: lucideIcon(Video),
   text: lucideIcon(FileText),
+  textLines: lucideIcon(AlignLeft),
   pdf: lucideIcon(FileType),
   chev: lucideIcon(ChevronRight),
   chevD: lucideIcon(ChevronDown),
+  chevL: lucideIcon(ChevronLeft),
   arrowL: lucideIcon(ArrowLeft),
   arrowR: lucideIcon(ArrowRight),
   more: lucideIcon(Ellipsis),
+  moreV: lucideIcon(EllipsisVertical),
   download: lucideIcon(Download),
   star: lucideIcon(Star),
   starF: lucideIconFilled(Star),
@@ -188,6 +204,8 @@ export const I = {
   sort: lucideIcon(ArrowDownUp),
   filter: lucideIcon(Filter),
   check: lucideIcon(Check),
+  checkC: lucideIcon(CircleCheck),
+  searchX: lucideIcon(SearchX),
   x: lucideIcon(X),
   // TriangleAlertは視覚重心が下寄りなのでグリフを viewBox 上で2単位上げる。
   err: (p) => (

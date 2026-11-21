@@ -26,7 +26,11 @@ export function createFakeScanJobStore(initial: Partial<ScanJobState> = {}) {
     clearError: vi.fn(),
     reset: vi.fn(),
     setState: store.setState,
-  } satisfies ScanJobStore & { setState: typeof store.setState };
+    emit: events.emit,
+  } satisfies ScanJobStore & {
+    setState: typeof store.setState;
+    emit: typeof events.emit;
+  };
   return fake;
 }
 
@@ -38,9 +42,8 @@ export function createFakeDlsiteJobStore(initial: Partial<DlsiteJobState> = {}) 
     getState: store.getState,
     subscribe: store.subscribe,
     subscribeEvents: events.subscribe,
-    startBulk: vi.fn(async () => ({ ok: true as const })),
-    startSingle: vi.fn(async () => ({ ok: true as const })),
-    cancelBulk: vi.fn(async () => ({ ok: true as const })),
+    start: vi.fn(async () => ({ ok: true as const })),
+    cancel: vi.fn(async () => ({ ok: true as const })),
     attach: vi.fn(async () => {}),
     clearError: vi.fn(),
     reset: vi.fn(),

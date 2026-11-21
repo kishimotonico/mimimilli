@@ -2,14 +2,17 @@ import { createStore } from "jotai";
 import { describe, expect, it } from "vitest";
 import {
   clearScanCandidateLocalState,
-  scanCandidateDeselectedPathsAtom,
+  scanCandidateSelectionAtom,
 } from "../../src/entities/scan/model/atoms";
 
 describe("clearScanCandidateLocalState", () => {
-  it("選択解除を空にする", () => {
+  it("選択の上書きを空にする", () => {
     const store = createStore();
-    store.set(scanCandidateDeselectedPathsAtom, new Set(["b"]));
+    store.set(
+      scanCandidateSelectionAtom,
+      new Map([["b", { selected: false, judgments: [], rjCode: null }]]),
+    );
     clearScanCandidateLocalState(store);
-    expect(store.get(scanCandidateDeselectedPathsAtom).size).toBe(0);
+    expect(store.get(scanCandidateSelectionAtom).size).toBe(0);
   });
 });

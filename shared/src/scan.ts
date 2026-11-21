@@ -1,6 +1,5 @@
 // サーバー側スキャンジョブの HTTP / SSE 契約。
 import { z } from "zod";
-import { dataIntegrityWarningSchema, type DataIntegrityWarning } from "./dataIntegrity.ts";
 import {
   dlsiteCoverSkipReasonSchema,
   dlsiteProductSummarySchema,
@@ -19,12 +18,14 @@ export type ScanCandidateFolder = {
   detectedRjCode: string | null;
 };
 
-/** 同じRJコードを持つ、行方不明（catalogでmissing）の作品 */
-export const scanCandidateMissingWorkSchema = z.object({
+/** 状態が missing（行方不明）の作品。スキャン候補では同じRJコードを持つものを添える */
+export const missingWorkSchema = z.object({
   workId: z.string(),
   title: z.string(),
+  /** 行方不明になる前の作品フォルダー（単体音声作品は音声ファイル）のroot相対path。rootの外にあった作品は null */
+  previousPath: workspacePathSchema.nullable(),
 });
-export type ScanCandidateMissingWork = z.infer<typeof scanCandidateMissingWorkSchema>;
+export type MissingWork = z.infer<typeof missingWorkSchema>;
 
 export const scanCandidateSchema = z.object({
   path: workspacePathSchema,
@@ -41,7 +42,7 @@ export const scanCandidateSchema = z.object({
   dlsite: dlsiteProductSummarySchema,
   /** dlsite を読む前にサーバーが読んだ、DLsite取得状態の revision。取得ジョブの終端の結果と新旧を比べる */
   dlsiteRevision: z.number().int().nonnegative(),
-  missingWorks: z.array(scanCandidateMissingWorkSchema),
+  missingWorks: z.array(missingWorkSchema),
 });
 export type ScanCandidate = z.infer<typeof scanCandidateSchema>;
 /** アダプタとスキャンセッションが組み立てる候補。dlsiteRevision はルートが付ける */
@@ -53,7 +54,12 @@ export const invalidMetaFileSchema = z.object({
 });
 export type InvalidMetaFile = z.infer<typeof invalidMetaFileSchema>;
 
-export const scanCandidatesResponseSchema = z.object({ candidates: z.array(scanCandidateSchema) });
+/** scanCompleted は、候補を持つスキャンが完了している（サーバーの起動後、rootが変わるまで）かどうか。false のとき候補は空で、0件とは別の状態。記録の finishedAt とは別の事実 */
+export const scanCandidatesResponseSchema = z.discriminatedUnion("scanCompleted", [
+  z.object({ scanCompleted: z.literal(false), candidates: z.tuple([]) }),
+  z.object({ scanCompleted: z.literal(true), candidates: z.array(scanCandidateSchema) }),
+]);
+export type ScanCandidatesResponse = z.infer<typeof scanCandidatesResponseSchema>;
 export const scanCandidatesMutationSchema = z.object({
   paths: z
     .array(workspacePathSchema)
@@ -77,8 +83,14 @@ export const scanCandidatesRegisterRequestSchema = z.object({
     .refine((paths) => new Set(paths).size === paths.length, "候補パスが重複しています"),
   apply: dlsiteRegistrationApplySchema,
 });
+/** 除外済みの候補。rjCode はサーバーが持つ値で、直したRJコードがあればそれ。プールに無いパスはフォルダー名から検出した値（検出できなければ null） */
+export const scanCandidateExclusionSchema = z.object({
+  path: workspacePathSchema,
+  rjCode: z.string().nullable(),
+});
+export type ScanCandidateExclusion = z.infer<typeof scanCandidateExclusionSchema>;
 export const scanCandidateExclusionsResponseSchema = z.object({
-  paths: z.array(workspacePathSchema),
+  exclusions: z.array(scanCandidateExclusionSchema),
 });
 export const scanCandidateRegistrationSchema = z.object({
   path: workspacePathSchema,
@@ -117,15 +129,6 @@ export const updatedWorkSchema = z.object({
 });
 export type UpdatedWork = z.infer<typeof updatedWorkSchema>;
 
-/** 今回のスキャンで新たに行方不明になった作品。以前から行方不明の作品は含まない */
-export const missingWorkSchema = z.object({
-  workId: z.string(),
-  title: z.string(),
-  /** 行方不明になる前の作品フォルダー（単体音声作品は音声ファイル）のroot相対path */
-  previousPath: workspacePathSchema,
-});
-export type MissingWork = z.infer<typeof missingWorkSchema>;
-
 /** adapter が返すスキャン1回分の結果。HTTPには出さず、サーバーの記録（ScanRecord）の元になる */
 export interface ScanResult {
   registered: number;
@@ -133,8 +136,6 @@ export interface ScanResult {
   insertedWorkIds: string[];
   /** スキャン開始時点でカタログに作品が1件も無かった。true のとき記録の新規作品は空にする */
   startedWithEmptyCatalog: boolean;
-  /** 今回のスキャンで新たに行方不明になった作品 */
-  missingWorks: MissingWork[];
   /** 今回のスキャンで変化が見つかった既存作品。エラーからの復帰や全件読み直しで読み直しただけの作品は含まない */
   updatedWorks: UpdatedWork[];
   errors: number;
@@ -145,8 +146,6 @@ export interface ScanResult {
   coverErrors: number;
   /** 走査中に読み取れなかったサブツリーのディレクトリのroot相対path。ルート失敗時はスキャン自体がエラーになる */
   unreadablePaths: WorkspacePath[];
-  /** finalize 時の listSummaries() でタグ等の不整合により除外した作品。その実行の警告 */
-  dataIntegrityWarning?: DataIntegrityWarning;
 }
 
 /** 同じ Work ID を持つ mimimilli.json が複数見つかった診断。paths はroot相対・separator正規化済みのportable pathで、相互参照用に全件を含む。 */
@@ -157,11 +156,31 @@ export const identityConflictSchema = z.object({
 });
 export type IdentityConflict = z.infer<typeof identityConflictSchema>;
 
-/** GET /scan/diagnostics の返却値。要対応の現在状態で、スキャンの実行結果ではない。 */
+/** ID重複。registeredTitle・registeredPath は同じ作品IDで登録済みの作品のタイトル（文字列として読めなければ null）と、paths のうちその作品の作品情報ファイルがあるもの。登録済みの作品がないときは null */
+export const identityConflictDiagnosticSchema = identityConflictSchema.extend({
+  registeredTitle: z.string().nullable(),
+  registeredPath: workspacePathSchema.nullable(),
+});
+export type IdentityConflictDiagnostic = z.infer<typeof identityConflictDiagnosticSchema>;
+
+/** データ不整合の作品。title は保存された値の検証を通さずに読む作品名。文字列として読めないときは null */
+export const dataIntegrityWorkSchema = z.object({
+  workId: z.string(),
+  title: z.string().nullable(),
+});
+export type DataIntegrityWork = z.infer<typeof dataIntegrityWorkSchema>;
+
+/** GET /scan/diagnostics の返却値。要対応の現在状態で、すべて保存済みのデータから導く。 */
 export const scanDiagnosticsSchema = z.object({
-  identityConflicts: z.array(identityConflictSchema),
+  identityConflicts: z.array(identityConflictDiagnosticSchema),
   /** 読み取りまたは検証に失敗した作品情報ファイル。pathはroot相対のportable path。 */
   invalidMetaFiles: z.array(invalidMetaFileSchema),
+  /** 直近に完了したスキャンで開けなかったフォルダーのroot相対path */
+  unreadablePaths: z.array(workspacePathSchema),
+  /** 保存された値を読めず、作品一覧・スマートフォルダー・エクスポートから外れる作品。保存された行の検証に通らない作品すべて */
+  dataIntegrityWorks: z.array(dataIntegrityWorkSchema),
+  /** 状態が missing の作品すべて。ライブラリのエラー表示と同じ集合 */
+  missingWorks: z.array(missingWorkSchema),
 });
 export type ScanDiagnostics = z.infer<typeof scanDiagnosticsSchema>;
 
@@ -227,9 +246,6 @@ export type ScanConflictResponse = z.infer<typeof scanConflictResponseSchema>;
 export const scanRecordSchema = z.object({
   finishedAt: z.string().nullable(),
   updatedWorks: z.array(updatedWorkSchema),
-  missingWorks: z.array(missingWorkSchema),
-  unreadablePaths: z.array(workspacePathSchema),
-  dataIntegrityWarning: dataIntegrityWarningSchema.optional(),
 });
 export type ScanRecord = z.infer<typeof scanRecordSchema>;
 

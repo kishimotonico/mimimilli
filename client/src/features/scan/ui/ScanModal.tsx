@@ -1,24 +1,32 @@
 import type { WorkspacePath } from "@mimimilli/shared";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useAtomValue } from "jotai";
 import Modal, { ModalHeader } from "../../../shared/ui/Modal";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
 import { useToast } from "../../../shared/ui/useToast";
-import { useScanJobStore, useScanProgress, useScanning } from "../../../entities/scan/useScanJob";
-import {
-  scanDiagnosticsQueryOptions,
-  scanRecordQueryOptions,
-} from "../../../entities/scan/queryOptions";
-import { useScanCandidatesCache } from "../model/useScanCandidatesCache";
+import { useScanJobStore, useScanning } from "../../../entities/scan/useScanJob";
+import { scanResultsRefreshedAtom } from "../../../entities/scan/model/atoms";
+import { scanRecordQueryOptions } from "../../../entities/scan/queryOptions";
+import { scanNewCountQueryOptions } from "../../../entities/work/scanNewCountQueryOptions";
+import { useScanCandidatesState } from "../model/useScanCandidatesCache";
+import { formatWorkNames } from "../model/formatWorkNames";
 import ScanSidebar from "./scanModal/ScanSidebar";
 import UnregisteredTab from "./scanModal/unregistered/UnregisteredTab";
 import NeedsAttentionTab from "./scanModal/NeedsAttentionTab";
 import NewWorksTab from "./scanModal/newWorks/NewWorksTab";
 import UpdatedWorksTab from "./scanModal/updated/UpdatedWorksTab";
-import { useScanCompletionHint } from "./scanModal/useScanCompletionHint";
-import { buildNeedsAttentionRows, countNeedsAttention } from "../model/needsAttention";
+import { useNeedsAttentionRows } from "../model/useNeedsAttentionRows";
+import {
+  computeScanTabCounts,
+  landingTab,
+  type ScanTabCounts,
+  type ScanTabPending,
+} from "./scanModal/scanTabs";
+import CollectionStatus from "../../../shared/ui/CollectionStatus";
+import { useDelayedLoading } from "../../../shared/ui/useDelayedLoading";
 import type { CandidatesRegisteredResult, ScanTabKey } from "./scanModal/types";
 
 interface ScanModalProps {
@@ -35,62 +43,64 @@ export default function ScanModal({
   onOpenWorkDetail,
 }: ScanModalProps) {
   const scanning = useScanning();
-  const progress = useScanProgress();
   const { start, cancel } = useScanJobStore();
-  const [activeTab, setActiveTab] = useState<ScanTabKey>("unregistered");
   const toast = useToast();
 
+  const candidates = useScanCandidatesState();
+
+  const needsAttention = useNeedsAttentionRows();
+  const recordQuery = useQuery(scanRecordQueryOptions);
+  const newCountQuery = useQuery(scanNewCountQueryOptions);
+
+  const counts = computeScanTabCounts({
+    candidates: candidates.response ?? undefined,
+    needsAttention: needsAttention.rows?.length,
+    newCount: newCountQuery.data,
+    record: recordQuery.data,
+  });
+  const pending: ScanTabPending = {
+    unregistered: candidates.status === "loading",
+    needsAttention: needsAttention.loading,
+    newWorks: newCountQuery.isPending,
+    updated: recordQuery.isPending,
+  };
+  const [activeTab, setActiveTab] = useActiveTab(counts, pending);
+  const landingLoading = useDelayedLoading(activeTab === null);
+
   const handleUnregisteredRegistered = ({
-    registeredCount,
+    registeredTitles,
+    coverSkippedTitles,
     failedCount,
-    coverSkippedCount,
+    remainingCandidates,
     interrupted,
   }: CandidatesRegisteredResult) => {
-    if (registeredCount === 0) return;
+    if (registeredTitles.length === 0) return;
+    const names = formatWorkNames(registeredTitles);
     const coverNote =
-      coverSkippedCount > 0 ? `うち${coverSkippedCount}件はカバーを適用できませんでした。` : "";
+      coverSkippedTitles.length > 0
+        ? `${formatWorkNames(coverSkippedTitles)}はカバーを適用できませんでした。`
+        : "";
     if (failedCount > 0 || interrupted) {
       toast.show({
         message:
           (interrupted
-            ? `${registeredCount}件を追加して止まりました。`
-            : `${registeredCount}件を追加しました。${failedCount}件は追加できず、未登録タブに残っています。`) +
+            ? `${names}を追加して止まりました。`
+            : `${names}を追加しました。${failedCount}件は追加できず、未登録タブに残っています。`) +
           coverNote,
         variant: "warning",
         priority: "notice",
       });
       return;
     }
-    if (coverNote) {
-      toast.show({
-        message: `${registeredCount}件を追加しました。${coverNote}`,
-        variant: "warning",
-        priority: "notice",
-      });
-    }
-    setActiveTab("newWorks");
+    toast.show({
+      message: `${names}を追加しました。${coverNote}`,
+      variant: coverNote ? "warning" : "success",
+      priority: "notice",
+    });
+    if (remainingCandidates === 0) setActiveTab("newWorks");
   };
 
-  // 直近のスキャンの記録（サーバーのメモリ。次のスキャンかサーバー再起動まで）。
-  const scanRecordQuery = useQuery(scanRecordQueryOptions);
-
-  const candidates = useScanCandidatesCache();
-
-  // 診断はFilesでの解決や登録解除を随時反映する必要があるため、スキャン時点のスナップショットではなく
-  // 常に最新を購読する。作品変更後のキャッシュ更新が同じキーを無効化する。
-  const diagnosticsQuery = useQuery(scanDiagnosticsQueryOptions);
-
-  const { showCompletedHint } = useScanCompletionHint(scanning);
-
-  const needsAttentionRows = buildNeedsAttentionRows({
-    diagnostics: diagnosticsQuery.data,
-    record: scanRecordQuery.data,
-  });
-
-  const counts: Partial<Record<ScanTabKey, number>> = {
-    unregistered: candidates.length,
-    needsAttention: countNeedsAttention(needsAttentionRows),
-  };
+  const scanPending = recordQuery.data !== undefined && recordQuery.data.finishedAt === null;
 
   // スキャン実行中でも閉じられる。スキャン自体はバックグラウンドで継続する。
   const dialog = useDialogModal({ onClose });
@@ -100,7 +110,7 @@ export default function ScanModal({
       <ModalHeader
         title="スキャン"
         titleId="scan-modal-title"
-        icon={<I.refresh size={14} className={cn("text-ink-3", scanning && "animate-spin")} />}
+        icon={<I.refresh size={15} className={cn("text-ink-2", scanning && "animate-spin")} />}
         onClose={onClose}
       />
 
@@ -109,44 +119,77 @@ export default function ScanModal({
           active={activeTab}
           onSelect={setActiveTab}
           counts={counts}
-          scanning={scanning}
-          progress={progress}
           lastScanTime={lastScanTime}
-          showCompletedHint={showCompletedHint}
+          scanPending={scanPending}
           onStart={() => void start()}
           onFullScan={() => void start({ full: true })}
           onCancel={() => void cancel()}
         />
         <div
           role="tabpanel"
-          id={`scan-tabpanel-${activeTab}`}
-          aria-labelledby={`scan-tab-${activeTab}`}
+          id={activeTab ? `scan-tabpanel-${activeTab}` : undefined}
+          aria-labelledby={activeTab ? `scan-tab-${activeTab}` : undefined}
           className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          {activeTab === "unregistered" && (
-            <UnregisteredTab candidates={candidates} onRegistered={handleUnregisteredRegistered} />
-          )}
-          {activeTab === "needsAttention" && (
-            <NeedsAttentionTab
-              rows={needsAttentionRows}
-              loading={diagnosticsQuery.isPending || scanRecordQuery.isPending}
-              error={diagnosticsQuery.isError || scanRecordQuery.isError}
-              onRetry={() => {
-                if (diagnosticsQuery.isError) void diagnosticsQuery.refetch();
-                if (scanRecordQuery.isError) void scanRecordQuery.refetch();
-              }}
-              onOpenFiles={onOpenFiles}
-              onOpenWorkDetail={onOpenWorkDetail}
-            />
-          )}
-          {activeTab === "newWorks" && (
-            <NewWorksTab onOpenFiles={onOpenFiles} onOpenWorkDetail={onOpenWorkDetail} />
-          )}
-          {activeTab === "updated" && (
-            <UpdatedWorksTab onOpenFiles={onOpenFiles} onOpenWorkDetail={onOpenWorkDetail} />
+          {landingLoading === "visible" ? (
+            <CollectionStatus variant="list" kind="loading" />
+          ) : (
+            <>
+              {activeTab === "unregistered" && (
+                <UnregisteredTab
+                  onRegistered={handleUnregisteredRegistered}
+                  onOpenFiles={onOpenFiles}
+                />
+              )}
+              {activeTab === "needsAttention" && (
+                <NeedsAttentionTab onOpenFiles={onOpenFiles} onOpenWorkDetail={onOpenWorkDetail} />
+              )}
+              {activeTab === "newWorks" && (
+                <NewWorksTab onOpenFiles={onOpenFiles} onOpenWorkDetail={onOpenWorkDetail} />
+              )}
+              {activeTab === "updated" && (
+                <UpdatedWorksTab onOpenFiles={onOpenFiles} onOpenWorkDetail={onOpenWorkDetail} />
+              )}
+            </>
           )}
         </div>
       </div>
     </Modal>
   );
+}
+
+/** 開いたときは件数のあるタブへ着地する。決まるまでは、どのタブも選ばない。
+ *  スキャン完了後は、今のタブが空のときだけ同じ規則で移る。 */
+function useActiveTab(
+  counts: ScanTabCounts,
+  pending: ScanTabPending,
+): [ScanTabKey | null, (tab: ScanTabKey) => void] {
+  const landing = landingTab(counts, pending);
+  const [tab, setTab] = useState<ScanTabKey | null>(landing);
+  const refreshed = useAtomValue(scanResultsRefreshedAtom);
+  const seenRefreshed = useRef(refreshed);
+
+  useEffect(() => {
+    if (tab === null && landing !== null) setTab(landing);
+  }, [tab, landing]);
+
+  // 完了を見たとき今のタブが空なら、着地が決まった時点で移る（先頭側のタブの件数が読み込み中で着地が決まらないあいだも移動を落とさない）
+  const [moveNeeded, setMoveNeeded] = useState(false);
+  const selectTab = useCallback((next: ScanTabKey) => {
+    setMoveNeeded(false);
+    setTab(next);
+  }, []);
+  useEffect(() => {
+    if (seenRefreshed.current === refreshed) return;
+    seenRefreshed.current = refreshed;
+    if (tab !== null && counts[tab] === 0) setMoveNeeded(true);
+  }, [refreshed, tab, counts]);
+
+  useEffect(() => {
+    if (!moveNeeded || landing === null) return;
+    setMoveNeeded(false);
+    if (tab !== null && counts[tab] === 0) setTab(landing);
+  }, [moveNeeded, landing, tab, counts]);
+
+  return [tab, selectTab];
 }

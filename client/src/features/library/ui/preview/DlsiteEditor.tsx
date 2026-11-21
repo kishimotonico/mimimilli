@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   computeDlsiteWorkDiff,
   defaultDlsiteApplySelection,
   detectRjCode,
+  pathBaseName,
   type DlsiteApplySelectionInput,
   type DlsiteCoverChange,
   type DlsitePreview,
@@ -37,14 +38,9 @@ import {
 } from "../../../../entities/work/model/workMutations";
 import { useToast } from "../../../../shared/ui/useToast";
 
-function folderNameOf(physicalPath: string): string {
-  const cut = Math.max(physicalPath.lastIndexOf("/"), physicalPath.lastIndexOf("\\"));
-  return cut < 0 ? physicalPath : physicalPath.slice(cut + 1);
-}
-
 function initialRjCode(snapshot: WorkEditSnapshot): string {
   if (snapshot.dlsite.rjCode !== null) return snapshot.dlsite.rjCode;
-  return detectRjCode([folderNameOf(snapshot.physicalPath), snapshot.title]) ?? "";
+  return detectRjCode([pathBaseName(snapshot.physicalPath), snapshot.title]) ?? "";
 }
 
 const UNAVAILABLE_REASON_LABEL: Record<DlsiteUnavailableReason, string> = {
@@ -147,6 +143,7 @@ function DlsiteApplyDialog({
     if (!busy) onClose();
   };
   const dialog = useDialogModal({ onClose: close });
+  const tagsHeadingId = useId();
 
   return createPortal(
     <Modal dialog={dialog} size={680} labelledBy="dlsite-apply-title">
@@ -176,8 +173,11 @@ function DlsiteApplyDialog({
           onCheckedChange={(cover) => onSelectionChange({ ...selection, cover })}
         />
         {diff.tags.length > 0 && (
-          <fieldset className="grid gap-1.5 py-2.5">
-            <legend className="mb-1 font-sans font-medium">追加されるタグ</legend>
+          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- fieldset の legend は親の padding の外に置かれ、上の行と余白がそろわない
+          <div role="group" aria-labelledby={tagsHeadingId} className="grid gap-1.5 py-2.5">
+            <span id={tagsHeadingId} className="mb-1 font-sans font-medium">
+              追加されるタグ
+            </span>
             {diff.tags.map(({ tag, replaces }) => (
               <label key={tag} className="flex items-center gap-1.5">
                 <input
@@ -198,7 +198,7 @@ function DlsiteApplyDialog({
                 )}
               </label>
             ))}
-          </fieldset>
+          </div>
         )}
         {diff.presentTags.length > 0 && (
           <details className="py-2 text-ink-2">

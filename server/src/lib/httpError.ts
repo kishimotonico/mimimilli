@@ -7,6 +7,7 @@ import {
   SourceChangedError,
   SourceConflictError,
   SourceParseError,
+  SourceReloadUnresolvedError,
 } from "../errors.ts";
 
 const STATUS_BY_CODE = {
@@ -20,6 +21,7 @@ const STATUS_BY_CODE = {
   conflict: 409,
   source_changed: 409,
   dlsite_refetch_required: 409,
+  reload_unresolved: 409,
   root_reconfiguring: 409,
   internal: 500,
 } as const;
@@ -57,6 +59,9 @@ export function throwSourceCommandError(error: unknown): never {
   }
   if (error instanceof SourceChangedError) throw apiError("source_changed", error.message);
   if (error instanceof SourceParseError) throw apiError("parse_error", error.message);
+  if (error instanceof SourceReloadUnresolvedError) {
+    throw apiError("reload_unresolved", error.message);
+  }
   if (error instanceof SourceConflictError) throw apiError("conflict", error.message);
   throw error;
 }

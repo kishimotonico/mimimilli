@@ -204,7 +204,6 @@ export function worksRoute(adapter: DataAdapter, scanRecord: ScanRecordStore): H
     } catch (error) {
       throwSourceCommandError(error);
     }
-    scanRecord.resolveDataIntegrity(workId);
     return c.body(null, 204);
   });
 

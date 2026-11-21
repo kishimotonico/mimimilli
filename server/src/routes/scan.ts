@@ -75,9 +75,10 @@ export function scanRoute(
 
   app.get("/scan/candidates", async (c) => {
     const dlsiteRevision = dlsite.revision();
-    const candidates = await jobs.session.listCandidates();
+    const { scanCompleted, candidates } = await jobs.session.listCandidates();
     return c.json(
       scanCandidatesResponseSchema.parse({
+        scanCompleted,
         candidates: candidates.map((candidate) => ({ ...candidate, dlsiteRevision })),
       }),
     );
@@ -117,8 +118,8 @@ export function scanRoute(
   });
 
   app.get("/scan/candidates/exclusions", async (c) => {
-    const paths = await jobs.session.listExclusions();
-    return c.json(scanCandidateExclusionsResponseSchema.parse({ paths }));
+    const exclusions = await jobs.session.listExclusions();
+    return c.json(scanCandidateExclusionsResponseSchema.parse({ exclusions }));
   });
 
   app.post("/scan/candidates/exclusions/restore", async (c) => {

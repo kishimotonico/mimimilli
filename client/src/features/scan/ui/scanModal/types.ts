@@ -1,12 +1,13 @@
-// スキャンモーダルの左リスト⇄各タブの境界契約。親（ScanModal）がデータ取得・状態を持ち、
-// 各タブコンポーネントはここで定義した props だけを受け取る。
+// スキャンモーダルの左リスト⇄各タブの境界契約。各タブは自分で必要なデータを読んで一覧の状態を導き、
+// 親（ScanModal）へは縦タブの件数と着地タブの判定に要るもの以外を渡さない。
 
 export type ScanTabKey = "unregistered" | "newWorks" | "needsAttention" | "updated";
 
+/** サイドバーの並びであり、開いたときに件数のあるタブを探す順 */
 export const SCAN_TAB_ORDER: ScanTabKey[] = [
   "unregistered",
-  "newWorks",
   "needsAttention",
+  "newWorks",
   "updated",
 ];
 
@@ -17,18 +18,14 @@ export const SCAN_TAB_LABEL: Record<ScanTabKey, string> = {
   updated: "更新済み",
 };
 
-/** 件数を出すタブ。開いているタブには出さない */
-export const SCAN_TAB_WITH_COUNT: ReadonlySet<ScanTabKey> = new Set([
-  "unregistered",
-  "needsAttention",
-]);
-
-/** UnregisteredTab が候補登録の成否をScanModalへ伝える契約。 */
+/** UnregisteredTab が候補登録の成否をScanModalへ伝える契約。タイトルは追加した作品の名前 */
 export interface CandidatesRegisteredResult {
-  registeredCount: number;
+  registeredTitles: string[];
+  /** 追加できた作品のうち、選んだカバーを適用できなかったもの */
+  coverSkippedTitles: string[];
   failedCount: number;
-  /** 追加できた作品のうち、選んだカバーを適用できなかった件数 */
-  coverSkippedCount: number;
+  /** 追加のあとに取り直した、未登録に残る候補の件数。取り直せなかった・追加できたものがないときは null */
+  remainingCandidates: number | null;
   /** 途中で止まったか（候補の変更など） */
   interrupted: boolean;
 }

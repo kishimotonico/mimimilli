@@ -638,12 +638,6 @@ export function canonicalDlsiteProductCode(code: string): string {
   return code.trim().toUpperCase();
 }
 
-/** 1コードあたりの取得時間の目安。「N件・約M分」の表示に使う（測った速度は使わない） */
-export const DLSITE_FETCH_ESTIMATE_MS_PER_CODE = 2000;
-
-export const dlsiteJobOriginSchema = z.enum(["bulk", "single"]);
-export type DlsiteJobOrigin = z.infer<typeof dlsiteJobOriginSchema>;
-
 export const dlsiteJobCodeStateSchema = z.enum([
   "queued",
   "fetching",
@@ -653,14 +647,11 @@ export const dlsiteJobCodeStateSchema = z.enum([
 ]);
 export type DlsiteJobCodeState = z.infer<typeof dlsiteJobCodeStateSchema>;
 
-/** POST /api/dlsite/jobs のボディ。singleは失敗の記録を無視して取り直す（force） */
-export const dlsiteJobStartBodySchema = z.discriminatedUnion("origin", [
-  z.object({
-    origin: z.literal("bulk"),
-    productCodes: z.array(rjCodeFormatSchema).min(1).max(DLSITE_JOB_MAX_PRODUCT_CODES),
-  }),
-  z.object({ origin: z.literal("single"), productCode: rjCodeFormatSchema }),
-]);
+/** POST /api/dlsite/jobs のボディ。force=true のとき、失敗の記録を無視して取り直す */
+export const dlsiteJobStartBodySchema = z.object({
+  productCodes: z.array(rjCodeFormatSchema).min(1).max(DLSITE_JOB_MAX_PRODUCT_CODES),
+  force: z.boolean().default(false),
+});
 export type DlsiteJobStartBody = z.infer<typeof dlsiteJobStartBodySchema>;
 
 const dlsiteFetchedSummarySchema = z.object({
@@ -693,7 +684,6 @@ const dlsiteRevisionSchema = z.number().int().nonnegative();
 
 const dlsiteJobCodeBase = {
   productCode: z.string(),
-  origin: dlsiteJobOriginSchema,
   /** このコードが最後に変化した時点の revision */
   revision: dlsiteRevisionSchema,
 };
@@ -716,18 +706,18 @@ export const dlsiteJobCodeSchema = z.discriminatedUnion("state", [
 ]);
 export type DlsiteJobCode = z.infer<typeof dlsiteJobCodeSchema>;
 
-/** 起点がまとめてのコードだけを数える。processedは終端状態のコード数 */
-export const dlsiteJobBulkProgressSchema = z.object({
+/** ジョブのコードの進捗。processedは終端状態のコード数 */
+export const dlsiteJobProgressSchema = z.object({
   processed: z.number().int().nonnegative(),
   total: z.number().int().nonnegative(),
 });
-export type DlsiteJobBulkProgress = z.infer<typeof dlsiteJobBulkProgressSchema>;
+export type DlsiteJobProgress = z.infer<typeof dlsiteJobProgressSchema>;
 
 export const dlsiteJobSnapshotSchema = z.object({
   jobId: z.string(),
   status: z.enum(["running", "finished"]),
   codes: z.array(dlsiteJobCodeSchema),
-  bulk: dlsiteJobBulkProgressSchema,
+  progress: dlsiteJobProgressSchema,
 });
 export type DlsiteJobSnapshot = z.infer<typeof dlsiteJobSnapshotSchema>;
 
@@ -741,16 +731,16 @@ export const dlsiteJobStateSchema = z.object({
 });
 export type DlsiteJobState = z.infer<typeof dlsiteJobStateSchema>;
 
-/** DELETE /api/dlsite/jobs/:jobId/bulk のレスポンス */
-export const dlsiteJobCancelBulkResponseSchema = z.object({
+/** DELETE /api/dlsite/jobs/:jobId のレスポンス */
+export const dlsiteJobCancelResponseSchema = z.object({
   removed: z.number().int().nonnegative(),
 });
-export type DlsiteJobCancelBulkResponse = z.infer<typeof dlsiteJobCancelBulkResponseSchema>;
+export type DlsiteJobCancelResponse = z.infer<typeof dlsiteJobCancelResponseSchema>;
 
 const dlsiteJobCodeEventBase = {
   type: z.literal("code"),
   jobId: z.string(),
-  bulk: dlsiteJobBulkProgressSchema,
+  progress: dlsiteJobProgressSchema,
   ...dlsiteJobCodeBase,
 };
 
@@ -787,7 +777,7 @@ export const dlsiteJobEventSchema = z.discriminatedUnion("type", [
     revision: dlsiteRevisionSchema,
     jobId: z.string(),
     productCodes: z.array(z.string()),
-    bulk: dlsiteJobBulkProgressSchema,
+    progress: dlsiteJobProgressSchema,
   }),
   z.object({
     type: z.literal("finished"),

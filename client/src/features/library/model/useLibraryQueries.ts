@@ -57,6 +57,7 @@ import type { LibraryViewState } from "./useLibraryNavigation";
 const SEARCH_DEBOUNCE_MS = 250;
 
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
+import { scanDiagnosticsQueryOptions } from "../../../entities/scan/queryOptions";
 import { errorViewCountQueryOptions } from "../../../entities/work/errorViewCountQueryOptions";
 import { missingWorksCountQueryOptions } from "../../../entities/work/missingWorksCountQueryOptions";
 interface WorksPageParam {
@@ -148,7 +149,6 @@ function toSuspenseWorksResult(query: {
     hasNextPage: query.hasNextPage,
     worksTotal: lastPage?.total,
     worksStats: lastPage?.stats,
-    dataIntegrityWarning: lastPage?.dataIntegrityWarning,
     isFetchingNextPage: query.isFetchingNextPage,
     fetchNextPage: query.fetchNextPage,
     refetchWorks: query.refetch,
@@ -163,6 +163,7 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
   // 件数バッジ（libraryTotal）と軸レール下部のライブラリ統計表示を兼ねる。
   const libraryStatsQuery = useQuery(libraryTotalQueryOptions);
   const errorViewCountQuery = useQuery(errorViewCountQueryOptions);
+  const diagnosticsQuery = useQuery(scanDiagnosticsQueryOptions);
   const facetAxis = getFacetAxisForQuery(nav.activeAxis);
   // 結果面の値一覧（AxisValueList）は既定=置き換えの入口（ADR-0013）なので、件数基準は
   // 無条件集計にする（主クリックの結果＝選択タグを丸ごと置き換えた後の件数と一致させる）。
@@ -182,6 +183,7 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
   return {
     libraryTotal: libraryStatsQuery.data?.total,
     errorViewCount: errorViewCountQuery.data?.total,
+    dataIntegrityCount: diagnosticsQuery.data?.dataIntegrityWorks.length,
     libraryStats: computeCollectionStatsDisplay(
       libraryStatsQuery.isLoading,
       libraryStatsQuery.isError,

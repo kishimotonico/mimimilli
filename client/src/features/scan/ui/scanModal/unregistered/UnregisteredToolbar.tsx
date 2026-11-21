@@ -1,67 +1,79 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import type { Ref } from "react";
 import Button from "../../../../../shared/ui/Button";
+import { I } from "../../../../../shared/ui/Icon";
+import ScanFilterChip from "../ScanFilterChip";
 
 interface UnregisteredToolbarProps {
-  allSelected: boolean;
-  partiallySelected: boolean;
-  selectAllDisabled: boolean;
-  onToggleAll: () => void;
-  excludeCount: number;
-  busy: boolean;
-  onExclude: () => void;
-  /** 問題のある候補の件数。0かつ絞り込み中でないときはリンクを出さない */
+  /** 除外済みの件数。0かつ取得失敗でもないときは入口を出さない */
+  excludedCount: number;
+  /** 除外済みを読めなかった。0件と区別して入口を出し、一覧の中で再試行できるようにする */
+  excludedFailed: boolean;
+  excludedTriggerRef: Ref<HTMLButtonElement>;
+  onShowExcluded: () => void;
+  /** 判断が要る候補の件数。0かつ絞り込み中でないときは出さない */
   problemCount: number;
-  onlyProblems: boolean;
-  onToggleOnlyProblems: () => void;
-  /** 右側の取得の枠 */
-  slot: ReactNode;
+  /** 押した時点の行で固定した絞り込み。null は絞り込みなし */
+  filter: { kind: "problem" | "noinfo"; count: number } | null;
+  onFilterProblems: () => void;
+  onClearFilter: () => void;
 }
 
 export default function UnregisteredToolbar({
-  allSelected,
-  partiallySelected,
-  selectAllDisabled,
-  onToggleAll,
-  excludeCount,
-  busy,
-  onExclude,
+  excludedCount,
+  excludedFailed,
+  excludedTriggerRef,
+  onShowExcluded,
   problemCount,
-  onlyProblems,
-  onToggleOnlyProblems,
-  slot,
+  filter,
+  onFilterProblems,
+  onClearFilter,
 }: UnregisteredToolbarProps) {
-  const checkboxRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (checkboxRef.current) checkboxRef.current.indeterminate = partiallySelected;
-  }, [partiallySelected]);
-
+  const hasExcluded = excludedCount > 0 || excludedFailed;
+  if (problemCount === 0 && filter === null && !hasExcluded) return null;
   return (
-    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line-soft px-[18px] py-2">
-      <div className="flex min-w-0 items-center gap-3">
-        <label className="flex items-center gap-2 font-jp text-body text-ink-1">
-          <input
-            ref={checkboxRef}
-            type="checkbox"
-            checked={allSelected}
-            disabled={busy || selectAllDisabled}
-            onChange={onToggleAll}
-          />
-          すべて選択
-        </label>
-        <Button variant="quiet" disabled={busy || excludeCount === 0} onClick={onExclude}>
-          除外
-        </Button>
-        {(problemCount > 0 || onlyProblems) && (
-          <button
-            type="button"
-            onClick={onToggleOnlyProblems}
-            className="font-jp text-secondary text-acc-ink underline underline-offset-2 hover:text-ink-0"
+    <div
+      data-testid="unregistered-toolbar"
+      className="flex h-[46px] shrink-0 items-center gap-2.5 px-[18px]"
+    >
+      {filter?.kind === "noinfo" ? (
+        <ScanFilterChip pressed clearable count={filter.count} onClick={onClearFilter}>
+          DLsite情報なし
+        </ScanFilterChip>
+      ) : filter?.kind === "problem" ? (
+        <ScanFilterChip
+          pressed
+          clearable
+          count={filter.count}
+          icon={PROBLEM_ICON}
+          onClick={onClearFilter}
+        >
+          問題あり
+        </ScanFilterChip>
+      ) : (
+        problemCount > 0 && (
+          <ScanFilterChip
+            pressed={false}
+            count={problemCount}
+            icon={PROBLEM_ICON}
+            onClick={onFilterProblems}
           >
-            {onlyProblems ? "すべて表示" : `問題のある${problemCount}件だけ表示`}
-          </button>
-        )}
-      </div>
-      {slot}
+            問題あり
+          </ScanFilterChip>
+        )
+      )}
+      {hasExcluded && (
+        <Button
+          ref={excludedTriggerRef}
+          variant="quiet"
+          className="ml-auto px-2 font-normal"
+          onClick={onShowExcluded}
+        >
+          除外済み{" "}
+          {!excludedFailed && <span className="font-mono tabular-nums">{excludedCount}</span>}
+        </Button>
+      )}
     </div>
   );
 }
+
+const PROBLEM_ICON = <I.err size={13} className="text-[var(--state-danger)]" aria-hidden="true" />;

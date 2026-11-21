@@ -68,7 +68,7 @@ test("ジョブの終端状態は、同じコードのDlsiteCache.resolve由来�
   });
   const manager = new DlsiteJobManager(adapter);
   const codes = ["RJ000001", "RJ000002", "RJ000003", "RJ000004"];
-  manager.start({ origin: "bulk", productCodes: codes });
+  manager.start({ productCodes: codes });
   while (manager.getState().job?.status !== "finished") await tick();
   const states: Record<string, string> = Object.fromEntries(
     manager.getState().job!.codes.map((code) => [code.productCode, code.state]),
@@ -251,7 +251,7 @@ test("オフライン設定ではisDlsiteOfflineがtrueを返す", (t) => {
   assert.equal(adapter.isDlsiteOffline(), true);
 });
 
-test("forceでも、TTL内で解析できるokのsnapshotはHTTPなしで使う（同期取得・ジョブの単発）", async (t) => {
+test("forceでも、TTL内で解析できるokのsnapshotはHTTPなしで使う（同期取得・force付きのジョブ）", async (t) => {
   let htmlCalls = 0;
   const { adapter } = setup(t, {
     html: (code) => {

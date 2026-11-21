@@ -50,7 +50,7 @@ function renderPreview(
   api = mockApi({
     "GET /api/fs": buildFsListing(entries),
     "GET /api/scan/diagnostics": buildScanDiagnostics({ identityConflicts: diagnostics }),
-    "GET /api/scan/candidates": { candidates: [] },
+    "GET /api/scan/candidates": { scanCompleted: true, candidates: [] },
     "GET /api/settings": settings,
     "POST /api/works/identity-conflicts/reassign": buildWorkSourceMutationResult(),
     ...routeOverrides,
@@ -110,7 +110,15 @@ describe("FilePreview ID重複（単一ファイル形式）", () => {
     renderPreview(
       metaPath,
       [metaEntry],
-      [{ kind: "identity_conflict", workId: "w1", paths: ["a/single.mimimilli.json", metaPath] }],
+      [
+        {
+          kind: "identity_conflict",
+          registeredTitle: null,
+          registeredPath: null,
+          workId: "w1",
+          paths: ["a/single.mimimilli.json", metaPath],
+        },
+      ],
     );
 
     expect(
@@ -124,7 +132,15 @@ describe("FilePreview ID重複（単一ファイル形式）", () => {
     const { store } = renderPreview(
       metaPath,
       [metaEntry],
-      [{ kind: "identity_conflict", workId: "w1", paths: ["a/single.mimimilli.json", metaPath] }],
+      [
+        {
+          kind: "identity_conflict",
+          registeredTitle: null,
+          registeredPath: null,
+          workId: "w1",
+          paths: ["a/single.mimimilli.json", metaPath],
+        },
+      ],
     );
 
     await userEvent.click(await screen.findByRole("button", { name: "別の作品として取り込む" }));
@@ -139,6 +155,8 @@ describe("FilePreview ID重複（単一ファイル形式）", () => {
   it("再採番後の再取得でプレビューがアンマウントされても、選択は外れる", async () => {
     const conflict: IdentityConflict = {
       kind: "identity_conflict",
+      registeredTitle: null,
+      registeredPath: null,
       workId: "w1",
       paths: ["a/single.mimimilli.json", metaPath],
     };

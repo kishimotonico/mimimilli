@@ -1,5 +1,10 @@
 import { META_FILE_NAME, planDlsiteRegistration, relativeToRoot } from "@mimimilli/shared";
-import type { MissingWork, ScanCandidateFolder, ScanResult } from "@mimimilli/shared";
+import type {
+  ScanCandidateFolder,
+  ScanDiagnostics,
+  ScanResult,
+  WorkspacePath,
+} from "@mimimilli/shared";
 import type {
   CandidateAvailability,
   CandidateDescriber,
@@ -12,6 +17,7 @@ import type {
 } from "../../adapter/index.ts";
 import type { FixtureWorkRecord } from "./data.ts";
 import { isFsPathWithin, normalizeFsPath } from "./fsResolve.ts";
+import { identityConflictMetaPathOf } from "./identityConflictPaths.ts";
 import { checkWorkPlacement } from "./playback.ts";
 import { FIXTURE_UNREADABLE_ROOT } from "./scenarios.ts";
 import {
@@ -31,6 +37,14 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** 行方不明になる前のroot相対path。rootの外にあった作品は null */
+function previousPathOf(state: FixtureState, physicalPath: string): WorkspacePath | null {
+  const rootAbs = normalizeFsPath(requireFixtureRoot(state));
+  return isFsPathWithin(rootAbs, normalizeFsPath(physicalPath))
+    ? relativeToRoot(physicalPath, rootAbs)
+    : null;
+}
+
 function describeMissingWorks(state: FixtureState, rjCode: string | null) {
   if (!rjCode) return [];
   return state.works
@@ -39,7 +53,11 @@ function describeMissingWorks(state: FixtureState, rjCode: string | null) {
         work.status === "missing" &&
         dlsiteLinkageOf(state, work.id).rjCode?.toUpperCase() === rjCode,
     )
-    .map((work) => ({ workId: work.id, title: work.title }));
+    .map((work) => ({
+      workId: work.id,
+      title: work.title,
+      previousPath: previousPathOf(state, work.physicalPath),
+    }));
 }
 
 /** 除外と、登録済み作品（自分自身か祖先フォルダー）の候補を除く。登録状況の正は作品一覧 */
@@ -64,21 +82,13 @@ function candidatePoolOf(state: FixtureState): ScanCandidateFolder[] {
   });
 }
 
-/** シナリオが指定した作品を行方不明にし、今回新たに行方不明になった作品として返す。 */
-function markScenarioMissingWorks(state: FixtureState): MissingWork[] {
-  const rootAbs = normalizeFsPath(requireFixtureRoot(state));
-  const missingWorks: MissingWork[] = [];
+/** シナリオが指定した作品を行方不明にする。 */
+function markScenarioMissingWorks(state: FixtureState): void {
   for (const work of state.works) {
     if (!state.scanNewlyMissingWorkIds.includes(work.id) || work.status === "missing") continue;
-    missingWorks.push({
-      workId: work.id,
-      title: work.title,
-      previousPath: relativeToRoot(work.physicalPath, rootAbs),
-    });
     work.status = "missing";
     work.errorMessage = null;
   }
-  return missingWorks;
 }
 
 async function runPseudoScan(
@@ -110,23 +120,19 @@ async function runPseudoScan(
 
   const scenario = !state.scanScenarioDelivered;
   state.scanScenarioDelivered = true;
-  const missingWorks = scenario ? markScenarioMissingWorks(state) : [];
+  if (scenario) markScenarioMissingWorks(state);
   state.works = state.works.map((work) => checkWorkPlacement(state, work));
   state.lastScanTime = new Date().toISOString();
   const result: ScanResult = {
     registered: state.works.length,
     insertedWorkIds: scenario ? state.scanInsertedWorkIds : [],
     startedWithEmptyCatalog,
-    missingWorks,
     updatedWorks: scenario ? state.scanUpdatedWorks : [],
     errors: state.works.filter((w) => w.status === "error").length,
     missing: state.works.filter((w) => w.status === "missing").length,
     skipped: 0,
     coverErrors: 0,
-    unreadablePaths: scenario ? state.scanUnreadablePaths : [],
-    ...(scenario && state.dataIntegrityWarning
-      ? { dataIntegrityWarning: state.dataIntegrityWarning }
-      : {}),
+    unreadablePaths: state.scanUnreadablePaths,
   };
   return {
     result,
@@ -168,7 +174,12 @@ export function createSettingsScanMethods(
 
     async beginRootReconfiguration(rootFolder: string): Promise<{ rootChanged: boolean }> {
       const rootChanged = state.rootFolder !== null && state.rootFolder !== rootFolder;
-      if (rootChanged) state.scanCandidateExclusions = [];
+      if (rootChanged) {
+        state.scanCandidateExclusions = [];
+        state.identityConflicts = [];
+        state.invalidMetaFiles = [];
+        state.scanUnreadablePaths = [];
+      }
       state.rootFolder = rootFolder;
       state.rootReconfiguration = { phase: "running" };
       return { rootChanged };
@@ -200,10 +211,33 @@ export function createSettingsScanMethods(
       return runPseudoScan(state, scanOptions ?? {}, FIXTURE_SCAN_STEP_MS);
     },
 
-    async listScanDiagnostics() {
+    async listScanDiagnostics(): Promise<ScanDiagnostics> {
+      const rootAbs = normalizeFsPath(requireFixtureRoot(state));
       return {
-        identityConflicts: state.identityConflicts,
+        identityConflicts: state.identityConflicts.map((conflict) => {
+          const owner = state.works.find((work) => work.id === conflict.workId);
+          return {
+            ...conflict,
+            registeredTitle: owner?.title ?? null,
+            registeredPath:
+              conflict.paths.find(
+                (path) => identityConflictMetaPathOf(rootAbs, path) === owner?.metaPath,
+              ) ?? null,
+          };
+        }),
         invalidMetaFiles: state.invalidMetaFiles,
+        unreadablePaths: state.scanUnreadablePaths,
+        dataIntegrityWorks: (state.dataIntegrityWarning?.skippedWorkIds ?? []).map((workId) => ({
+          workId,
+          title: state.dataIntegrityTitles[workId] ?? null,
+        })),
+        missingWorks: state.works
+          .filter((work) => work.status === "missing")
+          .map((work) => ({
+            workId: work.id,
+            title: work.title,
+            previousPath: previousPathOf(state, work.physicalPath),
+          })),
       };
     },
     async candidateRootIdentity(): Promise<string | null> {

@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useLibrarySupportingQueries } from "../../src/features/library/model/useLibraryQueries";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
 import { mockApi } from "../helpers/api";
-import { buildAxisFacetItem, buildWorksPage } from "../helpers/builders";
+import { buildAxisFacetItem, buildScanDiagnostics, buildWorksPage } from "../helpers/builders";
 
 const baseNav: LibraryViewState = {
   activeAxis: "cv",
@@ -25,6 +25,7 @@ describe("分類軸切替時の facetItems 系列（R2 機序調査）", () => {
         params.axis === "cv"
           ? Array.from({ length: 8 }, (_, i) => buildAxisFacetItem({ value: `cv${i}` }))
           : [],
+      "GET /api/scan/diagnostics": buildScanDiagnostics(),
       "GET /api/works": buildWorksPage(),
       "GET /api/tag-prefixes": [],
       "GET /api/tags": [],
