@@ -1,5 +1,5 @@
 import type { ScanJobSnapshot } from "@mimimilli/shared";
-import type { ScanProgress } from "../model";
+import type { ScanProgress } from "../../../entities/scan/model/scanProgressLabel";
 
 /** サイドバーの状態欄が出す6状態。まだスキャンしていない待機は at が null。失敗は日時を持たない。 */
 export type ScanStatusView =

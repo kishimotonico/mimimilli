@@ -33,7 +33,9 @@ import {
   canSkipIncremental,
   coverSatisfiedForState,
   type PreparedEntry,
+  type PreparedError,
   type PreparedMeta,
+  type PreparedSkip,
 } from "./scanTypes.ts";
 import type { CoverDimensions } from "./thumbnailCache.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
@@ -188,72 +190,57 @@ async function assembleWorkForUpsert(
   };
 }
 
-export function prepareMetaEntries(
-  inspections: ReadonlyMap<string, MetaInspection>,
+/** 読み込んだ作品情報ファイル1件を、登録の要否まで判定する。同じIDの重複は全件を見ないと分からないので扱わない */
+export function prepareMetaEntry(
+  metaPath: string,
+  inspection: MetaInspection,
   existingWorks: Map<string, ScanWorkState>,
   full: boolean,
-  checkAbort: () => void = () => {},
-  conflictedWorkIds: ReadonlySet<string> = new Set(),
-): PreparedEntry[] {
-  const prepared: PreparedEntry[] = [];
-  for (const [metaPath, inspection] of inspections) {
-    checkAbort();
-    try {
-      const { declaredId } = inspection;
-      if (declaredId !== null && conflictedWorkIds.has(declaredId)) {
-        prepared.push({ kind: "identity_conflict", metaPath, workId: declaredId });
-        continue;
-      }
-      if (inspection.diagnostic !== null) throw metaParseErrorOf(metaPath, inspection);
-      const { meta, bytes } = inspection;
-      const placement = resolveWorkPlacement(metaPath, meta);
-      const revisions = computeWorkRevisions(metaPath, meta, bytes);
-      const state = existingWorks.get(meta.id);
-      const cachedRevisions =
-        state && state.sourceRevision && state.projectionRevision && state.mediaRevision
-          ? {
-              sourceRevision: state.sourceRevision,
-              projectionRevision: state.projectionRevision,
-              mediaRevision: state.mediaRevision,
-            }
-          : undefined;
-      const coverSatisfied = coverSatisfiedForState(meta, state);
-      const placementSettled = placement.ok && state?.metaPath === metaPath;
-      if (
-        canSkipIncremental(
-          full,
-          cachedRevisions,
-          revisions,
-          coverSatisfied,
-          state?.status,
-          placementSettled,
-        )
-      ) {
-        prepared.push({ kind: "skip", metaPath, id: meta.id });
-        continue;
-      }
-      prepared.push({
-        kind: "ok",
-        metaPath,
-        meta,
-        placement,
-        bytes,
-        revisions,
+): PreparedMeta | PreparedSkip | PreparedError {
+  try {
+    if (inspection.diagnostic !== null) throw metaParseErrorOf(metaPath, inspection);
+    const { meta, bytes } = inspection;
+    const placement = resolveWorkPlacement(metaPath, meta);
+    const revisions = computeWorkRevisions(metaPath, meta, bytes);
+    const state = existingWorks.get(meta.id);
+    const cachedRevisions =
+      state && state.sourceRevision && state.projectionRevision && state.mediaRevision
+        ? {
+            sourceRevision: state.sourceRevision,
+            projectionRevision: state.projectionRevision,
+            mediaRevision: state.mediaRevision,
+          }
+        : undefined;
+    const coverSatisfied = coverSatisfiedForState(meta, state);
+    const placementSettled = placement.ok && state?.metaPath === metaPath;
+    if (
+      canSkipIncremental(
+        full,
         cachedRevisions,
-        cachedStatus: state?.status,
+        revisions,
         coverSatisfied,
+        state?.status,
         placementSettled,
-      });
-    } catch (e) {
-      if (e instanceof MetaParseError) {
-        prepared.push({ kind: "error", metaPath, error: e });
-      } else {
-        throw e;
-      }
+      )
+    ) {
+      return { kind: "skip", metaPath, id: meta.id };
     }
+    return {
+      kind: "ok",
+      metaPath,
+      meta,
+      placement,
+      bytes,
+      revisions,
+      cachedRevisions,
+      cachedStatus: state?.status,
+      coverSatisfied,
+      placementSettled,
+    };
+  } catch (e) {
+    if (e instanceof MetaParseError) return { kind: "error", metaPath, error: e };
+    throw e;
   }
-
-  return prepared;
 }
 
 export function prepareSingleMeta(

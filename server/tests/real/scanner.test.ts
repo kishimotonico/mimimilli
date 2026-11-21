@@ -11,6 +11,7 @@ import {
 import { prepareSingleMeta } from "../../src/adapters/real/scanRegister.ts";
 import assert from "node:assert/strict";
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -26,6 +27,7 @@ import { EMPTY_TAG_FILTERS, workspacePath } from "@mimimilli/shared";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
 import { Scanner } from "../../src/adapters/real/scanner.ts";
+import { ScanCancelledError } from "../../src/adapters/real/scanWalk.ts";
 import { audioProbeCache } from "../../src/adapters/real/catalogSchema.ts";
 import { readMetaSource } from "../../src/adapters/real/meta.ts";
 import { createWorkRepos, getTestWork, saveTestResume } from "../helpers/workTestUtils.ts";
@@ -563,26 +565,88 @@ test("増分スキャン: ディレクトリ移動を同一 UUID で追跡し fi
   assert.equal(work!.bookmarked, true);
 });
 
-test("増分スキャン: registering 進捗の processed/total はスキップ含む全作品数が正しい", async (t) => {
+function collectProgress(events: Array<{ phase: string; processed: number; total: number }>) {
+  return (event: { type: string; phase?: string; processed?: number; total?: number }) => {
+    if (event.type === "progress") {
+      events.push({ phase: event.phase!, processed: event.processed!, total: event.total! });
+    }
+  };
+}
+
+test("増分スキャン: 作品情報の読み込みが reading フェーズで全作品数まで進み、登録は変更のある作品だけを数える", async (t) => {
   const { adapter } = await setup(t);
   await runScan(adapter);
 
-  const events: Array<{ processed: number; total: number }> = [];
-  await runScan(adapter, {
-    onProgress: (event) => {
-      if (event.type === "progress" && event.phase === "registering") {
-        events.push({ processed: event.processed, total: event.total });
-      }
-    },
+  const events: Array<{ phase: string; processed: number; total: number }> = [];
+  await runScan(adapter, { onProgress: collectProgress(events) });
+
+  const phases = events.map((e) => e.phase).filter((p, i, all) => all.indexOf(p) === i);
+  assert.deepEqual(phases, ["walking", "reading", "registering", "generating", "finalizing"]);
+
+  const reading = events.filter((e) => e.phase === "reading");
+  assert.deepEqual(reading[0], { phase: "reading", processed: 0, total: 2 });
+  assert.deepEqual(reading[reading.length - 1], { phase: "reading", processed: 2, total: 2 });
+  assert.ok(reading.every((e) => e.total === 2));
+  for (let i = 1; i < reading.length; i++) {
+    assert.ok(reading[i]!.processed >= reading[i - 1]!.processed, "processed は単調非減少");
+  }
+
+  // 欠損トラックを持つ作品は error 状態でスキップされず、登録の対象に残る
+  const registering = events.filter((e) => e.phase === "registering");
+  assert.deepEqual(registering[0], { phase: "registering", processed: 0, total: 1 });
+  assert.deepEqual(registering[registering.length - 1], {
+    phase: "registering",
+    processed: 1,
+    total: 1,
+  });
+});
+
+test("増分スキャン: 変更のある作品が無いときは registering フェーズを出さない", async (t) => {
+  const { adapter, root } = await setup(t);
+  writeWav(join(root, "dlsite", "RJ900002_既存メタ", "missing.wav"), 1);
+  await runScan(adapter);
+
+  const events: Array<{ phase: string; processed: number; total: number }> = [];
+  const result = await runScan(adapter, { onProgress: collectProgress(events) });
+
+  assert.equal(result.skipped, 2);
+  assert.ok(events.some((e) => e.phase === "reading" && e.processed === 2 && e.total === 2));
+  assert.ok(events.every((e) => e.phase !== "registering"));
+});
+
+test("増分スキャン: 変更のない作品を同じIDでコピーすると、両方が重複として登録対象に残り元の作品は missing にならない", async (t) => {
+  const { adapter, root, existingWorkId } = await setup(t);
+  writeWav(join(root, "dlsite", "RJ900002_既存メタ", "missing.wav"), 1);
+  await runScan(adapter);
+  cpSync(join(root, "dlsite", "RJ900002_既存メタ"), join(root, "dlsite", "RJ900002_コピー"), {
+    recursive: true,
   });
 
-  assert.equal(events[events.length - 1]!.processed, 2);
-  assert.equal(events[events.length - 1]!.total, 2);
-  assert.ok(events.every((e) => e.total === 2));
-  const processedValues = events.map((e) => e.processed);
-  for (let i = 1; i < processedValues.length; i++) {
-    assert.ok(processedValues[i]! >= processedValues[i - 1]!, "processed は単調非減少");
-  }
+  const events: Array<{ phase: string; processed: number; total: number }> = [];
+  const result = await runScan(adapter, { onProgress: collectProgress(events) });
+
+  assert.equal(result.skipped, 1);
+  assert.equal(result.missing, 0);
+  const registering = events.filter((e) => e.phase === "registering");
+  assert.deepEqual(registering[0], { phase: "registering", processed: 0, total: 2 });
+  assert.equal((await adapter.getWork(existingWorkId))?.status, "ok");
+  assert.equal((await adapter.listScanDiagnostics()).identityConflicts.length, 1);
+});
+
+test("作品情報の読み込み中も中止の要求に応じる", async (t) => {
+  const { adapter } = await setup(t);
+  await runScan(adapter);
+
+  const controller = new AbortController();
+  await assert.rejects(
+    runScan(adapter, {
+      signal: controller.signal,
+      onProgress: (event) => {
+        if (event.type === "progress" && event.phase === "reading") controller.abort();
+      },
+    }),
+    ScanCancelledError,
+  );
 });
 
 test("増分スキャン: error状態の作品はfingerprint一致でも再評価される", async (t) => {
