@@ -106,7 +106,7 @@ test("スキャン前に開くと件数のある要対応へ着地し、未登�
   assertNoErrors(tracker);
 });
 
-test("ID重複は登録済みと未登録をラベルとパスの行で出し、取り込むボタンは未登録の行と同じ高さに並び、取り込むと行が消える", async ({
+test("ID重複は登録済みと未登録をラベルとパスの行で出し、取り込むボタンは1つで、取り込むと行が消える", async ({
   page,
 }) => {
   const tracker = trackErrors(page);
@@ -114,16 +114,11 @@ test("ID重複は登録済みと未登録をラベルとパスの行で出し、
 
   const row = panel.getByRole("row").filter({ hasText: "ID重複" });
   await expect(row.getByText("登録済み", { exact: true })).toBeVisible();
-  const unregisteredLabel = row.getByText("未登録", { exact: true });
-  await expect(unregisteredLabel).toBeVisible();
+  await expect(row.getByText("未登録", { exact: true })).toBeVisible();
   await expect(row.getByText("作品ID RJ501001", { exact: true })).toHaveCount(0);
 
   const importButton = row.getByRole("button", { name: "別の作品として取り込む" });
-  const labelBox = await unregisteredLabel.boundingBox();
-  const buttonBox = await importButton.boundingBox();
-  const centerY = (box: { y: number; height: number } | null) =>
-    box ? box.y + box.height / 2 : Number.NaN;
-  expect(Math.abs(centerY(labelBox) - centerY(buttonBox))).toBeLessThan(2);
+  await expect(importButton).toHaveCount(1);
 
   await importButton.click();
   await page

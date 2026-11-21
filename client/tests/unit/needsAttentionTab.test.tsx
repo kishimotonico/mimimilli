@@ -166,7 +166,7 @@ describe("NeedsAttentionTab", () => {
     expect(actionCell).toContainElement(importButton);
   });
 
-  it("未登録パスが複数のID重複は、押したボタンの行のパスを確認ダイアログに出す", async () => {
+  it("未登録パスが複数のID重複は、ボタンが1つで、確認ダイアログには先頭の未登録パスを出す", async () => {
     const user = userEvent.setup();
     mockApi({
       "POST /api/works/identity-conflicts/reassign": buildWorkSourceMutationResult(),
@@ -190,9 +190,9 @@ describe("NeedsAttentionTab", () => {
       ),
     });
     const buttons = screen.getAllByRole("button", { name: "別の作品として取り込む" });
-    expect(buttons).toHaveLength(2);
-    await user.click(buttons[1]!);
-    expect(await screen.findByText(/「copy\/c」の作品IDを新しくして/)).toBeInTheDocument();
+    expect(buttons).toHaveLength(1);
+    await user.click(buttons[0]!);
+    expect(await screen.findByText(/「copy\/b」の作品IDを新しくして/)).toBeInTheDocument();
   });
 
   it("登録済みのパスが診断にないID重複は、作品名で作品詳細を開く", async () => {
@@ -236,7 +236,7 @@ describe("NeedsAttentionTab", () => {
     expect(within(registered).getByRole("button", { name: "x" })).toBeInTheDocument();
   });
 
-  it("登録済みの作品が無いID重複は、すべてのパスを未登録として取り込める", () => {
+  it("登録済みの作品が無いID重複は、未登録として先頭のパスを取り込める", () => {
     renderTab({
       rows: buildNeedsAttentionRows(
         buildScanDiagnostics({
@@ -253,7 +253,7 @@ describe("NeedsAttentionTab", () => {
       ),
     });
     expect(screen.queryByText("登録済み")).toBeNull();
-    expect(screen.getAllByRole("button", { name: "別の作品として取り込む" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "別の作品として取り込む" })).toHaveLength(1);
   });
 
   it("単一ファイル形式の重複は、トーストに作品情報ファイルの接尾辞を出さない", async () => {

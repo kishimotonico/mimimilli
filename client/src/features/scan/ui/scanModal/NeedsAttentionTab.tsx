@@ -215,20 +215,17 @@ function whatHappened(row: NeedsAttentionRow): ReactNode {
   }
 }
 
-/** 操作の要る種類はボタンだけを、ない種類は短い文を置く。ID重複は対象の未登録の行と同じ高さにボタンを並べる */
+/** 操作の要る種類はボタンだけを、ない種類は短い文を置く。ID重複は未登録のパスの先頭の1つを取り込む */
 function RecommendedAction({ row }: { row: NeedsAttentionRow }) {
   switch (row.kind) {
-    case "identityConflict":
-      return (
-        <div className={LINES_CLASS}>
-          {row.registered && <div className="h-[26px]" />}
-          {row.unregisteredPaths.map((path) => (
-            <div key={path} className="flex h-[26px] items-center">
-              <ReassignIdentityButton path={path} />
-            </div>
-          ))}
-        </div>
+    case "identityConflict": {
+      const [first] = row.unregisteredPaths;
+      return first === undefined ? null : (
+        <ActionLine>
+          <ReassignIdentityButton path={first} />
+        </ActionLine>
       );
+    }
     case "invalidMetaFile":
       return <ActionLine>ファイルを直す</ActionLine>;
     case "unreadablePath":
