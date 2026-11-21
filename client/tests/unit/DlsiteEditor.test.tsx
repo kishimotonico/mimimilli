@@ -1,5 +1,5 @@
 import { createElement, type ReactNode } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -140,6 +140,9 @@ describe("DlsiteEditor", () => {
 
     expect(screen.getByLabelText(/^サークル\/夜想曲/)).not.toBeChecked();
     expect(screen.getByLabelText("cv/新CV")).toBeChecked();
+    const tagGroup = screen.getByRole("group", { name: "追加されるタグ" });
+    expect(within(tagGroup).getAllByRole("checkbox")).toHaveLength(2);
+    expect(within(tagGroup).getByLabelText("cv/新CV")).toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "選択内容を適用" }));
 
     await waitFor(() => expect(applyDlsiteInfo).toHaveBeenCalledTimes(1));
