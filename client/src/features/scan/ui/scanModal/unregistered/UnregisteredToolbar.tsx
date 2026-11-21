@@ -13,6 +13,20 @@ interface UnregisteredToolbarProps {
   onClearFilter: () => void;
 }
 
+type ToolbarContentInput = Pick<
+  UnregisteredToolbarProps,
+  "excludedCount" | "problemCount" | "filter"
+>;
+
+/** 帯に載せるものがあるか。無ければ帯ごと出さない */
+export function hasUnregisteredToolbarContent({
+  excludedCount,
+  problemCount,
+  filter,
+}: ToolbarContentInput): boolean {
+  return problemCount > 0 || filter !== null || excludedCount > 0;
+}
+
 export default function UnregisteredToolbar({
   excludedCount,
   onShowExcluded,
@@ -21,6 +35,7 @@ export default function UnregisteredToolbar({
   onFilterProblems,
   onClearFilter,
 }: UnregisteredToolbarProps) {
+  if (!hasUnregisteredToolbarContent({ excludedCount, problemCount, filter })) return null;
   return (
     <div
       data-testid="unregistered-toolbar"

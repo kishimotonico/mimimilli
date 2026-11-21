@@ -521,10 +521,10 @@ describe("ScanModal", () => {
   describe("一覧の状態", () => {
     const tabpanel = () => screen.getByRole("tabpanel");
 
-    it("未登録は、起動後にスキャンが完了していなければ、候補が0件でも「まだスキャンしていません」を出す", () => {
+    it("未登録は、起動後にスキャンが完了していなければ、候補が0件でも「スキャン結果はまだありません」を出す", () => {
       renderModal({ candidates: [], newCount: 0, scanNotCompleted: true });
 
-      expect(within(tabpanel()).getByText("まだスキャンしていません")).toBeInTheDocument();
+      expect(within(tabpanel()).getByText("スキャン結果はまだありません")).toBeInTheDocument();
       expect(within(tabpanel()).queryByText("未登録の候補はありません")).toBeNull();
       expect(within(within(tabpanel()).getByRole("status")).queryByRole("button")).toBeNull();
     });
@@ -578,7 +578,7 @@ describe("ScanModal", () => {
       expect(within(tabpanel()).getByText("検出済みDLsiteタイトル")).toBeInTheDocument();
     });
 
-    it("要対応は、スキャン前でも「まだスキャンしていません」を出さず、0件を出す", () => {
+    it("要対応は、スキャン前でも「スキャン結果はまだありません」を出さず、0件を出す", () => {
       renderModal({
         candidates: [],
         newCount: 0,
@@ -588,7 +588,7 @@ describe("ScanModal", () => {
       openTab("要対応");
 
       expect(within(tabpanel()).getByText("要対応の項目はありません")).toBeInTheDocument();
-      expect(within(tabpanel()).queryByText("まだスキャンしていません")).toBeNull();
+      expect(within(tabpanel()).queryByText("スキャン結果はまだありません")).toBeNull();
     });
 
     it("要対応は、診断を読み込めていないあいだは空の表示を出さない", async () => {
@@ -600,13 +600,33 @@ describe("ScanModal", () => {
       expect(within(tabpanel()).queryByText("要対応の項目はありません")).toBeNull();
     });
 
-    it("新規作品と更新済みは、記録の完了時刻がなければ「まだスキャンしていません」を出す", async () => {
+    it("更新済みは、記録を読み込めていないあいだ、スケルトンと列見出しだけで件数0のチップ行を出さない", async () => {
+      mockApi({
+        "GET /api/scan/candidates": () => ({ scanCompleted: true, candidates: [] }),
+        "GET /api/scan/candidates/exclusions": { paths: [] },
+        "GET /api/scan/last": () => new Promise<never>(() => {}),
+        "GET /api/scan/diagnostics": buildScanDiagnostics(),
+        "GET /api/works": () => buildWorksPage([], { total: 0 }),
+      });
+      renderModal({ unseeded: ["record"], candidates: [candidateDetected], newCount: 0 });
+      openTab("更新済み");
+
+      expect(await within(tabpanel()).findByText("読み込み中...")).toBeInTheDocument();
+      expect(within(tabpanel()).getByRole("columnheader", { name: "作品" })).toBeInTheDocument();
+      expect(within(tabpanel()).queryByRole("button", { name: /すべて/ })).toBeNull();
+    });
+
+    it("新規作品と更新済みは、記録の完了時刻がなければ「スキャン結果はまだありません」を出す", async () => {
       renderModal({ record: buildScanRecord({ finishedAt: null }), newCount: 0 });
 
       openTab("新規作品");
-      expect(await within(tabpanel()).findByText("まだスキャンしていません")).toBeInTheDocument();
+      expect(
+        await within(tabpanel()).findByText("スキャン結果はまだありません"),
+      ).toBeInTheDocument();
       openTab("更新済み");
-      expect(await within(tabpanel()).findByText("まだスキャンしていません")).toBeInTheDocument();
+      expect(
+        await within(tabpanel()).findByText("スキャン結果はまだありません"),
+      ).toBeInTheDocument();
     });
 
     it("新規作品と更新済みは、スキャンが完了して0件ならそれぞれの0件を出す", async () => {
@@ -1338,6 +1358,22 @@ describe("ScanModal", () => {
 
   describe("更新済みタブ", () => {
     const updatedRecord = () => buildScanRecord({ updatedWorks: updatedFixture });
+
+    it("記録が届いていて作品一覧だけ遅いあいだも、スケルトンの上にチップ行を出し続ける", async () => {
+      mockApi({
+        "GET /api/scan/candidates": () => ({ scanCompleted: true, candidates: [] }),
+        "GET /api/scan/candidates/exclusions": { paths: [] },
+        "GET /api/scan/last": () => updatedRecord(),
+        "GET /api/scan/diagnostics": buildScanDiagnostics(),
+        "GET /api/works": () => new Promise<never>(() => {}),
+      });
+      renderModal({ record: updatedRecord(), newCount: 0 });
+      openTab("更新済み");
+
+      expect(await screen.findByText("読み込み中...")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^すべて/ })).toBeInTheDocument();
+      expect(screen.getByRole("columnheader", { name: "作品" })).toBeInTheDocument();
+    });
 
     it("作品ごとに変化を1行ずつ出し、値の差分は出さない", async () => {
       renderModal({ record: updatedRecord() });

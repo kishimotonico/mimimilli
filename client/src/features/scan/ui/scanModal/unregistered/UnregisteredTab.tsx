@@ -37,7 +37,7 @@ import ExcludedList from "./ExcludedList";
 import UnregisteredFooter from "./UnregisteredFooter";
 import UnregisteredListHeader from "./UnregisteredListHeader";
 import UnregisteredRow, { type UnregisteredRowHandlers } from "./UnregisteredRow";
-import UnregisteredToolbar from "./UnregisteredToolbar";
+import UnregisteredToolbar, { hasUnregisteredToolbarContent } from "./UnregisteredToolbar";
 import type { RjCodeCommitResult, RjCodeFieldError } from "./RjCodeCell";
 import { ROW_HEIGHT } from "./layout";
 
@@ -318,12 +318,13 @@ export default function UnregisteredTab({
     resetScrollTop: true,
   });
 
+  const toolbarFilter = filter && { kind: filter.kind, count: visibleRows.length };
   const toolbar = (
     <UnregisteredToolbar
       excludedCount={exclusions.length}
       onShowExcluded={() => setShowExcluded(true)}
       problemCount={problems}
-      filter={filter && { kind: filter.kind, count: visibleRows.length }}
+      filter={toolbarFilter}
       onFilterProblems={() =>
         setFilter({ kind: "problem", paths: pathsOf(allRows.filter(needsJudgment)) })
       }
@@ -331,7 +332,13 @@ export default function UnregisteredTab({
     />
   );
   const toolbarOutside =
-    status !== "loading" && status !== "ready" && (status === "empty" || exclusions.length > 0);
+    status !== "loading" &&
+    status !== "ready" &&
+    hasUnregisteredToolbarContent({
+      excludedCount: exclusions.length,
+      problemCount: problems,
+      filter: toolbarFilter,
+    });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

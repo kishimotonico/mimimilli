@@ -84,7 +84,7 @@ export default function UpdatedWorksTab({ onOpenFiles, onOpenWorkDetail }: Updat
         table={{ label: "更新済みの作品", rowCount: total + 1 }}
         heading={
           <>
-            {chips}
+            {totalUpdated > 0 && chips}
             <div role="rowgroup" className="shrink-0">
               <div role="row" className={cn(UPDATED_GRID_CLASS, LIST_HEADING_ROW_CLASS)}>
                 <span role="columnheader">作品</span>

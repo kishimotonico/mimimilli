@@ -162,6 +162,34 @@ describe("UnregisteredTab ツールバー", () => {
     expect(await screen.findByRole("button", { name: /除外済み/ })).toBeInTheDocument();
     expect(screen.getByTestId("unregistered-toolbar")).toBeInTheDocument();
   });
+
+  it("問題ありも除外済みも無ければ、一覧があっても帯ごと出さない", async () => {
+    vi.spyOn(scanEntityApi, "getScanCandidateExclusions").mockResolvedValue([]);
+    await renderTab([candidateA, candidateB]);
+    expect(screen.getAllByRole("row").length).toBeGreaterThan(1);
+    expect(screen.queryByTestId("unregistered-toolbar")).toBeNull();
+  });
+
+  it("問題ありの行があれば帯を出し、除外済みボタンは出さない", async () => {
+    vi.spyOn(scanEntityApi, "getScanCandidateExclusions").mockResolvedValue([]);
+    const notFound = buildScanCandidate({
+      path: "d/nf",
+      inferredTitle: "該当なし作品",
+      rjCode: "RJ000403",
+      dlsite: { state: "not_found" },
+    });
+    await renderTab([candidateA, notFound]);
+    expect(screen.getByTestId("unregistered-toolbar")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /問題あり/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /除外済み/ })).toBeNull();
+  });
+
+  it("除外済みだけがあるときも帯を出す", async () => {
+    vi.spyOn(scanEntityApi, "getScanCandidateExclusions").mockResolvedValue(["dlsite/除外"]);
+    await renderTab([candidateA, candidateB]);
+    expect(await screen.findByRole("button", { name: /除外済み/ })).toBeInTheDocument();
+    expect(screen.getByTestId("unregistered-toolbar")).toBeInTheDocument();
+  });
 });
 
 describe("UnregisteredTab 仮想リスト", () => {

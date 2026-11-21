@@ -82,7 +82,7 @@ test("パスを押すとFilesで開く", async ({ page }) => {
   assertNoErrors(tracker);
 });
 
-test("スキャン前に開くと件数のある要対応へ着地し、未登録は「まだスキャンしていません」を出す", async ({
+test("スキャン前に開くと件数のある要対応へ着地し、未登録は「スキャン結果はまだありません」を出す", async ({
   page,
 }) => {
   const tracker = trackErrors(page);
@@ -96,11 +96,11 @@ test("スキャン前に開くと件数のある要対応へ着地し、未登�
   );
   const attention = dialog.getByRole("tabpanel", { name: /^要対応/ });
   await expect(attention.getByRole("row", { name: /^ID重複/ })).toBeVisible();
-  await expect(attention.getByText("まだスキャンしていません")).toHaveCount(0);
+  await expect(attention.getByText("スキャン結果はまだありません")).toHaveCount(0);
 
   await dialog.getByRole("tab", { name: /^未登録/ }).click();
   const unregistered = dialog.getByRole("tabpanel", { name: /^未登録/ });
-  await expect(unregistered.getByText("まだスキャンしていません")).toBeVisible();
+  await expect(unregistered.getByText("スキャン結果はまだありません")).toBeVisible();
   await expect(unregistered.getByRole("status").getByRole("button")).toHaveCount(0);
 
   assertNoErrors(tracker);
