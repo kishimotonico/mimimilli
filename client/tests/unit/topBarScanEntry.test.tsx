@@ -1,7 +1,7 @@
-import { act, createElement } from "react";
+import { act, createElement, Fragment } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { focusManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Provider as JotaiProvider, createStore } from "jotai";
+import { Provider as JotaiProvider, createStore, useAtomValue } from "jotai";
 import { beforeEach, describe, expect, it } from "vitest";
 import TopBar from "../../src/app/ui/TopBar";
 import { dlsiteJobStoreAtom } from "../../src/entities/dlsite/model/dlsiteJobStore";
@@ -20,6 +20,13 @@ import {
 } from "../helpers/builders";
 import { workspacePath } from "@mimimilli/shared";
 import { seedAppMode } from "../helpers/route";
+import ScanEntrySeenRecorder from "../../src/features/scan/ui/ScanEntrySeenRecorder";
+import { scanModalOpenAtom } from "../../src/entities/scan/model/atoms";
+
+// 「見た」の記憶は常駐の ScanRuntime が、スキャン画面を開いているあいだだけ書く。ここではその部分だけを TopBar と並べる。
+function SeenRecorder() {
+  return useAtomValue(scanModalOpenAtom) ? createElement(ScanEntrySeenRecorder) : null;
+}
 
 const SEEN_KEY = "mimimilli:scanEntrySeen";
 const UNREADABLE_KEY = "unreadable:壊れたフォルダー";
@@ -72,7 +79,11 @@ function renderTopBar(seed: Seed = {}) {
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(JotaiProvider, { store }, createElement(TopBar)),
+      createElement(
+        JotaiProvider,
+        { store },
+        createElement(Fragment, null, createElement(TopBar), createElement(SeenRecorder)),
+      ),
     ),
   );
   return { queryClient, store };

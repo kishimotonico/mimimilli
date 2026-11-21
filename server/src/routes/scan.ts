@@ -118,8 +118,8 @@ export function scanRoute(
   });
 
   app.get("/scan/candidates/exclusions", async (c) => {
-    const paths = await jobs.session.listExclusions();
-    return c.json(scanCandidateExclusionsResponseSchema.parse({ paths }));
+    const exclusions = await jobs.session.listExclusions();
+    return c.json(scanCandidateExclusionsResponseSchema.parse({ exclusions }));
   });
 
   app.post("/scan/candidates/exclusions/restore", async (c) => {

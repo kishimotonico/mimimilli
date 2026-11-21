@@ -17,7 +17,7 @@ import { refreshScanCandidatesQuietly } from "../../../../../entities/scan/scanC
 import { useRegisterScanCandidatesMutation } from "../../../../../entities/work/model/workMutations";
 import { scanCandidateSelectionAtom } from "../../../../../entities/scan/model/atoms";
 import { useDlsiteJobState, useDlsiteJobStore } from "../../../../../entities/dlsite/useDlsiteJob";
-import { candidateDlsiteDisplay } from "../../../model/unregisteredDlsite";
+import { candidateDlsiteDisplay, dlsiteResultRevision } from "../../../model/unregisteredDlsite";
 import {
   addTargets,
   footerPlan,
@@ -83,6 +83,7 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
       candidates.map((candidate) => ({
         candidate,
         display: candidateDlsiteDisplay(candidate, jobState),
+        resultRevision: dlsiteResultRevision(candidate, jobState),
         invalidRj: fieldErrors.has(candidate.path),
       })),
     [candidates, jobState, fieldErrors],
@@ -231,7 +232,7 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
     <div className="flex min-h-0 flex-1 flex-col">
       {showExcluded && (
         <ExcludedList
-          paths={exclusions}
+          exclusions={exclusions}
           status={exclusionsStatus}
           onRetry={retryExclusions}
           onBack={closeExcluded}

@@ -44,15 +44,15 @@ export function refreshScanCandidates(
     }
     const { replace } = options;
     if (replace) {
-      queryClient.setQueryData<ScanCandidatesResponse>(
-        SCAN_CANDIDATES_QUERY_KEY,
-        (previous) =>
-          previous && {
-            ...previous,
-            candidates: previous.candidates.map((entry) =>
-              entry.path === replace.path ? replace : entry,
-            ),
-          },
+      queryClient.setQueryData<ScanCandidatesResponse>(SCAN_CANDIDATES_QUERY_KEY, (previous) =>
+        previous?.scanCompleted
+          ? {
+              ...previous,
+              candidates: previous.candidates.map((entry) =>
+                entry.path === replace.path ? replace : entry,
+              ),
+            }
+          : previous,
       );
     }
     const superseded = () => {

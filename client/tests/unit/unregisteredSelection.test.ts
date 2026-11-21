@@ -7,7 +7,6 @@ import {
   judgmentCount,
   missingDlsiteRows,
   needsJudgment,
-  pruneStaleOverrides,
   selectionOverride,
   type CandidateRowModel,
 } from "../../src/features/scan/model/unregisteredSelection";
@@ -18,8 +17,9 @@ function row(
   path: string,
   rjCode: string | null,
   display: CandidateDlsiteDisplay,
+  resultRevision: number | null = null,
 ): CandidateRowModel {
-  return { candidate: buildScanCandidate({ path, rjCode }), display };
+  return { candidate: buildScanCandidate({ path, rjCode }), display, resultRevision };
 }
 
 describe("fetchTarget", () => {
@@ -113,6 +113,7 @@ describe("needsJudgment / isRowSelected", () => {
       missingWorks: [{ workId: "w", title: "旧", previousPath: "old/path" }],
     }),
     display: { state: "none" },
+    resultRevision: null,
   };
 
   it("取得結果が該当なし・失敗、形式に合わないRJコード、行方不明の作品と同じRJコードが判断の要る行", () => {
@@ -125,7 +126,10 @@ describe("needsJudgment / isRowSelected", () => {
     ]);
     expect(needsJudgment(row("f", null, { state: "none" }))).toBe(false);
     expect(
-      isRowSelected(badCode, new Map([["d", { selected: true, judged: true, rjCode: null }]])),
+      isRowSelected(
+        badCode,
+        new Map([["d", { selected: true, judged: true, rjCode: null, resultRevision: null }]]),
+      ),
     ).toBe(false);
   });
 
@@ -147,7 +151,6 @@ describe("needsJudgment / isRowSelected", () => {
     const deselectedOk = new Map([["a", selectionOverride(ok, false)]]);
     const recoded = row("a", "RJ000009", { state: "none" });
     expect(isRowSelected(recoded, deselectedOk)).toBe(true);
-    expect(pruneStaleOverrides([recoded], deselectedOk).size).toBe(0);
     const picked = new Map([["b", selectionOverride(notFound, true)]]);
     expect(isRowSelected(notFound, picked)).toBe(true);
     const deselected = new Map([["a", selectionOverride(ok, false)]]);
@@ -167,15 +170,35 @@ describe("judgmentCount", () => {
   });
 });
 
-describe("pruneStaleOverrides", () => {
-  const failed = row("a", "RJ000001", { state: "failed" });
-  const fetching = row("a", "RJ000001", { state: "fetching" });
+describe("取得結果の revision と選択の上書き", () => {
+  const failed = row("a", "RJ000001", { state: "failed" }, 10);
+  const picked = new Map([["a", selectionOverride(failed, true)]]);
 
-  it("判断が要るかどうかが変わった行の上書きを消し、失敗→取得中→失敗で選択が戻らない", () => {
-    const picked = new Map([["a", selectionOverride(failed, true)]]);
-    expect(pruneStaleOverrides([failed], picked)).toBe(picked);
-    const pruned = pruneStaleOverrides([fetching], picked);
-    expect(pruned.size).toBe(0);
-    expect(isRowSelected(failed, pruned)).toBe(false);
+  it("失敗の行を選んだあと、取得中を観測しなくても、取り直して再び失敗すれば（revision が進めば）選択は戻る", () => {
+    expect(isRowSelected(failed, picked)).toBe(true);
+    const failedAgain = row("a", "RJ000001", { state: "failed" }, 11);
+    expect(isRowSelected(failedAgain, picked)).toBe(false);
+  });
+
+  it("結果が変わらなければ、取得中を挟んでも選択は残る", () => {
+    const fetching = row("a", "RJ000001", { state: "fetching" }, 10);
+    expect(isRowSelected(fetching, picked)).toBe(true);
+    expect(isRowSelected(failed, picked)).toBe(true);
+  });
+
+  it("取得中に外した行は、取得が成功しても外れたまま", () => {
+    const unfetched = row("b", "RJ000002", { state: "none" }, null);
+    const deselected = new Map([["b", selectionOverride(unfetched, false)]]);
+    const fetching = row("b", "RJ000002", { state: "fetching" }, null);
+    const fetched = row("b", "RJ000002", { state: "fetched", title: "題", cover: null }, 12);
+    expect(isRowSelected(fetching, deselected)).toBe(false);
+    expect(isRowSelected(fetched, deselected)).toBe(false);
+  });
+
+  it("失敗の行を選び、取り直して再び失敗すると（結果の revision が進むと）選択が外れる", () => {
+    const failedAgain = row("a", "RJ000001", { state: "failed" }, 11);
+    expect(isRowSelected(failedAgain, picked)).toBe(false);
+    const retryFetching = row("a", "RJ000001", { state: "fetching" }, 10);
+    expect(isRowSelected(retryFetching, picked)).toBe(true);
   });
 });

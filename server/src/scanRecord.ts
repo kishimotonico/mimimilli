@@ -85,11 +85,6 @@ export class ScanRecordStore {
     };
   }
 
-  /** サーバーの起動後に、スキャンが1回以上完了している */
-  hasFinishedScan(): boolean {
-    return this.finishedAt !== null;
-  }
-
   /** GET /works の scanRecord 絞り込みが使う作品ID集合。作品一覧はIDで引くので、存在しない作品は自然に落ちる。updated は変化の種類で絞れる */
   workIds(kind: ScanRecordKind, change?: WorkChangeKind): string[] {
     if (kind === "new") return [...this.newWorkIds];

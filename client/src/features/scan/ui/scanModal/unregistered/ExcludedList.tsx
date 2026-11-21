@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { detectRjCode, pathBaseName } from "@mimimilli/shared";
+import { pathBaseName, type ScanCandidateExclusion } from "@mimimilli/shared";
 import { cn } from "../../../../../shared/lib/cn";
 import { LIST_HEADING_ROW_CLASS } from "../listHeading";
 import Button from "../../../../../shared/ui/Button";
@@ -10,7 +10,7 @@ const EXCLUDED_GRID_CLASS =
   "grid items-center gap-x-3 px-[18px] [grid-template-columns:minmax(0,1fr)_120px_60px]";
 
 interface ExcludedListProps {
-  paths: readonly string[];
+  exclusions: readonly ScanCandidateExclusion[];
   /** 除外済みを読めていない間は loading、失敗は error。読めたあとは loaded のまま */
   status: "loading" | "error" | "loaded";
   onRetry: () => void;
@@ -20,7 +20,7 @@ interface ExcludedListProps {
 
 /** 除外した候補の一覧。行ごとに未登録の一覧へ戻せる。 */
 export default function ExcludedList({
-  paths,
+  exclusions,
   status,
   onRetry,
   onBack,
@@ -33,7 +33,7 @@ export default function ExcludedList({
     setRestoring(true);
     try {
       await onRestore(path);
-      if (paths.length <= 1) backRef.current?.focus();
+      if (exclusions.length <= 1) backRef.current?.focus();
     } finally {
       setRestoring(false);
     }
@@ -54,7 +54,7 @@ export default function ExcludedList({
         <span className="font-jp text-body font-bold text-ink-0">
           除外済み{" "}
           {status === "loaded" && (
-            <span className="font-mono font-normal text-ink-2">{paths.length}</span>
+            <span className="font-mono font-normal text-ink-2">{exclusions.length}</span>
           )}
         </span>
       </div>
@@ -62,7 +62,7 @@ export default function ExcludedList({
         <CollectionStatus variant="list" kind="loading" />
       ) : status === "error" ? (
         <CollectionStatus variant="list" kind="error" onRetry={onRetry} />
-      ) : paths.length === 0 ? (
+      ) : exclusions.length === 0 ? (
         <CollectionStatus variant="list" kind="empty" message="除外した候補はありません" />
       ) : (
         <>
@@ -75,7 +75,7 @@ export default function ExcludedList({
             aria-label="除外済みの候補"
             className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0"
           >
-            {paths.map((path) => (
+            {exclusions.map(({ path, rjCode }) => (
               <li
                 key={path}
                 className={cn(
@@ -94,9 +94,7 @@ export default function ExcludedList({
                     {path}
                   </span>
                 </span>
-                <span className="font-mono text-body text-ink-1">
-                  {detectRjCode([pathBaseName(path)]) ?? "—"}
-                </span>
+                <span className="font-mono text-body text-ink-1">{rjCode ?? "—"}</span>
                 <Button
                   variant="ghost"
                   aria-label={`「${pathBaseName(path)}」を未登録に戻す`}

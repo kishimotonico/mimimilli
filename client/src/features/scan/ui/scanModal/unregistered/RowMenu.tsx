@@ -1,9 +1,6 @@
-import { useCallback, useId, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { MENU_PANEL_CLASS, MenuItem } from "../../../../../shared/ui/Menu";
+import { PopupMenu, type MenuItemSpec } from "../../../../../shared/ui/Menu";
 import IconButton from "../../../../../shared/ui/IconButton";
 import { I } from "../../../../../shared/ui/Icon";
-import { useAnchoredPopover } from "../../../../../shared/ui/useAnchoredPopover";
 
 interface RowMenuProps {
   label: string;
@@ -12,70 +9,24 @@ interface RowMenuProps {
   onExclude: () => void;
 }
 
-/** 行の右端の︙メニュー。Escapeはメニューだけを閉じる。 */
+/** 行の右端の︙メニュー。 */
 export default function RowMenu({ label, disabled, onOpenFolder, onExclude }: RowMenuProps) {
-  const [open, setOpen] = useState(false);
-  const menuId = useId();
-  const close = useCallback(() => setOpen(false), []);
-  const anchorRef = useRef<HTMLElement | null>(null);
-  const { setReference, setFloating, floatingStyles } = useAnchoredPopover({
-    isOpen: open,
-    preferredWidth: 0,
-    placement: "belowEnd",
-    onClose: close,
-    closeOnScroll: true,
-    closeOnFocusOut: true,
-    consumeEscape: true,
-  });
-
+  const items: MenuItemSpec[] = [
+    { key: "open-folder", label: "フォルダーを開く", onSelect: onOpenFolder },
+    { key: "exclude", label: "除外", onSelect: onExclude, danger: true },
+  ];
   return (
-    <div
-      ref={(node) => {
-        anchorRef.current = node;
-        setReference(node);
-      }}
-      className="relative inline-flex"
-    >
-      <IconButton
-        icon={I.moreV}
-        label={label}
-        size="sm"
-        tone="muted"
-        disabled={disabled}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
-        onClick={() => setOpen((value) => !value)}
-      />
-      {open &&
-        createPortal(
-          <div
-            id={menuId}
-            ref={setFloating}
-            style={floatingStyles}
-            role="menu"
-            className={MENU_PANEL_CLASS}
-          >
-            <MenuItem
-              onSelect={() => {
-                close();
-                onOpenFolder();
-              }}
-            >
-              フォルダーを開く
-            </MenuItem>
-            <MenuItem
-              danger
-              onSelect={() => {
-                close();
-                onExclude();
-              }}
-            >
-              除外
-            </MenuItem>
-          </div>,
-          anchorRef.current?.closest("dialog") ?? document.body,
-        )}
-    </div>
+    <PopupMenu items={items} placement="belowEnd" closeOnScroll closeOnFocusOut>
+      {(trigger) => (
+        <IconButton
+          icon={I.moreV}
+          label={label}
+          size="sm"
+          tone="muted"
+          disabled={disabled}
+          {...trigger}
+        />
+      )}
+    </PopupMenu>
   );
 }

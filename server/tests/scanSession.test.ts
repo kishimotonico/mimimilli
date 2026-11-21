@@ -283,3 +283,42 @@ test("記録の照合中にスキャンが完了しても、読み始めた時�
     ["new"],
   );
 });
+
+test("scanCompleted が false のときは候補が空。同じrootの再設定は記録だけを捨て、候補のスキャンは完了したまま", async () => {
+  const { session } = stubMaterials();
+  session.publish(execution(["A", "B"]), "t1");
+
+  session.beginRootReconfiguration(false);
+  const afterReconfiguration = await session.listCandidates();
+  assert.equal(afterReconfiguration.scanCompleted, true);
+  assert.equal(afterReconfiguration.candidates.length, 2);
+  assert.equal((await session.recordSnapshot()).finishedAt, null);
+
+  session.beginRootReconfiguration(true);
+  assert.deepEqual(await session.listCandidates(), { scanCompleted: false, candidates: [] });
+  session.reset();
+  assert.deepEqual(await session.listCandidates(), { scanCompleted: false, candidates: [] });
+});
+
+test("除外一覧のRJコードは、直した値、候補の検出値、プールに無いパスはフォルダー名から検出した値の順で返す", async () => {
+  const { state, session } = stubMaterials();
+  state.unavailable.add("RJ123456_未スキャン");
+  assert.deepEqual(await session.listExclusions(), [
+    { path: "RJ123456_未スキャン", rjCode: "RJ123456" },
+  ]);
+
+  session.publish(
+    { ...execution([]), candidatePool: [folder("B", null), folder("RJ222222_C", "RJ222222")] },
+    "t1",
+  );
+  await session.setRjCode("B", "RJ999999");
+  state.unavailable.add("B");
+  state.unavailable.add("RJ222222_C");
+  state.unavailable.add("名前だけ");
+  assert.deepEqual(await session.listExclusions(), [
+    { path: "RJ123456_未スキャン", rjCode: "RJ123456" },
+    { path: "B", rjCode: "RJ999999" },
+    { path: "RJ222222_C", rjCode: "RJ222222" },
+    { path: "名前だけ", rjCode: null },
+  ]);
+});

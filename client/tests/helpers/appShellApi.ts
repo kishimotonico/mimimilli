@@ -8,7 +8,7 @@ export function appShellRoutes(overrides: ApiRoutes = {}): ApiRoutes {
     "GET /api/scan/active": () => apiNoContent(),
     "GET /api/scan/last": buildScanRecord({ finishedAt: null }),
     "GET /api/scan/candidates": { scanCompleted: true, candidates: [] },
-    "GET /api/scan/candidates/exclusions": { paths: [] },
+    "GET /api/scan/candidates/exclusions": { exclusions: [] },
     "GET /api/scan/diagnostics": buildScanDiagnostics(),
     "GET /api/works": buildWorksPage(),
     "GET /api/tags": [],

@@ -54,11 +54,11 @@ export const invalidMetaFileSchema = z.object({
 });
 export type InvalidMetaFile = z.infer<typeof invalidMetaFileSchema>;
 
-export const scanCandidatesResponseSchema = z.object({
-  /** サーバーの起動後に、スキャンが1回以上完了している。false のとき候補は空で、0件とは別の状態 */
-  scanCompleted: z.boolean(),
-  candidates: z.array(scanCandidateSchema),
-});
+/** scanCompleted は、候補を持つスキャンが完了している（サーバーの起動後、rootが変わるまで）かどうか。false のとき候補は空で、0件とは別の状態。記録の finishedAt とは別の事実 */
+export const scanCandidatesResponseSchema = z.discriminatedUnion("scanCompleted", [
+  z.object({ scanCompleted: z.literal(false), candidates: z.tuple([]) }),
+  z.object({ scanCompleted: z.literal(true), candidates: z.array(scanCandidateSchema) }),
+]);
 export type ScanCandidatesResponse = z.infer<typeof scanCandidatesResponseSchema>;
 export const scanCandidatesMutationSchema = z.object({
   paths: z
@@ -83,8 +83,14 @@ export const scanCandidatesRegisterRequestSchema = z.object({
     .refine((paths) => new Set(paths).size === paths.length, "候補パスが重複しています"),
   apply: dlsiteRegistrationApplySchema,
 });
+/** 除外済みの候補。rjCode はサーバーが持つ値で、直したRJコードがあればそれ。プールに無い候補は null */
+export const scanCandidateExclusionSchema = z.object({
+  path: workspacePathSchema,
+  rjCode: z.string().nullable(),
+});
+export type ScanCandidateExclusion = z.infer<typeof scanCandidateExclusionSchema>;
 export const scanCandidateExclusionsResponseSchema = z.object({
-  paths: z.array(workspacePathSchema),
+  exclusions: z.array(scanCandidateExclusionSchema),
 });
 export const scanCandidateRegistrationSchema = z.object({
   path: workspacePathSchema,

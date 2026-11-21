@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useStore } from "jotai";
+import { useAtomValue, useStore } from "jotai";
 import { useEffect } from "react";
 import { SETTINGS_QUERY_KEYS } from "../../../entities/settings/queryKeys";
 import { SCAN_QUERY_KEYS } from "../api";
@@ -13,7 +13,7 @@ import { nextSeen, scanEntrySeenAtom } from "../model/scanEntrySeen";
 import { SCAN_FAILED_FALLBACK_REASON } from "../model/scanStatusView";
 import { scanModalOpenAtom, scanResultsRefreshedAtom } from "../../../entities/scan/model/atoms";
 import { useScanJobState, useScanJobStore } from "../../../entities/scan/useScanJob";
-import { useScanSelectionPruning } from "../model/useScanSelectionPruning";
+import ScanEntrySeenRecorder from "./ScanEntrySeenRecorder";
 import { useToast } from "../../../shared/ui/useToast";
 
 // スキャンジョブ（scanJobStore）の終端・開始イベントとエラー状態を、トースト・キャッシュ更新へつなぐ。
@@ -26,7 +26,7 @@ export default function ScanRuntime() {
   const errorToast = useToast();
   const failureToast = useToast();
   const error = useScanJobState((state) => state.error);
-  useScanSelectionPruning();
+  const modalOpen = useAtomValue(scanModalOpenAtom);
 
   useEffect(
     () =>
@@ -135,5 +135,5 @@ export default function ScanRuntime() {
     });
   }, [error, errorToast, scanJob]);
 
-  return null;
+  return modalOpen ? <ScanEntrySeenRecorder /> : null;
 }

@@ -43,3 +43,12 @@ export function candidateDlsiteDisplay(
   if (result && result.revision > candidate.dlsiteRevision) return displayOf(result.dlsite);
   return displayOf(candidate.dlsite);
 }
+
+/** 行が見ている取得結果の revision。選択の上書きが、取り直しで状態が入れ替わったかを知るのに使う */
+export function dlsiteResultRevision(
+  candidate: ScanCandidate,
+  job: DisplayJobState,
+): number | null {
+  if (candidate.rjCode === null) return null;
+  return job.results.get(canonicalDlsiteProductCode(candidate.rjCode))?.revision ?? null;
+}

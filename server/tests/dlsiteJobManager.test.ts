@@ -439,3 +439,30 @@ test("打ち切りでジョブがnullになるとrevisionが進む（実行中�
   assert.ok(done.manager.revision > before);
   assert.equal(done.manager.getState().job, null);
 });
+
+test("失敗したコードを（forceを含め）取り直して再び失敗すると、そのコードの終端の revision が進む", async () => {
+  const { manager, calls } = controlled();
+  const terminalRevision = () => {
+    const entry = manager.getState().job?.codes.find((code) => code.productCode === "RJ000001");
+    return entry && "dlsite" in entry ? entry.revision : null;
+  };
+  manager.start({ productCodes: ["RJ000001"] });
+  await tick();
+  calls[0]!.settle("failed");
+  await tick();
+  const first = terminalRevision();
+  assert.notEqual(first, null);
+
+  for (const force of [false, true]) {
+    manager.start({ productCodes: ["RJ000001"], force });
+    await tick();
+    calls.at(-1)!.settle("failed");
+    await tick();
+    const next = terminalRevision();
+    assert.ok(next !== null && next > first!, `force=${force}`);
+    manager.start({ productCodes: ["RJ000009"] });
+    await tick();
+    calls.at(-1)!.settle("fetched");
+    await tick();
+  }
+});

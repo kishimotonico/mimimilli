@@ -1,9 +1,13 @@
-import type {
-  DlsiteRegistrationApply,
-  ScanCandidateBody,
-  ScanCandidateFolder,
-  ScanCandidatesRegisterResponse,
-  ScanRecord,
+import {
+  detectRjCode,
+  pathBaseName,
+  workspacePath,
+  type DlsiteRegistrationApply,
+  type ScanCandidateBody,
+  type ScanCandidateExclusion,
+  type ScanCandidateFolder,
+  type ScanCandidatesRegisterResponse,
+  type ScanRecord,
 } from "@mimimilli/shared";
 import type { DataAdapter, ScanExecution } from "./adapter/index.ts";
 import { CandidatePoolChangedError } from "./errors.ts";
@@ -21,16 +25,27 @@ type SessionAdapter = Pick<
   | "restoreScanCandidateExclusions"
 >;
 
+/** 候補の一覧。スキャンが完了していなければ候補は空で、完了して0件のときとは別の状態 */
+export type ScanCandidatesListing =
+  | { scanCompleted: false; candidates: [] }
+  | { scanCompleted: true; candidates: ScanCandidateBody[] };
+
+/** 完了したスキャンが残した候補プール。走査したrootの同一性と対で持つ */
+interface CandidatePool {
+  folders: ReadonlyMap<string, ScanCandidateFolder>;
+  rootIdentity: string;
+}
+
 /**
  * 直近のスキャンの結果の持ち主。候補プール・直したRJコード・スキャンの記録を持つ。
  * プールと記録はスキャン完了のたびに同期的にまとめて差し替わり、メモリだけにあって寿命は次のスキャンまで。
+ * 候補のスキャンが完了したかどうかはプールの有無（null が未スキャン）で決まり、記録の完了時刻とは別の事実。
  * 直したRJコードはサーバー再起動まで持ち、候補から登録したときと、プールから外れたときに消える。
  */
 export class ScanSession {
   readonly record = new ScanRecordStore();
   private readonly adapter: SessionAdapter;
-  private pool: ReadonlyMap<string, ScanCandidateFolder> = new Map();
-  private rootIdentity: string | null = null;
+  private pool: CandidatePool | null = null;
   /** 値がnullのエントリはRJコードなしの明示 */
   private readonly rjCodeOverrides = new Map<string, string | null>();
 
@@ -40,10 +55,12 @@ export class ScanSession {
 
   /** 完了したスキャンの結果を公開する。プールの差し替えと記録の置き換えのあいだに await を入れない */
   publish(execution: ScanExecution, finishedAt: string): void {
-    this.pool = new Map(execution.candidatePool.map((folder) => [folder.path, folder]));
-    this.rootIdentity = execution.rootIdentity;
+    const folders = new Map<string, ScanCandidateFolder>(
+      execution.candidatePool.map((folder) => [folder.path, folder]),
+    );
+    this.pool = { folders, rootIdentity: execution.rootIdentity };
     for (const path of this.rjCodeOverrides.keys()) {
-      if (!this.pool.has(path)) this.rjCodeOverrides.delete(path);
+      if (!folders.has(path)) this.rjCodeOverrides.delete(path);
     }
     this.record.replace(execution.result, finishedAt);
   }
@@ -67,14 +84,13 @@ export class ScanSession {
   }
 
   private discardCandidates(): void {
-    this.pool = new Map();
-    this.rootIdentity = null;
+    this.pool = null;
     this.rjCodeOverrides.clear();
   }
 
   private async assertRootMatches(): Promise<void> {
     const current = await this.adapter.candidateRootIdentity();
-    if (this.rootIdentity === null || current !== this.rootIdentity) {
+    if (this.pool === null || current !== this.pool.rootIdentity) {
       throw new CandidatePoolChangedError();
     }
   }
@@ -96,23 +112,23 @@ export class ScanSession {
     isCandidate: (folder: ScanCandidateFolder) => boolean,
   ): ScanCandidateFolder[] {
     return paths.map((path) => {
-      const folder = this.pool.get(path);
+      const folder = this.pool?.folders.get(path);
       if (!folder || !isCandidate(folder)) throw new CandidatePoolChangedError();
       return folder;
     });
   }
 
-  /** scanCompleted が false のとき候補は空で、スキャンが完了して候補が0件のときとは別の状態 */
-  async listCandidates(): Promise<{ scanCompleted: boolean; candidates: ScanCandidateBody[] }> {
-    const scanCompleted = this.record.hasFinishedScan();
-    if (this.pool.size === 0) return { scanCompleted, candidates: [] };
+  async listCandidates(): Promise<ScanCandidatesListing> {
+    const pool = this.pool;
+    if (pool === null) return { scanCompleted: false, candidates: [] };
+    if (pool.folders.size === 0) return { scanCompleted: true, candidates: [] };
     const [isCandidate, describe] = await Promise.all([
       this.adapter.candidateAvailability(),
       this.adapter.describeCandidates(),
     ]);
     return {
-      scanCompleted,
-      candidates: [...this.pool.values()]
+      scanCompleted: true,
+      candidates: [...pool.folders.values()]
         .filter(isCandidate)
         .map((folder) => this.toCandidate(folder, describe)),
     };
@@ -187,8 +203,19 @@ export class ScanSession {
     await this.adapter.excludeScanCandidates(paths);
   }
 
-  listExclusions(): Promise<string[]> {
-    return this.adapter.listScanCandidateExclusions();
+  /** RJコードは、直した値があればそれ、なければ候補の検出値。プールに無いパスはフォルダー名から検出する */
+  async listExclusions(): Promise<ScanCandidateExclusion[]> {
+    const paths = await this.adapter.listScanCandidateExclusions();
+    const pool = this.pool;
+    return paths.map((path) => {
+      const folder = pool?.folders.get(path);
+      const rjCode = this.rjCodeOverrides.has(path)
+        ? (this.rjCodeOverrides.get(path) ?? null)
+        : folder
+          ? folder.detectedRjCode
+          : detectRjCode([pathBaseName(path)]);
+      return { path: workspacePath(path), rjCode };
+    });
   }
 
   restoreExclusions(paths: string[]): Promise<void> {

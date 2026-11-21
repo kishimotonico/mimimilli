@@ -176,7 +176,7 @@ beforeEach(() => {
       return apiNoContent();
     },
     "GET /api/scan/candidates": () => ({ scanCompleted: true, candidates: serverCandidates }),
-    "GET /api/scan/candidates/exclusions": { paths: [] },
+    "GET /api/scan/candidates/exclusions": { exclusions: [] },
     "GET /api/scan/last": () => apiNoContent(),
     "GET /api/scan/diagnostics": buildScanDiagnostics(),
     "GET /api/settings": buildSettings(),
@@ -550,7 +550,7 @@ describe("ScanModal", () => {
     it("未登録は、候補を読み込めていないあいだは空の表示を出さない", async () => {
       mockApi({
         "GET /api/scan/candidates": () => new Promise<never>(() => {}),
-        "GET /api/scan/candidates/exclusions": { paths: [] },
+        "GET /api/scan/candidates/exclusions": { exclusions: [] },
         "GET /api/scan/last": () => scanRecord,
         "GET /api/scan/diagnostics": buildScanDiagnostics(),
         "GET /api/works": () => buildWorksPage([], { total: 0 }),
@@ -569,7 +569,7 @@ describe("ScanModal", () => {
           fail
             ? apiError(500, "internal", "失敗")
             : { scanCompleted: true, candidates: [candidateDetected] },
-        "GET /api/scan/candidates/exclusions": { paths: [] },
+        "GET /api/scan/candidates/exclusions": { exclusions: [] },
         "GET /api/scan/last": () => scanRecord,
         "GET /api/scan/diagnostics": buildScanDiagnostics(),
         "GET /api/works": () => buildWorksPage([], { total: 0 }),
@@ -614,7 +614,7 @@ describe("ScanModal", () => {
     it("更新済みは、記録を読み込めていないあいだ、スケルトンと列見出しだけで件数0のチップ行を出さない", async () => {
       mockApi({
         "GET /api/scan/candidates": () => ({ scanCompleted: true, candidates: [] }),
-        "GET /api/scan/candidates/exclusions": { paths: [] },
+        "GET /api/scan/candidates/exclusions": { exclusions: [] },
         "GET /api/scan/last": () => new Promise<never>(() => {}),
         "GET /api/scan/diagnostics": buildScanDiagnostics(),
         "GET /api/works": () => buildWorksPage([], { total: 0 }),
@@ -1390,7 +1390,7 @@ describe("ScanModal", () => {
     it("記録が届いていて作品一覧だけ遅いあいだも、スケルトンの上にチップ行を出し続ける", async () => {
       mockApi({
         "GET /api/scan/candidates": () => ({ scanCompleted: true, candidates: [] }),
-        "GET /api/scan/candidates/exclusions": { paths: [] },
+        "GET /api/scan/candidates/exclusions": { exclusions: [] },
         "GET /api/scan/last": () => updatedRecord(),
         "GET /api/scan/diagnostics": buildScanDiagnostics(),
         "GET /api/works": () => new Promise<never>(() => {}),

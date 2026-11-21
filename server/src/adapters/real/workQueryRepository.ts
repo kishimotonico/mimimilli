@@ -412,7 +412,7 @@ export class WorkQueryRepository {
     });
   }
 
-  /** 一覧の行を作品に変換する。保存された値を読めない作品は skipped に分ける。行が読めるかの検証は rowToSummary を通る */
+  /** 一覧の行を作品に変換する。保存された値を読めない作品は skipped に分ける。行が読めるかの検証は validateWorkRow を通る */
   private mapWorkListRows(
     rows: RawWorkListRow[],
     root: string,
@@ -441,26 +441,9 @@ export class WorkQueryRepository {
     return { items, skipped };
   }
 
-  /** 保存された値を読めず、作品一覧・スマートフォルダー・エクスポートから外れる作品 */
+  /** 保存された値を読めず、作品一覧・スマートフォルダー・エクスポートから外れる作品。listSummaries と同じ検証で決まる */
   listDataIntegritySkips(workIds?: string[]): ListSummariesResult["skipped"] {
-    return withNormalizeTagBatchCache(() => {
-      if (workIds !== undefined && workIds.length === 0) return [];
-      const { rows, tagsByWork } = this.loadSummaryRows(workIds);
-      const skipped: ListSummariesResult["skipped"] = [];
-      for (const rawRow of rows) {
-        try {
-          validateWorkRow(
-            { ...rawRow, bookmarked: rawRow.bookmarked !== 0 },
-            tagsByWork.get(rawRow.id) ?? [],
-            parseDlsiteStateJson(rawRow.id, rawRow.dlsiteStateJson),
-          );
-        } catch (error) {
-          if (!(error instanceof PersistentDataError)) throw error;
-          skipped.push({ workId: rawRow.id, reason: error.message });
-        }
-      }
-      return skipped;
-    });
+    return this.listSummaries(workIds).skipped;
   }
 
   /** 状態が missing の作品。ライブラリのエラー表示の「行方不明」と同じ集合 */

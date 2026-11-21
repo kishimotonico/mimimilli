@@ -23,7 +23,7 @@ beforeEach(() => {
     "GET /api/settings": buildSettings({ rootFolder: "/audio" }),
     "GET /api/tag-prefixes": [],
     "GET /api/tag-prefixes/candidates": [],
-    "GET /api/scan/candidates/exclusions": { paths: [] },
+    "GET /api/scan/candidates/exclusions": { exclusions: [] },
   });
 });
 

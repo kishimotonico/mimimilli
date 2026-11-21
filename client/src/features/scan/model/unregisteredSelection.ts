@@ -5,12 +5,17 @@ import type { CandidateDlsiteDisplay } from "./unregisteredDlsite";
 export interface CandidateRowModel {
   candidate: ScanCandidate;
   display: CandidateDlsiteDisplay;
+  /** この行が見ている取得結果の revision。ジョブがまだ結果を返していないコードは null */
+  resultRevision: number | null;
   /** 編集中に確定できなかった形式エラーの値が残っている。候補には保存されていない */
   invalidRj?: boolean;
 }
 
 /** 行に出す名前。取得済みでタイトルがあればDLsiteのタイトル、なければフォルダー名 */
-export function rowTitle({ candidate, display }: CandidateRowModel): string {
+export function rowTitle({
+  candidate,
+  display,
+}: Pick<CandidateRowModel, "candidate" | "display">): string {
   return display.state === "fetched" && display.title ? display.title : candidate.inferredTitle;
 }
 
@@ -34,8 +39,16 @@ export function isRowSelectable(row: CandidateRowModel): boolean {
 
 export type SelectionOverrides = ReadonlyMap<string, ScanCandidateSelectionOverride>;
 
+/** 上書きしたときの行と、判断が要るか・RJコードがそろっているときだけ採る。
+ *  判断が要る行（失敗・該当なし）は、取得結果の revision もそろっているときだけ。取り直して再び失敗すれば revision が進み、上書きは外れる。
+ *  判断が要らない行は結果が変わっても上書きを保つ（取得中に外した行が、取得の成功で選び直されない）。 */
 function overrideApplies(row: CandidateRowModel, override: ScanCandidateSelectionOverride) {
-  return override.judged === needsJudgment(row) && override.rjCode === row.candidate.rjCode;
+  const judged = needsJudgment(row);
+  return (
+    override.judged === judged &&
+    override.rjCode === row.candidate.rjCode &&
+    (!judged || override.resultRevision === row.resultRevision)
+  );
 }
 
 export function isRowSelected(row: CandidateRowModel, overrides: SelectionOverrides): boolean {
@@ -44,26 +57,16 @@ export function isRowSelected(row: CandidateRowModel, overrides: SelectionOverri
   return override && overrideApplies(row, override) ? override.selected : !needsJudgment(row);
 }
 
-/** 判断が要るかどうか、またはRJコードが上書きの時と食い違った行の上書きを消す。変わらなければ同じ Map を返す。 */
-export function pruneStaleOverrides(
-  rows: readonly CandidateRowModel[],
-  overrides: SelectionOverrides,
-): SelectionOverrides {
-  let next: Map<string, ScanCandidateSelectionOverride> | null = null;
-  for (const row of rows) {
-    const override = overrides.get(row.candidate.path);
-    if (!override || overrideApplies(row, override)) continue;
-    next ??= new Map(overrides);
-    next.delete(row.candidate.path);
-  }
-  return next ?? overrides;
-}
-
 export function selectionOverride(
   row: CandidateRowModel,
   selected: boolean,
 ): ScanCandidateSelectionOverride {
-  return { selected, judged: needsJudgment(row), rjCode: row.candidate.rjCode };
+  return {
+    selected,
+    judged: needsJudgment(row),
+    rjCode: row.candidate.rjCode,
+    resultRevision: row.resultRevision,
+  };
 }
 
 /** 取得の対象。選択中でRJコードの形式に合い、未取得・該当なし・失敗のものを、コードで重複なく数える。

@@ -18,7 +18,10 @@ import { defineContract, type ContractHarness } from "./helpers/contractHarness.
 // 「未登録作品」だけを検証対象にする
 const contract = defineContract({
   works: [{ key: "existing", title: "登録済み作品" }],
-  candidateFolders: [{ path: "未登録作品", audioFiles: ["a.mp3", "b.mp3"] }],
+  candidateFolders: [
+    { path: "未登録作品", audioFiles: ["a.mp3", "b.mp3"] },
+    { path: "RJ123456_検出作品", audioFiles: ["a.mp3"] },
+  ],
   fixture: { scenario: "new-work" },
 });
 
@@ -109,7 +112,7 @@ contract("候補の除外は一覧から隠し、除外解除で戻る", async (
   assert.equal(excluded.status, 204);
   assert.equal(hasTarget(await listCandidates(harness)), false);
   assert.deepEqual((await harness.json("/api/scan/candidates/exclusions")).body, {
-    paths: ["未登録作品"],
+    exclusions: [{ path: "未登録作品", rjCode: null }],
   });
 
   const restored = await harness.send("POST", "/api/scan/candidates/exclusions/restore", {
@@ -118,6 +121,40 @@ contract("候補の除外は一覧から隠し、除外解除で戻る", async (
   assert.equal(restored.status, 204);
   assert.equal(hasTarget(await listCandidates(harness)), true);
 });
+
+contract("除外済みの一覧は、直したRJコードがあればその値を返す", async (harness) => {
+  await harness.send("POST", "/api/scan/candidates/rj-code", {
+    path: "未登録作品",
+    rjCode: "rj1234567",
+  });
+  await harness.send("POST", "/api/scan/candidates/exclude", { paths: ["未登録作品"] });
+  assert.deepEqual((await harness.json("/api/scan/candidates/exclusions")).body, {
+    exclusions: [{ path: "未登録作品", rjCode: "RJ1234567" }],
+  });
+
+  await harness.send("POST", "/api/scan/candidates/exclusions/restore", {
+    paths: ["未登録作品"],
+  });
+  await harness.send("POST", "/api/scan/candidates/rj-code", {
+    path: "未登録作品",
+    rjCode: "",
+  });
+  await harness.send("POST", "/api/scan/candidates/exclude", { paths: ["未登録作品"] });
+  assert.deepEqual((await harness.json("/api/scan/candidates/exclusions")).body, {
+    exclusions: [{ path: "未登録作品", rjCode: null }],
+  });
+});
+
+contract(
+  "除外済みの一覧は、直していなければフォルダー名から検出した値を返す",
+  async (harness) => {
+    await harness.send("POST", "/api/scan/candidates/exclude", { paths: ["RJ123456_検出作品"] });
+    assert.deepEqual((await harness.json("/api/scan/candidates/exclusions")).body, {
+      exclusions: [{ path: "RJ123456_検出作品", rjCode: "RJ123456" }],
+    });
+  },
+  { kinds: ["real"] },
+);
 
 contract(
   "候補のRJコードを直すと正規化して一覧に保持され、登録はその値で行われる",

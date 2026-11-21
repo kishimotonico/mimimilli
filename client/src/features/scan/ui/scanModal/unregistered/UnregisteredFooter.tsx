@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type { DlsiteRegistrationApply } from "@mimimilli/shared";
-import SplitButton, { type SplitButtonItem } from "../../../../../shared/ui/SplitButton";
+import SplitButton from "../../../../../shared/ui/SplitButton";
+import type { MenuItemSpec } from "../../../../../shared/ui/Menu";
 import { ModalFooter } from "../../../../../shared/ui/Modal";
 import type { FooterPlan } from "../../../model/unregisteredSelection";
 import DlsiteFetchProgress from "./DlsiteFetchProgress";
@@ -46,7 +47,7 @@ export default function UnregisteredFooter({
   const anchorRef = useRef<HTMLDivElement>(null);
 
   const addable = !busy && !rjCodeSaving && addCount > 0;
-  const items: SplitButtonItem[] = [];
+  const items: MenuItemSpec[] = [];
   if (plan.kind === "fetch") {
     items.push({
       key: "add-without-fetch",

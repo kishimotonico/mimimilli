@@ -18,7 +18,8 @@ import {
   useFloating,
   useInteractions,
 } from "@floating-ui/react";
-import type { Boundary } from "@floating-ui/react";
+import type { Boundary, Placement } from "@floating-ui/react";
+import { usePopoverEscape } from "./usePopoverEscape";
 import {
   isInsideBoundaries,
   mapDismissReason,
@@ -27,12 +28,56 @@ import {
 } from "./usePopoverDismissal";
 
 const POPOVER_MARGIN = 8;
-const RIGHT_PLACEMENT_GAP = 6;
-const ABOVE_PLACEMENT_GAP = 7;
-const BELOW_END_PLACEMENT_GAP = 5;
+
+interface PlacementSpec {
+  side: Placement;
+  strategy: "absolute" | "fixed";
+  gap: number;
+  /** 空きが足りなければ反対側へ反転する */
+  flip: boolean;
+  /** fit: 境界の空きに収める / preferred: 希望の幅 / auto: 内容に任せる */
+  width: "fit" | "preferred" | "auto";
+  /** 境界の幅だけを追う */
+  trackContainerWidth: boolean;
+}
+
+const PLACEMENTS = {
+  below: {
+    side: "bottom-start",
+    strategy: "absolute",
+    gap: 6,
+    flip: true,
+    width: "fit",
+    trackContainerWidth: false,
+  },
+  right: {
+    side: "right-start",
+    strategy: "fixed",
+    gap: 6,
+    flip: false,
+    width: "preferred",
+    trackContainerWidth: true,
+  },
+  above: {
+    side: "top-end",
+    strategy: "fixed",
+    gap: 7,
+    flip: true,
+    width: "auto",
+    trackContainerWidth: false,
+  },
+  belowEnd: {
+    side: "bottom-end",
+    strategy: "fixed",
+    gap: 5,
+    flip: true,
+    width: "auto",
+    trackContainerWidth: false,
+  },
+} satisfies Record<string, PlacementSpec>;
 
 export type { PopoverCloseReason };
-export type PopoverPlacement = "below" | "right" | "above" | "belowEnd";
+export type PopoverPlacement = keyof typeof PLACEMENTS;
 export type PopoverContainerResolver = (anchor: HTMLElement) => HTMLElement | null;
 
 const defaultContainerResolver: PopoverContainerResolver = (anchor) =>
@@ -63,8 +108,6 @@ export interface UseAnchoredPopoverOptions {
   closeOnScroll?: boolean;
   /** フォーカスが境界外へ外れたら自動的に閉じる。既定は無効（呼び出し側が明示的に有効化する） */
   closeOnFocusOut?: boolean;
-  /** Escapeをこのポップオーバーだけで消費する。フォーカスの位置に関わらず、親のダイアログへ届かない */
-  consumeEscape?: boolean;
 }
 
 export type AnchoredPopoverFloatingRefCallback = (node: HTMLElement | null) => (() => void) | void;
@@ -88,7 +131,6 @@ export function useAnchoredPopover({
   referenceElement,
   closeOnScroll = false,
   closeOnFocusOut = false,
-  consumeEscape = false,
 }: UseAnchoredPopoverOptions): UseAnchoredPopoverResult {
   const referenceRef = useRef<HTMLElement | null>(null);
   const floatingNodeRef = useRef<HTMLElement | null>(null);
@@ -140,43 +182,33 @@ export function useAnchoredPopover({
     },
   };
 
-  const middleware =
-    placement === "right"
-      ? [offset(RIGHT_PLACEMENT_GAP), shift(boundaryOptions), trackContainerWidth]
-      : placement === "above"
-        ? [offset(ABOVE_PLACEMENT_GAP), flip(boundaryOptions), shift(boundaryOptions)]
-        : placement === "belowEnd"
-          ? [offset(BELOW_END_PLACEMENT_GAP), flip(boundaryOptions), shift(boundaryOptions)]
-          : [
-              offset(RIGHT_PLACEMENT_GAP),
-              flip(boundaryOptions),
-              shift(boundaryOptions),
-              size(() => ({
-                ...boundaryOptions(),
-                apply({ availableWidth }) {
-                  const width = Math.min(preferredWidth, availableWidth);
-                  setPopoverWidth(width);
-                  const boundary = resolveBoundary();
-                  if (boundary instanceof HTMLElement) {
-                    setContainerWidth(readContainerWidth(boundary));
-                  }
-                },
-              })),
-            ];
-
-  const floatingPlacement =
-    placement === "below"
-      ? "bottom-start"
-      : placement === "right"
-        ? "right-start"
-        : placement === "belowEnd"
-          ? "bottom-end"
-          : "top-end";
+  const spec: PlacementSpec = PLACEMENTS[placement];
+  const middleware = [
+    offset(spec.gap),
+    ...(spec.flip ? [flip(boundaryOptions)] : []),
+    shift(boundaryOptions),
+    ...(spec.trackContainerWidth ? [trackContainerWidth] : []),
+    ...(spec.width === "fit"
+      ? [
+          size(() => ({
+            ...boundaryOptions(),
+            apply({ availableWidth }) {
+              const width = Math.min(preferredWidth, availableWidth);
+              setPopoverWidth(width);
+              const boundary = resolveBoundary();
+              if (boundary instanceof HTMLElement) {
+                setContainerWidth(readContainerWidth(boundary));
+              }
+            },
+          })),
+        ]
+      : []),
+  ];
 
   const { context, floatingStyles, refs } = useFloating({
     open: isOpen,
-    placement: floatingPlacement,
-    strategy: placement === "below" ? "absolute" : "fixed",
+    placement: spec.side,
+    strategy: spec.strategy,
     transform: false,
     elements: {
       reference: referenceElement ?? undefined,
@@ -220,7 +252,7 @@ export function useAnchoredPopover({
   );
 
   const dismiss = useDismiss(context, {
-    escapeKey: !consumeEscape,
+    escapeKey: false,
     outsidePressEvent: "pointerdown",
     outsidePress(event) {
       const target = event.target;
@@ -231,17 +263,11 @@ export function useAnchoredPopover({
 
   useInteractions([dismiss]);
 
-  useEffect(() => {
-    if (!isOpen || !consumeEscape) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.isComposing) return;
-      event.preventDefault();
-      event.stopPropagation();
-      close("escape");
-    };
-    window.addEventListener("keydown", handleKeyDown, true);
-    return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [isOpen, consumeEscape, close]);
+  usePopoverEscape(
+    isOpen,
+    () => referenceElement ?? referenceRef.current,
+    () => close("escape"),
+  );
 
   useEffect(() => {
     if (!isOpen || !closeOnScroll) return;
@@ -268,10 +294,10 @@ export function useAnchoredPopover({
 
   useEffect(() => {
     if (!isOpen) return;
-    if (placement === "right") {
+    if (spec.width === "preferred") {
       setPopoverWidth(preferredWidth);
     }
-  }, [isOpen, placement, preferredWidth]);
+  }, [isOpen, spec.width, preferredWidth]);
 
   useEffect(() => {
     if (!isOpen || !referenceElement) return;
@@ -283,8 +309,7 @@ export function useAnchoredPopover({
     setFloating,
     floatingStyles: {
       ...floatingStyles,
-      width:
-        placement === "below" ? popoverWidth : placement === "right" ? preferredWidth : undefined,
+      width: { fit: popoverWidth, preferred: preferredWidth, auto: undefined }[spec.width],
     },
     containerWidth,
     close,

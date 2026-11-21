@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { pathBaseName } from "@mimimilli/shared";
+import { pathBaseName, type ScanCandidateExclusion } from "@mimimilli/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { useToast } from "../../../shared/ui/useToast";
@@ -12,7 +12,7 @@ import { excludeScanCandidates, SCAN_QUERY_KEYS } from "../api";
 import { isCandidatesStale, STALE_MESSAGE } from "./candidatesStale";
 import { formatWorkNames } from "./formatWorkNames";
 
-const NO_EXCLUSIONS: string[] = [];
+const NO_EXCLUSIONS: ScanCandidateExclusion[] = [];
 
 interface UseCandidateExclusionsOptions {
   onExcludeError: (message: string) => void;

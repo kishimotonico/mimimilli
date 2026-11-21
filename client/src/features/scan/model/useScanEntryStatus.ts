@@ -1,58 +1,21 @@
-import { useEffect, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useAtom, useAtomValue } from "jotai";
+import { useAtomValue } from "jotai";
 import { useDlsiteFetchFrame } from "../../../entities/dlsite/useDlsiteJob";
 import { scanModalOpenAtom } from "../../../entities/scan/model/atoms";
-import {
-  scanDiagnosticsQueryOptions,
-  scanRecordQueryOptions,
-} from "../../../entities/scan/queryOptions";
 import { useScanning } from "../../../entities/scan/useScanJob";
-import { buildNeedsAttentionRows } from "./needsAttention";
-import { scanNewCountQueryOptions } from "../../../entities/work/scanNewCountQueryOptions";
-import { composeScanChanges, scanChangesKeys } from "./scanChanges";
 import type { ScanEntryRing } from "./scanEntryRing";
-import { hasUnseen, nextSeen, scanEntrySeenAtom, type ScanEntryCurrent } from "./scanEntrySeen";
-import { useScanCandidatesState } from "./useScanCandidatesCache";
+import { hasUnseen, scanEntrySeenAtom } from "./scanEntrySeen";
+import { useScanEntryCurrent } from "./useScanEntryCurrent";
 
 const INACTIVE: ScanEntryRing = { kind: "none" };
 const INDETERMINATE: ScanEntryRing = { kind: "indeterminate" };
 
-/** 上のバーのスキャン入口が出す輪と点。モーダルを開いているあいだは見た扱いにして記憶する。 */
+/** 上のバーのスキャン入口が出す輪と点。「見た」の記憶は読むだけで、書くのは ScanRuntime が開いているあいだだけ出す ScanEntrySeenRecorder コンポーネント。 */
 export function useScanEntryStatus(): { ring: ScanEntryRing; unseen: boolean } {
   const scanning = useScanning();
   const frame = useDlsiteFetchFrame();
   const open = useAtomValue(scanModalOpenAtom);
-  const { candidates, status: candidatesStatus } = useScanCandidatesState();
-  const candidatesLoaded = candidatesStatus === "loaded";
-  const recordQuery = useQuery(scanRecordQueryOptions);
-  const diagnosticsQuery = useQuery(scanDiagnosticsQueryOptions);
-  const newCountQuery = useQuery(scanNewCountQueryOptions);
-  const [seen, setSeen] = useAtom(scanEntrySeenAtom);
-
-  const record = recordQuery.data;
-  const diagnostics = diagnosticsQuery.data;
-  const newCount = newCountQuery.data;
-  const current = useMemo<ScanEntryCurrent>(
-    () => ({
-      candidates: candidatesLoaded ? candidates.map((candidate) => candidate.path) : null,
-      needsAttention:
-        diagnostics !== undefined
-          ? buildNeedsAttentionRows(diagnostics).map((row) => row.key)
-          : null,
-      changes:
-        record !== undefined && newCount !== undefined
-          ? scanChangesKeys(composeScanChanges(record, newCount))
-          : null,
-    }),
-    [candidatesLoaded, candidates, record, diagnostics, newCount],
-  );
-
-  useEffect(() => {
-    if (!open) return;
-    const next = nextSeen(seen, current);
-    if (next !== seen) setSeen(next);
-  }, [open, seen, current, setSeen]);
+  const seen = useAtomValue(scanEntrySeenAtom);
+  const current = useScanEntryCurrent();
 
   const ring: ScanEntryRing = scanning
     ? INDETERMINATE

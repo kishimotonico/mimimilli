@@ -17,17 +17,18 @@ import {
   startScanRequestSchema,
   startScanResponseSchema,
   type ScanDiagnostics,
+  type ScanCandidateExclusion,
   type ScanJobSnapshot,
   type ScanRecord,
   type StartScanRequest,
 } from "@mimimilli/shared";
 
-export async function getScanCandidateExclusions(): Promise<string[]> {
-  const { paths } = await getParsed(
+export async function getScanCandidateExclusions(): Promise<ScanCandidateExclusion[]> {
+  const { exclusions } = await getParsed(
     scanCandidateExclusionsResponseSchema,
     "/scan/candidates/exclusions",
   );
-  return paths;
+  return exclusions;
 }
 
 export async function restoreScanCandidateExclusions(paths: string[]): Promise<void> {
