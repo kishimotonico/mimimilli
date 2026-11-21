@@ -28,8 +28,8 @@ export function judgmentCount(rows: readonly CandidateRowModel[]): number {
 }
 
 /** 判断が要る行。DLsiteの取得結果が該当なし・失敗、RJコードが形式に合わない、行方不明の作品と同じRJコード。 */
-export function needsJudgment({ candidate, display, invalidRj }: CandidateRowModel): boolean {
-  return invalidRj === true || isProblemDisplay(display) || candidate.missingWorks.length > 0;
+export function needsJudgment(row: CandidateRowModel): boolean {
+  return judgments(row).length > 0;
 }
 
 /** 形式に合わないRJコードの行は、直すまで選べない。 */
@@ -39,16 +39,21 @@ export function isRowSelectable(row: CandidateRowModel): boolean {
 
 export type SelectionOverrides = ReadonlyMap<string, ScanCandidateSelectionOverride>;
 
-/** 判断が要らなければ null。判断の理由が取得結果（失敗・該当なし）ならその結果の revision まで含め、取り直して再び失敗すると別の値になる。
- *  行方不明の作品と同じRJコードなどそれ以外の理由は、取得しても変わらない固定値。 */
-function judgmentKey(row: CandidateRowModel): string | null {
-  if (!needsJudgment(row)) return null;
-  return isProblemDisplay(row.display) ? `result:${row.resultRevision}` : "other";
+/** 判断が要る理由。取得結果（失敗・該当なし）が理由のときは、その結果の revision まで含め、取り直して再び失敗すると別の理由になる。 */
+function judgments(row: CandidateRowModel): string[] {
+  const reasons: string[] = [];
+  if (row.invalidRj === true) reasons.push("invalidRj");
+  if (row.candidate.missingWorks.length > 0) reasons.push("missing");
+  if (isProblemDisplay(row.display)) reasons.push(`result:${row.resultRevision}`);
+  return reasons;
 }
 
-/** 上書きしたときの行と、判断の理由・RJコードがそろっているときだけ採る。 */
+/** RJコードが同じで、今の判断の理由が上書きしたときの理由に収まるあいだ採る。新しい理由が出たら既定に戻る。 */
 function overrideApplies(row: CandidateRowModel, override: ScanCandidateSelectionOverride) {
-  return override.judgment === judgmentKey(row) && override.rjCode === row.candidate.rjCode;
+  return (
+    override.rjCode === row.candidate.rjCode &&
+    judgments(row).every((reason) => override.judgments.includes(reason))
+  );
 }
 
 export function isRowSelected(row: CandidateRowModel, overrides: SelectionOverrides): boolean {
@@ -63,7 +68,7 @@ export function selectionOverride(
 ): ScanCandidateSelectionOverride {
   return {
     selected,
-    judgment: judgmentKey(row),
+    judgments: judgments(row),
     rjCode: row.candidate.rjCode,
   };
 }

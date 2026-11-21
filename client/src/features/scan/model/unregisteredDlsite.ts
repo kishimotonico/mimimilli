@@ -44,14 +44,12 @@ export function candidateDlsiteDisplay(
   return displayOf(candidate.dlsite);
 }
 
-/** 行の表示に使った取得結果の revision（candidateDlsiteDisplay と同じく、候補とジョブの結果のうち大きい方）。選択の上書きが、取り直しで状態が入れ替わったかを知るのに使う */
+/** そのコードをジョブが最後に終端にしたときの revision。ジョブで取得していないコードは null。
+ *  候補の dlsiteRevision は一覧を読んだ時点の全体の値で、候補を取り直すたびに進むので使わない。 */
 export function dlsiteResultRevision(
   candidate: ScanCandidate,
   job: DisplayJobState,
 ): number | null {
   if (candidate.rjCode === null) return null;
-  const result = job.results.get(canonicalDlsiteProductCode(candidate.rjCode));
-  return result && result.revision > candidate.dlsiteRevision
-    ? result.revision
-    : candidate.dlsiteRevision;
+  return job.results.get(canonicalDlsiteProductCode(candidate.rjCode))?.revision ?? null;
 }

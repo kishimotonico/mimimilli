@@ -147,16 +147,20 @@ describe("candidateDlsiteDisplay", () => {
 });
 
 describe("dlsiteResultRevision", () => {
-  const result = (revision: number) => ({
+  const withResult = (revision: number) => ({
     ...empty,
     results: new Map([["RJ000001", { dlsite: { state: "failed" as const }, revision }]]),
   });
 
-  it("表示に使う側（候補とジョブの結果のうち revision の大きい方）の revision を返す", () => {
-    const failed = candidate("RJ000001", { state: "failed" }, 15);
-    expect(dlsiteResultRevision(failed, result(12))).toBe(15);
-    expect(dlsiteResultRevision(failed, result(20))).toBe(20);
-    expect(dlsiteResultRevision(candidate(null, { state: "none" }, 15), result(20))).toBeNull();
+  it("そのコードの結果の revision を返し、候補の dlsiteRevision が進んでも変わらない", () => {
+    const state = withResult(12);
+    expect(dlsiteResultRevision(candidate("RJ000001", { state: "failed" }, 15), state)).toBe(12);
+    expect(dlsiteResultRevision(candidate("RJ000001", { state: "failed" }, 99), state)).toBe(12);
+  });
+
+  it("ジョブで取得していないコードとRJコードのない行は null", () => {
+    expect(dlsiteResultRevision(candidate("RJ000001", { state: "failed" }, 15), empty)).toBeNull();
+    expect(dlsiteResultRevision(candidate(null, { state: "none" }, 15), withResult(12))).toBeNull();
   });
 });
 

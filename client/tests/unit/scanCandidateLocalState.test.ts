@@ -10,7 +10,7 @@ describe("clearScanCandidateLocalState", () => {
     const store = createStore();
     store.set(
       scanCandidateSelectionAtom,
-      new Map([["b", { selected: false, judgment: null, rjCode: null }]]),
+      new Map([["b", { selected: false, judgments: [], rjCode: null }]]),
     );
     clearScanCandidateLocalState(store);
     expect(store.get(scanCandidateSelectionAtom).size).toBe(0);

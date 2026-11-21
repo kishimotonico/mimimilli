@@ -1,5 +1,5 @@
 import type { WorkspacePath } from "@mimimilli/shared";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAtomValue } from "jotai";
 import Modal, { ModalHeader } from "../../../shared/ui/Modal";
@@ -97,7 +97,7 @@ export default function ScanModal({
       variant: coverNote ? "warning" : "success",
       priority: "notice",
     });
-    if (failedCount === 0 && !interrupted && remainingCandidates === 0) setActiveTab("newWorks");
+    if (remainingCandidates === 0) setActiveTab("newWorks");
   };
 
   const scanPending = recordQuery.data !== undefined && recordQuery.data.finishedAt === null;
@@ -131,23 +131,26 @@ export default function ScanModal({
           aria-labelledby={activeTab ? `scan-tab-${activeTab}` : undefined}
           className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          {activeTab === null && landingLoading === "visible" && (
+          {landingLoading === "visible" ? (
             <CollectionStatus variant="list" kind="loading" />
-          )}
-          {activeTab === "unregistered" && (
-            <UnregisteredTab
-              onRegistered={handleUnregisteredRegistered}
-              onOpenFiles={onOpenFiles}
-            />
-          )}
-          {activeTab === "needsAttention" && (
-            <NeedsAttentionTab onOpenFiles={onOpenFiles} onOpenWorkDetail={onOpenWorkDetail} />
-          )}
-          {activeTab === "newWorks" && (
-            <NewWorksTab onOpenFiles={onOpenFiles} onOpenWorkDetail={onOpenWorkDetail} />
-          )}
-          {activeTab === "updated" && (
-            <UpdatedWorksTab onOpenFiles={onOpenFiles} onOpenWorkDetail={onOpenWorkDetail} />
+          ) : (
+            <>
+              {activeTab === "unregistered" && (
+                <UnregisteredTab
+                  onRegistered={handleUnregisteredRegistered}
+                  onOpenFiles={onOpenFiles}
+                />
+              )}
+              {activeTab === "needsAttention" && (
+                <NeedsAttentionTab onOpenFiles={onOpenFiles} onOpenWorkDetail={onOpenWorkDetail} />
+              )}
+              {activeTab === "newWorks" && (
+                <NewWorksTab onOpenFiles={onOpenFiles} onOpenWorkDetail={onOpenWorkDetail} />
+              )}
+              {activeTab === "updated" && (
+                <UpdatedWorksTab onOpenFiles={onOpenFiles} onOpenWorkDetail={onOpenWorkDetail} />
+              )}
+            </>
           )}
         </div>
       </div>
@@ -170,8 +173,12 @@ function useActiveTab(
     if (tab === null && landing !== null) setTab(landing);
   }, [tab, landing]);
 
-  // 完了を見たとき今のタブが空なら、着地が決まった時点で移る（後ろのタブの件数が未確定でも移動を落とさない）
+  // 完了を見たとき今のタブが空なら、着地が決まった時点で移る（先頭側のタブの件数が読み込み中で着地が決まらないあいだも移動を落とさない）
   const [moveNeeded, setMoveNeeded] = useState(false);
+  const selectTab = useCallback((next: ScanTabKey) => {
+    setMoveNeeded(false);
+    setTab(next);
+  }, []);
   useEffect(() => {
     if (seenRefreshed.current === refreshed) return;
     seenRefreshed.current = refreshed;
@@ -184,5 +191,5 @@ function useActiveTab(
     if (tab !== null && counts[tab] === 0) setTab(landing);
   }, [moveNeeded, landing, tab, counts]);
 
-  return [tab, setTab];
+  return [tab, selectTab];
 }

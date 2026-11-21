@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
+import { useLatest } from "../../../shared/lib/useLatest";
 
 /**
  * 没入モード中、アプリシェル（TopBar/AddressBar/LeftNav。`.mle-frame` 直下のうち
@@ -15,8 +16,7 @@ export function useNowPlayingImmersiveShell(
   onExit: () => void,
   focusTarget: RefObject<HTMLElement | null>,
 ) {
-  const onExitRef = useRef(onExit);
-  onExitRef.current = onExit;
+  const onExitRef = useLatest(onExit);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -54,5 +54,5 @@ export function useNowPlayingImmersiveShell(
         : document.querySelector<HTMLElement>(".mle-nowplaying__mode-toggle");
       restoreTarget?.focus({ preventScroll: true });
     };
-  }, [active, focusTarget]);
+  }, [active, focusTarget, onExitRef]);
 }

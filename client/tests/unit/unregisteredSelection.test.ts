@@ -126,7 +126,10 @@ describe("needsJudgment / isRowSelected", () => {
     ]);
     expect(needsJudgment(row("f", null, { state: "none" }))).toBe(false);
     expect(
-      isRowSelected(badCode, new Map([["d", { selected: true, judgment: "other", rjCode: null }]])),
+      isRowSelected(
+        badCode,
+        new Map([["d", { selected: true, judgments: ["missing"], rjCode: null }]]),
+      ),
     ).toBe(false);
   });
 
@@ -138,20 +141,6 @@ describe("needsJudgment / isRowSelected", () => {
       false,
       false,
     ]);
-  });
-
-  it("上書きは、判断が要るかどうかが変わると捨てて既定に戻る", () => {
-    const overrides = new Map([["a", selectionOverride(ok, true)]]);
-    const nowFailed = row("a", "RJ000001", { state: "failed" });
-    expect(isRowSelected(ok, overrides)).toBe(true);
-    expect(isRowSelected(nowFailed, overrides)).toBe(false);
-    const deselectedOk = new Map([["a", selectionOverride(ok, false)]]);
-    const recoded = row("a", "RJ000009", { state: "none" });
-    expect(isRowSelected(recoded, deselectedOk)).toBe(true);
-    const picked = new Map([["b", selectionOverride(notFound, true)]]);
-    expect(isRowSelected(notFound, picked)).toBe(true);
-    const deselected = new Map([["a", selectionOverride(ok, false)]]);
-    expect(isRowSelected(ok, deselected)).toBe(false);
   });
 });
 
@@ -167,59 +156,121 @@ describe("judgmentCount", () => {
   });
 });
 
-describe("判断の理由と選択の上書き", () => {
-  const failed = row("a", "RJ000001", { state: "failed" }, 10);
-  const picked = new Map([["a", selectionOverride(failed, true)]]);
-
-  it("失敗の行を選んだあと、取得中を観測しなくても、取り直して再び失敗すれば（revision が進めば）選択は戻る", () => {
-    expect(isRowSelected(failed, picked)).toBe(true);
-    const failedAgain = row("a", "RJ000001", { state: "failed" }, 11);
-    expect(isRowSelected(failedAgain, picked)).toBe(false);
+describe("選択の上書き（判断の理由 × 操作 → 選択）", () => {
+  const MISSING = [{ workId: "w", title: "旧", previousPath: "old/path" }];
+  const fetched: CandidateDlsiteDisplay = { state: "fetched", title: "題", cover: null };
+  const make = (
+    display: CandidateDlsiteDisplay,
+    resultRevision: number | null,
+    options: { missing?: boolean; rjCode?: string } = {},
+  ): CandidateRowModel => ({
+    candidate: buildScanCandidate({
+      path: "p",
+      rjCode: options.rjCode ?? "RJ000001",
+      missingWorks: options.missing ? MISSING : [],
+    }),
+    display,
+    resultRevision,
   });
 
-  it("結果が変わらなければ、取得中を挟んでも選択は残る", () => {
-    const fetching = row("a", "RJ000001", { state: "fetching" }, 10);
-    expect(isRowSelected(fetching, picked)).toBe(true);
-    expect(isRowSelected(failed, picked)).toBe(true);
-  });
+  /** 行を見て選択（または外し）たあと、行が順に変わっていったときの選択 */
+  const cases: Array<{
+    name: string;
+    first: CandidateRowModel;
+    selected: boolean;
+    steps: Array<[label: string, row: CandidateRowModel, expected: boolean]>;
+  }> = [
+    {
+      name: "判断不要の行を外す",
+      first: make({ state: "none" }, null),
+      selected: false,
+      steps: [
+        ["同じ行", make({ state: "none" }, null), false],
+        ["取得中", make({ state: "fetching" }, null), false],
+        ["取得成功", make(fetched, 12), false],
+        ["RJコードを直した", make({ state: "none" }, null, { rjCode: "RJ000009" }), true],
+      ],
+    },
+    {
+      name: "判断不要の行を選ぶ（既定どおり）",
+      first: make({ state: "none" }, null),
+      selected: true,
+      steps: [
+        ["取得成功", make(fetched, 12), true],
+        ["取得が失敗した", make({ state: "failed" }, 12), false],
+        ["取得が該当なしだった", make({ state: "not_found" }, 12), false],
+      ],
+    },
+    {
+      name: "行方不明の作品と同じRJコードの未取得の行を選ぶ",
+      first: make({ state: "none" }, null, { missing: true }),
+      selected: true,
+      steps: [
+        ["取得中", make({ state: "fetching" }, null, { missing: true }), true],
+        ["取得成功", make(fetched, 12, { missing: true }), true],
+        ["取得が失敗した", make({ state: "failed" }, 12, { missing: true }), false],
+      ],
+    },
+    {
+      name: "行方不明と失敗が重なった行を選ぶ",
+      first: make({ state: "failed" }, 10, { missing: true }),
+      selected: true,
+      steps: [
+        ["同じ行", make({ state: "failed" }, 10, { missing: true }), true],
+        ["取得中", make({ state: "fetching" }, 10, { missing: true }), true],
+        ["取得成功", make(fetched, 12, { missing: true }), true],
+        ["再び失敗した", make({ state: "failed" }, 12, { missing: true }), false],
+      ],
+    },
+    {
+      name: "失敗の行を選ぶ",
+      first: make({ state: "failed" }, 10),
+      selected: true,
+      steps: [
+        ["同じ行", make({ state: "failed" }, 10), true],
+        ["取得中", make({ state: "fetching" }, 10), true],
+        ["取得成功", make(fetched, 12), true],
+        ["再び失敗した", make({ state: "failed" }, 12), false],
+        ["再び該当なしだった", make({ state: "not_found" }, 12), false],
+      ],
+    },
+    {
+      name: "結果の無かった（DBの失敗だけの）行を選ぶ",
+      first: make({ state: "failed" }, null),
+      selected: true,
+      steps: [
+        ["同じ行", make({ state: "failed" }, null), true],
+        ["取り直して再び失敗した", make({ state: "failed" }, 12), false],
+      ],
+    },
+    {
+      name: "失敗の行を外す",
+      first: make({ state: "failed" }, 10),
+      selected: false,
+      steps: [
+        ["取得中", make({ state: "fetching" }, 10), false],
+        ["取得成功", make(fetched, 12), false],
+        ["再び失敗した", make({ state: "failed" }, 12), false],
+      ],
+    },
+  ];
 
-  it("取得中に外した行は、取得が成功しても外れたまま", () => {
-    const unfetched = row("b", "RJ000002", { state: "none" }, null);
-    const deselected = new Map([["b", selectionOverride(unfetched, false)]]);
-    const fetching = row("b", "RJ000002", { state: "fetching" }, null);
-    const fetched = row("b", "RJ000002", { state: "fetched", title: "題", cover: null }, 12);
-    expect(isRowSelected(fetching, deselected)).toBe(false);
-    expect(isRowSelected(fetched, deselected)).toBe(false);
-  });
-
-  it("失敗の行を選び、取り直して再び失敗すると（結果の revision が進むと）選択が外れる", () => {
-    const failedAgain = row("a", "RJ000001", { state: "failed" }, 11);
-    expect(isRowSelected(failedAgain, picked)).toBe(false);
-    const retryFetching = row("a", "RJ000001", { state: "fetching" }, 10);
-    expect(isRowSelected(retryFetching, picked)).toBe(true);
-  });
-
-  describe("行方不明の作品と同じRJコードの行", () => {
-    const missing = (display: CandidateDlsiteDisplay, resultRevision: number | null) => ({
-      ...row("m", "RJ000009", display, resultRevision),
-      candidate: buildScanCandidate({
-        path: "m",
-        rjCode: "RJ000009",
-        missingWorks: [{ workId: "w", title: "旧", previousPath: "old/path" }],
-      }),
+  for (const { name, first, selected, steps } of cases) {
+    it.each(steps)(`${name} → %s`, (_label, next, expected) => {
+      const overrides = new Map([["p", selectionOverride(first, selected)]]);
+      expect(isRowSelected(next, overrides)).toBe(expected);
     });
-    const picked = new Map([["m", selectionOverride(missing({ state: "none" }, null), true)]]);
+  }
 
-    it("選んで取得し、成功しても選択が残る", () => {
-      expect(isRowSelected(missing({ state: "none" }, null), picked)).toBe(true);
-      expect(isRowSelected(missing({ state: "fetching" }, null), picked)).toBe(true);
-      expect(
-        isRowSelected(missing({ state: "fetched", title: "題", cover: null }, 20), picked),
-      ).toBe(true);
-    });
+  it("上書きが無い行は、判断の要る行は選ばず、それ以外は選ぶ", () => {
+    expect(isRowSelected(make({ state: "failed" }, 10), new Map())).toBe(false);
+    expect(isRowSelected(make({ state: "none" }, null), new Map())).toBe(true);
+  });
 
-    it("取得が失敗すると、失敗が判断の理由になって選択が外れる", () => {
-      expect(isRowSelected(missing({ state: "failed" }, 20), picked)).toBe(false);
-    });
+  it("除外して戻した行（候補から外れていたあいだ）も、上書きが残って選択が保たれる", () => {
+    const row = make({ state: "failed" }, 10);
+    const overrides = new Map([["p", selectionOverride(row, true)]]);
+    // 候補に無いあいだ、上書きは Map に残る。戻ったときに同じ状態の行なら選択が戻る
+    expect(isRowSelected(make({ state: "failed" }, 10), overrides)).toBe(true);
   });
 });

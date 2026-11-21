@@ -597,6 +597,17 @@ describe("UnregisteredTab 取得と進捗", () => {
       return { ...rendered, checkbox };
     }
 
+    it("候補の取り直しで一覧全体の dlsiteRevision だけが進んでも、選んだ状態が残る", async () => {
+      const { rerenderWith } = await renderTab([failedRow]);
+      const checkbox = () => screen.getByLabelText(`「${failedRow.inferredTitle}」を選択`);
+      fireEvent.click(checkbox());
+      expect(checkbox()).toBeChecked();
+
+      await rerenderWith([{ ...failedRow, dlsiteRevision: failedRow.dlsiteRevision + 100 }]);
+
+      expect(checkbox()).toBeChecked();
+    });
+
     it("再び失敗したら、失敗の表示のまま未選択に戻る", async () => {
       const { job, checkbox } = await startRetry();
       act(() => {

@@ -811,6 +811,38 @@ describe("ScanModal", () => {
       await waitFor(() => expect(selectedTab()).toContain("要対応"));
     });
 
+    it("移動を持ち越しているあいだに手でタブを選んだら、そのタブから移さない", async () => {
+      mockApi({
+        "GET /api/scan/candidates/exclusions": { exclusions: [] },
+        "GET /api/scan/diagnostics": () => new Promise<never>(() => {}),
+        "GET /api/scan/last": scanRecord,
+        "GET /api/settings": buildSettings(),
+        "GET /api/works": () => buildWorksPage([], { total: 0 }),
+      });
+      const { queryClient, store } = renderModal({
+        unseeded: ["diagnostics"],
+        candidates: [candidateDetected],
+      });
+      act(() => {
+        queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), {
+          scanCompleted: true,
+          candidates: [],
+        });
+        store.set(scanResultsRefreshedAtom, (count) => count + 1);
+      });
+      fireEvent.click(screen.getByRole("tab", { name: /^更新済み/ }));
+      expect(selectedTab()).toContain("更新済み");
+
+      act(() => {
+        queryClient.setQueryData(
+          SCAN_QUERY_KEYS.diagnostics(),
+          buildScanDiagnostics({ unreadablePaths: [workspacePath("locked")] }),
+        );
+      });
+      await screen.findByRole("tab", { name: /^要対応/ });
+      expect(selectedTab()).toContain("更新済み");
+    });
+
     it("スキャンの完了でも、今のタブに件数があれば移らない", async () => {
       const { queryClient, store } = renderModal({ candidates: [candidateDetected], newCount: 0 });
 
