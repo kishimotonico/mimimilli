@@ -6,7 +6,10 @@ import { formatScanDateTime } from "../../../../shared/lib/format";
 import { buttonClass } from "../../../../shared/ui/Button";
 import { I } from "../../../../shared/ui/Icon";
 import SplitButton from "../../../../shared/ui/SplitButton";
-import { scanPhaseLabel, type ScanProgress } from "../../model";
+import {
+  scanPhaseLabel,
+  type ScanProgress,
+} from "../../../../entities/scan/model/scanProgressLabel";
 import type { ScanStatusView } from "../../model/scanStatusView";
 import { useScanStatusView } from "./useScanStatusView";
 import type { ScanTabCounts } from "./scanTabs";

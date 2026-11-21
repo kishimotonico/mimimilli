@@ -59,13 +59,13 @@ export interface PreparedMeta {
   placementSettled: boolean;
 }
 
-interface PreparedError {
+export interface PreparedError {
   kind: "error";
   metaPath: string;
   error: MetaParseError;
 }
 
-interface PreparedSkip {
+export interface PreparedSkip {
   kind: "skip";
   metaPath: string;
   id: string;

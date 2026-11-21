@@ -101,24 +101,35 @@ async function runPseudoScan(
     if (options.signal?.aborted)
       throw new DOMException("スキャンはキャンセルされました", "AbortError");
   };
-  const pseudoSteps = 4;
   const startedWithEmptyCatalog = state.works.length === 0;
+  const scenario = !state.scanScenarioDelivered;
+  const registerSteps = scenario
+    ? state.scanInsertedWorkIds.length + state.scanUpdatedWorks.length
+    : 0;
+  const readSteps = 2;
 
   checkAbort();
   emit({ type: "progress", phase: "walking", processed: 0, total: 0 });
   await sleep(stepMs);
   checkAbort();
-  emit({ type: "progress", phase: "registering", processed: 0, total: pseudoSteps });
-  for (let i = 1; i <= pseudoSteps; i++) {
-    await sleep(stepMs);
-    checkAbort();
-    emit({ type: "progress", phase: "registering", processed: i, total: pseudoSteps });
+  for (const [phase, steps] of [
+    ["reading", readSteps],
+    ["registering", Math.min(registerSteps, 2)],
+  ] as const) {
+    if (steps === 0) continue;
+    emit({ type: "progress", phase, processed: 0, total: steps });
+    for (let i = 1; i <= steps; i++) {
+      await sleep(stepMs);
+      checkAbort();
+      emit({ type: "progress", phase, processed: i, total: steps });
+    }
   }
+  emit({ type: "progress", phase: "generating", processed: 0, total: 1 });
   await sleep(stepMs);
   checkAbort();
+  emit({ type: "progress", phase: "generating", processed: 1, total: 1 });
   emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
 
-  const scenario = !state.scanScenarioDelivered;
   state.scanScenarioDelivered = true;
   if (scenario) markScenarioMissingWorks(state);
   state.works = state.works.map((work) => checkWorkPlacement(state, work));

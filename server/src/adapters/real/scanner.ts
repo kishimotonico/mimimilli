@@ -15,7 +15,6 @@ import { descendantsRegisteredError } from "../../errors.ts";
 import {
   MetaParseError,
   inspectMetaFile,
-  type MetaInspection,
   patchMetaFileCas,
   readMetaSource,
   writeMetaFile,
@@ -38,7 +37,7 @@ import { recoverStagedMetaFiles } from "./scanMetaStagingRecovery.ts";
 import {
   buildProbeCache,
   handleMetaParseError,
-  prepareMetaEntries,
+  prepareMetaEntry,
   prepareSingleMeta,
   registerMetaFile,
   type RegisteredWork,
@@ -47,6 +46,7 @@ import {
 import type {
   PreparedEntry,
   PreparedMeta,
+  PreparedSkip,
   ProjectOutcome,
   RegisterWorkOptions,
   RestoreMetaPatch,
@@ -99,24 +99,29 @@ function trackRegisteredWork(
   if (changes.length > 0) result.updatedWorks.push({ workId, changes });
 }
 
-function inspectMetaFiles(
-  metaPaths: string[],
-  checkAbort: () => void,
-): Map<string, MetaInspection> {
-  const inspections = new Map<string, MetaInspection>();
-  for (const metaPath of metaPaths) {
-    checkAbort();
-    inspections.set(metaPath, inspectMetaFile(metaPath));
+function settleSkipped(
+  entries: PreparedEntry[],
+  seenIds: SeenMetaIds,
+  result: Pick<ScanResult, "skipped">,
+): Exclude<PreparedEntry, PreparedSkip>[] {
+  const pending: Exclude<PreparedEntry, PreparedSkip>[] = [];
+  for (const entry of entries) {
+    if (entry.kind === "skip") {
+      seenIds.work.add(entry.id);
+      result.skipped += 1;
+    } else {
+      pending.push(entry);
+    }
   }
-  return inspections;
+  return pending;
 }
 
 function findIdentityConflicts(
   root: string,
-  inspections: ReadonlyMap<string, MetaInspection>,
+  declared: readonly { metaPath: string; declaredId: string | null }[],
 ): IdentityConflict[] {
   const pathsByWorkId = new Map<string, WorkspacePath[]>();
-  for (const [metaPath, { declaredId }] of inspections) {
+  for (const { metaPath, declaredId } of declared) {
     if (declaredId === null) continue;
     const paths = pathsByWorkId.get(declaredId) ?? [];
     paths.push(identityConflictPathOf(root, metaPath));
@@ -215,9 +220,11 @@ export class Scanner {
 
     const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, checkAbort);
 
+    const entries = this.readPhase(root, tree, existingWorks, full, diagnostics, emit, checkAbort);
+    const prepared = settleSkipped(entries, seenIds, result);
     await this.registerPhase(
       root,
-      tree,
+      prepared,
       full,
       seenIds,
       existingWorks,
@@ -270,28 +277,45 @@ export class Scanner {
     return tree;
   }
 
-  private prepareEntries(
+  private readPhase(
     root: string,
     tree: WalkResult,
     existingWorks: Map<string, ScanWorkState>,
     full: boolean,
     diagnostics: ScanFindings,
+    emit: NonNullable<ScanOptions["onProgress"]>,
     checkAbort: () => void,
   ): PreparedEntry[] {
-    const inspections = inspectMetaFiles(tree.metaPaths, checkAbort);
-    diagnostics.identityConflicts = findIdentityConflicts(root, inspections);
-    return prepareMetaEntries(
-      inspections,
-      existingWorks,
-      full,
-      checkAbort,
-      new Set(diagnostics.identityConflicts.map((diagnostic) => diagnostic.workId)),
+    const total = tree.metaPaths.length;
+    if (total > 0) emit({ type: "progress", phase: "reading", processed: 0, total });
+    const throttle = createProgressThrottle(PROGRESS_MIN_INTERVAL_MS);
+    const items: { metaPath: string; declaredId: string | null; entry: PreparedEntry }[] = [];
+    for (let i = 0; i < total; i++) {
+      checkAbort();
+      const metaPath = tree.metaPaths[i]!;
+      const inspection = inspectMetaFile(metaPath);
+      items.push({
+        metaPath,
+        declaredId: inspection.declaredId,
+        entry: prepareMetaEntry(metaPath, inspection, existingWorks, full),
+      });
+      const processed = i + 1;
+      if (throttle(processed, total)) {
+        emit({ type: "progress", phase: "reading", processed, total });
+      }
+    }
+    diagnostics.identityConflicts = findIdentityConflicts(root, items);
+    const conflictedIds = new Set(diagnostics.identityConflicts.map((c) => c.workId));
+    return items.map(({ metaPath, declaredId, entry }) =>
+      declaredId !== null && conflictedIds.has(declaredId)
+        ? { kind: "identity_conflict", metaPath, workId: declaredId }
+        : entry,
     );
   }
 
   private async registerPhase(
     root: string,
-    tree: WalkResult,
+    prepared: Exclude<PreparedEntry, PreparedSkip>[],
     full: boolean,
     seenIds: SeenMetaIds,
     existingWorks: Map<string, ScanWorkState>,
@@ -302,11 +326,11 @@ export class Scanner {
     emit: NonNullable<ScanOptions["onProgress"]>,
     checkAbort: () => void,
   ): Promise<void> {
-    emit({ type: "progress", phase: "registering", processed: 0, total: tree.metaPaths.length });
-
-    const prepared = this.prepareEntries(root, tree, existingWorks, full, diagnostics, checkAbort);
     const probeCache = buildProbeCache(this.query, prepared, full, checkAbort);
 
+    if (prepared.length > 0) {
+      emit({ type: "progress", phase: "registering", processed: 0, total: prepared.length });
+    }
     const registeringThrottle = createProgressThrottle(PROGRESS_MIN_INTERVAL_MS);
     for (let i = 0; i < prepared.length; i++) {
       checkAbort();
@@ -330,9 +354,6 @@ export class Scanner {
             path: workspacePath(toPortableRelativePath(root, entry.metaPath)),
             message: entry.error.message,
           });
-        } else if (entry.kind === "skip") {
-          seenIds.work.add(entry.id);
-          result.skipped += 1;
         } else {
           const outcome = await this.invokeRegisterMetaFile({
             prepared: entry,
@@ -373,8 +394,8 @@ export class Scanner {
         }
       }
       const processed = i + 1;
-      if (registeringThrottle(processed, tree.metaPaths.length)) {
-        emit({ type: "progress", phase: "registering", processed, total: tree.metaPaths.length });
+      if (registeringThrottle(processed, prepared.length)) {
+        emit({ type: "progress", phase: "registering", processed, total: prepared.length });
       }
     }
     checkAbort();

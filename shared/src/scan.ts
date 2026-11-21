@@ -185,7 +185,13 @@ export const scanDiagnosticsSchema = z.object({
 export type ScanDiagnostics = z.infer<typeof scanDiagnosticsSchema>;
 
 /** スキャンの大まかな進行段階（各アダプタの scanner 相当の処理に対応） */
-export const scanPhaseSchema = z.enum(["walking", "registering", "generating", "finalizing"]);
+export const scanPhaseSchema = z.enum([
+  "walking",
+  "reading",
+  "registering",
+  "generating",
+  "finalizing",
+]);
 export type ScanPhase = z.infer<typeof scanPhaseSchema>;
 
 /** adapter内部の進捗コールバック契約。完了・失敗は ScanJobManager が別経路で扱う。 */
@@ -207,11 +213,13 @@ export const scanJobStatusSchema = z.enum([
 ]);
 export type ScanJobStatus = z.infer<typeof scanJobStatusSchema>;
 
-const scanProgressSchema = z.object({
+export const scanProgressSchema = z.object({
   phase: scanPhaseSchema,
   processed: z.number().int().nonnegative(),
   total: z.number().int().nonnegative(),
 });
+
+export type ScanProgress = z.infer<typeof scanProgressSchema>;
 
 /** GET /scan/:id と POST /scan の返却値。日時は ISO 8601 文字列で統一する。 */
 export const scanJobSnapshotSchema = z.object({

@@ -12,7 +12,7 @@ import {
 
 export { SCAN_QUERY_KEYS };
 
-export type { ScanResult } from "./model";
+export type { ScanResult } from "@mimimilli/shared";
 export type { StartScanRequest };
 
 export async function excludeScanCandidates(paths: string[]): Promise<void> {
