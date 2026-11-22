@@ -2,7 +2,6 @@
 // query 結果と Jotai state を組み合わせて「何を表示するか」を決める部分を、
 // コンポーネントの配線から切り離してテスト可能にする。
 
-import { hasChipOrSearchRefinement } from "../../../entities/library/refinement";
 import {
   groupChipTag,
   isBuiltinPseudoTagKey,
@@ -52,33 +51,6 @@ export function formatFilterChipLabel(tag: NormalizedTag): string {
   const builtin = parseBuiltinPseudoTag(tag);
   if (!builtin || !isBuiltinPseudoTagKey(builtin.key)) return tag;
   return `${getGroupByLabel({ kind: "addedYear" })}/${builtin.value}`;
-}
-
-/**
- * 検索語やタグフィルタが原因で作品一覧が0件になっているかどうか。
- * fav 等が本来的に0件のケースとは区別し、原因表示が必要な場合だけ案内する。
- *
- * 検索デバウンス後に queryKey が変わった直後は、新クエリが確定するまで
- * works が一時的に空配列になる（isLoading中）。この間を「絞り込みで0件」と
- * 誤判定すると、選択中の作品が実際は結果に含まれる場合でも選択解除が
- * 先走ってしまうため、クエリが loading/error 中は false に倒す
- * （worksCount===0 という結果を信頼できるのは、クエリが成功して確定した後だけ）。
- */
-export function computeIsNoResultsDueToFilter(
-  isWorksPane: boolean,
-  worksCount: number,
-  searchQuery: string,
-  selectedTags: NormalizedTag[],
-  isWorksLoading: boolean,
-  isWorksError: boolean,
-): boolean {
-  return (
-    isWorksPane &&
-    !isWorksLoading &&
-    !isWorksError &&
-    worksCount === 0 &&
-    hasChipOrSearchRefinement({ selectedTags, q: searchQuery })
-  );
 }
 
 // ── 未選択プレースホルダーの統計表示 ────────────────────────────

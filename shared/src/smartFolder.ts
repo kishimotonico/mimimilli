@@ -90,7 +90,7 @@ export const smartFolderRestoreSchema = z.strictObject({
   sort: sortIdSchema.nullable(),
   groupBy: groupBySchema.nullable(),
   position: z.number().int().nonnegative(),
-  createdAt: z.string().min(1),
+  createdAt: z.iso.datetime({ offset: true }),
 });
 export type SmartFolderRestore = z.infer<typeof smartFolderRestoreSchema>;
 
@@ -241,6 +241,7 @@ export interface SmartFolderPermissions {
   edit: boolean;
 }
 
+/** 壊れた行（condition が null）は編集できず、削除だけできる。「すべて」は壊れていても削除できない */
 export function smartFolderPermissions(
   folder: Pick<SmartFolder, "id" | "condition">,
 ): SmartFolderPermissions {

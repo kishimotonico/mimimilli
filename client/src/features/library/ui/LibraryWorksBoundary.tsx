@@ -5,7 +5,7 @@ import type { ReadyLibraryViewState } from "../model/useLibraryNavigation";
 import type { WorksView } from "../../../entities/library/resolveLibraryView";
 import { useSuspenseLibraryWorks } from "../model/useLibraryQueries";
 import { folderWorksResetKey } from "../model/folderWorksRequest";
-import { computeIsNoResultsDueToFilter } from "../model/libraryPresentation";
+import { hasChipOrSearchRefinement } from "../../../entities/library/refinement";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 
 interface WorksResult {
@@ -84,14 +84,9 @@ function ResolvedWorks({
   children,
   result,
 }: Props & { result: WorksResult }) {
-  const isNoResults = computeIsNoResultsDueToFilter(
-    true,
-    result.works.length,
-    searchQuery,
-    nav.selectedTags,
-    false,
-    false,
-  );
+  const isNoResults =
+    result.works.length === 0 &&
+    hasChipOrSearchRefinement({ selectedTags: nav.selectedTags, q: searchQuery });
   useEffect(() => onNoResultsChange(isNoResults), [isNoResults, onNoResultsChange]);
   useEffect(() => onWorksTotalChange(result.worksTotal), [result.worksTotal, onWorksTotalChange]);
   // アンマウント時（エラー捕捉）は未確定へ戻す。すでに表示済みのSuspense境界が再サスペンド

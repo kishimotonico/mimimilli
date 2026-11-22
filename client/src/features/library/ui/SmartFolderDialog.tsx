@@ -93,8 +93,11 @@ export default function SmartFolderDialog({
   const sortId = useId();
   const permissions =
     target.kind === "edit" ? smartFolderPermissions(target.folder) : FULL_PERMISSIONS;
+  const close = () => {
+    if (!saving) onClose();
+  };
   const dialog = useDialogModal({
-    onClose,
+    onClose: close,
     initialFocusRef: permissions.rename ? nameRef : sortRef,
   });
 
@@ -123,7 +126,7 @@ export default function SmartFolderDialog({
     >
       <div className="mll-dlg-h">
         <span id={titleId}>{titleOf(target)}</span>
-        <IconButton icon={I.x} label="閉じる" size="sm" onClick={onClose} />
+        <IconButton icon={I.x} label="閉じる" size="sm" disabled={saving} onClick={close} />
       </div>
       <div className="mll-dlg-b">
         <div className="mll-fld">
@@ -205,7 +208,7 @@ export default function SmartFolderDialog({
         </div>
       </div>
       <div className="mll-dlg-f">
-        <Button type="button" variant="quiet" size="sm" onClick={onClose}>
+        <Button type="button" variant="quiet" size="sm" disabled={saving} onClick={close}>
           キャンセル
         </Button>
         <Button type="submit" variant="primary" size="sm" disabled={!canSave}>

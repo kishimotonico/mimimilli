@@ -6,7 +6,14 @@ import {
   type SmartFolder,
   type WorksPage,
 } from "@mimimilli/shared";
-import { defineContract, numberedWorks, type ContractHarness } from "./helpers/contractHarness.ts";
+import {
+  defineContract,
+  numberedWorks,
+  SEED_ADDED_AT,
+  type ContractHarness,
+} from "./helpers/contractHarness.ts";
+
+const SEED_YEAR = new Date(SEED_ADDED_AT).getUTCFullYear();
 
 const contract = defineContract({
   works: [
@@ -480,7 +487,7 @@ async function groupPairs(harness: ContractHarness, folderId: string, body: unkn
 }
 
 groupsLibrary(
-  "値一覧は件数の多い順で、同数なら値のバイト順。自身の groupBy でも任意の groupBy でも同じ口で取れる",
+  "値一覧は件数の多い順で、同数なら読み→値のバイト順。自身の groupBy でも任意の groupBy でも同じ口で取れる",
   async (harness) => {
     assert.deepEqual(
       await groupPairs(harness, "by-cv", { groupBy: { kind: "prefix", prefix: "cv" } }),
@@ -496,13 +503,13 @@ groupsLibrary(
       ["耳かき", 1],
     ]);
     assert.deepEqual(await groupPairs(harness, "all", { groupBy: { kind: "addedYear" } }), [
-      [String(new Date().getUTCFullYear()), 3],
+      [String(SEED_YEAR), 3],
     ]);
   },
 );
 
 groupsLibrary("値一覧はチップ・@year で母集団を絞る", async (harness) => {
-  const year = new Date().getUTCFullYear();
+  const year = SEED_YEAR;
   assert.deepEqual(await groupPairs(harness, "all", { groupBy: { kind: "tag" }, tags: ["cv/y"] }), [
     ["cv/y", 2],
     ["ASMR", 1],

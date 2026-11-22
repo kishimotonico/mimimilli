@@ -157,6 +157,16 @@ test("読めない行があっても一覧は成功し、壊れた行を null �
     }),
   });
   assert.equal(fix.status, 200);
+  assert.deepEqual(await fix.json(), {
+    id: "broken-sort",
+    name: "直した",
+    condition: { type: "and", children: [] },
+    sort: "added-desc",
+    groupBy: null,
+    position: 101,
+    createdAt: "2026-07-19T00:00:00.000Z",
+    count: null,
+  });
 });
 
 test("読めないスマートフォルダーの行は、行ごとに id・列・原因を警告に出す", async (t) => {

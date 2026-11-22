@@ -184,7 +184,7 @@ test("復元できる ID は sf-<uuid> と all 以外のテンプレート ID", 
     sort: null,
     groupBy: null,
     position: 0,
-    createdAt: "t",
+    createdAt: "2026-01-01T00:00:00.000Z",
   };
   const ok = (id: string) => smartFolderRestoreSchema.safeParse({ ...base, id }).success;
   assert.ok(ok("sf-123e4567-e89b-42d3-a456-426614174000"));
@@ -192,6 +192,7 @@ test("復元できる ID は sf-<uuid> と all 以外のテンプレート ID", 
   assert.ok(!ok("all"));
   assert.ok(!ok("sf-1"));
   assert.ok(!ok("whatever"));
+  assert.ok(!smartFolderRestoreSchema.safeParse({ ...base, id: "by-cv", createdAt: "t" }).success);
 });
 
 test("壊れた行は condition が null の行", () => {

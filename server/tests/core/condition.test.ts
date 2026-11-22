@@ -201,7 +201,7 @@ test("グループの値は正規化し、不正なら 400 にする", async () 
     condition: { type: "and", children: [] } as Condition,
     groupBy: { kind: "prefix", prefix: "cv" } as const,
   };
-  // 値の NFKC 正規化・trim はタグと同じ（"ａ" は全角で、正規形の "a" と一致する）
+  // 値の trim・正規化はタグと同じ（前後に空白のある " a " が、正規形の "a" と一致する）
   const page = await queryFolderWorks(adapter, cv, { ...request, group: " a " });
   assert.deepEqual(
     page.items.map((item) => item.id),

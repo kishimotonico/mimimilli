@@ -364,6 +364,7 @@ export class UserWorkStateRepository {
   }
 
   deleteSmartFolder(id: string): boolean {
+    this.reportedBrokenFolders.delete(id);
     return (
       this.db.user
         .delete(smartFolders)
@@ -398,10 +399,7 @@ function toSmartFolderRow(
   reportedBrokenFolders: Map<string, string>,
 ): SmartFolderRow {
   const base = { id: r.id, name: r.name, position: r.position, createdAt: r.createdAt };
-  const condition =
-    r.conditionJson === null
-      ? failed("condition_json", "値が NULL です")
-      : readJsonColumn("condition_json", r.conditionJson, conditionTreeSchema);
+  const condition = readJsonColumn("condition_json", r.conditionJson, conditionTreeSchema);
   const sort = sortIdSchema.nullable().safeParse(r.sort);
   const groupBy =
     r.groupByJson === null

@@ -7,7 +7,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
 import {
   ALL_SMART_FOLDER_ID,
-  type GroupBy,
   isBrokenSmartFolder,
   isReadableSmartFolder,
   type SmartFolder,
@@ -27,6 +26,7 @@ import {
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { useToast } from "../../../shared/ui/useToast";
+import { groupByKey } from "../../../entities/smart-folder/groupByKey";
 import { applyOrder } from "./smartFolderEditing";
 
 export interface SmartFolderEditor {
@@ -41,12 +41,6 @@ export interface SmartFolderEditor {
   saveDefaultSort: (id: string, sort: SortId) => Promise<boolean>;
   /** 削除して「元に戻す」を出す。開いている（保持しているものも含む）なら「すべて」へ置き換えで移る */
   remove: (folder: SmartFolder) => Promise<void>;
-}
-
-function sameGroupBy(a: GroupBy | null, b: GroupBy | null): boolean {
-  if (a === null || b === null) return a === b;
-  if (a.kind !== b.kind) return false;
-  return a.kind === "prefix" && b.kind === "prefix" ? a.prefix === b.prefix : true;
 }
 
 /** 並べ替えの保存の待ち行列。フックの再マウントをまたいで直列を保つため、モジュールで持つ */
@@ -178,16 +172,17 @@ export function useSmartFolderEditor(): SmartFolderEditor {
         const before = queryClient
           .getQueryData<SmartFolder[]>(SMART_FOLDER_QUERY_KEYS.all())
           ?.find((folder) => folder.id === id);
-        const saved = await commit(
-          failureMessage,
-          { definitionOf: id },
-          () => updateSmartFolder(id, data),
-          (row) => {
-            // 開いている一覧の ?group= は古いグループ分けの値なので、入り直して外す
-            const regrouped = before !== undefined && !sameGroupBy(before.groupBy, row.groupBy);
-            if (regrouped) replaceFolder(id, id);
-          },
+        const saved = await commit(failureMessage, { definitionOf: id }, () =>
+          updateSmartFolder(id, data),
         );
+        // 開いている一覧の ?group= は古いグループ分けの値なので、一覧が更新されたあとに入り直して外す
+        if (
+          saved &&
+          before !== undefined &&
+          groupByKey(before.groupBy) !== groupByKey(saved.groupBy)
+        ) {
+          replaceFolder(id, id);
+        }
         return saved !== null;
       },
       saveDefaultSort: async (id, sort) =>

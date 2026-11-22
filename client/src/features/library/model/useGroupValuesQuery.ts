@@ -2,7 +2,7 @@
 // 「＋絞り込み」が同じ query キー・同じ取得ロジックを共有する。
 
 import { useQuery } from "@tanstack/react-query";
-import type { GroupBy, NormalizedTag } from "@mimimilli/shared";
+import { normalizeSearchQuery, type GroupBy, type NormalizedTag } from "@mimimilli/shared";
 import { getSmartFolderGroups } from "../../../entities/smart-folder/api";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { assertGroupValueItems } from "./libraryPresentation";
@@ -18,7 +18,7 @@ export interface GroupValueScope {
 
 export function useGroupValuesQuery(groupBy: GroupBy | null, scope: GroupValueScope) {
   const { folderId, group = null, tags = [], q = "" } = scope;
-  const filter = { group, tags, q };
+  const filter = { group, tags, q: normalizeSearchQuery(q) };
   return useQuery({
     queryKey: SMART_FOLDER_QUERY_KEYS.groups(
       folderId,

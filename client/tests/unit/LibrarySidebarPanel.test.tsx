@@ -254,10 +254,10 @@ describe("LibrarySidebarPanel", () => {
     fireEvent.keyDown(screen.getByRole("button", { name: "追加年別" }), { key: "ArrowRight" });
 
     await waitFor(() => {
-      expect(document.activeElement).toBe(screen.getByLabelText("追加日の値を検索"));
+      expect(document.activeElement).toBe(screen.getByLabelText("追加年の値を検索"));
     });
     // 新パネルが開いたまま維持されている（閉じていない）。
-    expect(screen.getByLabelText("追加日の値を検索")).toBeInTheDocument();
+    expect(screen.getByLabelText("追加年の値を検索")).toBeInTheDocument();
   });
 
   it("クイックオーバーレイの値は主クリックもCtrl+クリックもその値の作品一覧（onOpenGroupValue）へ進む", async () => {

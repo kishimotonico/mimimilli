@@ -5,7 +5,6 @@ import { nt } from "../helpers/tag";
 import {
   buildFilterTag,
   computeCollectionStatsDisplay,
-  computeIsNoResultsDueToFilter,
   assertGroupValueItems,
   formatFilterChipLabel,
   shouldClearSelectionOnFilterMiss,
@@ -39,31 +38,6 @@ describe("assertGroupValueItems", () => {
     const items = [groupValueItem("藤田茜"), groupValueItem("霧島レイ")];
 
     expect(assertGroupValueItems({ kind: "prefix", prefix: "cv" }, items)).toBe(items);
-  });
-});
-
-describe("computeIsNoResultsDueToFilter", () => {
-  it("空白だけの検索語は絞り込みに数えない", () => {
-    expect(computeIsNoResultsDueToFilter(true, 0, "  ", [], false, false)).toBe(false);
-  });
-
-  it("is false when the list is just naturally empty (no search/filter)", () => {
-    expect(computeIsNoResultsDueToFilter(true, 0, "", [], false, false)).toBe(false);
-  });
-  it("is true when a search query narrows to zero results (query settled: not loading/error)", () => {
-    expect(computeIsNoResultsDueToFilter(true, 0, "存在しない語", [], false, false)).toBe(true);
-  });
-  it("is true when a selected tag filter narrows to zero results", () => {
-    expect(computeIsNoResultsDueToFilter(true, 0, "", ["存在しないタグ"], false, false)).toBe(true);
-  });
-  it("is false while the debounced query is still loading, even though works is temporarily empty", () => {
-    expect(computeIsNoResultsDueToFilter(true, 0, "存在しない語", [], true, false)).toBe(false);
-  });
-  it("is false when the works query errored (0件が確定した結果ではないため)", () => {
-    expect(computeIsNoResultsDueToFilter(true, 0, "存在しない語", [], false, true)).toBe(false);
-  });
-  it("is false when the pane isn't a works pane", () => {
-    expect(computeIsNoResultsDueToFilter(false, 0, "存在しない語", [], false, false)).toBe(false);
   });
 });
 

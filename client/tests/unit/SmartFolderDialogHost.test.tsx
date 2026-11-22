@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import userEvent from "@testing-library/user-event";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createStore, Provider } from "jotai";
 import { smartFolderDialogAtom } from "../../src/features/library/model/atoms";
@@ -95,7 +95,7 @@ describe("保存中に閉じたダイアログの応答", () => {
 
     act(() => store.set(smartFolderDialogAtom, { kind: "edit", folder: folderA }));
     await user.click(await screen.findByRole("button", { name: "保存" }));
-    await user.click(screen.getByRole("button", { name: "キャンセル" }));
+    act(() => store.set(smartFolderDialogAtom, null));
     act(() => store.set(smartFolderDialogAtom, { kind: "edit", folder: folderB }));
     expect(await screen.findByRole("dialog", { name: "「乙」を編集" })).toBeInTheDocument();
 
@@ -123,7 +123,7 @@ describe("保存中に閉じたダイアログの応答", () => {
 
     act(() => store.set(smartFolderDialogAtom, { kind: "save", draft }));
     await user.click(await screen.findByRole("button", { name: "保存" }));
-    await user.click(screen.getByRole("button", { name: "キャンセル" }));
+    act(() => store.set(smartFolderDialogAtom, null));
     act(() => store.set(smartFolderDialogAtom, { kind: "duplicate", folder: folderB }));
     expect(await screen.findByRole("dialog", { name: "「乙」を複製" })).toBeInTheDocument();
 
@@ -134,6 +134,36 @@ describe("保存中に閉じたダイアログの応答", () => {
 
     expect(screen.getByRole("dialog", { name: "「乙」を複製" })).toBeInTheDocument();
     expect(store.get(libraryRouteAtom).folderId).toBe(before);
+  });
+});
+
+describe("保存中のダイアログ", () => {
+  it("×・キャンセル・Esc では閉じられず、保存が終わったら閉じる", async () => {
+    const held = gate();
+    mockApi({
+      "GET /api/tag-prefixes": [],
+      "GET /api/smart-folders": [...defaultSmartFolders(), folderA],
+      "PUT /api/smart-folders/:id": async () => {
+        await held.promise;
+        return { ...folderA };
+      },
+    });
+    const store = renderHost();
+    const user = userEvent.setup();
+
+    act(() => store.set(smartFolderDialogAtom, { kind: "edit", folder: folderA }));
+    await user.click(await screen.findByRole("button", { name: "保存" }));
+
+    expect(screen.getByRole("button", { name: "キャンセル" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "閉じる" })).toBeDisabled();
+    fireEvent(screen.getByRole("dialog"), new Event("cancel", { cancelable: true }));
+    expect(store.get(smartFolderDialogAtom)).not.toBeNull();
+
+    held.release();
+    await act(async () => {
+      await held.promise;
+    });
+    await waitFor(() => expect(store.get(smartFolderDialogAtom)).toBeNull());
   });
 });
 
