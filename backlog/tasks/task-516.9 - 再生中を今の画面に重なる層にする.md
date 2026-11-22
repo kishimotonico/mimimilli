@@ -1,9 +1,10 @@
 ---
 id: TASK-516.9
 title: 再生中を今の画面に重なる層にする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-21 20:24'
+updated_date: '2026-11-22 12:10'
 labels:
   - player
   - navigation
@@ -25,10 +26,16 @@ ADR-0041「再生中の層」の実装。AppRoute の mode: nowPlaying をなく
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 再生バーとポップアップの ⤢ で層が開き、URL に np=1 が付き、下の画面（ライブラリ・作品詳細・ファイル）が残る
-- [ ] #2 「お気に入り → CV別 → 層を開く → Esc → 戻る」でお気に入りに着く
-- [ ] #3 np=1 の URL を直接開いて閉じてもアプリの外へ出ず、再生していないときは層が開かない
-- [ ] #4 層の作品名から作品詳細へ進み、戻ると層を開く前の画面（ファイルならその位置）に着く
-- [ ] #5 没入表示でも Esc で層が閉じ、没入の設定は変わらない
-- [ ] #6 nowPlaying 系の smoke を層の形に書き換えて pnpm test:smoke が通る
+- [x] #1 再生バーとポップアップの ⤢ で層が開き、URL に np=1 が付き、下の画面（ライブラリ・作品詳細・ファイル）が残る
+- [x] #2 「お気に入り → CV別 → 層を開く → Esc → 戻る」でお気に入りに着く
+- [x] #3 np=1 の URL を直接開いて閉じてもアプリの外へ出ず、再生していないときは層が開かない
+- [x] #4 層の作品名から作品詳細へ進み、戻ると層を開く前の画面（ファイルならその位置）に着く
+- [x] #5 没入表示でも Esc で層が閉じ、没入の設定は変わらない
+- [x] #6 nowPlaying 系の smoke を層の形に書き換えて pnpm test:smoke が通る
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+層の実装メモ: AppRoute.layer は URL の np=1 が正（openedBy は履歴エントリーの状態）。画面へ進む操作はすべて appRouteAction 経由で layer を落とし、層が開いている間は層のエントリーを置き換える。層のタグは主クリックのみ。smoke: library.smoke「詳細パネルの「その他」メニューから登録解除」は base(a286b2da)でも 5/24 で console 404 により落ちる既存フレーキー（本タスク無関係）
+<!-- SECTION:NOTES:END -->

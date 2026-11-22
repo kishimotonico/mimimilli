@@ -4,7 +4,7 @@ title: clientのテストを型チェック対象に含める
 status: To Do
 assignee: []
 created_date: '2026-08-09 15:08'
-updated_date: '2026-10-02 11:40'
+updated_date: '2026-11-22 19:18'
 labels: []
 dependencies: []
 ordinal: 293000
@@ -32,4 +32,6 @@ tests/ を include に加えると既存の型エラーが多数出ると報告�
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-02点検: tsc --listFilesOnlyでclientのtests・vite.config.ts・playwright.config.tsが0件。tsconfig.node.jsonのreferencesもtsc（-bなし）では辿られない。設定ファイルも型チェック対象に含める。
+
+2026-11-23計測（TASK-516.16）: tests を含めると 536 エラー・86 ファイル。vitest/globals の型未解決が約67、Work のテスト用ファクトリが必須フィールド（coverKind など）に追随していないものが多い。多いファイルは playerController.test.ts 90・useMediaSession.test.ts 75・UnregisteredTab.test.tsx 49・usePlayer.test.ts 32。TASK-516.16 のレビューで、シグネチャ変更に追随していないテスト（文字列を view として渡したまま別の分岐を通って成功）が実際に見つかった。
 <!-- SECTION:NOTES:END -->
