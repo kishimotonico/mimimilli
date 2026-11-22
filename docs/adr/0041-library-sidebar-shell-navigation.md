@@ -114,11 +114,7 @@ type AppRoute = {
   library: LibraryRoute;
   files: FilesUrlState;
   layer: { kind: "nowPlaying"; openedBy: "app" | "url" } | null;
-} & (
-  | { mode: "library" }
-  | { mode: "files" }
-  | { mode: "workDetail"; workId: string }
-);
+} & ({ mode: "library" } | { mode: "files" } | { mode: "workDetail"; workId: string });
 ```
 
 | 画面                 | URL                                      |
