@@ -64,7 +64,7 @@ export interface ApiMock {
   calls: ApiRequest[];
   /** `METHOD /api/path` と同じキーで呼び出しを絞る */
   requestsTo(key: string): ApiRequest[];
-  /** requestsTo と同じ絞り込みで、クエリ文字列つきのパス（/api/works?page=1 など）を返す */
+  /** requestsTo と同じ絞り込みで、クエリ文字列つきのパス（/api/smart-folders/all/works?page=1 など）を返す */
   urlsTo(key: string): string[];
   /** 記録済みの呼び出しを捨てる（以降の呼び出しだけを検証したいとき） */
   clear(): void;

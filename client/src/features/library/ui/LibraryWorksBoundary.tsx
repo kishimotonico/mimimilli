@@ -1,17 +1,10 @@
 import { Component, Suspense, useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { QueryErrorResetBoundary } from "@tanstack/react-query";
 import type { WorkListItem } from "@mimimilli/shared";
-import type { LibraryViewState } from "../model/useLibraryNavigation";
-import { isSmartAxis } from "../../../entities/library/axisDefinitions";
-import {
-  useSuspenseNormalLibraryWorks,
-  useSuspenseSmartLibraryWorks,
-} from "../model/useLibraryQueries";
-import {
-  buildWorksResetKey,
-  computeIsNoResultsDueToFilter,
-  isGridViewActive,
-} from "../model/libraryPresentation";
+import type { WorksView } from "../../../entities/library/resolveLibraryView";
+import { useSuspenseLibraryWorks } from "../model/useLibraryQueries";
+import { folderWorksResetKey } from "../model/folderWorksRequest";
+import { hasChipOrSearchRefinement } from "../../../entities/library/refinement";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 
 interface WorksResult {
@@ -24,16 +17,16 @@ interface WorksResult {
   refetchWorks: () => void;
 }
 
-// LibraryWorksBoundary は「作品一覧を表示する結果面」（ビュー軸・スマートフォルダー軸）
-// でのみ使う。facet/tag 軸の値一覧は works query 自体を発行しないため、
-// 呼び出し側（LibraryView）でこの境界に入らない。
+// LibraryWorksBoundary は作品一覧を表示する結果面でのみ使う。値一覧・読めない行は
+// works query 自体を発行しないため、呼び出し側（LibraryView）でこの境界に入らない。
 
 interface Props {
-  nav: LibraryViewState;
+  view: WorksView;
   searchQuery: string;
   viewMode: "list" | "grid";
   isPending: boolean;
-  onNoResultsChange: (isNoResults: boolean) => void;
+  /** 絞り込みで0件の一覧を表示しているとき、その一覧の resetKey。そうでなければ null */
+  onNoResultsChange: (noResultsKey: string | null) => void;
   onWorksTotalChange: (worksTotal: number | undefined) => void;
   children: (result: WorksResult, isPending: boolean) => ReactNode;
 }
@@ -75,23 +68,14 @@ class WorksErrorBoundary extends Component<
   }
 }
 
-function NormalWorks(props: Props) {
+function Works(props: Props) {
   return (
-    <ResolvedWorks
-      {...props}
-      result={useSuspenseNormalLibraryWorks(props.nav, props.searchQuery)}
-    />
-  );
-}
-
-function SmartWorks(props: Props) {
-  return (
-    <ResolvedWorks {...props} result={useSuspenseSmartLibraryWorks(props.nav, props.searchQuery)} />
+    <ResolvedWorks {...props} result={useSuspenseLibraryWorks(props.view, props.searchQuery)} />
   );
 }
 
 function ResolvedWorks({
-  nav,
+  view,
   searchQuery,
   isPending,
   onNoResultsChange,
@@ -99,15 +83,11 @@ function ResolvedWorks({
   children,
   result,
 }: Props & { result: WorksResult }) {
-  const isNoResults = computeIsNoResultsDueToFilter(
-    true,
-    result.works.length,
-    searchQuery,
-    nav.selectedTags,
-    false,
-    false,
-  );
-  useEffect(() => onNoResultsChange(isNoResults), [isNoResults, onNoResultsChange]);
+  const isNoResults =
+    result.works.length === 0 &&
+    hasChipOrSearchRefinement({ selectedTags: view.selectedTags, q: searchQuery });
+  const noResultsKey = isNoResults ? folderWorksResetKey(view, searchQuery) : null;
+  useEffect(() => onNoResultsChange(noResultsKey), [noResultsKey, onNoResultsChange]);
   useEffect(() => onWorksTotalChange(result.worksTotal), [result.worksTotal, onWorksTotalChange]);
   // アンマウント時（エラー捕捉）は未確定へ戻す。すでに表示済みのSuspense境界が再サスペンド
   // した場合はアンマウントされず非表示のまま保持されるため、その経路はSuspenseフォールバック
@@ -130,13 +110,9 @@ function LoadingFallback({ variant, onShow }: { variant: "list" | "grid"; onShow
 }
 
 export default function LibraryWorksBoundary(props: Props) {
-  const variant = isGridViewActive(props.nav.activeAxis, props.viewMode) ? "grid" : "list";
-  const resetKey = buildWorksResetKey({
-    activeAxis: props.nav.activeAxis,
-    selectedTags: props.nav.selectedTags,
-    sort: props.nav.sort,
-    searchQuery: props.searchQuery,
-  });
+  const variant = props.viewMode === "grid" ? "grid" : "list";
+  const { view } = props;
+  const resetKey = folderWorksResetKey(view, props.searchQuery);
   return (
     <QueryErrorResetBoundary>
       {({ reset }) => (
@@ -149,11 +125,7 @@ export default function LibraryWorksBoundary(props: Props) {
               />
             }
           >
-            {isSmartAxis(props.nav.activeAxis) ? (
-              <SmartWorks {...props} />
-            ) : (
-              <NormalWorks {...props} />
-            )}
+            <Works {...props} />
           </Suspense>
         </WorksErrorBoundary>
       )}

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   DEFAULT_TAG_PREFIXES,
+  SMART_FOLDER_TEMPLATES,
   dlsiteFetchStateOfResolution,
   projectDlsiteState,
   toDlsiteLinkageStatus,
@@ -18,7 +19,6 @@ import type {
   ScanCandidateFolder,
   UpdatedWork,
   IdentityConflict,
-  SmartFolder,
   TagPrefix,
   WorkSummary,
   WorkspacePath,
@@ -31,6 +31,8 @@ import {
   type FixtureWorkRecord,
   type SeedPlaylistSpec,
 } from "./data.ts";
+import type { SmartFolderRow } from "../../adapter/classification.ts";
+import { insertFromTemplate } from "../../core/smartFolderTemplateRow.ts";
 import { requireConfiguredRoot } from "../../core/rootFolder.ts";
 import { createFixtureScenario, type FixtureRootReconfiguration } from "./scenarios.ts";
 
@@ -89,8 +91,8 @@ export interface FixtureState {
   /** 編集用カバー列（表示用 cover と独立。unmeasured を表現する） */
   coverColumns: Map<string, FixtureCoverColumns>;
   tagPrefixes: TagPrefix[];
-  smartFolders: SmartFolder[];
-  nextSmartFolderId: number;
+  /** 位置の昇順。fixture は migration を通らないので、「すべて」と初回投入分を初期状態に持つ */
+  smartFolders: SmartFolderRow[];
   /** 作品ごとのレジューム位置 */
   resumes: Map<string, ResumeBody>;
   playbackIds: Map<string, PlaybackIds>;
@@ -284,11 +286,6 @@ export interface FixtureAdapterOptions {
 export function createInitialState(options: FixtureAdapterOptions): FixtureState {
   const now = new Date().toISOString();
   const scenario = createFixtureScenario(options.scenario, now);
-  const maxSmartFolderNum = scenario.smartFolders.reduce((max, sf) => {
-    const m = /^sf-(\d+)$/.exec(sf.id);
-    return m ? Math.max(max, Number(m[1])) : max;
-  }, 0);
-
   let works: FixtureWorkRecord[];
   let detachedWorks: FixtureWorkRecord[];
   let dlsiteLinkages: Map<string, MetaDlsiteState>;
@@ -336,8 +333,9 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     dlsiteCovers: new Map(),
     coverColumns,
     tagPrefixes: DEFAULT_TAG_PREFIXES.map((def) => ({ ...def })),
-    smartFolders: scenario.smartFolders,
-    nextSmartFolderId: maxSmartFolderNum + 1,
+    smartFolders: SMART_FOLDER_TEMPLATES.filter((template) => template.seeded).map(
+      (template, position) => ({ ...insertFromTemplate(template, now), position }),
+    ),
     resumes: new Map(),
     playbackIds: new Map(),
     playlistSpecs: new Map(Object.entries({ ...SEED_PLAYLIST_SPECS, ...options.playlistSpecs })),

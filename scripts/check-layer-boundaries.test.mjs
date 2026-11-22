@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFile, writeFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -17,10 +18,11 @@ const repoRoot = path.resolve(scriptDir, "..");
 const boundaryScript = path.join(scriptDir, "check-layer-boundaries.mjs");
 const oxlintrcPath = path.join(repoRoot, ".oxlintrc.json");
 
-function runBoundaryCheck() {
+function runBoundaryCheck(root = repoRoot) {
   return spawnSync(process.execPath, [boundaryScript], {
     cwd: repoRoot,
     encoding: "utf8",
+    env: { ...process.env, LAYER_BOUNDARY_ROOT: root },
   });
 }
 
@@ -95,17 +97,29 @@ const RULE_PROBES = [
   },
 ];
 
+// 本物のソースツリーには書かず、一時ディレクトリに規則の対象になるディレクトリだけを作ってプローブを置く
+const PROBE_SKELETON_DIRS = [
+  "client/src/app",
+  "client/src/features/library",
+  "client/src/features/player",
+];
+
 async function withProbes(selectSource, fn) {
-  const written = [];
+  const root = await mkdtemp(path.join(os.tmpdir(), "layer-boundary-"));
   try {
+    for (const dir of PROBE_SKELETON_DIRS) {
+      await mkdir(path.join(root, dir), { recursive: true });
+    }
+    const written = [];
     for (const probe of RULE_PROBES) {
-      const probeFile = path.join(repoRoot, probe.file);
+      const probeFile = path.join(root, probe.file);
+      await mkdir(path.dirname(probeFile), { recursive: true });
       await writeFile(probeFile, selectSource(probe), "utf8");
       written.push(probeFile);
     }
-    await fn(written);
+    await fn(written, root);
   } finally {
-    await Promise.all(written.map((file) => rm(file, { force: true })));
+    await rm(root, { recursive: true, force: true });
   }
 }
 
@@ -142,8 +156,8 @@ test("oxlint のレイヤー overrides は layer-boundary-rules から導出さ�
 test("境界スクリプトが各レイヤー規則の意図的な違反を検知する", async () => {
   await withProbes(
     (probe) => probe.source,
-    async () => {
-      const result = runBoundaryCheck();
+    async (_written, root) => {
+      const result = runBoundaryCheck(root);
       assert.notEqual(result.status, 0, result.stdout + result.stderr);
       for (const probe of RULE_PROBES) {
         assert.match(result.stderr, new RegExp(probe.message.replaceAll("/", "\\/")), probe.name);

@@ -40,7 +40,7 @@ async function setup(t: TestContext) {
   await configureRoot(adapter, lib.root);
   await scanAndRegisterCandidates(adapter);
 
-  const res = await app.request("/api/works");
+  const res = await app.request("/api/smart-folders/all/works?sort=added-desc");
   const works = (await res.json()) as WorksPage;
   const work = works.items.find((w) => w.title.includes("RJ900001"))!;
   return { app, adapter, work, coverPath, cacheDir };

@@ -1,7 +1,6 @@
-// ライブラリ（検索・分類軸・スマートフォルダー・検索プリセット）の契約。
+// ライブラリ（並び順・値一覧）の契約。
 import { z } from "zod";
 import { coverValueSchema } from "./cover.ts";
-import { dedupeTags, normalizeTags, tagSchema } from "./work.ts";
 
 export { compareUtf8Bytes } from "./text.ts";
 
@@ -20,114 +19,51 @@ export const sortIdSchema = z.enum([
 ]);
 export type SortId = z.infer<typeof sortIdSchema>;
 
-/** 「最近追加」ビューの対象期間（日）。core と SQL の recent view 判定で共有する。 */
-export const RECENT_VIEW_WINDOW_DAYS = 30;
+/** random ソート用 seed の上限。契約（GET /smart-folders/:id/works の seed）の範囲と同じ */
+export const MAX_RANDOM_SEED = 0x7fffffff;
 
-/** random ソート用 seed。0x7fffffff 以下の非負整数。 */
+export function isRandomSeed(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= MAX_RANDOM_SEED;
+}
+
+/** random ソート用 seed。0 以上 MAX_RANDOM_SEED 以下の整数。 */
 export function createRandomSeed(): number {
-  return crypto.getRandomValues(new Uint32Array(1))[0]! & 0x7fffffff;
+  return crypto.getRandomValues(new Uint32Array(1))[0]! & MAX_RANDOM_SEED;
 }
 
-// ── ビュー・分類軸 ────────────────────────────────────────────
-
-/** 軸レールのビュー（単純ビュー）。軸IDの予約語・client のビュー軸一覧はここから導出する */
-export const VIEW_IDS = ["all", "recent", "added", "fav", "error"] as const;
-export const viewIdSchema = z.enum(VIEW_IDS);
-export type ViewId = z.infer<typeof viewIdSchema>;
-
-/** スマートフォルダー軸IDの接頭辞。軸ID = 接頭辞 + スマートフォルダーID */
-export const SMART_FOLDER_AXIS_PREFIX = "smart-";
-
-export function toSmartFolderAxisId(folderId: string): string {
-  return `${SMART_FOLDER_AXIS_PREFIX}${folderId}`;
-}
-
-export function isSmartFolderAxisId(axis: string): boolean {
-  return axis.startsWith(SMART_FOLDER_AXIS_PREFIX);
-}
-
-/** 軸IDからスマートフォルダーIDを取り出す。接頭辞のみ・非スマート軸は空文字 */
-export function smartFolderIdFromAxisId(axis: string): string {
-  return isSmartFolderAxisId(axis) ? axis.slice(SMART_FOLDER_AXIS_PREFIX.length) : "";
-}
-
-/** 分類軸の ID（ADR-0005）。enum ではなく文字列:
- *  - "tag": 全タグ軸（組み込み）。flat・annotated 双方を集計する
- *    （ADR-0005）
- *  - "year": 追加日の年（組み込み。addedAt 由来でタグではない）
- *  - それ以外: 登録済み prefix そのもの（例: "cv", "サークル"）。正規形（小文字）で扱う */
-export const facetAxisIdSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .transform((s) => s.toLowerCase())
-  .refine((s) => !s.includes("/"), { message: "軸IDにスラッシュは使えません" });
-export type FacetAxisId = string;
+// ── 値一覧 ───────────────────────────────────────────────────
 
 /** 値一覧の代表カバー1件。カバー画像配信（GET /media/cover/:id）が作品単位のルートしか
  *  持たないため、コラージュ描画に必要な workId を持たせる（coverValueSchema 単体には無い）。 */
-export const axisFacetCoverSchema = coverValueSchema.extend({ workId: z.string() });
-export type AxisFacetCover = z.infer<typeof axisFacetCoverSchema>;
+export const groupValueCoverSchema = coverValueSchema.extend({ workId: z.string() });
+export type GroupValueCover = z.infer<typeof groupValueCoverSchema>;
 
-export const axisFacetItemSchema = z.object({
+/** 値一覧の並び（向き込み）。名前は読み（sortKey）の順 */
+export const groupSortIdSchema = z.enum([
+  "count-desc",
+  "count-asc",
+  "name-asc",
+  "name-desc",
+  "duration-desc",
+  "duration-asc",
+  "added-desc",
+  "last-played",
+]);
+export type GroupSortId = z.infer<typeof groupSortIdSchema>;
+
+export const groupValueItemSchema = z.object({
   value: z.string(),
+  /** 値の読み。名前順の第1キー */
+  sortKey: z.string(),
+  /** その値に属する作品の追加日時の最大 */
+  lastAddedAt: z.string(),
+  /** その値に属する作品の最終再生日時の最大。1件も再生していなければ null */
+  lastPlayedAt: z.string().nullable(),
   count: z.number().int().nonnegative(),
   /** その値に属する全作品の再生時間合計（秒）。totalDurationSec が未知（null）の作品は合算から除く */
   durationSec: z.number().nonnegative(),
   /** 代表カバー。追加日時の新しい順で最大4件、cover未設定の作品は含まない */
-  covers: z.array(axisFacetCoverSchema).max(4),
+  covers: z.array(groupValueCoverSchema).max(4),
 });
-export type AxisFacetItem = z.infer<typeof axisFacetItemSchema>;
-export const axisFacetListSchema = z.array(axisFacetItemSchema);
-
-// ── スマートフォルダー ────────────────────────────────────────
-
-const smartFolderConjunctionSchema = z.enum(["WHERE", "AND", "OR", "AND NOT"]);
-
-export const smartFolderRuleSchema = z.discriminatedUnion("field", [
-  z.object({
-    conjunction: smartFolderConjunctionSchema,
-    field: z.literal("タグ"),
-    operator: z.literal("∋"),
-    // 作品側（workSourcePatchSchema 等）と同じく正規形（prefix小文字化・trim・重複排除）で保存する
-    values: z
-      .array(tagSchema)
-      .min(1)
-      .transform((tags) => dedupeTags(normalizeTags(tags))),
-  }),
-  z.object({
-    conjunction: z.enum(["WHERE", "AND", "OR"]),
-    field: z.literal("長さ"),
-    operator: z.literal("≥"),
-    values: z.array(z.string().regex(/^\d+$/)).length(1),
-  }),
-]);
-export type SmartFolderRule = z.infer<typeof smartFolderRuleSchema>;
-
-export const smartFolderSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  rules: z.array(smartFolderRuleSchema),
-  sort: sortIdSchema,
-  createdAt: z.string(),
-});
-export type SmartFolder = z.infer<typeof smartFolderSchema>;
-export const smartFolderListSchema = z.array(smartFolderSchema);
-
-export const smartFolderCreateSchema = z.object({
-  name: z.string().min(1),
-  rules: z.array(smartFolderRuleSchema).default([]),
-  sort: sortIdSchema.default("added-desc"),
-});
-export type SmartFolderCreate = z.infer<typeof smartFolderCreateSchema>;
-
-export const smartFolderUpdateSchema = z
-  .object({
-    name: z.string().min(1).optional(),
-    rules: z.array(smartFolderRuleSchema).optional(),
-    sort: sortIdSchema.optional(),
-  })
-  .refine(
-    (patch) => patch.name !== undefined || patch.rules !== undefined || patch.sort !== undefined,
-  );
-export type SmartFolderUpdate = z.infer<typeof smartFolderUpdateSchema>;
+export type GroupValueItem = z.infer<typeof groupValueItemSchema>;
+export const groupValueListSchema = z.array(groupValueItemSchema);

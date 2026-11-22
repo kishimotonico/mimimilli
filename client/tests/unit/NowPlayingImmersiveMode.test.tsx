@@ -1,4 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { buildWork } from "../helpers/builders";
+import { mockApi } from "../helpers/api";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import NowPlayingView from "../../src/features/player/ui/NowPlayingView";
@@ -25,6 +28,10 @@ vi.mock("../../src/entities/player/model/usePlayerActions", () => ({
 }));
 
 function renderNowPlaying() {
+  mockApi({
+    "GET /api/works/:id": buildWork({ id: "work-1", tags: [] }),
+    "GET /api/tag-prefixes": [],
+  });
   const store = createStore();
   store.set(playerCoreAtom, {
     ...PLAYER_CORE_INITIAL,
@@ -47,14 +54,18 @@ function renderNowPlaying() {
     tracks: [{ id: "track-1", title: "Track 1", file: "audio/track-1.wav" }],
   });
   render(
-    <JotaiProvider store={store}>
-      <NowPlayingView onOpenWork={vi.fn()} />
-    </JotaiProvider>,
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <JotaiProvider store={store}>
+        <NowPlayingView onOpenWork={vi.fn()} onTagClick={vi.fn()} />
+      </JotaiProvider>
+    </QueryClientProvider>,
   );
   return { store };
 }
 
-describe("再生中タブ: 没入モード切替とシーク行の非再マウント", () => {
+describe("再生中の層: 没入モード切替とシーク行の非再マウント", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
@@ -150,7 +161,7 @@ describe("再生中タブ: 没入モード切替とシーク行の非再マウ�
       await vi.advanceTimersByTimeAsync(400);
     });
 
-    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: "通常表示に戻す" }));
 
     expect(document.activeElement).not.toBe(document.body);
     expect(screen.getByRole("button", { name: "没入モードにする" })).toHaveFocus();

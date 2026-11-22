@@ -1,12 +1,12 @@
 import type { NormalizedTag, Work } from "@mimimilli/shared";
-import type { LibraryViewState, LibraryViewActions } from "../../model/useLibraryNavigation";
+import type { ReadyLibraryViewState, LibraryViewActions } from "../../model/useLibraryNavigation";
 import { useLibraryWorkPatchMutations } from "../../model/useLibraryQueries";
 import { useUnregisterWorkMutation } from "../../../../entities/work/model/workMutations";
 import { WorkDetail } from "./WorkDetail";
 
 interface WorkDetailPatchScopeProps {
   work: Work;
-  nav: LibraryViewState & Pick<LibraryViewActions, "selectWork">;
+  nav: ReadyLibraryViewState & Pick<LibraryViewActions, "selectWork">;
   searchQuery: string;
   playingTrackIndex: number | null;
   isPlaybackActive?: boolean;
@@ -24,7 +24,7 @@ export function WorkDetailPatchScope({
   searchQuery,
   ...rest
 }: WorkDetailPatchScopeProps) {
-  const workPatchMutations = useLibraryWorkPatchMutations(nav, searchQuery);
+  const workPatchMutations = useLibraryWorkPatchMutations(nav.view, searchQuery);
   const deleteMutation = useUnregisterWorkMutation();
   return (
     <WorkDetail

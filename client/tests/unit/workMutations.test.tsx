@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 const activeKey = WORK_QUERY_KEYS.list({ sort: "added-desc" });
-const otherKey = WORK_QUERY_KEYS.list({ sort: "added-desc", view: "fav" });
+const otherKey = WORK_QUERY_KEYS.list({ sort: "added-desc", scanRecord: "new" });
 const smartKey = SMART_FOLDER_QUERY_KEYS.works("sf-1");
 const emptyPages = { pages: [{ items: [], total: 0 }], pageParams: [{ page: 1 }] };
 
@@ -116,7 +116,7 @@ describe("正本変更の失敗", () => {
 });
 
 describe("画面の後処理の順序", () => {
-  it("mutate 単位の onSuccess は必須更新の完了後に呼ばれる", async () => {
+  it("登録解除の mutate 単位の onSuccess は一覧の無効化の完了後に呼ばれ、作品の詳細は消えていない", async () => {
     vi.spyOn(workApi, "deleteWork").mockResolvedValue(undefined);
     mockApi({ "GET /api/scan/candidates": { scanCompleted: true, candidates: [] } });
     const { queryClient, wrapper, isInvalidated } = setup();
@@ -137,6 +137,6 @@ describe("画面の後処理の順序", () => {
       });
     });
 
-    expect(observed).toEqual([{ detailRemoved: true, listInvalidated: true }]);
+    expect(observed).toEqual([{ detailRemoved: false, listInvalidated: true }]);
   });
 });

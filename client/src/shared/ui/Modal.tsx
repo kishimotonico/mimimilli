@@ -11,6 +11,7 @@ const SIZE_CLASS = {
   480: "p-0 w-[min(480px,calc(100vw-32px))]",
   520: "p-0 w-[min(520px,calc(100vw-32px))]",
   560: "p-0 w-[min(560px,calc(100vw-32px))]",
+  620: "p-0 w-[min(620px,calc(100vw-32px))]",
   640: "p-0 w-[min(640px,calc(100vw-32px))]",
   680: "p-0 w-[min(680px,calc(100vw-32px))]",
   720: "p-0 w-[min(720px,calc(100vw-32px))]",

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Condition } from "@mimimilli/shared";
 import {
   buildEmptyWorksHint,
   buildEmptyWorksMessage,
@@ -24,25 +25,29 @@ describe("buildEmptyWorksMessage", () => {
   });
 });
 
-describe("buildEmptyWorksHint", () => {
-  it("adds context for fav view when not filtered", () => {
-    expect(buildEmptyWorksHint("fav", false)).toBe(
+describe("buildEmptyWorksHint（条件の形で決める）", () => {
+  const and = (...children: Condition[]): Condition => ({ type: "and", children });
+
+  it("adds context for a bookmarked-only folder when not filtered", () => {
+    expect(buildEmptyWorksHint(and({ type: "bookmarked" }), false)).toBe(
       "作品をブックマークするとお気に入りに表示されます",
     );
   });
 
-  it("adds context for error view when not filtered", () => {
-    expect(buildEmptyWorksHint("error", false)).toBe(
+  it("adds context for a hasError-only folder when not filtered", () => {
+    expect(buildEmptyWorksHint(and({ type: "hasError" }), false)).toBe(
       "元ファイルが見つからない・メタデータの読み込みに失敗した作品はここに表示されます",
     );
   });
 
   it("omits hint when the empty state is due to a filter (search/tags)", () => {
-    expect(buildEmptyWorksHint("fav", true)).toBeUndefined();
-    expect(buildEmptyWorksHint("error", true)).toBeUndefined();
+    expect(buildEmptyWorksHint(and({ type: "bookmarked" }), true)).toBeUndefined();
+    expect(buildEmptyWorksHint(and({ type: "hasError" }), true)).toBeUndefined();
   });
 
-  it("omits hint for axes without a specific context", () => {
-    expect(buildEmptyWorksHint("all", false)).toBeUndefined();
+  it("omits hint for conditions without a specific context", () => {
+    expect(buildEmptyWorksHint(and(), false)).toBeUndefined();
+    expect(buildEmptyWorksHint(and({ type: "played" }), false)).toBeUndefined();
+    expect(buildEmptyWorksHint(null, false)).toBeUndefined();
   });
 });

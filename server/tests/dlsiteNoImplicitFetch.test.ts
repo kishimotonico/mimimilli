@@ -159,7 +159,13 @@ test("スキャン完了・root再設定でDLsite取得ジョブが作られな�
   t.after(() => app.shutdown());
 
   await scanToCompletion(app);
-  assert.ok((await (await app.request("/api/works?scanRecord=new")).json()).total > 0);
+  assert.ok(
+    (
+      await (
+        await app.request("/api/smart-folders/all/works?sort=added-desc&scanRecord=new")
+      ).json()
+    ).total > 0,
+  );
   await assertNoDlsiteJob(app);
 
   const reconfigured = await post(app, "/api/root-reconfiguration", {

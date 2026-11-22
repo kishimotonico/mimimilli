@@ -9,16 +9,6 @@
   border-bottom: 1px solid var(--line-soft);
   background: var(--paper-1);
 }
-.mll-tagband__lbl {
-  font-family: var(--font-sans);
-  font-size: var(--fs-label);
-  line-height: var(--lh-label);
-  letter-spacing: 0.06em;
-  color: var(--ink-2);
-  text-transform: uppercase;
-  font-weight: 600;
-  padding-right: 4px;
-}
 .mll-tagband__chip {
   display: inline-flex;
   align-items: center;
@@ -26,13 +16,12 @@
   height: 22px;
   padding: 0 4px 0 8px;
   border-radius: var(--r-pill);
-  background: var(--acc-soft);
-  border: 1px solid var(--acc-line);
-  color: var(--acc-ink);
+  background: var(--paper-3);
+  color: var(--ink-0);
   font-family: var(--font-jp);
   font-size: var(--fs-control);
   line-height: var(--lh-control);
-  font-weight: 500;
+  font-weight: 400;
 }
 .mll-tagband__chip .lbl {
   max-width: 220px;
@@ -40,8 +29,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.mll-tagband__chip .lbl:hover {
-  text-decoration: underline;
+.mll-tagband__chip .lbl b {
+  margin-right: 4px;
+  font-weight: 500;
 }
 .mll-tagband__chip .x {
   width: 16px;
@@ -52,7 +42,7 @@
   color: var(--ink-2);
 }
 .mll-tagband__chip .x:hover {
-  background: var(--paper-1);
+  background: var(--paper-4);
   color: var(--ink-0);
 }
 .mll-tagband__addbtn {
@@ -73,15 +63,6 @@
   color: var(--ink-0);
   background: var(--paper-2);
 }
-.mll-tagband__and {
-  font-family: var(--font-mono);
-  font-size: var(--fs-mono);
-  line-height: var(--lh-mono);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--ink-2);
-  padding: 0 2px;
-}
 .mll-tagband__tail {
   display: flex;
   align-items: center;
@@ -94,16 +75,21 @@
   line-height: var(--lh-mono);
   color: var(--ink-2);
 }
-.mll-tagband__clear {
-  font-family: var(--font-sans);
-  font-size: var(--fs-caption);
-  line-height: var(--lh-caption);
-  font-weight: 600;
-  color: var(--ink-2);
-  padding: 3px 6px;
-  border-radius: var(--r-1);
+.mll-tagband__save {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-family: var(--font-jp);
+  font-size: var(--fs-control);
+  line-height: var(--lh-control);
+  font-weight: 500;
+  color: var(--ink-1);
+  white-space: nowrap;
 }
-.mll-tagband__clear:hover {
+.mll-tagband__save:hover {
   color: var(--ink-0);
   background: var(--paper-2);
 }

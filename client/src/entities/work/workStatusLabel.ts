@@ -1,6 +1,6 @@
 import type { WorkStatus } from "@mimimilli/shared";
 
-/** grid・list・preview・詳細・軸で共通の行方不明／メタ読み込みエラー表記 */
+/** grid・list・preview・詳細・値一覧で共通の行方不明／メタ読み込みエラー表記 */
 export const WORK_STATUS_LABEL: Record<Exclude<WorkStatus, "ok">, string> = {
   missing: "行方不明",
   error: "メタ読み込みエラー",

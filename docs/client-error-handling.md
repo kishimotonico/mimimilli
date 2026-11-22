@@ -26,7 +26,7 @@ client のエラー所有権・Promise 契約・best-effort 失敗の基準。�
 **完全に無視する箇所**
 
 - `useResumePersistence` のレジューム位置保存 — 再生は継続。次回起動時に古い位置が残るだけ
-- `useAudioEngineLifecycle` の `updateLastPlayed` — 同上。サイドバーの「最終再生」表示が更新されないだけ
+- `useAudioEngineLifecycle` の `updateLastPlayed` — 同上。「最近再生」の並びと作品の情報の最終再生が更新されないだけ
 - `audioEngine` の `AudioContext.resume()` — ブラウザの自動再生ポリシーでよく失敗する。次の `play()` で再試行
 - `audioEngine` の `AudioContext.close()`（`destroy` 時）— 破棄時のクリーンアップ。既に再生は止まっている
 - `refreshScanCandidates` の呼び出し（`ScanRuntime` の起動時、登録の集合の無効化（`workCacheUpdates`。登録・解除・スキャン完了など）、`DlsiteJobRuntime` の結果不明のコードがあるとき、RJコードの修正（差し替えを伴う）、root再設定の離脱時、`UnregisteredTab` の候補更新エラー後）— 失敗しても直前の候補キャッシュが残るだけ（ジョブの終端表示は候補と別に持つ結果から出るので、取り直しの成否に左右されない）。ユーザーの明示操作（再スキャン・候補タブの再取得）で取り直せる

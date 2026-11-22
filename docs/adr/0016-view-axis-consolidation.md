@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-08-11
-- 関連: [ADR-0012](0012-library-axis-as-value-browse.md)（本ADRで決定4を廃止）
+- 関連: [ADR-0012](0012-library-axis-as-value-browse.md)（本ADRで決定4を廃止）、[ADR-0040](0040-smart-folder-condition-tree.md)（ビュー軸5つを既定のスマートフォルダーに置き換え）
 
 ## 文脈
 

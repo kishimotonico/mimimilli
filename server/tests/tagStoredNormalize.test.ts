@@ -113,7 +113,7 @@ function buildTagValidationCorpus(): string[] {
     "普通のタグ",
     "genre/耳かき",
     "café/foo",
-    "@axis/value",
+    "@unknown/value",
     "",
     " ",
     "cv/",

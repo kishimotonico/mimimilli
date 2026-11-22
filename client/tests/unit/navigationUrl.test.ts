@@ -7,24 +7,21 @@ import {
 } from "../../src/entities/navigation/model/navigationUrl";
 
 describe("navigation URL codec", () => {
-  // "cv"・"tag"は値一覧種の軸（tags/qを消去する独立入口）になったため、
-  // タグ・work・sortのエンコード/デコード自体を検証するこれらのテストはworks種の
-  // 軸（all）で行う。
-  it("round-trips a Japanese library axis with a tag filter, work, and sort", () => {
+  it("round-trips a Japanese library group with a tag filter and work", () => {
     const state: NavigationUrlState = {
       mode: "library",
+      np: false,
       library: {
         ...DEFAULT_LIBRARY_URL_STATE,
-        activeAxis: "all",
+        folderId: "all",
         selectedTags: ["cv/水瀬なずな"],
         selectedWorkId: "RJ01234567",
-        sort: "title-asc",
       },
     };
 
     const url = serializeNavigationUrl(state);
     expect(url).toBe(
-      "/library/all?tags=cv%2F%E6%B0%B4%E7%80%AC%E3%81%AA%E3%81%9A%E3%81%AA&work=RJ01234567&sort=title-asc",
+      "/library/all?tags=cv%2F%E6%B0%B4%E7%80%AC%E3%81%AA%E3%81%9A%E3%81%AA&work=RJ01234567",
     );
     expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
   });
@@ -32,9 +29,10 @@ describe("navigation URL codec", () => {
   it("preserves multiple Japanese tags without comma ambiguity", () => {
     const state: NavigationUrlState = {
       mode: "library",
+      np: false,
       library: {
         ...DEFAULT_LIBRARY_URL_STATE,
-        activeAxis: "all",
+        folderId: "all",
         selectedTags: ["ASMR", "癒し系"],
       },
     };
@@ -44,10 +42,11 @@ describe("navigation URL codec", () => {
     expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
   });
 
-  it("carries a tag filter over even on a view axis (ADR-0012: filters apply across all axes)", () => {
+  it("keeps a tag filter on the all folder", () => {
     const state: NavigationUrlState = {
       mode: "library",
-      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "all", selectedTags: ["ASMR"] },
+      np: false,
+      library: { ...DEFAULT_LIBRARY_URL_STATE, folderId: "all", selectedTags: ["ASMR"] },
     };
 
     const url = serializeNavigationUrl(state);
@@ -55,12 +54,11 @@ describe("navigation URL codec", () => {
     expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
   });
 
-  // 値一覧種の軸（year・tag等）はtags/qを消去する独立入口になったため、
-  // タグ保持のround-tripはworks種の軸（all）で検証する。
   it("round-trips a year pseudo-tag filter as the reserved @ form (ADR-0012 §2)", () => {
     const state: NavigationUrlState = {
       mode: "library",
-      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "all", selectedTags: ["@year/2024"] },
+      np: false,
+      library: { ...DEFAULT_LIBRARY_URL_STATE, folderId: "all", selectedTags: ["@year/2024"] },
     };
 
     const url = serializeNavigationUrl(state);
@@ -71,7 +69,8 @@ describe("navigation URL codec", () => {
   it("round-trips a real tag literally named year/2025 distinctly from the pseudo-tag form", () => {
     const state: NavigationUrlState = {
       mode: "library",
-      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "all", selectedTags: ["year/2025"] },
+      np: false,
+      library: { ...DEFAULT_LIBRARY_URL_STATE, folderId: "all", selectedTags: ["year/2025"] },
     };
 
     const url = serializeNavigationUrl(state);
@@ -82,7 +81,8 @@ describe("navigation URL codec", () => {
   it("round-trips smart folder IDs", () => {
     const state: NavigationUrlState = {
       mode: "library",
-      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "smart-sleep-long" },
+      np: false,
+      library: { ...DEFAULT_LIBRARY_URL_STATE, folderId: "sf-1234" },
     };
 
     expect(parseNavigationUrl(serializeNavigationUrl(state))).toMatchObject({
@@ -91,54 +91,71 @@ describe("navigation URL codec", () => {
     });
   });
 
-  it("omits sort= for a smart folder axis, since its sort is not the effective one", () => {
-    const state: NavigationUrlState = {
+  it("ignores sort= in the URL, since sort lives in the history entry state", () => {
+    const result = parseNavigationUrl("/library/all?sort=title-asc");
+
+    expect(result.state).toEqual({
       mode: "library",
-      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "smart-sleep-long", sort: "title-asc" },
-    };
-
-    const url = serializeNavigationUrl(state);
-    expect(url).toBe("/library/smart-sleep-long");
-  });
-
-  it("still writes sort= for a normal axis (regression check for the smart-axis suppression)", () => {
-    const state: NavigationUrlState = {
-      mode: "library",
-      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "all", sort: "title-asc" },
-    };
-
-    const url = serializeNavigationUrl(state);
-    expect(url).toBe("/library/all?sort=title-asc");
-  });
-
-  it("strips tags= and q= for a value-list axis URL, even if present (ADR-0026)", () => {
-    const result = parseNavigationUrl("/library/cv?tags=cv%2F%E8%97%A4%E7%94%B0%E8%8C%9C&q=foo");
-    expect(result.state).toMatchObject({
-      mode: "library",
-      library: { activeAxis: "cv", selectedTags: [], q: "" },
+      library: DEFAULT_LIBRARY_URL_STATE,
+      np: false,
     });
-    expect(result.canonicalUrl).toBe("/library/cv");
+    expect(result.canonicalUrl).toBe("/library/all");
+    expect(result.warnings).toEqual([]);
   });
 
-  it("keeps tags= and q= for a normal (works) axis URL (regression)", () => {
-    const result = parseNavigationUrl("/library/all?tags=ASMR&q=foo");
+  it("does not drop tags= and q= at parse time even for a grouped folder (resolveLibraryView ignores them)", () => {
+    const result = parseNavigationUrl("/library/by-cv?tags=cv%2F%E8%97%A4%E7%94%B0%E8%8C%9C&q=foo");
     expect(result.state).toMatchObject({
       mode: "library",
-      library: { activeAxis: "all", selectedTags: ["ASMR"], q: "foo" },
+      np: false,
+      library: { folderId: "by-cv", group: null, selectedTags: ["cv/藤田茜"], q: "foo" },
+    });
+    expect(result.canonicalUrl).toBe("/library/by-cv?tags=cv%2F%E8%97%A4%E7%94%B0%E8%8C%9C&q=foo");
+  });
+
+  it("keeps tags= and q= for a folder URL", () => {
+    const result = parseNavigationUrl("/library/sf-1?tags=ASMR&q=foo");
+    expect(result.state).toMatchObject({
+      mode: "library",
+      np: false,
+      library: { folderId: "sf-1", selectedTags: ["ASMR"], q: "foo" },
     });
   });
 
-  it("keeps tags= and q= for a smart-folder axis URL (regression)", () => {
-    const result = parseNavigationUrl("/library/smart-sleep-long?tags=ASMR&q=foo");
-    expect(result.state).toMatchObject({
+  it("round-trips a group value via ?group= placed before tags", () => {
+    const state: NavigationUrlState = {
       mode: "library",
-      library: { activeAxis: "smart-sleep-long", selectedTags: ["ASMR"], q: "foo" },
+      np: false,
+      library: {
+        ...DEFAULT_LIBRARY_URL_STATE,
+        folderId: "by-cv",
+        group: "水瀬なずな",
+        selectedTags: ["ASMR"],
+      },
+    };
+    const url = serializeNavigationUrl(state);
+    expect(url).toBe(
+      "/library/by-cv?group=%E6%B0%B4%E7%80%AC%E3%81%AA%E3%81%9A%E3%81%AA&tags=ASMR",
+    );
+    expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
+  });
+
+  it("keeps a tag-kind group value containing slashes", () => {
+    const state: NavigationUrlState = {
+      mode: "library",
+      np: false,
+      library: { ...DEFAULT_LIBRARY_URL_STATE, folderId: "by-tag", group: "cv/藤田茜" },
+    };
+    expect(parseNavigationUrl(serializeNavigationUrl(state))).toMatchObject({
+      state,
+      warnings: [],
     });
   });
 
   it("round-trips file segments and a root-relative selection", () => {
     const state: NavigationUrlState = {
       mode: "files",
+      np: false,
       files: {
         relPath: ["ASMR", "2026年"],
         selectedRelPath: ["ASMR", "2026年", "作品01.flac"],
@@ -153,60 +170,39 @@ describe("navigation URL codec", () => {
 
   it("canonicalizes the root URL to the default library view", () => {
     expect(parseNavigationUrl("/")).toEqual({
-      state: { mode: "library", library: DEFAULT_LIBRARY_URL_STATE },
+      state: { mode: "library", library: DEFAULT_LIBRARY_URL_STATE, np: false },
       canonicalUrl: "/library/all",
       warnings: [],
     });
   });
 
-  it("accepts arbitrary prefix segments as facet axes (lowercased)", () => {
-    // ADR-0005: 予約ID以外のセグメントは prefix 軸として受理する
+  it("accepts any folder ID segment without validating existence (not lowercased)", () => {
     const result = parseNavigationUrl("/library/%E6%B0%97%E5%88%86");
     expect(result.state).toEqual({
       mode: "library",
-      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "気分" },
+      np: false,
+      library: { ...DEFAULT_LIBRARY_URL_STATE, folderId: "気分" },
     });
     expect(result.warnings).toEqual([]);
 
-    const upper = parseNavigationUrl("/library/CV");
-    expect(upper.state).toMatchObject({ library: { activeAxis: "cv" } });
+    expect(parseNavigationUrl("/library/CV").state).toMatchObject({ library: { folderId: "CV" } });
   });
 
-  it("warns and falls back for a bare smart- axis", () => {
-    const result = parseNavigationUrl("/library/smart-?work=ignored");
-
-    expect(result.state).toEqual({
-      mode: "library",
-      library: DEFAULT_LIBRARY_URL_STATE,
-    });
-    expect(result.canonicalUrl).toBe("/library/all");
-    expect(result.warnings).toEqual(["存在しないライブラリ軸を拒否しました: smart-"]);
-  });
-
-  it("rejects the abolished home axis and falls back to the default axis", () => {
-    const result = parseNavigationUrl("/library/home");
-
-    expect(result.state).toEqual({
-      mode: "library",
-      library: DEFAULT_LIBRARY_URL_STATE,
-    });
-    expect(result.canonicalUrl).toBe("/library/all");
-    expect(result.warnings).toEqual(["存在しないライブラリ軸を拒否しました: home"]);
-  });
-
-  it("rejects a drillValue-style third path segment (drill segment abolished, ADR-0012 §2)", () => {
+  it("rejects a third path segment", () => {
     const result = parseNavigationUrl("/library/fav/value");
     expect(result.state).toEqual({
       mode: "library",
+      np: false,
       library: DEFAULT_LIBRARY_URL_STATE,
     });
-    expect(result.warnings[0]).toContain("軸の階層として不正な URL");
+    expect(result.warnings[0]).toContain("スマートフォルダーの階層として不正な URL");
   });
 
   it("rejects paths that can escape or impersonate the configured root", () => {
     const pathResult = parseNavigationUrl("/files/%2Fetc/passwd");
     expect(pathResult.state).toEqual({
       mode: "library",
+      np: false,
       library: DEFAULT_LIBRARY_URL_STATE,
     });
     expect(pathResult.warnings[0]).toContain("安全でないパス segment");
@@ -214,6 +210,7 @@ describe("navigation URL codec", () => {
     const selectionResult = parseNavigationUrl("/files/library?sel=%2Fetc%2Fpasswd");
     expect(selectionResult.state).toEqual({
       mode: "files",
+      np: false,
       files: { relPath: ["library"], selectedRelPath: null },
     });
     expect(selectionResult.warnings).toEqual([
@@ -224,6 +221,7 @@ describe("navigation URL codec", () => {
   it("round-trips a search query via q=", () => {
     const state: NavigationUrlState = {
       mode: "library",
+      np: false,
       library: { ...DEFAULT_LIBRARY_URL_STATE, q: "耳かき ASMR" },
     };
 
@@ -235,48 +233,40 @@ describe("navigation URL codec", () => {
   it("omits q from the URL when empty", () => {
     const url = serializeNavigationUrl({
       mode: "library",
+      np: false,
       library: { ...DEFAULT_LIBRARY_URL_STATE, q: "" },
     });
     expect(url).toBe("/library/all");
   });
 
-  it("rejects an unknown builtin-axis pseudo-tag with a warning instead of leaving a dead chip (ADR-0012 §2)", () => {
+  it("rejects an unknown builtin pseudo-tag with a warning instead of leaving a dead chip (ADR-0012 §2)", () => {
     const result = parseNavigationUrl(
       "/library/all?tags=%40unknown%2F2024&tags=cv%2F%E8%97%A4%E7%94%B0%E8%8C%9C",
     );
 
     expect(result.state).toEqual({
       mode: "library",
-      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "all", selectedTags: ["cv/藤田茜"] },
+      np: false,
+      library: { ...DEFAULT_LIBRARY_URL_STATE, folderId: "all", selectedTags: ["cv/藤田茜"] },
     });
     expect(result.warnings[0]).toContain("選択タグを検証しました");
     expect(result.warnings[0]).toContain("@unknown/2024");
   });
 
   it("normalizes multiple year pseudo-tags to the first one with a warning, matching the single-selection UI constraint", () => {
-    // 値一覧種の軸（year）はtagsを消去するため、works種の軸（all）で検証する。
     const result = parseNavigationUrl("/library/all?tags=%40year%2F2023&tags=%40year%2F2024");
 
     expect(result.state).toEqual({
       mode: "library",
-      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "all", selectedTags: ["@year/2023"] },
+      np: false,
+      library: { ...DEFAULT_LIBRARY_URL_STATE, folderId: "all", selectedTags: ["@year/2023"] },
     });
     expect(result.warnings[0]).toContain("選択タグを検証しました");
     expect(result.warnings[0]).toContain("@year/2024");
   });
 
-  it("warns and restores the default sort for an invalid value", () => {
-    const result = parseNavigationUrl("/library/all?sort=nope");
-
-    expect(result.state).toEqual({
-      mode: "library",
-      library: DEFAULT_LIBRARY_URL_STATE,
-    });
-    expect(result.warnings).toEqual(["存在しない sort を既定値へ戻しました: nope"]);
-  });
-
   it("round-trips the full-screen work detail route", () => {
-    const state: NavigationUrlState = { mode: "workDetail", workId: "RJ01234567" };
+    const state: NavigationUrlState = { mode: "workDetail", workId: "RJ01234567", np: false };
 
     const url = serializeNavigationUrl(state);
     expect(url).toBe("/work/RJ01234567");
@@ -288,8 +278,48 @@ describe("navigation URL codec", () => {
 
     expect(result.state).toEqual({
       mode: "library",
+      np: false,
       library: DEFAULT_LIBRARY_URL_STATE,
     });
     expect(result.warnings[0]).toContain("作品詳細の階層として不正な URL");
+  });
+
+  it("再生中の層は、下の画面の URL に np=1 を足して表す", () => {
+    const cases: [NavigationUrlState, string][] = [
+      [
+        {
+          mode: "library",
+          np: true,
+          library: { ...DEFAULT_LIBRARY_URL_STATE, folderId: "fav" },
+        },
+        "/library/fav?np=1",
+      ],
+      [{ mode: "workDetail", workId: "RJ01234567", np: true }, "/work/RJ01234567?np=1"],
+      [
+        { mode: "files", np: true, files: { relPath: ["ASMR"], selectedRelPath: null } },
+        "/files/ASMR?np=1",
+      ],
+    ];
+    for (const [state, url] of cases) {
+      expect(serializeNavigationUrl(state)).toBe(url);
+      expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
+    }
+  });
+
+  it("np は他のクエリと並べて書き、np=1 以外は層を開かない", () => {
+    expect(
+      serializeNavigationUrl({
+        mode: "library",
+        np: true,
+        library: { ...DEFAULT_LIBRARY_URL_STATE, folderId: "all", selectedTags: ["ASMR"] },
+      }),
+    ).toBe("/library/all?tags=ASMR&np=1");
+    expect(parseNavigationUrl("/library/all?np=0").state.np).toBe(false);
+  });
+
+  it("/now-playing は存在しない画面として扱い、ライブラリへ戻す", () => {
+    const result = parseNavigationUrl("/now-playing");
+    expect(result.state).toMatchObject({ mode: "library", np: false });
+    expect(result.warnings).toHaveLength(1);
   });
 });

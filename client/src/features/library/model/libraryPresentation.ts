@@ -3,207 +3,54 @@
 // コンポーネントの配線から切り離してテスト可能にする。
 
 import {
-  buildBuiltinAxisTag,
-  isBuiltinPseudoTagAxis,
-  normalizeTag,
-  parseBuiltinAxisTag,
-  parseTag,
+  groupChipTag,
+  isBuiltinPseudoTagKey,
+  normalizeGroupValue,
+  parseBuiltinPseudoTag,
   TagNormalizationError,
-  type AxisFacetItem,
+  type GroupValueItem,
   type CollectionStats,
-  type FacetAxisId,
+  type GroupBy,
   type NormalizedTag,
-  type WorksQueryInput,
 } from "@mimimilli/shared";
 import { ApiRequestError } from "../../../shared/api/http";
-import type { AxisId, SortId, ViewMode } from "../../../entities/library/types";
-import { getAxisLabel, isSmartAxis, isViewAxis } from "../../../entities/library/axisDefinitions";
-import { computeResultsPaneKind } from "../../../entities/library/resultsPane";
+import { getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
+import { groupByKey } from "../../../entities/smart-folder/groupByKey";
 
-export { computeResultsPaneKind } from "../../../entities/library/resultsPane";
-
-// 組み込み軸の擬似タグ（year 等、ADR-0012 §2）の構築・解析・検証は shared/pseudoTag.ts に
-// 集約している（client・server の両方が同じ実装を使うため）。isBuiltinPseudoTagAxis /
-// buildBuiltinAxisTag / parseBuiltinAxisTag / splitSelectedTags は @mimimilli/shared から
+// 組み込みの擬似タグ（year 等、ADR-0012 §2）の構築・解析・検証は shared/pseudoTag.ts に
+// 集約している（client・server の両方が同じ実装を使うため）。isBuiltinPseudoTagKey /
+// buildBuiltinPseudoTag / parseBuiltinPseudoTag / splitSelectedTags は @mimimilli/shared から
 // 直接importする。
 
-/** グリッド／リストの決定は libraryViewModeAtom のみに依存する（ADR-0012 §3・§5）。
- *  works（作品一覧）・value-list（値一覧）の両方がグリッド表示に従う。 */
-export function isGridViewActive(axis: AxisId, viewMode: ViewMode): boolean {
-  const kind = computeResultsPaneKind(axis);
-  return (kind === "works" || kind === "value-list") && viewMode === "grid";
+/** グループ分けの値一覧で1項目を選んだときにチップへ足す完全なタグ文字列を組み立てる。
+ *  tag は GroupValueItem.value が既に完全なタグ文字列（ADR-0005）、
+ *  addedYear は擬似タグ（@year/値）、prefix は "prefix/値" の実タグとして表現する。 */
+export function buildFilterTag(groupBy: GroupBy, value: string): NormalizedTag {
+  const normalized = normalizeGroupValue(groupBy, value);
+  if (normalized === null) throw new TagNormalizationError(value);
+  return groupChipTag(groupBy, normalized);
 }
 
-/** facet/tag 軸の値一覧で1項目を選んだときに selectedTagsAtom へ追加する完全なタグ文字列を組み立てる。
- *  tag 軸は AxisFacetItem.value が既に完全なタグ文字列（ADR-0005）、
- *  year のようなタグ由来でない組み込み軸は擬似タグ、それ以外の facet 軸
- *  （prefix 定義に基づく実タグ由来の軸）は "軸/値" の実タグとして表現する。 */
-export function buildFilterTag(axis: AxisId, value: string): NormalizedTag {
-  if (axis === "tag") {
-    const normalized = normalizeTag(value);
-    if (normalized === null) throw new TagNormalizationError(value);
-    return normalized;
-  }
-  if (isBuiltinPseudoTagAxis(axis)) return buildBuiltinAxisTag(axis, value);
-  const normalized = normalizeTag(`${axis}/${value}`);
-  if (normalized === null) throw new TagNormalizationError(`${axis}/${value}`);
-  return normalized;
-}
-
-/** サーバー由来の facet 一覧から、buildFilterTag が正規化できない値を取り除く。
- *  軸の値一覧はこれを通ったデータだけを描画対象にすることで、不正値による
- *  render中throw（RootErrorBoundaryへの巻き込み）を経路として残さない。 */
-export function filterValidFacetItems<T extends AxisFacetItem>(axis: AxisId, items: T[]): T[] {
-  return items.filter((item) => {
-    try {
-      buildFilterTag(axis, item.value);
-      return true;
-    } catch (cause) {
-      if (!(cause instanceof TagNormalizationError)) throw cause;
-      console.warn(`軸「${axis}」の値「${item.value}」を正規化できないためスキップしました`, cause);
-      return false;
+/** サーバーの値一覧が、グループの値として使えるものだけかを確かめる。使えない値はサーバーとの契約違反なので、
+ *  読み飛ばさず一覧の取得エラーにする（描画中の throw にしない） */
+export function assertGroupValueItems<T extends GroupValueItem>(groupBy: GroupBy, items: T[]): T[] {
+  for (const item of items) {
+    if (normalizeGroupValue(groupBy, item.value) === null) {
+      throw new Error(
+        `グループ分け「${groupByKey(groupBy)}」の値「${item.value}」はグループの値として使えません`,
+      );
     }
-  });
-}
-
-// ── 軸レール・チップの入口共通「置き換え既定」（ADR-0013） ─────────────
-
-/** タグ文字列が属する軸ID。チップの兄弟値ドロップダウンで問い合わせる facet 軸を
- *  決めるのに使う。フラットタグは "tag" 軸（値一覧に全フラットタグが並ぶ）を返す。 */
-export function axisOfFilterTag(tag: NormalizedTag): AxisId {
-  const builtin = parseBuiltinAxisTag(tag);
-  if (builtin) return builtin.axis;
-  const parsed = parseTag(tag);
-  return parsed.kind === "flat" ? "tag" : parsed.prefix;
+  }
+  return items;
 }
 
 /** チップ表示用の文字列。design-system.md の「チップはフルパス表示」規約は維持しつつ、
- *  組み込み軸の擬似タグ（@year/2023等）だけ内部表現ではなく「軸ラベル/値」（例:
- *  「追加日/2023」）に変換する。実タグはそのまま tag を返す。 */
+ *  組み込みの擬似タグ（@year/2023等）だけ内部表現ではなく「グループ分けのラベル/値」（例:
+ *  「追加年/2023」）に変換する。実タグはそのまま tag を返す。 */
 export function formatFilterChipLabel(tag: NormalizedTag): string {
-  const builtin = parseBuiltinAxisTag(tag);
-  if (!builtin) return tag;
-  return `${getAxisLabel(builtin.axis)}/${builtin.value}`;
-}
-
-// ── works query のパラメータ ──────────────────────────────────
-
-interface WorksParamsInput {
-  activeAxis: AxisId;
-  sort: SortId;
-  searchQuery: string;
-  selectedTags: NormalizedTag[];
-  /** sort="random" のときだけ使う。呼び出し側の randomSeedAtom 由来 */
-  randomSeed?: number;
-}
-
-/** selectedTagsAtom（組み込み軸の擬似タグ混じり）を works query の tags フィールドへ変換する。
- *  通常の works query（buildWorksParams）とスマートフォルダー評価（buildSmartFolderFilterParams）
- *  で共通のロジック。組み込み軸（year等）専用のクエリパラメータは持たない（ADR-0012 §2）。
- *  擬似タグの解釈（実タグ／yearへの分解）はサーバー側の共通フィルタ解釈層が一度だけ行う
- *  （shared/pseudoTag.ts） */
-export interface TagFilterParams {
-  tags?: string[];
-  tagOp?: "AND";
-}
-
-export interface SmartFolderFilterParams extends TagFilterParams {
-  q?: string;
-}
-
-/** works query・軸ファセットクエリ・スマートフォルダー評価が共通で使うタグ→クエリ変換。
- *  渡すタグの取捨選択は呼び出し側の責務で、値一覧本体（AxisValueRows/AxisValueGrid）は
- *  常に無条件集計、「＋絞り込み」ポップオーバー（AxisValuePopoverPanel）は現在の選択
- *  タグ込みで呼び分ける。 */
-export function buildTagFilterParams(selectedTags: NormalizedTag[]): TagFilterParams {
-  return selectedTags.length > 0 ? { tags: selectedTags, tagOp: "AND" } : {};
-}
-
-/** 通常軸（ビュー軸）の works query パラメータ。結果面が works で非スマート軸であることは
- *  呼び出し側（LibraryWorksBoundary の NormalWorks）が保証する。 */
-export function buildNormalWorksParams(input: WorksParamsInput): WorksQueryInput {
-  const { activeAxis, sort, searchQuery, selectedTags, randomSeed } = input;
-  const p: WorksQueryInput = { sort, ...buildTagFilterParams(selectedTags) };
-  if (searchQuery) p.q = searchQuery;
-  if (isViewAxis(activeAxis) && activeAxis !== "all") {
-    p.view = activeAxis as WorksQueryInput["view"];
-  }
-  if (sort === "random" && randomSeed !== undefined) p.seed = randomSeed;
-  return p;
-}
-
-/** works 種の結果面（ビュー軸・スマートフォルダー軸）以外は works query を発行しない。
- *  スマートフォルダーは別 query（evalSmartFolder）で取得する。 */
-export function buildWorksParams(input: WorksParamsInput): WorksQueryInput | null {
-  const { activeAxis } = input;
-  if (computeResultsPaneKind(activeAxis) !== "works" || isSmartAxis(activeAxis)) return null;
-  return buildNormalWorksParams(input);
-}
-
-/** スマートフォルダー評価API（GET /smart-folders/:id/works）へ渡す追加フィルタ。
- *  tags・q いずれもフォルダーのルール（OR・除外を含む）全体に対する追加の AND 条件として
- *  適用される（ADR-0012）。フィルタが無ければキーを持たないオブジェクトを返す
- *  （クエリキーの安定のため）。 */
-export function buildSmartFolderFilterParams(
-  selectedTags: NormalizedTag[],
-  searchQuery: string,
-): SmartFolderFilterParams {
-  const params: SmartFolderFilterParams = buildTagFilterParams(selectedTags);
-  if (searchQuery) params.q = searchQuery;
-  return params;
-}
-
-/** 作品一覧の描画結果（グリッド・リスト・エラー境界）を再マウントすべきタイミングを表す
- *  安定なキー。スマート軸は sort をフォルダー自身が保持し、この sort が API へ渡らない
- *  （LibrarySortMenu も参照）ため、nav.sort をキーへ混ぜると効いていない変化で無意味な
- *  再マウントが起きる。 */
-export interface WorksResetKeyInput {
-  activeAxis: AxisId;
-  selectedTags: NormalizedTag[];
-  sort: SortId;
-  searchQuery: string;
-}
-
-export function buildWorksResetKey(input: WorksResetKeyInput): string {
-  const { activeAxis, selectedTags, sort, searchQuery } = input;
-  return JSON.stringify({
-    axis: activeAxis,
-    tags: selectedTags,
-    sort: isSmartAxis(activeAxis) ? undefined : sort,
-    search: searchQuery,
-  });
-}
-
-/** ファセット一覧（GET /axes/:axis）を取得すべき軸。value-list 種の結果面のみ */
-export function getFacetAxisForQuery(activeAxis: AxisId): FacetAxisId | null {
-  return computeResultsPaneKind(activeAxis) === "value-list" ? (activeAxis as FacetAxisId) : null;
-}
-
-/**
- * 検索語やタグフィルタが原因で作品一覧が0件になっているかどうか。
- * fav 等が本来的に0件のケースとは区別し、原因表示が必要な場合だけ案内する。
- *
- * 検索デバウンス後に queryKey が変わった直後は、新クエリが確定するまで
- * works が一時的に空配列になる（isLoading中）。この間を「絞り込みで0件」と
- * 誤判定すると、選択中の作品が実際は結果に含まれる場合でも選択解除が
- * 先走ってしまうため、クエリが loading/error 中は false に倒す
- * （worksCount===0 という結果を信頼できるのは、クエリが成功して確定した後だけ）。
- */
-export function computeIsNoResultsDueToFilter(
-  isWorksPane: boolean,
-  worksCount: number,
-  searchQuery: string,
-  selectedTags: NormalizedTag[],
-  isWorksLoading: boolean,
-  isWorksError: boolean,
-): boolean {
-  return (
-    isWorksPane &&
-    !isWorksLoading &&
-    !isWorksError &&
-    worksCount === 0 &&
-    (Boolean(searchQuery) || selectedTags.length > 0)
-  );
+  const builtin = parseBuiltinPseudoTag(tag);
+  if (!builtin || !isBuiltinPseudoTagKey(builtin.key)) return tag;
+  return `${getGroupByLabel({ kind: "addedYear" })}/${builtin.value}`;
 }
 
 // ── 未選択プレースホルダーの統計表示 ────────────────────────────

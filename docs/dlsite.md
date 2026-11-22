@@ -32,7 +32,7 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 
 変換後は `normalizeTags` で正規形にする。既存タグとの合流は `mergeAppliedDlsiteTags(existing, applyTags)` が担う。単体適用（replace）用で、ユーザーが `POST /dlsite/:id/apply` で明示的に選んだタグを反映する際に使う。single prefixは既存の同prefixタグを置き換え（2値共存を作らない）、multi prefixは加算する。prefix名で分岐する判定はマージ関数側に書かず、`DLSITE_TAG_FIELDS` の cardinality から導出する。
 
-既存作品へ後からratingタグを足す場合は、単体適用でratingタグを選ぶ。prefix定義 `rating`（ラベル: レーティング）は初回起動のseedに含まれる。すでにseed済みのライブラリには自動追加しないので、軸表示が必要ならタグ設定の候補から登録する。
+既存作品へ後からratingタグを足す場合は、単体適用でratingタグを選ぶ。prefix定義 `rating`（ラベル: レーティング）は初回起動のseedに含まれる。すでにseed済みのライブラリには自動追加しないので、必要ならタグ設定の候補から登録する。
 
 ## 適用の流れ
 

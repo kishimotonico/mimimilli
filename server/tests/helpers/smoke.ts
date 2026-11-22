@@ -26,11 +26,23 @@ try {
   await pollUntil(async () => (await json("/api/root-reconfiguration")).body.status !== "running");
   console.log("== settings ==", await json("/api/settings"));
   console.log("== scan ==", JSON.stringify(await json("/api/scan", { method: "POST" })));
-  const works = await json("/api/works?sort=title-asc");
+  const works = await json("/api/smart-folders/all/works?sort=title-asc");
   console.log("== works ==", JSON.stringify(works.body, null, 1).slice(0, 1200));
-  const errWork = await json("/api/works?view=error");
+  const errWork = await json("/api/smart-folders/error/works?sort=added-desc");
   console.log("== error view ==", JSON.stringify(errWork.body));
-  console.log("== axes/cv ==", JSON.stringify(await json("/api/axes/cv")));
+  console.log(
+    "== groups/cv ==",
+    JSON.stringify(
+      await json("/api/smart-folders/all/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          groupBy: { kind: "prefix", prefix: "cv" },
+          groupSort: "count-desc",
+        }),
+      }),
+    ),
+  );
   console.log("== fs ==", JSON.stringify((await json(`/api/fs?path=dlsite`)).body).slice(0, 600));
 
   // 自動生成された作品のメディア配信（Range）

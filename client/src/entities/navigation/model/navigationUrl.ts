@@ -1,14 +1,19 @@
-import { buildBuiltinAxisTag, splitSelectedTags, type NormalizedTag } from "@mimimilli/shared";
-import { getSmartFolderId, isSmartAxis, isViewAxis } from "../../library/axisDefinitions";
-import { computeResultsPaneKind } from "../../library/resultsPane";
-import type { AxisId, SortId } from "../../library/types";
+import {
+  ALL_SMART_FOLDER_ID,
+  buildBuiltinPseudoTag,
+  orderSelectedTags,
+  splitSelectedTags,
+  type NormalizedTag,
+} from "@mimimilli/shared";
 
 export interface LibraryUrlState {
-  activeAxis: AxisId;
+  /** スマートフォルダーの ID。URL だけでは存在を決められない（resolveLibraryView が突き合わせる） */
+  folderId: string;
+  /** グループ分けで選んだ値。null なら値一覧 */
+  group: string | null;
   selectedTags: NormalizedTag[];
   selectedWorkId: string | null;
-  sort: SortId;
-  q?: string;
+  q: string;
 }
 
 export interface FilesUrlState {
@@ -16,11 +21,13 @@ export interface FilesUrlState {
   selectedRelPath: string[] | null;
 }
 
-export type NavigationUrlState =
+export type NavigationScreenUrlState =
   | { mode: "library"; library: LibraryUrlState }
   | { mode: "files"; files: FilesUrlState }
-  | { mode: "nowPlaying" }
   | { mode: "workDetail"; workId: string };
+
+/** 画面の URL に、再生中の層を表す `np=1` を足すかどうかを持つ */
+export type NavigationUrlState = NavigationScreenUrlState & { np: boolean };
 
 export interface NavigationParseResult {
   state: NavigationUrlState;
@@ -28,32 +35,19 @@ export interface NavigationParseResult {
   warnings: string[];
 }
 
-export const DEFAULT_SORT: SortId = "added-desc";
-
 export const DEFAULT_LIBRARY_URL_STATE: LibraryUrlState = {
-  activeAxis: "all",
+  folderId: ALL_SMART_FOLDER_ID,
+  group: null,
   selectedTags: [],
   selectedWorkId: null,
-  sort: DEFAULT_SORT,
   q: "",
 };
-
-const SORTS = new Set<SortId>([
-  "added-desc",
-  "added-asc",
-  "title-asc",
-  "title-desc",
-  "duration-desc",
-  "duration-asc",
-  "last-played",
-  "random",
-  "id-asc",
-]);
 
 function defaultResult(warnings: string[]): NavigationParseResult {
   const state: NavigationUrlState = {
     mode: "library",
     library: { ...DEFAULT_LIBRARY_URL_STATE },
+    np: false,
   };
   return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
 }
@@ -83,15 +77,6 @@ function isSafeRelativeSegment(value: string): boolean {
   );
 }
 
-function parseAxis(value: string): AxisId | null {
-  if (value === "home") return null;
-  if (isViewAxis(value as AxisId) || value === "tag") return value;
-  if (isSmartAxis(value)) {
-    return getSmartFolderId(value) ? value : null;
-  }
-  return value.toLowerCase();
-}
-
 function uniqueNonEmpty(values: string[]): string[] {
   return [...new Set(values.filter((value) => value.length > 0))];
 }
@@ -99,7 +84,9 @@ function uniqueNonEmpty(values: string[]): string[] {
 function parseAndValidateSelectedTags(rawValues: string[], warnings: string[]): NormalizedTag[] {
   const { tags, yearValue, warnings: splitWarnings } = splitSelectedTags(uniqueNonEmpty(rawValues));
   for (const warning of splitWarnings) warnings.push(`選択タグを検証しました: ${warning}`);
-  return yearValue !== null ? [...tags, buildBuiltinAxisTag("year", yearValue)] : tags;
+  return orderSelectedTags(
+    yearValue !== null ? [...tags, buildBuiltinPseudoTag("year", yearValue)] : tags,
+  );
 }
 
 function parseSelectedRelPath(value: string, warnings: string[]): string[] | null {
@@ -118,6 +105,7 @@ function parseSelectedRelPath(value: string, warnings: string[]): string[] | nul
 export function parseNavigationUrl(input: string | URL): NavigationParseResult {
   const url = input instanceof URL ? input : new URL(input, "http://mimimilli.local");
   const warnings: string[] = [];
+  const np = url.searchParams.get("np") === "1";
 
   if (url.hash) warnings.push(`未対応の URL hash を削除しました: ${url.hash}`);
 
@@ -134,46 +122,22 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
   }
 
   if (segments[0] === "library") {
-    const axisValue = segments[1] ?? "all";
-    const axis = parseAxis(axisValue);
-    if (!axis) {
-      warnings.push(`存在しないライブラリ軸を拒否しました: ${axisValue}`);
-      return defaultResult(warnings);
-    }
-
     if (segments.length > 2) {
-      warnings.push(`軸の階層として不正な URL を拒否しました: ${url.pathname}`);
+      warnings.push(`スマートフォルダーの階層として不正な URL を拒否しました: ${url.pathname}`);
       return defaultResult(warnings);
     }
-
-    const isValueList = computeResultsPaneKind(axis) === "value-list";
-    const selectedTags = isValueList
-      ? []
-      : parseAndValidateSelectedTags(url.searchParams.getAll("tags"), warnings);
-
-    const selectedWorkId = url.searchParams.get("work") || null;
-    const sortValue = url.searchParams.get("sort");
-    const sort = sortValue && SORTS.has(sortValue as SortId) ? (sortValue as SortId) : DEFAULT_SORT;
-    if (sortValue && sort === DEFAULT_SORT && sortValue !== DEFAULT_SORT) {
-      warnings.push(`存在しない sort を既定値へ戻しました: ${sortValue}`);
-    }
-    // 値一覧は現在の絞り込みと独立した全作品の入口（ADR-0026）。効かないq・tagsを
-    // URLから復元しない。
-    const q = isValueList ? "" : (url.searchParams.get("q") ?? "");
-
+    const folderId = segments[1] ?? ALL_SMART_FOLDER_ID;
     const state: NavigationUrlState = {
       mode: "library",
-      library: { activeAxis: axis, selectedTags, selectedWorkId, sort, q },
+      library: {
+        folderId,
+        group: url.searchParams.get("group") || null,
+        selectedTags: parseAndValidateSelectedTags(url.searchParams.getAll("tags"), warnings),
+        selectedWorkId: url.searchParams.get("work") || null,
+        q: url.searchParams.get("q") ?? "",
+      },
+      np,
     };
-    return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
-  }
-
-  if (segments[0] === "now-playing") {
-    if (segments.length > 1) {
-      warnings.push(`再生中画面の階層として不正な URL を拒否しました: ${url.pathname}`);
-      return defaultResult(warnings);
-    }
-    const state: NavigationUrlState = { mode: "nowPlaying" };
     return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
   }
 
@@ -183,7 +147,7 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
       warnings.push(`作品詳細の階層として不正な URL を拒否しました: ${url.pathname}`);
       return defaultResult(warnings);
     }
-    const state: NavigationUrlState = { mode: "workDetail", workId };
+    const state: NavigationUrlState = { mode: "workDetail", workId, np };
     return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
   }
 
@@ -196,6 +160,7 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
     const state: NavigationUrlState = {
       mode: "files",
       files: { relPath: segments.slice(1), selectedRelPath },
+      np,
     };
     return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
   }
@@ -210,33 +175,26 @@ function encodeSegments(segments: string[]): string {
 
 export function serializeNavigationUrl(state: NavigationUrlState): string {
   const params = new URLSearchParams();
-
-  if (state.mode === "nowPlaying") {
-    return "/now-playing";
-  }
+  let pathname: string;
 
   if (state.mode === "workDetail") {
-    return `/work/${encodeURIComponent(state.workId)}`;
-  }
-
-  if (state.mode === "library") {
-    const { activeAxis, selectedTags, selectedWorkId, sort, q } = state.library;
-    const pathname = `/library/${encodeURIComponent(activeAxis)}`;
+    pathname = `/work/${encodeURIComponent(state.workId)}`;
+  } else if (state.mode === "library") {
+    const { folderId, group, selectedTags, selectedWorkId, q } = state.library;
+    pathname = `/library/${encodeURIComponent(folderId)}`;
+    if (group !== null) params.set("group", group);
     for (const tag of selectedTags) params.append("tags", tag);
     if (selectedWorkId) params.set("work", selectedWorkId);
-    // スマート軸の sort はフォルダー自身が保持し、この URL の sort= は効かない
-    // （LibrarySortMenu 参照）。効いていない値をURLへ残さない
-    if (!isSmartAxis(activeAxis) && sort !== DEFAULT_SORT) params.set("sort", sort);
     if (q) params.set("q", q);
-    const search = params.toString();
-    return search ? `${pathname}?${search}` : pathname;
+  } else {
+    const suffix = encodeSegments(state.files.relPath);
+    pathname = suffix ? `/files/${suffix}` : "/files";
+    if (state.files.selectedRelPath?.length) {
+      params.set("sel", state.files.selectedRelPath.join("/"));
+    }
   }
 
-  const suffix = encodeSegments(state.files.relPath);
-  const pathname = suffix ? `/files/${suffix}` : "/files";
-  if (state.files.selectedRelPath?.length) {
-    params.set("sel", state.files.selectedRelPath.join("/"));
-  }
+  if (state.np) params.set("np", "1");
   const search = params.toString();
   return search ? `${pathname}?${search}` : pathname;
 }

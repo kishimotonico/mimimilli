@@ -4,12 +4,14 @@ import { createPortal } from "react-dom";
 import { fireEvent, render, screen, cleanup, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AxisFacetItem } from "@mimimilli/shared";
-import AxisValueQuickList from "../../src/features/library/ui/AxisValueQuickList";
+import type { GroupBy, GroupValueItem } from "@mimimilli/shared";
+import GroupValueQuickList from "../../src/features/library/ui/GroupValueQuickList";
 import { useAnchoredPopover } from "../../src/shared/ui/useAnchoredPopover";
 import type { UseAnchoredPopoverResult } from "../../src/shared/ui/useAnchoredPopover";
 import { usePopoverDismissal } from "../../src/shared/ui/usePopoverDismissal";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
+
+const CV: GroupBy = { kind: "prefix", prefix: "cv" };
 
 afterEach(() => {
   cleanup();
@@ -59,7 +61,7 @@ function DismissalHarness() {
   );
 }
 
-const QUICK_LIST_ITEMS: AxisFacetItem[] = [
+const QUICK_LIST_ITEMS: GroupValueItem[] = [
   { value: "声優A", count: 3, durationSec: 0, covers: [] },
   { value: "声優B", count: 2, durationSec: 0, covers: [] },
 ];
@@ -84,9 +86,9 @@ function QuickListWithDismissalHarness() {
         createElement(
           "div",
           { ref: panelRef },
-          createElement(AxisValueQuickList, {
-            axis: "cv",
-            axisLabel: "CV",
+          createElement(GroupValueQuickList, {
+            groupBy: CV,
+            groupByLabel: "CV",
             items: QUICK_LIST_ITEMS,
             isSelected: () => false,
             onSelect: () => close(),
@@ -439,7 +441,7 @@ describe("usePopoverDismissal", () => {
   });
 });
 
-describe("AxisValueQuickList 経路での close()", () => {
+describe("GroupValueQuickList 経路での close()", () => {
   it("検索欄で Escape するとアンカーへフォーカスが戻る", async () => {
     const sizeMock = mockElementSize(260, 260);
     render(createElement(QuickListWithDismissalHarness));

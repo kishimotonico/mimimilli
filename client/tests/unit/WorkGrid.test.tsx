@@ -339,38 +339,66 @@ describe("WorkGrid empty states", () => {
     clearResizeObservers();
   });
 
-  it("お気に入りビューが0件のとき文脈付きの案内を1行添える", () => {
-    renderWorkGrid({ overrides: { nav: { activeAxis: "fav" }, works: [] } });
+  it("お気に入りが0件のとき文脈付きの案内を1行添える（条件の形で判定）", () => {
+    renderWorkGrid({ overrides: { nav: { library: { folderId: "fav" } }, works: [] } });
     expect(
       screen.getByText("作品をブックマークするとお気に入りに表示されます"),
     ).toBeInTheDocument();
   });
 
-  it("スマートフォルダーが0件のとき専用の見出しと「条件を編集」を出す", () => {
-    const onEditSmartFolderRules = vi.fn();
-    renderWorkGrid({
-      overrides: { works: [], emptyState: { isSmartFolder: true, onEditSmartFolderRules } },
-    });
-
-    expect(screen.getByText("条件に一致する作品がありません")).toBeInTheDocument();
-    expect(screen.getByText("条件を見直すか、絞り込みを外してください。")).toBeInTheDocument();
-    expect(screen.queryByText("絞り込みをすべてクリア")).toBeNull();
-
-    screen.getByRole("button", { name: "条件を編集" }).click();
-    expect(onEditSmartFolderRules).toHaveBeenCalled();
-  });
-
-  it("スマートフォルダーが0件・チップ絞り込み中のとき「絞り込みをすべてクリア」も出す", () => {
+  it("チップ絞り込みが原因の0件では専用メッセージと「絞り込みをすべてクリア」を出す", () => {
     const clearTags = vi.fn();
     renderWorkGrid({
       overrides: {
         works: [],
-        nav: { selectedTags: nts(["タグ"]), clearTags },
-        emptyState: { isSmartFolder: true },
+        nav: { library: { selectedTags: nts(["タグ"]) }, clearTags },
       },
     });
 
+    expect(screen.getByText("選択中のフィルタに一致する作品はありません")).toBeInTheDocument();
     screen.getByRole("button", { name: "絞り込みをすべてクリア" }).click();
     expect(clearTags).toHaveBeenCalled();
+  });
+
+  it("「すべて」以外でチップか検索語があるとき「『すべて』で探す」を出し、押すと searchInAll を呼ぶ", () => {
+    const searchInAll = vi.fn();
+    renderWorkGrid({
+      overrides: {
+        works: [],
+        nav: { library: { folderId: "fav", selectedTags: nts(["タグ"]) }, searchInAll },
+      },
+    });
+
+    screen.getByRole("button", { name: "「すべて」で探す" }).click();
+    expect(searchInAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("検索語だけでも「『すべて』で探す」を出す", () => {
+    renderWorkGrid({
+      overrides: {
+        works: [],
+        nav: { library: { folderId: "fav", q: "雨" } },
+        emptyState: { searchQuery: "雨" },
+      },
+    });
+
+    expect(screen.getByRole("button", { name: "「すべて」で探す" })).toBeInTheDocument();
+  });
+
+  it("「すべて」自身では「『すべて』で探す」を出さない", () => {
+    renderWorkGrid({
+      overrides: {
+        works: [],
+        nav: { library: { folderId: "all", selectedTags: nts(["タグ"]) } },
+      },
+    });
+
+    expect(screen.queryByRole("button", { name: "「すべて」で探す" })).toBeNull();
+  });
+
+  it("絞り込みが無い0件では「『すべて』で探す」を出さない", () => {
+    renderWorkGrid({ overrides: { works: [], nav: { library: { folderId: "fav" } } } });
+
+    expect(screen.queryByRole("button", { name: "「すべて」で探す" })).toBeNull();
   });
 });

@@ -38,7 +38,7 @@ test("2xx リクエストは http カテゴリの DEBUG で requestId 等を記�
   await captureLogs(
     async (records) => {
       const app = createApp(createFixtureAdapter());
-      const res = await app.request("/api/works");
+      const res = await app.request("/api/smart-folders/all/works?sort=added-desc");
       assert.equal(res.status, 200);
 
       const logged = httpRequestRecords(categoryRecords(records, "http"));
@@ -47,7 +47,7 @@ test("2xx リクエストは http カテゴリの DEBUG で requestId 等を記�
       const properties = logged[0]!.properties;
       assert.ok(typeof properties.requestId === "string" && properties.requestId.length > 0);
       assert.equal(properties.method, "GET");
-      assert.equal(properties.path, "/api/works");
+      assert.equal(properties.path, "/api/smart-folders/all/works");
       assert.equal(properties.status, 200);
       assert.equal(typeof properties.durationMs, "number");
     },
@@ -136,7 +136,9 @@ test("2xx のアクセスログはコンソールへ出さず、5xx はコンソ
     const requestCalls = () =>
       calls.filter((call) => call.text.includes("HTTPリクエストを処理しました"));
 
-    const ok = await createApp(createFixtureAdapter()).request("/api/works");
+    const ok = await createApp(createFixtureAdapter()).request(
+      "/api/smart-folders/all/works?sort=added-desc",
+    );
     assert.equal(ok.status, 200);
     assert.deepEqual(requestCalls(), []);
 

@@ -1,10 +1,11 @@
-// GET /works の scanRecord 絞り込みと、登録解除した作品を記録が読むときに落とすこと（worksRoute・adapter・ScanRecordStore の結線）。
+// GET /smart-folders/:id/works の scanRecord 絞り込みと、登録解除した作品を記録が読むときに落とすこと（smartFoldersRoute・adapter・ScanRecordStore の結線）。
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Hono } from "hono";
 import { workspacePath, type ScanResult } from "@mimimilli/shared";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { worksRoute } from "../src/routes/works.ts";
+import { smartFoldersRoute } from "../src/routes/smartFolders.ts";
 import type { DataAdapter } from "../src/adapter/index.ts";
 import { ScanRecordStore } from "../src/scanRecord.ts";
 import { runScan } from "./helpers/scanLibrary.ts";
@@ -32,7 +33,9 @@ async function snapshotOf(adapter: DataAdapter, store: ScanRecordStore) {
 function setup() {
   const adapter = createFixtureAdapter();
   const store = new ScanRecordStore();
-  const app = new Hono().route("/api", worksRoute(adapter, store));
+  const app = new Hono()
+    .route("/api", worksRoute(adapter))
+    .route("/api", smartFoldersRoute(adapter, store));
   return { adapter, store, app };
 }
 
@@ -40,7 +43,7 @@ async function idsOf(
   app: Hono,
   query: string,
 ): Promise<{ status: number; ids: string[]; total: number }> {
-  const res = await app.request(`/api/works?${query}`);
+  const res = await app.request(`/api/smart-folders/all/works?sort=added-desc&${query}`);
   const body = (await res.json()) as { items?: Array<{ id: string }>; total?: number };
   return {
     status: res.status,
@@ -110,7 +113,9 @@ test("DELETE /works/:id した作品は、記録を読むときにすべての�
 async function reassignWithRecord(path: string) {
   const adapter = createFixtureAdapter({ scenario: "new-work" });
   const store = new ScanRecordStore();
-  const app = new Hono().route("/api", worksRoute(adapter, store));
+  const app = new Hono()
+    .route("/api", worksRoute(adapter))
+    .route("/api", smartFoldersRoute(adapter, store));
   store.replace(
     result({
       insertedWorkIds: ["RJ501001", "RJ501002"],
@@ -159,7 +164,9 @@ test("POST /works/unregister-missing した作品は、診断の行方不明か�
 test("fixtureのスキャンは、登録解除した新規作品を次のスキャンで記録へ戻さず、記録を今回の変化へ入れ替える", async () => {
   const adapter = createFixtureAdapter({ scenario: "new-work" });
   const store = new ScanRecordStore();
-  const app = new Hono().route("/api", worksRoute(adapter, store));
+  const app = new Hono()
+    .route("/api", worksRoute(adapter))
+    .route("/api", smartFoldersRoute(adapter, store));
 
   const first = await runScan(adapter);
   store.replace(first, "t1");
@@ -173,4 +180,23 @@ test("fixtureのスキャンは、登録解除した新規作品を次のスキ�
   store.replace(second, "t2");
   assert.deepEqual(store.workIds("new"), []);
   assert.deepEqual((await snapshotOf(adapter, store)).updatedWorks, []);
+});
+
+test("「すべて」以外のフォルダーに scanRecord を付けると、フォルダーの条件と記録の作品が AND になる", async () => {
+  const { store, app } = setup();
+  const list = async (path: string) => {
+    const res = await app.request(`/api/smart-folders/${path}`);
+    return ((await res.json()) as { items: Array<{ id: string }> }).items.map((item) => item.id);
+  };
+  const errors = await list("error/works?sort=id-asc");
+  const all = await list("all/works?sort=id-asc&limit=500");
+  const healthy = all.find((id) => !errors.includes(id));
+  assert.ok(errors.length > 0 && healthy !== undefined);
+  store.replace(result({ insertedWorkIds: [errors[0]!, healthy] }), "t");
+
+  assert.deepEqual(await list("error/works?sort=id-asc&scanRecord=new"), [errors[0]]);
+  assert.deepEqual(
+    (await list("all/works?sort=id-asc&scanRecord=new")).sort(),
+    [errors[0]!, healthy].sort(),
+  );
 });

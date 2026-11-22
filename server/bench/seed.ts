@@ -222,17 +222,20 @@ async function main(): Promise<void> {
       {
         id: smartFolderNoRulesId,
         name: "全件",
-        rulesJson: "[]",
+        conditionJson: JSON.stringify({ type: "and", children: [] }),
         sort: "added-desc",
+        position: 1,
         createdAt,
       },
       {
         id: smartFolderWithRulesId,
         name: "CV水瀬",
-        rulesJson: JSON.stringify([
-          { conjunction: "WHERE", field: "タグ", operator: "∋", values: ["cv/水瀬なずな"] },
-        ]),
+        conditionJson: JSON.stringify({
+          type: "and",
+          children: [{ type: "tag", tag: "cv/水瀬なずな" }],
+        }),
         sort: "title-asc",
+        position: 2,
         createdAt,
       },
     ])

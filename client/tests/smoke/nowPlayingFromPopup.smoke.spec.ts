@@ -1,7 +1,7 @@
 import { expect, test } from "./fixtures";
 import { assertNoErrors, openApp, trackErrors } from "./support";
 
-test("ポップアップの展開ボタンから再生中タブへ遷移し、旧全画面dialog・ポップアップが残らず表示モードが維持される", async ({
+test("ポップアップの ⤢ から再生中の層が重なり、URL に np=1 が付き、下の画面が残り、表示モードが維持される", async ({
   page,
 }) => {
   const tracker = trackErrors(page);
@@ -13,23 +13,28 @@ test("ポップアップの展開ボタンから再生中タブへ遷移し、�
     localStorage.setItem("mimimilli:nowPlayingViewMode", JSON.stringify("immersive"));
   });
   await page.reload({ waitUntil: "domcontentloaded" });
-  await expect(page.locator(".mle-col.is-axis")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(".mll-sidebar")).toBeVisible({ timeout: 20_000 });
 
   await page.getByText("ツンデレ後輩ちゃんの秘密のお世話ボイス", { exact: false }).click();
   await page.locator(".mle-prv").getByRole("button", { name: "最初から再生" }).click();
 
-  // バー→ポップアップへ切り替え、展開ボタンで再生中タブへ遷移する。
+  // バー→ポップアップへ切り替え、⤢ で再生中の層を開く。
   await page.locator(".mle-bar1").getByRole("button", { name: "バーを展開" }).click();
   await expect(page.locator(".mle-popup")).toBeVisible();
-  await page.getByRole("button", { name: "再生中タブを表示" }).click();
+  await page.locator(".mle-popup").getByRole("button", { name: "再生中を開く" }).click();
+  await expect(page.locator(".mle-layer")).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("np")).toBe("1");
 
-  // 旧 <dialog> 全画面プレイヤーは再生中タブ領域には存在せず、ポップアップ／下部バーも
-  // 画面に残らない（設定等の正当な<dialog>は他領域にあり得るため再生中タブ配下に絞る）。
+  // 下の画面（ライブラリ）は層の下に残り、サイドバーは層に隠れる（状態は変わらない）。
+  await expect(page.locator(".mll-results")).toBeAttached();
+  await expect(page.locator(".mll-sidebar")).toBeAttached();
+
+  // 層は dialog ではなく、ポップアップ／下部バーも画面に残らない。
   await expect(page.locator(".mle-nowplaying dialog")).toHaveCount(0);
   await expect(page.locator(".mle-popup")).toHaveCount(0);
   await expect(page.locator(".mle-bar1")).toHaveCount(0);
 
-  // 保存済みの表示モード（没入）のまま再生中タブが開く。
+  // 保存済みの表示モード（没入）のまま層が開く。
   await expect(page.locator(".mle-nowplaying__immersive-cover")).toBeVisible();
 
   assertNoErrors(tracker);

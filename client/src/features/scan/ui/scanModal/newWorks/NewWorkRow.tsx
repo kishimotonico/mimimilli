@@ -4,6 +4,7 @@ import CoverImg from "../../../../../entities/work/ui/CoverImg";
 import { selectFixedCoverThumbnailWidth } from "../../../../../entities/work/ui/coverThumbnailWidth";
 import { cn } from "../../../../../shared/lib/cn";
 import { I } from "../../../../../shared/ui/Icon";
+import { NO_AUTOFILL_PROPS } from "../../../../../shared/ui/noAutofill";
 import StatusLabel from "../../../../../shared/ui/StatusLabel";
 import { useInlineEditKeyDown } from "../../../../../shared/ui/useInlineEditKeyDown";
 import { newWorkDlsiteLink } from "../../../model/newWorkDlsiteLink";
@@ -54,6 +55,7 @@ export default function NewWorkRow({ work, edit, onOpenFiles, onOpenWorkDetail }
         <div className="-ml-1.5 flex min-w-0 items-center gap-1">
           {editing ? (
             <input
+              {...NO_AUTOFILL_PROPS}
               ref={edit.titleInputRef}
               aria-label="タイトル"
               value={edit.editTitle}

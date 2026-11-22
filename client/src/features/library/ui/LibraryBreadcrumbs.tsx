@@ -1,25 +1,51 @@
-import { useAtomValue, useSetAtom } from "jotai";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { AnimatePresence } from "motion/react";
+import { ALL_SMART_FOLDER_ID } from "@mimimilli/shared";
 import Breadcrumbs from "../../../shared/ui/Breadcrumbs";
-import { buildLibraryAddressPath } from "../model/atoms";
-import { activeAxisAtom } from "../../../entities/library/model/navigationAtoms";
-import { goToLibrarySegmentAtom } from "../../../entities/library/model/navigationActions";
-import { useLibraryTransition } from "../model/useLibraryNavigation";
+import { getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
 import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
-import { listSmartFolders } from "../../../entities/smart-folder/api";
-import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
+import { useLibraryNavigation } from "../model/useLibraryNavigation";
+import GroupValuePopover from "./GroupValuePopover";
 
+export const LIBRARY_ROOT_LABEL = "ライブラリ";
+
+/** 「ライブラリ / スマートフォルダー名（/ 値）」。「ライブラリ」は「すべて」へ、スマートフォルダー名は
+ *  グループ分けの値一覧へ戻り、値は兄弟の値のドロップダウンを開く */
 export default function LibraryBreadcrumbs() {
-  const activeAxis = useAtomValue(activeAxisAtom);
+  const nav = useLibraryNavigation();
+  const view = nav.foldersStatus === "ready" ? nav.view : null;
   const { tagPrefixes } = useTagPrefixes();
-  const smartFoldersQuery = useQuery({
-    queryKey: SMART_FOLDER_QUERY_KEYS.all(),
-    queryFn: listSmartFolders,
-  });
-  const path = buildLibraryAddressPath(activeAxis, tagPrefixes, smartFoldersQuery.data ?? []);
-  const goToSegmentAtom = useSetAtom(goToLibrarySegmentAtom);
-  const startTransition = useLibraryTransition();
-  const goToSegment = (index: number) => startTransition(() => goToSegmentAtom(index));
+  const [siblingAnchor, setSiblingAnchor] = useState<HTMLElement | null>(null);
+  const group = view?.kind === "works" ? view.group : null;
+  const groupBy = view?.kind === "works" ? view.groupBy : null;
+  const groupSort = view?.kind === "works" ? view.groupSort : null;
 
-  return <Breadcrumbs path={path} onNavigate={goToSegment} />;
+  return (
+    <>
+      <Breadcrumbs
+        path={[LIBRARY_ROOT_LABEL, ...(view?.breadcrumb ?? [])]}
+        onNavigate={(index, anchor) => {
+          if (index === 0) nav.openFolder(ALL_SMART_FOLDER_ID);
+          else if (index === 1) nav.backToValueList();
+          else if (group !== null) setSiblingAnchor(anchor);
+        }}
+      />
+      <AnimatePresence>
+        {view && siblingAnchor && group !== null && groupBy !== null && groupSort !== null && (
+          <GroupValuePopover
+            key={`siblings:${view.folder.id}:${groupSort}`}
+            placement="below"
+            folderId={view.folder.id}
+            groupBy={groupBy}
+            groupSort={groupSort}
+            groupByLabel={getGroupByLabel(groupBy, tagPrefixes)}
+            anchorEl={siblingAnchor}
+            selectedValue={group}
+            onSelectValue={nav.selectGroupValue}
+            onClose={() => setSiblingAnchor(null)}
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
 }

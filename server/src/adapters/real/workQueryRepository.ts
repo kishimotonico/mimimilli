@@ -1,7 +1,6 @@
 import { sep } from "node:path";
 import { asc, eq } from "drizzle-orm";
 import {
-  createRandomSeed,
   relativeToRoot,
   isCoverUnmeasured,
   projectCoverKind,
@@ -9,18 +8,25 @@ import {
   workPlacementOf,
 } from "@mimimilli/shared";
 import type {
-  AxisFacetItem,
+  GroupSortId,
+  GroupValueItem,
+  Condition,
+  GroupBy,
   MissingWork,
-  SmartFolderRule,
   Work,
   WorkPlacement,
   WorkspacePath,
   WorksPage,
-  WorksQuery,
+  SortId,
 } from "@mimimilli/shared";
-import type { AxisFacetsQuery } from "@mimimilli/shared";
 import { isPathWithin } from "../../lib/path.ts";
-import { japaneseSortKey } from "../../core/japaneseSortKey.ts";
+import type {
+  ConditionGroupQuery,
+  ConditionWorksQuery,
+  EvalContext,
+} from "../../adapter/condition.ts";
+import { requireRandomSeed } from "../../core/conditionQuery.ts";
+import { compileCondition } from "./conditionSql.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips } from "./dataIntegrity.ts";
 import type { Db } from "./db.ts";
@@ -39,20 +45,16 @@ import {
   hasTrackFile as hasTrackFileFromDb,
 } from "./workMediaQueries.ts";
 import {
-  axisFacetSql,
+  groupValueSql,
   chunk,
   inClausePlaceholders,
   JOINED_WORKS_SELECT,
-  smartFolderRulePredicates,
   SQLITE_IN_CHUNK_SIZE,
-  tagAxisConditions,
-  textSearchCondition,
-  viewConditions,
   WORKS_QUERY_FROM,
   worksOrderSql,
 } from "./workQuerySql.ts";
 import {
-  type AxisFacetRow,
+  type GroupValueRow,
   type ListSummariesResult,
   mapRawWorkRows,
   parseDlsiteStateJson,
@@ -340,42 +342,41 @@ export class WorkQueryRepository {
     }>;
   }
 
-  /** ルールに一致しうる作品のサマリー。ルールなしは全作品（SQLで候補を絞るだけで最終評価は呼び出し側） */
-  listSmartFolderCandidateSummaries(rules: SmartFolderRule[]): ListSummariesResult {
-    if (rules.length === 0) return this.listSummaries();
-    const { predicates, bindings } = smartFolderRulePredicates(rules);
-    const rows = this.db.sqlite
-      .query(`SELECT works.id AS id FROM main.works WHERE ${predicates.join(" OR ")}`)
-      .all(...bindings) as Array<{ id: string }>;
-    return this.listSummaries(rows.map((row) => row.id));
+  /** 条件の木に一致する作品の一覧（ADR-0040）。seed は呼び出し側が渡し、ここでは発行しない */
+  queryWorksByCondition(query: ConditionWorksQuery, root: string, ctx: EvalContext): WorksPage {
+    const seed = requireRandomSeed(query.sort, query.seed);
+    const compiled = compileCondition(query.condition, ctx);
+    const conditions = [compiled.sql];
+    const bindings: Array<string | number> = [...compiled.bindings];
+    if (query.ids !== undefined) {
+      conditions.push("works.id IN (SELECT value FROM json_each(?))");
+      bindings.push(JSON.stringify(query.ids));
+    }
+    return this.runWorksQuery(
+      {
+        whereSql: `WHERE ${conditions.join(" AND ")}`,
+        bindings,
+        sort: query.sort,
+        seed,
+        page: query.page,
+        limit: query.limit,
+      },
+      root,
+    );
   }
 
-  queryWorks(params: WorksQuery, root: string): WorksPage {
-    const seed = params.sort === "random" ? (params.seed ?? createRandomSeed()) : undefined;
-    const conditions: string[] = [];
-    const bindings: Array<string | number> = [];
-
-    if (params.ids !== undefined) {
-      conditions.push("works.id IN (SELECT value FROM json_each(?))");
-      bindings.push(JSON.stringify(params.ids));
-    }
-
-    if (params.q) {
-      const text = textSearchCondition(japaneseSortKey(params.q), params.q);
-      conditions.push(...text.conditions);
-      bindings.push(...text.bindings);
-    }
-
-    const { tags: realTags, yearValue } = params.tags;
-    const tagAxis = tagAxisConditions(realTags, params.tagOp, yearValue);
-    conditions.push(...tagAxis.conditions);
-    bindings.push(...tagAxis.bindings);
-
-    const view = viewConditions(params.view);
-    conditions.push(...view.conditions);
-    bindings.push(...view.bindings);
-
-    const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  private runWorksQuery(
+    run: {
+      whereSql: string;
+      bindings: Array<string | number>;
+      sort: SortId;
+      seed: number | undefined;
+      page: number;
+      limit: number;
+    },
+    root: string,
+  ): WorksPage {
+    const { whereSql, bindings, sort, seed, page, limit } = run;
     return this.db.transaction(() => {
       const statsRow = this.db.sqlite
         .query(`
@@ -388,27 +389,19 @@ export class WorkQueryRepository {
         .get(...bindings) as { total: number; trackCount: number; durationSec: number };
 
       const orderBindings: number[] = [];
-      const orderSql = worksOrderSql(params.sort, seed, orderBindings);
-      const paginationSql =
-        params.page !== undefined && params.limit !== undefined ? "LIMIT ? OFFSET ?" : "";
-      const paginationBindings =
-        params.page !== undefined && params.limit !== undefined
-          ? [params.limit, (params.page - 1) * params.limit]
-          : [];
+      const orderSql = worksOrderSql(sort, seed, orderBindings);
       const rows = this.db.sqlite
         .query(`
         ${WORK_LIST_ROW_SELECT}
         ${whereSql}
         ORDER BY ${orderSql}
-        ${paginationSql}
+        LIMIT ? OFFSET ?
       `)
-        .all(...bindings, ...orderBindings, ...paginationBindings) as RawWorkListRow[];
+        .all(...bindings, ...orderBindings, limit, (page - 1) * limit) as RawWorkListRow[];
       const { items, skipped } = this.mapWorkListRows(rows, root);
       logDataIntegritySkips(queryWorksLogger, "query-works", skipped);
       const stats = { trackCount: statsRow.trackCount, durationSec: statsRow.durationSec };
-      return seed === undefined
-        ? { items, total: statsRow.total, stats }
-        : { items, total: statsRow.total, stats, seed };
+      return { items, total: statsRow.total, stats };
     });
   }
 
@@ -523,21 +516,42 @@ export class WorkQueryRepository {
     return fetchProbeCacheFromDb(this.db, paths);
   }
 
-  getAxisFacets(axis: string, filter: Partial<AxisFacetsQuery> = {}): AxisFacetItem[] {
-    const { tags: realTags, yearValue } = filter.tags ?? { tags: [], yearValue: null };
-    const tagAxis = tagAxisConditions(realTags, filter.tagOp ?? "AND", yearValue);
-    const filterWhere =
-      tagAxis.conditions.length > 0 ? `WHERE ${tagAxis.conditions.join(" AND ")}` : "";
+  /** 条件の木に一致する作品を、グループ分けの値ごとに集計する（ADR-0040） */
+  groupWorksByCondition(query: ConditionGroupQuery, ctx: EvalContext): GroupValueItem[] {
+    const compiled = compileCondition(query.condition, ctx);
+    return this.groupValueItems(query.groupBy, query.groupSort, [compiled.sql], compiled.bindings);
+  }
 
-    let rows: AxisFacetRow[];
+  /** 条件ごとの一致件数を1回の走査で数える。入力と同じ順で返す */
+  countByConditions(conditions: Condition[], ctx: EvalContext): number[] {
+    if (conditions.length === 0) return [];
+    const compiled = conditions.map((condition) => compileCondition(condition, ctx));
+    const columns = compiled.map((c, index) => `COALESCE(SUM(${c.sql}), 0) AS c${index}`);
+    const row = this.db.sqlite
+      .query(`SELECT ${columns.join(", ")} ${WORKS_QUERY_FROM}`)
+      .get(...compiled.flatMap((c) => c.bindings)) as Record<string, number>;
+    return compiled.map((_, index) => row[`c${index}`]!);
+  }
 
-    if (axis === "year") {
+  private groupValueItems(
+    groupBy: GroupBy,
+    groupSort: GroupSortId,
+    conditions: string[],
+    bindings: Array<string | number>,
+  ): GroupValueItem[] {
+    const filterWhere = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    let rows: GroupValueRow[];
+
+    if (groupBy.kind === "addedYear") {
       rows = this.db.sqlite
         .query(
-          axisFacetSql(`
+          groupValueSql(
+            `
             SELECT substr(work_states.added_at, 1, 4) AS value,
                    works.id AS work_id,
                    work_states.added_at AS added_at,
+                   work_states.last_played_at AS last_played_at,
                    works.total_duration_sec AS duration_sec,
                    works.cover_image AS cover_image,
                    works.cover_width AS cover_width,
@@ -546,16 +560,20 @@ export class WorkQueryRepository {
             FROM main.works
             INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
             ${filterWhere}
-          `),
+          `,
+            groupSort,
+          ),
         )
-        .all(...tagAxis.bindings) as AxisFacetRow[];
-    } else if (axis === "tag") {
+        .all(...bindings) as GroupValueRow[];
+    } else if (groupBy.kind === "tag") {
       rows = this.db.sqlite
         .query(
-          axisFacetSql(`
+          groupValueSql(
+            `
             SELECT tags.name AS value,
                    works.id AS work_id,
                    work_states.added_at AS added_at,
+                   work_states.last_played_at AS last_played_at,
                    works.total_duration_sec AS duration_sec,
                    works.cover_image AS cover_image,
                    works.cover_width AS cover_width,
@@ -566,36 +584,42 @@ export class WorkQueryRepository {
             INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id
             INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
             ${filterWhere}
-          `),
+          `,
+            groupSort,
+          ),
         )
-        .all(...tagAxis.bindings) as AxisFacetRow[];
+        .all(...bindings) as GroupValueRow[];
     } else {
       const prefixConditions = [
         "substr(tags.name, 1, instr(tags.name, '/') - 1) = ?",
-        ...tagAxis.conditions,
+        ...conditions,
       ];
       rows = this.db.sqlite
         .query(
-          axisFacetSql(`
+          groupValueSql(
+            `
             SELECT substr(tags.name, instr(tags.name, '/') + 1) AS value,
                    works.id AS work_id,
                    work_states.added_at AS added_at,
+                   work_states.last_played_at AS last_played_at,
                    works.total_duration_sec AS duration_sec,
                    works.cover_image AS cover_image,
                    works.cover_width AS cover_width,
                    works.cover_height AS cover_height,
-                   tags.facet_sort_key AS sort_key
+                   tags.value_sort_key AS sort_key
             FROM main.works
             INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
             INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id
             INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
             WHERE ${prefixConditions.join(" AND ")}
-          `),
+          `,
+            groupSort,
+          ),
         )
-        .all(axis, ...tagAxis.bindings) as AxisFacetRow[];
+        .all(groupBy.prefix, ...bindings) as GroupValueRow[];
     }
 
-    const versions = this.facetCoverVersions(
+    const versions = this.groupValueCoverVersions(
       rows.flatMap((row) =>
         (JSON.parse(row.coversJson) as Array<{ workId: string }>).map((cover) => cover.workId),
       ),
@@ -603,10 +627,13 @@ export class WorkQueryRepository {
 
     return rows.map((row) => ({
       value: row.value,
+      sortKey: row.sortKey,
+      lastAddedAt: row.lastAddedAt,
+      lastPlayedAt: row.lastPlayedAt,
       count: row.count,
       durationSec: row.durationSec,
       covers: (
-        JSON.parse(row.coversJson) as Array<Omit<AxisFacetItem["covers"][number], "version">>
+        JSON.parse(row.coversJson) as Array<Omit<GroupValueItem["covers"][number], "version">>
       ).flatMap((cover) => {
         const version = versions.get(cover.workId);
         return version === undefined ? [] : [{ ...cover, version }];
@@ -614,7 +641,7 @@ export class WorkQueryRepository {
     }));
   }
 
-  private facetCoverVersions(workIds: string[]): Map<string, string> {
+  private groupValueCoverVersions(workIds: string[]): Map<string, string> {
     const uniqueIds = [...new Set(workIds)];
     const versions = new Map<string, string>();
     if (uniqueIds.length === 0) return versions;

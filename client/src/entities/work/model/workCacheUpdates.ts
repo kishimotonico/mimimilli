@@ -23,10 +23,16 @@ import {
 async function invalidateLibraryViews(queryClient: QueryClient): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() }),
-    queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() }),
+    queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allGroups() }),
     queryClient.invalidateQueries({ queryKey: TAG_QUERY_KEYS.all() }),
     queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() }),
+    invalidateSmartFolderCounts(queryClient),
   ]);
+}
+
+/** スマートフォルダー一覧（件数入り）だけを取り直す。開いている一覧の並びは動かさない */
+function invalidateSmartFolderCounts(queryClient: QueryClient): Promise<void> {
+  return queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.all() });
 }
 
 async function invalidateRegistrationViews(
@@ -93,10 +99,11 @@ export async function updateCachesAfterPlaybackPrepared(
   work: Work,
 ): Promise<void> {
   queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), work);
-  await invalidateLibraryViews(queryClient);
+  await invalidateSmartFolderCounts(queryClient);
 }
 
-/** excludedListKey は画面が apply で揃え済みの一覧。その key だけ無効化しない */
+/** excludedListKey は画面が apply で揃え済みの一覧。その key だけ無効化しない。
+ *  お気に入りはグループの値の件数・総時間に効くので値一覧も取り直す（再生は開いている値一覧を動かさないことを優先して取り直さない。ADR-0040「件数」） */
 export async function updateCachesAfterBookmark(
   queryClient: QueryClient,
   change: { workId: string; bookmarked: boolean },
@@ -106,16 +113,24 @@ export async function updateCachesAfterBookmark(
     prev ? { ...prev, bookmarked: change.bookmarked } : prev,
   );
   const excludedHash = excludedListKey === null ? null : hashKey(excludedListKey);
-  await queryClient.invalidateQueries({
-    predicate: (query) => isWorkListQuery(query) && query.queryHash !== excludedHash,
-  });
+  await Promise.all([
+    queryClient.invalidateQueries({
+      predicate: (query) => isWorkListQuery(query) && query.queryHash !== excludedHash,
+    }),
+    queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allGroups() }),
+    invalidateSmartFolderCounts(queryClient),
+  ]);
 }
 
 /** 登録（候補一括・Files 単体）の成功後。取り直した候補を返す。取り直せなかったときは null */
-export function updateCachesAfterRegistration(
+export async function updateCachesAfterRegistration(
   queryClient: QueryClient,
 ): Promise<ScanCandidatesResponse | null> {
-  return invalidateRegistrationViews(queryClient);
+  const [candidates] = await Promise.all([
+    invalidateRegistrationViews(queryClient),
+    invalidateAllWorkDetails(queryClient),
+  ]);
+  return candidates;
 }
 
 export async function updateCachesAfterLibraryScan(queryClient: QueryClient): Promise<void> {
@@ -125,13 +140,8 @@ export async function updateCachesAfterLibraryScan(queryClient: QueryClient): Pr
   ]);
 }
 
-export async function updateCachesAfterUnregistration(
-  queryClient: QueryClient,
-  workId: string,
-): Promise<void> {
+export async function updateCachesAfterUnregistration(queryClient: QueryClient): Promise<void> {
   await invalidateRegistrationViews(queryClient);
-  // 表示中の詳細 observer が再描画で再取得しないよう、画面の後処理（選択解除）の直前に削除する
-  queryClient.removeQueries({ queryKey: WORK_QUERY_KEYS.detail(workId) });
 }
 
 /** 作品単位の読み直し（データ不整合の解消）の成功後 */
@@ -149,10 +159,7 @@ export async function updateCachesAfterWorkReload(
 export async function updateCachesAfterMissingUnregistration(
   queryClient: QueryClient,
 ): Promise<void> {
-  await Promise.all([
-    invalidateRegistrationViews(queryClient),
-    invalidateAllWorkDetails(queryClient),
-  ]);
+  await invalidateRegistrationViews(queryClient);
 }
 
 export async function updateCachesAfterIdentityReassign(

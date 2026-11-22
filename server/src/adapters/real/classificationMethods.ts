@@ -1,30 +1,26 @@
 import {
   DEFAULT_TAG_PREFIXES,
-  type AxisFacetItem,
-  type SmartFolder,
-  type SmartFolderCreate,
-  type SmartFolderRule,
-  type SmartFolderUpdate,
+  SMART_FOLDER_TEMPLATES,
+  type Condition,
+  type GroupSortId,
+  type SmartFolderWrite,
+  type SortId,
   type TagPrefix,
   type TagPrefixCandidate,
   type TagPrefixCreate,
   type TagPrefixUpdate,
-  type WorksPage,
 } from "@mimimilli/shared";
-import type { AxisFacetsQuery, SmartFolderEvalQuery } from "@mimimilli/shared";
+import type { SmartFolderInsert, SmartFolderRow } from "../../adapter/classification.ts";
+import { insertFromTemplate } from "../../core/smartFolderTemplateRow.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips } from "./dataIntegrity.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
-import {
-  countSmartFolderRuleMatches,
-  getSmartFolderAxisFacets,
-  querySmartFolderWorks,
-} from "./smartFolderWorks.ts";
 
 const scanLogger = getCategoryLogger("scan");
 const KEY_TAG_PREFIXES_SEEDED = "tag_prefixes_seeded";
+const KEY_SMART_FOLDERS_SEEDED = "smart_folders_seeded";
 
 export function initializeTagPrefixes(user: UserWorkStateRepository): void {
   if (user.getUserSetting(KEY_TAG_PREFIXES_SEEDED) === null) {
@@ -33,26 +29,24 @@ export function initializeTagPrefixes(user: UserWorkStateRepository): void {
   }
 }
 
+/** 「すべて」は migration が入れる。残りの既定は初回だけ入れ、全部消しても戻さない */
+export function initializeSmartFolders(user: UserWorkStateRepository): void {
+  if (user.getUserSetting(KEY_SMART_FOLDERS_SEEDED) !== null) return;
+  const createdAt = new Date().toISOString();
+  user.seedSmartFolders(
+    SMART_FOLDER_TEMPLATES.filter((template) => template.seeded).map((template) =>
+      insertFromTemplate(template, createdAt),
+    ),
+    KEY_SMART_FOLDERS_SEEDED,
+  );
+}
+
 export function createClassificationMethods(deps: {
   query: WorkQueryRepository;
   user: UserWorkStateRepository;
-  requireRoot: () => string;
 }) {
-  const { query, user, requireRoot } = deps;
+  const { query, user } = deps;
   return {
-    async getAxisFacets(
-      axis: string,
-      filter?: Partial<AxisFacetsQuery>,
-    ): Promise<AxisFacetItem[] | null> {
-      if (filter?.smartFolder) {
-        const folder = user.getSmartFolder(filter.smartFolder);
-        // /smart-folders/:id/works と同じ「解決できない」応答（404）に揃える
-        if (!folder) return null;
-        return getSmartFolderAxisFacets(query, axis, folder, filter);
-      }
-      return query.getAxisFacets(axis, filter);
-    },
-
     async listTagPrefixes(): Promise<TagPrefix[]> {
       return user.listTagPrefixes();
     },
@@ -77,25 +71,43 @@ export function createClassificationMethods(deps: {
       );
     },
 
-    async listSmartFolders(): Promise<SmartFolder[]> {
+    async listSmartFolders(): Promise<SmartFolderRow[]> {
       return user.listSmartFolders();
     },
-    async createSmartFolder(input: SmartFolderCreate): Promise<SmartFolder> {
-      return user.createSmartFolder(input);
+    async getSmartFolder(id: string): Promise<SmartFolderRow | null> {
+      return user.getSmartFolder(id);
     },
-    async updateSmartFolder(id: string, input: SmartFolderUpdate): Promise<SmartFolder | null> {
+    async appendSmartFolder(folder: SmartFolderInsert): Promise<SmartFolderRow | null> {
+      return user.appendSmartFolder(folder);
+    },
+    async restoreSmartFolder(
+      folder: SmartFolderInsert & { position: number },
+    ): Promise<SmartFolderRow | null> {
+      return user.restoreSmartFolder(folder);
+    },
+    async updateSmartFolder(id: string, input: SmartFolderWrite): Promise<SmartFolderRow | null> {
       return user.updateSmartFolder(id, input);
+    },
+    async updateSmartFolderSort(id: string, sort: SortId | null): Promise<SmartFolderRow | null> {
+      return user.updateSmartFolderSort(id, sort);
+    },
+    async updateSmartFolderCondition(
+      id: string,
+      change: { condition: Condition; sort?: SortId | null },
+    ): Promise<SmartFolderRow | null> {
+      return user.updateSmartFolderCondition(id, change);
+    },
+    async updateSmartFolderGroupSort(
+      id: string,
+      groupSort: GroupSortId,
+    ): Promise<SmartFolderRow | null> {
+      return user.updateSmartFolderGroupSort(id, groupSort);
+    },
+    async reorderSmartFolders(ids: string[]): Promise<SmartFolderRow[] | null> {
+      return user.reorderSmartFolders(ids);
     },
     async deleteSmartFolder(id: string): Promise<boolean> {
       return user.deleteSmartFolder(id);
-    },
-    async evalSmartFolder(id: string, evalQuery: SmartFolderEvalQuery): Promise<WorksPage | null> {
-      const folder = user.getSmartFolder(id);
-      if (!folder) return null;
-      return querySmartFolderWorks(query, folder, evalQuery, requireRoot());
-    },
-    async previewSmartFolderRuleCount(rules: SmartFolderRule[]): Promise<number> {
-      return countSmartFolderRuleMatches(query, rules);
     },
   };
 }

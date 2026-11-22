@@ -1,0 +1,325 @@
+/* ライブラリのサイドバー（.mll-sidebar*）。見出し「ライブラリ」・スマートフォルダーの行・最下部の統計。 */
+
+.mll-sidebar {
+  grid-column: 1;
+  grid-row: 3;
+  width: 208px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--paper-1);
+  border-right: 1px solid var(--line);
+}
+.mll-sidebar__scroll {
+  flex: 1;
+  display: grid;
+  align-content: start;
+  gap: 1px;
+  padding: 8px 6px;
+  overflow-y: auto;
+}
+.mll-sidebar__hd {
+  padding: 8px 6px 4px 8px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+}
+.mll-sbrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 29px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--ink-1);
+  font-family: var(--font-jp);
+  font-size: var(--fs-body);
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+.mll-sbrow:hover {
+  background: var(--paper-2);
+}
+.mll-sbrow.is-on {
+  background: var(--paper-4);
+  color: var(--ink-0);
+  font-weight: 600;
+}
+.mll-sbrow svg {
+  flex: none;
+}
+.mll-sbrow.is-on svg {
+  color: var(--acc);
+}
+.mll-sbrow .nm {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mll-sbrow .ct {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.4;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+.mll-sbrow .ct.is-error {
+  padding: 0 6px;
+  border-radius: 99px;
+  background: var(--state-danger);
+  color: var(--paper-1);
+}
+.mll-sbrow .chev {
+  color: var(--ink-3);
+}
+.mll-sidebar__foot {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line-soft);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.mll-sidebar__error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: var(--paper-2);
+  color: var(--ink-2);
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
+}
+
+/* 見出しの ＋・編集と、編集の状態（ADR-0041・ADR-0042） */
+.mll-sidebar__hd {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.mll-sidebar__hd > span {
+  flex: 1;
+}
+.mll-sidebar__done {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--acc-ink);
+  cursor: pointer;
+}
+.mll-sidebar__done:hover {
+  background: var(--paper-2);
+}
+.mll-sbrow.is-editing {
+  gap: 4px;
+  padding-right: 2px;
+  cursor: default;
+}
+.mll-sbrow.is-editing:hover {
+  background: var(--paper-2);
+}
+.mll-sbrow.is-dimmed {
+  opacity: 0.5;
+}
+.mll-sbrow.is-dragging {
+  opacity: 0.35;
+}
+/* 挿入線は行の角丸に沿わない直線で、行と行の境目に出す */
+.mll-sbrow.is-drop-before,
+.mll-sbrow.is-drop-after {
+  position: relative;
+}
+.mll-sbrow.is-drop-before::after,
+.mll-sbrow.is-drop-after::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--acc);
+  pointer-events: none;
+}
+.mll-sbrow.is-drop-before::after {
+  top: -1px;
+}
+.mll-sbrow.is-drop-after::after {
+  bottom: -1px;
+}
+.mll-sbrow .grip {
+  color: var(--ink-3);
+  cursor: grab;
+}
+.mll-sbrow .act {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  color: var(--ink-2);
+}
+.mll-sbrow button.act {
+  cursor: pointer;
+}
+.mll-sbrow button.act:hover {
+  background: var(--paper-3);
+  color: var(--ink-0);
+}
+.mll-sbmenu {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 4px;
+  right: 4px;
+  z-index: 12;
+  display: grid;
+  gap: 1px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-1);
+  box-shadow: var(--shadow-pop);
+  letter-spacing: 0;
+  font-family: var(--font-jp);
+  font-size: var(--fs-body);
+  font-weight: 400;
+  color: var(--ink-1);
+}
+.mll-sbmenu .mh {
+  padding: 6px 8px 2px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+}
+.mll-sbmenu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 5px;
+  text-align: left;
+  cursor: pointer;
+}
+.mll-sbmenu button:hover {
+  background: var(--paper-2);
+}
+.mll-sbmenu .none {
+  padding: 4px 8px 6px;
+  color: var(--ink-3);
+}
+.mll-sbmenu hr {
+  margin: 3px 0;
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+/* 編集のダイアログ */
+.mll-dlg-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+}
+.mll-dlg-h > span {
+  flex: 1;
+}
+.mll-dlg-b {
+  display: grid;
+  gap: 12px;
+  padding: 4px 16px 14px;
+  overflow-y: auto;
+}
+.mll-fld {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+.mll-fld.is-top {
+  align-items: start;
+}
+.mll-fld.is-top > .lb {
+  padding-top: 6px;
+}
+.mll-fld > label,
+.mll-fld > .lb {
+  font-family: var(--font-sans);
+  font-size: var(--fs-control);
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.mll-fld input[type="text"],
+.mll-fld select {
+  min-width: 0;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--paper-1);
+  color: var(--ink-0);
+  font: inherit;
+}
+.mll-fld input[type="text"]:focus,
+.mll-fld select:focus {
+  outline: none;
+  border-color: var(--ink-3);
+}
+.mll-fld input:disabled,
+.mll-fld select:disabled {
+  background: var(--paper-2);
+  color: var(--ink-2);
+  cursor: not-allowed;
+}
+.mll-condsum {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--paper-2);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  color: var(--ink-1);
+}
+.mll-condlist {
+  display: grid;
+  gap: 4px;
+}
+.mll-condrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px 3px 10px;
+  border-radius: 6px;
+  background: var(--paper-2);
+  font-size: var(--fs-body);
+  color: var(--ink-1);
+}
+.mll-condrow > span {
+  flex: 1;
+  min-width: 0;
+}
+.mll-dlg-f {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--line-soft);
+}

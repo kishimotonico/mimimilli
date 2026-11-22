@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-08-03
-- 関連: [ADR-0005](0005-tags-as-sole-attribute.md)（本ADRで一部改訂）、[ADR-0013](0013-tag-click-replaces-all.md)（§7を改訂）、[ADR-0016](0016-view-axis-consolidation.md)（決定4を廃止）、[ADR-0026](0026-value-list-as-global-entry.md)（決定1を限定）、[ADR-0031](0031-app-route-navigation.md)（ナビゲーション状態とURL同期の実装方式）、backlog DRAFT-50「ライブラリ再設計: 2ペイン・フィルタチップ型」（アーカイブ済み。同番号の別ドラフトがあるためタイトルで特定する）、TASK-178〜183
+- 関連: [ADR-0005](0005-tags-as-sole-attribute.md)（本ADRで一部改訂）、[ADR-0040](0040-smart-folder-condition-tree.md)（決定1・2を改訂。スマートフォルダーのグループ分けに置き換え）、[ADR-0041](0041-library-sidebar-shell-navigation.md)（決定7を改訂）、[ADR-0013](0013-tag-click-replaces-all.md)（§7を改訂）、[ADR-0016](0016-view-axis-consolidation.md)（決定4を廃止）、[ADR-0026](0026-value-list-as-global-entry.md)（決定1を限定）、[ADR-0031](0031-app-route-navigation.md)（ナビゲーション状態とURL同期の実装方式）、backlog DRAFT-50「ライブラリ再設計: 2ペイン・フィルタチップ型」（アーカイブ済み。同番号の別ドラフトがあるためタイトルで特定する）、TASK-178〜183
 
 ## 文脈
 

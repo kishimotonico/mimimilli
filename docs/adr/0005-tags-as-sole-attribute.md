@@ -2,7 +2,7 @@
 
 - ステータス: 承認（実装済み）
 - 日付: 2026-07-11
-- 関連: [ADR-0004](0004-core-functions-over-sql.md)、[ADR-0012](0012-library-axis-as-value-browse.md)（§6の軸ドリルをタグフィルタへ統合）、[../requirements-v4.md](../requirements-v4.md) §4
+- 関連: [ADR-0004](0004-core-functions-over-sql.md)、[ADR-0012](0012-library-axis-as-value-browse.md)（§6の軸ドリルをタグフィルタへ統合）、[ADR-0040](0040-smart-folder-condition-tree.md)（§3の軸レールをスマートフォルダーに置き換え。prefix定義の軸表示を廃止）、[../requirements-v4.md](../requirements-v4.md) §4
 
 ## 文脈
 

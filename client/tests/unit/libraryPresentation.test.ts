@@ -1,256 +1,43 @@
-import { describe, expect, it, vi } from "vitest";
-import type { AxisFacetItem } from "@mimimilli/shared";
+import { describe, expect, it } from "vitest";
+import type { GroupValueItem, NormalizedTag } from "@mimimilli/shared";
 import { ApiRequestError } from "../../src/shared/api/http";
 import { nt } from "../helpers/tag";
 import {
-  axisOfFilterTag,
   buildFilterTag,
-  buildSmartFolderFilterParams,
-  buildTagFilterParams,
-  buildWorksParams,
   computeCollectionStatsDisplay,
-  computeIsNoResultsDueToFilter,
-  computeResultsPaneKind,
-  filterValidFacetItems,
+  assertGroupValueItems,
   formatFilterChipLabel,
-  getFacetAxisForQuery,
-  isGridViewActive,
   shouldClearSelectionOnFilterMiss,
   shouldClearSelectionOnWorkNotFound,
 } from "../../src/features/library/model/libraryPresentation";
 
-function facetItem(value: string): AxisFacetItem {
+function groupValueItem(value: string): GroupValueItem {
   return { value, count: 1, durationSec: 0, covers: [] };
 }
 
-describe("computeResultsPaneKind", () => {
-  it("facet 軸（prefix・year）は value-list", () => {
-    expect(computeResultsPaneKind("circle")).toBe("value-list");
-    expect(computeResultsPaneKind("year")).toBe("value-list");
-  });
-  it("tag 軸は value-list", () => {
-    expect(computeResultsPaneKind("tag")).toBe("value-list");
-  });
-  it("ビュー軸・スマートフォルダー軸は works", () => {
-    expect(computeResultsPaneKind("all")).toBe("works");
-    expect(computeResultsPaneKind("fav")).toBe("works");
-    expect(computeResultsPaneKind("smart-abc")).toBe("works");
-  });
-});
-
-describe("isGridViewActive", () => {
-  it("works・value-list 種の結果面は viewMode のみに従う（強制グリッドは廃止済み）", () => {
-    expect(isGridViewActive("all", "list")).toBe(false);
-    expect(isGridViewActive("all", "grid")).toBe(true);
-    expect(isGridViewActive("smart-abc", "grid")).toBe(true);
-    expect(isGridViewActive("circle", "list")).toBe(false);
-    expect(isGridViewActive("circle", "grid")).toBe(true);
-    expect(isGridViewActive("tag", "grid")).toBe(true);
-  });
-});
-
 describe("buildFilterTag", () => {
-  it("tag 軸はそのまま返す（値が既に完全なタグ文字列のため）", () => {
-    expect(buildFilterTag("tag", "cv/藤田茜")).toBe("cv/藤田茜");
+  it("tag のグループ分けはそのまま返す（値が既に完全なタグ文字列のため）", () => {
+    expect(buildFilterTag({ kind: "tag" }, "cv/藤田茜")).toBe("cv/藤田茜");
   });
-  it("実タグ由来の facet 軸は 軸/値 の実タグを組み立てる", () => {
-    expect(buildFilterTag("cv", "藤田茜")).toBe("cv/藤田茜");
+  it("prefix のグループ分けは prefix/値 の実タグを組み立てる", () => {
+    expect(buildFilterTag({ kind: "prefix", prefix: "cv" }, "藤田茜")).toBe("cv/藤田茜");
   });
-  it("year（タグ由来でない組み込み軸）は @軸/値 の擬似タグを組み立てる", () => {
-    expect(buildFilterTag("year", "2024")).toBe("@year/2024");
-  });
-});
-
-describe("filterValidFacetItems", () => {
-  it("正規化できない値をスキップしconsole.warnする", () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-    const result = filterValidFacetItems("tag", [facetItem("cv/藤田茜"), facetItem("   ")]);
-
-    expect(result).toEqual([facetItem("cv/藤田茜")]);
-    expect(warn).toHaveBeenCalledTimes(1);
-    warn.mockRestore();
-  });
-
-  it("すべて正規化できる値ならそのまま返す", () => {
-    const items = [facetItem("cv/藤田茜"), facetItem("cv/霧島レイ")];
-
-    expect(filterValidFacetItems("cv", items)).toEqual(items);
+  it("addedYear（タグ由来でない）は @year/値 の擬似タグを組み立てる", () => {
+    expect(buildFilterTag({ kind: "addedYear" }, "2024")).toBe("@year/2024");
   });
 });
 
-describe("axisOfFilterTag（正規化済みタグを前提とする）", () => {
-  it("year擬似タグは軸が特定される", () => {
-    expect(axisOfFilterTag(nt("@year/2024"))).toBe("year");
-  });
-});
-
-describe("buildWorksParams", () => {
-  it("returns null for smart folder axes (handled by a separate query)", () => {
-    expect(
-      buildWorksParams({
-        activeAxis: "smart-abc",
-        sort: "added-desc",
-        searchQuery: "",
-        selectedTags: [],
-      }),
-    ).toBeNull();
+describe("assertGroupValueItems", () => {
+  it("グループの値として使えない値があれば、読み飛ばさず投げる", () => {
+    expect(() =>
+      assertGroupValueItems({ kind: "tag" }, [groupValueItem("cv/藤田茜"), groupValueItem("   ")]),
+    ).toThrow("使えません");
   });
 
-  it("returns null for value-list axes (facet/tag axes never show a works list)", () => {
-    expect(
-      buildWorksParams({
-        activeAxis: "tag",
-        sort: "added-desc",
-        searchQuery: "",
-        selectedTags: ["ASMR"],
-      }),
-    ).toBeNull();
-    expect(
-      buildWorksParams({
-        activeAxis: "circle",
-        sort: "added-desc",
-        searchQuery: "",
-        selectedTags: [],
-      }),
-    ).toBeNull();
-  });
+  it("すべて使える値ならそのまま返す", () => {
+    const items = [groupValueItem("藤田茜"), groupValueItem("霧島レイ")];
 
-  it("sets view for non-all view axes but not for all", () => {
-    expect(
-      buildWorksParams({
-        activeAxis: "fav",
-        sort: "added-desc",
-        searchQuery: "",
-        selectedTags: [],
-      }),
-    ).toEqual({ sort: "added-desc", view: "fav" });
-    expect(
-      buildWorksParams({
-        activeAxis: "all",
-        sort: "added-desc",
-        searchQuery: "",
-        selectedTags: [],
-      }),
-    ).toEqual({ sort: "added-desc" });
-  });
-
-  it("sets tags/tagOp when a view axis has selected tags (ADR-0012: filters apply across all axes)", () => {
-    expect(
-      buildWorksParams({
-        activeAxis: "all",
-        sort: "added-desc",
-        searchQuery: "",
-        selectedTags: ["cv/藤田茜", "サークル/月白製作所"],
-      }),
-    ).toEqual({
-      sort: "added-desc",
-      tags: ["cv/藤田茜", "サークル/月白製作所"],
-      tagOp: "AND",
-    });
-  });
-
-  it("passes a year pseudo-tag through in tags as-is; the server interprets it (ADR-0012 §2)", () => {
-    expect(
-      buildWorksParams({
-        activeAxis: "all",
-        sort: "added-desc",
-        searchQuery: "",
-        selectedTags: ["@year/2024"],
-      }),
-    ).toEqual({ sort: "added-desc", tags: ["@year/2024"], tagOp: "AND" });
-  });
-
-  it("combines a real tag filter and a year pseudo-tag filter together in tags", () => {
-    expect(
-      buildWorksParams({
-        activeAxis: "all",
-        sort: "added-desc",
-        searchQuery: "",
-        selectedTags: ["cv/藤田茜", "@year/2024"],
-      }),
-    ).toEqual({
-      sort: "added-desc",
-      tags: ["cv/藤田茜", "@year/2024"],
-      tagOp: "AND",
-    });
-  });
-
-  it("treats a real tag literally named year/2025 as an exact-match tag, not the addedAt year filter", () => {
-    expect(
-      buildWorksParams({
-        activeAxis: "all",
-        sort: "added-desc",
-        searchQuery: "",
-        selectedTags: ["year/2025"],
-      }),
-    ).toEqual({ sort: "added-desc", tags: ["year/2025"], tagOp: "AND" });
-  });
-});
-
-describe("buildSmartFolderFilterParams（スマートフォルダー評価APIへの追加AND条件）", () => {
-  it("フィルタが無ければキーの無い空オブジェクトを返す（クエリキーの安定のため）", () => {
-    expect(buildSmartFolderFilterParams([], "")).toEqual({});
-  });
-  it("実タグは tags/tagOp として渡す", () => {
-    expect(buildSmartFolderFilterParams(["cv/藤田茜", "サークル/月白製作所"], "")).toEqual({
-      tags: ["cv/藤田茜", "サークル/月白製作所"],
-      tagOp: "AND",
-    });
-  });
-  it("year 擬似タグも tags にそのまま渡す（サーバー側で解釈する）", () => {
-    expect(buildSmartFolderFilterParams(["@year/2024"], "")).toEqual({
-      tags: ["@year/2024"],
-      tagOp: "AND",
-    });
-  });
-  it("実タグとyear擬似タグを同時に渡せる", () => {
-    expect(buildSmartFolderFilterParams(["cv/藤田茜", "@year/2024"], "")).toEqual({
-      tags: ["cv/藤田茜", "@year/2024"],
-      tagOp: "AND",
-    });
-  });
-  it("作品検索qはフォルダーのルール全体への追加AND条件としてqに渡す", () => {
-    expect(buildSmartFolderFilterParams([], "藤田茜")).toEqual({ q: "藤田茜" });
-  });
-  it("qとタグを同時に渡せる", () => {
-    expect(buildSmartFolderFilterParams(["cv/藤田茜"], "ASMR")).toEqual({
-      tags: ["cv/藤田茜"],
-      tagOp: "AND",
-      q: "ASMR",
-    });
-  });
-});
-
-describe("getFacetAxisForQuery", () => {
-  it("returns the axis for value-list axes (facet/tag)", () => {
-    expect(getFacetAxisForQuery("circle")).toBe("circle");
-    expect(getFacetAxisForQuery("tag")).toBe("tag");
-  });
-  it("returns null for view/smart axes", () => {
-    expect(getFacetAxisForQuery("all")).toBeNull();
-    expect(getFacetAxisForQuery("smart-abc")).toBeNull();
-  });
-});
-
-describe("computeIsNoResultsDueToFilter", () => {
-  it("is false when the axis is just naturally empty (no search/filter)", () => {
-    expect(computeIsNoResultsDueToFilter(true, 0, "", [], false, false)).toBe(false);
-  });
-  it("is true when a search query narrows to zero results (query settled: not loading/error)", () => {
-    expect(computeIsNoResultsDueToFilter(true, 0, "存在しない語", [], false, false)).toBe(true);
-  });
-  it("is true when a selected tag filter narrows to zero results", () => {
-    expect(computeIsNoResultsDueToFilter(true, 0, "", ["存在しないタグ"], false, false)).toBe(true);
-  });
-  it("is false while the debounced query is still loading, even though works is temporarily empty", () => {
-    expect(computeIsNoResultsDueToFilter(true, 0, "存在しない語", [], true, false)).toBe(false);
-  });
-  it("is false when the works query errored (0件が確定した結果ではないため)", () => {
-    expect(computeIsNoResultsDueToFilter(true, 0, "存在しない語", [], false, true)).toBe(false);
-  });
-  it("is false when the pane isn't a works pane", () => {
-    expect(computeIsNoResultsDueToFilter(false, 0, "存在しない語", [], false, false)).toBe(false);
+    expect(assertGroupValueItems({ kind: "prefix", prefix: "cv" }, items)).toBe(items);
   });
 });
 
@@ -326,26 +113,17 @@ describe("computeCollectionStatsDisplay", () => {
   });
 });
 
-describe("buildTagFilterParams", () => {
-  it("タグが1件以上あればtags/tagOpへそのまま渡す（軸による絞り込みはしない）", () => {
-    expect(buildTagFilterParams(["cv/藤田茜", "サークル/月白製作所"])).toEqual({
-      tags: ["cv/藤田茜", "サークル/月白製作所"],
-      tagOp: "AND",
-    });
-  });
-
-  it("タグが無ければ空オブジェクトを返す", () => {
-    expect(buildTagFilterParams([])).toEqual({});
-  });
-});
-
 describe("formatFilterChipLabel（チップの内部表現を隠す）", () => {
-  it("組み込み軸の擬似タグは「軸ラベル/値」に変換する", () => {
-    expect(formatFilterChipLabel(nt("@year/2024"))).toBe("追加日/2024");
+  it("組み込みの擬似タグは「グループ分けのラベル/値」に変換する", () => {
+    expect(formatFilterChipLabel(nt("@year/2024"))).toBe("追加年/2024");
   });
 
   it("実タグはフルパスのまま変更しない", () => {
     expect(formatFilterChipLabel(nt("cv/藤田茜"))).toBe("cv/藤田茜");
     expect(formatFilterChipLabel(nt("ASMR"))).toBe("ASMR");
+  });
+
+  it("組み込みのキーでない擬似タグは変換しない", () => {
+    expect(formatFilterChipLabel("@other/2024" as NormalizedTag)).toBe("@other/2024");
   });
 });

@@ -6,6 +6,7 @@ import type { Work, WorkEditSnapshot } from "@mimimilli/shared";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import type { EditWorkSourceMutation } from "../../src/entities/work/model/workMutations";
+import { buildNav } from "./fixtures/libraryNav";
 import { useLibraryWorkPatchMutations } from "../../src/features/library/model/useLibraryQueries";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
 import { WorkEditDialog } from "../../src/features/library/ui/preview/WorkEditDialog";
@@ -138,13 +139,8 @@ function EditDialogWithRealMutation(props: {
   tagSuggestions?: string[];
   onClose?: () => void;
 }) {
-  const nav: LibraryViewState = {
-    activeAxis: "all",
-    selectedTags: [],
-    selectedWorkId: props.work.id,
-    sort: "added-desc",
-  };
-  const { editMutation } = useLibraryWorkPatchMutations(nav, "");
+  const nav: LibraryViewState = buildNav({ library: { selectedWorkId: props.work.id } });
+  const { editMutation } = useLibraryWorkPatchMutations(nav.view, "");
   return (
     <WorkEditDialog
       work={props.work}

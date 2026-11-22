@@ -46,6 +46,10 @@
   --cat-color: oklch(52% 0.11 285);
 
   /* Feedback state — success/warning/danger（トースト・インライン通知の種別区別用） */
+  /* トースト（暗い地）の上だけで使う印の色 */
+  --toast-success: oklch(82% 0.17 150);
+  --toast-warning: oklch(82% 0.15 85);
+  --toast-danger: oklch(76% 0.17 25);
   --state-success: oklch(52% 0.13 150);
   --state-warning: oklch(66% 0.15 75);
   --state-danger: oklch(54% 0.19 25);
@@ -118,4 +122,7 @@
   --sp-5: 24px;
   --sp-6: 32px;
   --sp-7: 48px;
+
+  /* 画面下の再生バーの高さ（.mle-bar1）。バーの上に出るものがこの値を基準に位置を決める */
+  --dock-height: 72px;
 }

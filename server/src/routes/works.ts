@@ -1,4 +1,4 @@
-// 作品関連: GET/PATCH/DELETE /works, /works/:id/resume, /works/:id/last-played,
+// 作品関連: GET/PATCH/DELETE /works/:id, /works/:id/resume, /works/:id/last-played,
 //          POST /works/:id/playback-preparation,
 //          GET /tags, POST /export, POST /works, GET /works/register-preview
 import { Hono } from "hono";
@@ -6,7 +6,6 @@ import {
   normalizeTag,
   resumeBodySchema,
   tagSchema,
-  WORKS_DEFAULT_PAGE_SIZE,
   workBookmarkPatchSchema,
   workCreateBodySchema,
   identityConflictReassignBodySchema,
@@ -15,13 +14,11 @@ import {
   workCreateResponseSchema,
   workSourceMutationResultSchema,
   workSourcePatchSchema,
-  worksQuerySchema,
 } from "@mimimilli/shared";
 import { InvalidResumeError, WorkRegisterError } from "../errors.ts";
 import type { DataAdapter } from "../adapter/index.ts";
 import { conflict, invalidRequest, notFound, throwSourceCommandError } from "../lib/httpError.ts";
 import { readJsonBody } from "../lib/jsonBody.ts";
-import type { ScanRecordStore } from "../scanRecord.ts";
 
 function parseWorkTagPath(c: {
   req: { path: string; param: (name: string) => string };
@@ -43,31 +40,8 @@ function parseWorkTagPath(c: {
   return normalized;
 }
 
-export function worksRoute(adapter: DataAdapter, scanRecord: ScanRecordStore): Hono {
+export function worksRoute(adapter: DataAdapter): Hono {
   const app = new Hono();
-
-  app.get("/works", async (c) => {
-    const parsed = worksQuerySchema.safeParse({
-      ...c.req.query(),
-      tags: c.req.queries("tags"),
-    });
-    if (!parsed.success) {
-      invalidRequest("works のクエリパラメータが不正です");
-    }
-    const { scanRecord: recordKind, scanChange, ...query } = parsed.data;
-    if (scanChange !== undefined && recordKind !== "updated") {
-      invalidRequest("scanChange は scanRecord=updated のときだけ指定できます");
-    }
-    // page/limit 未指定でもサーバー側デフォルトでページングする。
-    // limit だけの指定は page=1 として扱う
-    const page = await adapter.queryWorks({
-      ...query,
-      ...(recordKind ? { ids: scanRecord.workIds(recordKind, scanChange) } : {}),
-      page: parsed.data.page ?? 1,
-      limit: parsed.data.limit ?? WORKS_DEFAULT_PAGE_SIZE,
-    });
-    return c.json(page);
-  });
 
   app.get("/works/register-preview", async (c) => {
     const parsed = workRegisterPreviewQuerySchema.safeParse(c.req.query());

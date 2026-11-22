@@ -84,12 +84,12 @@ const KEYS = {
   detail2: WORK_QUERY_KEYS.detail("w2"),
   source2: WORK_QUERY_KEYS.source("w2"),
   list: WORK_QUERY_KEYS.list({ sort: "added-desc" }),
-  favList: WORK_QUERY_KEYS.list({ sort: "added-desc", view: "fav" }),
+  otherList: WORK_QUERY_KEYS.list({ sort: "title-asc" }),
   total: WORK_QUERY_KEYS.total(),
-  facets: WORK_QUERY_KEYS.facets("circle"),
+  groupValues: SMART_FOLDER_QUERY_KEYS.groups("sf-1", "prefix:cv"),
   tags: TAG_QUERY_KEYS.all(),
   smartWorks: SMART_FOLDER_QUERY_KEYS.works("sf-1"),
-  smartPreview: SMART_FOLDER_QUERY_KEYS.preview([{ axis: "circle", op: "eq", value: "c" }]),
+  smartFolders: SMART_FOLDER_QUERY_KEYS.all(),
   fs: FILE_SYSTEM_QUERY_KEYS.directory("dlsite"),
   diagnostics: SCAN_QUERY_KEYS.diagnostics(),
   scanRecord: SCAN_QUERY_KEYS.last(),
@@ -107,12 +107,12 @@ function seededClient(): QueryClient {
   queryClient.setQueryData(KEYS.detail2, makeWork({ id: "w2" }));
   queryClient.setQueryData(KEYS.source2, makeSnapshot("w2", "作品2"));
   queryClient.setQueryData(KEYS.list, structuredClone(emptyPages));
-  queryClient.setQueryData(KEYS.favList, structuredClone(emptyPages));
+  queryClient.setQueryData(KEYS.otherList, structuredClone(emptyPages));
   queryClient.setQueryData(KEYS.total, { items: [], total: 0 });
-  queryClient.setQueryData(KEYS.facets, []);
+  queryClient.setQueryData(KEYS.groupValues, []);
   queryClient.setQueryData(KEYS.tags, []);
   queryClient.setQueryData(KEYS.smartWorks, structuredClone(emptyPages));
-  queryClient.setQueryData(KEYS.smartPreview, 3);
+  queryClient.setQueryData(KEYS.smartFolders, []);
   queryClient.setQueryData(KEYS.fs, { entries: [] });
   queryClient.setQueryData(KEYS.diagnostics, buildScanDiagnostics());
   queryClient.setQueryData(KEYS.scanRecord, { finishedAt: null });
@@ -134,12 +134,12 @@ function removedKeys(queryClient: QueryClient): KeyName[] {
 
 const LIBRARY_VIEWS: KeyName[] = [
   "list",
-  "favList",
+  "otherList",
   "total",
-  "facets",
+  "groupValues",
   "tags",
   "smartWorks",
-  "smartPreview",
+  "smartFolders",
 ];
 const REGISTRATION_VIEWS: KeyName[] = [...LIBRARY_VIEWS, "fs", "diagnostics", "scanRecord"];
 
@@ -148,7 +148,7 @@ function sorted(names: KeyName[]): KeyName[] {
 }
 
 describe("meta 編集の必須更新", () => {
-  it("source へ応答の snapshot を書き戻し、詳細・一覧系・facet・タグ・SF を無効化する", async () => {
+  it("source へ応答の snapshot を書き戻し、詳細・一覧系・グループの値・タグ・SF を無効化する", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterSourceEdit(queryClient, mutationResult("w1"));
@@ -168,7 +168,8 @@ describe("再生開始時の投影反映", () => {
     await updateCachesAfterPlaybackPrepared(queryClient, prepared);
 
     expect(queryClient.getQueryData(KEYS.detail1)).toEqual(prepared);
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(LIBRARY_VIEWS));
+    // 件数（スマートフォルダー一覧）だけを取り直し、開いている一覧の並びは動かさない（ADR-0040）
+    expect(invalidatedKeys(queryClient)).toEqual(["smartFolders"]);
   });
 });
 
@@ -187,13 +188,13 @@ describe("bookmark の必須更新", () => {
     });
   });
 
-  it("一覧（works の list 形と smartFolderWorks）だけを無効化し、総件数・facet・詳細は無効化しない", async () => {
+  it("一覧（works の list 形と smartFolderWorks）・グループの値・スマートフォルダーの件数だけを無効化し、総件数・詳細は無効化しない", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterBookmark(queryClient, { workId: "w1", bookmarked: true });
 
     expect(sorted(invalidatedKeys(queryClient))).toEqual(
-      sorted(["list", "favList", "smartWorks", "smartPreview"]),
+      sorted(["list", "otherList", "smartWorks", "groupValues", "smartFolders"]),
     );
   });
 
@@ -213,19 +214,21 @@ describe("bookmark の必須更新", () => {
     unsubscribe();
 
     expect(queryClient.getQueryCache().find({ queryKey: KEYS.list })?.isStale()).toBe(false);
-    expect(queryClient.getQueryCache().find({ queryKey: KEYS.favList })?.isStale()).toBe(true);
+    expect(queryClient.getQueryCache().find({ queryKey: KEYS.otherList })?.isStale()).toBe(true);
     expect(queryClient.getQueryCache().find({ queryKey: KEYS.smartWorks })?.isStale()).toBe(true);
     expect(fetchCount).toBe(0);
   });
 });
 
 describe("登録・スキャン完了の必須更新", () => {
-  it("登録は一覧系・facet・タグ・SF（件数プレビューを含む）・FS・診断・スキャンの記録を無効化し、詳細は触らない", async () => {
+  it("登録は登録の集合に加えて全詳細を無効化する（再登録で古い詳細・sourceRevision を残さない）", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterRegistration(queryClient);
 
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(REGISTRATION_VIEWS));
+    expect(sorted(invalidatedKeys(queryClient))).toEqual(
+      sorted([...REGISTRATION_VIEWS, "detail1", "source1", "detail2", "source2"]),
+    );
   });
 
   it("登録・解除は、サーバーの応答で候補一覧を置き換え、取得に失敗しても reject しない", async () => {
@@ -235,7 +238,7 @@ describe("登録・スキャン完了の必須更新", () => {
     });
     const queryClient = seededClient();
 
-    await updateCachesAfterUnregistration(queryClient, "w1");
+    await updateCachesAfterUnregistration(queryClient);
     expect(queryClient.getQueryData(KEYS.candidates)).toEqual({
       scanCompleted: true,
       candidates: [found],
@@ -268,23 +271,22 @@ describe("登録・スキャン完了の必須更新", () => {
 });
 
 describe("登録解除の必須更新", () => {
-  it("単体は対象作品のキャッシュ（詳細と source）を削除し、他の作品の詳細は残す", async () => {
+  it("単体は登録の集合を無効化するだけで、作品のキャッシュは消さない", async () => {
     const queryClient = seededClient();
 
-    await updateCachesAfterUnregistration(queryClient, "w1");
+    await updateCachesAfterUnregistration(queryClient);
 
-    expect(sorted(removedKeys(queryClient))).toEqual(sorted(["detail1", "source1"]));
+    expect(removedKeys(queryClient)).toEqual([]);
     expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(REGISTRATION_VIEWS));
   });
 
-  it("missing 一括は全詳細と登録の集合を無効化する", async () => {
+  it("missing 一括は登録の集合だけを無効化し、詳細は触らない", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterMissingUnregistration(queryClient);
 
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(
-      sorted([...REGISTRATION_VIEWS, "detail1", "source1", "detail2", "source2"]),
-    );
+    expect(removedKeys(queryClient)).toEqual([]);
+    expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(REGISTRATION_VIEWS));
   });
 });
 
@@ -303,7 +305,7 @@ describe("ID 再採番の必須更新", () => {
 });
 
 describe("DLsite の必須更新", () => {
-  it("単体適用は source を書き戻して残し、詳細・一覧系・facet・タグ・SF を無効化する", async () => {
+  it("単体適用は source を書き戻して残し、詳細・一覧系・グループの値・タグ・SF を無効化する", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterDlsiteLinkageChange(queryClient, mutationResult("w1"));

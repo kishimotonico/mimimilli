@@ -8,6 +8,8 @@ export type NavigationDirection = "forward" | "back";
 
 export interface NavigateOptions {
   replace?: boolean;
+  /** push のとき、URLが同じで履歴エントリーの状態だけが変わる場合も履歴を積む。既定は置き換え */
+  pushSameUrl?: boolean;
   direction?: NavigationDirection;
 }
 
@@ -20,6 +22,13 @@ export type RouteUpdate<R> = R | ((current: R) => R);
 export interface HistoryAvailability {
   canBack: boolean;
   canForward: boolean;
+}
+
+/** 履歴へ書く1回分の操作。URL と履歴エントリーの状態は route から codec が作る */
+export interface PendingHistoryOp<R> {
+  route: R;
+  write: HistoryWrite;
+  pushSameUrl: boolean;
 }
 
 export interface RouteStore<R> {
@@ -38,15 +47,18 @@ export interface RouteStore<R> {
       [apply: (current: R) => R, direction: NavigationDirection],
       void
     >;
-    pendingWriteAtom: Atom<HistoryWrite | null>;
-    consumePendingWriteAtom: WritableAtom<null, [], void>;
+    /** navigate ごとの履歴操作を、まとめずに呼ばれた順で持つ */
+    pendingOpsAtom: Atom<readonly PendingHistoryOp<R>[]>;
+    /** 未反映の操作をすべて取り出して空にする */
+    takePendingOpsAtom: WritableAtom<null, [], PendingHistoryOp<R>[]>;
     historyAvailabilityAtom: WritableAtom<HistoryAvailability, [HistoryAvailability], void>;
   };
 }
 
 export function createRouteStore<R>(readInitial: () => R): RouteStore<R> {
   const baseRouteAtom = atomWithLazy(readInitial);
-  const pendingWriteAtom = atom<HistoryWrite | null>(null);
+  const NO_OPS: readonly PendingHistoryOp<R>[] = [];
+  const pendingOpsAtom = atom<readonly PendingHistoryOp<R>[]>(NO_OPS);
   const directionAtom = atom<NavigationDirection>("forward");
   const historyAvailabilityAtom = atom<HistoryAvailability>({ canBack: false, canForward: false });
 
@@ -57,7 +69,10 @@ export function createRouteStore<R>(readInitial: () => R): RouteStore<R> {
       const route = typeof next === "function" ? (next as (current: R) => R)(current) : next;
       if (route === current) return;
       const write: HistoryWrite = options.replace ? "replace" : "push";
-      set(pendingWriteAtom, get(pendingWriteAtom) === "push" ? "push" : write);
+      set(pendingOpsAtom, [
+        ...get(pendingOpsAtom),
+        { route, write, pushSameUrl: options.pushSameUrl === true },
+      ]);
       set(directionAtom, options.direction ?? "forward");
       set(baseRouteAtom, route);
     },
@@ -77,13 +92,18 @@ export function createRouteStore<R>(readInitial: () => R): RouteStore<R> {
       applyFromHistoryAtom: atom(
         null,
         (get, set, apply: (current: R) => R, direction: NavigationDirection) => {
-          set(pendingWriteAtom, null);
+          set(pendingOpsAtom, NO_OPS);
           set(directionAtom, direction);
           set(baseRouteAtom, apply(get(baseRouteAtom)));
         },
       ),
-      pendingWriteAtom,
-      consumePendingWriteAtom: atom(null, (_get, set) => set(pendingWriteAtom, null)),
+      pendingOpsAtom,
+      takePendingOpsAtom: atom(null, (get, set) => {
+        const ops = get(pendingOpsAtom);
+        if (ops.length === 0) return [];
+        set(pendingOpsAtom, NO_OPS);
+        return [...ops];
+      }),
       historyAvailabilityAtom,
     },
   };

@@ -62,7 +62,9 @@ async function setup(t: TestContext) {
       }
     ).dataIntegrityWorks.map((work) => work.workId);
   const listedIds = async () => {
-    const page = (await (await app.request("/api/works")).json()) as {
+    const page = (await (
+      await app.request("/api/smart-folders/all/works?sort=added-desc")
+    ).json()) as {
       items: Array<{ id: string }>;
     };
     return page.items.map((item) => item.id);

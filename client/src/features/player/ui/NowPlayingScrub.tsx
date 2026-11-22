@@ -1,4 +1,4 @@
-// 再生中タブの scrub（AB区間ハンドル付き）+ 時刻行 leaf。
+// 再生中の層の scrub（AB区間ハンドル付き）+ 時刻行 leaf。
 // currentTime/duration を自前で購読し、親（NowPlayingView）を再レンダリングさせない
 // （docs/HANDOFF.md の高頻度atom購読設計）。
 

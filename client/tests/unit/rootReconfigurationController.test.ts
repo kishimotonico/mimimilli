@@ -16,7 +16,7 @@ import { FILE_SYSTEM_QUERY_KEYS } from "../../src/entities/file-system/queryKeys
 const AFFECTED_KEYS = [
   WORK_QUERY_KEYS.list({}),
   WORK_QUERY_KEYS.detail("work-1"),
-  WORK_QUERY_KEYS.allFacets(),
+  SMART_FOLDER_QUERY_KEYS.allGroups(),
   SMART_FOLDER_QUERY_KEYS.all(),
   SMART_FOLDER_QUERY_KEYS.works("folder-1"),
   TAG_QUERY_KEYS.all(),
@@ -96,6 +96,18 @@ describe("resetReconfigurationAffectedQueries", () => {
     await vi.waitFor(() => expect(result.current.status).toBe("success"));
     expect(result.current.data).toEqual({ seeded: true, refreshed: true });
     expect(result.current.isPending).toBe(false);
+  });
+
+  it("スマートフォルダー一覧はデータを残したまま取り直す（サイドバーの前提を空にしない）", () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), [{ id: "all" }]);
+    queryClient.setQueryData(WORK_QUERY_KEYS.all(), { stale: true });
+
+    resetReconfigurationAffectedQueries(queryClient);
+
+    expect(queryClient.getQueryData(SMART_FOLDER_QUERY_KEYS.all())).toEqual([{ id: "all" }]);
+    expect(queryClient.getQueryState(SMART_FOLDER_QUERY_KEYS.all())?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryData(WORK_QUERY_KEYS.all())).toBeUndefined();
   });
 
   it("settingsクエリなど再設定に無関係なキャッシュは対象にしない", () => {

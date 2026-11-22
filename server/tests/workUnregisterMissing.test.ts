@@ -47,7 +47,7 @@ async function assertMissingBulkDeleteContract(
 
   assert.equal((await app.request(`/api/works/${ids.ok}`)).status, 200);
 
-  const listBody = await (await app.request("/api/works")).json();
+  const listBody = await (await app.request("/api/smart-folders/all/works?sort=added-desc")).json();
   assert.equal(listBody.total, 2);
 
   const recountRes = await app.request("/api/works/missing-count");

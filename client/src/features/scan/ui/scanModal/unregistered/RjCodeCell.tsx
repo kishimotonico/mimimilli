@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { NO_AUTOFILL_PROPS } from "../../../../../shared/ui/noAutofill";
 import { cn } from "../../../../../shared/lib/cn";
 import { useInlineEditKeyDown } from "../../../../../shared/ui/useInlineEditKeyDown";
 import { RJ_CELL_HEIGHT } from "./layout";
@@ -121,6 +122,7 @@ function RjCodeInput({
 
   return (
     <input
+      {...NO_AUTOFILL_PROPS}
       ref={inputRef}
       value={value}
       readOnly={readOnly}

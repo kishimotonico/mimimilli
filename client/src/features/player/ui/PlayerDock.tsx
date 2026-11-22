@@ -3,7 +3,10 @@ import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { useCallback, useState } from "react";
 import { type MotionVariant, useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { playerIsActiveAtom } from "../../../entities/player/model/atoms";
-import { appModeAtom, setAppModeAtom } from "../../../entities/navigation/model/appRouteStore";
+import {
+  layerAtom,
+  openNowPlayingLayerAtom,
+} from "../../../entities/navigation/model/appRouteStore";
 import { usePlayerActions } from "../../../entities/player/model/usePlayerActions";
 import { usePlayerState, type PlayerState } from "../model/usePlayerState";
 import { usePopupDrag } from "../model/usePopupDrag";
@@ -20,6 +23,7 @@ interface DockBarProps {
   onPrev: () => void;
   onSeek: (t: number) => void;
   onSwitchToPopup: () => void;
+  onOpenNowPlaying: () => void;
   onSetVolume: (v: number) => void;
   onStop: () => void;
   onRetryError: () => void;
@@ -94,8 +98,8 @@ export default function PlayerDock({ onShowPlayingWork }: PlayerDockProps) {
   const state = usePlayerState();
   const actions = usePlayerActions();
   const isPlaying = useAtomValue(playerIsActiveAtom);
-  const isNowPlaying = useAtomValue(appModeAtom) === "nowPlaying";
-  const setAppMode = useSetAtom(setAppModeAtom);
+  const layerOpen = useAtomValue(layerAtom) !== null;
+  const openNowPlaying = useSetAtom(openNowPlayingLayerAtom);
   const [uiMode, setUiMode] = useAtom(playerUiModeAtom);
   const [switchingUiMode, setSwitchingUiMode] = useState(false);
   const { dockBarSlide, dockBarSwitch, dockPopupScale } = useMotionVariants();
@@ -115,11 +119,11 @@ export default function PlayerDock({ onShowPlayingWork }: PlayerDockProps) {
     setSwitchingUiMode(false);
   }, []);
 
-  // 再生中タブでは自前の下部固定バーを持つため、PlayerDock（バー/ポップアップ）は
+  // 再生中の層は自前の操作部を持つため、層が開いている間は PlayerDock（バー/ポップアップ）を
   // 描画しない。playerUiModeAtom（bar/popup）の保存値はここでは変更せず、
-  // 他モードへ戻れば保存値どおりに復元される。
-  const showBar = isPlaying && uiMode === "bar" && !isNowPlaying;
-  const showPopup = isPlaying && uiMode === "popup" && !isNowPlaying;
+  // 層を閉じれば保存値どおりに復元される。
+  const showBar = isPlaying && uiMode === "bar" && !layerOpen;
+  const showPopup = isPlaying && uiMode === "popup" && !layerOpen;
   const barVariant = switchingUiMode
     ? dockBarSwitch({ waitEnter: uiMode === "bar" })
     : dockBarSlide();
@@ -139,6 +143,7 @@ export default function PlayerDock({ onShowPlayingWork }: PlayerDockProps) {
             onPrev={actions.prevTrack}
             onSeek={actions.seek}
             onSwitchToPopup={() => switchUiMode("popup")}
+            onOpenNowPlaying={() => openNowPlaying()}
             onSetVolume={actions.setVolume}
             onStop={actions.stop}
             onRetryError={actions.retryPlayback}
@@ -162,7 +167,7 @@ export default function PlayerDock({ onShowPlayingWork }: PlayerDockProps) {
             onNext={actions.nextTrack}
             onPrev={actions.prevTrack}
             onFold={() => switchUiMode("bar")}
-            onOpenNowPlaying={() => setAppMode("nowPlaying")}
+            onOpenNowPlaying={() => openNowPlaying()}
             onShowPlayingWork={handleShowPlayingWork}
             onStop={actions.stop}
             onRetryError={actions.retryPlayback}

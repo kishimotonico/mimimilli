@@ -20,7 +20,13 @@ function createFolderRequest(name: string, headers: Record<string, string>) {
   return {
     method: "POST",
     headers: { ...JSON_TYPE, ...headers },
-    body: JSON.stringify({ name, rules: [], sort: "added-desc" }),
+    body: JSON.stringify({
+      name,
+      condition: { type: "and", children: [] },
+      sort: "added-desc",
+      groupBy: null,
+      groupSort: null,
+    }),
   };
 }
 
@@ -52,7 +58,9 @@ async function assertAccepted(
 contract("外部Hostは拒否し、状態を変えない", async (harness) => {
   for (const host of ["evil.example", "127.0.0.1.evil.example", "localhost.evil.example"]) {
     await assertRejected(harness, `host-${host}`, { Host: host });
-    const get = await harness.app.request("/api/works", { headers: { Host: host } });
+    const get = await harness.app.request("/api/smart-folders/all/works?sort=added-desc", {
+      headers: { Host: host },
+    });
     assert.equal(get.status, 403, host);
   }
   await assertRejected(harness, "host-userinfo", { Host: "localhost@evil.example" });
@@ -74,7 +82,10 @@ contract("loopbackのHostは通す（ポート・大文字小文字を問わな�
 });
 
 contract("Hostヘッダーが無い要求は要求URLがlocalhostでも拒否する", async (harness) => {
-  for (const url of ["http://localhost/api/works", "http://evil.example/api/works"]) {
+  for (const url of [
+    "http://localhost/api/smart-folders/all/works?sort=added-desc",
+    "http://evil.example/api/smart-folders/all/works?sort=added-desc",
+  ]) {
     const res = await harness.app.fetch(new Request(url));
     assert.equal(res.status, 403, url);
   }
@@ -154,7 +165,7 @@ contract("本文なしの外部Origin POSTも拒否する", async (harness) => {
 contract(
   "GETは外部Originでも出所検証の対象外で、OPTIONSにCORSヘッダーを付けない",
   async (harness) => {
-    const get = await harness.app.request("/api/works", {
+    const get = await harness.app.request("/api/smart-folders/all/works?sort=added-desc", {
       headers: { Origin: "http://evil.example", "Sec-Fetch-Site": "cross-site" },
     });
     assert.equal(get.status, 200);
@@ -178,7 +189,13 @@ contract(
 contract(
   "JSON本文のメディア型がapplication/jsonでなければ415で、状態を変えない",
   async (harness) => {
-    const body = JSON.stringify({ name: "text-plain", rules: [], sort: "added-desc" });
+    const body = JSON.stringify({
+      name: "text-plain",
+      condition: { type: "and", children: [] },
+      sort: "added-desc",
+      groupBy: null,
+      groupSort: null,
+    });
     for (const headers of [
       { "Content-Type": "text/plain" },
       {},
@@ -201,7 +218,13 @@ contract("パラメータ付き・大文字小文字違いのapplication/jsonは
     const res = await harness.app.request("/api/smart-folders", {
       method: "POST",
       headers: { "Content-Type": type },
-      body: JSON.stringify({ name: `ct-${index}`, rules: [], sort: "added-desc" }),
+      body: JSON.stringify({
+        name: `ct-${index}`,
+        condition: { type: "and", children: [] },
+        sort: "added-desc",
+        groupBy: null,
+        groupSort: null,
+      }),
     });
     assert.equal(res.status, 201, type);
   }

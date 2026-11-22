@@ -240,7 +240,7 @@ describe("useHoverGroupCoordinator", () => {
     removeSpy.mockRestore();
   });
 
-  it("旧オーナーのトークンでの登録解除は新オーナーの登録を壊さない（軸A→B切替）", () => {
+  it("旧オーナーのトークンでの登録解除は新オーナーの登録を壊さない（グループ分けA→B切替）", () => {
     const { result } = renderHook(() => useHoverGroupCoordinator());
     const elA = elAt({ left: 0, top: 90, bottom: 110 });
     const elB = elAt({ left: 0, top: 130, bottom: 150 });

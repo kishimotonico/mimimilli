@@ -130,7 +130,6 @@ export default function TagPrefixSettings() {
       prefix,
       label: newLabel.trim() || prefix,
       color: newColor,
-      showAsAxis: true,
       protected: false,
     });
   };
@@ -173,9 +172,6 @@ export default function TagPrefixSettings() {
             onCommitEditLabel={() => commitEditLabel(p)}
             onCancelEditLabel={() => setEditingPrefix(null)}
             onColorChange={(color) => updateMutation.mutate({ prefix: p.prefix, patch: { color } })}
-            onShowAsAxisChange={(showAsAxis) =>
-              updateMutation.mutate({ prefix: p.prefix, patch: { showAsAxis } })
-            }
             onProtectedChange={(isProtected) =>
               updateMutation.mutate({ prefix: p.prefix, patch: { protected: isProtected } })
             }
@@ -210,7 +206,6 @@ export default function TagPrefixSettings() {
                   prefix: c.prefix,
                   label: c.prefix,
                   color: null,
-                  showAsAxis: true,
                   protected: false,
                 })
               }
@@ -234,7 +229,7 @@ export default function TagPrefixSettings() {
       {deleteTarget && (
         <ConfirmDialog
           title={`prefix「${deleteTarget.label}」を削除`}
-          message={`この prefix 定義を削除します。作品に付いた ${deleteTarget.prefix}/ タグ自体は消えませんが、軸レールへの表示・専用色・保護設定は失われます。`}
+          message={`この prefix 定義を削除します。作品に付いた ${deleteTarget.prefix}/ タグ自体は消えませんが、表示名・専用色・保護設定は失われます。`}
           confirmLabel="削除する"
           onCancel={() => setDeleteTarget(null)}
           onConfirm={() => {

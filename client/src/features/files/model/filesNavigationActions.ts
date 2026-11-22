@@ -2,7 +2,7 @@ import type { WorkspacePath } from "@mimimilli/shared";
 import type { RouteTransition } from "../../../shared/model/routeStore";
 import type { AppRoute } from "../../../entities/navigation/model/appRoute";
 import type { FilesUrlState } from "../../../entities/navigation/model/navigationUrl";
-import { appRouteStore } from "../../../entities/navigation/model/appRouteStore";
+import { appRouteAction } from "../../../entities/navigation/model/appRouteStore";
 import { toSelectedRelPath } from "../../../entities/file-system/model/navigationAtoms";
 
 function withFiles(route: AppRoute, patch: Partial<FilesUrlState>): AppRoute {
@@ -52,8 +52,8 @@ export function goUpFiles(route: AppRoute): RouteTransition<AppRoute> | null {
   };
 }
 
-export const openFilesDirAtom = appRouteStore.action(openFilesDir);
-export const selectFilesEntryAtom = appRouteStore.action(selectFilesEntry);
-export const clearFilesSelectionAtom = appRouteStore.action(clearFilesSelection);
-export const goToFilesSegmentAtom = appRouteStore.action(goToFilesSegment);
-export const goUpFilesAtom = appRouteStore.action(goUpFiles);
+export const openFilesDirAtom = appRouteAction(openFilesDir);
+export const selectFilesEntryAtom = appRouteAction(selectFilesEntry);
+export const clearFilesSelectionAtom = appRouteAction(clearFilesSelection);
+export const goToFilesSegmentAtom = appRouteAction(goToFilesSegment);
+export const goUpFilesAtom = appRouteAction(goUpFiles);

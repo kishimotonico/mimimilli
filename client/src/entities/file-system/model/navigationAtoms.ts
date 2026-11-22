@@ -2,7 +2,7 @@ import { atom } from "jotai";
 import { relativeToRoot, workspacePath, type WorkspacePath } from "@mimimilli/shared";
 import type { RouteTransition } from "../../../shared/model/routeStore";
 import type { AppRoute } from "../../navigation/model/appRoute";
-import { appRouteAtom, appRouteStore } from "../../navigation/model/appRouteStore";
+import { appRouteAction, appRouteAtom } from "../../navigation/model/appRouteStore";
 
 /** カレントディレクトリのルート相対 segments（[] = ルート） */
 export const filesRelPathAtom = atom((get) => get(appRouteAtom).files.relPath);
@@ -37,9 +37,10 @@ export function openPathInFiles(
     route: {
       mode: "files",
       library: route.library,
+      layer: route.layer,
       files: { relPath: segments.slice(0, -1), selectedRelPath: toSelectedRelPath(relativePath) },
     },
   };
 }
 
-export const openPathInFilesAtom = appRouteStore.action(openPathInFiles);
+export const openPathInFilesAtom = appRouteAction(openPathInFiles);

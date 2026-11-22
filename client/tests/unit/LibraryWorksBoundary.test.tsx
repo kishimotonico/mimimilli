@@ -2,19 +2,16 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { describe, expect, it } from "vitest";
-import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
 import { useLibraryNavigation } from "../../src/features/library/model/useLibraryNavigation";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
+import { buildNav } from "./fixtures/libraryNav";
+import { seedSmartFolders } from "../helpers/smartFolders";
 import { mockApi } from "../helpers/api";
 import { buildWorkListItem, buildWorksPage } from "../helpers/builders";
 import LibraryWorksBoundary from "../../src/features/library/ui/LibraryWorksBoundary";
 
-const baseNav: LibraryViewState = {
-  activeAxis: "all",
-  selectedTags: [],
-  selectedWorkId: null,
-  sort: "added-desc",
-};
+const baseNav = buildNav();
+const baseView = baseNav.view as Extract<typeof baseNav.view, { kind: "works" }>;
 
 function worksPage(items: { id: string; title: string }[]) {
   return buildWorksPage(items.map((item) => buildWorkListItem(item)));
@@ -25,7 +22,7 @@ function renderBoundary(children: Parameters<typeof LibraryWorksBoundary>[0]["ch
   return render(
     <QueryClientProvider client={queryClient}>
       <LibraryWorksBoundary
-        nav={baseNav}
+        view={baseView}
         searchQuery=""
         viewMode="list"
         isPending={false}
@@ -42,7 +39,7 @@ describe("LibraryWorksBoundary", () => {
   it("初回取得中だけ既存の読み込みfallbackを表示する", async () => {
     let resolveFetch: ((value: unknown) => void) | undefined;
     mockApi({
-      "GET /api/works": () =>
+      "GET /api/smart-folders/:id/works": () =>
         new Promise<unknown>((resolve) => {
           resolveFetch = resolve;
         }),
@@ -58,7 +55,7 @@ describe("LibraryWorksBoundary", () => {
   it("並び替えactionのtransition中は旧一覧を薄表示で保持し、解決後に解除する", async () => {
     let resolveRandom: ((value: unknown) => void) | undefined;
     mockApi({
-      "GET /api/works": ({ url }) => {
+      "GET /api/smart-folders/:id/works": ({ url }) => {
         if (url.searchParams.get("sort") === "random") {
           return new Promise<unknown>((resolve) => {
             resolveRandom = resolve;
@@ -81,7 +78,7 @@ describe("LibraryWorksBoundary", () => {
       const nav = useLibraryNavigation();
       return (
         <LibraryWorksBoundary
-          nav={nav}
+          view={nav.view as typeof baseView}
           searchQuery=""
           viewMode="list"
           isPending={nav.isPending}
@@ -96,6 +93,7 @@ describe("LibraryWorksBoundary", () => {
     }
 
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    seedSmartFolders(queryClient);
     const store = createStore();
     render(
       <QueryClientProvider client={queryClient}>

@@ -1,7 +1,4 @@
-import type { NormalizedTag } from "@mimimilli/shared";
-import type { SmartFolderRule, WorksQuery } from "@mimimilli/shared";
-import { RECENT_VIEW_WINDOW_DAYS } from "@mimimilli/shared";
-import { parseSmartFolderMinLengthSec } from "../../core/smartFolder.ts";
+import type { GroupSortId, SortId } from "@mimimilli/shared";
 import { normalizeRjCode } from "../../core/worksQuery.ts";
 
 /** SQLite の IN 句パラメータ上限を避けるため、配列を一定件数ごとに分割する */
@@ -19,11 +16,7 @@ export function inClausePlaceholders(count: number): string {
   return Array.from({ length: count }, () => "?").join(", ");
 }
 
-export function worksOrderSql(
-  sort: WorksQuery["sort"],
-  seed: number | undefined,
-  bindings: number[],
-): string {
+export function worksOrderSql(sort: SortId, seed: number | undefined, bindings: number[]): string {
   const idTieBreaker = "works.id COLLATE BINARY ASC";
   switch (sort) {
     case "title-asc":
@@ -66,7 +59,7 @@ function rjCodeNormalizedSql(alias: string): string {
 export function textSearchCondition(
   searchKey: string,
   rawQuery: string,
-): { conditions: string[]; bindings: string[] } {
+): { sql: string; bindings: string[] } {
   const rjKey = normalizeRjCode(rawQuery);
   const rjCondition = rjKey
     ? ` OR EXISTS (
@@ -79,8 +72,7 @@ export function textSearchCondition(
   const bindings = [searchKey, searchKey];
   if (rjKey) bindings.push(rjKey);
   return {
-    conditions: [
-      `(
+    sql: `(
       instr(works.title_sort_key, ?) > 0 OR EXISTS (
         SELECT 1
         FROM main.work_tags AS query_work_tags
@@ -89,49 +81,8 @@ export function textSearchCondition(
           AND instr(query_tags.search_key, ?) > 0
       )${rjCondition}
     )`,
-    ],
     bindings,
   };
-}
-
-export function tagAxisConditions(
-  tags: NormalizedTag[],
-  tagOp: "AND" | "OR",
-  yearValue: string | null,
-): { conditions: string[]; bindings: Array<string | number> } {
-  const conditions: string[] = [];
-  const bindings: Array<string | number> = [];
-
-  if (tags.length > 0) {
-    if (tagOp === "AND") {
-      for (const tag of tags) {
-        conditions.push(`EXISTS (
-          SELECT 1
-          FROM main.work_tags AS filter_work_tags
-          INNER JOIN main.tags AS filter_tags ON filter_tags.id = filter_work_tags.tag_id
-          WHERE filter_work_tags.work_id = works.id AND filter_tags.name = ?
-        )`);
-        bindings.push(tag);
-      }
-    } else {
-      const placeholders = inClausePlaceholders(tags.length);
-      conditions.push(`EXISTS (
-        SELECT 1
-        FROM main.work_tags AS filter_work_tags
-        INNER JOIN main.tags AS filter_tags ON filter_tags.id = filter_work_tags.tag_id
-        WHERE filter_work_tags.work_id = works.id
-          AND filter_tags.name IN (${placeholders})
-      )`);
-      bindings.push(...tags);
-    }
-  }
-
-  if (yearValue !== null) {
-    conditions.push("substr(work_states.added_at, 1, 4) = ?");
-    bindings.push(yearValue);
-  }
-
-  return { conditions, bindings };
 }
 
 export const RESUME_RESOLVED_CASE = `
@@ -179,38 +130,22 @@ export const WORKS_QUERY_FROM = `
   FROM main.works
   INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id`;
 
-export function viewConditions(view: WorksQuery["view"]): {
-  conditions: string[];
-  bindings: string[];
-} {
-  const conditions: string[] = [];
-  const bindings: string[] = [];
-  switch (view) {
-    case "recent":
-      conditions.push("work_states.last_played_at IS NOT NULL");
-      break;
-    case "added":
-      conditions.push("work_states.added_at >= ?");
-      bindings.push(new Date(Date.now() - RECENT_VIEW_WINDOW_DAYS * 86400000).toISOString());
-      break;
-    case "fav":
-      conditions.push("work_states.bookmarked = 1");
-      break;
-    case "error":
-      conditions.push("works.status != 'ok'");
-      break;
-    case "all":
-    case undefined:
-      break;
-    default: {
-      const unreachable: never = view;
-      throw new Error(`未対応のviewです: ${unreachable}`);
-    }
-  }
-  return { conditions, bindings };
-}
+const NAME_ASC = "sortKey COLLATE BINARY ASC, value COLLATE BINARY ASC";
+const NAME_DESC = "sortKey COLLATE BINARY DESC, value COLLATE BINARY DESC";
 
-export function axisFacetSql(baseSelect: string): string {
+/** 値一覧の並び。同順位は読み・値の BINARY 順（降順の並びは両方を逆順）。core の GROUP_SORT_COMPARATORS と同じ */
+const GROUP_VALUE_ORDER: Record<GroupSortId, string> = {
+  "count-desc": `count DESC, ${NAME_ASC}`,
+  "count-asc": `count ASC, ${NAME_ASC}`,
+  "name-asc": NAME_ASC,
+  "name-desc": NAME_DESC,
+  "duration-desc": `durationSec DESC, ${NAME_ASC}`,
+  "duration-asc": `durationSec ASC, ${NAME_ASC}`,
+  "added-desc": `lastAddedAt COLLATE BINARY DESC, ${NAME_ASC}`,
+  "last-played": `lastPlayedAt IS NULL, lastPlayedAt COLLATE BINARY DESC, ${NAME_ASC}`,
+};
+
+export function groupValueSql(baseSelect: string, groupSort: GroupSortId): string {
   return `
     WITH base AS (${baseSelect}),
     ranked_covers AS (
@@ -237,42 +172,13 @@ export function axisFacetSql(baseSelect: string): string {
       base.value AS value,
       COUNT(*) AS count,
       COALESCE(SUM(base.duration_sec), 0) AS durationSec,
+      MAX(base.added_at) AS lastAddedAt,
+      MAX(base.last_played_at) AS lastPlayedAt,
+      MIN(base.sort_key) AS sortKey,
       COALESCE(covers_agg.covers_json, '[]') AS coversJson
     FROM base
     LEFT JOIN covers_agg ON covers_agg.value = base.value
     GROUP BY base.value
-    ORDER BY count DESC, base.sort_key COLLATE BINARY ASC, base.value COLLATE BINARY ASC
+    ORDER BY ${GROUP_VALUE_ORDER[groupSort]}
   `;
-}
-
-export function smartFolderRulePredicates(rules: SmartFolderRule[]): {
-  predicates: string[];
-  bindings: Array<string | number>;
-} {
-  const predicates: string[] = [];
-  const bindings: Array<string | number> = [];
-  for (const rule of rules) {
-    switch (rule.field) {
-      case "タグ": {
-        const placeholders = inClausePlaceholders(rule.values.length);
-        predicates.push(`EXISTS (
-          SELECT 1
-          FROM main.work_tags AS rule_work_tags
-          INNER JOIN main.tags AS rule_tags ON rule_tags.id = rule_work_tags.tag_id
-          WHERE rule_work_tags.work_id = works.id AND rule_tags.name IN (${placeholders})
-        )`);
-        bindings.push(...rule.values);
-        break;
-      }
-      case "長さ": {
-        const minSec = parseSmartFolderMinLengthSec(rule.values[0]);
-        predicates.push("works.total_duration_sec >= ?");
-        bindings.push(minSec);
-        break;
-      }
-      default:
-        throw new Error(`未対応のスマートフォルダールールです: ${JSON.stringify(rule)}`);
-    }
-  }
-  return { predicates, bindings };
 }

@@ -49,7 +49,7 @@ export interface ContractHarness {
   send<T = any>(method: string, path: string, body?: unknown): Promise<{ status: number; body: T }>;
 }
 
-const SEED_ADDED_AT = new Date().toISOString();
+export const SEED_ADDED_AT = new Date().toISOString();
 
 /** keyから決まる、real/fixtureで共通の作品ID（UUID形式） */
 export function contractWorkId(key: string): string {

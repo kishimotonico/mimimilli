@@ -12,8 +12,11 @@ const RESET_FETCH_TIMEOUT_MS = 5_000;
 
 const SUPERVISE_SCRIPT = fileURLToPath(new URL("./superviseProcess.mjs", import.meta.url));
 
-// Viteは--port 0を受け付けない（既定ポートへ戻る）ため、OSに空きポートを借りて渡す。
-// 借りたポートは接続せずbindだけで確保する（接続はADR-0020のWSL blackholeを踏みうる）。
+// Viteは--port 0を受け付けない（既定ポートへ戻る）ため、OSに空きポートを借りて開始ポートとして
+// 渡す。借りて閉じたあとに他のworkerが同じポートを取りうるので、Viteには--strictPortを付けず、
+// 使用中なら次のポートへ進ませる（Viteが実際にbindして決めるので取り合いにならない）。
+// 実際のポートは起動ログから読む。借りるときは接続せずbindだけで確保する
+// （接続はADR-0020のWSL blackholeを踏みうる）。
 function acquireFreePort(): Promise<number> {
   return new Promise((resolvePromise, reject) => {
     const probe = createServer();
@@ -83,7 +86,7 @@ async function warmUp(baseURL: string, timeoutMs: number): Promise<void> {
   try {
     const page = await browser.newPage();
     await page.goto(baseURL, { waitUntil: "domcontentloaded", timeout: timeoutMs });
-    await page.locator(".mle-col.is-axis").waitFor({ state: "visible", timeout: timeoutMs });
+    await page.locator(".mll-sidebar").waitFor({ state: "visible", timeout: timeoutMs });
   } finally {
     await browser.close();
   }
@@ -159,25 +162,35 @@ export const test = base.extend<
         });
         const [, bunPortText] = await waitForLog(
           bunProc,
-          /サーバーを起動しました: http:\/\/localhost:(\d+)/,
+          /サーバーを起動しました: http:\/\/localhost:(\d+)\s/,
           120_000,
         );
         const bunPort = Number(bunPortText);
 
-        const vitePort = await acquireFreePort();
-        viteProc = spawnSupervised("pnpm", [
-          "exec",
-          "cross-env",
-          "VITE_DISABLE_QUERY_DEVTOOLS=1",
-          `MIMIMILLI_BACKEND_URL=http://127.0.0.1:${bunPort}`,
-          "vite",
-          "--host",
-          "127.0.0.1",
-          "--port",
-          String(vitePort),
-          "--strictPort",
-        ]);
-        await waitForLog(viteProc, /ready in/, 120_000);
+        const startPort = await acquireFreePort();
+        // ポート番号を色付きのエスケープ無しで読めるよう、色を切って起動する
+        const { FORCE_COLOR: _forceColor, ...baseEnv } = process.env;
+        viteProc = spawnSupervised(
+          "pnpm",
+          [
+            "exec",
+            "cross-env",
+            "VITE_DISABLE_QUERY_DEVTOOLS=1",
+            `MIMIMILLI_BACKEND_URL=http://127.0.0.1:${bunPort}`,
+            "vite",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            String(startPort),
+          ],
+          { env: { ...baseEnv, NO_COLOR: "1" } },
+        );
+        const [, vitePortText] = await waitForLog(
+          viteProc,
+          /Local:\s+http:\/\/127\.0\.0\.1:(\d+)\//,
+          120_000,
+        );
+        const vitePort = Number(vitePortText);
         await warmUp(`http://127.0.0.1:${vitePort}`, 60_000);
 
         await use({

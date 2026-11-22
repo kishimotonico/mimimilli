@@ -58,7 +58,9 @@ test("real: カバーファイル差し替えで version と describeCover ETag 
   await configureRoot(adapter, lib.root);
   await scanAndRegisterCandidates(adapter);
 
-  const works = (await (await app.request("/api/works")).json()) as WorksPage;
+  const works = (await (
+    await app.request("/api/smart-folders/all/works?sort=added-desc")
+  ).json()) as WorksPage;
   const work = works.items.find((item) => item.title.includes("RJ900001"));
   assert.ok(work?.cover);
   const versionBefore = work.cover.version;
@@ -99,7 +101,9 @@ async function setupRealCoverRoute(t: TestContext) {
   const app = createApp(adapter);
   await configureRoot(adapter, lib.root);
   await scanAndRegisterCandidates(adapter);
-  const works = (await (await app.request("/api/works")).json()) as WorksPage;
+  const works = (await (
+    await app.request("/api/smart-folders/all/works?sort=added-desc")
+  ).json()) as WorksPage;
   const work = works.items.find((item) => item.title.includes("RJ900001"));
   assert.ok(work?.cover);
   return { app, adapter, work };

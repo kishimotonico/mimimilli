@@ -2,7 +2,7 @@
 
 - ステータス: 承認（未実装）
 - 日付: 2026-07-11
-- 関連: [../design-system.md](../design-system.md)、[ADR-0016](0016-view-axis-consolidation.md)（`fav` ビュー）、[ADR-0025](0025-source-mutation-projection-read-separation.md)（`bookmarked` の所有）、backlog のモバイル関連ドラフト群
+- 関連: [../design-system.md](../design-system.md)、[ADR-0016](0016-view-axis-consolidation.md)（`fav` ビュー）、[ADR-0041](0041-library-sidebar-shell-navigation.md)（LeftNav・AddressBar を前提にしたナビゲーション形態を改訂。ライブラリの行はすべてスマートフォルダー）、[ADR-0025](0025-source-mutation-projection-read-separation.md)（`bookmarked` の所有）、backlog のモバイル関連ドラフト群
 
 ## 文脈
 

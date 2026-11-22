@@ -12,6 +12,7 @@ import { PLAYER_CORE_INITIAL, playerCoreAtom } from "../../src/entities/player/m
 import { dlsiteJobStoreAtom } from "../../src/entities/dlsite/model/dlsiteJobStore";
 import { scanJobStoreAtom } from "../../src/entities/scan/model/scanJobStore";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
+import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import type { WorkSummary } from "../../src/entities/work/model";
@@ -19,6 +20,7 @@ import { createFakeDlsiteJobStore, createFakeScanJobStore } from "../helpers/fak
 import { mockApi } from "../helpers/api";
 import { buildScanRecord, buildSettings } from "../helpers/builders";
 import { seedLibraryRoute } from "../helpers/route";
+import { defaultSmartFolders } from "../helpers/smartFolders";
 
 let appShellCallCount = 0;
 let jotaiProbeRenderCount = 0;
@@ -78,6 +80,7 @@ function seedQueryCache(queryClient: QueryClient) {
   );
   queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
   queryClient.setQueryData(WORK_QUERY_KEYS.total(), 0);
+  queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), defaultSmartFolders());
 }
 
 function createTestQueryClient() {

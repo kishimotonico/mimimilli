@@ -43,7 +43,7 @@ function seedHighCardinality(
     insertWorkState.run(id);
   }
   const insertTag = sqlite.prepare(
-    "INSERT INTO tags (name, search_key, facet_sort_key) VALUES (?, ?, ?)",
+    "INSERT INTO tags (name, search_key, value_sort_key) VALUES (?, ?, ?)",
   );
   const tagIds: number[] = [];
   for (let t = 0; t < uniqueTagCount; t++) {

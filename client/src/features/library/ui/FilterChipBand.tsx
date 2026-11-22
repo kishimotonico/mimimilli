@@ -1,110 +1,73 @@
-import { Fragment, useState } from "react";
-import { AnimatePresence } from "motion/react";
-import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
-import { getAxisLabel } from "../../../entities/library/axisDefinitions";
-import { axisOfFilterTag, formatFilterChipLabel } from "../model/libraryPresentation";
-import { useAnchoredPopover } from "../../../shared/ui/useAnchoredPopover";
-import AxisValuePopoverPanel from "./AxisValuePopoverPanel";
+import { parseTag, resolveTagPrefix, type NormalizedTag, type TagPrefix } from "@mimimilli/shared";
+import { tagPrefixColorToCss } from "../../../entities/work/tagPrefixColor";
+import { formatFilterChipLabel } from "../model/libraryPresentation";
+import type { GroupValueScope } from "../model/useGroupValuesQuery";
 import FilterChipAddButton from "./FilterChipAddButton";
+import type { SaveOffer } from "../model/saveSearch";
 import { I } from "../../../shared/ui/Icon";
-import {
-  deriveValueSelectionHandlers,
-  type ValueSelectionIntent,
-} from "../model/valueSelectionContract";
 
-// 選択中フィルタのチップ列（ADR-0012 §2）。facet 軸・タグ軸を問わず同じ見た目で並べ、
-// ×で個別解除、1件以上あるとき「すべてクリア」を表示する。旧 ContentColumn の
-// .mll-tagband（タグ軸専用だった）を軸共通へ昇格させたもの。
-// チップ本体クリックは同じ軸の兄弟値ドロップダウン（ADR-0012 §7）。既定は
-// 置き換え、Ctrl/Cmd+クリックで AND 追加へ反転する。「＋絞り込み」は常に表示し、
-// フィルタが無い状態からでも最初の1件を追加できる。
-// 置き換え選択は結果面を作品一覧へ遷移させ、AND追加は現在の結果面に留まる（ADR-0012 §8）。
-// onReplace には遷移込みのアクション（replaceTag、ADR-0012 §8）を渡す。
+// 選択中フィルタのチップ列（ADR-0012 §2）。×で個別解除する。
+// 「＋絞り込み」は常に表示し、フィルタが無い状態からでも最初の1件を追加できる。
+// チップは常に AND で効く。グループの値はチップではなくパンくずで扱う（ADR-0041）。
 
 interface FilterChipBandProps {
   tagPrefixes: TagPrefix[];
   selectedTags: NormalizedTag[];
-  /** 表示中のスマートフォルダーID。チップの候補件数をフォルダー条件適用後にする */
-  smartFolderId?: string;
-  /** 置き換え選択（結果面を作品一覧へ遷移させる。ADR-0012 §8） */
-  onReplace: (tag: NormalizedTag) => void;
-  /** Ctrl/Cmd+クリックによる反転先・チップの解除に使うトグル（結果面はそのまま） */
-  onToggle: (tag: NormalizedTag) => void;
-  /** 追加ボタン用の冪等なAND追加（ADR-0013） */
+  /** 「＋絞り込み」の候補を数える母集団。値一覧では絞り込みを持たないので undefined */
+  groupValueScope?: GroupValueScope;
   onAddTag: (tag: NormalizedTag) => void;
-  onClearAll: () => void;
+  onRemoveTag: (tag: NormalizedTag) => void;
   /** 絞り込み後の作品件数。作品一覧を出さない結果面では undefined */
   worksTotal?: number;
-  /** 値一覧ペインの分類数。指定時は作品件数の代わりに「ライブラリ全体」件数であることを
-   *  明示するラベルを出し、「＋絞り込み」ボタンも隠す（値一覧はAND追加を提供しない独立した
-   *  全作品入口のため。ADR-0026） */
+  /** 値一覧ペインの分類数。指定時は作品件数の代わりに分類数を出し、「＋絞り込み」ボタンも隠す */
   valueListItemCount?: number;
+  /** 保存の操作。出すものは状態で決まる（ADR-0041） */
+  save?: {
+    offer: SaveOffer;
+    folderName: string;
+    onSave: () => void;
+    onOverwrite: () => void;
+  };
 }
 
 function FilterChip({
   tag,
   tagPrefixes,
-  selectedTags,
-  smartFolderId,
-  onSelect,
-  onAdd,
   onRemove,
 }: {
   tag: NormalizedTag;
   tagPrefixes: TagPrefix[];
-  /** 現在選択中の全タグ。兄弟値ドロップダウンの選択中チェック表示にのみ使う
-   *  （件数は既定=置き換えの入口として無条件集計にする） */
-  selectedTags: NormalizedTag[];
-  smartFolderId?: string;
-  onSelect: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
-  onAdd: (tag: NormalizedTag) => void;
   onRemove: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const { setReference, setFloating, floatingStyles, close } = useAnchoredPopover({
-    isOpen: open,
-    preferredWidth: 220,
-    onClose: () => setOpen(false),
-  });
-  const axis = axisOfFilterTag(tag);
-
+  const label = formatFilterChipLabel(tag);
+  const parsed = label === tag ? parseTag(tag) : null;
+  const annotated = parsed?.kind === "annotated" ? parsed : null;
   return (
-    <span ref={setReference} className="mll-tagband__chip relative">
-      <button type="button" className="lbl" onClick={() => (open ? close() : setOpen(true))}>
-        {formatFilterChipLabel(tag)}
-      </button>
+    <span className="mll-tagband__chip relative">
+      <span className="lbl">
+        {annotated ? (
+          <>
+            <b
+              style={{
+                color: tagPrefixColorToCss(resolveTagPrefix(annotated.prefix, tagPrefixes).color),
+              }}
+            >
+              {tag.slice(0, annotated.prefix.length + 1)}
+            </b>
+            {annotated.value}
+          </>
+        ) : (
+          label
+        )}
+      </span>
       <button
         type="button"
         className="x"
         aria-label={`${formatFilterChipLabel(tag)}を解除`}
-        onClick={(e) => {
-          e.stopPropagation();
-          onRemove();
-        }}
+        onClick={onRemove}
       >
         <I.x size={9} />
       </button>
-      <AnimatePresence>
-        {open && (
-          <AxisValuePopoverPanel
-            key={axis}
-            axis={axis}
-            axisLabel={getAxisLabel(axis, tagPrefixes)}
-            floatingStyles={floatingStyles}
-            setFloating={setFloating}
-            selectedTags={selectedTags}
-            // 既定=置き換えの入口（ADR-0013）。件数基準は無条件集計にする。
-            countTags={[]}
-            smartFolderId={smartFolderId}
-            onSelect={(nextTag, opts) => {
-              onSelect(nextTag, opts);
-              close();
-            }}
-            onAdd={onAdd}
-            close={close}
-          />
-        )}
-      </AnimatePresence>
     </span>
   );
 }
@@ -112,68 +75,51 @@ function FilterChip({
 export default function FilterChipBand({
   tagPrefixes,
   selectedTags,
-  smartFolderId,
-  onReplace,
-  onToggle,
+  groupValueScope,
   onAddTag,
-  onClearAll,
+  onRemoveTag,
   worksTotal,
   valueListItemCount,
+  save,
 }: FilterChipBandProps) {
   const isValueListPane = valueListItemCount !== undefined;
-  // チップの兄弟値ドロップダウンは既定=置き換えの入口、「＋絞り込み」は既定=AND追加の入口
-  // （値選択の契約。design-system.md）。
-  const siblingDropdownIntent: ValueSelectionIntent<NormalizedTag> = {
-    default: "replace",
-    onReplace,
-    onToggle,
-    onAdd: onAddTag,
-  };
-  const { onSelect: handleSelectSibling, onAddButton: handleAddSibling } =
-    deriveValueSelectionHandlers(siblingDropdownIntent);
-
-  const addFilterIntent: ValueSelectionIntent<NormalizedTag> = {
-    default: "add",
-    onAdd: onAddTag,
-    onReplace,
-  };
-  const { onSelect: handleAddFilterSelect } = deriveValueSelectionHandlers(addFilterIntent);
-
   return (
     <div className="mll-tagband">
-      {selectedTags.length > 0 && <span className="mll-tagband__lbl">AND</span>}
-      {selectedTags.map((tag, i) => (
-        <Fragment key={tag}>
-          {i > 0 && <span className="mll-tagband__and">AND</span>}
-          <FilterChip
-            tag={tag}
-            tagPrefixes={tagPrefixes}
-            selectedTags={selectedTags}
-            smartFolderId={smartFolderId}
-            onSelect={handleSelectSibling}
-            onAdd={handleAddSibling}
-            onRemove={() => onToggle(tag)}
-          />
-        </Fragment>
+      {selectedTags.map((tag) => (
+        <FilterChip
+          key={tag}
+          tag={tag}
+          tagPrefixes={tagPrefixes}
+          onRemove={() => onRemoveTag(tag)}
+        />
       ))}
-      {!isValueListPane && (
+      {!isValueListPane && groupValueScope && (
         <FilterChipAddButton
           tagPrefixes={tagPrefixes}
           selectedTags={selectedTags}
-          smartFolderId={smartFolderId}
-          onAddValue={handleAddFilterSelect}
+          scope={groupValueScope}
+          onAddValue={onAddTag}
         />
       )}
       <div className="mll-tagband__tail">
-        {selectedTags.length > 0 && (
-          <button type="button" className="mll-tagband__clear" onClick={onClearAll}>
-            すべてクリア
+        {save?.offer === "overwrite" && (
+          <button type="button" className="mll-tagband__save" onClick={save.onOverwrite}>
+            {`「${save.folderName}」を上書き`}
+          </button>
+        )}
+        {save?.offer === "overwrite" && (
+          <button type="button" className="mll-tagband__save" onClick={save.onSave}>
+            別名で保存
+          </button>
+        )}
+        {save?.offer === "save" && (
+          <button type="button" className="mll-tagband__save" onClick={save.onSave}>
+            <I.bookmark size={12} />
+            検索を保存
           </button>
         )}
         {isValueListPane ? (
-          <span className="mll-tagband__count">
-            {valueListItemCount}分類（件数はライブラリ全体）
-          </span>
+          <span className="mll-tagband__count">{valueListItemCount} 分類</span>
         ) : (
           worksTotal != null && <span className="mll-tagband__count">{worksTotal} 件</span>
         )}

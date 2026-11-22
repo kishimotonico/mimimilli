@@ -1,78 +1,79 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { useQuery } from "@tanstack/react-query";
-import type { SortId } from "@mimimilli/shared";
+import { useSetAtom } from "jotai";
+import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
+import type { GroupSortId, SortId } from "@mimimilli/shared";
 import { SORT_OPTIONS } from "../../../entities/library/types";
-import { axisValueSortAtom, reshuffleLibraryRandomSeedAtom } from "../model/atoms";
-import { activeAxisAtom, sortAtom } from "../../../entities/library/model/navigationAtoms";
-import { setLibrarySortAtom } from "../../../entities/library/model/navigationActions";
-import { useLibraryTransition } from "../model/useLibraryNavigation";
-import { isSmartAxis, getSmartFolderId } from "../../../entities/library/axisDefinitions";
-import { computeResultsPaneKind } from "../model/libraryPresentation";
 import {
-  AXIS_VALUE_SORT_OPTIONS,
-  selectAxisValueSortKey,
-  type AxisValueSortKey,
-} from "../model/axisValueSort";
-import { listSmartFolders } from "../../../entities/smart-folder/api";
-import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
+  clearLibraryGroupSortAtom,
+  clearLibrarySortAtom,
+  reshuffleLibrarySeedAtom,
+} from "../../../entities/library/model/navigationActions";
+import { useLibraryNavigation } from "../model/useLibraryNavigation";
+import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
+import { getGroupSortLabel, groupSortOptions } from "../model/groupValueSort";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import { usePopoverDismissal } from "../../../shared/ui/usePopoverDismissal";
-
-const SMART_FOLDER_SORT_TOOLTIP = "並び順はスマートフォルダーの設定に従います";
 
 function getSortLabel(sortId: SortId): string | undefined {
   return SORT_OPTIONS.find((opt) => opt.id === sortId)?.label;
 }
 
-function getAxisValueSortLabel(key: AxisValueSortKey): string {
-  return AXIS_VALUE_SORT_OPTIONS.find((opt) => opt.id === key)?.label ?? key;
+// 結果面が値一覧のときは今の値の並び（8種）、作品一覧のときは今の並び（9種）を、どちらも履歴エントリーの
+// 状態（ADR-0041）として変える。今の並びが解決後の既定から外れているときだけ「この並びを既定にする」を出し、
+// スマートフォルダーの既定の並び（値一覧なら値の並び）として保存する。
+export default function LibrarySortMenu() {
+  const nav = useLibraryNavigation();
+  if (nav.foldersStatus !== "ready") {
+    // 一覧が無い間は既定の並びが分からないので操作させない
+    return (
+      <div className="mle-sortmenu">
+        <IconButton size="sm" icon={I.sort} label="並び替え" title="並び替え" disabled />
+      </div>
+    );
+  }
+  return <ReadySortMenu view={nav.view} setSort={nav.setSort} setGroupSort={nav.setGroupSort} />;
 }
 
-// ADR-0012 帰結: ソートは UI が単一系・state が二重。結果面が値一覧のときは
-// axisValueSortAtom（名前/件数/総時間）、作品一覧のときは sortAtom を
-// このメニューの接続先として切り替える。値一覧のソート状態と作品一覧のソート状態は
-// 別々に保持したまま、UI 側だけが結果面の内容に応じてどちらへ書き込むかを決める。
-export default function LibrarySortMenu() {
-  const activeAxis = useAtomValue(activeAxisAtom);
-  const sort = useAtomValue(sortAtom);
-  const setLibrarySort = useSetAtom(setLibrarySortAtom);
-  const startTransition = useLibraryTransition();
-  const setSort = (value: SortId) => startTransition(() => setLibrarySort(value));
-  const [axisValueSort, setAxisValueSort] = useAtom(axisValueSortAtom);
+function ReadySortMenu({
+  view,
+  setSort,
+  setGroupSort,
+}: {
+  view: ResolvedLibraryView;
+  setSort: (sort: SortId) => void;
+  setGroupSort: (groupSort: GroupSortId) => void;
+}) {
+  const editor = useSmartFolderEditor();
+  const [savingDefault, setSavingDefault] = useState(false);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
-  const reshuffle = useSetAtom(reshuffleLibraryRandomSeedAtom);
+  const reshuffle = useSetAtom(reshuffleLibrarySeedAtom);
+  const clearCurrentSort = useSetAtom(clearLibrarySortAtom);
+  const clearCurrentGroupSort = useSetAtom(clearLibraryGroupSortAtom);
 
-  const isValueListPane = computeResultsPaneKind(activeAxis) === "value-list";
-  const onSmartAxis = isSmartAxis(activeAxis);
-  const smartFoldersQuery = useQuery({
-    queryKey: SMART_FOLDER_QUERY_KEYS.all(),
-    queryFn: listSmartFolders,
-    enabled: onSmartAxis,
-  });
+  const disabled = view.kind === "broken";
+  const sort = view.kind === "works" ? view.sort : null;
+  const currentSortLabel =
+    view.kind === "value-list"
+      ? getGroupSortLabel(view.groupSort, view.groupBy)
+      : sort && getSortLabel(sort);
 
-  const smartFolderSort = onSmartAxis
-    ? smartFoldersQuery.data?.find((sf) => sf.id === getSmartFolderId(activeAxis))?.sort
-    : null;
+  const saveAsDefault = async () => {
+    if (view.kind === "broken") return;
+    setSavingDefault(true);
+    if (view.kind === "value-list") {
+      const saved = await editor.saveDefaultGroupSort(view.folder.id, view.groupSort);
+      if (saved) clearCurrentGroupSort({ folderId: view.folder.id, groupSort: view.groupSort });
+    } else {
+      const saved = await editor.saveDefaultSort(view.folder.id, view.sort);
+      if (saved) clearCurrentSort({ folderId: view.folder.id, sort: view.sort });
+    }
+    setSavingDefault(false);
+  };
 
-  const displaySort = onSmartAxis ? smartFolderSort : sort;
-  const currentSortLabel = isValueListPane
-    ? getAxisValueSortLabel(axisValueSort.key)
-    : displaySort
-      ? getSortLabel(displaySort)
-      : undefined;
-  const disabled = onSmartAxis;
-
-  const buttonTitle = disabled
-    ? currentSortLabel
-      ? `${SMART_FOLDER_SORT_TOOLTIP}（${currentSortLabel}）`
-      : SMART_FOLDER_SORT_TOOLTIP
-    : currentSortLabel
-      ? `並び替え: ${currentSortLabel}`
-      : "並び替え";
+  const buttonTitle = currentSortLabel ? `並び替え: ${currentSortLabel}` : "並び替え";
 
   const { close: closeSortMenu } = usePopoverDismissal({
     isOpen: sortMenuOpen && !disabled,
@@ -87,7 +88,7 @@ export default function LibrarySortMenu() {
   // role=menu の期待どおり、開いたら現在値（無ければ先頭）へ初期フォーカスする。
   useEffect(() => {
     if (!sortMenuOpen || disabled) return;
-    const items = sortRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]');
+    const items = sortRef.current?.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]');
     if (!items || items.length === 0) return;
     const checked = Array.from(items).find((item) => item.getAttribute("aria-checked") === "true");
     (checked ?? items[0])?.focus({ preventScroll: true });
@@ -97,7 +98,7 @@ export default function LibrarySortMenu() {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     event.preventDefault();
     const items = Array.from(
-      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'),
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]'),
     );
     if (items.length === 0) return;
     const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
@@ -106,7 +107,10 @@ export default function LibrarySortMenu() {
     items[nextIndex]?.focus({ preventScroll: true });
   };
 
-  const showReshuffle = !disabled && !isValueListPane && sort === "random";
+  const showReshuffle = view.kind === "works" && sort === "random";
+  const canSaveAsDefault =
+    (view.kind === "works" && view.sortDeviates) ||
+    (view.kind === "value-list" && view.groupSortDeviates);
 
   return (
     <div className="mle-sortmenu" ref={sortRef}>
@@ -130,7 +134,7 @@ export default function LibrarySortMenu() {
         <IconButton
           size="sm"
           icon={I.refresh}
-          label="再シャッフル"
+          label="並べ直す"
           title="別の並びを再抽選"
           onClick={() => reshuffle()}
         />
@@ -143,21 +147,21 @@ export default function LibrarySortMenu() {
           tabIndex={-1}
           onKeyDown={handleMenuKeyDown}
         >
-          {isValueListPane
-            ? AXIS_VALUE_SORT_OPTIONS.map((opt) => (
+          {view.kind === "value-list"
+            ? groupSortOptions(view.groupBy).map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
                   role="menuitemradio"
-                  aria-checked={axisValueSort.key === opt.id}
-                  className={`mle-sortmenu__item ${axisValueSort.key === opt.id ? "is-checked" : ""}`}
+                  aria-checked={view.groupSort === opt.id}
+                  className={`mle-sortmenu__item ${view.groupSort === opt.id ? "is-checked" : ""}`}
                   onClick={() => {
-                    setAxisValueSort(selectAxisValueSortKey(axisValueSort, opt.id));
+                    setGroupSort(opt.id);
                     closeSortMenu();
                   }}
                 >
                   <span className="check">
-                    {axisValueSort.key === opt.id && <I.check size={14} />}
+                    {view.groupSort === opt.id && <I.check size={14} />}
                   </span>
                   <span className="label">{opt.label}</span>
                 </button>
@@ -178,6 +182,21 @@ export default function LibrarySortMenu() {
                   <span className="label">{opt.label}</span>
                 </button>
               ))}
+          {canSaveAsDefault && (
+            <button
+              type="button"
+              role="menuitem"
+              className="mle-sortmenu__item"
+              disabled={savingDefault}
+              onClick={() => {
+                void saveAsDefault();
+                closeSortMenu();
+              }}
+            >
+              <span className="check" />
+              <span className="label">この並びを既定にする</span>
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 import {
   workspacePath,
-  axisFacetItemSchema,
+  groupValueItemSchema,
   fsEntrySchema,
   fsListingSchema,
   scanCandidateSchema,
@@ -15,7 +15,6 @@ import {
   scanJobSnapshotSchema,
   scanRecordSchema,
   settingsSchema,
-  smartFolderSchema,
   tagPrefixSchema,
   toDlsiteLinkageStatus,
   workEditSnapshotSchema,
@@ -23,14 +22,13 @@ import {
   workSourceMutationResultSchema,
   dlsiteApplyResponseSchema,
   type DlsiteApplyResponse,
-  type AxisFacetItem,
+  type GroupValueItem,
   type FsEntry,
   type FsListing,
   type DlsitePreview,
   type ScanDiagnostics,
   type ScanRecord,
   type Settings,
-  type SmartFolder,
   type TagPrefix,
   type ResolvedPlaylist,
   type ScanCandidate,
@@ -155,17 +153,6 @@ export function buildSettings(overrides: Partial<Settings> = {}): Settings {
   });
 }
 
-export function buildSmartFolder(overrides: Partial<SmartFolder> = {}): SmartFolder {
-  return smartFolderSchema.parse({
-    id: "sf-1",
-    name: "スマートフォルダー",
-    rules: [],
-    sort: "added-desc",
-    createdAt: "2026-01-01T00:00:00.000Z",
-    ...overrides,
-  });
-}
-
 export function buildScanDiagnostics(overrides: Partial<ScanDiagnostics> = {}): ScanDiagnostics {
   return scanDiagnosticsSchema.parse({
     identityConflicts: [],
@@ -190,7 +177,6 @@ export function buildTagPrefix(overrides: Partial<TagPrefix> = {}): TagPrefix {
     prefix: "cv",
     label: "CV",
     color: null,
-    showAsAxis: true,
     protected: false,
     order: 0,
     ...overrides,
@@ -300,9 +286,12 @@ export function buildFsListing(
   return fsListingSchema.parse({ path: null, parent: null, workId: null, entries, ...overrides });
 }
 
-export function buildAxisFacetItem(overrides: Partial<AxisFacetItem> = {}): AxisFacetItem {
-  return axisFacetItemSchema.parse({
+export function buildGroupValueItem(overrides: Partial<GroupValueItem> = {}): GroupValueItem {
+  return groupValueItemSchema.parse({
     value: "値",
+    sortKey: overrides.value ?? "値",
+    lastAddedAt: "2026-01-01T00:00:00.000Z",
+    lastPlayedAt: null,
     count: 1,
     durationSec: 0,
     covers: [],

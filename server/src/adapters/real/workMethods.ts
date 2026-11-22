@@ -3,6 +3,7 @@ import { prepareSingleMeta } from "./scanRegister.ts";
 import type { PreparedMeta } from "./scanTypes.ts";
 import { join } from "node:path";
 import type {
+  Condition,
   DataIntegrityWarning,
   IdentityConflictReassignBody,
   IdentityConflict,
@@ -18,10 +19,13 @@ import type {
   WorkSourceMutationResult,
   WorkSourcePatch,
   WorkspacePath,
-  WorksPage,
   UnregisterMissingWorksResult,
-  WorksQuery,
 } from "@mimimilli/shared";
+import type {
+  ConditionGroupQuery,
+  ConditionWorksQuery,
+  EvalContext,
+} from "../../adapter/condition.ts";
 import { errorMessage, resolveWorkPlacement, tagEquals } from "@mimimilli/shared";
 import { type Db } from "./db.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
@@ -132,8 +136,16 @@ export function createWorkMethods(deps: {
   }
 
   return {
-    async queryWorks(params: WorksQuery): Promise<WorksPage> {
-      return query.queryWorks(params, requireRoot());
+    async queryWorks(conditionQuery: ConditionWorksQuery, ctx: EvalContext) {
+      return query.queryWorksByCondition(conditionQuery, requireRoot(), ctx);
+    },
+
+    async groupWorks(groupQuery: ConditionGroupQuery, ctx: EvalContext) {
+      return query.groupWorksByCondition(groupQuery, ctx);
+    },
+
+    async countByConditions(conditions: Condition[], ctx: EvalContext) {
+      return query.countByConditions(conditions, ctx);
     },
 
     async getWork(id: string): Promise<Work | null> {

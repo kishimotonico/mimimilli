@@ -177,7 +177,14 @@ test("GET /scan/last は未スキャンなら finishedAt が null の空の記�
     finishedAt: null,
     updatedWorks: [],
   });
-  assert.equal((await (await app.request("/api/works?scanRecord=new")).json()).total, 0);
+  assert.equal(
+    (
+      await (
+        await app.request("/api/smart-folders/all/works?sort=added-desc&scanRecord=new")
+      ).json()
+    ).total,
+    0,
+  );
 
   const { id } = await start(app);
   await waitForTerminal(app, id);
@@ -194,7 +201,9 @@ test("GET /scan/last は未スキャンなら finishedAt が null の空の記�
     ["RJ501008", "RJ501010"],
   );
   assert.deepEqual(diagnostics.unreadablePaths, ["権限なし/フォルダー"]);
-  const created = await (await app.request("/api/works?scanRecord=new&sort=id-asc")).json();
+  const created = await (
+    await app.request("/api/smart-folders/all/works?sort=id-asc&scanRecord=new")
+  ).json();
   assert.deepEqual(
     created.items.map((item: { id: string }) => item.id),
     ["RJ501001", "RJ501003", "RJ501011"],
@@ -216,9 +225,11 @@ test("候補から追加した作品は、スキャンで自動登録された�
   const { registered: entries } = await registered.json();
   const addedId = entries[0].workId as string;
   const ids = async () =>
-    (await (await app.request("/api/works?scanRecord=new")).json()).items.map(
-      (item: { id: string }) => item.id,
-    );
+    (
+      await (
+        await app.request("/api/smart-folders/all/works?sort=added-desc&scanRecord=new")
+      ).json()
+    ).items.map((item: { id: string }) => item.id);
   assert.ok((await ids()).includes(addedId));
   assert.ok((await ids()).includes("RJ501011"));
 });

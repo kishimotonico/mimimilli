@@ -116,7 +116,7 @@ test("staticDir 設定時も /api は API ハンドラが優先される", async
   const staticDir = createStaticFixture();
   const app = createApp(createFixtureAdapter(), { staticDir });
 
-  const res = await app.request("/api/works");
+  const res = await app.request("/api/smart-folders/all/works?sort=added-desc");
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.ok(Array.isArray(body.items));
@@ -145,7 +145,7 @@ test("Bun.serve 経由でも静的配信と /api が共存する", async (t) => 
   assert.equal(spaRes.status, 200);
   assert.match(await spaRes.text(), /app/);
 
-  const apiRes = await fetch(`${baseUrl}/api/works`);
+  const apiRes = await fetch(`${baseUrl}/api/smart-folders/all/works?sort=added-desc`);
   assert.equal(apiRes.status, 200);
   const body = await apiRes.json();
   assert.ok(body.items.length > 0);
@@ -156,7 +156,7 @@ test("createStaticMiddleware は /api 配下を通過させる", async () => {
   const app = createApp(createFixtureAdapter());
   app.use("*", createStaticMiddleware(staticDir));
 
-  const res = await app.request("/api/works");
+  const res = await app.request("/api/smart-folders/all/works?sort=added-desc");
   assert.equal(res.status, 200);
 });
 

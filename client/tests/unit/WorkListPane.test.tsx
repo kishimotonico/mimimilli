@@ -219,15 +219,24 @@ describe("WorkListPane 空状態", () => {
     clearResizeObservers();
   });
 
-  it("お気に入りビューが0件のとき文脈付きの案内を1行添える", () => {
-    renderWorkListPane({ nav: { activeAxis: "fav" }, works: [] });
+  it("お気に入りが0件のとき文脈付きの案内を1行添える（条件の形で判定）", () => {
+    renderWorkListPane({ nav: { library: { folderId: "fav" } }, works: [] });
     expect(
       screen.getByText("作品をブックマークするとお気に入りに表示されます"),
     ).toBeInTheDocument();
   });
 
+  it("エラー一覧が0件のとき文脈付きの案内を1行添える（条件が hasError だけ）", () => {
+    renderWorkListPane({ nav: { library: { folderId: "error" } }, works: [] });
+    expect(
+      screen.getByText(
+        "元ファイルが見つからない・メタデータの読み込みに失敗した作品はここに表示されます",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("選択中フィルタが原因の0件では専用メッセージを出す", () => {
-    renderWorkListPane({ nav: { activeAxis: "all", selectedTags: nts(["タグ"]) }, works: [] });
+    renderWorkListPane({ nav: { library: { selectedTags: nts(["タグ"]) } }, works: [] });
     expect(screen.getByText("選択中のフィルタに一致する作品はありません")).toBeInTheDocument();
   });
 
@@ -240,33 +249,53 @@ describe("WorkListPane 空状態", () => {
     expect(onClearSearch).toHaveBeenCalledTimes(1);
   });
 
-  it("スマートフォルダーが0件のとき専用の見出しと「条件を編集」を出す", async () => {
-    const onEditSmartFolderRules = vi.fn();
-    const user = userEvent.setup();
-    renderWorkListPane({
-      works: [],
-      emptyState: { isSmartFolder: true, onEditSmartFolderRules },
-    });
-
-    expect(screen.getByText("条件に一致する作品がありません")).toBeInTheDocument();
-    expect(screen.getByText("条件を見直すか、絞り込みを外してください。")).toBeInTheDocument();
-    expect(screen.queryByText("絞り込みをすべてクリア")).toBeNull();
-
-    await user.click(screen.getByRole("button", { name: "条件を編集" }));
-    expect(onEditSmartFolderRules).toHaveBeenCalledTimes(1);
-  });
-
-  it("スマートフォルダーが0件・チップ絞り込み中のとき「絞り込みをすべてクリア」も出す", async () => {
+  it("チップ絞り込みが原因の0件では「絞り込みをすべてクリア」を出す", async () => {
     const clearTags = vi.fn();
     const user = userEvent.setup();
     renderWorkListPane({
       works: [],
-      nav: { selectedTags: nts(["タグ"]), clearTags },
-      emptyState: { isSmartFolder: true },
+      nav: { library: { selectedTags: nts(["タグ"]) }, clearTags },
     });
 
     await user.click(screen.getByRole("button", { name: "絞り込みをすべてクリア" }));
     expect(clearTags).toHaveBeenCalledTimes(1);
+  });
+
+  it("「すべて」以外でチップがあるとき「『すべて』で探す」を出し、押すと searchInAll を呼ぶ", async () => {
+    const searchInAll = vi.fn();
+    const user = userEvent.setup();
+    renderWorkListPane({
+      works: [],
+      nav: { library: { folderId: "fav", selectedTags: nts(["タグ"]) }, searchInAll },
+    });
+
+    await user.click(screen.getByRole("button", { name: "「すべて」で探す" }));
+    expect(searchInAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("検索語だけでも「『すべて』で探す」を出す", () => {
+    renderWorkListPane({
+      works: [],
+      nav: { library: { folderId: "fav", q: "雨" } },
+      emptyState: { searchQuery: "雨" },
+    });
+
+    expect(screen.getByRole("button", { name: "「すべて」で探す" })).toBeInTheDocument();
+  });
+
+  it("「すべて」自身では「『すべて』で探す」を出さない", () => {
+    renderWorkListPane({
+      works: [],
+      nav: { library: { folderId: "all", selectedTags: nts(["タグ"]) } },
+    });
+
+    expect(screen.queryByRole("button", { name: "「すべて」で探す" })).toBeNull();
+  });
+
+  it("絞り込みが無い0件では「『すべて』で探す」を出さない", () => {
+    renderWorkListPane({ works: [], nav: { library: { folderId: "fav" } } });
+
+    expect(screen.queryByRole("button", { name: "「すべて」で探す" })).toBeNull();
   });
 });
 

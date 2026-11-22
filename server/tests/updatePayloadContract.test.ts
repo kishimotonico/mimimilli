@@ -19,7 +19,7 @@ async function assertEmptyPayloadRejected(
 
 test("PATCH /api/works/:id は空オブジェクトを400で拒否する", async () => {
   const app = buildApp();
-  const works = await (await app.request("/api/works")).json();
+  const works = await (await app.request("/api/smart-folders/all/works?sort=added-desc")).json();
   const id = works.items[0].id;
 
   await assertEmptyPayloadRejected((app) =>

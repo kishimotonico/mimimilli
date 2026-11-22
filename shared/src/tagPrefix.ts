@@ -1,11 +1,10 @@
 // タグ prefix 定義（タグ設定）の契約。
-// ADR-0005: タグの特別扱い（軸表示・保護・ラベル・色）はコードでなく、
+// ADR-0005: タグの特別扱い（保護・ラベル・色・表示優先度）はコードでなく、
 // ユーザーが編集できる設定データとして表現する。システムは初期値の投入のみを行う。
 import { z } from "zod";
-import { isSmartFolderAxisId, SMART_FOLDER_AXIS_PREFIX, VIEW_IDS } from "./library.ts";
 
-/** prefix に使えない予約軸ID。ビュー・組み込み軸（tag / year）と軸IDの名前空間を共有するため */
-export const RESERVED_AXIS_IDS: readonly string[] = [...VIEW_IDS, "tag", "year"];
+/** 予約している名前は "tag" と "year"。値一覧のグループ分けが prefix 名と組み込みのグループ分け（tag・addedYear）で名前空間を共有するため、prefix には使えない */
+const RESERVED_PREFIX_NAMES: readonly string[] = ["tag", "year"];
 
 /** prefix 名。正規形（trim + 小文字）へ変換した上で予約ID・不正文字を拒否する */
 export const tagPrefixNameSchema = z
@@ -15,11 +14,8 @@ export const tagPrefixNameSchema = z
   .max(50)
   .transform((s) => s.toLowerCase())
   .refine((s) => !s.includes("/"), { message: "prefix にスラッシュは使えません" })
-  .refine((s) => !RESERVED_AXIS_IDS.includes(s), {
-    message: "予約された軸IDは prefix に使えません",
-  })
-  .refine((s) => !isSmartFolderAxisId(s), {
-    message: `${SMART_FOLDER_AXIS_PREFIX} で始まる prefix は使えません`,
+  .refine((s) => !RESERVED_PREFIX_NAMES.includes(s), {
+    message: "予約された名前は prefix に使えません",
   });
 
 /** タグ prefix の表示色キー。client が tokens.css の CSS 変数へ解決する */
@@ -28,15 +24,14 @@ export const tagPrefixColorKeySchema = z.enum(TAG_PREFIX_COLOR_KEYS);
 export type TagPrefixColorKey = z.infer<typeof tagPrefixColorKeySchema>;
 
 export const tagPrefixSchema = z.object({
-  /** 正規形（小文字）。軸IDとしてもそのまま使う */
+  /** 正規形（小文字）。グループ分け（prefix）の識別子としてもそのまま使う */
   prefix: z.string(),
   label: z.string(),
   /** 表示色の semantic key。null は client 側のデフォルト表示 */
   color: tagPrefixColorKeySchema.nullable(),
-  showAsAxis: z.boolean(),
   /** true のとき、この prefix に属するタグの削除・編集時に確認を挟む（ソフトガード） */
   protected: z.boolean(),
-  /** 設定一覧・軸レールでの並び順。小さいほど先頭。作成時にサーバーが末尾へ自動採番する */
+  /** prefix 定義の並び順。小さいほど先頭。作成時にサーバーが末尾へ自動採番する */
   order: z.number().int(),
 });
 export type TagPrefix = z.infer<typeof tagPrefixSchema>;
@@ -46,7 +41,6 @@ export const tagPrefixCreateSchema = z.object({
   prefix: tagPrefixNameSchema,
   label: z.string().trim().min(1),
   color: tagPrefixColorKeySchema.nullable().default(null),
-  showAsAxis: z.boolean().default(true),
   protected: z.boolean().default(false),
 });
 export type TagPrefixCreate = z.infer<typeof tagPrefixCreateSchema>;
@@ -56,15 +50,11 @@ export const tagPrefixUpdateSchema = z
   .object({
     label: z.string().trim().min(1).optional(),
     color: tagPrefixColorKeySchema.nullable().optional(),
-    showAsAxis: z.boolean().optional(),
     protected: z.boolean().optional(),
   })
   .refine(
     (patch) =>
-      patch.label !== undefined ||
-      patch.color !== undefined ||
-      patch.showAsAxis !== undefined ||
-      patch.protected !== undefined,
+      patch.label !== undefined || patch.color !== undefined || patch.protected !== undefined,
   );
 export type TagPrefixUpdate = z.infer<typeof tagPrefixUpdateSchema>;
 
@@ -87,12 +77,11 @@ export const tagPrefixCandidateListSchema = z.array(tagPrefixCandidateSchema);
  *  （seed 済みフラグで管理し、全削除しても再投入しない）。
  *  color は client が CSS 変数へ解決する semantic key */
 export const DEFAULT_TAG_PREFIXES: TagPrefix[] = [
-  { prefix: "cv", label: "CV", color: "cv", showAsAxis: true, protected: true, order: 0 },
+  { prefix: "cv", label: "CV", color: "cv", protected: true, order: 0 },
   {
     prefix: "サークル",
     label: "サークル",
     color: "circle",
-    showAsAxis: true,
     protected: true,
     order: 1,
   },
@@ -100,7 +89,6 @@ export const DEFAULT_TAG_PREFIXES: TagPrefix[] = [
     prefix: "シリーズ",
     label: "シリーズ",
     color: "series",
-    showAsAxis: true,
     protected: false,
     order: 2,
   },
@@ -108,7 +96,6 @@ export const DEFAULT_TAG_PREFIXES: TagPrefix[] = [
     prefix: "カテゴリ",
     label: "カテゴリ",
     color: "cat",
-    showAsAxis: true,
     protected: false,
     order: 3,
   },
@@ -116,7 +103,6 @@ export const DEFAULT_TAG_PREFIXES: TagPrefix[] = [
     prefix: "genre",
     label: "ジャンル",
     color: "cat",
-    showAsAxis: false,
     protected: false,
     order: 4,
   },
@@ -124,7 +110,6 @@ export const DEFAULT_TAG_PREFIXES: TagPrefix[] = [
     prefix: "rating",
     label: "レーティング",
     color: "cat",
-    showAsAxis: true,
     protected: false,
     order: 5,
   },
@@ -136,7 +121,7 @@ export interface ResolvedTagPrefix {
 }
 
 /** prefix 文字列に対応する表示ラベル・色を解決する。ADR-0005 のラベル・色は tagPrefixes
- *  設定データが正であり、この関数を通すことでタグチップ・軸レール・スマートフォルダー等の
+ *  設定データが正であり、この関数を通すことでタグチップ・サイドバー・スマートフォルダー等の
  *  複数画面が同じ結果になる。未登録の prefix はラベルを prefix 文字列そのまま、色は
  *  null（呼び出し側の既定色）にする */
 export function resolveTagPrefix(

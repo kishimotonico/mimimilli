@@ -3,8 +3,6 @@
 // fixture ベースで adapter メソッドを差し替えて検証する。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { worksQuerySchema } from "@mimimilli/shared";
-import { compareJapaneseSortKeys } from "../src/core/japaneseSortKey.ts";
 import { createApp } from "./helpers/testApp.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
@@ -19,6 +17,7 @@ const contract = defineContract({
   ],
 });
 
+const ALL_WORKS = "/api/smart-folders/all/works?sort=added-desc";
 const ALL_IDS = ["a", "b", "c"].map((key) => ({ key }));
 
 function idsOf(harness: ContractHarness, keys: string[]): string[] {
@@ -36,75 +35,95 @@ async function sourceRevisionOf(harness: ContractHarness, id: string): Promise<s
   return body.sourceRevision;
 }
 
-contract("GET /api/works は登録済みの全作品を {items, total} で返す", async (harness) => {
-  const { status, body } = await harness.json("/api/works");
-  assert.equal(status, 200);
-  assert.equal(body.total, ALL_IDS.length);
-  assert.deepEqual(sortedIds(body.items), idsOf(harness, ["a", "b", "c"]));
-});
-
-contract("GET /api/works は複数の tags を配列で受け、タグ内のカンマを保持する", async (harness) => {
-  const matched = await harness.json("/api/works?tags=tag%2Cone&tags=ASMR");
-  assert.equal(matched.status, 200);
-  assert.deepEqual(sortedIds(matched.body.items), idsOf(harness, ["a"]));
-
-  const split = await harness.json("/api/works?tags=tag&tags=one");
-  assert.equal(split.status, 200);
-  assert.equal(split.body.total, 0);
-});
+contract(
+  "GET /api/smart-folders/:id/works は登録済みの全作品を {items, total} で返す",
+  async (harness) => {
+    const { status, body } = await harness.json(ALL_WORKS);
+    assert.equal(status, 200);
+    assert.equal(body.total, ALL_IDS.length);
+    assert.deepEqual(sortedIds(body.items), idsOf(harness, ["a", "b", "c"]));
+  },
+);
 
 contract(
-  "GET /api/works は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する",
+  "GET /api/smart-folders/:id/works は複数の tags を配列で受け、タグ内のカンマを保持する",
+  async (harness) => {
+    const matched = await harness.json(`${ALL_WORKS}&tags=tag%2Cone&tags=ASMR`);
+    assert.equal(matched.status, 200);
+    assert.deepEqual(sortedIds(matched.body.items), idsOf(harness, ["a"]));
+
+    const split = await harness.json(`${ALL_WORKS}&tags=tag&tags=one`);
+    assert.equal(split.status, 200);
+    assert.equal(split.body.total, 0);
+  },
+);
+
+contract(
+  "GET /api/smart-folders/:id/works は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する",
   async (harness) => {
     for (const badTag of ["@year", "@year/", "@/2024", "@year/banana", "@unknown/2024"]) {
-      const { status, body } = await harness.json(`/api/works?tags=${encodeURIComponent(badTag)}`);
+      const { status, body } = await harness.json(
+        `${ALL_WORKS}&tags=${encodeURIComponent(badTag)}`,
+      );
       assert.equal(status, 400, badTag);
       assert.equal(body.error.code, "invalid_request", badTag);
     }
   },
 );
 
-contract("GET /api/works は正しい @year/YYYY 擬似タグで追加年に絞り込む", async (harness) => {
-  const thisYear = await harness.json(`/api/works?tags=${encodeURIComponent(`@year/${YEAR}`)}`);
-  assert.equal(thisYear.status, 200);
-  assert.equal(thisYear.body.total, ALL_IDS.length);
+contract(
+  "GET /api/smart-folders/:id/works は正しい @year/YYYY 擬似タグで追加年に絞り込む",
+  async (harness) => {
+    const thisYear = await harness.json(`${ALL_WORKS}&tags=${encodeURIComponent(`@year/${YEAR}`)}`);
+    assert.equal(thisYear.status, 200);
+    assert.equal(thisYear.body.total, ALL_IDS.length);
 
-  const otherYear = await harness.json(`/api/works?tags=${encodeURIComponent("@year/1999")}`);
-  assert.equal(otherYear.status, 200);
-  assert.equal(otherYear.body.total, 0);
-});
+    const otherYear = await harness.json(`${ALL_WORKS}&tags=${encodeURIComponent("@year/1999")}`);
+    assert.equal(otherYear.status, 200);
+    assert.equal(otherYear.body.total, 0);
+  },
+);
 
 contract(
-  "GET /api/works は先頭に空白を挟んだ擬似タグも正規化後の値で判定し受理する",
+  "GET /api/smart-folders/:id/works は先頭に空白を挟んだ擬似タグも正規化後の値で判定し受理する",
   async (harness) => {
     const { status, body } = await harness.json(
-      `/api/works?tags=${encodeURIComponent(` @year/${YEAR}`)}`,
+      `${ALL_WORKS}&tags=${encodeURIComponent(` @year/${YEAR}`)}`,
     );
     assert.equal(status, 200);
     assert.equal(body.total, ALL_IDS.length);
   },
 );
 
+const CTX = { now: Date.parse("2026-06-15T12:00:00.000Z") };
+const ALL_CONDITION = { type: "and" as const, children: [] };
+
 contract(
-  "adapterのqueryWorksは ids で該当作品のみへ絞り込み、他のフィルタ・ページングと組み合わせられる",
+  "adapterのqueryWorks(条件の木)は ids で絞り込み、ページングと組み合わせられる",
   async (harness) => {
-    const base = worksQuerySchema.parse({});
-    const subset = await harness.adapter.queryWorks({
-      ...base,
-      page: 1,
-      limit: 10,
-      ids: [harness.workId("a"), harness.workId("c")],
-    });
+    const subset = await harness.adapter.queryWorks(
+      {
+        condition: ALL_CONDITION,
+        sort: "id-asc",
+        page: 1,
+        limit: 10,
+        ids: [harness.workId("a"), harness.workId("c")],
+      },
+      CTX,
+    );
     assert.deepEqual(sortedIds(subset.items), idsOf(harness, ["a", "c"]));
     assert.equal(subset.total, 2);
 
-    const paged = await harness.adapter.queryWorks({
-      ...base,
-      sort: "id-asc",
-      page: 1,
-      limit: 1,
-      ids: ["a", "b", "c"].map((key) => harness.workId(key)),
-    });
+    const paged = await harness.adapter.queryWorks(
+      {
+        condition: ALL_CONDITION,
+        sort: "id-asc",
+        page: 1,
+        limit: 1,
+        ids: ["a", "b", "c"].map((key) => harness.workId(key)),
+      },
+      CTX,
+    );
     assert.deepEqual(
       paged.items.map((item) => item.id),
       [idsOf(harness, ["a", "b", "c"])[0]],
@@ -113,25 +132,30 @@ contract(
   },
 );
 
-contract("adapterのqueryWorksは数万件のidsを渡しても束縛数の上限に当たらない", async (harness) => {
-  const unknown = Array.from({ length: 40000 }, (_, index) => `unknown-${index}`);
-  const page = await harness.adapter.queryWorks({
-    ...worksQuerySchema.parse({}),
-    page: 1,
-    limit: 10,
-    ids: [...unknown, harness.workId("b")],
-  });
-  assert.deepEqual(sortedIds(page.items), idsOf(harness, ["b"]));
-  assert.equal(page.total, 1);
-});
+contract(
+  "adapterのqueryWorks(条件の木)は数万件のidsを渡しても束縛数の上限に当たらない",
+  async (harness) => {
+    const unknown = Array.from({ length: 40000 }, (_, index) => `unknown-${index}`);
+    const page = await harness.adapter.queryWorks(
+      {
+        condition: ALL_CONDITION,
+        sort: "id-asc",
+        page: 1,
+        limit: 10,
+        ids: [...unknown, harness.workId("b")],
+      },
+      CTX,
+    );
+    assert.deepEqual(sortedIds(page.items), idsOf(harness, ["b"]));
+    assert.equal(page.total, 1);
+  },
+);
 
-contract("adapterのqueryWorksは空のidsを空集合として扱う", async (harness) => {
-  const page = await harness.adapter.queryWorks({
-    ...worksQuerySchema.parse({}),
-    page: 1,
-    limit: 10,
-    ids: [],
-  });
+contract("adapterのqueryWorks(条件の木)は空のidsを空集合として扱う", async (harness) => {
+  const page = await harness.adapter.queryWorks(
+    { condition: ALL_CONDITION, sort: "id-asc", page: 1, limit: 10, ids: [] },
+    CTX,
+  );
   assert.equal(page.total, 0);
 });
 
@@ -222,155 +246,11 @@ contract("PATCH /api/works/:id は古いsourceRevisionを409 source_changedで�
   assert.equal(body.error.code, "source_changed");
 });
 
-contract("GET /api/axes/cv は AxisFacetItem[] を count 降順で返す", async (harness) => {
-  const { status, body } = await harness.json("/api/axes/cv");
-  assert.equal(status, 200);
-  assert.deepEqual(
-    body.map((item: { value: string; count: number }) => [item.value, item.count]),
-    [
-      ["声優A", 2],
-      ["声優B", 1],
-    ],
-  );
-});
-
-contract(
-  "GET /api/axes/:axis は未登録 prefix でも集計する（該当なしは空配列）",
-  async (harness) => {
-    const { status, body } = await harness.json("/api/axes/unknown-prefix");
-    assert.equal(status, 200);
-    assert.deepEqual(body, []);
-  },
-);
-
-contract("GET /api/axes/:axis にスラッシュ入りの軸を渡すと400", async (harness) => {
-  const { status, body } = await harness.json(`/api/axes/${encodeURIComponent("a/b")}`);
-  assert.equal(status, 400);
-  assert.equal(body.error.code, "invalid_request");
-});
-
-contract("GET /api/axes/:axis は tags/tagOp で作品を絞り込んで集計する", async (harness) => {
-  const and = await harness.json("/api/axes/cv?tags=ASMR");
-  assert.deepEqual(
-    and.body.map((item: { value: string; count: number }) => [item.value, item.count]),
-    [["声優A", 2]],
-  );
-
-  const or = await harness.json("/api/axes/cv?tags=tag2&tags=cv%2F%E5%A3%B0%E5%84%AAB&tagOp=OR");
-  assert.deepEqual(or.body.map((item: { value: string; count: number }) => item.value).sort(), [
-    "声優A",
-    "声優B",
-  ]);
-});
-
-contract("GET /api/axes/:axis は tagOp 省略時 AND で絞り込む", async (harness) => {
-  const query = "tags=ASMR&tags=cv%2F%E5%A3%B0%E5%84%AAB";
-  const and = await harness.json(`/api/axes/cv?${query}`);
-  assert.deepEqual(and.body, []);
-
-  const or = await harness.json(`/api/axes/cv?${query}&tagOp=OR`);
-  assert.deepEqual(
-    or.body.map((item: { value: string; count: number }) => [item.value, item.count]).sort(),
-    [
-      ["声優A", 2],
-      ["声優B", 1],
-    ],
-  );
-});
-
-contract("GET /api/axes/:axis は組み込み軸の擬似タグも絞り込みに含める", async (harness) => {
-  const thisYear = await harness.json(
-    `/api/axes/cv?tags=${encodeURIComponent(`@year/${YEAR}`)}&tags=ASMR`,
-  );
-  assert.equal(thisYear.status, 200);
-  assert.deepEqual(
-    thisYear.body.map((item: { value: string; count: number }) => [item.value, item.count]),
-    [["声優A", 2]],
-  );
-  const otherYear = await harness.json(`/api/axes/cv?tags=${encodeURIComponent("@year/1999")}`);
-  assert.deepEqual(otherYear.body, []);
-});
-
-contract(
-  "GET /api/axes/:axis は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する",
-  async (harness) => {
-    const { status, body } = await harness.json("/api/axes/cv?tags=%40year%2Fbanana");
-    assert.equal(status, 400);
-    assert.equal(body.error.code, "invalid_request");
-  },
-);
-
-contract(
-  "GET /api/smart-folders/:id/works は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する",
-  async (harness) => {
-    const created = await harness.send("POST", "/api/smart-folders", {
-      name: "テスト",
-      rules: [],
-      sort: "added-desc",
-    });
-    const { status, body } = await harness.json(
-      `/api/smart-folders/${created.body.id}/works?tags=%40year%2F`,
-    );
-    assert.equal(status, 400);
-    assert.equal(body.error.code, "invalid_request");
-  },
-);
-
 contract("GET /api/fs はルートの listing を返す", async (harness) => {
   const { status, body } = await harness.json("/api/fs");
   assert.equal(status, 200);
   assert.equal(body.path, null);
   assert.ok(Array.isArray(body.entries));
-});
-
-contract("POST /api/smart-folders は201 + 作成されたSmartFolderを返す", async (harness) => {
-  const { status, body } = await harness.send("POST", "/api/smart-folders", {
-    name: "テストフォルダー",
-    rules: [],
-    sort: "added-desc",
-  });
-  assert.equal(status, 201);
-  assert.equal(body.name, "テストフォルダー");
-  assert.equal(typeof body.id, "string");
-  assert.equal(typeof body.createdAt, "string");
-});
-
-contract("POST /api/smart-folders は未対応ルールを400で拒否する", async (harness) => {
-  const { status, body } = await harness.send("POST", "/api/smart-folders", {
-    name: "不正ルール",
-    rules: [{ conjunction: "WHERE", field: "不明", operator: "=", values: ["x"] }],
-    sort: "added-desc",
-  });
-  assert.equal(status, 400);
-  assert.equal(body.error.code, "invalid_request");
-});
-
-contract("スマートフォルダーの作品一覧は保存済み sort を適用する", async (harness) => {
-  const created = await harness.send("POST", "/api/smart-folders", {
-    name: "タイトル降順",
-    rules: [],
-    sort: "title-desc",
-  });
-  const { status, body } = await harness.json(`/api/smart-folders/${created.body.id}/works`);
-  assert.equal(status, 200);
-  assert.equal(body.total, ALL_IDS.length);
-  const titles = body.items.map((work: { title: string }) => work.title);
-  assert.deepEqual(
-    titles,
-    [...titles].sort((a, b) => compareJapaneseSortKeys(b, a)),
-  );
-});
-
-contract("randomソートのスマートフォルダーも作品一覧を返す", async (harness) => {
-  const created = await harness.send("POST", "/api/smart-folders", {
-    name: "ランダム",
-    rules: [],
-    sort: "random",
-  });
-  const { status, body } = await harness.json(`/api/smart-folders/${created.body.id}/works`);
-  assert.equal(status, 200);
-  assert.equal(body.items.length, ALL_IDS.length);
-  assert.equal(typeof body.seed, "number");
 });
 
 contract("未知ルートは404 + not_found", async (harness) => {

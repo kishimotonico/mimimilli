@@ -1,4 +1,4 @@
-// 再生中タブ本体。通常モード（左カバー / 右トラックリストの横長2カラム + 下部固定バー）と
+// 再生中の層の中身。通常モード（左カバー / 右トラックリストの横長2カラム + 下部固定バー）と
 // 没入モード（ビューポート全面カバー）を切り替える。
 //
 // シーク行（.mle-nowplaying__seek）はモードを問わず1回だけマウントする永続スロットで、
@@ -15,6 +15,7 @@ import { selectActiveTrackView } from "../../../entities/player/model/playerCore
 import { nowPlayingViewModeAtom } from "../model/playerPresentationAtoms";
 import { usePlayerActions } from "../../../entities/player/model/usePlayerActions";
 import { usePlayerState, type PlayerState } from "../model/usePlayerState";
+import NowPlayingTags, { type TagClickHandler } from "./NowPlayingTags";
 import PlaybackArtwork from "./PlaybackArtwork";
 import PlaybackErrorNotice from "./PlaybackErrorNotice";
 import NowPlayingScrub from "./NowPlayingScrub";
@@ -31,6 +32,7 @@ import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverT
 
 interface NowPlayingViewProps {
   onOpenWork: (workId: string) => void;
+  onTagClick: TagClickHandler;
 }
 
 const COVER_MAX_SIZE = 480;
@@ -38,6 +40,7 @@ const COVER_MAX_SIZE = 480;
 interface NowPlayingNormalBodyProps {
   state: PlayerState;
   onOpenWork: (workId: string) => void;
+  onTagClick: TagClickHandler;
   onSelectTrack: (i: number) => void;
   onEnterImmersive: () => void;
   onTogglePlay: () => void;
@@ -57,6 +60,7 @@ interface NowPlayingNormalBodyProps {
 function NowPlayingNormalBody({
   state,
   onOpenWork,
+  onTagClick,
   onSelectTrack,
   onEnterImmersive,
   onTogglePlay,
@@ -109,6 +113,10 @@ function NowPlayingNormalBody({
               {trackTitle}
             </h1>
           </div>
+
+          {!isFilePlayback && currentWork && (
+            <NowPlayingTags workId={currentWork.id} onTagClick={onTagClick} />
+          )}
 
           <PlaybackErrorNotice
             error={playbackError}
@@ -175,7 +183,7 @@ function NowPlayingNormalBody({
   );
 }
 
-export default function NowPlayingView({ onOpenWork }: NowPlayingViewProps) {
+export default function NowPlayingView({ onOpenWork, onTagClick }: NowPlayingViewProps) {
   const isActive = useAtomValue(playerIsActiveAtom);
   const state = usePlayerState();
   const actions = usePlayerActions();
@@ -210,6 +218,7 @@ export default function NowPlayingView({ onOpenWork }: NowPlayingViewProps) {
             key="normal"
             state={state}
             onOpenWork={onOpenWork}
+            onTagClick={onTagClick}
             onSelectTrack={actions.setTrackIndex}
             onEnterImmersive={() => setMode("immersive")}
             onTogglePlay={actions.togglePlay}

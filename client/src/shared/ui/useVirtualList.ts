@@ -23,7 +23,7 @@ export interface UseVirtualListOptions {
   overscan?: number;
   measureElement?: (element: Element) => number;
   scrollRef?: RefObject<HTMLDivElement | null>;
-  /** resetKey 変化時に scrollTop も 0 に戻す（軸値リスト系） */
+  /** resetKey 変化時に scrollTop も 0 に戻す（グループ値リスト系） */
   resetScrollTop?: boolean;
   infiniteScroll?: VirtualListInfiniteScroll;
 }

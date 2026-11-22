@@ -2,14 +2,14 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { isPointInTriangle, type Point } from "./pointInTriangle";
 
 // 「複数のトリガーが1つのポータル越しパネルを共有し、常に高々1つだけ開く」ホバーUI
-// （軸レールのクイックオーバーレイ等）の意図判定を一元管理するグループコーディネーター。
+// （サイドバーのクイックオーバーレイ等）の意図判定を一元管理するグループコーディネーター。
 // 各トリガー単独の開閉遅延・pointerイベント・トリガー⇄パネル間のタイマー共有という
 // useHoverIntent の役割に加え、トリガーからパネルへの斜め移動が他のトリガーの上を
 // 通過しても開閉が横取りされないよう、セーフトライアングル判定で他行の open 要求を
 // 抑止する（参考: https://ics.media/entry/260803/）。
 //
 // パネル側（panelElRef・panelHandlers・セーフトライアングルの document pointermove）は
-// 常に「現在openなオーナー」1つだけに紐づく。AnimatePresence 下では軸A→Bの切替時に
+// 常に「現在openなオーナー」1つだけに紐づく。AnimatePresence 下ではグループ分けA→Bの切替時に
 // 旧Aが退出アニメーション中もマウントされ続けるため、旧Aの登録解除（アンマウント時の
 // ref クリーンアップ）が新Bの登録より遅れて発火しうる。これが新Bの登録を壊さないよう、
 // オーナーが交代するたびに発行するトークンで登録・解除を照合する。
@@ -46,7 +46,7 @@ export interface UseHoverGroupCoordinatorOptions {
 export interface UseHoverGroupCoordinatorResult {
   /** 現在開いているトリガーのキー */
   openKey: string | null;
-  /** 現在開いているトリガーの要素（AxisQuickOverlay の anchorEl に渡す） */
+  /** 現在開いているトリガーの要素（GroupValuePopover の anchorEl に渡す） */
   openAnchorEl: HTMLElement | null;
   /** 現在openなオーナーのトークン。openKeyがnullの間はnull。 */
   ownerToken: HoverGroupOwnerToken | null;
@@ -231,7 +231,7 @@ export function useHoverGroupCoordinator(
 
   const registerPanelEl = (token: HoverGroupOwnerToken, el: HTMLElement | null) => {
     const current = openStateRef.current;
-    // 現在のオーナーと異なるトークンからの登録・解除は無視する（軸A→B切替時に、
+    // 現在のオーナーと異なるトークンからの登録・解除は無視する（グループ分けA→B切替時に、
     // 退出アニメーション中の旧Aが遅れて解除しても新Bの登録を壊さないため）。
     // current が null（何もopenでない）のときは保護対象が無いため素直に反映する。
     if (current !== null && current.token !== token) return;

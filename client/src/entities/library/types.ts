@@ -1,4 +1,4 @@
-export type { SortId, AxisFacetItem, SmartFolder } from "@mimimilli/shared";
+export type { SortId, GroupValueItem, SmartFolder } from "@mimimilli/shared";
 import type { SortId } from "@mimimilli/shared";
 
 export const SORT_OPTIONS: { id: SortId; label: string }[] = [
@@ -16,5 +16,3 @@ export const SORT_OPTIONS: { id: SortId; label: string }[] = [
 export type ViewMode = "list" | "grid";
 
 export type GridLayoutMode = "square" | "justified";
-
-export type AxisId = string;

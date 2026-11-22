@@ -21,7 +21,7 @@ async function setup(t: TestContext, chunkSizeBytes?: number) {
   await configureRoot(adapter, lib.root);
   await scanAndRegisterCandidates(adapter);
 
-  const res = await app.request("/api/works");
+  const res = await app.request("/api/smart-folders/all/works?sort=added-desc");
   const works = (await res.json()) as WorksPage;
   const generated = works.items.find((w) => w.title.includes("RJ900001"))!;
   const existing = works.items.find((w) => w.title === "既存メタの作品")!;

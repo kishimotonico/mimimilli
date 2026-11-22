@@ -1,44 +1,28 @@
-// ブックマーク後に表示中の一覧をどう揃えるかは、表示中の軸・検索・ソートを知るライブラリが決める。
+// ブックマーク後に表示中の一覧をどう揃えるかは、表示中のスマートフォルダー・検索・並びを知るライブラリが決める。
 
-import type { QueryKey } from "@tanstack/react-query";
-import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
-import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
-import { isSmartAxis, getSmartFolderId } from "../../../entities/library/axisDefinitions";
+import { usesBookmarked } from "@mimimilli/shared";
 import type { ActiveListCacheHandler } from "../../../entities/work/model/workMutations";
-import { buildSmartFolderFilterParams } from "./libraryPresentation";
+import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
+import { folderWorksKey } from "./folderWorksRequest";
 import { patchBookmarkedInQueryCache } from "./workPatchListCache";
-import type { LibraryViewState } from "./useLibraryNavigation";
 
-export function smartOrWorksListKey(
-  nav: LibraryViewState,
-  worksParams: object | null,
-  searchQuery: string,
-): QueryKey | null {
-  if (isSmartAxis(nav.activeAxis)) {
-    return SMART_FOLDER_QUERY_KEYS.works(
-      getSmartFolderId(nav.activeAxis),
-      buildSmartFolderFilterParams(nav.selectedTags, searchQuery),
-    );
-  }
-  return worksParams !== null ? WORK_QUERY_KEYS.list(worksParams) : null;
-}
-
-/** 所属が変わりうるスマートフォルダー軸・お気に入り軸は reset、それ以外は該当行だけ直接パッチする */
+/** 条件がお気に入りに依存するスマートフォルダーは所属が変わりうるので reset、
+ *  それ以外は該当行だけ直接パッチする */
 export function bookmarkActiveListHandler(
-  nav: LibraryViewState,
-  activeListQueryKey: QueryKey | null,
+  view: ResolvedLibraryView,
+  searchQuery: string,
 ): ActiveListCacheHandler | null {
-  if (activeListQueryKey === null) return null;
-  if (isSmartAxis(nav.activeAxis) || nav.activeAxis === "fav") {
+  if (view.kind !== "works") return null;
+  const queryKey = folderWorksKey(view, searchQuery);
+  if (usesBookmarked(view.condition)) {
     return {
-      queryKey: activeListQueryKey,
-      apply: (queryClient) =>
-        queryClient.resetQueries({ queryKey: activeListQueryKey, exact: true }),
+      queryKey,
+      apply: (queryClient) => queryClient.resetQueries({ queryKey, exact: true }),
     };
   }
   return {
-    queryKey: activeListQueryKey,
+    queryKey,
     apply: (queryClient, { workId, bookmarked }) =>
-      patchBookmarkedInQueryCache(queryClient, activeListQueryKey, workId, bookmarked),
+      patchBookmarkedInQueryCache(queryClient, queryKey, workId, bookmarked),
   };
 }

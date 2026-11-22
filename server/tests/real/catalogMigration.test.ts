@@ -19,7 +19,7 @@ import {
 import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
 
 const CATALOG_MIGRATIONS_DIR = join(import.meta.dir, "../../drizzle/catalog");
-const LATEST_MIGRATION_TAG = "0014_unreadable_paths";
+const LATEST_MIGRATION_TAG = "0015_rename_tag_value_sort_key";
 
 function tableExists(sqlite: Database, name: string): boolean {
   const row = sqlite
@@ -55,7 +55,7 @@ test("unreadable_paths: 新規DBはopenDbでテーブルが作られる", (t) =>
   assert.equal(tableExists(db.sqlite, "unreadable_paths"), true);
 });
 
-test("unreadable_paths: 0013まで適用済みの既存DBはpendingと判定され、openDbでテーブルが足されデータは保たれる", (t) => {
+test("tags: 0014まで適用済みの既存DBはpendingと判定され、openDbで列が value_sort_key に改名されデータは保たれる", (t) => {
   const directory = makeTestDirectory("catalog-migration-existing");
   t.after(directory.cleanup);
   const previousDir = join(directory.path, "previous-migrations");
@@ -67,9 +67,8 @@ test("unreadable_paths: 0013まで適用済みの既存DBはpendingと判定さ�
   const legacy = new Database(catalogPath, { create: true });
   executeSqliteMigrations(legacy, previousDir);
   legacy.exec(
-    `INSERT INTO identity_conflicts (work_id, path) VALUES ('work', 'copy-a'), ('work', 'copy-b')`,
+    `INSERT INTO tags (name, search_key, facet_sort_key) VALUES ('cv/a', 'key-a', 'sort-a'), ('cv/b', 'key-b', 'sort-b')`,
   );
-  assert.equal(tableExists(legacy, "unreadable_paths"), false);
   assert.equal(hasPendingSqliteMigrations(legacy, CATALOG_MIGRATIONS_DIR), true);
   legacy.close();
 
@@ -77,13 +76,14 @@ test("unreadable_paths: 0013まで適用済みの既存DBはpendingと判定さ�
     openDb({ kind: "files", catalogPath, userPath: join(dbDir, "user.sqlite") }),
   );
 
-  assert.equal(tableExists(db.sqlite, "invalid_meta_files"), true);
-  assert.equal(tableExists(db.sqlite, "unreadable_paths"), true);
   assert.equal(hasPendingSqliteMigrations(db.sqlite, CATALOG_MIGRATIONS_DIR), false);
-  const conflicts = db.sqlite.query("SELECT COUNT(*) AS count FROM identity_conflicts").get() as {
-    count: number;
-  };
-  assert.equal(conflicts.count, 2);
+  const sortKeys = db.sqlite
+    .query("SELECT value_sort_key AS key FROM tags ORDER BY name")
+    .all() as Array<{ key: string }>;
+  assert.deepEqual(
+    sortKeys.map((row) => row.key),
+    ["sort-a", "sort-b"],
+  );
   const backups = join(directory.path, "backup");
   assert.equal(existsSync(backups) && readdirSync(backups).length > 0, true);
 });

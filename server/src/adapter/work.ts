@@ -1,4 +1,6 @@
 import type {
+  GroupValueItem,
+  Condition,
   DataIntegrityWarning,
   IdentityConflictReassignBody,
   NormalizedTag,
@@ -15,11 +17,16 @@ import type {
   WorkspacePath,
   WorksPage,
   UnregisterMissingWorksResult,
-  WorksQuery,
 } from "@mimimilli/shared";
+import type { ConditionGroupQuery, ConditionWorksQuery, EvalContext } from "./condition.ts";
 
 export interface WorkAdapter {
-  queryWorks(params: WorksQuery): Promise<WorksPage>;
+  /** 条件の木に一致する作品の一覧（ADR-0040）。now は route が1リクエストにつき1回作る */
+  queryWorks(query: ConditionWorksQuery, ctx: EvalContext): Promise<WorksPage>;
+  /** 条件に一致する作品を、グループ分けの値ごとに集計する */
+  groupWorks(query: ConditionGroupQuery, ctx: EvalContext): Promise<GroupValueItem[]>;
+  /** 条件ごとの一致件数。入力と同じ順で返す */
+  countByConditions(conditions: Condition[], ctx: EvalContext): Promise<number[]>;
   getWorkRegisterPreview(path: WorkspacePath): Promise<WorkRegisterPreview | null>;
   createWork(body: WorkCreateBody): Promise<WorkCreateResponse | null>;
   reassignIdentityConflict(

@@ -7,8 +7,8 @@ import { workDetailIdAtom } from "../../../entities/work/model/navigationAtoms";
 import { workDetailQueryOptions } from "../../../entities/work/workDetailQueryOptions";
 import { allTagsQueryOptions } from "../../../entities/tag/allTagsQueryOptions";
 import {
+  openNowPlayingLayerAtom,
   replaceAppModeAtom,
-  setAppModeAtom,
 } from "../../../entities/navigation/model/appRouteStore";
 import {
   playerIsPlayingOrLoadingAtom,
@@ -18,24 +18,24 @@ import {
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import { useLibraryWorkPatchMutations } from "../model/useLibraryQueries";
 import { useUnregisterWorkMutation } from "../../../entities/work/model/workMutations";
-import { librarySearchQueryAtom } from "../../../entities/library/model/navigationAtoms";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import { WorkDetail } from "./preview/WorkDetail";
 
 export default function WorkDetailPage() {
   const workId = useAtomValue(workDetailIdAtom);
-  const searchQuery = useAtomValue(librarySearchQueryAtom);
   const playingWorkId = useAtomValue(playingWorkIdAtom);
   const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
   const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
-  const setAppMode = useSetAtom(setAppModeAtom);
+  const openNowPlaying = useSetAtom(openNowPlayingLayerAtom);
   const replaceAppMode = useSetAtom(replaceAppModeAtom);
   const nav = useLibraryNavigation();
   const { clickTag } = nav;
+  const view = nav.foldersStatus === "ready" ? nav.view : null;
+  const searchQuery = nav.foldersStatus === "ready" ? nav.searchQuery : "";
 
   const workQuery = useQuery(workDetailQueryOptions(workId));
   const tagsQuery = useQuery(allTagsQueryOptions);
-  const workPatchMutations = useLibraryWorkPatchMutations(nav, searchQuery);
+  const workPatchMutations = useLibraryWorkPatchMutations(view, searchQuery);
   const deleteMutation = useUnregisterWorkMutation();
 
   // 削除済み作品などをURLで直接開いた場合、404を確認したらライブラリへ戻す（LibraryViewの
@@ -52,14 +52,9 @@ export default function WorkDetailPage() {
   const isCurrentWorkPlaying = work !== null && playingWorkId === work.id;
 
   const handleTagClick = useCallback(
-    (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => {
-      clickTag(tag, opts);
-      setAppMode("library");
-    },
-    [clickTag, setAppMode],
+    (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => clickTag(tag, opts),
+    [clickTag],
   );
-
-  const handleGoToPlayingScreen = useCallback(() => setAppMode("nowPlaying"), [setAppMode]);
 
   if (!work) {
     return (
@@ -86,7 +81,7 @@ export default function WorkDetailPage() {
         // 解除後の退避も、404と同じくreplaceで抜ける（上のuseEffect参照）
         onUnregistered={() => replaceAppMode("library")}
         onTagClick={handleTagClick}
-        onGoToPlayingScreen={isCurrentWorkPlaying ? handleGoToPlayingScreen : undefined}
+        onGoToPlayingScreen={isCurrentWorkPlaying ? openNowPlaying : undefined}
       />
     </div>
   );

@@ -1,28 +1,11 @@
 // library feature の client/UI state。
 // ナビゲーション atom は entities/library/model/navigationAtoms.ts が正。
-// ここには URL に載せない表示設定と、値一覧ソートなど library 固有の UI state だけを置く。
+// ここには URL に載せない表示設定など library 固有の UI state だけを置く。
 
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
-import { createRandomSeed, type SmartFolder, type TagPrefix } from "@mimimilli/shared";
-import type { AxisId, GridLayoutMode, ViewMode } from "../../../entities/library/types";
-import {
-  getAxisLabel,
-  getSmartFolderId,
-  isSmartAxis,
-} from "../../../entities/library/axisDefinitions";
-import { DEFAULT_AXIS_VALUE_SORT, type AxisValueSortState } from "./axisValueSort";
-
-// 値一覧のソート状態。sortAtom（作品一覧）とは別に保持する（ADR-0012 帰結）。
-// ソートメニューと list の列見出しクリックは同一のこの state への別入口。
-export const axisValueSortAtom = atom<AxisValueSortState>(DEFAULT_AXIS_VALUE_SORT);
-
-// sort=random の作品一覧が使う seed。URLには載せない
-export const randomSeedAtom = atom(createRandomSeed());
-
-export const reshuffleLibraryRandomSeedAtom = atom(null, (_get, set) => {
-  set(randomSeedAtom, createRandomSeed());
-});
+import type { GridLayoutMode, ViewMode } from "../../../entities/library/types";
+import type { SmartFolderDialogTarget } from "./smartFolderEditing";
 
 // URLには含めない表示設定。ブラウザーを再起動しても直前の見た目を復元する。
 export const libraryViewModeAtom = atomWithStorage<ViewMode>("mimimilli:libraryViewMode", "list");
@@ -33,19 +16,5 @@ export const libraryGridLayoutModeAtom = atomWithStorage<GridLayoutMode>(
   "square",
 );
 
-// ── アドレスバーパス（純粋計算）────────────────────────────────
-
-// パンくずは「ライブラリ > 軸名」までを表す。絞り込みはチップ列だけが表現する
-// （ADR-0012 §2・帰結）。
-export function buildLibraryAddressPath(
-  axis: AxisId,
-  tagPrefixes: TagPrefix[],
-  smartFolders: SmartFolder[],
-): string[] {
-  if (axis === "all") return ["ライブラリ"];
-  if (isSmartAxis(axis)) {
-    const folder = smartFolders.find((sf) => sf.id === getSmartFolderId(axis));
-    return ["ライブラリ", folder?.name ?? getAxisLabel(axis, tagPrefixes)];
-  }
-  return ["ライブラリ", getAxisLabel(axis, tagPrefixes)];
-}
+// スマートフォルダーのダイアログの対象。サイドバー・チップ列は値を入れるだけで、描画は SmartFolderDialogHost が行う。
+export const smartFolderDialogAtom = atom<SmartFolderDialogTarget | null>(null);

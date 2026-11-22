@@ -37,7 +37,7 @@ test("実在ルートは末尾スラッシュなしで正しく応答する", as
   const settingsBody = await settings.json();
   assert.equal(typeof settingsBody.rootFolder, "string");
 
-  const works = await fetch(`${baseUrl}/api/works`);
+  const works = await fetch(`${baseUrl}/api/smart-folders/all/works?sort=added-desc`);
   assert.equal(works.status, 200);
   const worksBody = await works.json();
   assert.ok(Array.isArray(worksBody.items));

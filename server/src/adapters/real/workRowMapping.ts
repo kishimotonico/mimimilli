@@ -108,8 +108,11 @@ export interface CoverLocation {
   coverImage: string | null;
 }
 
-export interface AxisFacetRow {
+export interface GroupValueRow {
   value: string;
+  sortKey: string;
+  lastAddedAt: string;
+  lastPlayedAt: string | null;
   count: number;
   durationSec: number;
   coversJson: string;

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
-import { axisFacetListSchema, emptyDlsiteState, type WorksPage } from "@mimimilli/shared";
+import { groupValueListSchema, emptyDlsiteState, type WorksPage } from "@mimimilli/shared";
 import { createApp } from "../helpers/testApp.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
@@ -110,7 +110,7 @@ async function setupMissingCoverListQuery(t: TestContext) {
 test("real: カバー実体欠損作品を含む一覧は成功し cover は null", async (t) => {
   const { app, work } = await setupMissingCoverListQuery(t);
 
-  const res = await app.request("/api/works");
+  const res = await app.request("/api/smart-folders/all/works?sort=added-desc");
   assert.equal(res.status, 200);
   const page = (await res.json()) as WorksPage;
   const item = page.items.find((entry) => entry.id === work.id);
@@ -118,12 +118,16 @@ test("real: カバー実体欠損作品を含む一覧は成功し cover は nul
   assert.equal(item.cover, null);
 });
 
-test("real: カバー実体欠損作品は軸ファセットの covers から除外される", async (t) => {
+test("real: カバー実体欠損作品は値一覧の covers から除外される", async (t) => {
   const { app, work, presentWork } = await setupMissingCoverListQuery(t);
 
-  const res = await app.request("/api/axes/year");
+  const res = await app.request("/api/smart-folders/all/groups", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ groupBy: { kind: "addedYear" }, groupSort: "count-desc" }),
+  });
   assert.equal(res.status, 200);
-  const items = axisFacetListSchema.parse(await res.json());
+  const items = groupValueListSchema.parse(await res.json());
   const year = items.find((item) => item.value === "2026");
   assert.ok(year);
   assert.equal(year.count, 2);

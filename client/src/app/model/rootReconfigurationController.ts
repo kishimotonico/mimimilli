@@ -20,7 +20,7 @@ function affectedQueryKeys(): readonly (readonly unknown[])[] {
   return [
     WORK_QUERY_KEYS.all(),
     WORK_QUERY_KEYS.allDetails(),
-    WORK_QUERY_KEYS.allFacets(),
+    SMART_FOLDER_QUERY_KEYS.allGroups(),
     SMART_FOLDER_QUERY_KEYS.all(),
     SMART_FOLDER_QUERY_KEYS.allWorks(),
     TAG_QUERY_KEYS.all(),
@@ -48,7 +48,12 @@ export function removeReconfigurationAffectedQueries(queryClient: QueryClient): 
  *  observerが再開せずpendingのまま残るため、activeな分は自動で再取得されるresetを使う。 */
 export function resetReconfigurationAffectedQueries(queryClient: QueryClient): void {
   for (const queryKey of affectedQueryKeys()) {
-    void queryClient.resetQueries({ queryKey });
+    // スマートフォルダー一覧はサイドバーの前提なので、データを残したまま取り直す
+    if (queryKey[0] === SMART_FOLDER_QUERY_KEYS.all()[0]) {
+      void queryClient.invalidateQueries({ queryKey });
+    } else {
+      void queryClient.resetQueries({ queryKey });
+    }
   }
 }
 

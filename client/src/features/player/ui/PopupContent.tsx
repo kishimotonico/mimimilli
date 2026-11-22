@@ -1,5 +1,5 @@
 // 右下ポップアップの中身。日常操作（音量・トラック移動・ループ・再生速度）を厳選して置く。
-// channelSwap / abRepeat 等のニッチ機能は置かない（再生中タブ側の役割）。
+// channelSwap / abRepeat 等のニッチ機能は置かない（再生中の層側の役割）。
 
 import { useState } from "react";
 import type { PlayerState } from "../model/usePlayerState";
@@ -77,7 +77,13 @@ export default function PopupContent({
         {isFilePlayback && <div />}
         <div className="mle-popup__head-actions">
           <IconButton size="sm" icon={I.chevD} label="バーへ戻る" onClick={onFold} />
-          <IconButton size="sm" icon={I.fs} label="再生中タブを表示" onClick={onOpenNowPlaying} />
+          <IconButton
+            size="sm"
+            icon={I.fs}
+            label="再生中を開く"
+            onClick={onOpenNowPlaying}
+            data-np-open
+          />
           <IconButton
             size="sm"
             icon={I.x}

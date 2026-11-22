@@ -1,15 +1,25 @@
-import { eq, asc } from "drizzle-orm";
-import { tagPrefixSchema, smartFolderSchema } from "@mimimilli/shared";
+import { and, asc, eq, gte, isNotNull, sql } from "drizzle-orm";
+import type { z } from "zod";
+import {
+  conditionTreeSchema,
+  groupBySchema,
+  groupSortIdSchema,
+  sortIdSchema,
+  tagPrefixSchema,
+} from "@mimimilli/shared";
 import type {
+  Condition,
   ResumeBody,
-  SmartFolder,
-  SmartFolderCreate,
-  SmartFolderUpdate,
+  SmartFolderWrite,
+  GroupSortId,
+  SortId,
   TagPrefix,
   TagPrefixCreate,
   TagPrefixUpdate,
   Work,
 } from "@mimimilli/shared";
+import type { SmartFolderInsert, SmartFolderRow } from "../../adapter/classification.ts";
+import { getCategoryLogger } from "../../lib/logger.ts";
 import type { Db } from "./db.ts";
 import {
   appSettings,
@@ -18,10 +28,13 @@ import {
   tagPrefixes,
   workStates,
 } from "./userSchema.ts";
-import { parseJsonField, parseRecord } from "./workRowMapping.ts";
+
+const smartFolderLogger = getCategoryLogger("db");
 
 export class UserWorkStateRepository {
   private readonly db: Db;
+  /** 警告済みの壊れた行（id → 問題の署名）。一覧を取るたびに同じ警告を重ねない。直った行は忘れる */
+  private readonly reportedBrokenFolders = new Map<string, string>();
 
   constructor(db: Db) {
     this.db = db;
@@ -97,7 +110,6 @@ export class UserWorkStateRepository {
           prefix: r.prefix,
           label: r.label,
           color: r.color,
-          showAsAxis: r.showAsAxis,
           protected: r.protected,
           order: r.sortOrder,
         }),
@@ -111,7 +123,6 @@ export class UserWorkStateRepository {
       prefix: r.prefix,
       label: r.label,
       color: r.color,
-      showAsAxis: r.showAsAxis,
       protected: r.protected,
       order: r.sortOrder,
     });
@@ -129,7 +140,6 @@ export class UserWorkStateRepository {
         prefix: input.prefix,
         label: input.label,
         color: input.color,
-        showAsAxis: input.showAsAxis,
         protected: input.protected,
         sortOrder: this.nextTagPrefixOrder(),
       })
@@ -146,7 +156,6 @@ export class UserWorkStateRepository {
     const set: Partial<typeof tagPrefixes.$inferInsert> = {};
     if (patch.label !== undefined) set.label = patch.label;
     if (patch.color !== undefined) set.color = patch.color;
-    if (patch.showAsAxis !== undefined) set.showAsAxis = patch.showAsAxis;
     if (patch.protected !== undefined) set.protected = patch.protected;
     if (Object.keys(set).length > 0) {
       this.db.user.update(tagPrefixes).set(set).where(eq(tagPrefixes.prefix, prefix)).run();
@@ -242,80 +251,151 @@ export class UserWorkStateRepository {
     });
   }
 
-  listSmartFolders(): SmartFolder[] {
+  listSmartFolders(): SmartFolderRow[] {
     return this.db.user
       .select()
       .from(smartFolders)
-      .orderBy(asc(smartFolders.createdAt))
+      .orderBy(asc(smartFolders.position), asc(smartFolders.createdAt), asc(smartFolders.id))
       .all()
-      .map((r) =>
-        parseRecord(
-          smartFolderSchema,
-          {
-            id: r.id,
-            name: r.name,
-            rules: parseJsonField(r.rulesJson, "smart_folders", r.id, "rules_json"),
-            sort: r.sort,
-            createdAt: r.createdAt,
-          },
-          "smart_folders",
-          r.id,
-        ),
-      );
+      .map((row) => toSmartFolderRow(row, this.reportedBrokenFolders));
   }
 
-  getSmartFolder(id: string): SmartFolder | null {
+  getSmartFolder(id: string): SmartFolderRow | null {
     const r = this.db.user.select().from(smartFolders).where(eq(smartFolders.id, id)).get();
-    if (!r) return null;
-    return parseRecord(
-      smartFolderSchema,
-      {
-        id: r.id,
-        name: r.name,
-        rules: parseJsonField(r.rulesJson, "smart_folders", r.id, "rules_json"),
-        sort: r.sort,
-        createdAt: r.createdAt,
-      },
-      "smart_folders",
-      r.id,
-    );
+    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
   }
 
-  createSmartFolder(input: SmartFolderCreate): SmartFolder {
-    const folder: SmartFolder = {
-      id: `sf-${crypto.randomUUID()}`,
-      name: input.name,
-      rules: input.rules,
-      sort: input.sort,
-      createdAt: new Date().toISOString(),
-    };
+  /** 既にある ID は飛ばして末尾へ追加し、flagKey を立てる */
+  seedSmartFolders(folders: SmartFolderInsert[], flagKey: string): void {
+    this.db.userTransaction(() => {
+      for (const folder of folders) this.appendSmartFolder(folder);
+      this.setUserSetting(flagKey, "1");
+    });
+  }
+
+  /** 末尾へ追加する。ID が既にあれば null */
+  appendSmartFolder(folder: SmartFolderInsert): SmartFolderRow | null {
+    return this.db.userTransaction(() => {
+      if (this.getSmartFolder(folder.id)) return null;
+      const position = this.db.user
+        .select({ position: smartFolders.position })
+        .from(smartFolders)
+        .all()
+        .reduce((max, row) => Math.max(max, row.position + 1), 0);
+      return this.insertSmartFolderRow({ ...folder, position });
+    });
+  }
+
+  /** 同じ ID・位置・作成日時で戻す。位置が埋まっていれば、その位置以降を1つずつ後ろへ送る。ID が既にあれば null */
+  restoreSmartFolder(folder: SmartFolderRow & { condition: Condition }): SmartFolderRow | null {
+    return this.db.userTransaction(() => {
+      if (this.getSmartFolder(folder.id)) return null;
+      const occupied = this.db.user
+        .select({ id: smartFolders.id })
+        .from(smartFolders)
+        .where(eq(smartFolders.position, folder.position))
+        .get();
+      if (occupied) {
+        this.db.user
+          .update(smartFolders)
+          .set({ position: sql`${smartFolders.position} + 1` })
+          .where(gte(smartFolders.position, folder.position))
+          .run();
+      }
+      return this.insertSmartFolderRow(folder);
+    });
+  }
+
+  private insertSmartFolderRow(folder: SmartFolderRow & { condition: Condition }): SmartFolderRow {
     this.db.user
       .insert(smartFolders)
       .values({
         id: folder.id,
         name: folder.name,
-        rulesJson: JSON.stringify(folder.rules),
+        conditionJson: JSON.stringify(folder.condition),
         sort: folder.sort,
+        groupByJson: folder.groupBy === null ? null : JSON.stringify(folder.groupBy),
+        groupSort: folder.groupSort,
+        position: folder.position,
         createdAt: folder.createdAt,
       })
       .run();
     return folder;
   }
 
-  updateSmartFolder(id: string, input: SmartFolderUpdate): SmartFolder | null {
-    const existing = this.getSmartFolder(id);
-    if (!existing) return null;
-    const set: Partial<typeof smartFolders.$inferInsert> = {};
-    if (input.name !== undefined) set.name = input.name;
-    if (input.rules !== undefined) set.rulesJson = JSON.stringify(input.rules);
-    if (input.sort !== undefined) set.sort = input.sort;
-    if (Object.keys(set).length > 0) {
-      this.db.user.update(smartFolders).set(set).where(eq(smartFolders.id, id)).run();
-    }
-    return this.getSmartFolder(id);
+  updateSmartFolder(id: string, input: SmartFolderWrite): SmartFolderRow | null {
+    const r = this.db.user
+      .update(smartFolders)
+      .set({
+        name: input.name,
+        conditionJson: JSON.stringify(input.condition),
+        sort: input.sort,
+        groupByJson: input.groupBy === null ? null : JSON.stringify(input.groupBy),
+        groupSort: input.groupSort,
+      })
+      .where(eq(smartFolders.id, id))
+      .returning()
+      .get();
+    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
+  }
+
+  updateSmartFolderSort(id: string, sort: SortId | null): SmartFolderRow | null {
+    const r = this.db.user
+      .update(smartFolders)
+      .set({ sort })
+      .where(eq(smartFolders.id, id))
+      .returning()
+      .get();
+    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
+  }
+
+  updateSmartFolderCondition(
+    id: string,
+    change: { condition: Condition; sort?: SortId | null },
+  ): SmartFolderRow | null {
+    const r = this.db.user
+      .update(smartFolders)
+      .set({
+        conditionJson: JSON.stringify(change.condition),
+        ...(change.sort === undefined ? {} : { sort: change.sort }),
+      })
+      .where(eq(smartFolders.id, id))
+      .returning()
+      .get();
+    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
+  }
+
+  /** グループ分けのある行だけを更新する。グループ分けを外す更新と交差しても、値の並びだけが残る行を作らない */
+  updateSmartFolderGroupSort(id: string, groupSort: GroupSortId): SmartFolderRow | null {
+    const r = this.db.user
+      .update(smartFolders)
+      .set({ groupSort })
+      .where(and(eq(smartFolders.id, id), isNotNull(smartFolders.groupByJson)))
+      .returning()
+      .get();
+    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
+  }
+
+  /** 全件の順序を置き換える。渡された集合が今の集合と一致しなければ null */
+  reorderSmartFolders(ids: string[]): SmartFolderRow[] | null {
+    return this.db.userTransaction(() => {
+      const existing = new Set(
+        this.db.user
+          .select({ id: smartFolders.id })
+          .from(smartFolders)
+          .all()
+          .map((r) => r.id),
+      );
+      if (ids.length !== existing.size || !ids.every((id) => existing.has(id))) return null;
+      ids.forEach((id, position) => {
+        this.db.user.update(smartFolders).set({ position }).where(eq(smartFolders.id, id)).run();
+      });
+      return this.listSmartFolders();
+    });
   }
 
   deleteSmartFolder(id: string): boolean {
+    this.reportedBrokenFolders.delete(id);
     return (
       this.db.user
         .delete(smartFolders)
@@ -324,4 +404,66 @@ export class UserWorkStateRepository {
         .get() !== undefined
     );
   }
+}
+
+type ColumnProblem = { column: string; reason: unknown };
+type ColumnRead<T> = { ok: true; value: T } | { ok: false; problem: ColumnProblem };
+
+function failed(column: string, reason: unknown): { ok: false; problem: ColumnProblem } {
+  return { ok: false, problem: { column, reason } };
+}
+
+function readJsonColumn<T>(column: string, raw: string, schema: z.ZodType<T>): ColumnRead<T> {
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch (error) {
+    return failed(column, error instanceof Error ? error.message : String(error));
+  }
+  const parsed = schema.safeParse(json);
+  return parsed.success ? { ok: true, value: parsed.data } : failed(column, parsed.error.issues);
+}
+
+/** condition・sort・groupBy・groupSort のどれか1つでも読めない、または groupBy と groupSort の組が合わなければ、4つとも null の壊れた行にする。壊れた行は同じ問題につき1回だけ警告する */
+function toSmartFolderRow(
+  r: typeof smartFolders.$inferSelect,
+  reportedBrokenFolders: Map<string, string>,
+): SmartFolderRow {
+  const base = { id: r.id, name: r.name, position: r.position, createdAt: r.createdAt };
+  const condition = readJsonColumn("condition_json", r.conditionJson, conditionTreeSchema);
+  const sort = sortIdSchema.nullable().safeParse(r.sort);
+  const groupBy =
+    r.groupByJson === null
+      ? ({ ok: true, value: null } as const)
+      : readJsonColumn("group_by_json", r.groupByJson, groupBySchema);
+  const groupSort = groupSortIdSchema.nullable().safeParse(r.groupSort);
+  const problems: ColumnProblem[] = [];
+  if (!condition.ok) problems.push(condition.problem);
+  if (!sort.success) problems.push({ column: "sort", reason: sort.error.issues });
+  if (!groupBy.ok) problems.push(groupBy.problem);
+  if (!groupSort.success) problems.push({ column: "group_sort", reason: groupSort.error.issues });
+  const mismatched =
+    groupBy.ok && groupSort.success && (groupBy.value === null) !== (groupSort.data === null);
+  if (mismatched) {
+    problems.push({ column: "group_sort", reason: "group_by_json と group_sort の組が合いません" });
+  }
+  if (!condition.ok || !sort.success || !groupBy.ok || !groupSort.success || mismatched) {
+    const signature = JSON.stringify(problems);
+    if (reportedBrokenFolders.get(r.id) !== signature) {
+      reportedBrokenFolders.set(r.id, signature);
+      smartFolderLogger.warn("壊れたスマートフォルダーの行を読み込めません", {
+        smartFolderId: r.id,
+        problems,
+      });
+    }
+    return { ...base, condition: null, sort: null, groupBy: null, groupSort: null };
+  }
+  reportedBrokenFolders.delete(r.id);
+  return {
+    ...base,
+    condition: condition.value,
+    sort: sort.data,
+    groupBy: groupBy.value,
+    groupSort: groupSort.data,
+  };
 }

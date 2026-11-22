@@ -36,11 +36,13 @@ import {
   Minimize,
   Music,
   Pencil,
+  PanelLeft,
   Plus,
   RefreshCw,
   Search,
   SearchX,
   Star,
+  GripVertical,
   Trash2,
   User,
   Video,
@@ -151,6 +153,32 @@ export const I = {
   home: lucideIcon(Home),
   folder: lucideIcon(Folder),
   folderO: lucideIcon(FolderOpen),
+  panel: lucideIcon(PanelLeft),
+  shuffle: (p) => (
+    <Svg {...p} d="M4 7h3l10 10h3M4 17h3l3-3M14 10l3-3h3M18 4l2 3-2 3M18 14l2 3-2 3" />
+  ),
+  clock: (p) => <Svg {...p} d={["M4 12a8 8 0 1 0 16 0a8 8 0 1 0 -16 0", "M12 8v4l3 2"]} />,
+  house: (p) => <Svg {...p} d={["M4 20V9l8-5 8 5v11", "M9 20v-6h6v6"]} />,
+  steps: (p) => <Svg {...p} d="M4 6h16M4 12h10M4 18h6" />,
+  tag: (p) => (
+    <Svg {...p} d={["M3 12V4h8l10 10-8 8z", "M6.2 7.5a1.3 1.3 0 1 0 2.6 0a1.3 1.3 0 1 0 -2.6 0"]} />
+  ),
+  calendar: (p) => (
+    <Svg
+      {...p}
+      d={[
+        "M6 5h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z",
+        "M4 10h16M9 3v4M15 3v4",
+      ]}
+    />
+  ),
+  series: (p) => (
+    <Svg
+      {...p}
+      d={["M5 4h8a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z", "M8 20h11V8"]}
+    />
+  ),
+  funnel: (p) => <Svg {...p} d="M4 5h16l-6 8v6l-4 2v-8z" />,
   file: lucideIcon(File),
   image: lucideIcon(Image),
   audio: lucideIcon(Music),
@@ -224,6 +252,7 @@ export const I = {
   user: lucideIcon(User),
   bookmark: lucideIcon(Bookmark),
   trash: lucideIcon(Trash2),
+  grip: lucideIcon(GripVertical),
   minimize: lucideIcon(Minimize),
   locate: lucideIcon(Locate),
   swapLR: (p) => <Svg {...p} d={["M4 8h13", "M14 4l3 4 -3 4", "M20 16H7", "M10 12l-3 4 3 4"]} />,

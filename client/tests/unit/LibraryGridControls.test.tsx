@@ -7,23 +7,32 @@ import {
   libraryGridLayoutModeAtom,
   libraryViewModeAtom,
 } from "../../src/features/library/model/atoms";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
+import { seedSmartFolders } from "../helpers/smartFolders";
 import { seedLibraryRoute } from "../helpers/route";
 
 afterEach(cleanup);
 
 function renderControls(store: ReturnType<typeof createStore>) {
+  const queryClient = new QueryClient();
+  seedSmartFolders(queryClient);
   return render(
-    <Provider store={store}>
-      <LibraryGridControls />
-    </Provider>,
+    <QueryClientProvider client={queryClient}>
+      <Provider store={store}>
+        <LibraryNavigationProvider>
+          <LibraryGridControls />
+        </LibraryNavigationProvider>
+      </Provider>
+    </QueryClientProvider>,
   );
 }
 
 describe("LibraryGridControls", () => {
-  it("グリッドモードかつ作品グリッドが描画可能な軸では敷き詰め形式トグルが有効", () => {
+  it("グリッドモードかつ作品グリッドが描画可能な表示では敷き詰め形式トグルが有効", () => {
     const store = createStore();
     store.set(libraryViewModeAtom, "grid");
-    seedLibraryRoute(store, { activeAxis: "all" });
+    seedLibraryRoute(store, { folderId: "all" });
     renderControls(store);
 
     expect(screen.getByLabelText("カバーを1対1に切り抜き、等幅で並べる")).toBeEnabled();
@@ -33,7 +42,7 @@ describe("LibraryGridControls", () => {
   it("敷き詰め形式トグルのクリックで libraryGridLayoutModeAtom を切り替える", async () => {
     const store = createStore();
     store.set(libraryViewModeAtom, "grid");
-    seedLibraryRoute(store, { activeAxis: "all" });
+    seedLibraryRoute(store, { folderId: "all" });
     renderControls(store);
 
     await userEvent.click(screen.getByLabelText("カバーの縦横比を保ち、行の右端を揃えて並べる"));
@@ -41,10 +50,10 @@ describe("LibraryGridControls", () => {
     expect(store.get(libraryGridLayoutModeAtom)).toBe("justified");
   });
 
-  it("値一覧表示中（作品グリッドが描画されない facet 軸）ではトグルが disabled になる", () => {
+  it("値一覧表示中（作品グリッドが描画されない グループ分け）ではトグルが disabled になる", () => {
     const store = createStore();
     store.set(libraryViewModeAtom, "grid");
-    seedLibraryRoute(store, { activeAxis: "circle" });
+    seedLibraryRoute(store, { folderId: "by-circle" });
     renderControls(store);
 
     expect(screen.getByLabelText("カバーを1対1に切り抜き、等幅で並べる")).toBeDisabled();
@@ -53,7 +62,7 @@ describe("LibraryGridControls", () => {
   it("リストモードではトグルが disabled になる", () => {
     const store = createStore();
     store.set(libraryViewModeAtom, "list");
-    seedLibraryRoute(store, { activeAxis: "all" });
+    seedLibraryRoute(store, { folderId: "all" });
     renderControls(store);
 
     expect(screen.getByLabelText("カバーを1対1に切り抜き、等幅で並べる")).toBeDisabled();

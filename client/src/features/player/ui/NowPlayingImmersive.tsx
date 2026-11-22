@@ -1,4 +1,4 @@
-// 再生中タブの没入モード本文。ビューポート全面のカバー＋環境光風の背景と、
+// 再生中の層の没入モード本文。ビューポート全面のカバー＋環境光風の背景と、
 // 最小限のオーバーレイ（切替アイコン・タイトル・マウスアクティブ時のミニ操作）だけで
 // 構成する。シーク行は NowPlayingView 側の永続スロットを使うため、ここでは持たない。
 
@@ -113,7 +113,7 @@ export default function NowPlayingImmersive({
     return () => clearTimeout(timer);
   }, [currentTrackIndex]);
   const titleIdle = idle && !trackJustChanged;
-  useNowPlayingImmersiveShell(isPresent, onExit, toggleRef);
+  useNowPlayingImmersiveShell(isPresent, toggleRef);
 
   const { workTitle, trackTitle } = selectActiveTrackView(state);
   const ambientUrl =

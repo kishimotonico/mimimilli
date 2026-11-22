@@ -1,7 +1,7 @@
 import { expect, test } from "./fixtures";
-import { assertNoErrors, openApp, trackErrors } from "./support";
+import { assertNoErrors, openApp, trackErrors, openNowPlayingFromBar } from "./support";
 
-test("再生中タブ: 通常モードのトラックリストが多数トラックでも内部スクロールで最後まで到達できる", async ({
+test("再生中の層: 通常モードのトラックリストが多数トラックでも内部スクロールで最後まで到達できる", async ({
   page,
 }) => {
   const tracker = trackErrors(page);
@@ -12,10 +12,7 @@ test("再生中タブ: 通常モードのトラックリストが多数トラッ
     .locator(".mle-prv")
     .getByRole("button", { name: /^(最初から再生|続きから再生)$/ })
     .click();
-  await page
-    .getByRole("navigation", { name: "メインナビゲーション" })
-    .getByRole("button", { name: "再生中" })
-    .click();
+  await openNowPlayingFromBar(page);
 
   const body = page.locator(".mle-nowplaying__body");
   await expect(body).toBeVisible();
@@ -35,7 +32,7 @@ test("再生中タブ: 通常モードのトラックリストが多数トラッ
   assertNoErrors(tracker);
 });
 
-test("再生中タブ: :modal存在下ではEscで最前面のdialogだけが閉じ、没入モードは維持される", async ({
+test("再生中の層: :modal存在下ではEscで最前面のdialogだけが閉じ、dialogが消えた後のEscで層が閉じ、没入の設定は維持される", async ({
   page,
 }) => {
   const tracker = trackErrors(page);
@@ -43,18 +40,15 @@ test("再生中タブ: :modal存在下ではEscで最前面のdialogだけが閉
 
   await page.getByText("ツンデレ後輩ちゃんの秘密のお世話ボイス", { exact: false }).click();
   await page.locator(".mle-prv").getByRole("button", { name: "最初から再生" }).click();
-  await page
-    .getByRole("navigation", { name: "メインナビゲーション" })
-    .getByRole("button", { name: "再生中" })
-    .click();
+  await openNowPlayingFromBar(page);
   await page.getByRole("button", { name: "没入モードにする" }).click();
   await expect(page.locator(".mle-nowplaying__immersive-cover")).toBeVisible();
 
   // ブラウザの戻る/進む（没入中は TopBar が inert 化されておりUI操作できないため、
-  // ブラウザの履歴API自体を使う。UIのinert化を経由しない履歴遷移で、没入を維持した
-  // ままモーダルを開いた状態を作る）。
+  // ブラウザの履歴API自体を使う。UIのinert化を経由しない履歴遷移で、層を開いたまま
+  // モーダルを開いた状態を作る）。
   await page.evaluate(() => window.history.back());
-  await expect(page.locator(".mle-nowplaying")).toHaveCount(0);
+  await expect(page.locator(".mle-layer")).toHaveCount(0);
 
   await page.getByRole("button", { name: "設定" }).click();
   await expect(page.locator("dialog[open]")).toBeVisible();
@@ -63,14 +57,17 @@ test("再生中タブ: :modal存在下ではEscで最前面のdialogだけが閉
   await expect(page.locator(".mle-nowplaying__immersive-cover")).toBeVisible();
   await expect(page.locator("dialog[open]")).toBeVisible();
 
-  // 1回目のEscは最前面のdialogだけを閉じ、没入は維持される。
+  // 1回目のEscは最前面のdialogだけを閉じ、層と没入は維持される。
   await page.keyboard.press("Escape");
   await expect(page.locator("dialog[open]")).toHaveCount(0);
   await expect(page.locator(".mle-nowplaying__immersive-cover")).toBeVisible();
 
-  // dialogが消えた後の2回目のEscで没入が解除される。
+  // dialogが消えた後の2回目のEscで層が閉じる。没入の設定は変わらない。
   await page.keyboard.press("Escape");
-  await expect(page.locator(".mle-nowplaying__body")).toBeVisible();
+  await expect(page.locator(".mle-layer")).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem("mimimilli:nowPlayingViewMode"))).toBe(
+    JSON.stringify("immersive"),
+  );
 
   assertNoErrors(tracker);
 });

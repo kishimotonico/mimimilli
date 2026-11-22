@@ -6,15 +6,8 @@ import {
   playingWorkIdAtom,
 } from "../../../entities/player/model/atoms";
 import type { WorkResultsProps } from "./workResultsProps";
-import Button from "../../../shared/ui/Button";
-import { I } from "../../../shared/ui/Icon";
 import { GRID_COLUMN_GAP, GRID_ROW_GAP, clampTileSize } from "../../../shared/lib/gridSizing";
-import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
-import CollectionStatus from "../../../shared/ui/CollectionStatus";
-import SmartFolderEmptyAction, {
-  SMART_FOLDER_EMPTY_HINT,
-  SMART_FOLDER_EMPTY_MESSAGE,
-} from "./SmartFolderEmptyAction";
+import WorksEmptyState from "./WorksEmptyState";
 import LoadMore from "./LoadMore";
 import { useVirtualGrid } from "../../../shared/ui/useVirtualGrid";
 import {
@@ -41,13 +34,10 @@ export default function WorkGrid({
   isPending = false,
   dockedBarActive = false,
   pagination: { hasNextPage = false, worksTotal, isFetchingNextPage = false, onLoadMore },
-  emptyState: { searchQuery, isSmartFolder = false, onClearSearch, onEditSmartFolderRules },
+  emptyState: { searchQuery, onClearSearch },
 }: WorkResultsProps) {
-  const axis = nav.activeAxis;
   const selectedWorkId = nav.selectedWorkId;
-  const hasSelectedTags = nav.selectedTags.length > 0;
   const onWorkSelect = nav.selectWork;
-  const onClearAllFilters = nav.clearTags;
   const onDeselect = useCallback(() => onWorkSelect(null), [onWorkSelect]);
   const playingWorkId = useAtomValue(playingWorkIdAtom) ?? null;
   const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
@@ -159,35 +149,12 @@ export default function WorkGrid({
       <div className="mll-grid-body">
         <div ref={scrollRef} className="mll-grid-scroll">
           {works.length === 0 ? (
-            isSmartFolder ? (
-              <CollectionStatus
-                variant="grid"
-                kind="empty"
-                message={SMART_FOLDER_EMPTY_MESSAGE}
-                hint={SMART_FOLDER_EMPTY_HINT}
-                action={
-                  <SmartFolderEmptyAction
-                    hasSelectedTags={hasSelectedTags}
-                    onEditRules={() => onEditSmartFolderRules?.()}
-                    onClearFilters={() => onClearAllFilters?.()}
-                  />
-                }
-              />
-            ) : (
-              <CollectionStatus
-                variant="grid"
-                kind="empty"
-                message={buildEmptyWorksMessage(searchQuery, hasSelectedTags)}
-                hint={buildEmptyWorksHint(axis, Boolean(searchQuery) || hasSelectedTags)}
-                action={
-                  searchQuery ? (
-                    <Button variant="ghost" icon={I.x} onClick={onClearSearch}>
-                      検索をクリア
-                    </Button>
-                  ) : undefined
-                }
-              />
-            )
+            <WorksEmptyState
+              variant="grid"
+              nav={nav}
+              searchQuery={searchQuery}
+              onClearSearch={onClearSearch}
+            />
           ) : (
             <WorkGridVirtualContent
               isJustified={isJustified}
