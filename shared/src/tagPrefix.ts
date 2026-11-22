@@ -31,7 +31,7 @@ export const tagPrefixSchema = z.object({
   color: tagPrefixColorKeySchema.nullable(),
   /** true のとき、この prefix に属するタグの削除・編集時に確認を挟む（ソフトガード） */
   protected: z.boolean(),
-  /** 設定一覧・サイドバーでの並び順。小さいほど先頭。作成時にサーバーが末尾へ自動採番する */
+  /** prefix 定義の並び順。小さいほど先頭。作成時にサーバーが末尾へ自動採番する */
   order: z.number().int(),
 });
 export type TagPrefix = z.infer<typeof tagPrefixSchema>;
