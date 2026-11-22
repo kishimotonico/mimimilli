@@ -65,6 +65,35 @@ describe("buildGroupValueDisplayRows", () => {
     expect(rows.map((row) => row.label)).toEqual(["う", "あ", "い"]);
   });
 
+  it("平らな値と入れ子の値が混ざっても、サーバーの順（読み順）が保たれ、降順でも親子が崩れない", () => {
+    // 読みのバイト順と localeCompare("ja") で順が変わる値（一・亜）を含む
+    const asc = buildGroupValueDisplayRows(
+      [item("一"), item("亜"), item("cv/a"), item("cv/b")],
+      "",
+      "name-asc",
+    );
+    expect(asc.map((row) => `${row.depth}:${row.label}`)).toEqual([
+      "0:一",
+      "0:亜",
+      "0:cv",
+      "1:a",
+      "1:b",
+    ]);
+
+    const desc = buildGroupValueDisplayRows(
+      [item("cv/b"), item("cv/a"), item("亜"), item("一")],
+      "",
+      "name-desc",
+    );
+    expect(desc.map((row) => `${row.depth}:${row.label}`)).toEqual([
+      "0:cv",
+      "1:b",
+      "1:a",
+      "0:亜",
+      "0:一",
+    ]);
+  });
+
   it("入れ子の値は名前順のときだけ階層にする", () => {
     const items = [item("cv/a"), item("cv/b")];
     expect(buildGroupValueDisplayRows(items, "", "name-asc").map((row) => row.kind)).toEqual([

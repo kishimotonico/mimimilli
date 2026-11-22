@@ -18,6 +18,7 @@ export default function LibraryBreadcrumbs() {
   const [siblingAnchor, setSiblingAnchor] = useState<HTMLElement | null>(null);
   const group = view?.kind === "works" ? view.group : null;
   const groupBy = view?.kind === "works" ? view.groupBy : null;
+  const groupSort = view?.kind === "works" ? view.groupSort : null;
 
   return (
     <>
@@ -30,13 +31,13 @@ export default function LibraryBreadcrumbs() {
         }}
       />
       <AnimatePresence>
-        {view && siblingAnchor && group !== null && groupBy !== null && (
+        {view && siblingAnchor && group !== null && groupBy !== null && groupSort !== null && (
           <GroupValuePopover
             key="siblings"
             placement="below"
             folderId={view.folder.id}
             groupBy={groupBy}
-            groupSort={view.folder.groupSort!}
+            groupSort={groupSort}
             groupByLabel={getGroupByLabel(groupBy, tagPrefixes)}
             anchorEl={siblingAnchor}
             selectedValue={group}

@@ -59,12 +59,9 @@ describe("buildGroupValueHierarchy", () => {
     ]);
   });
 
-  it("兄弟は名前順（direction）で並ぶ", () => {
-    const rows = buildGroupValueHierarchy([makeItem("b"), makeItem("a"), makeItem("c")], "asc");
-    expect(rows.map((r) => r.label)).toEqual(["a", "b", "c"]);
-
-    const desc = buildGroupValueHierarchy([makeItem("b"), makeItem("a"), makeItem("c")], "desc");
-    expect(desc.map((r) => r.label)).toEqual(["c", "b", "a"]);
+  it("兄弟は items に最初に現れた順で並び、並べ直さない", () => {
+    const rows = buildGroupValueHierarchy([makeItem("b"), makeItem("a"), makeItem("c")]);
+    expect(rows.map((r) => r.label)).toEqual(["b", "a", "c"]);
   });
 
   it("4階層以上でも破綻しない", () => {
@@ -85,8 +82,8 @@ describe("buildGroupValueHierarchy", () => {
     expect(rows.map((r) => `${r.kind}:${r.path}`)).toEqual([
       "heading:シチュ",
       "heading:シチュ/学園",
-      "value:シチュ/学園/屋上",
       "value:シチュ/学園/図書室",
+      "value:シチュ/学園/屋上",
       "value:シチュ/職場",
     ]);
   });

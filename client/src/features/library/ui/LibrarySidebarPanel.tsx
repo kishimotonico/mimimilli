@@ -8,6 +8,7 @@ import {
   type SmartFolder,
   type TagPrefix,
 } from "@mimimilli/shared";
+import { folderGrouping } from "../../../entities/library/resolveLibraryView";
 import { getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
 import { useHoverGroupCoordinator } from "../../../shared/lib/useHoverGroupCoordinator";
 import Button from "../../../shared/ui/Button";
@@ -87,7 +88,7 @@ export default function LibrarySidebarPanel({
   const readyFolders = folders.status === "ready" ? folders.folders : [];
   const rows = buildSidebarRows(readyFolders, activeFolderId ?? "", dataIntegrity, editing);
   const overlayFolder = readyFolders.find((folder) => folder.id === overlayFolderId) ?? null;
-  const overlayGroupBy = overlayFolder?.groupBy ?? null;
+  const overlayGrouping = overlayFolder ? folderGrouping(overlayFolder) : null;
 
   usePopoverDismissal({
     isOpen: menuOpen,
@@ -227,18 +228,18 @@ export default function LibrarySidebarPanel({
       )}
 
       <AnimatePresence>
-        {!editing && overlayFolder && overlayGroupBy && ownerToken && (
+        {!editing && overlayFolder && overlayGrouping && ownerToken && (
           <GroupValuePopover
             key={overlayFolder.id}
             placement="right"
             folderId={overlayFolder.id}
-            groupBy={overlayGroupBy}
-            groupSort={overlayFolder.groupSort!}
-            groupByLabel={getGroupByLabel(overlayGroupBy, tagPrefixes)}
+            groupBy={overlayGrouping.groupBy}
+            groupSort={overlayGrouping.groupSort}
+            groupByLabel={getGroupByLabel(overlayGrouping.groupBy, tagPrefixes)}
             anchorEl={openAnchorEl}
             selectedValue={overlayFolder.id === activeFolderId ? activeGroup : null}
             onSelectValue={(value) => onOpenGroupValue(overlayFolder.id, value)}
-            onAddValue={(value) => onAddTag(buildFilterTag(overlayGroupBy, value))}
+            onAddValue={(value) => onAddTag(buildFilterTag(overlayGrouping.groupBy, value))}
             onClose={closeOverlay}
             panelHandlers={getPanelHandlers(ownerToken)}
             onPanelElChange={(el) => registerPanelEl(ownerToken, el)}

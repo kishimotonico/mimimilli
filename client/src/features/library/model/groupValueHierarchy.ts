@@ -1,11 +1,10 @@
-// 入れ子タグ（スラッシュ複数のタグ）の階層表現（ADR-0012 §5）。名前順ソートのときだけ
-// インデント＋葉ラベルの木構造として並べ、件数・総時間ソートのときはフルパスの平坦表示に
-// フォールバックする。中間ノードは実際にタグとして存在する（groupValueItems に value として
+// 入れ子タグ（スラッシュ複数のタグ）の階層表現（ADR-0012 §5）。名前順のときだけ
+// インデント＋葉ラベルの木構造として並べ、それ以外の並びではフルパスの平坦表示にする。
+// 各階層の順は、サーバーが並べた順に子が最初に現れた順（client では並べ直さない）。中間ノードは実際にタグとして存在する（groupValueItems に value として
 // 現れる）場合だけ選択可能な値行になり、それ以外は選択不可の見出し行になる
 // （完全一致セマンティクス ADR-0005 §6 と衝突する「配下を含む絞り込み」は作らない）。
 
 import type { GroupValueItem } from "@mimimilli/shared";
-import type { SortDirection } from "./groupValueSort";
 
 export interface GroupValueHeadingRow {
   kind: "heading";
@@ -40,11 +39,8 @@ function getOrCreateChild(parent: TreeNode, segment: string, path: string): Tree
   return created;
 }
 
-/** 名前順ソート用の階層構造を構築する。items の順序には依存しない（各階層で並べ替える）。 */
-export function buildGroupValueHierarchy(
-  items: GroupValueItem[],
-  direction: SortDirection = "asc",
-): GroupValueHierarchyRow[] {
+/** 名前順用の階層構造を構築する。各階層の子は、items の順で最初に現れた順に並べる。 */
+export function buildGroupValueHierarchy(items: GroupValueItem[]): GroupValueHierarchyRow[] {
   const root: TreeNode = { label: "", path: "", item: null, children: new Map() };
 
   for (const item of items) {
@@ -58,14 +54,10 @@ export function buildGroupValueHierarchy(
     node.item = item;
   }
 
-  const dir = direction === "asc" ? 1 : -1;
   const rows: GroupValueHierarchyRow[] = [];
 
   const visit = (node: TreeNode, depth: number) => {
-    const children = [...node.children.values()].sort(
-      (a, b) => a.label.localeCompare(b.label, "ja") * dir,
-    );
-    for (const child of children) {
+    for (const child of node.children.values()) {
       rows.push(
         child.item
           ? { kind: "value", depth, path: child.path, label: child.label, item: child.item }

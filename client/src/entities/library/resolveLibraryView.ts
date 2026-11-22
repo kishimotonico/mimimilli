@@ -22,6 +22,8 @@ export type ResolvedLibraryView =
       condition: Condition;
       group: string | null;
       groupBy: GroupBy | null;
+      /** グループ分けのある行の解決済みの値の並び。値を選んだあとの兄弟値の一覧が使う */
+      groupSort: GroupSortId | null;
       selectedTags: NormalizedTag[];
       q: string;
       /** 解決済みの並び（今の並び → フォルダーの既定 → 「すべて」の既定） */
@@ -47,6 +49,15 @@ export type ResolvedLibraryView =
 
 export type WorksView = Extract<ResolvedLibraryView, { kind: "works" }>;
 
+/** グループ分けを持つ行の、グループ分けと値の並び（今の並び → 行の既定）。グループ分けの無い行・壊れた行は null */
+export function folderGrouping(
+  folder: SmartFolder,
+  currentGroupSort: GroupSortId | null = null,
+): { groupBy: GroupBy; groupSort: GroupSortId } | null {
+  if (folder.groupBy === null || folder.groupSort === null) return null;
+  return { groupBy: folder.groupBy, groupSort: currentGroupSort ?? folder.groupSort };
+}
+
 /** 値一覧か作品一覧か。値を選ぶ前のグループ分けが値一覧。選んだ行に要る値だけを確かめる */
 export function resolveLibraryView(
   library: LibraryRoute,
@@ -62,16 +73,15 @@ export function resolveLibraryView(
   }
 
   const groupBy = folder.groupBy;
-  if (groupBy !== null && library.group === null) {
-    // グループ分けのある行は値の並びも必ず持つ（保存時に検証される）
-    const defaultGroupSort = folder.groupSort!;
+  const grouping = folderGrouping(folder, library.groupSort);
+  if (grouping !== null && library.group === null) {
     return {
       folder,
       kind: "value-list",
       condition,
-      groupBy,
-      groupSort: library.groupSort ?? defaultGroupSort,
-      groupSortDeviates: library.groupSort !== null && library.groupSort !== defaultGroupSort,
+      groupBy: grouping.groupBy,
+      groupSort: grouping.groupSort,
+      groupSortDeviates: library.groupSort !== null && library.groupSort !== folder.groupSort,
       breadcrumb: [folder.name],
     };
   }
@@ -89,6 +99,7 @@ export function resolveLibraryView(
     condition,
     group,
     groupBy,
+    groupSort: grouping?.groupSort ?? null,
     selectedTags: library.selectedTags,
     q: library.q,
     sort,
