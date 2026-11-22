@@ -1,5 +1,7 @@
 import { useId, useRef, useState } from "react";
 import {
+  ALL_SMART_FOLDER_ID,
+  findSmartFolderTemplate,
   rootChildren,
   smartFolderPermissions,
   type SmartFolderPermissions,
@@ -61,6 +63,12 @@ function titleOf(target: SmartFolderDialogTarget): string {
   return "グループ分けを追加";
 }
 
+/** 「すべて」の並びが読めないときは「すべて」と同じを選べないので、継承の下書きは既定テンプレートの並びで始める */
+function withSelectableSort(draft: SmartFolderDraft, allSort: SortId | null): SmartFolderDraft {
+  if (draft.sort !== null || allSort !== null) return draft;
+  return { ...draft, sort: findSmartFolderTemplate(ALL_SMART_FOLDER_ID)!.sort };
+}
+
 /** 括弧の中に括弧が入らないよう、並び名の（）は「・」に置き換える */
 function sortLabel(sort: SortId): string {
   const label = SORT_OPTIONS.find((option) => option.id === sort)?.label ?? sort;
@@ -74,7 +82,9 @@ export default function SmartFolderDialog({
   onSave,
   onClose,
 }: SmartFolderDialogProps) {
-  const [draft, setDraft] = useState<SmartFolderDraft>(() => initialDraft(target, tagPrefixes));
+  const [draft, setDraft] = useState<SmartFolderDraft>(() =>
+    withSelectableSort(initialDraft(target, tagPrefixes), allSort),
+  );
   const [saving, setSaving] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
   const sortRef = useRef<HTMLSelectElement>(null);
@@ -91,8 +101,7 @@ export default function SmartFolderDialog({
 
   const children = rootChildren(draft.condition);
   const options = groupByOptions(tagPrefixes, draft.groupBy);
-  const needsSort = permissions.inheritSort && allSort === null && draft.sort === null;
-  const canSave = !saving && draft.name.trim() !== "" && !needsSort;
+  const canSave = !saving && draft.name.trim() !== "";
 
   const save = async () => {
     if (!canSave) return;
@@ -187,11 +196,6 @@ export default function SmartFolderDialog({
           >
             {permissions.inheritSort && allSort !== null && (
               <option value="">{`「すべて」と同じ（${sortLabel(allSort)}）`}</option>
-            )}
-            {permissions.inheritSort && allSort === null && draft.sort === null && (
-              <option value="" hidden disabled>
-                選択してください
-              </option>
             )}
             {SORT_OPTIONS.map((option) => (
               <option key={option.id} value={option.id}>

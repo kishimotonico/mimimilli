@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import userEvent from "@testing-library/user-event";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { createStore, Provider } from "jotai";
 import { smartFolderDialogAtom } from "../../src/features/library/model/atoms";
@@ -138,19 +138,17 @@ describe("保存中に閉じたダイアログの応答", () => {
 });
 
 describe("「すべて」の並びが読めないとき", () => {
-  it("ダイアログは出て、「すべて」と同じは選べず、並びを選ぶまで保存できない", async () => {
+  it("ダイアログは出て、「すべて」と同じは選べず、継承の下書きは既定テンプレートの並びで始まる", async () => {
     mockApi({ "GET /api/tag-prefixes": [] });
     const brokenAll = buildSmartFolder({ id: "all", name: "すべて", condition: null, sort: null });
     const folders = [brokenAll, ...defaultSmartFolders().filter((f) => f.id !== "all"), folderA];
     const store = renderHost(folders);
-    const user = userEvent.setup();
 
     act(() => store.set(smartFolderDialogAtom, { kind: "edit", folder: folderA }));
     const select = await screen.findByLabelText("既定の並び");
 
     expect(screen.queryByRole("option", { name: /「すべて」と同じ/ })).toBeNull();
-    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
-    await user.selectOptions(select, "title-asc");
-    await waitFor(() => expect(screen.getByRole("button", { name: "保存" })).toBeEnabled());
+    expect(select).toHaveValue("added-desc");
+    expect(screen.getByRole("button", { name: "保存" })).toBeEnabled();
   });
 });
