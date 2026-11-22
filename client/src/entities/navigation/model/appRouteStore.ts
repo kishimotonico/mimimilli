@@ -23,7 +23,7 @@ export const navigateAtom = appRouteStore.navigateAtom;
 export const navigationDirectionAtom = appRouteStore.directionAtom;
 export const navigationHistoryAvailabilityAtom = appRouteStore.historyAvailabilityAtom;
 
-/** 画面へ進む操作は必ず層を落とす。層が開いているあいだの遷移は、層のエントリーを置き換える。
+/** 遷移: 画面へ進む操作は必ず層を落とす。層が開いているあいだの遷移は、層のエントリーを置き換える。
  *  層そのものを開く・閉じる操作はこの規則の外（appRouteStore.action を直接使う） */
 export function appRouteAction<A extends unknown[]>(
   compute: (current: AppRoute, ...args: A) => RouteTransition<AppRoute> | null,
@@ -35,6 +35,18 @@ export function appRouteAction<A extends unknown[]>(
     return current.layer === null
       ? { ...transition, route }
       : { ...transition, route, replace: true };
+  });
+}
+
+/** 補正: 開いている画面の route を事実に合わせ直す（選択解除・消えたフォルダーからの退避など）。
+ *  await のあとに走っても層を閉じないよう、層を保ち、履歴は常に置き換える */
+export function appRouteCorrection<A extends unknown[]>(
+  compute: (current: AppRoute, ...args: A) => RouteTransition<AppRoute> | null,
+) {
+  return appRouteStore.action((current: AppRoute, ...args: A) => {
+    const transition = compute(current, ...args);
+    if (!transition) return transition;
+    return { ...transition, route: { ...transition.route, layer: current.layer }, replace: true };
   });
 }
 

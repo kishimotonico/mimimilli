@@ -11,10 +11,18 @@ import { openFilesDirAtom } from "../../src/features/files/model/filesNavigation
 import { openWorkDetailAtom } from "../../src/entities/work/model/navigationActions";
 import {
   addLibraryTagAtom,
+  clearLibrarySortAtom,
+  replaceLibraryFolderAtom,
   openLibraryTagAtom,
 } from "../../src/entities/library/model/navigationActions";
 import { appRouteCodec } from "../../src/entities/navigation/model/appRoute";
-import { pendingWrites, seedAppMode, seedRoute } from "../helpers/route";
+import {
+  clearPendingOps,
+  pendingWrites,
+  seedAppMode,
+  seedLibraryRoute,
+  seedRoute,
+} from "../helpers/route";
 import { nts } from "../helpers/tag";
 
 afterEach(() => {
@@ -111,6 +119,33 @@ describe("再生中の層の遷移", () => {
     const route = store.get(appRouteAtom);
     expect(route.layer).toBeNull();
     expect(route.library.selectedTags).toEqual(nts(["cv/藤田茜"]));
+  });
+
+  it("層から選択済みのタグを Ctrl+クリックしても、層を落として一覧へ移る", () => {
+    const store = openedStore("library");
+    seedLibraryRoute(store, { selectedTags: nts(["cv/藤田茜"]) });
+    clearPendingOps(store);
+    store.set(addLibraryTagAtom, nts(["cv/藤田茜"])[0], "works");
+
+    expect(pendingWrites(store)).toEqual(["replace"]);
+    const route = store.get(appRouteAtom);
+    expect(route.layer).toBeNull();
+    expect(route.library.selectedTags).toEqual(nts(["cv/藤田茜"]));
+  });
+
+  it("補正（既定の並びの保存後・消えたフォルダーからの退避）は層を保ち、置き換える", () => {
+    const store = openedStore("library");
+    seedLibraryRoute(store, { folderId: "sf-x", sort: "title-asc" });
+    clearPendingOps(store);
+
+    store.set(clearLibrarySortAtom, { folderId: "sf-x", sort: "title-asc" });
+    expect(store.get(appRouteAtom)).toMatchObject({ layer: { kind: "nowPlaying" } });
+    expect(store.get(appRouteAtom).library.sort).toBeNull();
+
+    store.set(replaceLibraryFolderAtom, "all");
+    expect(store.get(appRouteAtom)).toMatchObject({ layer: { kind: "nowPlaying" } });
+    expect(store.get(appRouteAtom).library.folderId).toBe("all");
+    expect(pendingWrites(store)).toEqual(["replace", "replace"]);
   });
 
   it("画面へ進む操作は、遷移の中身によらず層を落として置き換える（ファイル内の操作を含む）", () => {

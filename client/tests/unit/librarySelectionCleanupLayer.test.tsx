@@ -1,64 +1,60 @@
 import { createElement, type ReactNode } from "react";
-import { act, renderHook } from "@testing-library/react";
+import { renderHook } from "@testing-library/react";
 import { createStore, Provider } from "jotai";
-import { describe, expect, it, vi } from "vitest";
-import { selectLibraryWorkAtom } from "../../src/entities/library/model/navigationActions";
+import { describe, expect, it } from "vitest";
+import { deselectLibraryWorkAtom } from "../../src/entities/library/model/navigationActions";
 import { appRouteAtom } from "../../src/entities/navigation/model/appRouteStore";
 import { ApiRequestError } from "../../src/shared/api/http";
 import { useLibrarySelectionCleanup } from "../../src/features/library/model/useLibrarySelectionCleanup";
-import { seedLibraryRoute, seedRoute } from "../helpers/route";
+import { clearPendingOps, pendingWrites, seedLibraryRoute, seedRoute } from "../helpers/route";
 
 function openLayer(store: ReturnType<typeof createStore>) {
   seedRoute(store, (route) => ({ ...route, layer: { kind: "nowPlaying", openedBy: "app" } }));
 }
 
 describe("背景の選択解除と再生中の層", () => {
-  it("選択の解除は appRouteAction を通るので、層が開いていると層を落とす（背景から呼んではいけない根拠）", () => {
+  it("選択の解除は補正なので、層を保ち履歴を置き換える", () => {
     const store = createStore();
     seedLibraryRoute(store, { selectedWorkId: "w1" });
     openLayer(store);
+    clearPendingOps(store);
 
-    store.set(selectLibraryWorkAtom, null);
+    store.set(deselectLibraryWorkAtom);
 
-    expect(store.get(appRouteAtom).layer).toBeNull();
+    expect(store.get(appRouteAtom).layer).not.toBeNull();
+    expect(store.get(appRouteAtom).library.selectedWorkId).toBeNull();
+    expect(pendingWrites(store)).toEqual(["replace"]);
   });
 
   function setup(layerOpen: boolean, props: { noResults: boolean; error?: unknown }) {
     const store = createStore();
     seedLibraryRoute(store, { selectedWorkId: "w1" });
     if (layerOpen) openLayer(store);
-    const selectWork = vi.fn((_id: string | null) => {});
     const wrapper = ({ children }: { children: ReactNode }) =>
       createElement(Provider, { store }, children);
-    const hook = renderHook(
+    renderHook(
       () =>
         useLibrarySelectionCleanup({
-          nav: { selectedWorkId: "w1", selectWork },
+          nav: { selectedWorkId: "w1" },
           isNoResultsDueToFilter: props.noResults,
           workDetailError: props.error ?? null,
         }),
       { wrapper },
     );
-    return { store, selectWork, hook };
+    return store;
   }
 
   const notFound = new ApiRequestError(404, "not_found", "ない");
 
-  it("層が開いている間は、0件でも404でも選択を解除しない", () => {
-    const { selectWork } = setup(true, { noResults: true, error: notFound });
-    expect(selectWork).not.toHaveBeenCalled();
+  it("層が開いていても、0件・404の解除は層を保ったまま行う", () => {
+    const store = setup(true, { noResults: true, error: notFound });
+    expect(store.get(appRouteAtom).library.selectedWorkId).toBeNull();
+    expect(store.get(appRouteAtom).layer).not.toBeNull();
   });
 
-  it("層が閉じたあとに、0件・404の解除を行う", () => {
-    const { store, selectWork } = setup(true, { noResults: true, error: notFound });
-    act(() => {
-      seedRoute(store, (route) => ({ ...route, layer: null }));
-    });
-    expect(selectWork).toHaveBeenCalledWith(null);
-  });
-
-  it("層が無ければ今までどおり解除する", () => {
-    const { selectWork } = setup(false, { noResults: true });
-    expect(selectWork).toHaveBeenCalledWith(null);
+  it("層が無ければ選択だけ解除する", () => {
+    const store = setup(false, { noResults: true });
+    expect(store.get(appRouteAtom).library.selectedWorkId).toBeNull();
+    expect(store.get(appRouteAtom).layer).toBeNull();
   });
 });

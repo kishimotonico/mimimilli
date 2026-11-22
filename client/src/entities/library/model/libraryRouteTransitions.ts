@@ -119,7 +119,7 @@ export function addLibraryTag(
 ): Transition | null {
   if (held !== "works") return { route: toAll(route, [tag], "", { entering: true }) };
   const prev = route.library.selectedTags;
-  if (prev.includes(tag) && route.mode === "library") return null;
+  if (prev.includes(tag) && route.mode === "library" && route.layer === null) return null;
   return {
     route: withLibrary(route, {
       selectedTags: prev.includes(tag) ? prev : appendTag(prev, tag),

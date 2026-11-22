@@ -1,4 +1,5 @@
-import { appRouteAction } from "../../navigation/model/appRouteStore";
+import type { AppRoute } from "../../navigation/model/appRoute";
+import { appRouteAction, appRouteCorrection } from "../../navigation/model/appRouteStore";
 import {
   addLibraryTag,
   clearLibrarySort,
@@ -19,7 +20,6 @@ import {
 } from "./libraryRouteTransitions";
 
 export const openLibraryFolderAtom = appRouteAction(openLibraryFolder);
-export const replaceLibraryFolderAtom = appRouteAction(replaceLibraryFolder);
 export const openLibraryGroupValueAtom = appRouteAction(openLibraryGroupValue);
 export const selectLibraryGroupValueAtom = appRouteAction(selectLibraryGroupValue);
 export const openLibraryTagAtom = appRouteAction(openLibraryTag);
@@ -28,9 +28,15 @@ export const removeLibraryTagAtom = appRouteAction(removeLibraryTag);
 export const clearLibraryTagsAtom = appRouteAction(clearLibraryTags);
 export const selectLibraryWorkAtom = appRouteAction(selectLibraryWork);
 export const setLibrarySortAtom = appRouteAction(setLibrarySort);
-export const clearLibrarySortAtom = appRouteAction(clearLibrarySort);
 export const reshuffleLibrarySeedAtom = appRouteAction(reshuffleLibrarySeed);
 export const setLibrarySearchQueryAtom = appRouteAction(setLibrarySearchQuery);
 export const searchLibraryInAllAtom = appRouteAction(searchLibraryInAll);
 export const goToLibrarySegmentAtom = appRouteAction(goToLibrarySegment);
 export const showLibraryWorkAtom = appRouteAction(showLibraryWork);
+
+export const replaceLibraryFolderAtom = appRouteCorrection(replaceLibraryFolder);
+export const clearLibrarySortAtom = appRouteCorrection(clearLibrarySort);
+/** 選択中の作品が絞り込みから外れた・存在しないときの選択解除 */
+export const deselectLibraryWorkAtom = appRouteCorrection((route: AppRoute) =>
+  selectLibraryWork(route, null),
+);
