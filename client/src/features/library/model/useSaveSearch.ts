@@ -13,6 +13,7 @@ import {
   type SaveOffer,
 } from "./saveSearch";
 import { draftOf, toWrite } from "./smartFolderEditing";
+import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
 import type { LibraryViewActions, LibraryViewState } from "./useLibraryNavigation";
 import { useSmartFolderEditor } from "./useSmartFolderEditor";
 
@@ -24,17 +25,21 @@ export interface SaveSearchActions {
   overwrite: () => Promise<void>;
 }
 
+/** 「検索を保存」「別名で保存」。名前を入れるダイアログを開く。作品一覧のときだけ開く */
+export function useOpenSaveDialog(view: ResolvedLibraryView | null): () => void {
+  const setDialog = useSetAtom(smartFolderDialogAtom);
+  return useCallback(() => {
+    if (view?.kind === "works") setDialog(saveDialogTarget(view));
+  }, [view, setDialog]);
+}
+
 export function useSaveSearch(nav: LibraryViewState & LibraryViewActions): SaveSearchActions {
   const view = nav.foldersStatus === "ready" ? nav.view : null;
   const reenterFolder = useSetAtom(reenterLibraryFolderAtom);
   const editor = useSmartFolderEditor();
   const toast = useToast();
-  const setDialog = useSetAtom(smartFolderDialogAtom);
+  const openSaveDialog = useOpenSaveDialog(view);
   const overwriting = useRef(false);
-
-  const openSaveDialog = useCallback(() => {
-    if (view?.kind === "works") setDialog(saveDialogTarget(view));
-  }, [view, setDialog]);
 
   const overwrite = useCallback(async () => {
     if (view?.kind !== "works" || !isOverwritable(view)) return;

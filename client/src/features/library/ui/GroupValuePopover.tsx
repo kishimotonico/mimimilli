@@ -1,69 +1,97 @@
 import { createPortal } from "react-dom";
-import type { GroupBy } from "@mimimilli/shared";
-import { motion, useIsPresent } from "motion/react";
+import { useIsPresent } from "motion/react";
+import type { GroupBy, GroupValueItem } from "@mimimilli/shared";
 import { useAnchoredPopover } from "../../../shared/ui/useAnchoredPopover";
-import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
-import { useGroupValuesQuery } from "../model/useGroupValuesQuery";
-import GroupValueQuickList from "./GroupValueQuickList";
+import type { HoverGroupPanelHandlers } from "../../../shared/lib/useHoverGroupCoordinator";
+import GroupValuePopoverPanel from "./GroupValuePopoverPanel";
 
-const POPOVER_WIDTH = 240;
+// アンカーの横または下にグループの値の一覧を出す。サイドバーの列は overflow でクリップされるため、
+// document.body へポータルして位置決めを useAnchoredPopover に任せる。
+// right: サイドバーのグループ分けの行のクイックオーバーレイ（ADR-0012 §7・ADR-0041）。サイドバーは
+// 画面左端に固定なので、右に余白が無いケースは実質発生せず、左右の反転フォールバックは設けない。
+// below: パンくずの値から開く、同じグループ分けの兄弟の値のドロップダウン。
+//
+// 呼び出し側は AnimatePresence の子としてマウントする。退出アニメーション中もこのインスタンスは
+// マウントされ続けるため、groupBy / anchorEl は凍結した最後の props のまま渡り、クエリも
+// 常に有効な groupBy で購読され続ける。
+
+const PLACEMENTS = {
+  right: { width: 280, position: "fixed", origin: "left center" },
+  below: { width: 240, position: "inline", origin: "top left" },
+} as const;
 
 interface GroupValuePopoverProps {
+  placement: keyof typeof PLACEMENTS;
   folderId: string;
   groupBy: GroupBy;
   groupByLabel: string;
-  anchorEl: HTMLElement;
-  selectedValue: string;
+  anchorEl: HTMLElement | null;
+  /** 選択中の値（チェック表示） */
+  selectedValue: string | null;
+  /** 値を選ぶ。選んだあと一覧は閉じる */
   onSelectValue: (value: string) => void;
+  /** 行の＋ボタン。渡したときだけ出る */
+  onAddValue?: (value: string) => void;
   onClose: () => void;
+  /** ホバーで開くときの、一覧自体へのホバー・フォーカスの扱い */
+  panelHandlers?: HoverGroupPanelHandlers;
+  onPanelElChange?: (el: HTMLElement | null) => void;
 }
 
-/** パンくずの値から、同じグループ分けの兄弟の値を選ぶ（ADR-0041）。件数は絞り込み無しで数える */
 export default function GroupValuePopover({
+  placement,
   folderId,
   groupBy,
   groupByLabel,
   anchorEl,
   selectedValue,
   onSelectValue,
+  onAddValue,
   onClose,
+  panelHandlers,
+  onPanelElChange,
 }: GroupValuePopoverProps) {
   const isPresent = useIsPresent();
-  const groupValuesQuery = useGroupValuesQuery(groupBy, { folderId });
-  const { popoverScale } = useMotionVariants();
-  const variant = popoverScale({ origin: "top left" });
+  const { width, position, origin } = PLACEMENTS[placement];
   const { setFloating, floatingStyles, close } = useAnchoredPopover({
     isOpen: isPresent,
-    preferredWidth: POPOVER_WIDTH,
+    preferredWidth: width,
     onClose: () => onClose(),
     getContainer: (el) => el.closest(".mle-app"),
-    placement: "below",
+    placement,
     referenceElement: anchorEl,
   });
 
+  const setPanelEl = (el: HTMLElement | null) => {
+    const cleanup = setFloating(el);
+    onPanelElChange?.(el);
+    return () => {
+      cleanup?.();
+      onPanelElChange?.(null);
+    };
+  };
+
+  if (!anchorEl) return null;
+
   return createPortal(
-    <motion.div
-      ref={setFloating}
-      {...variant}
-      className="mll-qoverlay mll-qoverlay--inline"
-      style={floatingStyles}
-      inert={!isPresent}
-    >
-      <GroupValueQuickList
-        groupBy={groupBy}
-        groupByLabel={groupByLabel}
-        isOpen={isPresent}
-        items={groupValuesQuery.data ?? []}
-        isLoading={groupValuesQuery.isLoading}
-        isError={groupValuesQuery.isError}
-        isSelected={(value) => value === selectedValue}
-        onSelect={(item) => {
-          onSelectValue(item.value);
-          close();
-        }}
-        close={close}
-      />
-    </motion.div>,
+    <GroupValuePopoverPanel
+      groupBy={groupBy}
+      groupByLabel={groupByLabel}
+      // 件数は主クリック（その値の作品一覧）の結果と一致させるため、絞り込み無しで数える
+      scope={{ folderId }}
+      position={position}
+      origin={origin}
+      setFloating={setPanelEl}
+      floatingStyles={floatingStyles}
+      panelHandlers={panelHandlers}
+      isSelected={(value) => value === selectedValue}
+      onSelect={(item: GroupValueItem) => {
+        onSelectValue(item.value);
+        close();
+      }}
+      onAdd={onAddValue && ((item) => onAddValue(item.value))}
+      close={close}
+    />,
     document.body,
   );
 }

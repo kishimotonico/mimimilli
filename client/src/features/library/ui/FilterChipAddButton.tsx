@@ -9,6 +9,7 @@ import {
   useAnchoredPopover,
   type AnchoredPopoverFloatingRefCallback,
 } from "../../../shared/ui/useAnchoredPopover";
+import { buildFilterTag } from "../model/libraryPresentation";
 import { groupByKey } from "../../../entities/smart-folder/groupByKey";
 import GroupValuePopoverPanel from "./GroupValuePopoverPanel";
 import type { GroupValueScope } from "../model/useGroupValuesQuery";
@@ -128,13 +129,15 @@ export default function FilterChipAddButton({
             key={groupByKey(pickedGroupBy)}
             groupBy={pickedGroupBy}
             groupByLabel={getGroupByLabel(pickedGroupBy, tagPrefixes)}
-            floatingStyles={floatingStyles}
-            setFloating={setFloating}
-            selectedTags={selectedTags}
             // 件数は現在の絞り込み込みの集計にする（「追加したら何件になるか」を示す）
             scope={scope}
-            onSelect={(tag) => {
-              onAddValue(tag);
+            position="inline"
+            origin="top left"
+            floatingStyles={floatingStyles}
+            setFloating={setFloating}
+            isSelected={(value) => selectedTags.includes(buildFilterTag(pickedGroupBy, value))}
+            onSelect={(item) => {
+              onAddValue(buildFilterTag(pickedGroupBy, item.value));
               close();
             }}
             close={close}

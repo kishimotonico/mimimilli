@@ -46,7 +46,7 @@ export interface UseHoverGroupCoordinatorOptions {
 export interface UseHoverGroupCoordinatorResult {
   /** 現在開いているトリガーのキー */
   openKey: string | null;
-  /** 現在開いているトリガーの要素（GroupQuickOverlay の anchorEl に渡す） */
+  /** 現在開いているトリガーの要素（GroupValuePopover の anchorEl に渡す） */
   openAnchorEl: HTMLElement | null;
   /** 現在openなオーナーのトークン。openKeyがnullの間はnull。 */
   ownerToken: HoverGroupOwnerToken | null;

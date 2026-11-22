@@ -17,12 +17,12 @@ import { MOBILE_MEDIA_QUERY, useMediaQuery } from "../../../shared/ui/useMediaQu
 import { usePopoverDismissal } from "../../../shared/ui/usePopoverDismissal";
 import { formatDuration } from "../../../shared/lib/format";
 import { smartFolderDialogAtom } from "../model/atoms";
-import type { CollectionStatsDisplay } from "../model/libraryPresentation";
+import { buildFilterTag, type CollectionStatsDisplay } from "../model/libraryPresentation";
 import { buildSidebarRows, type DataIntegrityCount } from "../model/sidebarRows";
 import { missingTemplates } from "../model/smartFolderEditing";
 import { useSidebarReorder } from "./useSidebarReorder";
 import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
-import GroupQuickOverlay from "./GroupQuickOverlay";
+import GroupValuePopover from "./GroupValuePopover";
 import SidebarAddMenu from "./SidebarAddMenu";
 import SidebarEditRow from "./SidebarEditRow";
 import SidebarRowItem from "./SidebarRowItem";
@@ -41,9 +41,9 @@ interface LibrarySidebarPanelProps {
   tagPrefixes: TagPrefix[];
   stats: CollectionStatsDisplay;
   /** 値・チップ・検索語のどれかで絞り込んでいるか。絞り込みがあれば「今の検索を保存」、無ければ「複製」を出す */
-  filtered?: boolean;
+  filtered: boolean;
   /** 「今の検索を保存」。保存のダイアログを開く */
-  onSaveSearch?: () => void;
+  onSaveSearch: () => void;
   onOpenFolder: (folderId: string) => void;
   /** クイックオーバーレイの値。主クリックも Ctrl+クリックもその値の作品一覧へ進む */
   onOpenGroupValue: (folderId: string, group: string) => void;
@@ -51,6 +51,8 @@ interface LibrarySidebarPanelProps {
   onAddTag: (tag: NormalizedTag) => void;
 }
 
+/** props は開いているライブラリの状態とその操作（LibrarySidebar が view・route から渡す）。
+ *  サイドバー自身の編集（並べ替え・追加・編集・削除・ダイアログ）と表示だけの状態はここで持つ */
 export default function LibrarySidebarPanel({
   folders,
   activeFolderId,
@@ -58,7 +60,7 @@ export default function LibrarySidebarPanel({
   dataIntegrity,
   tagPrefixes,
   stats,
-  filtered = false,
+  filtered,
   onSaveSearch,
   onOpenFolder,
   onOpenGroupValue,
@@ -149,7 +151,7 @@ export default function LibrarySidebarPanel({
           {menuOpen && (
             <SidebarAddMenu
               duplicateName={duplicateSource?.name ?? null}
-              canSaveSearch={filtered && onSaveSearch !== undefined}
+              canSaveSearch={filtered}
               templates={missingTemplates(readyFolders)}
               onDuplicate={() => {
                 setMenuOpen(false);
@@ -157,7 +159,7 @@ export default function LibrarySidebarPanel({
               }}
               onSaveSearch={() => {
                 setMenuOpen(false);
-                onSaveSearch?.();
+                onSaveSearch();
               }}
               onAddGroup={() => {
                 setMenuOpen(false);
@@ -223,15 +225,16 @@ export default function LibrarySidebarPanel({
 
       <AnimatePresence>
         {!editing && overlayFolder && overlayGroupBy && ownerToken && (
-          <GroupQuickOverlay
+          <GroupValuePopover
             key={overlayFolder.id}
+            placement="right"
             folderId={overlayFolder.id}
             groupBy={overlayGroupBy}
             groupByLabel={getGroupByLabel(overlayGroupBy, tagPrefixes)}
             anchorEl={openAnchorEl}
             selectedValue={overlayFolder.id === activeFolderId ? activeGroup : null}
             onSelectValue={(value) => onOpenGroupValue(overlayFolder.id, value)}
-            onAddTag={onAddTag}
+            onAddValue={(value) => onAddTag(buildFilterTag(overlayGroupBy, value))}
             onClose={closeOverlay}
             panelHandlers={getPanelHandlers(ownerToken)}
             onPanelElChange={(el) => registerPanelEl(ownerToken, el)}

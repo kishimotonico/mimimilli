@@ -33,6 +33,7 @@ export default function LibraryBreadcrumbs() {
         {view && siblingAnchor && group !== null && groupBy !== null && (
           <GroupValuePopover
             key="siblings"
+            placement="below"
             folderId={view.folder.id}
             groupBy={groupBy}
             groupByLabel={getGroupByLabel(groupBy, tagPrefixes)}

@@ -6,14 +6,14 @@ import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
 import { computeCollectionStatsDisplay } from "../model/libraryPresentation";
 import { useDataIntegrityCount } from "../model/useDataIntegrityCount";
 import { isRefined } from "../model/saveSearch";
-import { useSaveSearch } from "../model/useSaveSearch";
+import { useOpenSaveDialog } from "../model/useSaveSearch";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import LibrarySidebarPanel, { type SidebarFolders } from "./LibrarySidebarPanel";
 
 /** ライブラリ・作品詳細の左に出るサイドバー1本（ADR-0041）。シェルのスロットへ渡す */
 export default function LibrarySidebar() {
   const nav = useLibraryNavigation();
-  const saveSearch = useSaveSearch(nav);
+  const openSaveDialog = useOpenSaveDialog(nav.foldersStatus === "ready" ? nav.view : null);
   const mode = useAtomValue(appModeAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
   const dataIntegrity = useDataIntegrityCount();
@@ -44,7 +44,7 @@ export default function LibrarySidebar() {
       tagPrefixes={tagPrefixes}
       stats={stats}
       filtered={ready?.view.kind === "works" && isRefined(ready.view)}
-      onSaveSearch={saveSearch.openSaveDialog}
+      onSaveSearch={openSaveDialog}
       onOpenFolder={(folderId) => {
         // 作品詳細・再生中から元のスマートフォルダーの行を押したときは、保持している状態のまま戻る
         if (mode !== "library" && folderId === activeFolderId) setAppMode("library");
