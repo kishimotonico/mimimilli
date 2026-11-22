@@ -6,7 +6,11 @@ import {
   type GroupSortId,
 } from "@mimimilli/shared";
 import type { SortId } from "../../library/types";
-import type { RouteCodec, RouteParseResult } from "../../../shared/model/useRouteHistorySync";
+import type {
+  ParseContext,
+  RouteCodec,
+  RouteParseResult,
+} from "../../../shared/model/useRouteHistorySync";
 import {
   DEFAULT_LIBRARY_URL_STATE,
   parseNavigationUrl,
@@ -139,17 +143,35 @@ function readLayerOpenedBy(entryState: unknown): LayerOpenedBy {
   return entryState.layer.openedBy === "app" ? "app" : "url";
 }
 
+/** アプリの中で開いた層を、すぐ下のエントリーへ戻って閉じるとき。層の間は library をユーザーが変えられず、
+ *  変わるのは補正だけなので、層を開いていたときの library が正で、下のエントリーの library は古い */
+function closesLayerBelow(
+  current: AppRoute,
+  state: NavigationUrlState,
+  context: ParseContext | undefined,
+): boolean {
+  return (
+    context?.delta === -1 &&
+    current.mode === "library" &&
+    state.mode === "library" &&
+    !state.np &&
+    current.layer?.openedBy === "app"
+  );
+}
+
 export const appRouteCodec: RouteCodec<AppRoute> = {
-  parse(href, entryState): RouteParseResult<AppRoute> {
+  parse(href, entryState, context): RouteParseResult<AppRoute> {
     const { state, canonicalUrl, warnings } = parseNavigationUrl(href);
     return {
       canonicalUrl,
       warnings,
       apply: (current) =>
-        applyEntryState(
-          applyNavigationUrlState(current, state, readLayerOpenedBy(entryState)),
-          entryState,
-        ),
+        closesLayerBelow(current, state, context)
+          ? { ...current, layer: null }
+          : applyEntryState(
+              applyNavigationUrlState(current, state, readLayerOpenedBy(entryState)),
+              entryState,
+            ),
     };
   },
   serialize: (route) => ({

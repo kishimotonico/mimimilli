@@ -18,9 +18,14 @@ export interface RouteParseResult<R> {
   apply: (current: R) => R;
 }
 
+/** 履歴の移動の様子。delta は移動先の履歴の位置から今の位置を引いた値（初回ロードは 0） */
+export interface ParseContext {
+  delta: number;
+}
+
 export interface RouteCodec<R> {
   /** entryState は履歴エントリーに書かれていた値。無ければ undefined */
-  parse: (href: string, entryState: unknown) => RouteParseResult<R>;
+  parse: (href: string, entryState: unknown, context?: ParseContext) => RouteParseResult<R>;
   serialize: (route: R) => SerializedRoute;
 }
 
@@ -97,16 +102,20 @@ export function useRouteHistorySync<R>(routeStore: RouteStore<R>, codec: RouteCo
       alwaysMark: boolean,
       direction: NavigationDirection,
       state: unknown,
+      delta: number,
     ) => {
-      const parsed = codec.parse(window.location.href, readHistoryEntryState(state));
+      const parsed = codec.parse(window.location.href, readHistoryEntryState(state), { delta });
       for (const warning of parsed.warnings) console.warn(`[navigation] ${warning}`);
       if (alwaysMark || parsed.canonicalUrl !== currentUrl()) {
         history.replaceState(stateWithMarker(index), "", parsed.canonicalUrl);
       }
       store.set(sync.applyFromHistoryAtom, parsed.apply, direction);
-      // 履歴エントリーに状態が無い・読めなかった項目は、適用後の route の値を置き換えで書く
+      // URL や履歴エントリーの状態が無い・読めなかった・route が補正済みの項目は、適用後の route の値を置き換えで書く
       const { url, entryState } = codec.serialize(store.get(routeStore.routeAtom));
-      if (!sameEntryState(readHistoryEntryState(history.state), entryState)) {
+      if (
+        url !== currentUrl() ||
+        !sameEntryState(readHistoryEntryState(history.state), entryState)
+      ) {
         history.replaceState(stateWithMarker(index, entryState), "", url);
       }
     };
@@ -116,15 +125,16 @@ export function useRouteHistorySync<R>(routeStore: RouteStore<R>, codec: RouteCo
       const index = readMarkerIndex(history.state);
       const current = index ?? 0;
       moveTo(current, index === null ? current : readMaxIndex(current));
-      applyLocation(current, true, "forward", history.state);
+      applyLocation(current, true, "forward", history.state, 0);
     }
 
     const handlePopState = (event: PopStateEvent) => {
       const index = readMarkerIndex(event.state);
       const next = index ?? 0;
       const direction = next < indexRef.current ? "back" : "forward";
+      const delta = next - indexRef.current;
       moveTo(next, Math.max(maxIndexRef.current, readMaxIndex(next)));
-      applyLocation(next, index === null, direction, event.state);
+      applyLocation(next, index === null, direction, event.state, delta);
     };
 
     // navigate ごとの履歴操作を、描画を待たずに呼ばれた順で1つずつ反映する。描画後の effect で
