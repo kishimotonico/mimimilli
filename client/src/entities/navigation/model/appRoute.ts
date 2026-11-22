@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   createRandomSeed,
   groupSortIdSchema,
@@ -157,17 +158,41 @@ function applyEntryState(route: AppRoute, entryState: unknown): AppRoute {
   };
 }
 
-function isLibraryRecord(value: unknown): value is LibraryRoute {
-  return isRecord(value) && typeof value.folderId === "string" && typeof value.q === "string";
+const carryLibrarySchema = z.strictObject({
+  folderId: z.string(),
+  group: z.string().nullable(),
+  selectedTags: z.array(z.string()),
+  selectedWorkId: z.string().nullable(),
+  q: z.string(),
+  sort: sortIdSchema.nullable(),
+  groupSort: groupSortIdSchema.nullable(),
+  seed: z.number().refine(isRandomSeed),
+});
+
+/** 履歴から読んだ library を、URL から読む library と同じ規則で検証する。URL へ書いて読み戻して
+ *  変わらず、警告も出ないものだけを通す */
+function readCarryLibrary(value: unknown): LibraryRoute | null {
+  const parsed = carryLibrarySchema.safeParse(value);
+  if (!parsed.success) return null;
+  const { sort, groupSort, seed, ...urlPart } = parsed.data;
+  const url = serializeNavigationUrl({
+    mode: "library",
+    library: urlPart as LibraryUrlState,
+    np: false,
+  });
+  const read = parseNavigationUrl(url);
+  if (read.warnings.length > 0 || read.state.mode !== "library") return null;
+  const library = { ...read.state.library, sort, groupSort, seed };
+  return libraryKey(library) === libraryKey(parsed.data as LibraryRoute) ? library : null;
 }
 
 function readLayerCarry(entryState: unknown): LayerCarry | undefined {
   if (!isRecord(entryState) || !isRecord(entryState.layer)) return undefined;
   const { carry } = entryState.layer;
-  if (!isRecord(carry) || !isLibraryRecord(carry.from) || !isLibraryRecord(carry.to)) {
-    return undefined;
-  }
-  return { from: carry.from, to: carry.to };
+  if (!isRecord(carry)) return undefined;
+  const from = readCarryLibrary(carry.from);
+  const to = readCarryLibrary(carry.to);
+  return from && to ? { from, to } : undefined;
 }
 
 function readLayerOpenedBy(entryState: unknown): LayerOpenedBy {
@@ -192,6 +217,20 @@ function closesLayerBelow(
   );
 }
 
+/** 閉じた層へ進んで戻ったとき、下がすでに補正後の library なら、その補正は反映済みなので引き継ぎを持ち越さない */
+function revisitedCarry(
+  current: AppRoute,
+  context: ParseContext | undefined,
+  carry: LayerCarry | undefined,
+): LayerCarry | undefined {
+  const reflected =
+    context?.delta === 1 &&
+    current.layer === null &&
+    carry !== undefined &&
+    libraryKey(carry.to) === libraryKey(current.library);
+  return reflected ? undefined : carry;
+}
+
 export const appRouteCodec: RouteCodec<AppRoute> = {
   parse(href, entryState, context): RouteParseResult<AppRoute> {
     const { state, canonicalUrl, warnings } = parseNavigationUrl(href);
@@ -204,7 +243,7 @@ export const appRouteCodec: RouteCodec<AppRoute> = {
             current,
             state,
             readLayerOpenedBy(entryState),
-            readLayerCarry(entryState),
+            revisitedCarry(current, context, readLayerCarry(entryState)),
           ),
           entryState,
         );

@@ -184,4 +184,78 @@ describe("層を閉じて下のエントリーへ戻る", () => {
       library: { sort: "title-asc", selectedTags: [], q: "" },
     });
   });
+
+  it("再訪した層で2回目の補正をしても、閉じると最後の補正が残る（A→B のあと B→C）", () => {
+    const { routeStore, store } = setup();
+    const seed = store.get(routeStore.routeAtom).library.seed;
+    const correct = (patch: object) =>
+      act(() =>
+        store.set(
+          routeStore.navigateAtom,
+          (route) => correctLibrary(route, { ...route.library, ...patch }).route,
+          { replace: true },
+        ),
+      );
+    act(() =>
+      store.set(routeStore.navigateAtom, (route) => ({
+        ...route,
+        layer: { kind: "nowPlaying", openedBy: "app" },
+      })),
+    );
+    correct({ q: "" });
+    const layerEntryState = (history.state as Record<string, unknown>).__mimimilliRouteEntry;
+    const layerUrl = currentUrl();
+
+    // 閉じて（B が下へ反映される）、層を再訪する
+    popToBelow(seed);
+    const layerState = {
+      __mimimilliNavigation: { index: 1 },
+      __mimimilliRouteEntry: layerEntryState,
+    };
+    history.replaceState(layerState, "", layerUrl);
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate", { state: layerState }));
+    });
+    correct({ selectedTags: [] });
+
+    popToBelow(seed, null, "/library/sf-own");
+
+    expect(store.get(routeStore.routeAtom)).toMatchObject({
+      layer: null,
+      library: { selectedTags: [], q: "" },
+    });
+  });
+
+  it("履歴から読んだ補正の印が不正なら無視し、通常の戻り先を使う", () => {
+    const { routeStore, store } = setup();
+    const seed = store.get(routeStore.routeAtom).library.seed;
+    const library = store.get(routeStore.routeAtom).library;
+    const { selectedTags: _omitted, ...broken } = library;
+    const layerState = {
+      __mimimilliNavigation: { index: 1 },
+      __mimimilliRouteEntry: {
+        sort: null,
+        groupSort: null,
+        seed,
+        layer: {
+          kind: "nowPlaying",
+          openedBy: "app",
+          carry: { from: library, to: { ...broken, q: "" } },
+        },
+      },
+    };
+    history.replaceState(layerState, "", `${BELOW_URL}&np=1`);
+
+    expect(() =>
+      act(() => {
+        window.dispatchEvent(new PopStateEvent("popstate", { state: layerState }));
+      }),
+    ).not.toThrow();
+    popToBelow(seed);
+
+    expect(store.get(routeStore.routeAtom)).toMatchObject({
+      layer: null,
+      library: { selectedTags: ["ASMR"], q: "雨" },
+    });
+  });
 });

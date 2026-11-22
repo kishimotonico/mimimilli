@@ -7,6 +7,7 @@ import {
 import {
   appRouteCodec,
   createInitialAppRoute,
+  libraryKey,
   type AppMode,
   type AppRoute,
   type LibraryRoute,
@@ -56,10 +57,13 @@ export function correctLibrary(
   current: AppRoute,
   library: LibraryRoute,
 ): RouteTransition<AppRoute> {
-  const layer = current.layer && {
-    ...current.layer,
-    carry: { from: current.layer.carry?.from ?? current.library, to: library },
-  };
+  const pending = current.layer?.carry;
+  // 起点は、まだ下へ反映されていない補正の始まり。今の library が前の補正の結果でなければ、今の library
+  const from =
+    pending && libraryKey(pending.to) === libraryKey(current.library)
+      ? pending.from
+      : current.library;
+  const layer = current.layer && { ...current.layer, carry: { from, to: library } };
   return { route: { ...current, library, layer }, replace: true };
 }
 
