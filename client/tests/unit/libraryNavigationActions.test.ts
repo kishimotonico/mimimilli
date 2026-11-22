@@ -399,12 +399,12 @@ describe("検索欄の入力（setLibrarySearchQueryAtom）", () => {
     expect(pendingWrites(store)).toEqual([]);
   });
 
-  it("作品一覧の検索語は前後の空白を落として持つ", () => {
+  it("作品一覧の検索語は入力のまま持つ（入力中の空白を消さない）", () => {
     const store = setup({ folderId: "fav" });
 
-    store.set(setLibrarySearchQueryAtom, " 藤田 ", "works");
+    store.set(setLibrarySearchQueryAtom, "藤田 ", "works");
 
-    expect(lib(store).q).toBe("藤田");
+    expect(lib(store).q).toBe("藤田 ");
   });
 
   it("読めない行を保持しているときも「すべて」の検索結果へ移る", () => {

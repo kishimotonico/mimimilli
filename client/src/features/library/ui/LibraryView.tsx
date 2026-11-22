@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
-import { isHasErrorOnly } from "@mimimilli/shared";
+import { isHasErrorOnly, normalizeSearchQuery } from "@mimimilli/shared";
 import { libraryViewModeAtom } from "../model/atoms";
 import { openNowPlayingLayerAtom } from "../../../entities/navigation/model/appRouteStore";
 import { openWorkDetailAtom } from "../../../entities/work/model/navigationActions";
@@ -107,7 +107,7 @@ function LibraryViewBody({
                     folderId: view.folder.id,
                     group: view.group,
                     tags: view.selectedTags,
-                    q: debouncedSearchQuery,
+                    q: normalizeSearchQuery(debouncedSearchQuery),
                   }
                 : undefined
             }

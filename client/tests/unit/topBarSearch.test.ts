@@ -55,6 +55,18 @@ describe("TopBar の検索入力", () => {
     expect(store.get(libraryRouteAtom).q).toBe("asmr");
   });
 
+  it("語を消して続けて打っても、入力中の空白が消えない", () => {
+    const store = renderTopBar("");
+    const input = screen.getByPlaceholderText(PLACEHOLDER);
+
+    fireEvent.change(input, { target: { value: "藤田 茜" } });
+    fireEvent.change(input, { target: { value: "藤田 " } });
+    expect(input).toHaveValue("藤田 ");
+    expect(store.get(libraryRouteAtom).q).toBe("藤田 ");
+    fireEvent.change(input, { target: { value: "藤田 葵" } });
+    expect(input).toHaveValue("藤田 葵");
+  });
+
   it("IME composition 中は atom へ反映せず表示だけ更新し、確定時に反映する", () => {
     const store = renderTopBar("");
     const input = screen.getByPlaceholderText(PLACEHOLDER);

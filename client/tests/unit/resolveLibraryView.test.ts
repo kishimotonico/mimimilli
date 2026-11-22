@@ -45,10 +45,10 @@ describe("resolveLibraryView: 存在しない ID・グループ", () => {
 });
 
 describe("resolveLibraryView: 検索語", () => {
-  it("空白だけの検索語は空として解決する", () => {
-    const view = resolveLibraryView(route({ folderId: "fav", q: "  " }), folders);
+  it("検索語は入力のまま解決する（正規化は判定とクエリ側）", () => {
+    const view = resolveLibraryView(route({ folderId: "fav", q: " 藤田 " }), folders);
 
-    expect(view).toMatchObject({ kind: "works", q: "" });
+    expect(view).toMatchObject({ kind: "works", q: " 藤田 " });
   });
 });
 

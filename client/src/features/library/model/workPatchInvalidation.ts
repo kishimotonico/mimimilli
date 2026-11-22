@@ -1,7 +1,7 @@
 // ブックマーク後に表示中の一覧をどう揃えるかは、表示中のスマートフォルダー・検索・並びを知るライブラリが決める。
 
 import type { QueryKey } from "@tanstack/react-query";
-import type { Condition } from "@mimimilli/shared";
+import { normalizeSearchQuery, type Condition } from "@mimimilli/shared";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import type { SmartFolderWorksParams } from "../../../entities/smart-folder/api";
 import type { ActiveListCacheHandler } from "../../../entities/work/model/workMutations";
@@ -16,7 +16,7 @@ export function folderWorksParams(
   searchQuery: string,
 ): Omit<SmartFolderWorksParams, "page" | "limit"> {
   return {
-    q: searchQuery,
+    q: normalizeSearchQuery(searchQuery),
     tags: view.selectedTags,
     group: view.group,
     sort: view.sort,

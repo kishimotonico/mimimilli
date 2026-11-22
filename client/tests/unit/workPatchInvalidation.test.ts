@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { Condition, SmartFolder } from "@mimimilli/shared";
 import { resolveLibraryView } from "../../src/entities/library/resolveLibraryView";
 import { createInitialAppRoute } from "../../src/entities/navigation/model/appRoute";
-import { bookmarkActiveListHandler } from "../../src/features/library/model/workPatchInvalidation";
+import {
+  bookmarkActiveListHandler,
+  folderWorksParams,
+} from "../../src/features/library/model/workPatchInvalidation";
 import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
 
 const tag = (value: string): Condition => ({ type: "tag", tag: value });
@@ -65,5 +68,18 @@ describe("bookmarkActiveListHandler: 条件がお気に入りに依存するか"
       broken,
     ]);
     expect(bookmarkActiveListHandler(view, "")).toBeNull();
+  });
+});
+
+describe("folderWorksParams: 検索語", () => {
+  it("前後の空白を落とした正規形を要求とキーに使う", () => {
+    const view = resolveLibraryView(
+      { ...createInitialAppRoute().library, folderId: "fav", q: " 藤田 " },
+      defaultSmartFolders(),
+    );
+    if (view.kind !== "works") throw new Error("works ではありません");
+
+    expect(folderWorksParams(view, " 藤田 ").q).toBe("藤田");
+    expect(folderWorksParams(view, "  ").q).toBe("");
   });
 });
