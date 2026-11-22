@@ -2,7 +2,7 @@ import { Component, Suspense, useEffect, useLayoutEffect, useRef, type ReactNode
 import { QueryErrorResetBoundary } from "@tanstack/react-query";
 import type { WorkListItem } from "@mimimilli/shared";
 import type { ReadyLibraryViewState } from "../model/useLibraryNavigation";
-import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
+import type { WorksView } from "../../../entities/library/resolveLibraryView";
 import { useSuspenseLibraryWorks } from "../model/useLibraryQueries";
 import { folderWorksResetKey } from "../model/folderWorksRequest";
 import { computeIsNoResultsDueToFilter } from "../model/libraryPresentation";
@@ -20,8 +20,6 @@ interface WorksResult {
 
 // LibraryWorksBoundary は作品一覧を表示する結果面でのみ使う。値一覧・読めない行は
 // works query 自体を発行しないため、呼び出し側（LibraryView）でこの境界に入らない。
-
-type WorksView = Extract<ResolvedLibraryView, { kind: "works" }>;
 
 interface Props {
   nav: ReadyLibraryViewState;

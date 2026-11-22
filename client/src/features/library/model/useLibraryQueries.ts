@@ -16,7 +16,8 @@ import {
 } from "../../../entities/work/model/workMutations";
 import { missingWorksCountQueryOptions } from "../../../entities/work/missingWorksCountQueryOptions";
 import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
-import { folderWorksKey, folderWorksParams, type WorksView } from "./folderWorksRequest";
+import type { WorksView } from "../../../entities/library/resolveLibraryView";
+import { folderWorksKey, folderWorksParams } from "./folderWorksRequest";
 import { bookmarkActiveListHandler } from "./workPatchInvalidation";
 import { useGroupValuesQuery } from "./useGroupValuesQuery";
 import type { ReadyLibraryViewState } from "./useLibraryNavigation";

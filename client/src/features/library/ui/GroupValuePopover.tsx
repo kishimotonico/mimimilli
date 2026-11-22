@@ -3,7 +3,7 @@ import { useIsPresent } from "motion/react";
 import type { GroupBy, GroupValueItem } from "@mimimilli/shared";
 import { useAnchoredPopover } from "../../../shared/ui/useAnchoredPopover";
 import type { HoverGroupPanelHandlers } from "../../../shared/lib/useHoverGroupCoordinator";
-import GroupValuePopoverPanel from "./GroupValuePopoverPanel";
+import GroupValuePopoverPanel, { GROUP_VALUE_PLACEMENTS } from "./GroupValuePopoverPanel";
 
 // アンカーの横または下にグループの値の一覧を出す。サイドバーの列は overflow でクリップされるため、
 // document.body へポータルして位置決めを useAnchoredPopover に任せる。
@@ -15,13 +15,8 @@ import GroupValuePopoverPanel from "./GroupValuePopoverPanel";
 // マウントされ続けるため、groupBy / anchorEl は凍結した最後の props のまま渡り、クエリも
 // 常に有効な groupBy で購読され続ける。
 
-const PLACEMENTS = {
-  right: { width: 280, position: "fixed", origin: "left center" },
-  below: { width: 240, position: "inline", origin: "top left" },
-} as const;
-
 interface GroupValuePopoverProps {
-  placement: keyof typeof PLACEMENTS;
+  placement: keyof typeof GROUP_VALUE_PLACEMENTS;
   folderId: string;
   groupBy: GroupBy;
   groupByLabel: string;
@@ -52,7 +47,7 @@ export default function GroupValuePopover({
   onPanelElChange,
 }: GroupValuePopoverProps) {
   const isPresent = useIsPresent();
-  const { width, position, origin } = PLACEMENTS[placement];
+  const { width } = GROUP_VALUE_PLACEMENTS[placement];
   const { setFloating, floatingStyles, close } = useAnchoredPopover({
     isOpen: isPresent,
     preferredWidth: width,
@@ -79,8 +74,7 @@ export default function GroupValuePopover({
       groupByLabel={groupByLabel}
       // 件数は主クリック（その値の作品一覧）の結果と一致させるため、絞り込み無しで数える
       scope={{ folderId }}
-      position={position}
-      origin={origin}
+      placement={placement}
       setFloating={setPanelEl}
       floatingStyles={floatingStyles}
       panelHandlers={panelHandlers}

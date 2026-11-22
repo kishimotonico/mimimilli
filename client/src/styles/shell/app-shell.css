@@ -29,8 +29,8 @@
    ここで body 自体の内容領域をバー高さぶん縮め、カラムのクライアント高さがバーへ
    絶対に重ならないようにする。 */
 .mle-app.has-docked-bar .mle-body {
-  padding-bottom: 72px;
+  padding-bottom: var(--dock-height);
 }
 .mle-app.has-docked-bar .mll-sidebar {
-  padding-bottom: 72px;
+  padding-bottom: var(--dock-height);
 }

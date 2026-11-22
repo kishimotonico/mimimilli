@@ -105,13 +105,21 @@ describe("folderWorksResetKey", () => {
     expect(folderWorksResetKey(base, "x")).toBe(folderWorksResetKey({ ...base }, " x "));
   });
 
+  it("random の seed が違えばキーが変わる", () => {
+    const random = (seed: number) => worksView({ sort: "random", seed });
+    expect(folderWorksResetKey(random(1), "")).not.toBe(folderWorksResetKey(random(2), ""));
+    expect(folderWorksResetKey(random(1), "")).toBe(folderWorksResetKey(random(1), ""));
+  });
+
+  it("グループの値が違えばキーが変わる", () => {
+    const inGroup = (group: string) => worksView({ folderId: "sf-grouped", group });
+    expect(folderWorksResetKey(inGroup("藤田茜"), "")).not.toBe(
+      folderWorksResetKey(inGroup("霧島レイ"), ""),
+    );
+  });
+
   it.each([
     ["フォルダー", worksView({ folderId: "fav" }), ""],
-    [
-      "グループの値",
-      worksView({ folderId: "sf-grouped", selectedTags: [nt("ASMR")], group: "藤田茜" }),
-      "",
-    ],
     ["チップ", worksView({}), ""],
     ["解決済みの並び", worksView({ selectedTags: [nt("ASMR")], sort: "title-asc" }), ""],
     ["検索語", base, "x"],

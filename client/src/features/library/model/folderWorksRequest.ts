@@ -1,13 +1,10 @@
-// スマートフォルダーの作品一覧の要求と query key。取得（useSuspenseLibraryWorks）・
-// ブックマーク後の差し替え・一覧の再マウント判定が同じ定義を参照する。
+// スマートフォルダーの作品一覧の要求と query key。作品一覧を決める項目はここだけで列挙する。
 
 import { hashKey, type QueryKey } from "@tanstack/react-query";
 import { normalizeSearchQuery } from "@mimimilli/shared";
 import type { SmartFolderWorksParams } from "../../../entities/smart-folder/api";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
-import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
-
-export type WorksView = Extract<ResolvedLibraryView, { kind: "works" }>;
+import type { WorksView } from "../../../entities/library/resolveLibraryView";
 
 /** 作品一覧の要求。ページ以外は解決済みの値だけで決まる（今の並び・既定・seed の違いは結果の違い） */
 export function folderWorksParams(

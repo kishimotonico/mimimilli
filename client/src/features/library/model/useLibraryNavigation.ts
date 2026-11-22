@@ -107,11 +107,11 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
     () => (folders ? resolveLibraryView(library, folders) : null),
     [library, folders],
   );
-  // 操作は呼ばれた時点の最新の view を読む。参照は view が変わっても変えない
-  const viewRef = useRef(view);
+  // 操作は呼ばれた時点の最新の一覧を渡す（解決は遷移の中で反映先の route に対して行う）。参照は変えない
+  const foldersRef = useRef(folders);
   useLayoutEffect(() => {
-    viewRef.current = view;
-  }, [view]);
+    foldersRef.current = folders;
+  }, [folders]);
 
   useEffect(() => {
     if (folders) normalizeFolder(folders);
@@ -123,24 +123,24 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
         action();
       });
     // 一覧が無い間は保持しているライブラリが決まらないので、それに依存する操作は行わない
-    const withView = (action: (view: ResolvedLibraryView) => void) => {
-      const view = viewRef.current;
-      if (view !== null) run(() => action(view));
+    const withFolders = (action: (folders: SmartFolder[]) => void) => {
+      const current = foldersRef.current;
+      if (current) run(() => action(current));
     };
     return {
       openFolder: (folderId) => run(() => openFolder(folderId)),
       openGroupValue: (folderId, group) => run(() => openGroupValue(folderId, group)),
-      selectGroupValue: (group) => withView((v) => selectGroupValue(group, v)),
+      selectGroupValue: (group) => withFolders((f) => selectGroupValue(group, f)),
       removeTag: (tag) => run(() => removeTag(tag)),
-      addTag: (tag) => withView((v) => addTag(tag, v)),
+      addTag: (tag) => withFolders((f) => addTag(tag, f)),
       clickTag: (tag, { ctrlKey, metaKey }) =>
-        withView((v) => (ctrlKey || metaKey ? addTag(tag, v) : openTag(tag, v))),
+        withFolders((f) => (ctrlKey || metaKey ? addTag(tag, f) : openTag(tag, f))),
       clearTags: () => run(() => clearTags()),
-      searchInAll: () => withView((v) => searchInAll(v)),
-      setSearchQuery: (q) => withView((v) => setSearchQuery(q, v)),
+      searchInAll: () => withFolders((f) => searchInAll(f)),
+      setSearchQuery: (q) => withFolders((f) => setSearchQuery(q, f)),
       selectWork,
       setSort: (sort) => run(() => setSort(sort)),
-      backToValueList: () => withView((v) => backToValueList(v)),
+      backToValueList: () => withFolders((f) => backToValueList(f)),
     };
   }, [
     openFolder,

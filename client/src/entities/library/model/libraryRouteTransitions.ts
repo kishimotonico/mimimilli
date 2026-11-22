@@ -11,7 +11,7 @@ import {
 } from "@mimimilli/shared";
 import type { RouteTransition } from "../../../shared/model/routeStore";
 import type { AppRoute, LibraryRoute } from "../../navigation/model/appRoute";
-import type { ResolvedLibraryView } from "../resolveLibraryView";
+import { resolveLibraryView, type ResolvedLibraryView } from "../resolveLibraryView";
 
 type Transition = RouteTransition<AppRoute>;
 
@@ -71,15 +71,17 @@ export function replaceLibraryFolder(
   return openLibraryFolder(route, to).route.library;
 }
 
-/** 保持しているライブラリが存在しないスマートフォルダーを指しているとき、「すべて」へ正規化する（補正）。
- *  チップ・検索語・並びは保つ */
+/** 保持しているライブラリを、スマートフォルダー一覧に合わせて書き戻す（補正）。存在しないスマートフォルダーは
+ *  「すべて」へ、グループ分けの無いスマートフォルダーの group は落とす。チップ・検索語・並びは保つ */
 export function normalizeLibraryFolder(
   route: AppRoute,
   folders: readonly SmartFolder[],
 ): LibraryRoute | null {
   const { library } = route;
-  if (folders.some((folder) => folder.id === library.folderId)) return null;
-  return { ...library, folderId: ALL_SMART_FOLDER_ID, group: null };
+  const folder = folders.find((item) => item.id === library.folderId);
+  if (folder === undefined) return { ...library, folderId: ALL_SMART_FOLDER_ID, group: null };
+  if (folder.groupBy === null && library.group !== null) return { ...library, group: null };
+  return null;
 }
 
 /** サイドバーのクイックオーバーレイから、グループの値の作品一覧へ入る */
@@ -96,8 +98,9 @@ export function openLibraryGroupValue(
 export function selectLibraryGroupValue(
   route: AppRoute,
   group: string,
-  view: ResolvedLibraryView,
+  folders: readonly SmartFolder[],
 ): Transition | null {
+  const view = resolveLibraryView(route.library, folders);
   if (view.kind === "works" && view.group === group) return null;
   const fromValueList = view.kind === "value-list";
   return {
@@ -128,8 +131,9 @@ function toAll(
 export function openLibraryTag(
   route: AppRoute,
   tag: NormalizedTag,
-  view: ResolvedLibraryView,
+  folders: readonly SmartFolder[],
 ): Transition {
+  const view = resolveLibraryView(route.library, folders);
   return { route: toAll(route, view, [tag], "", { entering: false }) };
 }
 
@@ -138,8 +142,9 @@ export function openLibraryTag(
 export function addLibraryTag(
   route: AppRoute,
   tag: NormalizedTag,
-  view: ResolvedLibraryView,
+  folders: readonly SmartFolder[],
 ): Transition | null {
+  const view = resolveLibraryView(route.library, folders);
   if (view.kind !== "works") return { route: toAll(route, view, [tag], "", { entering: true }) };
   const prev = view.selectedTags;
   if (prev.includes(tag) && route.mode === "library" && route.layer === null) return null;
@@ -204,8 +209,9 @@ export function reshuffleLibrarySeed(route: AppRoute): Transition {
 export function setLibrarySearchQuery(
   route: AppRoute,
   q: string,
-  view: ResolvedLibraryView,
+  folders: readonly SmartFolder[],
 ): Transition | null {
+  const view = resolveLibraryView(route.library, folders);
   if (view.kind === "works") {
     if (view.q === q) return null;
     return { route: withLibrary(route, { q }), replace: true };
@@ -215,7 +221,11 @@ export function setLibrarySearchQuery(
 }
 
 /** 0件のとき、同じチップと検索語のまま「すべて」で探す */
-export function searchLibraryInAll(route: AppRoute, view: ResolvedLibraryView): Transition | null {
+export function searchLibraryInAll(
+  route: AppRoute,
+  folders: readonly SmartFolder[],
+): Transition | null {
+  const view = resolveLibraryView(route.library, folders);
   if (view.kind !== "works") return null;
   return { route: toAll(route, view, view.selectedTags, view.q, { entering: true }) };
 }
@@ -223,8 +233,9 @@ export function searchLibraryInAll(route: AppRoute, view: ResolvedLibraryView): 
 /** グループの値の作品一覧から、そのスマートフォルダーの値一覧へ戻る */
 export function backToLibraryValueList(
   route: AppRoute,
-  view: ResolvedLibraryView,
+  folders: readonly SmartFolder[],
 ): Transition | null {
+  const view = resolveLibraryView(route.library, folders);
   if (view.kind !== "works" || view.group === null) return null;
   return {
     route: withLibrary(route, { group: null, selectedTags: [], q: "", selectedWorkId: null }),

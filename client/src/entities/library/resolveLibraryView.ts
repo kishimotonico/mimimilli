@@ -40,7 +40,7 @@ export type ResolvedLibraryView =
   /** 開けない。folder: 行が読めない／sort: 「すべて」の並びを継承するが、その並びが読めない */
   | (ResolvedBase & { kind: "broken"; reason: "folder" | "sort"; breadcrumb: string[] });
 
-export type ResolvedViewKind = ResolvedLibraryView["kind"];
+export type WorksView = Extract<ResolvedLibraryView, { kind: "works" }>;
 
 /** 値一覧か作品一覧か。値を選ぶ前のグループ分けが値一覧。選んだ行に要る値だけを確かめる */
 export function resolveLibraryView(

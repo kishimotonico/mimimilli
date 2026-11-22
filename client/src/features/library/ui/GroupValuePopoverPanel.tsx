@@ -15,14 +15,18 @@ import type { HoverGroupPanelHandlers } from "../../../shared/lib/useHoverGroupC
 // AnimatePresence が最後の props を凍結して渡し続けるため、groupBy 等の値を呼び出し側で
 // 手動退避する必要はない。
 
-export interface GroupValuePopoverPanelProps {
+/** right: サイドバーの行から右へ（画面に固定）。below: アンカーの下へ（親の中の絶対配置） */
+export const GROUP_VALUE_PLACEMENTS = {
+  right: { width: 280, position: "fixed", origin: "left center" },
+  below: { width: 240, position: "inline", origin: "top left" },
+} as const;
+
+interface GroupValuePopoverPanelProps {
   groupBy: GroupBy;
   groupByLabel: string;
   /** 候補を数える母集団 */
   scope: GroupValueScope;
-  /** fixed はポータル先で画面に固定、inline は親の中の絶対配置 */
-  position: "fixed" | "inline";
-  origin: "left center" | "top left";
+  placement: keyof typeof GROUP_VALUE_PLACEMENTS;
   setFloating: AnchoredPopoverFloatingRefCallback;
   floatingStyles: CSSProperties;
   panelHandlers?: HoverGroupPanelHandlers;
@@ -37,8 +41,7 @@ export default function GroupValuePopoverPanel({
   groupBy,
   groupByLabel,
   scope,
-  position,
-  origin,
+  placement,
   setFloating,
   floatingStyles,
   panelHandlers,
@@ -50,6 +53,7 @@ export default function GroupValuePopoverPanel({
   const isPresent = useIsPresent();
   const groupValuesQuery = useGroupValuesQuery(groupBy, scope);
   const { popoverScale } = useMotionVariants();
+  const { position, origin } = GROUP_VALUE_PLACEMENTS[placement];
   const variant = popoverScale({ origin });
 
   return (

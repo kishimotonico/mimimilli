@@ -375,23 +375,22 @@ export class UserWorkStateRepository {
   }
 }
 
-type ColumnProblem = { column: string; issues: unknown };
+type ColumnProblem = { column: string; reason: unknown };
 type ColumnRead<T> = { ok: true; value: T } | { ok: false; problem: ColumnProblem };
+
+function failed(column: string, reason: unknown): { ok: false; problem: ColumnProblem } {
+  return { ok: false, problem: { column, reason } };
+}
 
 function readJsonColumn<T>(column: string, raw: string, schema: z.ZodType<T>): ColumnRead<T> {
   let json: unknown;
   try {
     json = JSON.parse(raw);
   } catch (error) {
-    return {
-      ok: false,
-      problem: { column, issues: error instanceof Error ? error.message : String(error) },
-    };
+    return failed(column, error instanceof Error ? error.message : String(error));
   }
   const parsed = schema.safeParse(json);
-  return parsed.success
-    ? { ok: true, value: parsed.data }
-    : { ok: false, problem: { column, issues: parsed.error.issues } };
+  return parsed.success ? { ok: true, value: parsed.data } : failed(column, parsed.error.issues);
 }
 
 /** condition・sort・groupBy のどれか1つでも読めなければ、3つとも null の壊れた行にする。壊れた行は同じ問題につき1回だけ警告する */
@@ -399,7 +398,7 @@ function toSmartFolderRow(r: typeof smartFolders.$inferSelect): SmartFolderRow {
   const base = { id: r.id, name: r.name, position: r.position, createdAt: r.createdAt };
   const condition =
     r.conditionJson === null
-      ? ({ ok: false, problem: { column: "condition_json", issues: "null" } } as const)
+      ? failed("condition_json", "値が NULL です")
       : readJsonColumn("condition_json", r.conditionJson, conditionTreeSchema);
   const sort = sortIdSchema.nullable().safeParse(r.sort);
   const groupBy =
@@ -408,7 +407,7 @@ function toSmartFolderRow(r: typeof smartFolders.$inferSelect): SmartFolderRow {
       : readJsonColumn("group_by_json", r.groupByJson, groupBySchema);
   const problems: ColumnProblem[] = [];
   if (!condition.ok) problems.push(condition.problem);
-  if (!sort.success) problems.push({ column: "sort", issues: sort.error.issues });
+  if (!sort.success) problems.push({ column: "sort", reason: sort.error.issues });
   if (!groupBy.ok) problems.push(groupBy.problem);
   if (!condition.ok || !sort.success || !groupBy.ok) {
     const signature = JSON.stringify(problems);

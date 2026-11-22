@@ -14,10 +14,8 @@ import {
   type SmartFolderWrite,
 } from "@mimimilli/shared";
 import { hasChipOrSearchRefinement } from "../../../entities/library/refinement";
-import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
+import type { ResolvedLibraryView, WorksView } from "../../../entities/library/resolveLibraryView";
 import { type SmartFolderDialogTarget, type SmartFolderDraft } from "./smartFolderEditing";
-
-export type WorksView = Extract<ResolvedLibraryView, { kind: "works" }>;
 
 export type SaveOffer = "save" | "overwrite";
 

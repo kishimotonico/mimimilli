@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { conditionSchema } from "@mimimilli/shared";
-import { resolveLibraryView } from "../../src/entities/library/resolveLibraryView";
+import { resolveLibraryView, type WorksView } from "../../src/entities/library/resolveLibraryView";
 import {
   createInitialAppRoute,
   type LibraryRoute,
@@ -11,7 +11,6 @@ import {
   saveOffer,
   saveSearchDraft,
   type OverwritableFolder,
-  type WorksView,
 } from "../../src/features/library/model/saveSearch";
 import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
 import { nts } from "../helpers/tag";

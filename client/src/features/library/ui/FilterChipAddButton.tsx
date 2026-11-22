@@ -131,8 +131,7 @@ export default function FilterChipAddButton({
             groupByLabel={getGroupByLabel(pickedGroupBy, tagPrefixes)}
             // 件数は現在の絞り込み込みの集計にする（「追加したら何件になるか」を示す）
             scope={scope}
-            position="inline"
-            origin="top left"
+            placement="below"
             floatingStyles={floatingStyles}
             setFloating={setFloating}
             isSelected={(value) => selectedTags.includes(buildFilterTag(pickedGroupBy, value))}

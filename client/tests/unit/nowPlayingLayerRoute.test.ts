@@ -1,4 +1,3 @@
-import { resolveLibraryView } from "../../src/entities/library/resolveLibraryView";
 import { defaultSmartFolders } from "../helpers/smartFolders";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStore } from "jotai";
@@ -91,11 +90,7 @@ describe("再生中の層の遷移", () => {
 
   it("層からタグへ進むと、層のエントリーを置き換えて「すべて」＋タグへ移る", () => {
     const store = openedStore("files");
-    store.set(
-      openLibraryTagAtom,
-      nts(["cv/藤田茜"])[0],
-      resolveLibraryView(store.get(appRouteAtom).library, defaultSmartFolders()),
-    );
+    store.set(openLibraryTagAtom, nts(["cv/藤田茜"])[0], defaultSmartFolders());
 
     expect(pendingWrites(store)).toEqual(["replace"]);
     const route = store.get(appRouteAtom);
@@ -119,7 +114,7 @@ describe("再生中の層の遷移", () => {
 
   it("層からタグを Ctrl+クリックすると、層のエントリーを置き換えてチップを足す", () => {
     const store = openedStore("library");
-    store.set(addLibraryTagAtom, nts(["cv/藤田茜"])[0], "works");
+    store.set(addLibraryTagAtom, nts(["cv/藤田茜"])[0], defaultSmartFolders());
 
     expect(pendingWrites(store)).toEqual(["replace"]);
     const route = store.get(appRouteAtom);
@@ -131,7 +126,7 @@ describe("再生中の層の遷移", () => {
     const store = openedStore("library");
     seedLibraryRoute(store, { selectedTags: nts(["cv/藤田茜"]) });
     clearPendingOps(store);
-    store.set(addLibraryTagAtom, nts(["cv/藤田茜"])[0], "works");
+    store.set(addLibraryTagAtom, nts(["cv/藤田茜"])[0], defaultSmartFolders());
 
     expect(pendingWrites(store)).toEqual(["replace"]);
     const route = store.get(appRouteAtom);
