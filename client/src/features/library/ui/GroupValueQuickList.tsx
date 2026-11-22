@@ -131,7 +131,7 @@ export default function GroupValueQuickList({
     setSortMenuOpen(false);
   }, [groupKey, isOpen]);
 
-  const currentSortLabel = getGroupSortLabel(sort);
+  const currentSortLabel = getGroupSortLabel(sort, groupBy);
 
   const rows = buildGroupValueDisplayRows(items, query, sort);
   const resetKey = `${groupKey}:${sort}:${query}`;

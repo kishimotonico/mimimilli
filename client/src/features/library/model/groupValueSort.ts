@@ -1,7 +1,7 @@
 // 値一覧の並び（GroupSortId）の語彙と、列見出しの切り替え規則（ADR-0040・ADR-0041）。
 // 並べるのはサーバー（POST /smart-folders/:id/groups）で、client は選んだ ID を送るだけ。
 
-import type { GroupSortId } from "@mimimilli/shared";
+import type { GroupBy, GroupSortId } from "@mimimilli/shared";
 
 export type SortDirection = "asc" | "desc";
 
@@ -26,8 +26,25 @@ export const GROUP_SORT_COLUMNS: { id: GroupSortColumn; label: string }[] = [
   { id: "duration", label: "総時間" },
 ];
 
-export function getGroupSortLabel(sort: GroupSortId): string {
+/** 追加年のグループ分けでは、値が年なので名前順を年の古い順・新しい順と呼ぶ */
+const ADDED_YEAR_LABELS: Partial<Record<GroupSortId, string>> = {
+  "name-asc": "年（古い順）",
+  "name-desc": "年（新しい順）",
+};
+
+export function getGroupSortLabel(sort: GroupSortId, groupBy: GroupBy | null): string {
+  if (groupBy?.kind === "addedYear" && ADDED_YEAR_LABELS[sort] !== undefined) {
+    return ADDED_YEAR_LABELS[sort];
+  }
   return GROUP_SORT_OPTIONS.find((option) => option.id === sort)?.label ?? sort;
+}
+
+/** そのグループ分けの並びメニュー・ダイアログの項目 */
+export function groupSortOptions(groupBy: GroupBy | null): { id: GroupSortId; label: string }[] {
+  return GROUP_SORT_OPTIONS.map((option) => ({
+    id: option.id,
+    label: getGroupSortLabel(option.id, groupBy),
+  }));
 }
 
 export function groupSortColumn(sort: GroupSortId): GroupSortColumn | null {

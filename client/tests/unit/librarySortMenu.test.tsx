@@ -204,6 +204,18 @@ describe("LibrarySortMenu", () => {
     expect(currentSort(store)).toBe("duration-desc");
   });
 
+  it("追加年の値一覧は、名前順を年の古い順・新しい順と呼ぶ", () => {
+    renderSortMenu({ folderId: "by-year" });
+    const button = screen.getByRole("button", { name: "並び替え" });
+    expect(button).toHaveAttribute("title", "並び替え: 年（新しい順）");
+
+    fireEvent.click(button);
+    const menu = screen.getByRole("menu", { name: "並び替え" });
+    expect(within(menu).getByRole("menuitemradio", { name: "年（古い順）" })).toBeInTheDocument();
+    expect(within(menu).getByRole("menuitemradio", { name: "年（新しい順）" })).toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitemradio", { name: "名前（あ→ん）" })).toBeNull();
+  });
+
   it("値一覧へ切り替えても、作品一覧へ戻ったときの今の並びは壊れない", () => {
     const { store } = renderSortMenu({ folderId: "all", sort: "duration-desc" });
 

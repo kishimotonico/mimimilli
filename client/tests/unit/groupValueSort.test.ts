@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   GROUP_SORT_OPTIONS,
+  getGroupSortLabel,
+  groupSortOptions,
   groupSortColumn,
   groupSortDirection,
   isNameSort,
   toggleGroupSortColumn,
 } from "../../src/features/library/model/groupValueSort";
 import { buildGroupValueDisplayRows } from "../../src/features/library/model/groupValueDisplayRows";
-import type { GroupValueItem } from "@mimimilli/shared";
+import type { GroupBy, GroupValueItem } from "@mimimilli/shared";
 
 function item(value: string): GroupValueItem {
   return {
@@ -42,6 +44,20 @@ describe("値の並びの語彙", () => {
     expect(groupSortColumn("added-desc")).toBeNull();
     expect(groupSortColumn("last-played")).toBeNull();
     expect(isNameSort("added-desc")).toBe(false);
+  });
+});
+
+describe("追加年のグループ分けの名前順のラベル", () => {
+  const year: GroupBy = { kind: "addedYear" };
+  const cv: GroupBy = { kind: "prefix", prefix: "cv" };
+
+  it("追加年は名前順を年の古い順・新しい順と呼び、ほかの並びとほかのグループ分けは変えない", () => {
+    expect(getGroupSortLabel("name-asc", year)).toBe("年（古い順）");
+    expect(getGroupSortLabel("name-desc", year)).toBe("年（新しい順）");
+    expect(getGroupSortLabel("count-desc", year)).toBe("件数（多い順）");
+    expect(getGroupSortLabel("name-asc", cv)).toBe("名前（あ→ん）");
+    expect(groupSortOptions(year).map((option) => option.label)).toContain("年（新しい順）");
+    expect(groupSortOptions(null).map((option) => option.label)).toContain("名前（ん→あ）");
   });
 });
 

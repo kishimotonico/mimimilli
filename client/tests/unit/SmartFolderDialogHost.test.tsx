@@ -180,6 +180,48 @@ describe("保存中のダイアログ", () => {
   });
 });
 
+describe("保存中の入力欄", () => {
+  const grouped = buildSmartFolder({
+    id: "sf-00000000-0000-4000-8000-0000000000c2",
+    name: "年別",
+    groupBy: { kind: "addedYear" },
+    groupSort: "name-desc",
+    condition: { type: "and", children: [{ type: "bookmarked" }] },
+  });
+
+  it("保存を待つ間は名前・条件の削除・グループ分け・2つの並びを操作できず、失敗したら同じ下書きで再開できる", async () => {
+    const held = gate();
+    mockApi({
+      "GET /api/tag-prefixes": [],
+      "GET /api/smart-folders": [...defaultSmartFolders(), grouped],
+      "PUT /api/smart-folders/:id": async () => {
+        await held.promise;
+        return apiError(409, "conflict", "競合しました");
+      },
+    });
+    const store = renderHost([...defaultSmartFolders(), grouped]);
+    const user = userEvent.setup();
+
+    act(() => store.set(smartFolderDialogAtom, { kind: "edit", folder: grouped }));
+    const name = await screen.findByLabelText("名前");
+    await user.clear(name);
+    await user.type(name, "新しい名前");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(screen.getByLabelText("名前")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "この条件を外す" })).toBeDisabled();
+    expect(screen.getByLabelText("グループ分け")).toBeDisabled();
+    expect(screen.getByLabelText("値の並び")).toBeDisabled();
+    expect(screen.getByLabelText("作品の並び")).toBeDisabled();
+
+    held.release();
+    await waitFor(() => expect(screen.getByLabelText("名前")).toBeEnabled());
+    expect(screen.getByLabelText("名前")).toHaveValue("新しい名前");
+    expect(screen.getByLabelText("値の並び")).toBeEnabled();
+    expect(store.get(smartFolderDialogAtom)).not.toBeNull();
+  });
+});
+
 describe("グループ分けがあるときの並びの欄", () => {
   const grouped = buildSmartFolder({
     id: "sf-00000000-0000-4000-8000-0000000000c1",

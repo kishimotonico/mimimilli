@@ -11,7 +11,7 @@ import {
   type SortId,
   type TagPrefix,
 } from "@mimimilli/shared";
-import { GROUP_SORT_OPTIONS } from "../model/groupValueSort";
+import { groupSortOptions } from "../model/groupValueSort";
 import { SORT_OPTIONS } from "../../../entities/library/types";
 import { groupByFromKey, groupByKey } from "../../../entities/smart-folder/groupByKey";
 import Button from "../../../shared/ui/Button";
@@ -142,7 +142,7 @@ export default function SmartFolderDialog({
             type="text"
             value={draft.name}
             placeholder="名前"
-            disabled={!permissions.rename}
+            disabled={!permissions.rename || saving}
             onChange={(event) => setDraft({ ...draft, name: event.target.value })}
           />
         </div>
@@ -160,6 +160,7 @@ export default function SmartFolderDialog({
                       icon={I.x}
                       label="この条件を外す"
                       size="xs"
+                      disabled={saving}
                       onClick={() =>
                         setDraft({ ...draft, condition: withoutRootChild(draft.condition, index) })
                       }
@@ -175,7 +176,7 @@ export default function SmartFolderDialog({
           <select
             id={groupId}
             value={groupByKey(draft.groupBy)}
-            disabled={!permissions.editGroupBy}
+            disabled={!permissions.editGroupBy || saving}
             onChange={(event) =>
               setDraft(withGroupBy(draft, groupByFromKey(event.target.value), initial))
             }
@@ -194,11 +195,12 @@ export default function SmartFolderDialog({
             <select
               id={groupSortId}
               value={draft.groupSort}
+              disabled={saving}
               onChange={(event) =>
                 setDraft({ ...draft, groupSort: event.target.value as GroupSortId })
               }
             >
-              {GROUP_SORT_OPTIONS.map((option) => (
+              {groupSortOptions(draft.groupBy).map((option) => (
                 <option key={option.id} value={option.id}>
                   {option.label}
                 </option>
@@ -212,6 +214,7 @@ export default function SmartFolderDialog({
             ref={sortRef}
             id={sortId}
             value={draft.sort ?? ""}
+            disabled={saving}
             onChange={(event) =>
               setDraft({
                 ...draft,

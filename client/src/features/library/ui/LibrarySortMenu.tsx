@@ -11,7 +11,7 @@ import {
 } from "../../../entities/library/model/navigationActions";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
-import { GROUP_SORT_OPTIONS, getGroupSortLabel } from "../model/groupValueSort";
+import { getGroupSortLabel, groupSortOptions } from "../model/groupValueSort";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import { usePopoverDismissal } from "../../../shared/ui/usePopoverDismissal";
@@ -56,7 +56,9 @@ function ReadySortMenu({
   const disabled = view.kind === "broken";
   const sort = view.kind === "works" ? view.sort : null;
   const currentSortLabel =
-    view.kind === "value-list" ? getGroupSortLabel(view.groupSort) : sort && getSortLabel(sort);
+    view.kind === "value-list"
+      ? getGroupSortLabel(view.groupSort, view.groupBy)
+      : sort && getSortLabel(sort);
 
   const saveAsDefault = async () => {
     if (view.kind === "broken") return;
@@ -146,7 +148,7 @@ function ReadySortMenu({
           onKeyDown={handleMenuKeyDown}
         >
           {view.kind === "value-list"
-            ? GROUP_SORT_OPTIONS.map((opt) => (
+            ? groupSortOptions(view.groupBy).map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
