@@ -5,12 +5,15 @@ import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQue
 import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
 import { computeCollectionStatsDisplay } from "../model/libraryPresentation";
 import { useDataIntegrityCount } from "../model/useDataIntegrityCount";
+import { smartFolderDialogAtom } from "../model/atoms";
+import { saveDialogTarget } from "../model/saveSearch";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import LibrarySidebarPanel, { type SidebarFolders } from "./LibrarySidebarPanel";
 
 /** ライブラリ・作品詳細の左に出るサイドバー1本（ADR-0041）。シェルのスロットへ渡す */
 export default function LibrarySidebar() {
   const nav = useLibraryNavigation();
+  const setDialog = useSetAtom(smartFolderDialogAtom);
   const mode = useAtomValue(appModeAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
   const dataIntegrity = useDataIntegrityCount();
@@ -44,6 +47,9 @@ export default function LibrarySidebar() {
         ready?.view.kind === "works" &&
         (ready.view.group !== null || ready.view.selectedTags.length > 0 || ready.view.q !== "")
       }
+      onSaveSearch={() => {
+        if (ready?.view.kind === "works") setDialog(saveDialogTarget(ready.view));
+      }}
       onOpenFolder={(folderId) => {
         // 作品詳細・再生中から元のスマートフォルダーの行を押したときは、保持している状態のまま戻る
         if (mode !== "library" && folderId === activeFolderId) setAppMode("library");

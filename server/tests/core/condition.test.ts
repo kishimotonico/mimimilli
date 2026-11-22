@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { HTTPException } from "hono/http-exception";
-import type { Condition, GroupBy } from "@mimimilli/shared";
+import { buildEffectiveCondition, type Condition, type GroupBy } from "@mimimilli/shared";
 import { createFixtureAdapter } from "../../src/adapters/fixture/index.ts";
-import { buildEffectiveCondition, matchCondition } from "../../src/core/condition.ts";
+import { matchCondition } from "../../src/core/condition.ts";
 import {
   parseSmartFolderGroupsRequest,
   parseSmartFolderWorksRequest,

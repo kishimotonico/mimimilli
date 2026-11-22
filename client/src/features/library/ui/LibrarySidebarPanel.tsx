@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useSetAtom } from "jotai";
 import { AnimatePresence } from "motion/react";
 import { monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { extractInstruction } from "@atlaskit/pragmatic-drag-and-drop-hitbox/list-item";
@@ -20,6 +21,7 @@ import IconButton from "../../../shared/ui/IconButton";
 import { MOBILE_MEDIA_QUERY, useMediaQuery } from "../../../shared/ui/useMediaQuery";
 import { usePopoverDismissal } from "../../../shared/ui/usePopoverDismissal";
 import { formatDuration } from "../../../shared/lib/format";
+import { smartFolderDialogAtom } from "../model/atoms";
 import { axisOfGroupBy, type CollectionStatsDisplay } from "../model/libraryPresentation";
 import { buildSidebarRows, type DataIntegrityCount, type SidebarRow } from "../model/sidebarRows";
 import { missingTemplates, reorderIds, smartFolderPermissions } from "../model/smartFolderEditing";
@@ -27,7 +29,6 @@ import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
 import GroupQuickOverlay from "./GroupQuickOverlay";
 import SidebarAddMenu from "./SidebarAddMenu";
 import SidebarEditRow, { SMART_FOLDER_DRAG_TYPE } from "./SidebarEditRow";
-import SmartFolderDialog, { type SmartFolderDialogTarget } from "./SmartFolderDialog";
 
 interface SidebarRowItemProps {
   row: SidebarRow;
@@ -91,8 +92,10 @@ interface LibrarySidebarPanelProps {
   dataIntegrity: DataIntegrityCount;
   tagPrefixes: TagPrefix[];
   stats: CollectionStatsDisplay;
-  /** 値・チップ・検索語のどれかで絞り込んでいるか。絞り込みが無いときだけ「複製」を出す */
+  /** 値・チップ・検索語のどれかで絞り込んでいるか。絞り込みがあれば「今の検索を保存」、無ければ「複製」を出す */
   filtered?: boolean;
+  /** 「今の検索を保存」。保存のダイアログを開く */
+  onSaveSearch?: () => void;
   onOpenFolder: (folderId: string) => void;
   /** 開いているスマートフォルダーを消したとき、「すべて」へ置き換えで移る */
   onReplaceFolder: (folderId: string) => void;
@@ -110,6 +113,7 @@ export default function LibrarySidebarPanel({
   tagPrefixes,
   stats,
   filtered = false,
+  onSaveSearch,
   onOpenFolder,
   onReplaceFolder,
   onOpenGroupValue,
@@ -119,7 +123,7 @@ export default function LibrarySidebarPanel({
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY);
   const [editing, setEditing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [dialog, setDialog] = useState<SmartFolderDialogTarget | null>(null);
+  const setDialog = useSetAtom(smartFolderDialogAtom);
   const headerRef = useRef<HTMLDivElement>(null);
   const {
     openKey: overlayFolderId,
@@ -176,26 +180,11 @@ export default function LibrarySidebarPanel({
     activeFolder && activeFolder.condition !== null && !filtered
       ? (activeFolder as SmartFolder & { condition: Condition })
       : null;
-  const allSort = readyFolders.find((folder) => folder.id === ALL_SMART_FOLDER_ID)?.sort ?? null;
 
   const startEditing = () => {
     closeOverlay();
     setMenuOpen(false);
     setEditing(true);
-  };
-
-  const saveDialog = async (data: Parameters<typeof editor.create>[0]) => {
-    if (!dialog) return false;
-    if (dialog.kind === "edit") {
-      const saved = await editor.update(dialog.folder.id, data);
-      if (saved) setDialog(null);
-      return saved;
-    }
-    const created = await editor.create(data);
-    if (!created) return false;
-    setDialog(null);
-    onOpenFolder(created.id);
-    return true;
   };
 
   const addFromTemplate = async (templateId: string) => {
@@ -239,10 +228,15 @@ export default function LibrarySidebarPanel({
           {menuOpen && (
             <SidebarAddMenu
               duplicateName={duplicateSource?.name ?? null}
+              canSaveSearch={filtered && onSaveSearch !== undefined}
               templates={missingTemplates(readyFolders)}
               onDuplicate={() => {
                 setMenuOpen(false);
                 if (duplicateSource) setDialog({ kind: "duplicate", folder: duplicateSource });
+              }}
+              onSaveSearch={() => {
+                setMenuOpen(false);
+                onSaveSearch?.();
               }}
               onAddGroup={() => {
                 setMenuOpen(false);
@@ -313,17 +307,6 @@ export default function LibrarySidebarPanel({
       )}
       {stats.status === "error" && (
         <div className="mll-sidebar__foot">統計の取得に失敗しました</div>
-      )}
-
-      {dialog && allSort !== null && (
-        <SmartFolderDialog
-          key={dialog.kind === "group" ? "group" : `${dialog.kind}:${dialog.folder.id}`}
-          target={dialog}
-          allSort={allSort}
-          tagPrefixes={tagPrefixes}
-          onSave={saveDialog}
-          onClose={() => setDialog(null)}
-        />
       )}
 
       <AnimatePresence>

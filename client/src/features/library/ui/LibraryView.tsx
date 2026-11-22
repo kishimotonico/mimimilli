@@ -10,6 +10,7 @@ import {
   useLibrarySupportingQueries,
   useMissingWorksCountQuery,
 } from "../model/useLibraryQueries";
+import { useSaveSearch } from "../model/useSaveSearch";
 import { axisOfGroupBy, buildWorksResetKey } from "../model/libraryPresentation";
 import { useLibrarySelectionCleanup } from "../model/useLibrarySelectionCleanup";
 import { useLibraryPreviewActions } from "../model/useLibraryPreviewActions";
@@ -76,6 +77,7 @@ function LibraryViewBody({
   const missingWorksCountQuery = useMissingWorksCountQuery(isErrorView);
 
   const showGrid = viewMode === "grid";
+  const saveSearch = useSaveSearch(nav);
 
   useLibrarySelectionCleanup({
     nav,
@@ -114,6 +116,16 @@ function LibraryViewBody({
             onClearAll={nav.clearTags}
             worksTotal={view.kind === "works" ? worksTotal : undefined}
             valueListItemCount={view.kind === "value-list" ? facetItems.length : undefined}
+            save={
+              saveSearch.offer
+                ? {
+                    offer: saveSearch.offer,
+                    folderName: view.folder.name,
+                    onSave: saveSearch.openSaveDialog,
+                    onOverwrite: () => void saveSearch.overwrite(),
+                  }
+                : undefined
+            }
           />
         )}
         {view.kind === "broken" ? (

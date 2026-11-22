@@ -6,6 +6,7 @@ import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 import type { GridLayoutMode, ViewMode } from "../../../entities/library/types";
 import { DEFAULT_AXIS_VALUE_SORT, type AxisValueSortState } from "./axisValueSort";
+import type { SmartFolderDialogTarget } from "./smartFolderEditing";
 
 // 値一覧のソート状態。今の並び（route.library.sort）とは別に保持する（ADR-0012 帰結）。
 // ソートメニューと list の列見出しクリックは同一のこの state への別入口。
@@ -19,3 +20,6 @@ export const libraryGridLayoutModeAtom = atomWithStorage<GridLayoutMode>(
   "mimimilli:libraryGridLayoutMode",
   "square",
 );
+
+// スマートフォルダーのダイアログの対象。サイドバー・チップ列は値を入れるだけで、描画は SmartFolderDialogHost が行う。
+export const smartFolderDialogAtom = atom<SmartFolderDialogTarget | null>(null);

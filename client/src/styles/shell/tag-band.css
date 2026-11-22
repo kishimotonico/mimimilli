@@ -107,3 +107,21 @@
   color: var(--ink-0);
   background: var(--paper-2);
 }
+.mll-tagband__save {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-family: var(--font-jp);
+  font-size: var(--fs-control);
+  line-height: var(--lh-control);
+  font-weight: 500;
+  color: var(--ink-1);
+  white-space: nowrap;
+}
+.mll-tagband__save:hover {
+  color: var(--ink-0);
+  background: var(--paper-2);
+}

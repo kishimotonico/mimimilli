@@ -1,6 +1,10 @@
 // スマートフォルダーの条件の木（ADR-0040）。保存できる形の検証・正規化・形の判定を持つ。
 // 評価（matchCondition / compileCondition）は server 側の責務でここには置かない。
+// 絞り込みを重ねた1本の木の組み立て（buildEffectiveCondition）は、サーバーの評価と
+// クライアントの保存が同じ規則を使うためここに置く。
 import { z } from "zod";
+import type { TagFilters } from "./pseudoTag.ts";
+import type { GroupBy } from "./smartFolder.ts";
 import { normalizeTag, tagSchema } from "./tagNormalize.ts";
 
 export type Condition =
@@ -174,6 +178,40 @@ export const conditionSchema: z.ZodType<Condition, unknown> = writeTreeSchema.tr
 );
 
 export const EMPTY_CONDITION: Condition = { type: "and", children: [] };
+
+export interface EffectiveConditionInput {
+  /** スマートフォルダーの条件 */
+  condition: Condition;
+  /** 選択中のグループの値 */
+  group?: { by: GroupBy; value: string };
+  /** チップ。擬似タグ @year/… は分解済みの yearValue で届く */
+  tags?: TagFilters;
+  q?: string;
+}
+
+function groupPredicate(by: GroupBy, value: string): Condition {
+  switch (by.kind) {
+    case "prefix":
+      return { type: "tag", tag: `${by.prefix}/${value}` };
+    case "tag":
+      return { type: "tag", tag: value };
+    case "addedYear":
+      return { type: "addedYear", year: value };
+  }
+}
+
+/** スマートフォルダー・グループの値・チップ・検索語から1本の木を作る。
+ *  サーバーの評価と、クライアントの「検索を保存」「上書き」が同じ規則を使う */
+export function buildEffectiveCondition(input: EffectiveConditionInput): Condition {
+  const { condition } = input;
+  const children: Condition[] = condition.type === "and" ? [...condition.children] : [condition];
+  if (input.group) children.push(groupPredicate(input.group.by, input.group.value));
+  for (const tag of input.tags?.tags ?? []) children.push({ type: "tag", tag });
+  if (input.tags?.yearValue != null)
+    children.push({ type: "addedYear", year: input.tags.yearValue });
+  if (input.q) children.push({ type: "text", q: input.q });
+  return children.length === 0 ? EMPTY_CONDITION : { type: "and", children };
+}
 
 // ── 条件の形の判定（正規化済みの木が前提） ─────────────────────
 

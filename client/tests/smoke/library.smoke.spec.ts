@@ -180,7 +180,7 @@ test("並び順メニュー: 今の並びはURLに出ず、戻る・進むで保
   const tracker = trackErrors(page);
   await openApp(page);
 
-  const sortButton = page.getByRole("button", { name: "並び替え" });
+  const sortButton = page.getByRole("button", { name: "並び替え", exact: true });
   await sortButton.click();
   await page.getByRole("menuitemradio", { name: "タイトル（A→Z）" }).click();
   expect(new URL(page.url()).searchParams.has("sort")).toBe(false);

@@ -1,7 +1,8 @@
 // スマートフォルダーの作品一覧・値一覧の評価呼び出し（ADR-0040）。
 // 基準時刻 now をここで1リクエストにつき1回作ってアダプタへ渡す。検索規則は持たず、
-// 木の組み立ては buildEffectiveCondition に任せる。
+// 木の組み立ては shared の buildEffectiveCondition に任せる。
 import {
+  buildEffectiveCondition,
   normalizeTag,
   smartFolderGroupsRequestSchema,
   tagSchema,
@@ -15,7 +16,6 @@ import {
   type WorksPage,
 } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter/index.ts";
-import { buildEffectiveCondition } from "../core/condition.ts";
 import { invalidRequest } from "../lib/httpError.ts";
 
 export interface QueriedSmartFolder {

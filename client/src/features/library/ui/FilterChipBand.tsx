@@ -3,6 +3,7 @@ import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
 import { formatFilterChipLabel } from "../model/libraryPresentation";
 import type { FacetScope } from "../model/useAxisFacetsQuery";
 import FilterChipAddButton from "./FilterChipAddButton";
+import type { SaveOffer } from "../model/saveSearch";
 import { I } from "../../../shared/ui/Icon";
 
 // 選択中フィルタのチップ列（ADR-0012 §2）。×で個別解除、1件以上あるとき「すべてクリア」を
@@ -22,6 +23,13 @@ interface FilterChipBandProps {
   /** 値一覧ペインの分類数。指定時は作品件数の代わりに「ライブラリ全体」件数であることを
    *  明示するラベルを出し、「＋絞り込み」ボタンも隠す（値一覧は独立した全作品の入口。ADR-0026） */
   valueListItemCount?: number;
+  /** 保存の操作。出すものは状態で決まる（ADR-0041） */
+  save?: {
+    offer: SaveOffer;
+    folderName: string;
+    onSave: () => void;
+    onOverwrite: () => void;
+  };
 }
 
 function FilterChip({ tag, onRemove }: { tag: NormalizedTag; onRemove: () => void }) {
@@ -49,6 +57,7 @@ export default function FilterChipBand({
   onClearAll,
   worksTotal,
   valueListItemCount,
+  save,
 }: FilterChipBandProps) {
   const isValueListPane = valueListItemCount !== undefined;
   return (
@@ -72,6 +81,22 @@ export default function FilterChipBand({
         {selectedTags.length > 0 && (
           <button type="button" className="mll-tagband__clear" onClick={onClearAll}>
             すべてクリア
+          </button>
+        )}
+        {save?.offer === "overwrite" && (
+          <button type="button" className="mll-tagband__save" onClick={save.onOverwrite}>
+            {`「${save.folderName}」を上書き`}
+          </button>
+        )}
+        {save?.offer === "overwrite" && (
+          <button type="button" className="mll-tagband__save" onClick={save.onSave}>
+            別名で保存
+          </button>
+        )}
+        {save?.offer === "save" && (
+          <button type="button" className="mll-tagband__save" onClick={save.onSave}>
+            <I.bookmark size={12} />
+            検索を保存
           </button>
         )}
         {isValueListPane ? (

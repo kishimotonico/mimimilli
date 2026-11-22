@@ -295,4 +295,18 @@ describe("LibrarySidebarPanel", () => {
     fireEvent.click(addButton!);
     expect(onAddTag).toHaveBeenCalledWith("cv/藤田茜");
   });
+  it("＋メニューは絞り込みがあれば「今の検索を保存」、無ければ「複製」を出す", async () => {
+    const onSaveSearch = vi.fn();
+    const { unmount } = renderSidebar({ filtered: true, onSaveSearch });
+    await userEvent.click(screen.getByRole("button", { name: "追加" }));
+    expect(screen.queryByRole("menuitem", { name: /を複製$/ })).toBeNull();
+    await userEvent.click(screen.getByRole("menuitem", { name: "今の検索を保存" }));
+    expect(onSaveSearch).toHaveBeenCalledTimes(1);
+    unmount();
+
+    renderSidebar({ filtered: false, onSaveSearch });
+    await userEvent.click(screen.getByRole("button", { name: "追加" }));
+    expect(screen.queryByRole("menuitem", { name: "今の検索を保存" })).toBeNull();
+    expect(screen.getByRole("menuitem", { name: "「すべて」を複製" })).toBeInTheDocument();
+  });
 });

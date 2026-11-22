@@ -220,6 +220,12 @@ export function groupDraft(groupBy: GroupBy): SmartFolderDraft {
   return { name: "", condition: EMPTY_CONDITION, sort: null, groupBy };
 }
 
+export type SmartFolderDialogTarget =
+  | { kind: "edit"; folder: SmartFolder & { condition: Condition } }
+  | { kind: "duplicate"; folder: SmartFolder & { condition: Condition } }
+  | { kind: "save"; draft: SmartFolderDraft }
+  | { kind: "group" };
+
 export function toWrite(draft: SmartFolderDraft): SmartFolderWrite {
   return { ...draft, name: draft.name.trim() };
 }

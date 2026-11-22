@@ -1,11 +1,5 @@
 import { useId, useRef, useState } from "react";
-import {
-  rootChildren,
-  type Condition,
-  type SmartFolder,
-  type SortId,
-  type TagPrefix,
-} from "@mimimilli/shared";
+import { rootChildren, type SortId, type TagPrefix } from "@mimimilli/shared";
 import { SORT_OPTIONS } from "../../../entities/library/types";
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
@@ -23,14 +17,10 @@ import {
   smartFolderPermissions,
   toWrite,
   withoutRootChild,
+  type SmartFolderDialogTarget,
   type SmartFolderDraft,
   type SmartFolderPermissions,
 } from "../model/smartFolderEditing";
-
-export type SmartFolderDialogTarget =
-  | { kind: "edit"; folder: SmartFolder & { condition: Condition } }
-  | { kind: "duplicate"; folder: SmartFolder & { condition: Condition } }
-  | { kind: "group" };
 
 interface SmartFolderDialogProps {
   target: SmartFolderDialogTarget;
@@ -54,6 +44,7 @@ const FULL_PERMISSIONS: SmartFolderPermissions = {
 function initialDraft(target: SmartFolderDialogTarget, tagPrefixes: readonly TagPrefix[]) {
   if (target.kind === "edit") return draftOf(target.folder);
   if (target.kind === "duplicate") return duplicateDraft(target.folder);
+  if (target.kind === "save") return target.draft;
   const first = groupByOptions(tagPrefixes, null)[0]!;
   return groupDraft(groupByFromKey(first.key)!);
 }
@@ -61,6 +52,7 @@ function initialDraft(target: SmartFolderDialogTarget, tagPrefixes: readonly Tag
 function titleOf(target: SmartFolderDialogTarget): string {
   if (target.kind === "edit") return `「${target.folder.name}」を編集`;
   if (target.kind === "duplicate") return `「${target.folder.name}」を複製`;
+  if (target.kind === "save") return "検索を保存";
   return "グループ分けを追加";
 }
 

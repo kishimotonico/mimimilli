@@ -1,12 +1,5 @@
 // スマートフォルダーの条件の木の評価（ADR-0040）。real の compileCondition と同じ意味表に従う。
-import {
-  EMPTY_CONDITION,
-  parseTag,
-  type Condition,
-  type GroupBy,
-  type TagFilters,
-  type WorkSummary,
-} from "@mimimilli/shared";
+import { parseTag, type Condition, type WorkSummary } from "@mimimilli/shared";
 import type { EvalContext } from "../adapter/condition.ts";
 import { textMatcher } from "./worksQuery.ts";
 
@@ -71,37 +64,4 @@ export function createMatcher(condition: Condition, ctx: EvalContext): WorkMatch
 
 export function matchCondition(condition: Condition, work: WorkSummary, ctx: EvalContext): boolean {
   return createMatcher(condition, ctx)(work);
-}
-
-export interface EffectiveConditionInput {
-  /** スマートフォルダーの条件 */
-  condition: Condition;
-  /** 選択中のグループの値 */
-  group?: { by: GroupBy; value: string };
-  /** チップ。擬似タグ @year/… は分解済みの yearValue で届く */
-  tags?: TagFilters;
-  q?: string;
-}
-
-function groupPredicate(by: GroupBy, value: string): Condition {
-  switch (by.kind) {
-    case "prefix":
-      return { type: "tag", tag: `${by.prefix}/${value}` };
-    case "tag":
-      return { type: "tag", tag: value };
-    case "addedYear":
-      return { type: "addedYear", year: value };
-  }
-}
-
-/** スマートフォルダー・グループの値・チップ・検索語から、評価に渡す1本の木を作る */
-export function buildEffectiveCondition(input: EffectiveConditionInput): Condition {
-  const { condition } = input;
-  const children: Condition[] = condition.type === "and" ? [...condition.children] : [condition];
-  if (input.group) children.push(groupPredicate(input.group.by, input.group.value));
-  for (const tag of input.tags?.tags ?? []) children.push({ type: "tag", tag });
-  if (input.tags?.yearValue != null)
-    children.push({ type: "addedYear", year: input.tags.yearValue });
-  if (input.q) children.push({ type: "text", q: input.q });
-  return children.length === 0 ? EMPTY_CONDITION : { type: "and", children };
 }

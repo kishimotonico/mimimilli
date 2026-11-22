@@ -24,7 +24,7 @@ export interface SmartFolderEditor {
   /** 作ったスマートフォルダー。失敗は null */
   create: (data: SmartFolderWrite) => Promise<SmartFolder | null>;
   addFromTemplate: (templateId: string) => Promise<SmartFolder | null>;
-  update: (id: string, data: SmartFolderWrite) => Promise<boolean>;
+  update: (id: string, data: SmartFolderWrite, failureMessage?: string) => Promise<boolean>;
   /** onDeleted は削除が成功した直後（一覧を取り直す前）に呼ぶ */
   remove: (folder: SmartFolder, onDeleted?: () => void) => Promise<void>;
 }
@@ -98,10 +98,8 @@ export function useSmartFolderEditor(): SmartFolderEditor {
         if (created) await refreshFolders();
         return created;
       },
-      update: async (id, data) => {
-        const updated = await attempt("スマートフォルダーを保存できませんでした", () =>
-          updateSmartFolder(id, data),
-        );
+      update: async (id, data, failureMessage = "スマートフォルダーを保存できませんでした") => {
+        const updated = await attempt(failureMessage, () => updateSmartFolder(id, data));
         if (updated) await refreshAfterUpdate();
         return updated !== null;
       },

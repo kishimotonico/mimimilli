@@ -21,6 +21,7 @@ import NowPlayingLayerHost from "./ui/NowPlayingLayerHost";
 import { resolveAppStartupState } from "./model/resolveAppStartupState";
 import RootConfigurationScreen from "../features/setup/ui/RootConfigurationScreen";
 import StartupErrorScreen from "./ui/StartupErrorScreen";
+import SmartFolderDialogHost from "../features/library/ui/SmartFolderDialogHost";
 import LibrarySidebar from "../features/library/ui/LibrarySidebar";
 import { LibraryNavigationProvider } from "../features/library/ui/LibraryNavigationProvider";
 import GlobalToast from "./ui/GlobalToast";
@@ -203,6 +204,7 @@ export default function App() {
                 onOpenFiles={handleOpenScanProblemInFiles}
                 onOpenWorkDetail={handleOpenScanWorkDetail}
               />
+              <SmartFolderDialogHost />
               <GlobalToast />
             </>
           }
