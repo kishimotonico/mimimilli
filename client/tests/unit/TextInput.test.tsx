@@ -9,8 +9,14 @@ describe("TextInput", () => {
 
     expect(input).toHaveAttribute("autocomplete", "off");
     expect(input).toHaveAttribute("data-1p-ignore");
+    expect(input).toHaveAttribute("data-op-ignore");
     expect(input).toHaveAttribute("data-lpignore", "true");
     expect(input).toHaveAttribute("data-bwignore", "true");
     expect(input).toHaveAttribute("data-form-type", "other");
+  });
+
+  it("呼び出し側の autoComplete は既定より優先される", () => {
+    render(<TextInput aria-label="場所" autoComplete="street-address" />);
+    expect(screen.getByLabelText("場所")).toHaveAttribute("autocomplete", "street-address");
   });
 });
