@@ -208,6 +208,7 @@ describe("層を閉じて下のエントリーへ戻る", () => {
 
     // 閉じて（B が下へ反映される）、層を再訪する
     popToBelow(seed);
+    const reflectedUrl = currentUrl();
     const layerState = {
       __mimimilliNavigation: { index: 1 },
       __mimimilliRouteEntry: layerEntryState,
@@ -218,7 +219,7 @@ describe("層を閉じて下のエントリーへ戻る", () => {
     });
     correct({ selectedTags: [] });
 
-    popToBelow(seed, null, "/library/sf-own");
+    popToBelow(seed, null, reflectedUrl);
 
     expect(store.get(routeStore.routeAtom)).toMatchObject({
       layer: null,
