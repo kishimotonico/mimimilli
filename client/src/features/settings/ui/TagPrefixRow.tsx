@@ -28,7 +28,6 @@ interface TagPrefixRowProps {
   onCommitEditLabel: () => void;
   onCancelEditLabel: () => void;
   onColorChange: (color: TagPrefixColorKey | null) => void;
-  onShowAsAxisChange: (showAsAxis: boolean) => void;
   onProtectedChange: (isProtected: boolean) => void;
   onRequestDelete: () => void;
 }
@@ -48,7 +47,6 @@ export default function TagPrefixRow({
   onCommitEditLabel,
   onCancelEditLabel,
   onColorChange,
-  onShowAsAxisChange,
   onProtectedChange,
   onRequestDelete,
 }: TagPrefixRowProps) {
@@ -105,15 +103,6 @@ export default function TagPrefixRow({
 
       <ColorSwatches value={p.color} disabled={isMutating} onChange={onColorChange} />
 
-      <label className={TOGGLE_LABEL_CLASS} title="軸レールにこのprefixの軸を表示する">
-        <input
-          type="checkbox"
-          checked={p.showAsAxis}
-          disabled={isMutating}
-          onChange={(e) => onShowAsAxisChange(e.target.checked)}
-        />
-        軸
-      </label>
       <label className={TOGGLE_LABEL_CLASS} title="このprefixのタグを削除・編集するとき確認を挟む">
         <input
           type="checkbox"

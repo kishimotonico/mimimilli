@@ -3,11 +3,11 @@ import type { TagPrefix } from "@mimimilli/shared";
 import { sortTagsForDisplay } from "../../src/entities/work/sortTagsForDisplay";
 
 const PREFIXES: TagPrefix[] = [
-  { prefix: "cv", label: "CV", color: null, showAsAxis: true, protected: true },
-  { prefix: "サークル", label: "サークル", color: null, showAsAxis: true, protected: true },
-  { prefix: "シリーズ", label: "シリーズ", color: null, showAsAxis: true, protected: false },
-  { prefix: "カテゴリ", label: "カテゴリ", color: null, showAsAxis: true, protected: false },
-  { prefix: "genre", label: "ジャンル", color: null, showAsAxis: false, protected: false },
+  { prefix: "cv", label: "CV", color: null, protected: true },
+  { prefix: "サークル", label: "サークル", color: null, protected: true },
+  { prefix: "シリーズ", label: "シリーズ", color: null, protected: false },
+  { prefix: "カテゴリ", label: "カテゴリ", color: null, protected: false },
+  { prefix: "genre", label: "ジャンル", color: null, protected: false },
 ];
 
 describe("sortTagsForDisplay", () => {

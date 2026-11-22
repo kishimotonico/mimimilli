@@ -98,13 +98,15 @@ export function buildViewAxisRows(): ViewAxisRow[] {
   }));
 }
 
-/** 分類軸の行 = 軸表示ONの prefix 定義（定義順）＋ 組み込みの tag / year（ADR-0005）。
+/** 分類軸の行 = prefix 定義（定義順）＋ 組み込みの tag / year（ADR-0005）。
  *  軸レール（AxisColumn）と「＋絞り込み」の軸選択ステージ（FilterChipAddButton）
  *  が共有する。 */
 export function buildFacetAxisRows(tagPrefixes: TagPrefix[]): FacetAxisRow[] {
-  const prefixRows = tagPrefixes
-    .filter((p) => p.showAsAxis)
-    .map((p) => ({ id: p.prefix, name: p.label, icon: getAxisIcon(p.prefix) }));
+  const prefixRows = tagPrefixes.map((p) => ({
+    id: p.prefix,
+    name: p.label,
+    icon: getAxisIcon(p.prefix),
+  }));
   return [
     ...prefixRows,
     { id: "tag", name: "タグ", icon: getAxisIcon("tag") },

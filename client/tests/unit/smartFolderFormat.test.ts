@@ -36,7 +36,6 @@ describe("smartFolderFormat", () => {
         prefix: "cv",
         label: "CV",
         color: "cv",
-        showAsAxis: true,
         protected: true,
         order: 0,
       },

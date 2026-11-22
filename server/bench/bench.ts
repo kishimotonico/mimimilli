@@ -127,13 +127,15 @@ async function main(): Promise<void> {
     }),
     {
       name: "smart-folder-no-rules",
-      path: `/api/smart-folders/${manifest.smartFolderNoRulesId}/works`,
-      run: async () => request(`/api/smart-folders/${manifest.smartFolderNoRulesId}/works`),
+      path: `/api/smart-folders/${manifest.smartFolderNoRulesId}/works?sort=added-desc`,
+      run: async () =>
+        request(`/api/smart-folders/${manifest.smartFolderNoRulesId}/works?sort=added-desc`),
     },
     {
       name: "smart-folder-with-rules",
-      path: `/api/smart-folders/${manifest.smartFolderWithRulesId}/works`,
-      run: async () => request(`/api/smart-folders/${manifest.smartFolderWithRulesId}/works`),
+      path: `/api/smart-folders/${manifest.smartFolderWithRulesId}/works?sort=added-desc`,
+      run: async () =>
+        request(`/api/smart-folders/${manifest.smartFolderWithRulesId}/works?sort=added-desc`),
     },
     ...["cv", "サークル", "tag", "year"].map((axis) => {
       const path = `/api/axes/${encodeURIComponent(axis)}`;
@@ -141,8 +143,13 @@ async function main(): Promise<void> {
     }),
     {
       name: "values-cv-in-smart-folder",
-      path: `/api/axes/cv?smartFolder=${manifest.smartFolderWithRulesId}`,
-      run: async () => request(`/api/axes/cv?smartFolder=${manifest.smartFolderWithRulesId}`),
+      path: `/api/smart-folders/${manifest.smartFolderWithRulesId}/groups`,
+      run: async () =>
+        app.request(`/api/smart-folders/${manifest.smartFolderWithRulesId}/groups`, {
+          method: "POST",
+          headers: { Host: "127.0.0.1:8080", "Content-Type": "application/json" },
+          body: JSON.stringify({ groupBy: { kind: "prefix", prefix: "cv" } }),
+        }),
     },
     {
       name: "counts-views",
@@ -157,10 +164,9 @@ async function main(): Promise<void> {
       },
     },
     {
-      name: "counts-smart-folder-total",
-      path: `/api/smart-folders/${manifest.smartFolderWithRulesId}/works?limit=1`,
-      run: async () =>
-        request(`/api/smart-folders/${manifest.smartFolderWithRulesId}/works?limit=1`),
+      name: "counts-smart-folders",
+      path: "/api/smart-folders",
+      run: async () => request("/api/smart-folders"),
     },
     {
       name: "fs-root",

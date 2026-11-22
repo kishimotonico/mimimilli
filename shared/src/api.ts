@@ -119,17 +119,11 @@ export type SmartFolderPreviewResponse = z.infer<typeof smartFolderPreviewRespon
 
 /** GET /api/axes/:axis のクエリパラメータ。値一覧の件数・総時間・代表カバーは、渡された
  *  tags による絞り込み後の集合から集計する（自軸除外カウント）。
- *  自軸由来のフィルタを除外した集合を渡すのは呼び出し側（client）の責務。
- *  smartFolder はスマートフォルダー表示中の集計元をフォルダー条件適用後の集合に絞る
- *  （生のルールではなくIDを渡し、サーバー側で解決する） */
-export const axisFacetsQuerySchema = worksQueryBaseSchema
-  .pick({
-    tags: true,
-    tagOp: true,
-  })
-  .extend({
-    smartFolder: z.string().optional(),
-  });
+ *  自軸由来のフィルタを除外した集合を渡すのは呼び出し側（client）の責務 */
+export const axisFacetsQuerySchema = worksQueryBaseSchema.pick({
+  tags: true,
+  tagOp: true,
+});
 export type AxisFacetsQuery = z.infer<typeof axisFacetsQuerySchema>;
 
 /** GET /api/tags */

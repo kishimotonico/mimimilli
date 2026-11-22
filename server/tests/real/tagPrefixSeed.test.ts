@@ -51,7 +51,6 @@ test("real アダプタで prefix 定義の CRUD が動く", async (t) => {
     prefix: "気分",
     label: "気分",
     color: null,
-    showAsAxis: true,
     protected: false,
   });
   assert.equal(created?.prefix, "気分");
@@ -62,7 +61,6 @@ test("real アダプタで prefix 定義の CRUD が動く", async (t) => {
       prefix: "気分",
       label: "気分2",
       color: null,
-      showAsAxis: true,
       protected: false,
     }),
     null,

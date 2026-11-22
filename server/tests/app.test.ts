@@ -4,7 +4,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { worksQuerySchema } from "@mimimilli/shared";
-import { compareJapaneseSortKeys } from "../src/core/japaneseSortKey.ts";
 import { createApp } from "./helpers/testApp.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
@@ -364,77 +363,11 @@ contract(
   },
 );
 
-contract(
-  "GET /api/smart-folders/:id/works は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する",
-  async (harness) => {
-    const created = await harness.send("POST", "/api/smart-folders", {
-      name: "テスト",
-      rules: [],
-      sort: "added-desc",
-    });
-    const { status, body } = await harness.json(
-      `/api/smart-folders/${created.body.id}/works?tags=%40year%2F`,
-    );
-    assert.equal(status, 400);
-    assert.equal(body.error.code, "invalid_request");
-  },
-);
-
 contract("GET /api/fs はルートの listing を返す", async (harness) => {
   const { status, body } = await harness.json("/api/fs");
   assert.equal(status, 200);
   assert.equal(body.path, null);
   assert.ok(Array.isArray(body.entries));
-});
-
-contract("POST /api/smart-folders は201 + 作成されたSmartFolderを返す", async (harness) => {
-  const { status, body } = await harness.send("POST", "/api/smart-folders", {
-    name: "テストフォルダー",
-    rules: [],
-    sort: "added-desc",
-  });
-  assert.equal(status, 201);
-  assert.equal(body.name, "テストフォルダー");
-  assert.equal(typeof body.id, "string");
-  assert.equal(typeof body.createdAt, "string");
-});
-
-contract("POST /api/smart-folders は未対応ルールを400で拒否する", async (harness) => {
-  const { status, body } = await harness.send("POST", "/api/smart-folders", {
-    name: "不正ルール",
-    rules: [{ conjunction: "WHERE", field: "不明", operator: "=", values: ["x"] }],
-    sort: "added-desc",
-  });
-  assert.equal(status, 400);
-  assert.equal(body.error.code, "invalid_request");
-});
-
-contract("スマートフォルダーの作品一覧は保存済み sort を適用する", async (harness) => {
-  const created = await harness.send("POST", "/api/smart-folders", {
-    name: "タイトル降順",
-    rules: [],
-    sort: "title-desc",
-  });
-  const { status, body } = await harness.json(`/api/smart-folders/${created.body.id}/works`);
-  assert.equal(status, 200);
-  assert.equal(body.total, ALL_IDS.length);
-  const titles = body.items.map((work: { title: string }) => work.title);
-  assert.deepEqual(
-    titles,
-    [...titles].sort((a, b) => compareJapaneseSortKeys(b, a)),
-  );
-});
-
-contract("randomソートのスマートフォルダーも作品一覧を返す", async (harness) => {
-  const created = await harness.send("POST", "/api/smart-folders", {
-    name: "ランダム",
-    rules: [],
-    sort: "random",
-  });
-  const { status, body } = await harness.json(`/api/smart-folders/${created.body.id}/works`);
-  assert.equal(status, 200);
-  assert.equal(body.items.length, ALL_IDS.length);
-  assert.equal(typeof body.seed, "number");
 });
 
 contract("未知ルートは404 + not_found", async (harness) => {

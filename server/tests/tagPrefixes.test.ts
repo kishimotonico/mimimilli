@@ -405,16 +405,13 @@ contract("POST /api/tag-prefixes で登録し、PATCH・DELETE できる", async
   });
   assert.equal(created.status, 201);
   assert.equal(created.body.prefix, "気分");
-  assert.equal(created.body.showAsAxis, true);
   assert.equal(created.body.protected, false);
 
   const patched = await harness.send("PATCH", `/api/tag-prefixes/${encodeURIComponent("気分")}`, {
     protected: true,
-    showAsAxis: false,
   });
   assert.equal(patched.status, 200);
   assert.equal(patched.body.protected, true);
-  assert.equal(patched.body.showAsAxis, false);
 
   const deleted = await harness.request(`/api/tag-prefixes/${encodeURIComponent("気分")}`, {
     method: "DELETE",

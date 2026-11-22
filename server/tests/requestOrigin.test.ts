@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ApiError, SmartFolder } from "@mimimilli/shared";
+import type { ApiError, SmartFolderItem } from "@mimimilli/shared";
 import { createApp } from "./helpers/testApp.ts";
 import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
 
@@ -12,7 +12,7 @@ const contract = defineContract({ works: [{ key: "a" }] }, { shared: true });
 const JSON_TYPE = { "Content-Type": "application/json" };
 
 async function folderNames(harness: ContractHarness): Promise<string[]> {
-  const { body } = await harness.json<SmartFolder[]>("/api/smart-folders");
+  const { body } = await harness.json<SmartFolderItem[]>("/api/smart-folders");
   return body.map((folder) => folder.name);
 }
 
@@ -20,7 +20,12 @@ function createFolderRequest(name: string, headers: Record<string, string>) {
   return {
     method: "POST",
     headers: { ...JSON_TYPE, ...headers },
-    body: JSON.stringify({ name, rules: [], sort: "added-desc" }),
+    body: JSON.stringify({
+      name,
+      condition: { type: "and", children: [] },
+      sort: "added-desc",
+      groupBy: null,
+    }),
   };
 }
 
@@ -178,7 +183,12 @@ contract(
 contract(
   "JSON本文のメディア型がapplication/jsonでなければ415で、状態を変えない",
   async (harness) => {
-    const body = JSON.stringify({ name: "text-plain", rules: [], sort: "added-desc" });
+    const body = JSON.stringify({
+      name: "text-plain",
+      condition: { type: "and", children: [] },
+      sort: "added-desc",
+      groupBy: null,
+    });
     for (const headers of [
       { "Content-Type": "text/plain" },
       {},
@@ -201,7 +211,12 @@ contract("パラメータ付き・大文字小文字違いのapplication/jsonは
     const res = await harness.app.request("/api/smart-folders", {
       method: "POST",
       headers: { "Content-Type": type },
-      body: JSON.stringify({ name: `ct-${index}`, rules: [], sort: "added-desc" }),
+      body: JSON.stringify({
+        name: `ct-${index}`,
+        condition: { type: "and", children: [] },
+        sort: "added-desc",
+        groupBy: null,
+      }),
     });
     assert.equal(res.status, 201, type);
   }

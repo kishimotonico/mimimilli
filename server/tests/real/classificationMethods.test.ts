@@ -6,18 +6,15 @@ import type { WorkQueryRepository } from "../../src/adapters/real/workQueryRepos
 
 test("分類メソッドは real adapter を起動せず直接生成できる", async () => {
   const user = {
-    listTagPrefixes: () => [
-      { prefix: "genre:", label: "ジャンル", color: null, showAsAxis: false, protected: false },
-    ],
+    listTagPrefixes: () => [{ prefix: "genre:", label: "ジャンル", color: null, protected: false }],
   } as unknown as UserWorkStateRepository;
 
   const methods = createClassificationMethods({
     query: {} as unknown as WorkQueryRepository,
     user,
-    requireRoot: () => "/library",
   });
 
   assert.deepStrictEqual(await methods.listTagPrefixes(), [
-    { prefix: "genre:", label: "ジャンル", color: null, showAsAxis: false, protected: false },
+    { prefix: "genre:", label: "ジャンル", color: null, protected: false },
   ]);
 });

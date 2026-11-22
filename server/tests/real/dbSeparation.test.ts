@@ -37,11 +37,19 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
       prefix: "気分",
       label: "気分",
       color: null,
-      showAsAxis: true,
       protected: false,
     }),
   );
-  await adapter.createSmartFolder({ name: "保持フォルダー", rules: [], sort: "added-desc" });
+  assert.ok(
+    await adapter.appendSmartFolder({
+      id: "sf-00000000-0000-4000-8000-000000000001",
+      name: "保持フォルダー",
+      condition: { type: "and", children: [] },
+      sort: "added-desc",
+      groupBy: null,
+      createdAt: "2026-07-19T00:00:00.000Z",
+    }),
+  );
   await adapter.close();
 
   assert.ok(existsSync(catalogPath));
@@ -106,5 +114,5 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
   });
   assert.ok(after.lastPlayedAt);
   assert.ok((await rebuilt.listTagPrefixes()).some((prefix) => prefix.prefix === "気分"));
-  assert.equal((await rebuilt.listSmartFolders())[0]?.name, "保持フォルダー");
+  assert.ok((await rebuilt.listSmartFolders()).some((folder) => folder.name === "保持フォルダー"));
 });

@@ -10,12 +10,10 @@ import {
   type ScanCandidateFolder,
   type UpdatedWork,
   type WorkspacePath,
-  type SmartFolder,
 } from "@mimimilli/shared";
 import type { RootReconfigurationRecord } from "../../adapter/index.ts";
 import { createBulkWorks } from "./bulkData.ts";
 import {
-  createSeedSmartFolders,
   buildSeedDlsiteFailures,
   SEED_DLSITE_LINKAGES,
   SEED_WORKS,
@@ -64,7 +62,6 @@ export interface FixtureScenario {
   works: FixtureWorkRecord[];
   dlsiteLinkages: Map<string, MetaDlsiteState>;
   dlsiteFetchFailures: Map<string, DlsiteCacheResolution>;
-  smartFolders: SmartFolder[];
   rootFolder: string | null;
   lastScanTime: string;
   /** scan() が insertedWorkIds として返す、新規に見つかった作品ID */
@@ -98,13 +95,6 @@ function cloneDlsiteFailures(nowMs: number): Map<string, DlsiteCacheResolution> 
   return buildSeedDlsiteFailures(nowMs);
 }
 
-function cloneSmartFolders(folders: SmartFolder[]): SmartFolder[] {
-  return folders.map((sf) => ({
-    ...sf,
-    rules: sf.rules.map((rule) => ({ ...rule, values: [...rule.values] })) as SmartFolder["rules"],
-  }));
-}
-
 /** シナリオIDを検証する。不明なIDは黙って "default" にフォールバックせずエラーにする */
 export function parseFixtureScenarioId(rawId: string | undefined): FixtureScenarioId {
   if (rawId === undefined) return "default";
@@ -119,7 +109,6 @@ export function parseFixtureScenarioId(rawId: string | undefined): FixtureScenar
 /** シナリオごとの初期データを構築する */
 export function createFixtureScenario(rawId: string | undefined, now: string): FixtureScenario {
   const id = parseFixtureScenarioId(rawId);
-  const smartFolders = createSeedSmartFolders(now);
   const nowMs = Date.parse(now);
 
   if (id === "empty") {
@@ -128,7 +117,6 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       works: [],
       dlsiteLinkages: new Map(),
       dlsiteFetchFailures: new Map(),
-      smartFolders: [],
       rootFolder: "/library/empty-library",
       lastScanTime: now,
       scanInsertedWorkIds: [],
@@ -149,7 +137,6 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       works: cloneWorks(SEED_WORKS),
       dlsiteLinkages: cloneDlsiteLinkages(),
       dlsiteFetchFailures: cloneDlsiteFailures(nowMs),
-      smartFolders: cloneSmartFolders(smartFolders),
       rootFolder: "/library",
       lastScanTime: now,
       // DLsite列の連携済み(RJ501001)・未連携(RJ501011・RJ501003の取得失敗)を一通り確認できるよう、
@@ -215,7 +202,6 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       works: [...cloneWorks(SEED_WORKS), ...cloneWorks([SINGLE_FILE_SEED_WORK])],
       dlsiteLinkages: cloneDlsiteLinkages(),
       dlsiteFetchFailures: cloneDlsiteFailures(nowMs),
-      smartFolders: cloneSmartFolders(smartFolders),
       rootFolder: "/library",
       lastScanTime: now,
       scanInsertedWorkIds: [],
@@ -241,7 +227,6 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       works: cloneWorks(SEED_WORKS),
       dlsiteLinkages: cloneDlsiteLinkages(),
       dlsiteFetchFailures: cloneDlsiteFailures(nowMs),
-      smartFolders: cloneSmartFolders(smartFolders),
       rootFolder: "/library",
       lastScanTime: now,
       scanInsertedWorkIds: [],
@@ -273,7 +258,6 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       works: [...cloneWorks(SEED_WORKS), ...bulk.works],
       dlsiteLinkages,
       dlsiteFetchFailures,
-      smartFolders: cloneSmartFolders(smartFolders),
       rootFolder: "/library",
       lastScanTime: now,
       scanInsertedWorkIds: [],
@@ -294,7 +278,6 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       works: cloneWorks(SEED_WORKS.filter((w) => w.status !== "ok")),
       dlsiteLinkages: cloneDlsiteLinkages(),
       dlsiteFetchFailures: cloneDlsiteFailures(nowMs),
-      smartFolders: [],
       // SEED_WORKS の physicalPath は "/library/..." 固定なのでrootFolderも合わせる。
       rootFolder: "/library",
       lastScanTime: now,
@@ -318,7 +301,6 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       works: cloneWorks(SEED_WORKS),
       dlsiteLinkages: cloneDlsiteLinkages(),
       dlsiteFetchFailures: cloneDlsiteFailures(nowMs),
-      smartFolders: cloneSmartFolders(smartFolders),
       rootFolder: "/library",
       lastScanTime: now,
       scanInsertedWorkIds: [],
@@ -355,7 +337,6 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       works: [],
       dlsiteLinkages: cloneDlsiteLinkages(),
       dlsiteFetchFailures: cloneDlsiteFailures(nowMs),
-      smartFolders: cloneSmartFolders(smartFolders),
       rootFolder: FIXTURE_UNREADABLE_ROOT,
       lastScanTime: now,
       scanInsertedWorkIds: [],
@@ -379,7 +360,6 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       works: cloneWorks(SEED_WORKS),
       dlsiteLinkages: cloneDlsiteLinkages(),
       dlsiteFetchFailures: cloneDlsiteFailures(nowMs),
-      smartFolders: cloneSmartFolders(smartFolders),
       rootFolder: "/library",
       lastScanTime: now,
       scanInsertedWorkIds: [],
@@ -461,7 +441,6 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
     works: cloneWorks(SEED_WORKS),
     dlsiteLinkages: cloneDlsiteLinkages(),
     dlsiteFetchFailures: cloneDlsiteFailures(nowMs),
-    smartFolders: cloneSmartFolders(smartFolders),
     rootFolder: "/library",
     lastScanTime: now,
     scanInsertedWorkIds: [],

@@ -11,8 +11,8 @@ import {
 } from "../../src/entities/library/axisDefinitions";
 
 const PREFIXES: TagPrefix[] = [
-  { prefix: "cv", label: "CV", color: null, showAsAxis: true, protected: true },
-  { prefix: "サークル", label: "サークル", color: null, showAsAxis: true, protected: true },
+  { prefix: "cv", label: "CV", color: null, protected: true },
+  { prefix: "サークル", label: "サークル", color: null, protected: true },
 ];
 
 describe("axisDefinitions", () => {

@@ -5,8 +5,8 @@ import type { WorkTagMutation } from "../../src/entities/work/model/workMutation
 import { useWorkTagEditor } from "../../src/features/library/ui/preview/useWorkTagEditor";
 
 const PREFIXES: TagPrefix[] = [
-  { prefix: "cv", label: "CV", color: null, showAsAxis: true, protected: true },
-  { prefix: "カテゴリ", label: "カテゴリ", color: null, showAsAxis: true, protected: false },
+  { prefix: "cv", label: "CV", color: null, protected: true },
+  { prefix: "カテゴリ", label: "カテゴリ", color: null, protected: false },
 ];
 
 function createIntentMutation(onIntent: (tag: string) => Promise<void>): WorkTagMutation {

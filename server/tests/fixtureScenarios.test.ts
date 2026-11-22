@@ -296,7 +296,7 @@ test("候補登録APIは、サーバーが持つ実効RJコード（検出値・
   }
 });
 
-test("empty: 作品・スマートフォルダーが0件", async () => {
+test("empty: 作品が0件で、既定のスマートフォルダーの件数は0", async () => {
   const app = buildApp("empty");
 
   const worksRes = await app.request("/api/works");
@@ -305,7 +305,9 @@ test("empty: 作品・スマートフォルダーが0件", async () => {
   assert.deepEqual(worksBody.items, []);
 
   const smartFoldersRes = await app.request("/api/smart-folders");
-  assert.deepEqual(await smartFoldersRes.json(), []);
+  const folders = (await smartFoldersRes.json()) as Array<{ id: string; count: number | null }>;
+  assert.equal(folders[0]?.id, "all");
+  for (const folder of folders) assert.ok(folder.count === null || folder.count === 0, folder.id);
 });
 
 test("errors: エラー・行方不明の作品のみが含まれる", async () => {

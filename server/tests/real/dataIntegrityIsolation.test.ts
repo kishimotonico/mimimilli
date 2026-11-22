@@ -148,21 +148,17 @@ test("HTTP smart folder は壊れた作品を除外する", async (t) => {
   const { catalog, user } = createWorkRepos(db);
   const { goodId } = seedCorruptedPair(catalog, user, db);
   user.setUserSetting("root_folder", "/library");
-  const folder = user.createSmartFolder({
+  const folder = user.appendSmartFolder({
+    id: "sf-00000000-0000-4000-8000-000000000001",
     name: "タグ一致",
-    rules: [
-      {
-        conjunction: "WHERE",
-        field: "タグ",
-        operator: "∋",
-        values: nts(["cv/正常"]),
-      },
-    ],
+    condition: { type: "and", children: [{ type: "tag", tag: "cv/正常" }] },
     sort: "id-asc",
-  });
+    groupBy: null,
+    createdAt: "2026-07-19T00:00:00.000Z",
+  })!;
   const adapter = fileAdapter(directory);
   const app = createApp(adapter);
-  const res = await app.request(`/api/smart-folders/${folder.id}/works`);
+  const res = await app.request(`/api/smart-folders/${folder.id}/works?sort=id-asc`);
   assert.equal(res.status, 200);
   const body = (await res.json()) as {
     items: Array<{ id: string }>;

@@ -33,7 +33,6 @@ export const tagPrefixSchema = z.object({
   label: z.string(),
   /** 表示色の semantic key。null は client 側のデフォルト表示 */
   color: tagPrefixColorKeySchema.nullable(),
-  showAsAxis: z.boolean(),
   /** true のとき、この prefix に属するタグの削除・編集時に確認を挟む（ソフトガード） */
   protected: z.boolean(),
   /** 設定一覧・軸レールでの並び順。小さいほど先頭。作成時にサーバーが末尾へ自動採番する */
@@ -46,7 +45,6 @@ export const tagPrefixCreateSchema = z.object({
   prefix: tagPrefixNameSchema,
   label: z.string().trim().min(1),
   color: tagPrefixColorKeySchema.nullable().default(null),
-  showAsAxis: z.boolean().default(true),
   protected: z.boolean().default(false),
 });
 export type TagPrefixCreate = z.infer<typeof tagPrefixCreateSchema>;
@@ -56,15 +54,11 @@ export const tagPrefixUpdateSchema = z
   .object({
     label: z.string().trim().min(1).optional(),
     color: tagPrefixColorKeySchema.nullable().optional(),
-    showAsAxis: z.boolean().optional(),
     protected: z.boolean().optional(),
   })
   .refine(
     (patch) =>
-      patch.label !== undefined ||
-      patch.color !== undefined ||
-      patch.showAsAxis !== undefined ||
-      patch.protected !== undefined,
+      patch.label !== undefined || patch.color !== undefined || patch.protected !== undefined,
   );
 export type TagPrefixUpdate = z.infer<typeof tagPrefixUpdateSchema>;
 
@@ -87,12 +81,11 @@ export const tagPrefixCandidateListSchema = z.array(tagPrefixCandidateSchema);
  *  （seed 済みフラグで管理し、全削除しても再投入しない）。
  *  color は client が CSS 変数へ解決する semantic key */
 export const DEFAULT_TAG_PREFIXES: TagPrefix[] = [
-  { prefix: "cv", label: "CV", color: "cv", showAsAxis: true, protected: true, order: 0 },
+  { prefix: "cv", label: "CV", color: "cv", protected: true, order: 0 },
   {
     prefix: "サークル",
     label: "サークル",
     color: "circle",
-    showAsAxis: true,
     protected: true,
     order: 1,
   },
@@ -100,7 +93,6 @@ export const DEFAULT_TAG_PREFIXES: TagPrefix[] = [
     prefix: "シリーズ",
     label: "シリーズ",
     color: "series",
-    showAsAxis: true,
     protected: false,
     order: 2,
   },
@@ -108,7 +100,6 @@ export const DEFAULT_TAG_PREFIXES: TagPrefix[] = [
     prefix: "カテゴリ",
     label: "カテゴリ",
     color: "cat",
-    showAsAxis: true,
     protected: false,
     order: 3,
   },
@@ -116,7 +107,6 @@ export const DEFAULT_TAG_PREFIXES: TagPrefix[] = [
     prefix: "genre",
     label: "ジャンル",
     color: "cat",
-    showAsAxis: false,
     protected: false,
     order: 4,
   },
@@ -124,7 +114,6 @@ export const DEFAULT_TAG_PREFIXES: TagPrefix[] = [
     prefix: "rating",
     label: "レーティング",
     color: "cat",
-    showAsAxis: true,
     protected: false,
     order: 5,
   },

@@ -190,7 +190,6 @@ export function buildTagPrefix(overrides: Partial<TagPrefix> = {}): TagPrefix {
     prefix: "cv",
     label: "CV",
     color: null,
-    showAsAxis: true,
     protected: false,
     order: 0,
     ...overrides,

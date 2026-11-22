@@ -1,23 +1,18 @@
 import type {
   AxisFacetItem,
   AxisFacetsQuery,
-  SmartFolder,
-  SmartFolderCreate,
-  SmartFolderEvalQuery,
-  SmartFolderRule,
-  SmartFolderUpdate,
+  Condition,
+  SmartFolderItem,
+  SmartFolderWrite,
   TagPrefix,
   TagPrefixCandidate,
   TagPrefixCreate,
   TagPrefixUpdate,
-  WorksPage,
 } from "@mimimilli/shared";
 
 export interface ClassificationAdapter {
-  /** axis は "tag" / "year" / 任意の prefix 文字列（正規形・小文字）（ADR-0005）。
-   *  filter.smartFolder を指定したのに解決できない場合は null（ルートが 404 を返す。
-   *  /smart-folders/:id/works と同じ「解決できない」応答に揃える） */
-  getAxisFacets(axis: string, filter?: Partial<AxisFacetsQuery>): Promise<AxisFacetItem[] | null>;
+  /** axis は "tag" / "year" / 任意の prefix 文字列（正規形・小文字）（ADR-0005） */
+  getAxisFacets(axis: string, filter?: Partial<AxisFacetsQuery>): Promise<AxisFacetItem[]>;
   listTagPrefixes(): Promise<TagPrefix[]>;
   /** 既存の prefix と重複する場合は null（ルートが 409 を返す） */
   createTagPrefix(input: TagPrefixCreate): Promise<TagPrefix | null>;
@@ -27,12 +22,24 @@ export interface ClassificationAdapter {
   reorderTagPrefixes(order: string[]): Promise<TagPrefix[] | null>;
   deleteTagPrefix(prefix: string): Promise<boolean>;
   listTagPrefixCandidates(): Promise<TagPrefixCandidate[]>;
-  listSmartFolders(): Promise<SmartFolder[]>;
-  createSmartFolder(input: SmartFolderCreate): Promise<SmartFolder>;
-  updateSmartFolder(id: string, input: SmartFolderUpdate): Promise<SmartFolder | null>;
+  /** position の昇順。読めない行は condition・sort・groupBy が null の壊れた行で返す */
+  listSmartFolders(): Promise<SmartFolderRow[]>;
+  getSmartFolder(id: string): Promise<SmartFolderRow | null>;
+  /** 末尾へ追加する。ID が既にあれば null */
+  appendSmartFolder(folder: SmartFolderInsert): Promise<SmartFolderRow | null>;
+  /** 同じ ID・位置・作成日時で戻す。位置が埋まっていればその位置以降を後ろへ送る。ID が既にあれば null */
+  restoreSmartFolder(
+    folder: SmartFolderInsert & { position: number },
+  ): Promise<SmartFolderRow | null>;
+  updateSmartFolder(id: string, input: SmartFolderWrite): Promise<SmartFolderRow | null>;
+  /** 全件の順序を置き換える。渡された集合が今の集合と一致しなければ null */
+  reorderSmartFolders(ids: string[]): Promise<SmartFolderRow[] | null>;
   deleteSmartFolder(id: string): Promise<boolean>;
-  evalSmartFolder(id: string, query: SmartFolderEvalQuery): Promise<WorksPage | null>;
-  /** 未保存のドラフトルールを評価し、チップ絞り込みを適用しない純粋な一致件数を返す
-   *  （POST /smart-folders/preview） */
-  previewSmartFolderRuleCount(rules: SmartFolderRule[]): Promise<number>;
 }
+
+/** 件数を除いた一覧の1行 */
+export type SmartFolderRow = Omit<SmartFolderItem, "count">;
+/** 保存する行。読める行だけを書く */
+export type SmartFolderInsert = Omit<SmartFolderRow, "condition" | "position"> & {
+  condition: Condition;
+};

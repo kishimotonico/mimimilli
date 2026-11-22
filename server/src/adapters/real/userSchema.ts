@@ -18,7 +18,6 @@ export const tagPrefixes = sqliteTable("tag_prefixes", {
   prefix: text("prefix").notNull().unique(),
   label: text("label").notNull(),
   color: text("color"),
-  showAsAxis: integer("show_as_axis", { mode: "boolean" }).notNull().default(true),
   protected: integer("protected", { mode: "boolean" }).notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
 });
@@ -29,11 +28,15 @@ export const appSettings = sqliteTable("app_settings", {
   value: text("value"),
 });
 
+/** スマートフォルダー（ADR-0040）。condition_json は木、sort の null は「『すべて』と同じ」、
+ *  group_by_json の null はグループ分けなし。並びは position の昇順 */
 export const smartFolders = sqliteTable("smart_folders", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  rulesJson: text("rules_json").notNull(),
-  sort: text("sort").notNull(),
+  conditionJson: text("condition_json").notNull(),
+  sort: text("sort"),
+  groupByJson: text("group_by_json"),
+  position: integer("position").notNull(),
   createdAt: text("created_at").notNull(),
 });
 
