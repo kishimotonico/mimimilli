@@ -46,8 +46,21 @@ export function appRouteCorrection<A extends unknown[]>(
 ) {
   return appRouteStore.action((current: AppRoute, ...args: A) => {
     const library = compute(current, ...args);
-    return library && { route: { ...current, library }, replace: true };
+    return library && correctLibrary(current, library);
   });
+}
+
+/** library だけを差し替える（履歴は置き換え）。層が開いていれば、層を閉じたときに下へ引き継げるよう、
+ *  層を開いたときの library と補正後の library を層に持たせる */
+export function correctLibrary(
+  current: AppRoute,
+  library: LibraryRoute,
+): RouteTransition<AppRoute> {
+  const layer = current.layer && {
+    ...current.layer,
+    carry: { from: current.layer.carry?.from ?? current.library, to: library },
+  };
+  return { route: { ...current, library, layer }, replace: true };
 }
 
 export const appModeAtom = atom<AppMode>((get) => get(appRouteAtom).mode);

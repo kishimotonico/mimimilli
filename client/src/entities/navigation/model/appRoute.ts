@@ -33,7 +33,23 @@ export type LibraryRoute = LibraryUrlState & {
 /** 層を、アプリの中で開いたか、`np=1` の URL を直接開いたか */
 export type LayerOpenedBy = "app" | "url";
 
-export type RouteLayer = { kind: "nowPlaying"; openedBy: LayerOpenedBy } | null;
+/** 層の間に補正で変わった library。from は層を開いたときの library、to は補正後の library。
+ *  層を閉じたとき、戻った先の library が from のままなら to を引き継ぐ */
+export interface LayerCarry {
+  from: LibraryRoute;
+  to: LibraryRoute;
+}
+
+export type RouteLayer = {
+  kind: "nowPlaying";
+  openedBy: LayerOpenedBy;
+  carry?: LayerCarry;
+} | null;
+
+/** library の同一判定。キー順に依らず全項目で比べる */
+export function libraryKey(library: LibraryRoute): string {
+  return JSON.stringify(Object.entries(library).sort(([a], [b]) => (a < b ? -1 : 1)));
+}
 
 /** URLは表示中の画面だけを表すが、Library・Filesの状態は他の画面にいる間も保持する */
 export type AppRoute = {
@@ -93,9 +109,12 @@ function applyNavigationUrlState(
   route: AppRoute,
   state: NavigationUrlState,
   openedBy: LayerOpenedBy,
+  carry: LayerCarry | undefined,
 ): AppRoute {
   const { library, files } = route;
-  const layer: RouteLayer = state.np ? { kind: "nowPlaying", openedBy } : null;
+  const layer: RouteLayer = state.np
+    ? { kind: "nowPlaying", openedBy, ...(carry ? { carry } : {}) }
+    : null;
   switch (state.mode) {
     case "library":
       return {
@@ -138,13 +157,27 @@ function applyEntryState(route: AppRoute, entryState: unknown): AppRoute {
   };
 }
 
+function isLibraryRecord(value: unknown): value is LibraryRoute {
+  return isRecord(value) && typeof value.folderId === "string" && typeof value.q === "string";
+}
+
+function readLayerCarry(entryState: unknown): LayerCarry | undefined {
+  if (!isRecord(entryState) || !isRecord(entryState.layer)) return undefined;
+  const { carry } = entryState.layer;
+  if (!isRecord(carry) || !isLibraryRecord(carry.from) || !isLibraryRecord(carry.to)) {
+    return undefined;
+  }
+  return { from: carry.from, to: carry.to };
+}
+
 function readLayerOpenedBy(entryState: unknown): LayerOpenedBy {
   if (!isRecord(entryState) || !isRecord(entryState.layer)) return "url";
   return entryState.layer.openedBy === "app" ? "app" : "url";
 }
 
 /** アプリの中で開いた層を、すぐ下のエントリーへ戻って閉じるとき。層の間は library をユーザーが変えられず、
- *  変わるのは補正だけなので、層を開いていたときの library が正で、下のエントリーの library は古い */
+ *  変わるのは補正だけ。補正があった（carry を持つ）層は、戻った先の library が層を開いたときのままなら、
+ *  補正後の library を引き継ぐ。戻った先をその後に変えていれば引き継がない */
 function closesLayerBelow(
   current: AppRoute,
   state: NavigationUrlState,
@@ -165,13 +198,23 @@ export const appRouteCodec: RouteCodec<AppRoute> = {
     return {
       canonicalUrl,
       warnings,
-      apply: (current) =>
-        closesLayerBelow(current, state, context)
-          ? { ...current, layer: null }
-          : applyEntryState(
-              applyNavigationUrlState(current, state, readLayerOpenedBy(entryState)),
-              entryState,
-            ),
+      apply: (current) => {
+        const applied = applyEntryState(
+          applyNavigationUrlState(
+            current,
+            state,
+            readLayerOpenedBy(entryState),
+            readLayerCarry(entryState),
+          ),
+          entryState,
+        );
+        const carry = current.layer?.carry;
+        return carry &&
+          closesLayerBelow(current, state, context) &&
+          libraryKey(applied.library) === libraryKey(carry.from)
+          ? { ...applied, library: carry.to }
+          : applied;
+      },
     };
   },
   serialize: (route) => ({
