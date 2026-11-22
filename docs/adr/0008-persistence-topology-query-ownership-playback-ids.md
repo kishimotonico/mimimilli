@@ -77,7 +77,7 @@ catalog DBとuser DBは、どちらも順序付きのforward migrationをin-plac
 検索仕様はcoreが所有し、realでの実行はSQLが所有する。
 
 - 条件の木（[ADR-0040](0040-smart-folder-condition-tree.md)）の各述語とソートの意味、nullの順序、同順位の扱いはcoreの契約とする
-- `matchCondition`・`queryWorksByCondition`・値一覧の集計（`buildGroupFacets`）の純粋関数はfixture実装と参照実装として残す
+- `matchCondition`・`queryWorksByCondition`・値一覧の集計（`buildGroupValues`）の純粋関数はfixture実装と参照実装として残す
 - realアダプタは全件をcoreへ渡さず、条件の木を`compileCondition`でSQLにして、ATTACH JOINで検索、ソート、総件数、ページングを行う
 - routeはクエリを検証してアダプタへ渡すだけとし、SQL断片や検索規則を持たない
 

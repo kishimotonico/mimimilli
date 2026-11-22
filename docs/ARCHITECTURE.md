@@ -44,7 +44,7 @@ pnpm workspace のモノレポで、`client/` / `server/` / `shared/` の3パッ
 - `features` 間の sibling import 禁止。複数 feature で共有する state・操作は `shared/model/` か `entities/` へ引き上げる
 - `features` → `app` の import 禁止（`app` → `feature` の composition は許可）
 - `entities`・`shared` への依存は許可。`shared` と `entities` は上位レイヤー（`features` / `app`）へ依存しない
-- ナビゲーション状態は `entities/navigation` の AppRoute 1つを正本にし、書き込みは `navigate` とブラウザー履歴からの適用に限る。URL同期は `shared/model/useRouteHistorySync.ts` の項目を知らない汎用コードが行う（[ADR-0031](adr/0031-app-route-navigation.md)）
+- ナビゲーション状態は `entities/navigation` の AppRoute 1つを正本にし、書き込みは `navigate` とブラウザー履歴からの適用に限る。URL同期は `shared/model/useRouteHistorySync.ts` の項目を知らない汎用コードが行う（[ADR-0031](adr/0031-app-route-navigation.md)）。Libraryの今の並び・seed・層の開き方は URL ではなく履歴エントリーの状態に書き、URL と定義の突き合わせは `entities/library/resolveLibraryView.ts` の `resolveLibraryView` が1か所で行う（[ADR-0041](adr/0041-library-sidebar-shell-navigation.md)）
 - 作品を変更する操作は `entities/work/model/workMutations.ts` の hook（React 外は `workCacheUpdates.ts` の関数）を経由し、成功後の必須キャッシュ更新はそこが持つ。画面は選択解除・遷移・表示最適化だけを受け持つ（[ADR-0028](adr/0028-work-management-mutation-ownership.md)）
 
 **server**:
@@ -114,6 +114,9 @@ oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメン
 - [ADR-0028: 作品を変更する操作とキャッシュ更新方針を entities/work/model に集約する](adr/0028-work-management-mutation-ownership.md)
 - [ADR-0029: root変更を再設定ワークフローとして扱う](adr/0029-root-reconfiguration-workflow.md)
 - [ADR-0031: ナビゲーション状態を型付きAppRouteに一本化する](adr/0031-app-route-navigation.md)
+- [ADR-0040: ライブラリのビューをスマートフォルダーに一本化し、条件の木で評価する](adr/0040-smart-folder-condition-tree.md)
+- [ADR-0041: ライブラリを本体にしてサイドバーを1本にし、再生中を重なる層にする](adr/0041-library-sidebar-shell-navigation.md)
+- [ADR-0042: ドラッグ＆ドロップの基盤に Pragmatic drag and drop を使う](adr/0042-pragmatic-drag-and-drop.md)
 - [requirements-v4.md](requirements-v4.md) — 機能・UX 要件
 - [HANDOFF.md](HANDOFF.md) — 開発の現状・引き継ぎ
 - [design-system.md](design-system.md) — フロントエンドのデザイン規約

@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-08-07
-- 関連: [ADR-0012](0012-library-axis-as-value-browse.md)（本ADRで §7 を一部改訂）、[ADR-0026](0026-value-list-as-global-entry.md)（値一覧の追加ボタンを改訂）
+- 関連: [ADR-0012](0012-library-axis-as-value-browse.md)（本ADRで §7 を一部改訂）、[ADR-0026](0026-value-list-as-global-entry.md)（値一覧の追加ボタンを改訂）、[ADR-0041](0041-library-sidebar-shell-navigation.md)（作品詳細のタグクリックの行き先・兄弟値ドロップダウンを改訂）
 
 ## 文脈
 

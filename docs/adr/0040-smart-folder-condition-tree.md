@@ -265,7 +265,7 @@ curl -X PUT http://127.0.0.1:8080/api/smart-folders/<id> -H "content-type: appli
 
 ### 移行
 
-互換処理は書かない。user migration で `smart_folders` を DROP して上の形で CREATE し、「すべて」の行を INSERT する。`tag_prefixes.show_as_axis` も DROP する。既存のスマートフォルダーは失われるので、更新前に控えて手で作り直す。
+互換処理は書かない。user migration で `smart_folders` を DROP して上の形で CREATE し、「すべて」の行を INSERT する。`tag_prefixes.show_as_axis` も DROP する。既存のスマートフォルダーは失われるので、更新前に控えて手で作り直す。更新後の最初の起動で、既定の11本（「すべて」を含む）が入る。
 
 ```sh
 # 更新前に控える（Linux）
