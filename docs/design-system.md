@@ -172,7 +172,7 @@ Toast を複数箇所で描画すると、独立した2つのインスタンス�
 
 ### Toast の表示寿命・種別・見た目
 
-見た目は構想モック v13 の `.toast` を参照して決めた（正は実装）。画面下の中央に、`--ink-0` の地・`--paper-1` の文字・角丸8px・11.5px・padding 8px 14px・影 `0 10px 24px -10px`（`--shadow-ink` 16%）で出す。操作ボタンは `--r-mustard` の太字（`Button` の `quiet` を上書き）、閉じるは `IconButton`（xs・`bare`）。画面下の再生バー（`playerDockBarVisibleAtom` が真で、再生中の層が開いていないとき）が出ているときは、`GlobalToast` が `aboveDock` を渡して84px、無いときは20pxの高さに置く。モーダル dialog の中へ出るときは再生バーを避けない。出入りは `fadeSlideUp` を下から上へ向けた形で、reduced-motion のときは動かさない（opacity の値は変えず duration を0にする）。
+見た目は構想モック v13 の `.toast` を参照して決めた（正は実装）。画面下の中央に、`--ink-0` の地・`--paper-1` の文字・角丸8px・11.5px・padding 8px 14px・影 `0 10px 24px -10px`（`--shadow-ink` 16%）で出す。操作ボタンは `--r-mustard` の太字（`Button` の `quiet` を上書き）、閉じるは `IconButton`（xs・`bare`）。画面下の再生バー（`playerDockBarVisibleAtom` が真で、再生中の層が開いていないとき）が出ているときは、`GlobalToast` が `aboveDock` を渡して再生バーの高さ（`--dock-height`）＋12px、無いときは20pxの高さに置く。モーダル dialog の中へ出るときは再生バーを避けない。出入りは `fadeSlideUp` を下から上へ向けた形で、reduced-motion のときは動かさない（opacity の値は変えず duration を0にする）。
 
 `variant`（`"info" | "success" | "warning" | "error"`）はアイコンの色（`currentColor` / `--toast-success` / `--toast-warning` / `--toast-danger`。暗い地の上で読めるトースト専用のトークン）で成功・警告・失敗を区別する。`error` だけは左に `--state-danger` の3pxの縁も付け、暗い地の中でも区別がつくようにする。
 表示寿命は種別ではなくaction有無で決まる： action無しは5秒（`TOAST_AUTO_DISMISS_MS`）、

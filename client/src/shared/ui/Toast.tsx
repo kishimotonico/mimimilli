@@ -236,7 +236,7 @@ export default function Toast({
       popover={rendersAsDialogChild ? undefined : "manual"}
       className={cn(
         "pointer-events-none fixed inset-x-0 top-auto m-0 h-auto w-full max-w-none flex justify-center border-none bg-transparent p-0",
-        aboveDock && !rendersAsDialogChild ? "bottom-[84px]" : "bottom-5",
+        aboveDock && !rendersAsDialogChild ? "bottom-[calc(var(--dock-height)+12px)]" : "bottom-5",
       )}
     >
       <AnimatePresence onExitComplete={handleExitComplete}>

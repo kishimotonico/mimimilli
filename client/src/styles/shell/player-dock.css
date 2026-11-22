@@ -11,7 +11,7 @@
   z-index: 32;
   /* 60px（操作行）+ 12px（シーク行）。シーク行はトラック分の帯だけを専用に確保し、
        操作行との重なり・クリップを避ける。 */
-  height: 72px;
+  height: var(--dock-height);
   background: var(--paper-1);
   border-top: 1px solid var(--line);
   box-shadow: var(--shadow-dock);

@@ -111,8 +111,7 @@ export function useLibrarySupportingQueries(nav: ReadyLibraryViewState) {
 
 /** 編集ダイアログの一括保存（title・tags・urls）・ブックマーク・詳細ペイン常駐タグの
  *  意図コマンドを独立した mutation として提供する。ブックマークだけは表示中の一覧を
- *  画面側で揃え、その一覧の再取得を省く */
-/** view は一覧が揃うまで null。ブックマーク後に差し替える表示中の一覧が無い */
+ *  画面側で揃え、その一覧の再取得を省く。view は一覧が揃うまで null（揃える一覧が無い） */
 export function useLibraryWorkPatchMutations(
   view: ResolvedLibraryView | null,
   searchQuery: string,
