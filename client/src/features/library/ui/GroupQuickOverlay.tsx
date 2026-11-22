@@ -1,12 +1,11 @@
 import { createPortal } from "react-dom";
 import { motion, useIsPresent } from "motion/react";
-import type { NormalizedTag } from "@mimimilli/shared";
-import type { AxisId } from "../../../entities/library/types";
-import { useAxisFacetsQuery } from "../model/useAxisFacetsQuery";
+import type { GroupBy, NormalizedTag } from "@mimimilli/shared";
+import { useGroupValuesQuery } from "../model/useGroupValuesQuery";
 import { buildFilterTag } from "../model/libraryPresentation";
 import { useAnchoredPopover } from "../../../shared/ui/useAnchoredPopover";
 import type { HoverGroupPanelHandlers } from "../../../shared/lib/useHoverGroupCoordinator";
-import AxisValueQuickList from "./AxisValueQuickList";
+import GroupValueQuickList from "./GroupValueQuickList";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 
 // サイドバーのグループ分けの行のクイックオーバーレイ（ADR-0012 §7・ADR-0041）。ホバー約200ms・
@@ -18,15 +17,15 @@ import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 //
 // 呼び出し側（LibrarySidebarPanel）は開いている行ごとに異なる key で AnimatePresence の子として
 // マウントする。退出アニメーション中もこのコンポーネントインスタンス自体はマウントされ
-// 続けるため、axis / anchorEl は AnimatePresence が凍結した最後の props のまま渡り続け、
-// クエリも常に有効な axis で購読され続ける（値の手動退避は不要）。
+// 続けるため、groupBy / anchorEl は AnimatePresence が凍結した最後の props のまま渡り続け、
+// クエリも常に有効な groupBy で購読され続ける（値の手動退避は不要）。
 
 const OVERLAY_WIDTH = 280;
 
 interface GroupQuickOverlayProps {
   folderId: string;
-  axis: AxisId;
-  axisLabel: string;
+  groupBy: GroupBy;
+  groupByLabel: string;
   anchorEl: HTMLElement | null;
   /** 開いているグループの値（そのスマートフォルダーを開いているとき） */
   selectedValue: string | null;
@@ -41,8 +40,8 @@ interface GroupQuickOverlayProps {
 
 export default function GroupQuickOverlay({
   folderId,
-  axis,
-  axisLabel,
+  groupBy,
+  groupByLabel,
   anchorEl,
   selectedValue,
   onSelectValue,
@@ -53,7 +52,7 @@ export default function GroupQuickOverlay({
 }: GroupQuickOverlayProps) {
   const isPresent = useIsPresent();
   // 件数は主クリック（その値の作品一覧）の結果と一致させるため、絞り込み無しで数える
-  const facetQuery = useAxisFacetsQuery(axis, { folderId });
+  const groupValuesQuery = useGroupValuesQuery(groupBy, { folderId });
   const { popoverScale } = useMotionVariants();
   const variant = popoverScale({ origin: "left center" });
 
@@ -86,20 +85,20 @@ export default function GroupQuickOverlay({
       inert={!isPresent}
       {...panelHandlers}
     >
-      <AxisValueQuickList
-        axis={axis}
-        axisLabel={axisLabel}
+      <GroupValueQuickList
+        groupBy={groupBy}
+        groupByLabel={groupByLabel}
         isOpen={isPresent}
-        items={facetQuery.data ?? []}
-        isLoading={facetQuery.isLoading}
-        isError={facetQuery.isError}
+        items={groupValuesQuery.data ?? []}
+        isLoading={groupValuesQuery.isLoading}
+        isError={groupValuesQuery.isError}
         isSelected={(value) => value === selectedValue}
         onSelect={(item) => {
           onSelectValue(item.value);
           close();
         }}
         onAdd={(item) => {
-          onAddTag(buildFilterTag(axis, item.value));
+          onAddTag(buildFilterTag(groupBy, item.value));
         }}
         close={close}
       />

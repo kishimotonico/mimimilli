@@ -1,45 +1,45 @@
 import { describe, expect, it } from "vitest";
 import {
-  getNextAxisValueRowIndex,
+  getNextGroupValueRowIndex,
   nearestValueRowIndex,
-} from "../../src/features/library/model/axisValueRowNav";
-import type { AxisValueHierarchyRow } from "../../src/features/library/model/axisValueHierarchy";
+} from "../../src/features/library/model/groupValueRowNav";
+import type { GroupValueHierarchyRow } from "../../src/features/library/model/groupValueHierarchy";
 
-function value(path: string): AxisValueHierarchyRow {
+function value(path: string): GroupValueHierarchyRow {
   return { kind: "value", depth: 0, path, label: path, item: { value: path, count: 1 } } as never;
 }
 
-function heading(path: string): AxisValueHierarchyRow {
+function heading(path: string): GroupValueHierarchyRow {
   return { kind: "heading", depth: 0, path, label: path } as never;
 }
 
-describe("getNextAxisValueRowIndex", () => {
+describe("getNextGroupValueRowIndex", () => {
   it("見出し行を飛ばして値行間を移動する", () => {
     const rows = [heading("h"), value("a"), value("b"), heading("h2"), value("c")];
-    expect(getNextAxisValueRowIndex(rows, 1, "ArrowDown")).toBe(2);
-    expect(getNextAxisValueRowIndex(rows, 2, "ArrowDown")).toBe(4);
+    expect(getNextGroupValueRowIndex(rows, 1, "ArrowDown")).toBe(2);
+    expect(getNextGroupValueRowIndex(rows, 2, "ArrowDown")).toBe(4);
   });
 
   it("端ではラップアラウンドせずクランプする（作品一覧と同じ規則）", () => {
     const rows = [value("a"), value("b")];
-    expect(getNextAxisValueRowIndex(rows, 0, "ArrowUp")).toBe(0);
-    expect(getNextAxisValueRowIndex(rows, 1, "ArrowDown")).toBe(1);
+    expect(getNextGroupValueRowIndex(rows, 0, "ArrowUp")).toBe(0);
+    expect(getNextGroupValueRowIndex(rows, 1, "ArrowDown")).toBe(1);
   });
 
   it("Homeは先頭の値行、Endは末尾の値行を返す（見出し行は対象外）", () => {
     const rows = [heading("h"), value("a"), value("b"), heading("h2")];
-    expect(getNextAxisValueRowIndex(rows, 1, "Home")).toBe(1);
-    expect(getNextAxisValueRowIndex(rows, 1, "End")).toBe(2);
+    expect(getNextGroupValueRowIndex(rows, 1, "Home")).toBe(1);
+    expect(getNextGroupValueRowIndex(rows, 1, "End")).toBe(2);
   });
 
   it("値行が無ければ-1を返す", () => {
     const rows = [heading("h")];
-    expect(getNextAxisValueRowIndex(rows, 0, "Home")).toBe(-1);
-    expect(getNextAxisValueRowIndex(rows, 0, "End")).toBe(-1);
+    expect(getNextGroupValueRowIndex(rows, 0, "Home")).toBe(-1);
+    expect(getNextGroupValueRowIndex(rows, 0, "End")).toBe(-1);
   });
 
   it("0件のときは-1を返す", () => {
-    expect(getNextAxisValueRowIndex([], 0, "ArrowDown")).toBe(-1);
+    expect(getNextGroupValueRowIndex([], 0, "ArrowDown")).toBe(-1);
   });
 });
 

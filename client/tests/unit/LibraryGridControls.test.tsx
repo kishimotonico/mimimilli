@@ -29,7 +29,7 @@ function renderControls(store: ReturnType<typeof createStore>) {
 }
 
 describe("LibraryGridControls", () => {
-  it("グリッドモードかつ作品グリッドが描画可能な軸では敷き詰め形式トグルが有効", () => {
+  it("グリッドモードかつ作品グリッドが描画可能な表示では敷き詰め形式トグルが有効", () => {
     const store = createStore();
     store.set(libraryViewModeAtom, "grid");
     seedLibraryRoute(store, { folderId: "all" });
@@ -50,7 +50,7 @@ describe("LibraryGridControls", () => {
     expect(store.get(libraryGridLayoutModeAtom)).toBe("justified");
   });
 
-  it("値一覧表示中（作品グリッドが描画されない facet 軸）ではトグルが disabled になる", () => {
+  it("値一覧表示中（作品グリッドが描画されない グループ分け）ではトグルが disabled になる", () => {
     const store = createStore();
     store.set(libraryViewModeAtom, "grid");
     seedLibraryRoute(store, { folderId: "by-circle" });

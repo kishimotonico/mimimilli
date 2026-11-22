@@ -9,7 +9,7 @@ import {
   emptyDlsiteState,
   sortIdSchema,
   type Condition,
-  type AxisFacetItem,
+  type GroupValueItem,
   type GroupBy,
   type Work,
   type WorkSummary,
@@ -245,7 +245,7 @@ async function createAdapters(): Promise<Adapters> {
 }
 
 /** カバーの version は実ファイルの stat 由来で adapter ごとに決まるため、同一性は作品とファイルで見る */
-function normalizeFacets(items: AxisFacetItem[]) {
+function normalizeGroupValues(items: GroupValueItem[]) {
   return items.map((item) => ({
     ...item,
     covers: item.covers.map(({ workId, image }) => ({ workId, image })),
@@ -282,8 +282,8 @@ test("条件の木のグループの値一覧は fixture と real で値・件�
   for (const condition of trees) {
     for (const groupBy of groupBys) {
       assert.deepEqual(
-        normalizeFacets(await real.groupWorks({ condition, groupBy }, ctx)),
-        normalizeFacets(await fixture.groupWorks({ condition, groupBy }, ctx)),
+        normalizeGroupValues(await real.groupWorks({ condition, groupBy }, ctx)),
+        normalizeGroupValues(await fixture.groupWorks({ condition, groupBy }, ctx)),
         JSON.stringify({ condition, groupBy }),
       );
     }

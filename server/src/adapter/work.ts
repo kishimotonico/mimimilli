@@ -1,5 +1,5 @@
 import type {
-  AxisFacetItem,
+  GroupValueItem,
   Condition,
   DataIntegrityWarning,
   IdentityConflictReassignBody,
@@ -24,7 +24,7 @@ export interface WorkAdapter {
   /** 条件の木に一致する作品の一覧（ADR-0040）。now は route が1リクエストにつき1回作る */
   queryWorks(query: ConditionWorksQuery, ctx: EvalContext): Promise<WorksPage>;
   /** 条件に一致する作品を、グループ分けの値ごとに集計する */
-  groupWorks(query: ConditionGroupQuery, ctx: EvalContext): Promise<AxisFacetItem[]>;
+  groupWorks(query: ConditionGroupQuery, ctx: EvalContext): Promise<GroupValueItem[]>;
   /** 条件ごとの一致件数。入力と同じ順で返す */
   countByConditions(conditions: Condition[], ctx: EvalContext): Promise<number[]>;
   getWorkRegisterPreview(path: WorkspacePath): Promise<WorkRegisterPreview | null>;

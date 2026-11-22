@@ -11,10 +11,10 @@ import {
   useMissingWorksCountQuery,
 } from "../model/useLibraryQueries";
 import { useSaveSearch } from "../model/useSaveSearch";
-import { axisOfGroupBy, buildWorksResetKey } from "../model/libraryPresentation";
+import { buildWorksResetKey } from "../model/libraryPresentation";
 import { useLibrarySelectionCleanup } from "../model/useLibrarySelectionCleanup";
 import { useLibraryPreviewActions } from "../model/useLibraryPreviewActions";
-import AxisValueList from "./AxisValueList";
+import GroupValueList from "./GroupValueList";
 import BrokenFolderPane from "./BrokenFolderPane";
 import FilterChipBand from "./FilterChipBand";
 import LibraryResultsPane from "./LibraryResultsPane";
@@ -59,16 +59,16 @@ function LibraryViewBody({
   const viewMode = useAtomValue(libraryViewModeAtom);
 
   const {
-    facetItems,
-    isFacetLoading,
-    isFacetError,
+    groupValueItems,
+    isGroupValuesLoading,
+    isGroupValuesError,
     selectedWork,
     workDetailQuery,
     tagSuggestions,
     tagPrefixes,
     isTagPrefixesError,
     refetchTagPrefixes,
-    refetchFacets,
+    refetchGroupValues,
   } = useLibrarySupportingQueries(nav);
   const [isNoResultsDueToFilter, setIsNoResultsDueToFilter] = useState(false);
   const [worksTotal, setWorksTotal] = useState<number | undefined>(undefined);
@@ -101,7 +101,7 @@ function LibraryViewBody({
           <FilterChipBand
             tagPrefixes={tagPrefixes}
             selectedTags={nav.selectedTags}
-            facetScope={
+            groupValueScope={
               view.kind === "works"
                 ? {
                     folderId: view.folder.id,
@@ -115,7 +115,7 @@ function LibraryViewBody({
             onRemoveTag={nav.removeTag}
             onClearAll={nav.clearTags}
             worksTotal={view.kind === "works" ? worksTotal : undefined}
-            valueListItemCount={view.kind === "value-list" ? facetItems.length : undefined}
+            valueListItemCount={view.kind === "value-list" ? groupValueItems.length : undefined}
             save={
               saveSearch.offer
                 ? {
@@ -133,15 +133,15 @@ function LibraryViewBody({
         ) : view.kind === "value-list" ? (
           <div className="mll-results">
             <div className="mll-results__content">
-              <AxisValueList
-                axis={axisOfGroupBy(view.groupBy)}
-                facetItems={facetItems}
+              <GroupValueList
+                groupBy={view.groupBy}
+                groupValueItems={groupValueItems}
                 tagPrefixes={tagPrefixes}
-                isFacetLoading={isFacetLoading}
-                isFacetError={isFacetError}
+                isGroupValuesLoading={isGroupValuesLoading}
+                isGroupValuesError={isGroupValuesError}
                 isTagPrefixesError={isTagPrefixesError}
                 onSelectValue={nav.selectGroupValue}
-                onRetryFacets={refetchFacets}
+                onRetryGroupValues={refetchGroupValues}
                 onRetryTagPrefixes={refetchTagPrefixes}
               />
             </div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import type { AxisFacetItem } from "@mimimilli/shared";
-import type { AxisValueHierarchyRow, AxisValueValueRow } from "../model/axisValueHierarchy";
+import type { GroupValueItem } from "@mimimilli/shared";
+import type { GroupValueHierarchyRow, GroupValueValueRow } from "../model/groupValueHierarchy";
 import { GRID_COLUMN_GAP } from "../../../shared/lib/gridSizing";
 import {
   firstFlatIndexOfRow,
@@ -18,7 +18,7 @@ import { useRovingIndex } from "./useRovingIndex";
 // 値一覧の grid 表示（ADR-0012 §5）。代表カバー2×2コラージュ＋名前＋件数バッジのタイル。
 // 列数・タイルサイズの計算は作品グリッド（WorkGrid）と同じ gridSizing を共有する。
 // justified レイアウトは対象外（コラージュは常に正方形）。
-// 入れ子タグ（名前順ソート時）は axisValueHierarchy.ts の階層行のうち値行だけをタイルにし、
+// 入れ子タグ（名前順ソート時）は groupValueHierarchy.ts の階層行のうち値行だけをタイルにし、
 // 実タグとして存在しない中間ノード（見出し）はタイル化できないため飛ばす。depth>0 のタイルは
 // 親パスを小さいパンくずとして葉ラベルの上に添える。
 
@@ -26,33 +26,33 @@ const GRID_PADDING_START = 16;
 const GRID_PADDING_END = 16;
 
 /** 親パス（葉の1つ上の階層まで）。depth===0 なら親は無い。 */
-function parentPathOf(row: AxisValueValueRow): string | null {
+function parentPathOf(row: GroupValueValueRow): string | null {
   const idx = row.path.lastIndexOf("/");
   return idx <= 0 ? null : row.path.slice(0, idx);
 }
 
-interface AxisValueGridProps {
-  axisLabel: string;
-  rows: AxisValueHierarchyRow[];
+interface GroupValueGridProps {
+  groupByLabel: string;
+  rows: GroupValueHierarchyRow[];
   tileSize: number;
   fallbackIcon: IconName;
   resetKey: string;
   /** クリック（既定=置き換え）・Ctrl/Cmd+クリック（トグル、ADR-0012 §7・ADR-0013の
    *  作品詳細タグクリックと同型）。値一覧は独立した全作品入口のためAND追加ボタンは
    *  持たない。 */
-  onSelect: (item: AxisFacetItem, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
+  onSelect: (item: GroupValueItem, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
 }
 
-export default function AxisValueGrid({
-  axisLabel,
+export default function GroupValueGrid({
+  groupByLabel,
   rows,
   tileSize,
   fallbackIcon,
   resetKey,
   onSelect,
-}: AxisValueGridProps) {
+}: GroupValueGridProps) {
   const items = useMemo(
-    () => rows.filter((row): row is AxisValueValueRow => row.kind === "value"),
+    () => rows.filter((row): row is GroupValueValueRow => row.kind === "value"),
     [rows],
   );
 
@@ -113,7 +113,7 @@ export default function AxisValueGrid({
         className="mll-grid-scroll"
         // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 値ボタン集合を名前付き集合として表す。fieldset等の代替タグは適合しない
         role="group"
-        aria-label={`${axisLabel}の値一覧`}
+        aria-label={`${groupByLabel}の値一覧`}
       >
         <div ref={setGridContainer} className="mll-grid" style={wrapperStyle as CSSProperties}>
           {virtualItems.map((virtualRow) => {

@@ -1,5 +1,5 @@
 // タグ正規化・prefix 定義（ADR-0005）のテスト。
-// 純粋関数（normalizeTag / buildGroupFacets / buildTagPrefixCandidates）と
+// 純粋関数（normalizeTag / buildGroupValues / buildTagPrefixCandidates）と
 // fixture / real 両 adapter の HTTP CRUD を確認する。
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -17,7 +17,7 @@ import {
   tagPrefixNameSchema,
 } from "@mimimilli/shared";
 import type { WorkSummary } from "@mimimilli/shared";
-import { buildGroupFacets } from "../src/core/axisFacets.ts";
+import { buildGroupValues } from "../src/core/groupValues.ts";
 import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
 import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../src/adapters/real/dlsiteConfig.ts";
 import { htmlResponse, mockDlsiteTransport, sampleWorkHtml } from "./helpers/dlsiteTransport.ts";
@@ -140,46 +140,46 @@ test("resolveTagPrefix: 未登録 prefix は prefix 文字列をラベルにし�
   });
 });
 
-// ── ファセット集計（動的 prefix 軸）──────────────────────────
+// ── グループの値の集計（動的 prefix）──────────────────────────
 
-test("buildGroupFacets: prefix のグループを集計できる（別 prefix は混入しない）", () => {
+test("buildGroupValues: prefix のグループを集計できる（別 prefix は混入しない）", () => {
   const works = [
     summaryWith("W1", ["気分/睡眠用", "ASMR"]),
     summaryWith("W2", ["気分/睡眠用", "気分/作業用"]),
     summaryWith("W3", ["kibun/x", "気分/作業用"]),
   ];
-  const items = buildGroupFacets({ kind: "prefix", prefix: "気分" }, works);
+  const items = buildGroupValues({ kind: "prefix", prefix: "気分" }, works);
   assert.deepEqual(items, [
     { value: "作業用", count: 2, durationSec: 0, covers: [] },
     { value: "睡眠用", count: 2, durationSec: 0, covers: [] },
   ]);
 });
 
-test("buildGroupFacets: tag は flat・annotated 双方を集計し、addedYear は addedAt 由来", () => {
+test("buildGroupValues: tag は flat・annotated 双方を集計し、addedYear は addedAt 由来", () => {
   const works = [
     summaryWith("W1", ["cv/x", "ASMR"], "2025-06-01T00:00:00.000Z"),
     summaryWith("W2", ["ASMR"], "2026-01-01T00:00:00.000Z"),
   ];
-  assert.deepEqual(buildGroupFacets({ kind: "tag" }, works), [
+  assert.deepEqual(buildGroupValues({ kind: "tag" }, works), [
     { value: "ASMR", count: 2, durationSec: 0, covers: [] },
     { value: "cv/x", count: 1, durationSec: 0, covers: [] },
   ]);
   assert.deepEqual(
-    buildGroupFacets({ kind: "addedYear" }, works)
+    buildGroupValues({ kind: "addedYear" }, works)
       .map((i) => i.value)
       .sort(),
     ["2025", "2026"],
   );
 });
 
-test("buildGroupFacets: durationSecは同じ値に属する作品の合計、durationSec未知(null)は合算から除く", () => {
+test("buildGroupValues: durationSecは同じ値に属する作品の合計、durationSec未知(null)は合算から除く", () => {
   const works = [
     { ...summaryWith("W1", ["気分/睡眠用"]), totalDurationSec: 600 },
     { ...summaryWith("W2", ["気分/睡眠用"]), totalDurationSec: 1200 },
     { ...summaryWith("W3", ["気分/睡眠用"]), totalDurationSec: null },
   ];
   assert.deepEqual(
-    buildGroupFacets({ kind: "prefix", prefix: "気分" }, works).map(({ value, durationSec }) => ({
+    buildGroupValues({ kind: "prefix", prefix: "気分" }, works).map(({ value, durationSec }) => ({
       value,
       durationSec,
     })),
@@ -187,7 +187,7 @@ test("buildGroupFacets: durationSecは同じ値に属する作品の合計、dur
   );
 });
 
-test("buildGroupFacets: coversは追加日時の新しい順で最大4件、cover未設定の作品は含まない", () => {
+test("buildGroupValues: coversは追加日時の新しい順で最大4件、cover未設定の作品は含まない", () => {
   const cover = (n: number) => ({
     image: `cover-${n}.jpg`,
     dimensions: { width: n, height: n },
@@ -201,7 +201,7 @@ test("buildGroupFacets: coversは追加日時の新しい順で最大4件、cove
     { ...summaryWith("W5", ["気分/睡眠用"], "2026-01-04T00:00:00.000Z"), cover: cover(5) },
     { ...summaryWith("W6", ["気分/睡眠用"], "2026-01-06T00:00:00.000Z"), cover: cover(6) },
   ];
-  const [item] = buildGroupFacets({ kind: "prefix", prefix: "気分" }, works);
+  const [item] = buildGroupValues({ kind: "prefix", prefix: "気分" }, works);
   assert.deepEqual(
     item?.covers.map((c) => c.image),
     ["cover-6.jpg", "cover-4.jpg", "cover-5.jpg", "cover-2.jpg"],

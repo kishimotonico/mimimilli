@@ -108,7 +108,7 @@ export interface CoverLocation {
   coverImage: string | null;
 }
 
-export interface AxisFacetRow {
+export interface GroupValueRow {
   value: string;
   count: number;
   durationSec: number;

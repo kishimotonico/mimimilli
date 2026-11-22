@@ -9,7 +9,7 @@ import { isPointInTriangle, type Point } from "./pointInTriangle";
 // 抑止する（参考: https://ics.media/entry/260803/）。
 //
 // パネル側（panelElRef・panelHandlers・セーフトライアングルの document pointermove）は
-// 常に「現在openなオーナー」1つだけに紐づく。AnimatePresence 下では軸A→Bの切替時に
+// 常に「現在openなオーナー」1つだけに紐づく。AnimatePresence 下ではグループ分けA→Bの切替時に
 // 旧Aが退出アニメーション中もマウントされ続けるため、旧Aの登録解除（アンマウント時の
 // ref クリーンアップ）が新Bの登録より遅れて発火しうる。これが新Bの登録を壊さないよう、
 // オーナーが交代するたびに発行するトークンで登録・解除を照合する。
@@ -231,7 +231,7 @@ export function useHoverGroupCoordinator(
 
   const registerPanelEl = (token: HoverGroupOwnerToken, el: HTMLElement | null) => {
     const current = openStateRef.current;
-    // 現在のオーナーと異なるトークンからの登録・解除は無視する（軸A→B切替時に、
+    // 現在のオーナーと異なるトークンからの登録・解除は無視する（グループ分けA→B切替時に、
     // 退出アニメーション中の旧Aが遅れて解除しても新Bの登録を壊さないため）。
     // current が null（何もopenでない）のときは保護対象が無いため素直に反映する。
     if (current !== null && current.token !== token) return;

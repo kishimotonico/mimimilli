@@ -1,4 +1,4 @@
-/* 軸のクイックオーバーレイと値ドロップダウン（.mll-qoverlay* / .mll-qlist*）。 */
+/* グループ値のクイックオーバーレイと値ドロップダウン（.mll-qoverlay* / .mll-qlist*）。 */
 
 .mll-qoverlay {
   z-index: 30;

@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
 import { formatFilterChipLabel } from "../model/libraryPresentation";
-import type { FacetScope } from "../model/useAxisFacetsQuery";
+import type { GroupValueScope } from "../model/useGroupValuesQuery";
 import FilterChipAddButton from "./FilterChipAddButton";
 import type { SaveOffer } from "../model/saveSearch";
 import { I } from "../../../shared/ui/Icon";
@@ -14,7 +14,7 @@ interface FilterChipBandProps {
   tagPrefixes: TagPrefix[];
   selectedTags: NormalizedTag[];
   /** 「＋絞り込み」の候補を数える母集団。値一覧では絞り込みを持たないので undefined */
-  facetScope?: FacetScope;
+  groupValueScope?: GroupValueScope;
   onAddTag: (tag: NormalizedTag) => void;
   onRemoveTag: (tag: NormalizedTag) => void;
   onClearAll: () => void;
@@ -51,7 +51,7 @@ function FilterChip({ tag, onRemove }: { tag: NormalizedTag; onRemove: () => voi
 export default function FilterChipBand({
   tagPrefixes,
   selectedTags,
-  facetScope,
+  groupValueScope,
   onAddTag,
   onRemoveTag,
   onClearAll,
@@ -69,11 +69,11 @@ export default function FilterChipBand({
           <FilterChip tag={tag} onRemove={() => onRemoveTag(tag)} />
         </Fragment>
       ))}
-      {!isValueListPane && facetScope && (
+      {!isValueListPane && groupValueScope && (
         <FilterChipAddButton
           tagPrefixes={tagPrefixes}
           selectedTags={selectedTags}
-          scope={facetScope}
+          scope={groupValueScope}
           onAddValue={onAddTag}
         />
       )}

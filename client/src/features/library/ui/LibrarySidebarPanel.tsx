@@ -10,7 +10,7 @@ import {
   type SmartFolder,
   type TagPrefix,
 } from "@mimimilli/shared";
-import { getAxisLabel } from "../../../entities/library/axisDefinitions";
+import { getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
 import {
   useHoverGroupCoordinator,
   type HoverGroupTriggerHandlers,
@@ -22,7 +22,7 @@ import { MOBILE_MEDIA_QUERY, useMediaQuery } from "../../../shared/ui/useMediaQu
 import { usePopoverDismissal } from "../../../shared/ui/usePopoverDismissal";
 import { formatDuration } from "../../../shared/lib/format";
 import { smartFolderDialogAtom } from "../model/atoms";
-import { axisOfGroupBy, type CollectionStatsDisplay } from "../model/libraryPresentation";
+import type { CollectionStatsDisplay } from "../model/libraryPresentation";
 import { buildSidebarRows, type DataIntegrityCount, type SidebarRow } from "../model/sidebarRows";
 import { missingTemplates, reorderIds, smartFolderPermissions } from "../model/smartFolderEditing";
 import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
@@ -314,8 +314,8 @@ export default function LibrarySidebarPanel({
           <GroupQuickOverlay
             key={overlayFolder.id}
             folderId={overlayFolder.id}
-            axis={axisOfGroupBy(overlayGroupBy)}
-            axisLabel={getAxisLabel(axisOfGroupBy(overlayGroupBy), tagPrefixes)}
+            groupBy={overlayGroupBy}
+            groupByLabel={getGroupByLabel(overlayGroupBy, tagPrefixes)}
             anchorEl={openAnchorEl}
             selectedValue={overlayFolder.id === activeFolderId ? activeGroup : null}
             onSelectValue={(value) => onOpenGroupValue(overlayFolder.id, value)}

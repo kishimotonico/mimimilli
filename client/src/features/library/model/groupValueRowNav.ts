@@ -1,22 +1,22 @@
-import type { AxisValueHierarchyRow } from "./axisValueHierarchy";
+import type { GroupValueHierarchyRow } from "./groupValueHierarchy";
 
-export type AxisValueRowArrowKey = "ArrowUp" | "ArrowDown" | "Home" | "End";
+export type GroupValueRowArrowKey = "ArrowUp" | "ArrowDown" | "Home" | "End";
 
-export function isAxisValueRowArrowKey(key: string): key is AxisValueRowArrowKey {
+export function isGroupValueRowArrowKey(key: string): key is GroupValueRowArrowKey {
   return key === "ArrowUp" || key === "ArrowDown" || key === "Home" || key === "End";
 }
 
-function isValueRow(row: AxisValueHierarchyRow | undefined): boolean {
+function isValueRow(row: GroupValueHierarchyRow | undefined): boolean {
   return row?.kind === "value";
 }
 
-// 値一覧（AxisValueRows・AxisValueQuickList）の矢印キーナビ。見出し行（選択不可）は
+// 値一覧（GroupValueRows・GroupValueQuickList）の矢印キーナビ。見出し行（選択不可）は
 // 対象から飛ばす点だけが gridNavigation.ts の getNextGridIndex と異なる
 // （境界での挙動は同じくクランプ。作品一覧と同じ規則に揃える）。
-export function getNextAxisValueRowIndex(
-  rows: readonly AxisValueHierarchyRow[],
+export function getNextGroupValueRowIndex(
+  rows: readonly GroupValueHierarchyRow[],
   currentIndex: number,
-  key: AxisValueRowArrowKey,
+  key: GroupValueRowArrowKey,
 ): number {
   if (rows.length === 0) return -1;
 
@@ -37,7 +37,10 @@ export function getNextAxisValueRowIndex(
 
 /** roving tabindexの対象が見出し行（選択不可）を指してしまったときに、直近の値行へ
  *  寄せる。仮想化のフォールバック（先頭描画行）が見出し行に当たるケースで使う。 */
-export function nearestValueRowIndex(rows: readonly AxisValueHierarchyRow[], from: number): number {
+export function nearestValueRowIndex(
+  rows: readonly GroupValueHierarchyRow[],
+  from: number,
+): number {
   if (isValueRow(rows[from])) return from;
   for (let index = from; index < rows.length; index++) {
     if (isValueRow(rows[index])) return index;

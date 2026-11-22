@@ -2,31 +2,34 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider as JotaiProvider, createStore } from "jotai";
-import type { AxisFacetItem } from "@mimimilli/shared";
-import AxisValueList from "../../src/features/library/ui/AxisValueList";
+import type { GroupBy, GroupValueItem } from "@mimimilli/shared";
+import GroupValueList from "../../src/features/library/ui/GroupValueList";
 import { libraryTileSizeAtom, libraryViewModeAtom } from "../../src/features/library/model/atoms";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
+
+const CV: GroupBy = { kind: "prefix", prefix: "cv" };
+const CIRCLE: GroupBy = { kind: "prefix", prefix: "circle" };
 
 afterEach(() => {
   cleanup();
   clearResizeObservers();
 });
 
-function makeItem(overrides: Partial<AxisFacetItem> = {}): AxisFacetItem {
+function makeItem(overrides: Partial<GroupValueItem> = {}): GroupValueItem {
   return { value: "藤田茜", count: 5, durationSec: 0, covers: [], ...overrides };
 }
 
-function renderAxisValueList(
-  props: Partial<React.ComponentProps<typeof AxisValueList>> = {},
+function renderGroupValueList(
+  props: Partial<React.ComponentProps<typeof GroupValueList>> = {},
   viewMode: "list" | "grid" = "list",
 ) {
   const store = createStore();
   store.set(libraryViewModeAtom, viewMode);
   const utils = render(
     <JotaiProvider store={store}>
-      <AxisValueList
-        axis="cv"
-        facetItems={[]}
+      <GroupValueList
+        groupBy={CV}
+        groupValueItems={[]}
         tagPrefixes={[]}
         onSelectValue={vi.fn()}
         {...props}
@@ -57,11 +60,11 @@ function getRow(className: string, text: string): HTMLElement {
   return row;
 }
 
-describe("AxisValueList list 表示（ADR-0012 §5）", () => {
+describe("GroupValueList list 表示（ADR-0012 §5）", () => {
   it("2×2コラージュ・名前・件数・総時間の列を持つ行として並ぶ", async () => {
     const sizeMock = mockElementSize(600, 600);
-    renderAxisValueList({
-      facetItems: [makeItem({ value: "藤田茜", count: 5, durationSec: 125 })],
+    renderGroupValueList({
+      groupValueItems: [makeItem({ value: "藤田茜", count: 5, durationSec: 125 })],
     });
     await flushVirtualizer();
 
@@ -75,7 +78,7 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
 
   it("件数・総時間は tabular-nums 用のクラスで右揃えになる", async () => {
     const sizeMock = mockElementSize(600, 600);
-    renderAxisValueList({ facetItems: [makeItem()] });
+    renderGroupValueList({ groupValueItems: [makeItem()] });
     await flushVirtualizer();
 
     expect(document.querySelector(".mll-vrow__count")).toBeInTheDocument();
@@ -85,7 +88,7 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
 
   it("代表カバーが0件の値はプレースホルダーアイコンで欠けたコラージュを描画する", async () => {
     const sizeMock = mockElementSize(600, 600);
-    renderAxisValueList({ facetItems: [makeItem({ covers: [] })] });
+    renderGroupValueList({ groupValueItems: [makeItem({ covers: [] })] });
     await flushVirtualizer();
 
     expect(document.querySelector(".mll-collage--empty")).toBeInTheDocument();
@@ -94,8 +97,8 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
 
   it("代表カバーが1〜3件でもコラージュが崩れず描画される（欠けたセルは背景色）", async () => {
     const sizeMock = mockElementSize(600, 600);
-    renderAxisValueList({
-      facetItems: [
+    renderGroupValueList({
+      groupValueItems: [
         makeItem({
           value: "夜想曲",
           covers: [
@@ -127,8 +130,8 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
   it("列見出しクリックでソートが切り替わり、再クリックで昇順降順が反転する", async () => {
     const sizeMock = mockElementSize(600, 600);
     const user = userEvent.setup();
-    renderAxisValueList({
-      facetItems: [
+    renderGroupValueList({
+      groupValueItems: [
         makeItem({ value: "b", count: 1 }),
         makeItem({ value: "a", count: 3 }),
         makeItem({ value: "c", count: 2 }),
@@ -156,9 +159,9 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     const sizeMock = mockElementSize(600, 600);
     const onSelectValue = vi.fn();
     const user = userEvent.setup();
-    renderAxisValueList({
-      axis: "cv",
-      facetItems: [makeItem({ value: "藤田茜" })],
+    renderGroupValueList({
+      groupBy: CV,
+      groupValueItems: [makeItem({ value: "藤田茜" })],
       onSelectValue,
     });
     await flushVirtualizer();
@@ -172,9 +175,9 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
   it("Ctrl+クリックでも主クリックと同じくその値の作品一覧へ進む（反転しない。ADR-0041）", async () => {
     const sizeMock = mockElementSize(600, 600);
     const onSelectValue = vi.fn();
-    renderAxisValueList({
-      axis: "cv",
-      facetItems: [makeItem({ value: "藤田茜" })],
+    renderGroupValueList({
+      groupBy: CV,
+      groupValueItems: [makeItem({ value: "藤田茜" })],
       onSelectValue,
     });
     await flushVirtualizer();
@@ -188,7 +191,7 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
 
   it("値一覧の行にはAND追加ボタンが無い（値一覧は独立した全作品入口。ADR-0026）", async () => {
     const sizeMock = mockElementSize(600, 600);
-    renderAxisValueList({ axis: "cv", facetItems: [makeItem({ value: "藤田茜" })] });
+    renderGroupValueList({ groupBy: CV, groupValueItems: [makeItem({ value: "藤田茜" })] });
     await flushVirtualizer();
 
     const row = getRow(".mll-vrow", "藤田茜");
@@ -199,7 +202,7 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
   it("1000件でも仮想化により描画されるボタンは総数よりずっと少ない", async () => {
     const sizeMock = mockElementSize(600, 600);
     const items = Array.from({ length: 1000 }, (_, i) => makeItem({ value: `値${i}`, count: i }));
-    renderAxisValueList({ facetItems: items });
+    renderGroupValueList({ groupValueItems: items });
     await flushVirtualizer();
 
     const rows = document.querySelectorAll(".mll-vrow");
@@ -209,12 +212,12 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
   });
 });
 
-describe("AxisValueList list 表示の矢印キー・roving tabindex", () => {
+describe("GroupValueList list 表示の矢印キー・roving tabindex", () => {
   it("ArrowDownで次の行へ、Home/Endで先頭・末尾へ移動する（作品一覧と同じ規則）", async () => {
     const sizeMock = mockElementSize(600, 600);
     const user = userEvent.setup();
-    renderAxisValueList({
-      facetItems: [
+    renderGroupValueList({
+      groupValueItems: [
         makeItem({ value: "a", count: 3 }),
         makeItem({ value: "b", count: 2 }),
         makeItem({ value: "c", count: 1 }),
@@ -244,8 +247,12 @@ describe("AxisValueList list 表示の矢印キー・roving tabindex", () => {
   it("roving tabindex: 現在位置の行だけがtabIndex 0になる", async () => {
     const sizeMock = mockElementSize(600, 600);
     const user = userEvent.setup();
-    renderAxisValueList({
-      facetItems: [makeItem({ value: "a" }), makeItem({ value: "b" }), makeItem({ value: "c" })],
+    renderGroupValueList({
+      groupValueItems: [
+        makeItem({ value: "a" }),
+        makeItem({ value: "b" }),
+        makeItem({ value: "c" }),
+      ],
     });
     await flushVirtualizer();
 
@@ -261,10 +268,10 @@ describe("AxisValueList list 表示の矢印キー・roving tabindex", () => {
   });
 });
 
-describe("AxisValueList grid 表示", () => {
+describe("GroupValueList grid 表示", () => {
   it("代表カバー2×2コラージュ・名前・件数バッジのタイルとして並ぶ", async () => {
     const sizeMock = mockElementSize(600, 600);
-    renderAxisValueList({ facetItems: [makeItem({ value: "藤田茜", count: 5 })] }, "grid");
+    renderGroupValueList({ groupValueItems: [makeItem({ value: "藤田茜", count: 5 })] }, "grid");
     await flushVirtualizer();
 
     const tile = getRow(".mll-vtile", "藤田茜");
@@ -281,9 +288,9 @@ describe("AxisValueList grid 表示", () => {
     store.set(libraryTileSizeAtom, 200);
     render(
       <JotaiProvider store={store}>
-        <AxisValueList
-          axis="cv"
-          facetItems={[makeItem()]}
+        <GroupValueList
+          groupBy={CV}
+          groupValueItems={[makeItem()]}
           tagPrefixes={[]}
           onSelectValue={vi.fn()}
         />
@@ -297,12 +304,12 @@ describe("AxisValueList grid 表示", () => {
   });
 });
 
-describe("AxisValueList grid 表示の矢印キー・roving tabindex", () => {
+describe("GroupValueList grid 表示の矢印キー・roving tabindex", () => {
   it("Home/Endで先頭・末尾のタイルへ移動し、現在位置だけがtabIndex 0になる", async () => {
     const sizeMock = mockElementSize(600, 600);
     const user = userEvent.setup();
     const items = Array.from({ length: 8 }, (_, i) => makeItem({ value: `値${i}`, count: i }));
-    renderAxisValueList({ facetItems: items }, "grid");
+    renderGroupValueList({ groupValueItems: items }, "grid");
     await flushVirtualizer();
 
     const tiles = () =>
@@ -324,12 +331,12 @@ describe("AxisValueList grid 表示の矢印キー・roving tabindex", () => {
   });
 });
 
-describe("AxisValueList コンテキスト検索（ADR-0012 §6）", () => {
+describe("GroupValueList コンテキスト検索（ADR-0012 §6）", () => {
   it("表示中の値だけを絞り込み、全体検索state（URL）には影響しない", async () => {
     const sizeMock = mockElementSize(600, 600);
     const user = userEvent.setup();
-    renderAxisValueList({
-      facetItems: [makeItem({ value: "藤田茜" }), makeItem({ value: "夜想曲サークル" })],
+    renderGroupValueList({
+      groupValueItems: [makeItem({ value: "藤田茜" }), makeItem({ value: "夜想曲サークル" })],
     });
     await flushVirtualizer();
 
@@ -345,16 +352,16 @@ describe("AxisValueList コンテキスト検索（ADR-0012 §6）", () => {
     sizeMock.restore();
   });
 
-  it("軸切り替え（axisプロパティ変更）でリセットされる", async () => {
+  it("グループ分けの切り替え（groupBy プロパティ変更）でリセットされる", async () => {
     const sizeMock = mockElementSize(600, 600);
     const user = userEvent.setup();
     const store = createStore();
     store.set(libraryViewModeAtom, "list");
     const { rerender } = render(
       <JotaiProvider store={store}>
-        <AxisValueList
-          axis="cv"
-          facetItems={[makeItem({ value: "藤田茜" })]}
+        <GroupValueList
+          groupBy={CV}
+          groupValueItems={[makeItem({ value: "藤田茜" })]}
           tagPrefixes={[]}
           onSelectValue={vi.fn()}
         />
@@ -368,9 +375,9 @@ describe("AxisValueList コンテキスト検索（ADR-0012 §6）", () => {
 
     rerender(
       <JotaiProvider store={store}>
-        <AxisValueList
-          axis="circle"
-          facetItems={[makeItem({ value: "夜想曲" })]}
+        <GroupValueList
+          groupBy={CIRCLE}
+          groupValueItems={[makeItem({ value: "夜想曲" })]}
           tagPrefixes={[]}
           onSelectValue={vi.fn()}
         />
@@ -384,22 +391,22 @@ describe("AxisValueList コンテキスト検索（ADR-0012 §6）", () => {
   });
 });
 
-describe("AxisValueList エラー・空状態の再試行導線", () => {
-  it("isFacetError で再試行ボタンをクリックすると onRetryFacets を呼ぶ", async () => {
-    const onRetryFacets = vi.fn();
+describe("GroupValueList エラー・空状態の再試行導線", () => {
+  it("isGroupValuesError で再試行ボタンをクリックすると onRetryGroupValues を呼ぶ", async () => {
+    const onRetryGroupValues = vi.fn();
     const user = userEvent.setup();
-    renderAxisValueList({
-      isFacetError: true,
-      facetItems: [makeItem({ value: "tag-a" })],
-      onRetryFacets,
+    renderGroupValueList({
+      isGroupValuesError: true,
+      groupValueItems: [makeItem({ value: "tag-a" })],
+      onRetryGroupValues,
     });
 
     await user.click(screen.getByRole("button", { name: "再試行" }));
-    expect(onRetryFacets).toHaveBeenCalledTimes(1);
+    expect(onRetryGroupValues).toHaveBeenCalledTimes(1);
   });
 
-  it("キャッシュが無い（facetItems空）isFacetErrorは一覧全体をエラー画面に置き換える", () => {
-    renderAxisValueList({ axis: "circle", isFacetError: true, facetItems: [] });
+  it("キャッシュが無い（groupValueItems空）isGroupValuesErrorは一覧全体をエラー画面に置き換える", () => {
+    renderGroupValueList({ groupBy: CIRCLE, isGroupValuesError: true, groupValueItems: [] });
     expect(screen.getByText("読み込みに失敗しました")).toBeInTheDocument();
   });
 });

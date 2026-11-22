@@ -3,7 +3,7 @@
 // ユーザーが編集できる設定データとして表現する。システムは初期値の投入のみを行う。
 import { z } from "zod";
 
-/** 予約している名前は "tag" と "year"。値一覧の軸 ID が prefix 名と組み込みのグループ分け（tag・addedYear）で名前空間を共有するため、prefix には使えない */
+/** 予約している名前は "tag" と "year"。値一覧のグループ分けが prefix 名と組み込みのグループ分け（tag・addedYear）で名前空間を共有するため、prefix には使えない */
 const RESERVED_PREFIX_NAMES: readonly string[] = ["tag", "year"];
 
 /** prefix 名。正規形（trim + 小文字）へ変換した上で予約ID・不正文字を拒否する */
@@ -24,7 +24,7 @@ export const tagPrefixColorKeySchema = z.enum(TAG_PREFIX_COLOR_KEYS);
 export type TagPrefixColorKey = z.infer<typeof tagPrefixColorKeySchema>;
 
 export const tagPrefixSchema = z.object({
-  /** 正規形（小文字）。値一覧の軸 ID としてもそのまま使う */
+  /** 正規形（小文字）。グループ分け（prefix）の識別子としてもそのまま使う */
   prefix: z.string(),
   label: z.string(),
   /** 表示色の semantic key。null は client 側のデフォルト表示 */

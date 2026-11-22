@@ -43,7 +43,7 @@ export function useSmartFolderEditor(): SmartFolderEditor {
     await refreshFolders();
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() }),
-      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() }),
+      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allGroupValues() }),
     ]);
   }, [queryClient, refreshFolders]);
 

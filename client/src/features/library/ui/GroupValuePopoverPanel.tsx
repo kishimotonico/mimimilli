@@ -1,10 +1,9 @@
 import { motion, useIsPresent } from "motion/react";
 import type { CSSProperties } from "react";
-import type { NormalizedTag } from "@mimimilli/shared";
-import type { AxisId } from "../../../entities/library/types";
-import { useAxisFacetsQuery, type FacetScope } from "../model/useAxisFacetsQuery";
+import type { GroupBy, NormalizedTag } from "@mimimilli/shared";
+import { useGroupValuesQuery, type GroupValueScope } from "../model/useGroupValuesQuery";
 import { buildFilterTag } from "../model/libraryPresentation";
-import AxisValueQuickList from "./AxisValueQuickList";
+import GroupValueQuickList from "./GroupValueQuickList";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import type { AnchoredPopoverFloatingRefCallback } from "../../../shared/ui/useAnchoredPopover";
 
@@ -13,35 +12,35 @@ import type { AnchoredPopoverFloatingRefCallback } from "../../../shared/ui/useA
 // （GroupQuickOverlay）と違いポータル不要。
 //
 // 呼び出し側（FilterChipAddButton）は `<AnimatePresence>` の直下で
-// `{isOpen && <AxisValuePopoverPanel key={axis} .../>}` のように条件レンダーする。
+// `{isOpen && <GroupValuePopoverPanel key={groupBy} .../>}` のように条件レンダーする。
 // 退出アニメーション中は AnimatePresence が最後の props を凍結して渡し続けるため、
-// axis 等の値を呼び出し側で手動退避する必要はない。
+// groupBy 等の値を呼び出し側で手動退避する必要はない。
 
-interface AxisValuePopoverPanelProps {
-  axis: AxisId;
-  axisLabel: string;
+interface GroupValuePopoverPanelProps {
+  groupBy: GroupBy;
+  groupByLabel: string;
   floatingStyles: CSSProperties;
   setFloating: AnchoredPopoverFloatingRefCallback;
   /** 選択中判定（チェック表示）に使う実際の選択タグ */
   selectedTags: NormalizedTag[];
   /** 候補を数える母集団（開いている一覧の条件・値・チップ・検索語） */
-  scope: FacetScope;
+  scope: GroupValueScope;
   onSelect: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
   close: () => void;
 }
 
-export default function AxisValuePopoverPanel({
-  axis,
-  axisLabel,
+export default function GroupValuePopoverPanel({
+  groupBy,
+  groupByLabel,
   floatingStyles,
   setFloating,
   selectedTags,
   scope,
   onSelect,
   close,
-}: AxisValuePopoverPanelProps) {
+}: GroupValuePopoverPanelProps) {
   const isPresent = useIsPresent();
-  const facetQuery = useAxisFacetsQuery(axis, scope);
+  const groupValuesQuery = useGroupValuesQuery(groupBy, scope);
   const { popoverScale } = useMotionVariants();
   const variant = popoverScale({ origin: "top left" });
 
@@ -53,16 +52,16 @@ export default function AxisValuePopoverPanel({
       inert={!isPresent}
       {...variant}
     >
-      <AxisValueQuickList
-        axis={axis}
-        axisLabel={axisLabel}
+      <GroupValueQuickList
+        groupBy={groupBy}
+        groupByLabel={groupByLabel}
         isOpen={isPresent}
-        items={facetQuery.data ?? []}
-        isLoading={facetQuery.isLoading}
-        isError={facetQuery.isError}
-        isSelected={(value) => selectedTags.includes(buildFilterTag(axis, value))}
+        items={groupValuesQuery.data ?? []}
+        isLoading={groupValuesQuery.isLoading}
+        isError={groupValuesQuery.isError}
+        isSelected={(value) => selectedTags.includes(buildFilterTag(groupBy, value))}
         onSelect={(item, e) =>
-          onSelect(buildFilterTag(axis, item.value), { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
+          onSelect(buildFilterTag(groupBy, item.value), { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
         }
         close={close}
       />

@@ -111,7 +111,7 @@ export const normalizedTagArraySchema = z.array(z.string()).transform((tags, ctx
   return parsed.value;
 });
 
-/** 組み込み軸の擬似タグ専用の予約文字（ADR-0012 §2）。実タグでの使用は禁止する */
+/** 組み込みの擬似タグ専用の予約文字（ADR-0012 §2）。実タグでの使用は禁止する */
 export const RESERVED_TAG_PREFIX = "@";
 
 /** 実タグの書き込み検証。判定はすべて normalizeTag した後の値に対して行う。 */

@@ -20,7 +20,7 @@ function affectedQueryKeys(): readonly (readonly unknown[])[] {
   return [
     WORK_QUERY_KEYS.all(),
     WORK_QUERY_KEYS.allDetails(),
-    WORK_QUERY_KEYS.allFacets(),
+    WORK_QUERY_KEYS.allGroupValues(),
     SMART_FOLDER_QUERY_KEYS.all(),
     SMART_FOLDER_QUERY_KEYS.allWorks(),
     TAG_QUERY_KEYS.all(),

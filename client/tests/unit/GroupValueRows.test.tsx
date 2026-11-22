@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { AxisFacetItem } from "@mimimilli/shared";
-import AxisValueRows from "../../src/features/library/ui/AxisValueRows";
-import { flattenAxisValueRows } from "../../src/features/library/model/axisValueHierarchy";
+import type { GroupValueItem } from "@mimimilli/shared";
+import GroupValueRows from "../../src/features/library/ui/GroupValueRows";
+import { flattenGroupValueRows } from "../../src/features/library/model/groupValueHierarchy";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 
 afterEach(() => {
@@ -11,7 +11,7 @@ afterEach(() => {
   clearResizeObservers();
 });
 
-function makeItems(count: number): AxisFacetItem[] {
+function makeItems(count: number): GroupValueItem[] {
   return Array.from({ length: count }, (_, i) => ({
     value: `値${String(i).padStart(4, "0")}`,
     count: i,
@@ -33,11 +33,11 @@ async function settle() {
   });
 }
 
-function renderRows(items: AxisFacetItem[], onSelect = vi.fn()) {
+function renderRows(items: GroupValueItem[], onSelect = vi.fn()) {
   return render(
-    <AxisValueRows
-      axisLabel="CV"
-      rows={flattenAxisValueRows(items)}
+    <GroupValueRows
+      groupByLabel="CV"
+      rows={flattenGroupValueRows(items)}
       sort={{ key: "name", direction: "asc" }}
       onSortChange={vi.fn()}
       fallbackIcon="user"
@@ -51,7 +51,7 @@ function rowButtons() {
   return Array.from(document.querySelectorAll<HTMLButtonElement>("[data-flat-index]"));
 }
 
-describe("AxisValueRows のキーボード移動", () => {
+describe("GroupValueRows のキーボード移動", () => {
   it("roving tabindex: 未操作では描画中の先頭行だけがtabIndex 0、矢印移動後は現在位置の行だけが0", async () => {
     const sizeMock = mockElementSize(400, 400);
     const user = userEvent.setup();
@@ -154,9 +154,9 @@ describe("AxisValueRows のキーボード移動", () => {
     const { rerender } = renderRows(makeItems(5));
     await flush();
     rerender(
-      <AxisValueRows
-        axisLabel="CV"
-        rows={flattenAxisValueRows(makeItems(6))}
+      <GroupValueRows
+        groupByLabel="CV"
+        rows={flattenGroupValueRows(makeItems(6))}
         sort={{ key: "name", direction: "asc" }}
         onSortChange={vi.fn()}
         fallbackIcon="user"

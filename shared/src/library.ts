@@ -28,16 +28,16 @@ export function createRandomSeed(): number {
 
 /** 値一覧の代表カバー1件。カバー画像配信（GET /media/cover/:id）が作品単位のルートしか
  *  持たないため、コラージュ描画に必要な workId を持たせる（coverValueSchema 単体には無い）。 */
-export const axisFacetCoverSchema = coverValueSchema.extend({ workId: z.string() });
-export type AxisFacetCover = z.infer<typeof axisFacetCoverSchema>;
+export const groupValueCoverSchema = coverValueSchema.extend({ workId: z.string() });
+export type GroupValueCover = z.infer<typeof groupValueCoverSchema>;
 
-export const axisFacetItemSchema = z.object({
+export const groupValueItemSchema = z.object({
   value: z.string(),
   count: z.number().int().nonnegative(),
   /** その値に属する全作品の再生時間合計（秒）。totalDurationSec が未知（null）の作品は合算から除く */
   durationSec: z.number().nonnegative(),
   /** 代表カバー。追加日時の新しい順で最大4件、cover未設定の作品は含まない */
-  covers: z.array(axisFacetCoverSchema).max(4),
+  covers: z.array(groupValueCoverSchema).max(4),
 });
-export type AxisFacetItem = z.infer<typeof axisFacetItemSchema>;
-export const axisFacetListSchema = z.array(axisFacetItemSchema);
+export type GroupValueItem = z.infer<typeof groupValueItemSchema>;
+export const groupValueListSchema = z.array(groupValueItemSchema);

@@ -1,67 +1,68 @@
 import { useEffect, useState } from "react";
 import { useAtom, useAtomValue } from "jotai";
-import type { AxisFacetItem, TagPrefix } from "@mimimilli/shared";
-import type { AxisId } from "../../../entities/library/types";
-import { getAxisIcon, getAxisLabel } from "../../../entities/library/axisDefinitions";
-import { buildAxisValueDisplayRows } from "../model/axisValueDisplayRows";
-import { axisValueSortAtom, libraryTileSizeAtom, libraryViewModeAtom } from "../model/atoms";
+import type { GroupBy, GroupValueItem, TagPrefix } from "@mimimilli/shared";
+import { getGroupByIcon, getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
+import { groupByKey } from "../model/smartFolderEditing";
+import { buildGroupValueDisplayRows } from "../model/groupValueDisplayRows";
+import { groupValueSortAtom, libraryTileSizeAtom, libraryViewModeAtom } from "../model/atoms";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
-import AxisValueRows from "./AxisValueRows";
-import AxisValueGrid from "./AxisValueGrid";
+import GroupValueRows from "./GroupValueRows";
+import GroupValueGrid from "./GroupValueGrid";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 
-// 軸の値一覧の本実装（ADR-0012 §5）。grid/list はユーザーの libraryViewModeAtom に
-// 従い、値のソートは axisValueSortAtom（ソートメニュー・list列見出しの二重入口・単一state。
+// グループの値一覧の本実装（ADR-0012 §5）。grid/list はユーザーの libraryViewModeAtom に
+// 従い、値のソートは groupValueSortAtom（ソートメニュー・list列見出しの二重入口・単一state。
 // ADR-0012 帰結）。入れ子タグ（スラッシュ複数）は名前順ソートのときだけ階層表示にし、
-// 件数・総時間ソートではフルパスの平坦表示にフォールバックする（axisValueHierarchy.ts）。
+// 件数・総時間ソートではフルパスの平坦表示にフォールバックする（groupValueHierarchy.ts）。
 
-interface AxisValueListProps {
-  axis: AxisId;
-  facetItems: AxisFacetItem[];
+interface GroupValueListProps {
+  groupBy: GroupBy;
+  groupValueItems: GroupValueItem[];
   tagPrefixes: TagPrefix[];
-  isFacetLoading?: boolean;
-  isFacetError?: boolean;
+  isGroupValuesLoading?: boolean;
+  isGroupValuesError?: boolean;
   isTagPrefixesError?: boolean;
   /** 値の選択。主クリックも Ctrl/Cmd+クリックもその値の作品一覧へ進む（ADR-0041） */
   onSelectValue: (value: string) => void;
-  onRetryFacets?: () => void;
+  onRetryGroupValues?: () => void;
   onRetryTagPrefixes?: () => void;
 }
 
-export default function AxisValueList({
-  axis,
-  facetItems,
+export default function GroupValueList({
+  groupBy,
+  groupValueItems,
   tagPrefixes,
-  isFacetLoading,
-  isFacetError,
+  isGroupValuesLoading,
+  isGroupValuesError,
   isTagPrefixesError,
   onSelectValue,
-  onRetryFacets,
+  onRetryGroupValues,
   onRetryTagPrefixes,
-}: AxisValueListProps) {
+}: GroupValueListProps) {
   const viewMode = useAtomValue(libraryViewModeAtom);
   const tileSize = useAtomValue(libraryTileSizeAtom);
-  const [sort, setSort] = useAtom(axisValueSortAtom);
+  const [sort, setSort] = useAtom(groupValueSortAtom);
 
   // コンテキスト検索（ADR-0012 §6）: 表示中の値に対するクライアント側の絞り込み。
-  // 全体検索（URL の q=）とは別 state で、URL には載せず軸切り替えでリセットする。
+  // 全体検索（URL の q=）とは別 state で、URL には載せずグループ分けの切り替えでリセットする。
+  const groupKey = groupByKey(groupBy);
   const [contextQuery, setContextQuery] = useState("");
   useEffect(() => {
     setContextQuery("");
-  }, [axis]);
+  }, [groupKey]);
 
-  const rows = buildAxisValueDisplayRows(facetItems, contextQuery, sort);
-  const fallbackIcon = getAxisIcon(axis);
-  const axisLabel = getAxisLabel(axis, tagPrefixes);
-  const resetKey = `${axis}:${sort.key}:${sort.direction}:${contextQuery}`;
+  const rows = buildGroupValueDisplayRows(groupValueItems, contextQuery, sort);
+  const fallbackIcon = getGroupByIcon(groupBy);
+  const groupByLabel = getGroupByLabel(groupBy, tagPrefixes);
+  const resetKey = `${groupKey}:${sort.key}:${sort.direction}:${contextQuery}`;
 
-  const handleSelect = (item: AxisFacetItem) => onSelectValue(item.value);
+  const handleSelect = (item: GroupValueItem) => onSelectValue(item.value);
 
-  const showSearchMiss = facetItems.length > 0 && rows.length === 0 && contextQuery.length > 0;
+  const showSearchMiss = groupValueItems.length > 0 && rows.length === 0 && contextQuery.length > 0;
 
   return (
-    <div className={`mle-col is-results is-axis-values ${viewMode === "grid" ? "is-grid" : ""}`}>
+    <div className={`mle-col is-results is-group-values ${viewMode === "grid" ? "is-grid" : ""}`}>
       <div className="mll-vsearch">
         <I.search size={13} />
         <input
@@ -69,7 +70,7 @@ export default function AxisValueList({
           value={contextQuery}
           onChange={(e) => setContextQuery(e.target.value)}
           placeholder="値を絞り込み"
-          aria-label={`${getAxisLabel(axis, tagPrefixes)}の値を絞り込み`}
+          aria-label={`${getGroupByLabel(groupBy, tagPrefixes)}の値を絞り込み`}
         />
         {contextQuery && (
           <Button variant="ghost" icon={I.x} onClick={() => setContextQuery("")}>
@@ -79,33 +80,33 @@ export default function AxisValueList({
       </div>
 
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-        {isFacetLoading ? (
+        {isGroupValuesLoading ? (
           <CollectionStatus variant={viewMode === "grid" ? "grid" : "list"} kind="loading" />
-        ) : isFacetError && facetItems.length === 0 ? (
+        ) : isGroupValuesError && groupValueItems.length === 0 ? (
           // キャッシュが無い＝初回取得失敗のときだけ一覧全体をエラー画面に置き換える。
           <CollectionStatus
             variant={viewMode === "grid" ? "grid" : "list"}
             kind="error"
-            onRetry={onRetryFacets}
+            onRetry={onRetryGroupValues}
           />
         ) : (
           <>
-            {isFacetError && (
+            {isGroupValuesError && (
               // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- role="status"で非ブロッキング通知にする
               <div className="mle-col__notice" role="status" aria-live="polite">
-                <span>{getAxisLabel(axis, tagPrefixes)}の取得に失敗しました</span>
-                {onRetryFacets && (
-                  <Button variant="ghost" icon={I.refresh} onClick={onRetryFacets}>
+                <span>{getGroupByLabel(groupBy, tagPrefixes)}の取得に失敗しました</span>
+                {onRetryGroupValues && (
+                  <Button variant="ghost" icon={I.refresh} onClick={onRetryGroupValues}>
                     再試行
                   </Button>
                 )}
               </div>
             )}
-            {axis === "tag" &&
+            {groupBy.kind === "tag" &&
               isTagPrefixesError && (
                 // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- role="status"で非ブロッキング通知にする
                 <div className="mle-col__notice" role="status" aria-live="polite">
-                  <span>分類軸の取得に失敗しました</span>
+                  <span>タグ設定の取得に失敗しました</span>
                   {onRetryTagPrefixes && (
                     <Button variant="ghost" icon={I.refresh} onClick={onRetryTagPrefixes}>
                       再試行
@@ -113,7 +114,7 @@ export default function AxisValueList({
                   )}
                 </div>
               )}
-            {facetItems.length === 0 ? (
+            {groupValueItems.length === 0 ? (
               <CollectionStatus
                 variant={viewMode === "grid" ? "grid" : "list"}
                 kind="empty"
@@ -131,8 +132,8 @@ export default function AxisValueList({
                 }
               />
             ) : viewMode === "grid" ? (
-              <AxisValueGrid
-                axisLabel={axisLabel}
+              <GroupValueGrid
+                groupByLabel={groupByLabel}
                 rows={rows}
                 tileSize={tileSize}
                 fallbackIcon={fallbackIcon}
@@ -140,8 +141,8 @@ export default function AxisValueList({
                 onSelect={handleSelect}
               />
             ) : (
-              <AxisValueRows
-                axisLabel={axisLabel}
+              <GroupValueRows
+                groupByLabel={groupByLabel}
                 rows={rows}
                 sort={sort}
                 onSortChange={setSort}

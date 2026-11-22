@@ -86,7 +86,7 @@ const KEYS = {
   list: WORK_QUERY_KEYS.list({ sort: "added-desc" }),
   otherList: WORK_QUERY_KEYS.list({ sort: "title-asc" }),
   total: WORK_QUERY_KEYS.total(),
-  facets: WORK_QUERY_KEYS.scopedFacets("sf-1", "cv"),
+  groupValues: WORK_QUERY_KEYS.scopedGroupValues("sf-1", "prefix:cv"),
   tags: TAG_QUERY_KEYS.all(),
   smartWorks: SMART_FOLDER_QUERY_KEYS.works("sf-1"),
   smartFolders: SMART_FOLDER_QUERY_KEYS.all(),
@@ -109,7 +109,7 @@ function seededClient(): QueryClient {
   queryClient.setQueryData(KEYS.list, structuredClone(emptyPages));
   queryClient.setQueryData(KEYS.otherList, structuredClone(emptyPages));
   queryClient.setQueryData(KEYS.total, { items: [], total: 0 });
-  queryClient.setQueryData(KEYS.facets, []);
+  queryClient.setQueryData(KEYS.groupValues, []);
   queryClient.setQueryData(KEYS.tags, []);
   queryClient.setQueryData(KEYS.smartWorks, structuredClone(emptyPages));
   queryClient.setQueryData(KEYS.smartFolders, []);
@@ -136,7 +136,7 @@ const LIBRARY_VIEWS: KeyName[] = [
   "list",
   "otherList",
   "total",
-  "facets",
+  "groupValues",
   "tags",
   "smartWorks",
   "smartFolders",
@@ -148,7 +148,7 @@ function sorted(names: KeyName[]): KeyName[] {
 }
 
 describe("meta 編集の必須更新", () => {
-  it("source へ応答の snapshot を書き戻し、詳細・一覧系・facet・タグ・SF を無効化する", async () => {
+  it("source へ応答の snapshot を書き戻し、詳細・一覧系・グループの値・タグ・SF を無効化する", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterSourceEdit(queryClient, mutationResult("w1"));
@@ -188,7 +188,7 @@ describe("bookmark の必須更新", () => {
     });
   });
 
-  it("一覧（works の list 形と smartFolderWorks）とスマートフォルダーの件数だけを無効化し、総件数・facet・詳細は無効化しない", async () => {
+  it("一覧（works の list 形と smartFolderWorks）とスマートフォルダーの件数だけを無効化し、総件数・グループの値・詳細は無効化しない", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterBookmark(queryClient, { workId: "w1", bookmarked: true });
@@ -305,7 +305,7 @@ describe("ID 再採番の必須更新", () => {
 });
 
 describe("DLsite の必須更新", () => {
-  it("単体適用は source を書き戻して残し、詳細・一覧系・facet・タグ・SF を無効化する", async () => {
+  it("単体適用は source を書き戻して残し、詳細・一覧系・グループの値・タグ・SF を無効化する", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterDlsiteLinkageChange(queryClient, mutationResult("w1"));

@@ -1,56 +1,57 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AxisFacetItem } from "@mimimilli/shared";
+import type { GroupValueItem } from "@mimimilli/shared";
 import { ApiRequestError } from "../../src/shared/api/http";
 import { nt } from "../helpers/tag";
 import {
-  axisOfGroupBy,
   buildFilterTag,
   buildWorksResetKey,
   computeCollectionStatsDisplay,
   computeIsNoResultsDueToFilter,
-  filterValidFacetItems,
+  filterValidGroupValueItems,
   formatFilterChipLabel,
-  groupByOfAxis,
   shouldClearSelectionOnFilterMiss,
   shouldClearSelectionOnWorkNotFound,
 } from "../../src/features/library/model/libraryPresentation";
 
-function facetItem(value: string): AxisFacetItem {
+function groupValueItem(value: string): GroupValueItem {
   return { value, count: 1, durationSec: 0, covers: [] };
 }
 
 describe("buildFilterTag", () => {
-  it("tag 軸はそのまま返す（値が既に完全なタグ文字列のため）", () => {
-    expect(buildFilterTag("tag", "cv/藤田茜")).toBe("cv/藤田茜");
+  it("tag のグループ分けはそのまま返す（値が既に完全なタグ文字列のため）", () => {
+    expect(buildFilterTag({ kind: "tag" }, "cv/藤田茜")).toBe("cv/藤田茜");
   });
-  it("実タグ由来の facet 軸は 軸/値 の実タグを組み立てる", () => {
-    expect(buildFilterTag("cv", "藤田茜")).toBe("cv/藤田茜");
+  it("prefix のグループ分けは prefix/値 の実タグを組み立てる", () => {
+    expect(buildFilterTag({ kind: "prefix", prefix: "cv" }, "藤田茜")).toBe("cv/藤田茜");
   });
-  it("year（タグ由来でない組み込み軸）は @軸/値 の擬似タグを組み立てる", () => {
-    expect(buildFilterTag("year", "2024")).toBe("@year/2024");
+  it("addedYear（タグ由来でない）は @year/値 の擬似タグを組み立てる", () => {
+    expect(buildFilterTag({ kind: "addedYear" }, "2024")).toBe("@year/2024");
   });
 });
 
-describe("filterValidFacetItems", () => {
+describe("filterValidGroupValueItems", () => {
   it("正規化できない値をスキップしconsole.warnする", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    const result = filterValidFacetItems("tag", [facetItem("cv/藤田茜"), facetItem("   ")]);
+    const result = filterValidGroupValueItems({ kind: "tag" }, [
+      groupValueItem("cv/藤田茜"),
+      groupValueItem("   "),
+    ]);
 
-    expect(result).toEqual([facetItem("cv/藤田茜")]);
+    expect(result).toEqual([groupValueItem("cv/藤田茜")]);
     expect(warn).toHaveBeenCalledTimes(1);
     warn.mockRestore();
   });
 
   it("すべて正規化できる値ならそのまま返す", () => {
-    const items = [facetItem("cv/藤田茜"), facetItem("cv/霧島レイ")];
+    const items = [groupValueItem("cv/藤田茜"), groupValueItem("cv/霧島レイ")];
 
-    expect(filterValidFacetItems("cv", items)).toEqual(items);
+    expect(filterValidGroupValueItems({ kind: "prefix", prefix: "cv" }, items)).toEqual(items);
   });
 });
 
 describe("computeIsNoResultsDueToFilter", () => {
-  it("is false when the axis is just naturally empty (no search/filter)", () => {
+  it("is false when the list is just naturally empty (no search/filter)", () => {
     expect(computeIsNoResultsDueToFilter(true, 0, "", [], false, false)).toBe(false);
   });
   it("is true when a search query narrows to zero results (query settled: not loading/error)", () => {
@@ -143,27 +144,13 @@ describe("computeCollectionStatsDisplay", () => {
 });
 
 describe("formatFilterChipLabel（チップの内部表現を隠す）", () => {
-  it("組み込み軸の擬似タグは「軸ラベル/値」に変換する", () => {
+  it("組み込みの擬似タグは「グループ分けのラベル/値」に変換する", () => {
     expect(formatFilterChipLabel(nt("@year/2024"))).toBe("追加日/2024");
   });
 
   it("実タグはフルパスのまま変更しない", () => {
     expect(formatFilterChipLabel(nt("cv/藤田茜"))).toBe("cv/藤田茜");
     expect(formatFilterChipLabel(nt("ASMR"))).toBe("ASMR");
-  });
-});
-
-describe("axisOfGroupBy / groupByOfAxis（グループ分けと軸 ID の対応）", () => {
-  it("prefix・タグ・追加年を軸 ID に写す", () => {
-    expect(axisOfGroupBy({ kind: "prefix", prefix: "cv" })).toBe("cv");
-    expect(axisOfGroupBy({ kind: "tag" })).toBe("tag");
-    expect(axisOfGroupBy({ kind: "addedYear" })).toBe("year");
-  });
-
-  it("軸 ID からグループ分けへ戻せる（「＋絞り込み」の候補用）", () => {
-    expect(groupByOfAxis("cv")).toEqual({ kind: "prefix", prefix: "cv" });
-    expect(groupByOfAxis("tag")).toEqual({ kind: "tag" });
-    expect(groupByOfAxis("year")).toEqual({ kind: "addedYear" });
   });
 });
 

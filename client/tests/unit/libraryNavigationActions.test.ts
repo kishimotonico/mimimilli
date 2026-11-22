@@ -286,7 +286,7 @@ describe("タグの行き先（ADR-0041 の表）", () => {
     expect(pendingWrites(store)).toEqual([]);
   });
 
-  it("addLibraryTagAtom: 組み込み擬似タグ軸は同軸排他してから追加する（year）", () => {
+  it("addLibraryTagAtom: 組み込み擬似タグは同じキーで排他してから追加する（year）", () => {
     const store = setup({ selectedTags: nts(["cv/藤田茜", "@year/2023"]) });
 
     store.set(addLibraryTagAtom, nt("@year/2024"), "works");

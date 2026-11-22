@@ -1,6 +1,6 @@
 // list/grid の決定は libraryViewModeAtom のみに依存する（ADR-0012 §3・§5）。
 // 作品一覧（works）・値一覧（value-list）のどちらも同じ viewMode に従うため、
-// 軸の種類に関わらずボタンの active 状態は viewMode と一致する。
+// 表示の種類に関わらずボタンの active 状態は viewMode と一致する。
 
 import { createElement } from "react";
 import { render, screen, cleanup, within } from "@testing-library/react";
@@ -58,7 +58,7 @@ function renderAddressBar(options?: {
 }
 
 describe("AddressBar のビュー切替ボタン", () => {
-  it("作品一覧を表示する軸ではリスト/グリッドが選好どおり active になる", () => {
+  it("作品一覧を表示するときはリスト/グリッドが選好どおり active になる", () => {
     renderAddressBar({ folderId: "all", libraryViewMode: "list" });
 
     expect(screen.getByLabelText("リスト")).toBeEnabled();
@@ -70,7 +70,7 @@ describe("AddressBar のビュー切替ボタン", () => {
     expect(screen.getByLabelText("グリッド")).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("facet 軸（値一覧）でも viewMode=grid ならグリッドボタンが active になる", () => {
+  it("グループ分け（値一覧）でも viewMode=grid ならグリッドボタンが active になる", () => {
     renderAddressBar({ folderId: "by-circle", libraryViewMode: "grid" });
 
     expect(screen.getByLabelText("グリッド")).toHaveAttribute("aria-pressed", "true");

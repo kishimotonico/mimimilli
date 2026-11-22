@@ -109,7 +109,7 @@ export default function Tag({
   }
 
   // ラベル・色の解決は resolveTagPrefix（shared/src/tagPrefix.ts）に集約し、
-  // axisDefinitions.getAxisLabel と結果を揃える。definition は呼び出し側が
+  // smartFolderDefinitions.getGroupByLabel と結果を揃える。definition は呼び出し側が
   // 既に見つけている単一の定義なので、それを1件のリストとして渡す。
   const { label: catLabel, color } = resolveTagPrefix(
     parsed.prefix,

@@ -6,7 +6,7 @@ import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "
 import LibrarySidebarPanel from "../../src/features/library/ui/LibrarySidebarPanel";
 import { mockApi } from "../helpers/api";
 import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
-import { buildAxisFacetItem, buildTagPrefix } from "../helpers/builders";
+import { buildGroupValueItem, buildTagPrefix } from "../helpers/builders";
 
 let sizeMock: { restore: () => void } | null = null;
 
@@ -216,16 +216,16 @@ describe("LibrarySidebarPanel", () => {
     });
   });
 
-  it("オーバーレイ閉鎖（退出）中もfacet一覧が空にならない", async () => {
+  it("オーバーレイ閉鎖（退出）中も値一覧が空にならない", async () => {
     mockApi({
-      "POST /api/smart-folders/:id/groups": [buildAxisFacetItem({ value: "藤田茜", count: 3 })],
+      "POST /api/smart-folders/:id/groups": [buildGroupValueItem({ value: "藤田茜", count: 3 })],
     });
     renderSidebar({});
 
     // ArrowRight で遅延なしに開く（openImmediately）。
     fireEvent.keyDown(screen.getByRole("button", { name: "CV別" }), { key: "ArrowRight" });
 
-    // 読み込み完了で「項目がありません」（空表示）が出ないこと（＝1件のfacetが一覧に載っている）
+    // 読み込み完了で「項目がありません」（空表示）が出ないこと（＝1件の値が一覧に載っている）
     // を、一覧本体（role="group"）の出現で確認する。
     await waitFor(() => {
       expect(document.querySelector('.mll-qlist__body[role="group"]')).toBeInTheDocument();
@@ -241,7 +241,7 @@ describe("LibrarySidebarPanel", () => {
     expect(screen.queryByText("項目がありません")).toBeNull();
   });
 
-  it("軸A→B高速切替で新パネルが閉じず、検索欄フォーカスが奪われない", async () => {
+  it("グループ分けA→B高速切替で新パネルが閉じず、検索欄フォーカスが奪われない", async () => {
     mockApi({ "POST /api/smart-folders/:id/groups": [] });
     renderSidebar({});
 
@@ -250,7 +250,7 @@ describe("LibrarySidebarPanel", () => {
       expect(screen.getByLabelText("CVの値を検索")).toBeInTheDocument();
     });
 
-    // 退出アニメーション完了を待たず、別軸へ即座に切り替える（openImmediately）。
+    // 退出アニメーション完了を待たず、別のグループ分けへ即座に切り替える（openImmediately）。
     fireEvent.keyDown(screen.getByRole("button", { name: "追加年別" }), { key: "ArrowRight" });
 
     await waitFor(() => {
@@ -262,7 +262,7 @@ describe("LibrarySidebarPanel", () => {
 
   it("クイックオーバーレイの値は主クリックもCtrl+クリックもその値の作品一覧（onOpenGroupValue）へ進む", async () => {
     mockApi({
-      "POST /api/smart-folders/:id/groups": [buildAxisFacetItem({ value: "藤田茜", count: 3 })],
+      "POST /api/smart-folders/:id/groups": [buildGroupValueItem({ value: "藤田茜", count: 3 })],
     });
     sizeMock = mockElementSize(260, 260);
     const onOpenGroupValue = vi.fn();
@@ -281,7 +281,7 @@ describe("LibrarySidebarPanel", () => {
 
   it("クイックオーバーレイの追加ボタンは値をチップの候補として onAddTag へ渡す", async () => {
     mockApi({
-      "POST /api/smart-folders/:id/groups": [buildAxisFacetItem({ value: "藤田茜", count: 3 })],
+      "POST /api/smart-folders/:id/groups": [buildGroupValueItem({ value: "藤田茜", count: 3 })],
     });
     sizeMock = mockElementSize(260, 260);
     const onAddTag = vi.fn();

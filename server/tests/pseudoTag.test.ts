@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  buildBuiltinAxisTag,
+  buildBuiltinPseudoTag,
   normalizeTag,
-  parseBuiltinAxisTag,
+  parseBuiltinPseudoTag,
   splitSelectedTags,
   type NormalizedTag,
 } from "@mimimilli/shared";
@@ -16,28 +16,28 @@ function nt(tag: string): NormalizedTag {
   return normalized!;
 }
 
-test("buildBuiltinAxisTag / parseBuiltinAxisTag: 組み立てた擬似タグを分解すると軸と値が復元できる", () => {
-  const tag = buildBuiltinAxisTag("year", "2024");
+test("buildBuiltinPseudoTag / parseBuiltinPseudoTag: 組み立てた擬似タグを分解するとキーと値が復元できる", () => {
+  const tag = buildBuiltinPseudoTag("year", "2024");
   assert.equal(tag, "@year/2024");
-  assert.deepEqual(parseBuiltinAxisTag(tag), { axis: "year", value: "2024" });
+  assert.deepEqual(parseBuiltinPseudoTag(tag), { key: "year", value: "2024" });
 });
 
-test("parseBuiltinAxisTag: 予約文字 @ で始まらない文字列は擬似タグとして解釈しない", () => {
-  assert.equal(parseBuiltinAxisTag(nt("year/2025")), null);
-  assert.equal(parseBuiltinAxisTag(nt("cv/藤田茜")), null);
+test("parseBuiltinPseudoTag: 予約文字 @ で始まらない文字列は擬似タグとして解釈しない", () => {
+  assert.equal(parseBuiltinPseudoTag(nt("year/2025")), null);
+  assert.equal(parseBuiltinPseudoTag(nt("cv/藤田茜")), null);
 });
 
-test("parseBuiltinAxisTag: 軸や値が欠けた不正な形は null", () => {
+test("parseBuiltinPseudoTag: キーや値が欠けた不正な形は null", () => {
   // "@year/"（値が空）は normalizeTag 自体が null を返すため、NormalizedTag として
-  // 構築できず parseBuiltinAxisTag に到達し得ない（型がその不変条件を保証する）。
+  // 構築できず parseBuiltinPseudoTag に到達し得ない（型がその不変条件を保証する）。
   assert.equal(normalizeTag("@year/"), null);
-  assert.equal(parseBuiltinAxisTag(nt("@year")), null);
-  assert.equal(parseBuiltinAxisTag(nt("@/2024")), null);
+  assert.equal(parseBuiltinPseudoTag(nt("@year")), null);
+  assert.equal(parseBuiltinPseudoTag(nt("@/2024")), null);
 });
 
-test("parseBuiltinAxisTag: 判定は正規化後の値に対して行われ、先頭に空白を挟んだ入力も擬似タグとして認識する", () => {
-  assert.deepEqual(parseBuiltinAxisTag(nt(" @year/2024")), { axis: "year", value: "2024" });
-  assert.deepEqual(parseBuiltinAxisTag(nt("  @Year/2024")), { axis: "year", value: "2024" });
+test("parseBuiltinPseudoTag: 判定は正規化後の値に対して行われ、先頭に空白を挟んだ入力も擬似タグとして認識する", () => {
+  assert.deepEqual(parseBuiltinPseudoTag(nt(" @year/2024")), { key: "year", value: "2024" });
+  assert.deepEqual(parseBuiltinPseudoTag(nt("  @Year/2024")), { key: "year", value: "2024" });
 });
 
 test("splitSelectedTags: year 擬似タグを yearValue へ、それ以外は tags へ振り分ける", () => {
@@ -68,7 +68,7 @@ test("splitSelectedTags: 複数の year 擬似タグは先頭だけを採用し�
   assert.match(result.warnings[0]!, /@year\/2024/);
 });
 
-test("splitSelectedTags: 未知の組み込み軸の擬似タグは警告付きで拒否し、実タグとしても解釈しない", () => {
+test("splitSelectedTags: 未知の擬似タグは警告付きで拒否し、実タグとしても解釈しない", () => {
   const result = splitSelectedTags(["@unknown/2024", "cv/藤田茜"]);
   assert.deepEqual(result.tags, ["cv/藤田茜"]);
   assert.equal(result.yearValue, null);

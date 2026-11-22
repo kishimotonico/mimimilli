@@ -8,7 +8,7 @@ import {
   tagSchema,
   smartFolderWorksRequestSchema,
   WORKS_DEFAULT_PAGE_SIZE,
-  type AxisFacetItem,
+  type GroupValueItem,
   type Condition,
   type GroupBy,
   type SmartFolderGroupsRequest,
@@ -98,7 +98,7 @@ export async function queryFolderGroups(
   adapter: DataAdapter,
   folder: QueriedSmartFolder,
   request: SmartFolderGroupsRequest,
-): Promise<AxisFacetItem[]> {
+): Promise<GroupValueItem[]> {
   const now = Date.now();
   return adapter.groupWorks(
     {

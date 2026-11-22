@@ -23,7 +23,7 @@ function renderFilterChipBand(
       <FilterChipBand
         tagPrefixes={[]}
         selectedTags={["cv/藤田茜", "サークル/月白製作所"]}
-        facetScope={{ folderId: "fav", group: null, tags: ["cv/藤田茜"], q: "雨" }}
+        groupValueScope={{ folderId: "fav", group: null, tags: ["cv/藤田茜"], q: "雨" }}
         onAddTag={() => {}}
         onRemoveTag={() => {}}
         onClearAll={() => {}}
@@ -70,7 +70,7 @@ describe("FilterChipBand のチップ", () => {
     expect(request?.body).toEqual({ groupBy: { kind: "tag" }, tags: ["cv/藤田茜"], q: "雨" });
   });
 
-  it("「＋絞り込み」の軸は定義済みの prefix 全部・タグ・追加日", async () => {
+  it("「＋絞り込み」のグループ分けは定義済みの prefix 全部・タグ・追加日", async () => {
     renderFilterChipBand(undefined, {
       tagPrefixes: [
         { prefix: "cv", label: "CV", color: "cv", protected: true, displayPriority: 0 } as never,
@@ -78,10 +78,10 @@ describe("FilterChipBand のチップ", () => {
     });
 
     await userEvent.click(screen.getByRole("button", { name: /絞り込み$/ }));
-    const axes = screen
+    const groupByButtons = screen
       .getAllByRole("button")
       .filter((b) => b.className.includes("mll-qlist__item"));
-    expect(axes.map((b) => b.textContent)).toEqual(["CV", "タグ", "追加日"]);
+    expect(groupByButtons.map((b) => b.textContent)).toEqual(["CV", "タグ", "追加日"]);
   });
 });
 
@@ -99,7 +99,7 @@ describe("FilterChipBand の件数表示", () => {
 
 describe("値一覧ペイン表示中の件数ラベルと＋絞り込みの扱い（ADR-0026）", () => {
   it("valueListItemCount指定時は絞り込み後件数の代わりにライブラリ全体である旨のラベルを出す", () => {
-    renderFilterChipBand(undefined, { valueListItemCount: 12, facetScope: undefined });
+    renderFilterChipBand(undefined, { valueListItemCount: 12, groupValueScope: undefined });
     expect(screen.getByText("12分類（件数はライブラリ全体）")).toBeInTheDocument();
     expect(screen.queryByText(/^\d+ 件$/)).toBeNull();
   });

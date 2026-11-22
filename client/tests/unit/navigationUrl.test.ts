@@ -7,7 +7,7 @@ import {
 } from "../../src/entities/navigation/model/navigationUrl";
 
 describe("navigation URL codec", () => {
-  it("round-trips a Japanese library axis with a tag filter and work", () => {
+  it("round-trips a Japanese library group with a tag filter and work", () => {
     const state: NavigationUrlState = {
       mode: "library",
       np: false,
@@ -239,7 +239,7 @@ describe("navigation URL codec", () => {
     expect(url).toBe("/library/all");
   });
 
-  it("rejects an unknown builtin-axis pseudo-tag with a warning instead of leaving a dead chip (ADR-0012 §2)", () => {
+  it("rejects an unknown builtin pseudo-tag with a warning instead of leaving a dead chip (ADR-0012 §2)", () => {
     const result = parseNavigationUrl(
       "/library/all?tags=%40unknown%2F2024&tags=cv%2F%E8%97%A4%E7%94%B0%E8%8C%9C",
     );

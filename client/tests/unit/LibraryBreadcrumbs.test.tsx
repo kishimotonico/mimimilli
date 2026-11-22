@@ -6,7 +6,7 @@ import LibraryBreadcrumbs from "../../src/features/library/ui/LibraryBreadcrumbs
 import { LibraryNavigationContext } from "../../src/features/library/model/libraryNavigationContext";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 import { mockApi } from "../helpers/api";
-import { buildAxisFacetItem } from "../helpers/builders";
+import { buildGroupValueItem } from "../helpers/builders";
 import { buildNav } from "./fixtures/libraryNav";
 import type {
   LibraryViewActions,
@@ -84,8 +84,8 @@ describe("LibraryBreadcrumbs", () => {
     const api = mockApi({
       "GET /api/tag-prefixes": [],
       "POST /api/smart-folders/:id/groups": [
-        buildAxisFacetItem({ value: "藤田茜", count: 4 }),
-        buildAxisFacetItem({ value: "天音かなで", count: 3 }),
+        buildGroupValueItem({ value: "藤田茜", count: 4 }),
+        buildGroupValueItem({ value: "天音かなで", count: 3 }),
       ],
     });
     const sizeMock = mockElementSize(260, 260);

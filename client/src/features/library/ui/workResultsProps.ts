@@ -20,7 +20,7 @@ export interface WorkResultsEmptyState {
 export interface WorkResultsProps {
   nav: ReadyLibraryNavigation;
   works: WorkListItem[];
-  /** 検索・軸・ソート・タグ変更を検知してスクロール位置をリセットする key */
+  /** 検索・グループ・ソート・タグ変更を検知してスクロール位置をリセットする key */
   worksQueryKey: string;
   /** 遷移中は直前の一覧を薄く表示する。 */
   isPending?: boolean;

@@ -2,28 +2,28 @@ import { useCallback, useEffect, useRef, useState, type FocusEvent } from "react
 import { useVirtualList, type UseVirtualListOptions } from "../../../shared/ui/useVirtualList";
 import { focusVirtualItem } from "../../../shared/lib/focusVirtualItem";
 import {
-  getNextAxisValueRowIndex,
+  getNextGroupValueRowIndex,
   nearestValueRowIndex,
-  type AxisValueRowArrowKey,
-} from "../model/axisValueRowNav";
-import type { AxisValueHierarchyRow } from "../model/axisValueHierarchy";
+  type GroupValueRowArrowKey,
+} from "../model/groupValueRowNav";
+import type { GroupValueHierarchyRow } from "../model/groupValueHierarchy";
 import { useRovingIndex } from "./useRovingIndex";
 
-interface UseAxisValueListNavOptions {
-  rows: readonly AxisValueHierarchyRow[];
+interface UseGroupValueListNavOptions {
+  rows: readonly GroupValueHierarchyRow[];
   virtualList: Omit<UseVirtualListOptions, "count" | "resetScrollTop">;
   /** 行インデックスから、その行のフォーカス対象要素を指すセレクタを返す */
   itemSelector: (rowIndex: number) => string;
 }
 
-// 値一覧（AxisValueRows・AxisValueQuickList）が共有する、仮想リスト・roving tabindex・
+// 値一覧（GroupValueRows・GroupValueQuickList）が共有する、仮想リスト・roving tabindex・
 // 矢印キー移動。現在位置は ref を正とし、フォーカス確定前に次のキー入力が来ても
 // 取りこぼさない。位置は virtualList.resetKey が変わるまで維持する。
-export function useAxisValueListNav({
+export function useGroupValueListNav({
   rows,
   virtualList,
   itemSelector,
-}: UseAxisValueListNavOptions) {
+}: UseGroupValueListNavOptions) {
   const list = useVirtualList({ ...virtualList, count: rows.length, resetScrollTop: true });
   const { scrollRef, virtualizer, virtualItems } = list;
 
@@ -46,10 +46,10 @@ export function useAxisValueListNav({
   });
   const rovingIndex = nearestValueRowIndex(rows, rawRovingIndex);
 
-  const moveFocus = (key: AxisValueRowArrowKey) => {
+  const moveFocus = (key: GroupValueRowArrowKey) => {
     const listEl = scrollRef.current;
     if (!listEl) return;
-    const nextIndex = getNextAxisValueRowIndex(rows, activeIndexRef.current, key);
+    const nextIndex = getNextGroupValueRowIndex(rows, activeIndexRef.current, key);
     if (nextIndex === -1 || nextIndex === activeIndexRef.current) return;
     updateActiveIndex(nextIndex);
     focusVirtualItem(listEl, virtualizer, nextIndex, itemSelector(nextIndex));

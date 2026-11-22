@@ -70,7 +70,7 @@ oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメン
 
 ## データモデルと永続化
 
-- `mimimilli.json` が Source of Truth。タイトル・タグ・分類軸情報などの作品メタデータはここに保持する
+- `mimimilli.json` が Source of Truth。タイトル・タグなどの作品メタデータはここに保持する
 - SQLiteは `bun:sqlite` + Drizzleを使い、`catalog.sqlite` と `user.sqlite` に分ける。catalogには作品メタ・走査状態・派生キャッシュ、userには設定・プリセット・スマートフォルダー・ブックマーク・レジューム・最終再生を置く
 - DLsite取得キャッシュだけは独立ファイル `dlsite-cache.sqlite`（`DlsiteCache`）に分ける。外部サイトのHTML・カバー画像が中身で、catalogからは計算し直せず寿命も無関係なため。自前DDLで作りmigration executorの対象外なので、スキーマを変えたらファイルごと作り直す（[ADR-0008](adr/0008-persistence-topology-query-ownership-playback-ids.md)、運用は [dlsite.md](dlsite.md)）
 - catalog接続をmainとしてuser DBを `user` でATTACHし、作品とuser状態をJOINして読む。DB間外部キーとcascade deleteは使わない

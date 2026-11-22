@@ -3,84 +3,75 @@
 // コンポーネントの配線から切り離してテスト可能にする。
 
 import {
-  buildBuiltinAxisTag,
-  isBuiltinPseudoTagAxis,
+  buildBuiltinPseudoTag,
   normalizeTag,
-  parseBuiltinAxisTag,
+  parseBuiltinPseudoTag,
   TagNormalizationError,
-  type AxisFacetItem,
+  type GroupValueItem,
   type CollectionStats,
   type GroupBy,
   type NormalizedTag,
 } from "@mimimilli/shared";
 import { ApiRequestError } from "../../../shared/api/http";
-import type { AxisId } from "../../../entities/library/types";
-import { getAxisLabel } from "../../../entities/library/axisDefinitions";
+import { getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
+import { groupByKey } from "./smartFolderEditing";
 
-// 組み込み軸の擬似タグ（year 等、ADR-0012 §2）の構築・解析・検証は shared/pseudoTag.ts に
-// 集約している（client・server の両方が同じ実装を使うため）。isBuiltinPseudoTagAxis /
-// buildBuiltinAxisTag / parseBuiltinAxisTag / splitSelectedTags は @mimimilli/shared から
+// 組み込みの擬似タグ（year 等、ADR-0012 §2）の構築・解析・検証は shared/pseudoTag.ts に
+// 集約している（client・server の両方が同じ実装を使うため）。isBuiltinPseudoTagKey /
+// buildBuiltinPseudoTag / parseBuiltinPseudoTag / splitSelectedTags は @mimimilli/shared から
 // 直接importする。
 
-/** facet/tag 軸の値一覧で1項目を選んだときにチップへ足す完全なタグ文字列を組み立てる。
- *  tag 軸は AxisFacetItem.value が既に完全なタグ文字列（ADR-0005）、
- *  year のようなタグ由来でない組み込み軸は擬似タグ、それ以外の facet 軸
- *  （prefix 定義に基づく実タグ由来の軸）は "軸/値" の実タグとして表現する。 */
-export function buildFilterTag(axis: AxisId, value: string): NormalizedTag {
-  if (axis === "tag") {
-    const normalized = normalizeTag(value);
-    if (normalized === null) throw new TagNormalizationError(value);
-    return normalized;
+/** グループ分けの値一覧で1項目を選んだときにチップへ足す完全なタグ文字列を組み立てる。
+ *  tag は GroupValueItem.value が既に完全なタグ文字列（ADR-0005）、
+ *  addedYear は擬似タグ（@year/値）、prefix は "prefix/値" の実タグとして表現する。 */
+export function buildFilterTag(groupBy: GroupBy, value: string): NormalizedTag {
+  switch (groupBy.kind) {
+    case "tag": {
+      const normalized = normalizeTag(value);
+      if (normalized === null) throw new TagNormalizationError(value);
+      return normalized;
+    }
+    case "addedYear":
+      return buildBuiltinPseudoTag("year", value);
+    case "prefix": {
+      const normalized = normalizeTag(`${groupBy.prefix}/${value}`);
+      if (normalized === null) throw new TagNormalizationError(`${groupBy.prefix}/${value}`);
+      return normalized;
+    }
   }
-  if (isBuiltinPseudoTagAxis(axis)) return buildBuiltinAxisTag(axis, value);
-  const normalized = normalizeTag(`${axis}/${value}`);
-  if (normalized === null) throw new TagNormalizationError(`${axis}/${value}`);
-  return normalized;
 }
 
-/** サーバー由来の facet 一覧から、buildFilterTag が正規化できない値を取り除く。
- *  軸の値一覧はこれを通ったデータだけを描画対象にすることで、不正値による
+/** サーバー由来の値一覧から、buildFilterTag が正規化できない値を取り除く。
+ *  グループの値一覧はこれを通ったデータだけを描画対象にすることで、不正値による
  *  render中throw（RootErrorBoundaryへの巻き込み）を経路として残さない。 */
-export function filterValidFacetItems<T extends AxisFacetItem>(axis: AxisId, items: T[]): T[] {
+export function filterValidGroupValueItems<T extends GroupValueItem>(
+  groupBy: GroupBy,
+  items: T[],
+): T[] {
   return items.filter((item) => {
     try {
-      buildFilterTag(axis, item.value);
+      buildFilterTag(groupBy, item.value);
       return true;
     } catch (cause) {
       if (!(cause instanceof TagNormalizationError)) throw cause;
-      console.warn(`軸「${axis}」の値「${item.value}」を正規化できないためスキップしました`, cause);
+      console.warn(
+        `グループ分け「${groupByKey(groupBy)}」の値「${item.value}」を正規化できないためスキップしました`,
+        cause,
+      );
       return false;
     }
   });
 }
 
-/** グループ分けの種類に対応する軸 ID（prefix 軸・タグ・追加年）。軸 ID は値一覧の部品が
- *  ラベル・アイコン・値→タグの変換に使う */
-export function axisOfGroupBy(groupBy: GroupBy): AxisId {
-  switch (groupBy.kind) {
-    case "prefix":
-      return groupBy.prefix;
-    case "tag":
-      return "tag";
-    case "addedYear":
-      return "year";
-  }
-}
-
-/** 「＋絞り込み」の軸選択で選ばれた軸のグループ分け */
-export function groupByOfAxis(axis: AxisId): GroupBy {
-  if (axis === "tag") return { kind: "tag" };
-  if (axis === "year") return { kind: "addedYear" };
-  return { kind: "prefix", prefix: axis };
-}
-
 /** チップ表示用の文字列。design-system.md の「チップはフルパス表示」規約は維持しつつ、
- *  組み込み軸の擬似タグ（@year/2023等）だけ内部表現ではなく「軸ラベル/値」（例:
+ *  組み込みの擬似タグ（@year/2023等）だけ内部表現ではなく「グループ分けのラベル/値」（例:
  *  「追加日/2023」）に変換する。実タグはそのまま tag を返す。 */
 export function formatFilterChipLabel(tag: NormalizedTag): string {
-  const builtin = parseBuiltinAxisTag(tag);
+  const builtin = parseBuiltinPseudoTag(tag);
   if (!builtin) return tag;
-  return `${getAxisLabel(builtin.axis)}/${builtin.value}`;
+  const groupBy: GroupBy =
+    builtin.key === "year" ? { kind: "addedYear" } : { kind: "prefix", prefix: builtin.key };
+  return `${getGroupByLabel(groupBy)}/${builtin.value}`;
 }
 
 /** 作品一覧の描画結果（グリッド・リスト・エラー境界）を再マウントすべきタイミングを表す

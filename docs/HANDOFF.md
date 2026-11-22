@@ -4,7 +4,7 @@ mimimilli の現状と進行中の作業を、後続のエージェント／セ�
 
 ## このアプリは何か
 
-DLsite/FANZA 等からダウンロードした音声作品（ASMR・ボイスドラマ等）をローカルで管理・再生する常駐 Web アプリ。タグ／分類軸ベースの検索と、物理フォルダー（ファイラー）の両モードを持つ。`mimimilli.json` を Source of Truth、SQLite を検索キャッシュとする。
+DLsite/FANZA 等からダウンロードした音声作品（ASMR・ボイスドラマ等）をローカルで管理・再生する常駐 Web アプリ。タグ／スマートフォルダーベースの検索と、物理フォルダー（ファイラー）の両モードを持つ。`mimimilli.json` を Source of Truth、SQLite を検索キャッシュとする。
 
 名前は3つ使い分けている。アプリ・パッケージ名は `mimimilli`、リポジトリ／ディレクトリ名は旧名の `mimikago` のまま、portless のサービス名は短い URL を保つため `mimi`。いずれも意図的なので揃えようとしないこと。
 
@@ -117,9 +117,9 @@ smokeテストの注意:
 
 ## クライアントの状態管理
 
-- **Jotai atom**: API由来でない UI 操作状態。ナビゲーション（後述の AppRoute）、library 表示設定（`features/library/model/atoms.ts`: libraryViewMode/libraryTileSize/libraryGridLayoutMode/axisValueSort）、player（後述）
+- **Jotai atom**: API由来でない UI 操作状態。ナビゲーション（後述の AppRoute）、library 表示設定（`features/library/model/atoms.ts`: libraryViewMode/libraryTileSize/libraryGridLayoutMode/groupValueSort）、player（後述）
 - **TanStack Query**: サーバー状態。キーは `client/src/entities/<ドメイン>/queryKeys.ts` のファクトリで一元管理する（`WORK_QUERY_KEYS` / `TAG_QUERY_KEYS` / `SMART_FOLDER_QUERY_KEYS` / `SETTINGS_QUERY_KEYS` / `FILE_SYSTEM_QUERY_KEYS`）。広域 invalidate 用のプレフィックスキーも各ファクトリが持つ
-- **ナビゲーションとURL同期**: 画面mode・Libraryの軸/タグ/選択作品/sort/検索語・Filesの場所/選択・作品詳細IDは `entities/navigation/model/appRouteStore.ts` の AppRoute 1つが正本で、各entityの `navigationAtoms.ts` はそこからの読み取り専用の派生。書き込みは各操作の write atom（次のrouteとpush/replaceを計算する純粋関数＋`navigate`）と履歴からの適用だけ。URLとの同期は `Providers` 直下の `NavigationHistorySync`（汎用の `shared/model/useRouteHistorySync.ts` に codec を渡す）が常時マウントで受け持つ（[ADR-0031](adr/0031-app-route-navigation.md)）。AddressBar の戻る/進む・パンくずも本物
+- **ナビゲーションとURL同期**: 画面mode・Libraryのスマートフォルダー/グループ/タグ/選択作品/sort/検索語・Filesの場所/選択・作品詳細IDは `entities/navigation/model/appRouteStore.ts` の AppRoute 1つが正本で、各entityの `navigationAtoms.ts` はそこからの読み取り専用の派生。書き込みは各操作の write atom（次のrouteとpush/replaceを計算する純粋関数＋`navigate`）と履歴からの適用だけ。URLとの同期は `Providers` 直下の `NavigationHistorySync`（汎用の `shared/model/useRouteHistorySync.ts` に codec を渡す）が常時マウントで受け持つ（[ADR-0031](adr/0031-app-route-navigation.md)）。AddressBar の戻る/進む・パンくずも本物
 - **scanのジョブ追跡**: スナップショット・SSE接続・世代管理・終端検知は React 外の純 TS ストア（`entities/scan/model/scanJobStore.ts`）が持つ。`getState`/`subscribe`（状態）と `subscribeEvents`（終端などの一回きりの通知）、`start`/`cancel`/`attach`（サーバー上の実行中ジョブへの後乗り）/`reset`（ローカルの追跡だけを捨てる。サーバー側のジョブには触れない）を持つ。ストアは Jotai store ごとに1つ（`scanJobStoreAtom`）で、操作は Runtime のマウントに依存しない。React からは `useScanJob` の `useStoreSelector` 経由の hook で読む。`ScanRuntime` はイベントをトースト・キャッシュ更新へつなぐだけ
 - **DLsite取得ジョブの追跡**: scanと同じ形の純 TS ストア（`entities/dlsite/model/dlsiteJobStore.ts`、`useDlsiteJob`）がSSE接続と現在のジョブ状態を持つ。`DlsiteJobRuntime` がコードの終端を候補一覧・作品キャッシュの更新とエラートーストへつなぐ。未登録タブの行の状態と上のバーの輪は、このストアから読む。候補一覧（`GET /scan/candidates`）はキャッシュ由来の状態（未取得・取得済み・該当なし・失敗）だけを返し、取得中の表示はジョブの状態からだけ出す。サーバー状態は revision が進むものだけ取り込み、行の表示は候補の値とジョブで見た終端の結果のうち revision が大きい方を出す（ジョブの終端で候補一覧は取り直さない）。作品の詳細と一覧の無効化は、終端に達したコードを集め、ジョブの終わりにまとめて行う。終わりを見ないままミラーのジョブが替わったコードは結果不明として、無効化に加えて候補一覧を1回取り直す（[ADR-0038](adr/0038-dlsite-job-state-revision.md)）
 - **共通UIコンポーネント**: `client/src/shared/ui/` の `Button` / `IconButton` / `TagCombobox` を使う（CSSクラス直付けボタンは廃止済み。円形トランスポートとトップバー・アドレスバーの道具 `ToolButton` は固有意匠）

@@ -8,7 +8,7 @@ import {
   workPlacementOf,
 } from "@mimimilli/shared";
 import type {
-  AxisFacetItem,
+  GroupValueItem,
   Condition,
   GroupBy,
   MissingWork,
@@ -44,7 +44,7 @@ import {
   hasTrackFile as hasTrackFileFromDb,
 } from "./workMediaQueries.ts";
 import {
-  axisFacetSql,
+  groupValueSql,
   chunk,
   inClausePlaceholders,
   JOINED_WORKS_SELECT,
@@ -53,7 +53,7 @@ import {
   worksOrderSql,
 } from "./workQuerySql.ts";
 import {
-  type AxisFacetRow,
+  type GroupValueRow,
   type ListSummariesResult,
   mapRawWorkRows,
   parseDlsiteStateJson,
@@ -519,9 +519,9 @@ export class WorkQueryRepository {
   }
 
   /** 条件の木に一致する作品を、グループ分けの値ごとに集計する（ADR-0040） */
-  groupWorksByCondition(query: ConditionGroupQuery, ctx: EvalContext): AxisFacetItem[] {
+  groupWorksByCondition(query: ConditionGroupQuery, ctx: EvalContext): GroupValueItem[] {
     const compiled = compileCondition(query.condition, ctx);
-    return this.facetItems(query.groupBy, [compiled.sql], compiled.bindings);
+    return this.groupValueItems(query.groupBy, [compiled.sql], compiled.bindings);
   }
 
   /** 条件ごとの一致件数を1回の走査で数える。入力と同じ順で返す */
@@ -535,19 +535,19 @@ export class WorkQueryRepository {
     return compiled.map((_, index) => row[`c${index}`]!);
   }
 
-  private facetItems(
+  private groupValueItems(
     groupBy: GroupBy,
     conditions: string[],
     bindings: Array<string | number>,
-  ): AxisFacetItem[] {
+  ): GroupValueItem[] {
     const filterWhere = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    let rows: AxisFacetRow[];
+    let rows: GroupValueRow[];
 
     if (groupBy.kind === "addedYear") {
       rows = this.db.sqlite
         .query(
-          axisFacetSql(`
+          groupValueSql(`
             SELECT substr(work_states.added_at, 1, 4) AS value,
                    works.id AS work_id,
                    work_states.added_at AS added_at,
@@ -561,11 +561,11 @@ export class WorkQueryRepository {
             ${filterWhere}
           `),
         )
-        .all(...bindings) as AxisFacetRow[];
+        .all(...bindings) as GroupValueRow[];
     } else if (groupBy.kind === "tag") {
       rows = this.db.sqlite
         .query(
-          axisFacetSql(`
+          groupValueSql(`
             SELECT tags.name AS value,
                    works.id AS work_id,
                    work_states.added_at AS added_at,
@@ -581,7 +581,7 @@ export class WorkQueryRepository {
             ${filterWhere}
           `),
         )
-        .all(...bindings) as AxisFacetRow[];
+        .all(...bindings) as GroupValueRow[];
     } else {
       const prefixConditions = [
         "substr(tags.name, 1, instr(tags.name, '/') - 1) = ?",
@@ -589,7 +589,7 @@ export class WorkQueryRepository {
       ];
       rows = this.db.sqlite
         .query(
-          axisFacetSql(`
+          groupValueSql(`
             SELECT substr(tags.name, instr(tags.name, '/') + 1) AS value,
                    works.id AS work_id,
                    work_states.added_at AS added_at,
@@ -605,10 +605,10 @@ export class WorkQueryRepository {
             WHERE ${prefixConditions.join(" AND ")}
           `),
         )
-        .all(groupBy.prefix, ...bindings) as AxisFacetRow[];
+        .all(groupBy.prefix, ...bindings) as GroupValueRow[];
     }
 
-    const versions = this.facetCoverVersions(
+    const versions = this.groupValueCoverVersions(
       rows.flatMap((row) =>
         (JSON.parse(row.coversJson) as Array<{ workId: string }>).map((cover) => cover.workId),
       ),
@@ -619,7 +619,7 @@ export class WorkQueryRepository {
       count: row.count,
       durationSec: row.durationSec,
       covers: (
-        JSON.parse(row.coversJson) as Array<Omit<AxisFacetItem["covers"][number], "version">>
+        JSON.parse(row.coversJson) as Array<Omit<GroupValueItem["covers"][number], "version">>
       ).flatMap((cover) => {
         const version = versions.get(cover.workId);
         return version === undefined ? [] : [{ ...cover, version }];
@@ -627,7 +627,7 @@ export class WorkQueryRepository {
     }));
   }
 
-  private facetCoverVersions(workIds: string[]): Map<string, string> {
+  private groupValueCoverVersions(workIds: string[]): Map<string, string> {
     const uniqueIds = [...new Set(workIds)];
     const versions = new Map<string, string>();
     if (uniqueIds.length === 0) return versions;

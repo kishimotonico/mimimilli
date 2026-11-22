@@ -21,8 +21,7 @@ import {
   folderWorksKey,
   folderWorksParams,
 } from "./workPatchInvalidation";
-import { axisOfGroupBy } from "./libraryPresentation";
-import { useAxisFacetsQuery } from "./useAxisFacetsQuery";
+import { useGroupValuesQuery } from "./useGroupValuesQuery";
 import type { ReadyLibraryViewState } from "./useLibraryNavigation";
 
 /** 検索クエリのデバウンス時間。1文字ごとの全件検索発行を間引く */
@@ -82,7 +81,7 @@ export function useLibraryDebouncedSearchQuery(searchQuery: string) {
  *  パンくずの兄弟値と同じ母集団（絞り込み無し）なので、同じ query を共有する */
 export function useFolderGroupValuesQuery(view: ResolvedLibraryView) {
   const groupBy = view.kind === "value-list" ? view.groupBy : null;
-  return useAxisFacetsQuery(groupBy === null ? null : axisOfGroupBy(groupBy), {
+  return useGroupValuesQuery(groupBy, {
     folderId: view.folder.id,
   });
 }
@@ -102,10 +101,10 @@ export function useLibrarySupportingQueries(nav: ReadyLibraryViewState) {
   } = useTagPrefixes();
 
   return {
-    facetItems: groupValuesQuery.data ?? [],
-    isFacetLoading: groupValuesQuery.isLoading,
-    isFacetError: groupValuesQuery.isError,
-    refetchFacets: groupValuesQuery.refetch,
+    groupValueItems: groupValuesQuery.data ?? [],
+    isGroupValuesLoading: groupValuesQuery.isLoading,
+    isGroupValuesError: groupValuesQuery.isError,
+    refetchGroupValues: groupValuesQuery.refetch,
     selectedWork: workDetailQuery.data ?? null,
     workDetailQuery,
     tagSuggestions: tagsQuery.data ?? [],

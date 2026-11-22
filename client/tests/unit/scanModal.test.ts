@@ -1281,7 +1281,7 @@ describe("ScanModal", () => {
     expect(screen.queryByRole("tabpanel", { name: /^新規作品/ })).toBeNull();
   });
 
-  it("候補登録に成功すると作品一覧・軸件数・DLsite通知・スマートフォルダーのクエリを無効化する", async () => {
+  it("候補登録に成功すると作品一覧・値一覧・DLsite通知・スマートフォルダーのクエリを無効化する", async () => {
     registerReply = buildScanCandidatesRegisterResponse({
       registered: [{ path: candidateDetected.path, workId: "w-detected", coverSkipped: null }],
     });
@@ -1296,7 +1296,7 @@ describe("ScanModal", () => {
     fireEvent.click(within(unregistered).getByRole("button", { name: "1件を追加" }));
 
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["works"] }));
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["axisFacets"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["groupValues"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["smartFolderWorks"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: SCAN_QUERY_KEYS.last() });
   });
@@ -1360,7 +1360,7 @@ describe("ScanModal", () => {
     expect(screen.queryByRole("tabpanel", { name: /^新規作品/ })).toBeNull();
   });
 
-  it("候補の除外では作品一覧・軸件数・スマートフォルダーの再取得を行わない（AC#4）", async () => {
+  it("候補の除外では作品一覧・値一覧・スマートフォルダーの再取得を行わない（AC#4）", async () => {
     const { queryClient } = renderModal({
       candidates: [candidateUndetected],
     });
@@ -1382,7 +1382,7 @@ describe("ScanModal", () => {
       }),
     );
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["works"] });
-    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["axisFacets"] });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["groupValues"] });
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["smartFolderWorks"] });
   });
 

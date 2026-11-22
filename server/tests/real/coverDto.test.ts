@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
-import { axisFacetListSchema, emptyDlsiteState, type WorksPage } from "@mimimilli/shared";
+import { groupValueListSchema, emptyDlsiteState, type WorksPage } from "@mimimilli/shared";
 import { createApp } from "../helpers/testApp.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
@@ -127,7 +127,7 @@ test("real: カバー実体欠損作品は値一覧の covers から除外され
     body: JSON.stringify({ groupBy: { kind: "addedYear" } }),
   });
   assert.equal(res.status, 200);
-  const items = axisFacetListSchema.parse(await res.json());
+  const items = groupValueListSchema.parse(await res.json());
   const year = items.find((item) => item.value === "2026");
   assert.ok(year);
   assert.equal(year.count, 2);

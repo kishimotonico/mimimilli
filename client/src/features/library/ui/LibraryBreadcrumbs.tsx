@@ -2,9 +2,8 @@ import { useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { ALL_SMART_FOLDER_ID } from "@mimimilli/shared";
 import Breadcrumbs from "../../../shared/ui/Breadcrumbs";
-import { getAxisLabel } from "../../../entities/library/axisDefinitions";
+import { getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
 import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
-import { axisOfGroupBy } from "../model/libraryPresentation";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import GroupValuePopover from "./GroupValuePopover";
 
@@ -35,8 +34,8 @@ export default function LibraryBreadcrumbs() {
           <GroupValuePopover
             key="siblings"
             folderId={view.folder.id}
-            axis={axisOfGroupBy(groupBy)}
-            axisLabel={getAxisLabel(axisOfGroupBy(groupBy), tagPrefixes)}
+            groupBy={groupBy}
+            groupByLabel={getGroupByLabel(groupBy, tagPrefixes)}
             anchorEl={siblingAnchor}
             selectedValue={group}
             onSelectValue={nav.selectGroupValue}

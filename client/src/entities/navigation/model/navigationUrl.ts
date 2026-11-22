@@ -1,6 +1,6 @@
 import {
   ALL_SMART_FOLDER_ID,
-  buildBuiltinAxisTag,
+  buildBuiltinPseudoTag,
   splitSelectedTags,
   type NormalizedTag,
 } from "@mimimilli/shared";
@@ -83,7 +83,7 @@ function uniqueNonEmpty(values: string[]): string[] {
 function parseAndValidateSelectedTags(rawValues: string[], warnings: string[]): NormalizedTag[] {
   const { tags, yearValue, warnings: splitWarnings } = splitSelectedTags(uniqueNonEmpty(rawValues));
   for (const warning of splitWarnings) warnings.push(`選択タグを検証しました: ${warning}`);
-  return yearValue !== null ? [...tags, buildBuiltinAxisTag("year", yearValue)] : tags;
+  return yearValue !== null ? [...tags, buildBuiltinPseudoTag("year", yearValue)] : tags;
 }
 
 function parseSelectedRelPath(value: string, warnings: string[]): string[] | null {

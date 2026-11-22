@@ -6,17 +6,17 @@ import type { ResolvedLibraryView } from "../../../entities/library/resolveLibra
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { SortId } from "@mimimilli/shared";
 import { SORT_OPTIONS } from "../../../entities/library/types";
-import { axisValueSortAtom } from "../model/atoms";
+import { groupValueSortAtom } from "../model/atoms";
 import {
   clearLibrarySortAtom,
   reshuffleLibrarySeedAtom,
 } from "../../../entities/library/model/navigationActions";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import {
-  AXIS_VALUE_SORT_OPTIONS,
-  selectAxisValueSortKey,
-  type AxisValueSortKey,
-} from "../model/axisValueSort";
+  GROUP_VALUE_SORT_OPTIONS,
+  selectGroupValueSortKey,
+  type GroupValueSortKey,
+} from "../model/groupValueSort";
 import { updateSmartFolder } from "../../../entities/smart-folder/api";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
@@ -29,12 +29,12 @@ function getSortLabel(sortId: SortId): string | undefined {
   return SORT_OPTIONS.find((opt) => opt.id === sortId)?.label;
 }
 
-function getAxisValueSortLabel(key: AxisValueSortKey): string {
-  return AXIS_VALUE_SORT_OPTIONS.find((opt) => opt.id === key)?.label ?? key;
+function getGroupValueSortLabel(key: GroupValueSortKey): string {
+  return GROUP_VALUE_SORT_OPTIONS.find((opt) => opt.id === key)?.label ?? key;
 }
 
 // ADR-0012 帰結: ソートは UI が単一系・state が二重。結果面が値一覧のときは
-// axisValueSortAtom（名前/件数/総時間）、作品一覧のときは今の並び（履歴エントリーの状態。
+// groupValueSortAtom（名前/件数/総時間）、作品一覧のときは今の並び（履歴エントリーの状態。
 // ADR-0041）を接続先として切り替える。今の並びが解決後の既定から外れているときだけ
 // 「この並びを既定にする」を出し、スマートフォルダーの既定の並びとして保存する。
 export default function LibrarySortMenu() {
@@ -59,7 +59,7 @@ function ReadySortMenu({
 }) {
   const routeFolderId = useAtomValue(libraryRouteAtom).folderId;
   const queryClient = useQueryClient();
-  const [axisValueSort, setAxisValueSort] = useAtom(axisValueSortAtom);
+  const [groupValueSort, setGroupValueSort] = useAtom(groupValueSortAtom);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
   const reshuffle = useSetAtom(reshuffleLibrarySeedAtom);
@@ -69,7 +69,7 @@ function ReadySortMenu({
   const disabled = view.kind === "broken";
   const sort = view.sort;
   const currentSortLabel = isValueListPane
-    ? getAxisValueSortLabel(axisValueSort.key)
+    ? getGroupValueSortLabel(groupValueSort.key)
     : getSortLabel(sort);
 
   const toast = useToast();
@@ -164,20 +164,20 @@ function ReadySortMenu({
           onKeyDown={handleMenuKeyDown}
         >
           {isValueListPane
-            ? AXIS_VALUE_SORT_OPTIONS.map((opt) => (
+            ? GROUP_VALUE_SORT_OPTIONS.map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
                   role="menuitemradio"
-                  aria-checked={axisValueSort.key === opt.id}
-                  className={`mle-sortmenu__item ${axisValueSort.key === opt.id ? "is-checked" : ""}`}
+                  aria-checked={groupValueSort.key === opt.id}
+                  className={`mle-sortmenu__item ${groupValueSort.key === opt.id ? "is-checked" : ""}`}
                   onClick={() => {
-                    setAxisValueSort(selectAxisValueSortKey(axisValueSort, opt.id));
+                    setGroupValueSort(selectGroupValueSortKey(groupValueSort, opt.id));
                     closeSortMenu();
                   }}
                 >
                   <span className="check">
-                    {axisValueSort.key === opt.id && <I.check size={14} />}
+                    {groupValueSort.key === opt.id && <I.check size={14} />}
                   </span>
                   <span className="label">{opt.label}</span>
                 </button>

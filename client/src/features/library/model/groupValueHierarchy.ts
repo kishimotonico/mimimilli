@@ -1,13 +1,13 @@
 // 入れ子タグ（スラッシュ複数のタグ）の階層表現（ADR-0012 §5）。名前順ソートのときだけ
 // インデント＋葉ラベルの木構造として並べ、件数・総時間ソートのときはフルパスの平坦表示に
-// フォールバックする。中間ノードは実際にタグとして存在する（facetItems に value として
+// フォールバックする。中間ノードは実際にタグとして存在する（groupValueItems に value として
 // 現れる）場合だけ選択可能な値行になり、それ以外は選択不可の見出し行になる
 // （完全一致セマンティクス ADR-0005 §6 と衝突する「配下を含む絞り込み」は作らない）。
 
-import type { AxisFacetItem } from "@mimimilli/shared";
-import type { SortDirection } from "./axisValueSort";
+import type { GroupValueItem } from "@mimimilli/shared";
+import type { SortDirection } from "./groupValueSort";
 
-export interface AxisValueHeadingRow {
+export interface GroupValueHeadingRow {
   kind: "heading";
   depth: number;
   /** 見出しまでのフルパス（子ノードの構築キーにのみ使う） */
@@ -15,20 +15,20 @@ export interface AxisValueHeadingRow {
   label: string;
 }
 
-export interface AxisValueValueRow {
+export interface GroupValueValueRow {
   kind: "value";
   depth: number;
   path: string;
   label: string;
-  item: AxisFacetItem;
+  item: GroupValueItem;
 }
 
-export type AxisValueHierarchyRow = AxisValueHeadingRow | AxisValueValueRow;
+export type GroupValueHierarchyRow = GroupValueHeadingRow | GroupValueValueRow;
 
 interface TreeNode {
   label: string;
   path: string;
-  item: AxisFacetItem | null;
+  item: GroupValueItem | null;
   children: Map<string, TreeNode>;
 }
 
@@ -41,10 +41,10 @@ function getOrCreateChild(parent: TreeNode, segment: string, path: string): Tree
 }
 
 /** 名前順ソート用の階層構造を構築する。items の順序には依存しない（各階層で並べ替える）。 */
-export function buildAxisValueHierarchy(
-  items: AxisFacetItem[],
+export function buildGroupValueHierarchy(
+  items: GroupValueItem[],
   direction: SortDirection = "asc",
-): AxisValueHierarchyRow[] {
+): GroupValueHierarchyRow[] {
   const root: TreeNode = { label: "", path: "", item: null, children: new Map() };
 
   for (const item of items) {
@@ -59,7 +59,7 @@ export function buildAxisValueHierarchy(
   }
 
   const dir = direction === "asc" ? 1 : -1;
-  const rows: AxisValueHierarchyRow[] = [];
+  const rows: GroupValueHierarchyRow[] = [];
 
   const visit = (node: TreeNode, depth: number) => {
     const children = [...node.children.values()].sort(
@@ -80,7 +80,7 @@ export function buildAxisValueHierarchy(
 }
 
 /** 平坦表示（件数・総時間ソート、またはフォールバック）。全行 depth=0・kind="value"。 */
-export function flattenAxisValueRows(items: AxisFacetItem[]): AxisValueHierarchyRow[] {
+export function flattenGroupValueRows(items: GroupValueItem[]): GroupValueHierarchyRow[] {
   return items.map((item) => ({
     kind: "value",
     depth: 0,

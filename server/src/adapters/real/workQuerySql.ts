@@ -132,7 +132,7 @@ export const WORKS_QUERY_FROM = `
   FROM main.works
   INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id`;
 
-export function axisFacetSql(baseSelect: string): string {
+export function groupValueSql(baseSelect: string): string {
   return `
     WITH base AS (${baseSelect}),
     ranked_covers AS (

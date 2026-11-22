@@ -1,4 +1,4 @@
-import type { AxisFacetItem } from "@mimimilli/shared";
+import type { GroupValueItem } from "@mimimilli/shared";
 import { getCoverImageUrl } from "../../../entities/work/api";
 import { I, type IconName } from "../../../shared/ui/Icon";
 
@@ -6,11 +6,11 @@ import { I, type IconName } from "../../../shared/ui/Icon";
 // grid タイル・list 行・サイドバーのクイックオーバーレイが共有する部品。
 
 interface CoverCollageProps {
-  covers: AxisFacetItem["covers"];
+  covers: GroupValueItem["covers"];
   /** px指定なら固定サイズ（list行32pxなど）。省略時はCSS側（100%+aspect-ratio）に任せる（grid タイル用） */
   size?: number;
   radius?: number;
-  /** 代表カバーが0件のときに中央へ置く軸アイコン */
+  /** 代表カバーが0件のときに中央へ置くグループ分けのアイコン */
   fallbackIcon: IconName;
   requestWidth?: number;
 }

@@ -1,26 +1,26 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useAtom } from "jotai";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
-import type { AxisFacetItem } from "@mimimilli/shared";
+import type { GroupBy, GroupValueItem } from "@mimimilli/shared";
 import {
-  AXIS_VALUE_SORT_OPTIONS,
-  toggleAxisValueSort,
-  type AxisValueSortState,
-} from "../model/axisValueSort";
-import { axisValueSortAtom } from "../model/atoms";
-import { buildAxisValueDisplayRows } from "../model/axisValueDisplayRows";
-import { isAxisValueRowArrowKey } from "../model/axisValueRowNav";
-import type { AxisId } from "../../../entities/library/types";
+  GROUP_VALUE_SORT_OPTIONS,
+  toggleGroupValueSort,
+  type GroupValueSortState,
+} from "../model/groupValueSort";
+import { groupValueSortAtom } from "../model/atoms";
+import { groupByKey } from "../model/smartFolderEditing";
+import { buildGroupValueDisplayRows } from "../model/groupValueDisplayRows";
+import { isGroupValueRowArrowKey } from "../model/groupValueRowNav";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
-import { useAxisValueListNav } from "./useAxisValueListNav";
+import { useGroupValueListNav } from "./useGroupValueListNav";
 
 // サイドバーのクイックオーバーレイ・「＋絞り込み」・チップの兄弟値ドロップダウン
 // が共有する簡易値リスト。データ取得・フィルタ・ソートは値一覧本体
-// （AxisValueList / axisValueFilter / axisValueSort / axisValueHierarchy）と同じロジックを
+// （GroupValueList / groupValueFilter / groupValueSort / groupValueHierarchy）と同じロジックを
 // 使い回し、描画だけを簡易化する（コラージュは持たない）。CV・サークルは数百〜数千件に
-// なりうるため、値一覧本体（AxisValueRows）と同じ @tanstack/react-virtual で仮想化する
+// なりうるため、値一覧本体（GroupValueRows）と同じ @tanstack/react-virtual で仮想化する
 // （ADR-0012 §7: ホバーで開く導線が件数に耐えないと「素早い乗り換え」の前提が崩れる）。
 // 入れ子タグは名前順ソート時のみインデント表示にする（値一覧と同じ規則）。
 
@@ -29,32 +29,32 @@ const INDENT_PER_DEPTH = 12;
 const ROW_ESTIMATE_SIZE = 29;
 const LIST_PADDING = 4;
 
-interface AxisValueQuickListProps {
-  axis: AxisId;
-  /** 表示用の軸ラベル。呼び出し側が tagPrefixes を解決して渡す
-   *  （getAxisLabel(axis) を tagPrefixes なしで呼ぶと未登録prefixでIDがそのまま出るため） */
-  axisLabel: string;
+interface GroupValueQuickListProps {
+  groupBy: GroupBy;
+  /** 表示用のグループ分けのラベル。呼び出し側が tagPrefixes を解決して渡す
+   *  （getGroupByLabel(groupBy) を tagPrefixes なしで呼ぶと未登録prefixでIDがそのまま出るため） */
+  groupByLabel: string;
   /** 呼び出し側の開閉状態。AnimatePresence の退出アニメーション中に isOpen=false のまま
-   *  axis が変わらず再オープンされるケース（Escapeで閉じてすぐ同じ軸を開き直す等）でも
-   *  検索欄へフォーカスし直すため、axis 単体ではなくこの値の変化も見る */
+   *  グループ分けが変わらず再オープンされるケース（Escapeで閉じてすぐ同じグループ分けを開き直す等）でも
+   *  検索欄へフォーカスし直すため、groupBy 単体ではなくこの値の変化も見る */
   isOpen: boolean;
-  items: AxisFacetItem[];
+  items: GroupValueItem[];
   isLoading?: boolean;
   isError?: boolean;
   isSelected: (tag: string) => boolean;
   /** 値を選択したときのハンドラ。Ctrl/Cmdキーで既定動作を反転する（呼び出し側が解釈する） */
-  onSelect: (item: AxisFacetItem, event: { ctrlKey: boolean; metaKey: boolean }) => void;
+  onSelect: (item: GroupValueItem, event: { ctrlKey: boolean; metaKey: boolean }) => void;
   /** ホバー/フォーカス時に出る＋ボタン（冪等なAND追加。選択済み行には出さない）。
    *  省略時はボタンを出さない（ADR-0013） */
-  onAdd?: (item: AxisFacetItem) => void;
+  onAdd?: (item: GroupValueItem) => void;
   /** useAnchoredPopover / usePopoverDismissal が返す close をそのまま渡す */
   close: () => void;
   emptyLabel?: string;
 }
 
 interface SortMenuProps {
-  sort: AxisValueSortState;
-  onToggle: (id: (typeof AXIS_VALUE_SORT_OPTIONS)[number]["id"]) => void;
+  sort: GroupValueSortState;
+  onToggle: (id: (typeof GROUP_VALUE_SORT_OPTIONS)[number]["id"]) => void;
 }
 
 /** ソート切替メニュー。height:0↔auto の collapse で開閉する。
@@ -68,7 +68,7 @@ function SortMenu({ sort, onToggle }: SortMenuProps) {
     <motion.div style={{ overflow: "hidden" }} inert={!isPresent} {...v}>
       {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- ソート切替はボタン列で表現する */}
       <div className="mll-qlist__sort" role="group" aria-label="並び替え">
-        {AXIS_VALUE_SORT_OPTIONS.map((opt) => {
+        {GROUP_VALUE_SORT_OPTIONS.map((opt) => {
           const isActive = sort.key === opt.id;
           const directionLabel = isActive ? (sort.direction === "asc" ? "昇順" : "降順") : null;
           return (
@@ -94,9 +94,9 @@ function SortMenu({ sort, onToggle }: SortMenuProps) {
   );
 }
 
-export default function AxisValueQuickList({
-  axis,
-  axisLabel,
+export default function GroupValueQuickList({
+  groupBy,
+  groupByLabel,
   isOpen,
   items,
   isLoading,
@@ -106,27 +106,28 @@ export default function AxisValueQuickList({
   onAdd,
   close,
   emptyLabel = "項目がありません",
-}: AxisValueQuickListProps) {
+}: GroupValueQuickListProps) {
+  const groupKey = groupByKey(groupBy);
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useAtom(axisValueSortAtom);
+  const [sort, setSort] = useAtom(groupValueSortAtom);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const sortToggleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     // 退出中（isOpen=false）は何もしない。closeDelay中に isOpen が再び true に
-    // なったときは axis が変わっていなくても改めて発火させたいので、依存配列に
-    // axis だけでなく isOpen も含める。
+    // なったときは グループ分けが変わっていなくても改めて発火させたいので、依存配列に
+    // groupBy だけでなく isOpen も含める。
     if (!isOpen) return;
     searchRef.current?.focus({ preventScroll: true });
     setQuery("");
     setSortMenuOpen(false);
-  }, [axis, isOpen]);
+  }, [groupKey, isOpen]);
 
-  const currentSortLabel = AXIS_VALUE_SORT_OPTIONS.find((opt) => opt.id === sort.key)?.label ?? "";
+  const currentSortLabel = GROUP_VALUE_SORT_OPTIONS.find((opt) => opt.id === sort.key)?.label ?? "";
 
-  const rows = buildAxisValueDisplayRows(items, query, sort);
-  const resetKey = `${axis}:${sort.key}:${sort.direction}:${query}`;
+  const rows = buildGroupValueDisplayRows(items, query, sort);
+  const resetKey = `${groupKey}:${sort.key}:${sort.direction}:${query}`;
 
   const {
     scrollRef,
@@ -136,11 +137,11 @@ export default function AxisValueQuickList({
     rovingIndex,
     moveFocus,
     handleListFocus,
-  } = useAxisValueListNav({
+  } = useGroupValueListNav({
     rows,
     virtualList: {
       estimateSize: ROW_ESTIMATE_SIZE,
-      // resetKey（軸・ソート・検索語）が変わらない限り位置をリセットしない。AND追加ボタンで
+      // resetKey（グループ分け・ソート・検索語）が変わらない限り位置をリセットしない。AND追加ボタンで
       // items の参照だけが変わっても、スクロール位置・キーボード位置は維持する
       // （ADR-0013: AND追加はオーバーレイを開いたまま連続で行える）。
       resetKey,
@@ -158,7 +159,7 @@ export default function AxisValueQuickList({
       return;
     }
     const key = event.key;
-    if (!isAxisValueRowArrowKey(key)) return;
+    if (!isGroupValueRowArrowKey(key)) return;
     // Home/Endは検索入力欄のカーソル移動（ネイティブ動作）を横取りしない。矢印キーは
     // 検索欄側が個別処理する（handleSearchKeyDown）ため、ここへは既に処理済みで届かない。
     if ((key === "Home" || key === "End") && event.target instanceof HTMLInputElement) return;
@@ -190,8 +191,8 @@ export default function AxisValueQuickList({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleSearchKeyDown}
-          placeholder={`${axisLabel}を検索`}
-          aria-label={`${axisLabel}の値を検索`}
+          placeholder={`${groupByLabel}を検索`}
+          aria-label={`${groupByLabel}の値を検索`}
         />
         <button
           ref={sortToggleRef}
@@ -215,7 +216,7 @@ export default function AxisValueQuickList({
           <SortMenu
             key="sort-menu"
             sort={sort}
-            onToggle={(id) => setSort(toggleAxisValueSort(sort, id))}
+            onToggle={(id) => setSort(toggleGroupValueSort(sort, id))}
           />
         )}
       </AnimatePresence>
@@ -232,7 +233,7 @@ export default function AxisValueQuickList({
           className="mll-qlist__body"
           // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 値ボタン集合を名前付き集合として表す。fieldset等の代替タグは適合しない
           role="group"
-          aria-label={`${axisLabel}の値一覧`}
+          aria-label={`${groupByLabel}の値一覧`}
           onFocus={handleListFocus}
         >
           <div style={wrapperStyle}>

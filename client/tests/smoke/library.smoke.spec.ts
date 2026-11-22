@@ -64,7 +64,7 @@ test("パンくずの値から兄弟の値へ移れる", async ({ page }) => {
   assertNoErrors(tracker);
 });
 
-test("軸の値一覧をグリッド表示に切り替えられる", async ({ page }) => {
+test("グループの値一覧をグリッド表示に切り替えられる", async ({ page }) => {
   const tracker = trackErrors(page);
   await openApp(page);
 
@@ -83,10 +83,10 @@ test("タグ別を名前順にすると入れ子タグが階層表示される",
 
   await railRow(page, "タグ別").click();
   // 既定は件数ソート。名前順に切り替えると入れ子タグがインデント＋見出し行で並ぶ
-  // （axisValueHierarchy.ts）。見出し行はrole="heading"を持たないためクラスで特定する。
+  // （groupValueHierarchy.ts）。見出し行はrole="heading"を持たないためクラスで特定する。
   await page.getByRole("button", { name: "名前" }).click();
 
-  const valueList = page.locator(".mle-col.is-axis-values");
+  const valueList = page.locator(".mle-col.is-group-values");
   await expect(valueList.locator(".mll-vrow-heading").first()).toBeVisible();
 
   assertNoErrors(tracker);
@@ -104,7 +104,7 @@ test("値の作品一覧で「＋絞り込み」からチップを足せる", as
 
   await page.getByRole("button", { name: "絞り込み" }).click();
   await page
-    .getByRole("listbox", { name: "絞り込む軸" })
+    .getByRole("listbox", { name: "絞り込みの種類" })
     .getByRole("button", { name: "サークル" })
     .click();
   await page
@@ -647,7 +647,7 @@ test("主要画面でヨコ方向スクロールが発生しない", async ({ pa
   await openApp(page);
   await expectNoHorizontalOverflow(page);
 
-  // 軸の値一覧（CV軸選択時は結果面が値一覧に置き換わる。ADR-0012）
+  // グループの値一覧（CV別を開いたときは結果面が値一覧に置き換わる。ADR-0012）
   await page.getByRole("button", { name: "CV" }).click();
   const valueList = page.getByRole("group", { name: "CVの値一覧" });
   await expect(valueList.getByRole("button").first()).toBeVisible();

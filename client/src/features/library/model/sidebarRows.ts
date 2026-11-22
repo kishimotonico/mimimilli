@@ -1,5 +1,5 @@
 import { isHasErrorOnly, isHiddenWhenEmpty, showsCount, type SmartFolder } from "@mimimilli/shared";
-import { getSmartFolderIcon } from "../../../entities/library/axisDefinitions";
+import { getSmartFolderIcon } from "../../../entities/library/smartFolderDefinitions";
 import type { IconName } from "../../../shared/ui/Icon";
 
 /** 診断上のデータ不整合の件数（ADR-0039）。取得中・取得失敗は unknown で、0件とは扱わない */

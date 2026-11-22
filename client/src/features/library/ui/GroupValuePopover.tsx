@@ -1,17 +1,17 @@
 import { createPortal } from "react-dom";
+import type { GroupBy } from "@mimimilli/shared";
 import { motion, useIsPresent } from "motion/react";
 import { useAnchoredPopover } from "../../../shared/ui/useAnchoredPopover";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
-import { useAxisFacetsQuery } from "../model/useAxisFacetsQuery";
-import type { AxisId } from "../../../entities/library/types";
-import AxisValueQuickList from "./AxisValueQuickList";
+import { useGroupValuesQuery } from "../model/useGroupValuesQuery";
+import GroupValueQuickList from "./GroupValueQuickList";
 
 const POPOVER_WIDTH = 240;
 
 interface GroupValuePopoverProps {
   folderId: string;
-  axis: AxisId;
-  axisLabel: string;
+  groupBy: GroupBy;
+  groupByLabel: string;
   anchorEl: HTMLElement;
   selectedValue: string;
   onSelectValue: (value: string) => void;
@@ -21,15 +21,15 @@ interface GroupValuePopoverProps {
 /** パンくずの値から、同じグループ分けの兄弟の値を選ぶ（ADR-0041）。件数は絞り込み無しで数える */
 export default function GroupValuePopover({
   folderId,
-  axis,
-  axisLabel,
+  groupBy,
+  groupByLabel,
   anchorEl,
   selectedValue,
   onSelectValue,
   onClose,
 }: GroupValuePopoverProps) {
   const isPresent = useIsPresent();
-  const facetQuery = useAxisFacetsQuery(axis, { folderId });
+  const groupValuesQuery = useGroupValuesQuery(groupBy, { folderId });
   const { popoverScale } = useMotionVariants();
   const variant = popoverScale({ origin: "top left" });
   const { setFloating, floatingStyles, close } = useAnchoredPopover({
@@ -49,13 +49,13 @@ export default function GroupValuePopover({
       style={floatingStyles}
       inert={!isPresent}
     >
-      <AxisValueQuickList
-        axis={axis}
-        axisLabel={axisLabel}
+      <GroupValueQuickList
+        groupBy={groupBy}
+        groupByLabel={groupByLabel}
         isOpen={isPresent}
-        items={facetQuery.data ?? []}
-        isLoading={facetQuery.isLoading}
-        isError={facetQuery.isError}
+        items={groupValuesQuery.data ?? []}
+        isLoading={groupValuesQuery.isLoading}
+        isError={groupValuesQuery.isError}
         isSelected={(value) => value === selectedValue}
         onSelect={(item) => {
           onSelectValue(item.value);

@@ -2,17 +2,19 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider as JotaiProvider, createStore } from "jotai";
-import type { AxisFacetItem } from "@mimimilli/shared";
-import AxisValueQuickList from "../../src/features/library/ui/AxisValueQuickList";
-import { axisValueSortAtom } from "../../src/features/library/model/atoms";
+import type { GroupBy, GroupValueItem } from "@mimimilli/shared";
+import GroupValueQuickList from "../../src/features/library/ui/GroupValueQuickList";
+import { groupValueSortAtom } from "../../src/features/library/model/atoms";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
+
+const CV: GroupBy = { kind: "prefix", prefix: "cv" };
 
 afterEach(() => {
   cleanup();
   clearResizeObservers();
 });
 
-function makeItems(count: number): AxisFacetItem[] {
+function makeItems(count: number): GroupValueItem[] {
   return Array.from({ length: count }, (_, i) => ({
     value: `値${String(i).padStart(4, "0")}`,
     count: i,
@@ -28,13 +30,13 @@ async function flushVirtualizer(size = { width: 260, height: 260 }) {
   });
 }
 
-function renderQuickList(props: Partial<React.ComponentProps<typeof AxisValueQuickList>> = {}) {
+function renderQuickList(props: Partial<React.ComponentProps<typeof GroupValueQuickList>> = {}) {
   const store = createStore();
   const result = render(
     <JotaiProvider store={store}>
-      <AxisValueQuickList
-        axis="cv"
-        axisLabel="CV"
+      <GroupValueQuickList
+        groupBy={CV}
+        groupByLabel="CV"
         items={[]}
         isSelected={() => false}
         onSelect={vi.fn()}
@@ -46,7 +48,7 @@ function renderQuickList(props: Partial<React.ComponentProps<typeof AxisValueQui
   return { ...result, store };
 }
 
-describe("AxisValueQuickList の仮想化", () => {
+describe("GroupValueQuickList の仮想化", () => {
   it("2000件でも展開されるDOMの行数は総数よりずっと少ない", async () => {
     const sizeMock = mockElementSize(260, 260);
     renderQuickList({ items: makeItems(2000) });
@@ -63,7 +65,7 @@ describe("AxisValueQuickList の仮想化", () => {
   // ブラウザでの実機確認（agent-browser）で担保する。
 });
 
-describe("AxisValueQuickList のキーボード移動", () => {
+describe("GroupValueQuickList のキーボード移動", () => {
   it("開いたときの検索欄への初期フォーカスはpreventScroll:trueで祖先を自動スクロールしない", async () => {
     const sizeMock = mockElementSize(260, 260);
     const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
@@ -150,7 +152,7 @@ describe("AxisValueQuickList のキーボード移動", () => {
   });
 
   // 作品一覧の矢印キー（gridNavigation.ts の getNextGridIndex）は境界で
-  // ラップアラウンドせずクランプする。値一覧も同じ規則に揃える（getNextAxisValueRowIndex）。
+  // ラップアラウンドせずクランプする。値一覧も同じ規則に揃える（getNextGroupValueRowIndex）。
   it("ArrowUp/ArrowDownで値行間を移動し、端ではクランプする（作品一覧と同じ規則）", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
@@ -285,9 +287,9 @@ describe("AxisValueQuickList のキーボード移動", () => {
     const store = createStore();
     const { rerender } = render(
       <JotaiProvider store={store}>
-        <AxisValueQuickList
-          axis="cv"
-          axisLabel="CV"
+        <GroupValueQuickList
+          groupBy={CV}
+          groupByLabel="CV"
           items={makeItems(3)}
           isSelected={() => false}
           onSelect={vi.fn()}
@@ -305,15 +307,15 @@ describe("AxisValueQuickList のキーボード移動", () => {
     });
     expect(document.activeElement?.textContent).toContain("値0002");
 
-    // 同じ axis・ソート・検索語のまま items の中身だけ変わる（AND追加ボタンによる
-    // selectedTags の変化でfacetデータが再取得されるケースを想定。ADR-0013:
+    // 同じ groupBy・ソート・検索語のまま items の中身だけ変わる（AND追加ボタンによる
+    // selectedTags の変化でグループの値が再取得されるケースを想定。ADR-0013:
     // AND追加は一覧を開いたまま連続で行えるため、ここでスクロール・キーボード位置を
     // 先頭へ戻してはならない）。
     rerender(
       <JotaiProvider store={store}>
-        <AxisValueQuickList
-          axis="cv"
-          axisLabel="CV"
+        <GroupValueQuickList
+          groupBy={CV}
+          groupByLabel="CV"
           items={makeItems(3).map((item) => ({ ...item, value: `別${item.value}` }))}
           isSelected={() => false}
           onSelect={vi.fn()}
@@ -335,7 +337,7 @@ describe("AxisValueQuickList のキーボード移動", () => {
   });
 });
 
-describe("AxisValueQuickList のソート（アイコンボタン＋インライン展開）", () => {
+describe("GroupValueQuickList のソート（アイコンボタン＋インライン展開）", () => {
   it("既定では折りたたまれており、アイコンボタンで開閉する", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
@@ -401,7 +403,7 @@ describe("AxisValueQuickList のソート（アイコンボタン＋インライ
     sizeMock.restore();
   });
 
-  it("ソート変更は axisValueSortAtom へ書き込み、メイン値一覧と共有する", async () => {
+  it("ソート変更は groupValueSortAtom へ書き込み、メイン値一覧と共有する", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
     const { store } = renderQuickList({ items: makeItems(5) });
@@ -410,12 +412,12 @@ describe("AxisValueQuickList のソート（アイコンボタン＋インライ
     await user.click(screen.getByRole("button", { name: /^並び替え/ }));
     await user.click(screen.getByRole("button", { name: "名前" }));
 
-    expect(store.get(axisValueSortAtom)).toEqual({ key: "name", direction: "asc" });
+    expect(store.get(groupValueSortAtom)).toEqual({ key: "name", direction: "asc" });
     sizeMock.restore();
   });
 });
 
-describe("AxisValueQuickList の選択", () => {
+describe("GroupValueQuickList の選択", () => {
   it("値行クリックで onSelect にctrl/metaキー情報とともに完全な item を渡す", async () => {
     const sizeMock = mockElementSize(260, 260);
     const onSelect = vi.fn();

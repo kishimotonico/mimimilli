@@ -1,4 +1,4 @@
-/* 軸値一覧（.mll-vsearch / .mll-vlist-hd* / .mll-vrow*）。 */
+/* グループ値一覧（.mll-vsearch / .mll-vlist-hd* / .mll-vrow*）。 */
 
 .mll-vsearch {
   display: flex;
@@ -87,7 +87,7 @@
   color: inherit;
 }
 /* 入れ子タグの中間ノードのうち、実タグとして存在しないもの（選択不可の見出し。
-     ADR-0012 §5）。名前順ソート時のみ axisValueHierarchy.ts が生成する。 */
+     ADR-0012 §5）。名前順ソート時のみ groupValueHierarchy.ts が生成する。 */
 .mll-vrow-heading {
   display: flex;
   align-items: center;

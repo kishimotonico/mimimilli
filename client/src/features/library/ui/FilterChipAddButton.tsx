@@ -1,45 +1,48 @@
 import { useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
-import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
-import type { AxisId } from "../../../entities/library/types";
-import { buildFacetAxisRows, getAxisLabel } from "../../../entities/library/axisDefinitions";
+import type { GroupBy, NormalizedTag, TagPrefix } from "@mimimilli/shared";
+import {
+  buildGroupByRows,
+  getGroupByLabel,
+} from "../../../entities/library/smartFolderDefinitions";
 import {
   useAnchoredPopover,
   type AnchoredPopoverFloatingRefCallback,
 } from "../../../shared/ui/useAnchoredPopover";
-import AxisValuePopoverPanel from "./AxisValuePopoverPanel";
-import type { FacetScope } from "../model/useAxisFacetsQuery";
+import { groupByKey } from "../model/smartFolderEditing";
+import GroupValuePopoverPanel from "./GroupValuePopoverPanel";
+import type { GroupValueScope } from "../model/useGroupValuesQuery";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { I } from "../../../shared/ui/Icon";
 
 const POPOVER_WIDTH = 240;
 
-// チップ列の「＋絞り込み」（ADR-0012 §2）。軸→値の2段オーバーレイ。
+// チップ列の「＋絞り込み」（ADR-0012 §2）。グループ分け→値の2段オーバーレイ。
 // 選んだ値はチップとして足す。候補は定義済みの prefix 全部・タグ・追加年（ADR-0041）。
 //
-// 軸選択ステージ・値ステージともに、それぞれ独立した `<AnimatePresence>` で
-// 条件レンダーする。軸を選ぶと軸選択ステージが退出し値ステージが入場する
+// グループ分け選択ステージ・値ステージともに、それぞれ独立した `<AnimatePresence>` で
+// 条件レンダーする。グループ分けを選ぶとグループ分け選択ステージが退出し値ステージが入場する
 // クロスフェードは、AnimatePresence が退出側の最後の props を凍結することで
-// 成立し、呼び出し側でのpickedAxisの手動退避は不要。
+// 成立し、呼び出し側でのpickedGroupByの手動退避は不要。
 
 interface FilterChipAddButtonProps {
   tagPrefixes: TagPrefix[];
   selectedTags: NormalizedTag[];
   /** 候補を数える母集団（開いている一覧の条件・値・チップ・検索語） */
-  scope: FacetScope;
+  scope: GroupValueScope;
   onAddValue: (tag: NormalizedTag) => void;
 }
 
-function AxisPickerStage({
+function GroupByPickerStage({
   floatingStyles,
   setFloating,
-  facetAxisRows,
+  groupByRows,
   onPick,
 }: {
   floatingStyles: CSSProperties;
   setFloating: AnchoredPopoverFloatingRefCallback;
-  facetAxisRows: ReturnType<typeof buildFacetAxisRows>;
-  onPick: (axis: AxisId) => void;
+  groupByRows: ReturnType<typeof buildGroupByRows>;
+  onPick: (groupBy: GroupBy) => void;
 }) {
   const isPresent = useIsPresent();
   const { popoverScale } = useMotionVariants();
@@ -53,14 +56,14 @@ function AxisPickerStage({
       inert={!isPresent}
       {...variant}
     >
-      {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- AxisValueQuickList の一覧と表現を揃えるため<select>ではなくボタン一覧にする */}
-      <div className="mll-qlist__body" role="listbox" aria-label="絞り込む軸">
-        {facetAxisRows.map((ax) => (
+      {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- GroupValueQuickList の一覧と表現を揃えるため<select>ではなくボタン一覧にする */}
+      <div className="mll-qlist__body" role="listbox" aria-label="絞り込みの種類">
+        {groupByRows.map((ax) => (
           <button
-            key={ax.id}
+            key={groupByKey(ax.groupBy)}
             type="button"
             className="mll-qlist__item"
-            onClick={() => onPick(ax.id)}
+            onClick={() => onPick(ax.groupBy)}
           >
             <span className="nm">{ax.name}</span>
             <I.chev size={11} />
@@ -78,24 +81,24 @@ export default function FilterChipAddButton({
   onAddValue,
 }: FilterChipAddButtonProps) {
   const [open, setOpen] = useState(false);
-  const [pickedAxis, setPickedAxis] = useState<AxisId | null>(null);
-  const pickedAxisRef = useRef(pickedAxis);
-  pickedAxisRef.current = pickedAxis;
+  const [pickedGroupBy, setPickedGroupBy] = useState<GroupBy | null>(null);
+  const pickedGroupByRef = useRef(pickedGroupBy);
+  pickedGroupByRef.current = pickedGroupBy;
 
   const { setReference, setFloating, floatingStyles, close } = useAnchoredPopover({
     isOpen: open,
     preferredWidth: POPOVER_WIDTH,
     onClose: (reason) => {
-      if (reason === "escape" && pickedAxisRef.current !== null) {
-        setPickedAxis(null);
+      if (reason === "escape" && pickedGroupByRef.current !== null) {
+        setPickedGroupBy(null);
       } else {
         setOpen(false);
-        setPickedAxis(null);
+        setPickedGroupBy(null);
       }
     },
   });
 
-  const facetAxisRows = buildFacetAxisRows(tagPrefixes);
+  const groupByRows = buildGroupByRows(tagPrefixes);
 
   return (
     <div ref={setReference} className="relative inline-flex">
@@ -110,21 +113,21 @@ export default function FilterChipAddButton({
         絞り込み
       </button>
       <AnimatePresence>
-        {open && pickedAxis === null && (
-          <AxisPickerStage
+        {open && pickedGroupBy === null && (
+          <GroupByPickerStage
             floatingStyles={floatingStyles}
             setFloating={setFloating}
-            facetAxisRows={facetAxisRows}
-            onPick={setPickedAxis}
+            groupByRows={groupByRows}
+            onPick={setPickedGroupBy}
           />
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {pickedAxis !== null && (
-          <AxisValuePopoverPanel
-            key={pickedAxis}
-            axis={pickedAxis}
-            axisLabel={getAxisLabel(pickedAxis, tagPrefixes)}
+        {pickedGroupBy !== null && (
+          <GroupValuePopoverPanel
+            key={groupByKey(pickedGroupBy)}
+            groupBy={pickedGroupBy}
+            groupByLabel={getGroupByLabel(pickedGroupBy, tagPrefixes)}
             floatingStyles={floatingStyles}
             setFloating={setFloating}
             selectedTags={selectedTags}

@@ -1,6 +1,6 @@
 // 条件の木による作品一覧・グループの値一覧・件数（fixture アダプタの評価。real は SQL で同じ意味を返す）。
-import type { AxisFacetItem, Condition, SortId, WorkSummary } from "@mimimilli/shared";
-import { buildGroupFacets } from "./axisFacets.ts";
+import type { GroupValueItem, Condition, SortId, WorkSummary } from "@mimimilli/shared";
+import { buildGroupValues } from "./groupValues.ts";
 import type {
   ConditionGroupQuery,
   ConditionWorksQuery,
@@ -37,8 +37,8 @@ export function groupWorksByCondition(
   works: WorkSummary[],
   query: ConditionGroupQuery,
   ctx: EvalContext,
-): AxisFacetItem[] {
-  return buildGroupFacets(query.groupBy, works.filter(createMatcher(query.condition, ctx)));
+): GroupValueItem[] {
+  return buildGroupValues(query.groupBy, works.filter(createMatcher(query.condition, ctx)));
 }
 
 export function countWorksByConditions(

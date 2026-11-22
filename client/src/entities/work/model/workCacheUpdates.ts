@@ -23,7 +23,7 @@ import {
 async function invalidateLibraryViews(queryClient: QueryClient): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() }),
-    queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() }),
+    queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allGroupValues() }),
     queryClient.invalidateQueries({ queryKey: TAG_QUERY_KEYS.all() }),
     queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() }),
     invalidateSmartFolderCounts(queryClient),

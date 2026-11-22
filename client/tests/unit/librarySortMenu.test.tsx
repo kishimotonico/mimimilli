@@ -11,7 +11,7 @@ import LibrarySortMenu from "../../src/features/library/ui/LibrarySortMenu";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import { LibraryNavigationContext } from "../../src/features/library/model/libraryNavigationContext";
 import { libraryRouteAtom } from "../../src/entities/library/model/navigationAtoms";
-import { axisValueSortAtom } from "../../src/features/library/model/atoms";
+import { groupValueSortAtom } from "../../src/features/library/model/atoms";
 import { apiError, mockApi } from "../helpers/api";
 import { buildSmartFolder, defaultSmartFolders, seedSmartFolders } from "../helpers/smartFolders";
 import { seedLibraryRoute } from "../helpers/route";
@@ -166,7 +166,7 @@ describe("LibrarySortMenu", () => {
     expect(screen.queryByRole("menu", { name: "並び替え" })).not.toBeInTheDocument();
   });
 
-  it("値一覧では名前/件数/総時間のメニューを出し、axisValueSortAtomへ書き込む（ADR-0012帰結）", () => {
+  it("値一覧では名前/件数/総時間のメニューを出し、groupValueSortAtomへ書き込む（ADR-0012帰結）", () => {
     const { store } = renderSortMenu({ folderId: "by-cv", sort: "duration-desc" });
     const button = screen.getByRole("button", { name: "並び替え" });
 
@@ -182,7 +182,7 @@ describe("LibrarySortMenu", () => {
     expect(within(menu).queryByRole("menuitem", { name: /既定にする/ })).not.toBeInTheDocument();
 
     fireEvent.click(within(menu).getByRole("menuitemradio", { name: "名前" }));
-    expect(store.get(axisValueSortAtom)).toEqual({ key: "name", direction: "asc" });
+    expect(store.get(groupValueSortAtom)).toEqual({ key: "name", direction: "asc" });
     // 値一覧のソートは今の並びに影響しない
     expect(currentSort(store)).toBe("duration-desc");
   });
@@ -195,7 +195,7 @@ describe("LibrarySortMenu", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
     fireEvent.click(screen.getByRole("menuitemradio", { name: "総時間" }));
-    expect(store.get(axisValueSortAtom)).toEqual({ key: "duration", direction: "desc" });
+    expect(store.get(groupValueSortAtom)).toEqual({ key: "duration", direction: "desc" });
     expect(currentSort(store)).toBe("duration-desc");
 
     act(() => {

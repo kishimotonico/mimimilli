@@ -1,43 +1,43 @@
 import { useCallback } from "react";
-import type { AxisFacetItem } from "@mimimilli/shared";
-import type { AxisValueSortKey, AxisValueSortState } from "../model/axisValueSort";
-import { AXIS_VALUE_SORT_OPTIONS, toggleAxisValueSort } from "../model/axisValueSort";
-import type { AxisValueHierarchyRow } from "../model/axisValueHierarchy";
-import { isAxisValueRowArrowKey } from "../model/axisValueRowNav";
+import type { GroupValueItem } from "@mimimilli/shared";
+import type { GroupValueSortKey, GroupValueSortState } from "../model/groupValueSort";
+import { GROUP_VALUE_SORT_OPTIONS, toggleGroupValueSort } from "../model/groupValueSort";
+import type { GroupValueHierarchyRow } from "../model/groupValueHierarchy";
+import { isGroupValueRowArrowKey } from "../model/groupValueRowNav";
 import { formatDuration } from "../../../shared/lib/format";
 import { I } from "../../../shared/ui/Icon";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import CoverCollage from "./CoverCollage";
 import type { IconName } from "../../../shared/ui/Icon";
-import { useAxisValueListNav } from "./useAxisValueListNav";
+import { useGroupValueListNav } from "./useGroupValueListNav";
 
 const ROW_COLLAGE_SIZE = 32;
 /** 階層1段あたりのインデント幅。深さに制限は設けない（4階層以上でも破綻しない）。 */
 const INDENT_PER_DEPTH = 14;
 
 // 値一覧の list 表示（ADR-0012 §5）。2×2コラージュ(32px)/名前/件数/総時間 の列を持つ行。
-// 列見出しクリックはソートメニューと同じ AxisValueSortState への別入口（axisValueSort.ts）。
-// 入れ子タグ（名前順ソート時のみ）は axisValueHierarchy.ts の階層行を depth ぶんインデントし、
+// 列見出しクリックはソートメニューと同じ GroupValueSortState への別入口（groupValueSort.ts）。
+// 入れ子タグ（名前順ソート時のみ）は groupValueHierarchy.ts の階層行を depth ぶんインデントし、
 // 実タグとして存在しない中間ノードは選択不可の見出し行として描画する。
 
-/** AxisValueRow の概算高さ（WorkRow と同じ42px。CSS の block-size と一致させる）。
+/** GroupValueRow の概算高さ（WorkRow と同じ42px。CSS の block-size と一致させる）。
  *  見出し行も同じ高さにして仮想化の可変高さ対応を避ける。 */
 const ROW_ESTIMATE_SIZE = 42;
 const LIST_PADDING_START = 4;
 const LIST_PADDING_END = 4;
 
-interface AxisValueRowsProps {
-  axisLabel: string;
-  rows: AxisValueHierarchyRow[];
-  sort: AxisValueSortState;
-  onSortChange: (sort: AxisValueSortState) => void;
+interface GroupValueRowsProps {
+  groupByLabel: string;
+  rows: GroupValueHierarchyRow[];
+  sort: GroupValueSortState;
+  onSortChange: (sort: GroupValueSortState) => void;
   fallbackIcon: IconName;
-  /** 軸・並び順・検索語が変わったらスクロール位置をリセットするための key */
+  /** グループ分け・並び順・検索語が変わったらスクロール位置をリセットするための key */
   resetKey: string;
   /** クリック（既定=置き換え）・Ctrl/Cmd+クリック（トグル、ADR-0012 §7・ADR-0013の
    *  作品詳細タグクリックと同型）。値一覧は独立した全作品入口のためAND追加ボタンは
    *  持たない。 */
-  onSelect: (item: AxisFacetItem, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
+  onSelect: (item: GroupValueItem, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
 }
 
 function SortHeaderButton({
@@ -47,11 +47,11 @@ function SortHeaderButton({
   sort,
   onSortChange,
 }: {
-  sortKey: AxisValueSortKey;
+  sortKey: GroupValueSortKey;
   label: string;
   align: "start" | "end";
-  sort: AxisValueSortState;
-  onSortChange: (sort: AxisValueSortState) => void;
+  sort: GroupValueSortState;
+  onSortChange: (sort: GroupValueSortState) => void;
 }) {
   const isActive = sort.key === sortKey;
   const directionLabel = isActive ? (sort.direction === "asc" ? "昇順" : "降順") : null;
@@ -61,7 +61,7 @@ function SortHeaderButton({
       className={`mll-vlist-hd__sort ${isActive ? "is-active" : ""}`}
       style={align === "start" ? { justifyContent: "flex-start" } : undefined}
       aria-label={directionLabel ? `${label}（${directionLabel}）` : label}
-      onClick={() => onSortChange(toggleAxisValueSort(sort, sortKey))}
+      onClick={() => onSortChange(toggleGroupValueSort(sort, sortKey))}
     >
       {label}
       {isActive && (
@@ -73,15 +73,15 @@ function SortHeaderButton({
   );
 }
 
-export default function AxisValueRows({
-  axisLabel,
+export default function GroupValueRows({
+  groupByLabel,
   rows,
   sort,
   onSortChange,
   fallbackIcon,
   resetKey,
   onSelect,
-}: AxisValueRowsProps) {
+}: GroupValueRowsProps) {
   // コラージュは32pxを2×2に分割するので、各セルの要求サムネイル幅は半分の16pxを基準にする
   const collageRequestWidth = selectFixedCoverThumbnailWidth(
     ROW_COLLAGE_SIZE / 2,
@@ -98,7 +98,7 @@ export default function AxisValueRows({
     rovingIndex,
     moveFocus,
     handleListFocus,
-  } = useAxisValueListNav({
+  } = useGroupValueListNav({
     rows,
     virtualList: {
       estimateSize: ROW_ESTIMATE_SIZE,
@@ -115,7 +115,7 @@ export default function AxisValueRows({
     <>
       <div className="mll-vlist-hd">
         <span aria-hidden="true" />
-        {AXIS_VALUE_SORT_OPTIONS.map((opt) => (
+        {GROUP_VALUE_SORT_OPTIONS.map((opt) => (
           <SortHeaderButton
             key={opt.id}
             sortKey={opt.id}
@@ -133,7 +133,7 @@ export default function AxisValueRows({
         style={{ padding: 0 }}
         // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 値ボタン集合を名前付き集合として表す。fieldset等の代替タグは適合しない
         role="group"
-        aria-label={`${axisLabel}の値一覧`}
+        aria-label={`${groupByLabel}の値一覧`}
         onFocus={handleListFocus}
       >
         <div style={wrapperStyle}>
@@ -165,7 +165,7 @@ export default function AxisValueRows({
                         onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
                       }
                       onKeyDown={(e) => {
-                        if (!isAxisValueRowArrowKey(e.key)) return;
+                        if (!isGroupValueRowArrowKey(e.key)) return;
                         e.preventDefault();
                         moveFocus(e.key);
                       }}

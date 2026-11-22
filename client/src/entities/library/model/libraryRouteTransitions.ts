@@ -2,8 +2,8 @@
 import {
   ALL_SMART_FOLDER_ID,
   createRandomSeed,
-  isBuiltinPseudoTagAxis,
-  parseBuiltinAxisTag,
+  isBuiltinPseudoTagKey,
+  parseBuiltinPseudoTag,
   type NormalizedTag,
   type SortId,
 } from "@mimimilli/shared";
@@ -25,12 +25,12 @@ function withLibrary(route: AppRoute, patch: Partial<LibraryRoute>): AppRoute {
   };
 }
 
-/** 組み込み擬似タグ軸（year等）は同軸の既存選択を外してから追加する */
+/** 組み込み擬似タグ（year等）は同じキーの既存選択を外してから追加する */
 function appendTag(tags: NormalizedTag[], tag: NormalizedTag): NormalizedTag[] {
-  const builtin = parseBuiltinAxisTag(tag);
+  const builtin = parseBuiltinPseudoTag(tag);
   const base =
-    builtin && isBuiltinPseudoTagAxis(builtin.axis)
-      ? tags.filter((t) => parseBuiltinAxisTag(t)?.axis !== builtin.axis)
+    builtin && isBuiltinPseudoTagKey(builtin.key)
+      ? tags.filter((t) => parseBuiltinPseudoTag(t)?.key !== builtin.key)
       : tags;
   return [...base, tag];
 }

@@ -1,6 +1,6 @@
 import {
   workspacePath,
-  axisFacetItemSchema,
+  groupValueItemSchema,
   fsEntrySchema,
   fsListingSchema,
   scanCandidateSchema,
@@ -22,7 +22,7 @@ import {
   workSourceMutationResultSchema,
   dlsiteApplyResponseSchema,
   type DlsiteApplyResponse,
-  type AxisFacetItem,
+  type GroupValueItem,
   type FsEntry,
   type FsListing,
   type DlsitePreview,
@@ -286,8 +286,8 @@ export function buildFsListing(
   return fsListingSchema.parse({ path: null, parent: null, workId: null, entries, ...overrides });
 }
 
-export function buildAxisFacetItem(overrides: Partial<AxisFacetItem> = {}): AxisFacetItem {
-  return axisFacetItemSchema.parse({
+export function buildGroupValueItem(overrides: Partial<GroupValueItem> = {}): GroupValueItem {
+  return groupValueItemSchema.parse({
     value: "値",
     count: 1,
     durationSec: 0,

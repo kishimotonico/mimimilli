@@ -1,4 +1,4 @@
-import { getSmartFolderIcon } from "../../../entities/library/axisDefinitions";
+import { getSmartFolderIcon } from "../../../entities/library/smartFolderDefinitions";
 import { I } from "../../../shared/ui/Icon";
 import type { SmartFolderTemplate } from "@mimimilli/shared";
 

@@ -4,11 +4,11 @@
 import { deleteVoid, getParsed, postParsed, putParsed } from "../../shared/api/http";
 import {
   ALL_SMART_FOLDER_ID,
-  axisFacetListSchema,
+  groupValueListSchema,
   smartFolderListSchema,
   smartFolderSchema,
   worksPageSchema,
-  type AxisFacetItem,
+  type GroupValueItem,
   type GroupBy,
   type ScanRecordKind,
   type WorkChangeKind,
@@ -119,10 +119,10 @@ export interface SmartFolderGroupsParams {
 export async function getSmartFolderGroups(
   id: string,
   params: SmartFolderGroupsParams,
-): Promise<AxisFacetItem[]> {
+): Promise<GroupValueItem[]> {
   const body: Record<string, unknown> = { groupBy: params.groupBy };
   if (params.group) body.group = params.group;
   if (params.tags && params.tags.length > 0) body.tags = params.tags;
   if (params.q) body.q = params.q;
-  return postParsed(axisFacetListSchema, `${folderPath(id)}/groups`, body);
+  return postParsed(groupValueListSchema, `${folderPath(id)}/groups`, body);
 }
