@@ -17,7 +17,7 @@ import type {
   Work,
 } from "@mimimilli/shared";
 import type { SmartFolderInsert, SmartFolderRow } from "../../adapter/classification.ts";
-import { formatError, getCategoryLogger } from "../../lib/logger.ts";
+import { getCategoryLogger } from "../../lib/logger.ts";
 import type { Db } from "./db.ts";
 import {
   appSettings,
@@ -28,6 +28,9 @@ import {
 } from "./userSchema.ts";
 
 const smartFolderLogger = getCategoryLogger("db");
+
+/** 警告済みの壊れた行（id → 問題の署名）。一覧を取るたびに同じ警告を重ねない。直った行は忘れる */
+const reportedBrokenFolders = new Map<string, string>();
 
 export class UserWorkStateRepository {
   private readonly db: Db;
@@ -380,7 +383,10 @@ function readJsonColumn<T>(column: string, raw: string, schema: z.ZodType<T>): C
   try {
     json = JSON.parse(raw);
   } catch (error) {
-    return { ok: false, problem: { column, issues: formatError(error) } };
+    return {
+      ok: false,
+      problem: { column, issues: error instanceof Error ? error.message : String(error) },
+    };
   }
   const parsed = schema.safeParse(json);
   return parsed.success
@@ -388,7 +394,7 @@ function readJsonColumn<T>(column: string, raw: string, schema: z.ZodType<T>): C
     : { ok: false, problem: { column, issues: parsed.error.issues } };
 }
 
-/** condition・sort・groupBy のどれか1つでも読めなければ、3つとも null の壊れた行にする。壊れた行は読むたびに警告する */
+/** condition・sort・groupBy のどれか1つでも読めなければ、3つとも null の壊れた行にする。壊れた行は同じ問題につき1回だけ警告する */
 function toSmartFolderRow(r: typeof smartFolders.$inferSelect): SmartFolderRow {
   const base = { id: r.id, name: r.name, position: r.position, createdAt: r.createdAt };
   const condition =
@@ -405,11 +411,16 @@ function toSmartFolderRow(r: typeof smartFolders.$inferSelect): SmartFolderRow {
   if (!sort.success) problems.push({ column: "sort", issues: sort.error.issues });
   if (!groupBy.ok) problems.push(groupBy.problem);
   if (!condition.ok || !sort.success || !groupBy.ok) {
-    smartFolderLogger.warn("壊れたスマートフォルダーの行を読み込めません", {
-      smartFolderId: r.id,
-      problems,
-    });
+    const signature = JSON.stringify(problems);
+    if (reportedBrokenFolders.get(r.id) !== signature) {
+      reportedBrokenFolders.set(r.id, signature);
+      smartFolderLogger.warn("壊れたスマートフォルダーの行を読み込めません", {
+        smartFolderId: r.id,
+        problems,
+      });
+    }
     return { ...base, condition: null, sort: null, groupBy: null };
   }
+  reportedBrokenFolders.delete(r.id);
   return { ...base, condition: condition.value, sort: sort.data, groupBy: groupBy.value };
 }

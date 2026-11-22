@@ -6,6 +6,7 @@ import {
   normalizeSearchQuery,
   parseBuiltinPseudoTag,
   type NormalizedTag,
+  type SmartFolder,
   type SortId,
 } from "@mimimilli/shared";
 import type { RouteTransition } from "../../../shared/model/routeStore";
@@ -68,6 +69,17 @@ export function replaceLibraryFolder(
 ): LibraryRoute | null {
   if (route.library.folderId !== from) return null;
   return openLibraryFolder(route, to).route.library;
+}
+
+/** 保持しているライブラリが存在しないスマートフォルダーを指しているとき、「すべて」へ正規化する（補正）。
+ *  チップ・検索語・並びは保つ */
+export function normalizeLibraryFolder(
+  route: AppRoute,
+  folders: readonly SmartFolder[],
+): LibraryRoute | null {
+  const { library } = route;
+  if (folders.some((folder) => folder.id === library.folderId)) return null;
+  return { ...library, folderId: ALL_SMART_FOLDER_ID, group: null };
 }
 
 /** サイドバーのクイックオーバーレイから、グループの値の作品一覧へ入る */

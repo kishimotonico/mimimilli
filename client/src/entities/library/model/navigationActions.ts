@@ -7,6 +7,7 @@ import {
   backToLibraryValueList,
   openLibraryFolder,
   openLibraryGroupValue,
+  normalizeLibraryFolder,
   openLibraryTag,
   reenterLibraryFolder,
   removeLibraryTag,
@@ -37,6 +38,7 @@ export const backToLibraryValueListAtom = appRouteAction(backToLibraryValueList)
 export const showLibraryWorkAtom = appRouteAction(showLibraryWork);
 
 export const replaceLibraryFolderAtom = appRouteCorrection(replaceLibraryFolder);
+export const normalizeLibraryFolderAtom = appRouteCorrection(normalizeLibraryFolder);
 export const clearLibrarySortAtom = appRouteCorrection(clearLibrarySort);
 /** 選択中の作品が絞り込みから外れた・存在しないときの選択解除 */
 export const deselectLibraryWorkAtom = appRouteCorrection(deselectLibraryWork);

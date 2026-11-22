@@ -179,8 +179,8 @@ test("読めないスマートフォルダーの行は、行ごとに id・列�
   db.user
     .insert(smartFolders)
     .values([
-      { id: "broken-json", name: "壊れJSON", ...healthy, conditionJson: "{", position: 100 },
-      { id: "broken-sort", name: "壊れsort", ...healthy, sort: "unknown", position: 101 },
+      { id: "log-broken-json", name: "壊れJSON", ...healthy, conditionJson: "{", position: 100 },
+      { id: "log-broken-sort", name: "壊れsort", ...healthy, sort: "unknown", position: 101 },
       { id: "ok-error", name: "エラー確認", ...healthy, position: 102 },
     ])
     .run();
@@ -196,14 +196,22 @@ test("読めないスマートフォルダーの行は、行ごとに id・列�
           r.properties.problems as Array<{ column: string }>,
         ]),
       );
-      assert.deepEqual([...byId.keys()].sort(), ["broken-json", "broken-sort"]);
+      assert.deepEqual([...byId.keys()].sort(), ["log-broken-json", "log-broken-sort"]);
       assert.deepEqual(
-        byId.get("broken-json")!.map((p) => p.column),
+        byId.get("log-broken-json")!.map((p) => p.column),
         ["condition_json"],
       );
       assert.deepEqual(
-        byId.get("broken-sort")!.map((p) => p.column),
+        byId.get("log-broken-sort")!.map((p) => p.column),
         ["sort"],
+      );
+
+      const warned = warns.length;
+      const again = await app.request("/api/smart-folders");
+      assert.equal(again.status, 200);
+      assert.equal(
+        categoryRecords(records, "db").filter((r) => r.level === "warning").length,
+        warned,
       );
     },
     { categories: ["db"] },

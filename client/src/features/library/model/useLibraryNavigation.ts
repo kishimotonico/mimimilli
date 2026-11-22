@@ -2,7 +2,7 @@
 // route とスマートフォルダー一覧を resolveLibraryView で突き合わせた結果と、
 // write-only action atom を束ねた高レベル操作を提供する（ADR-0041）。
 
-import { useContext, useMemo, useTransition } from "react";
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useTransition } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import { type NormalizedTag, type SmartFolder, type SortId } from "@mimimilli/shared";
@@ -13,6 +13,7 @@ import {
   backToLibraryValueListAtom,
   openLibraryFolderAtom,
   openLibraryGroupValueAtom,
+  normalizeLibraryFolderAtom,
   openLibraryTagAtom,
   removeLibraryTagAtom,
   searchLibraryInAllAtom,
@@ -100,10 +101,21 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
   const setSort = useSetAtom(setLibrarySortAtom);
   const backToValueList = useSetAtom(backToLibraryValueListAtom);
 
+  const normalizeFolder = useSetAtom(normalizeLibraryFolderAtom);
+
   const view = useMemo(
     () => (folders ? resolveLibraryView(library, folders) : null),
     [library, folders],
   );
+  // 操作は呼ばれた時点の最新の view を読む。参照は view が変わっても変えない
+  const viewRef = useRef(view);
+  useLayoutEffect(() => {
+    viewRef.current = view;
+  }, [view]);
+
+  useEffect(() => {
+    if (folders) normalizeFolder(folders);
+  }, [folders, library.folderId, normalizeFolder]);
 
   const actions = useMemo<LibraryViewActions>(() => {
     const run = (action: () => void) =>
@@ -112,6 +124,7 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
       });
     // 一覧が無い間は保持しているライブラリが決まらないので、それに依存する操作は行わない
     const withView = (action: (view: ResolvedLibraryView) => void) => {
+      const view = viewRef.current;
       if (view !== null) run(() => action(view));
     };
     return {
@@ -130,7 +143,6 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
       backToValueList: () => withView((v) => backToValueList(v)),
     };
   }, [
-    view,
     openFolder,
     openGroupValue,
     selectGroupValue,

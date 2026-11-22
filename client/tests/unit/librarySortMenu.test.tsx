@@ -337,6 +337,7 @@ describe("LibrarySortMenu", () => {
 
     await waitFor(() => expect(currentSort(store)).toBeNull());
     expect(api.requestsTo("PUT /api/smart-folders/:id/sort")[0]?.params.id).toBe("all");
+    expect(store.get(libraryRouteAtom).folderId).toBe("all");
   });
 });
 

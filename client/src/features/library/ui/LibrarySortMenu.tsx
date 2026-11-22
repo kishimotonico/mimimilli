@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { libraryRouteAtom } from "../../../entities/library/model/navigationAtoms";
+import { useAtom, useSetAtom } from "jotai";
 import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
 import type { SortId } from "@mimimilli/shared";
 import { SORT_OPTIONS } from "../../../entities/library/types";
@@ -53,7 +52,6 @@ function ReadySortMenu({
   view: ResolvedLibraryView;
   setSort: (sort: SortId) => void;
 }) {
-  const routeFolderId = useAtomValue(libraryRouteAtom).folderId;
   const editor = useSmartFolderEditor();
   const [savingDefault, setSavingDefault] = useState(false);
   const [groupValueSort, setGroupValueSort] = useAtom(groupValueSortAtom);
@@ -74,7 +72,7 @@ function ReadySortMenu({
     setSavingDefault(true);
     const saved = await editor.saveDefaultSort(view.folder.id, view.sort);
     setSavingDefault(false);
-    if (saved) clearCurrentSort({ folderId: routeFolderId, sort: view.sort });
+    if (saved) clearCurrentSort({ folderId: view.folder.id, sort: view.sort });
   };
 
   const buttonTitle = currentSortLabel ? `並び替え: ${currentSortLabel}` : "並び替え";
