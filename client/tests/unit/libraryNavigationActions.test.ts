@@ -3,13 +3,14 @@ import { createStore } from "jotai";
 import { libraryRouteAtom } from "../../src/entities/library/model/navigationAtoms";
 import { nt, nts } from "../helpers/tag";
 import { clearPendingOps, pendingWrites, seedAppMode, seedLibraryRoute } from "../helpers/route";
-import { appRouteAtom } from "../../src/entities/navigation/model/appRouteStore";
+import { appRouteStore, appRouteAtom } from "../../src/entities/navigation/model/appRouteStore";
 import {
   addLibraryTagAtom,
   clearLibrarySortAtom,
   clearLibraryTagsAtom,
   goToLibrarySegmentAtom,
   openLibraryFolderAtom,
+  reenterLibraryFolderAtom,
   openLibraryGroupValueAtom,
   openLibraryTagAtom,
   removeLibraryTagAtom,
@@ -320,6 +321,30 @@ describe("タグの行き先（ADR-0041 の表）", () => {
     seedLibraryRoute(store, { selectedWorkId: "work-1" });
     store.set(clearLibraryTagsAtom);
     expect(lib(store)).toMatchObject({ selectedTags: [], selectedWorkId: null });
+  });
+});
+
+describe("履歴の積み方", () => {
+  const ops = (store: ReturnType<typeof createStore>) =>
+    store.get(appRouteStore.sync.pendingOpsAtom).map((op) => [op.write, op.pushSameUrl]);
+
+  it("上書きのあとの入り直しは、URLが同じでも積む指定で push する", () => {
+    const store = setup({ folderId: "sf-own", sort: "title-asc" });
+    clearPendingOps(store);
+
+    store.set(reenterLibraryFolderAtom, "sf-own");
+
+    expect(ops(store)).toEqual([["push", true]]);
+    expect(lib(store)).toMatchObject({ folderId: "sf-own", sort: null });
+  });
+
+  it("通常の並び変更は積む指定なしの replace", () => {
+    const store = setup({ folderId: "sf-own" });
+    clearPendingOps(store);
+
+    store.set(setLibrarySortAtom, "title-asc");
+
+    expect(ops(store)).toEqual([["replace", false]]);
   });
 });
 

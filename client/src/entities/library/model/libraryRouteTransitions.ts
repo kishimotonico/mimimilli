@@ -56,6 +56,12 @@ export function openLibraryFolder(route: AppRoute, folderId: string): Transition
   };
 }
 
+/** 上書きのあと、同じスマートフォルダーへ入り直す。並びだけの上書きでURLが同じでも履歴を積み、
+ *  戻るで上書き前の表示へ戻れるようにする */
+export function reenterLibraryFolder(route: AppRoute, folderId: string): Transition {
+  return { ...openLibraryFolder(route, folderId), pushSameUrl: true };
+}
+
 /** 開いているスマートフォルダーが消えたとき、履歴を積まずに入り直す。作品詳細などライブラリ以外の画面で
  *  保持しているライブラリの folderId も置き換え、画面はそのまま保つ */
 export function replaceLibraryFolder(route: AppRoute, folderId: string): Transition {

@@ -8,6 +8,7 @@ import {
   openLibraryFolder,
   openLibraryGroupValue,
   openLibraryTag,
+  reenterLibraryFolder,
   removeLibraryTag,
   replaceLibraryFolder,
   reshuffleLibrarySeed,
@@ -20,6 +21,7 @@ import {
 } from "./libraryRouteTransitions";
 
 export const openLibraryFolderAtom = appRouteAction(openLibraryFolder);
+export const reenterLibraryFolderAtom = appRouteAction(reenterLibraryFolder);
 export const openLibraryGroupValueAtom = appRouteAction(openLibraryGroupValue);
 export const selectLibraryGroupValueAtom = appRouteAction(selectLibraryGroupValue);
 export const openLibraryTagAtom = appRouteAction(openLibraryTag);

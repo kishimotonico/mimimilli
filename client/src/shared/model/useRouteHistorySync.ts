@@ -130,13 +130,13 @@ export function useRouteHistorySync<R>(routeStore: RouteStore<R>, codec: RouteCo
     // navigate ごとの履歴操作を、描画を待たずに呼ばれた順で1つずつ反映する。描画後の effect で
     // まとめて書くと、直前の replace の内容が、続く push の前のエントリーに残らない
     const writePending = () => {
-      for (const { route, write } of store.set(sync.takePendingOpsAtom)) {
+      for (const { route, write, pushSameUrl } of store.set(sync.takePendingOpsAtom)) {
         const { url: nextUrl, entryState } = codec.serialize(route);
         const urlChanged = nextUrl !== currentUrl();
         const stateChanged = !sameEntryState(readHistoryEntryState(history.state), entryState);
         if (!urlChanged && !stateChanged) continue;
 
-        if (write === "push" && urlChanged) {
+        if (write === "push" && (urlChanged || pushSameUrl)) {
           const nextIndex = indexRef.current + 1;
           moveTo(nextIndex, nextIndex);
           history.pushState(stateWithMarker(nextIndex, entryState), "", nextUrl);

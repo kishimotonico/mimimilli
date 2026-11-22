@@ -320,6 +320,22 @@ describe("useRouteHistorySync の履歴エントリーの状態", () => {
     expect(pushState).not.toHaveBeenCalled();
   });
 
+  it("URLが同じで状態だけ変わる push は、既定では置き換え、pushSameUrl なら積む", () => {
+    const { routeStore, store } = setupNote("/home");
+    pushState.mockClear();
+
+    act(() => store.set(routeStore.navigateAtom, (r) => ({ ...r, note: "A" })));
+    expect(entryNote()).toBe("A");
+    expect(pushState).not.toHaveBeenCalled();
+
+    act(() =>
+      store.set(routeStore.navigateAtom, (r) => ({ ...r, note: "B" }), { pushSameUrl: true }),
+    );
+    expect(entryNote()).toBe("B");
+    expect(pushState).toHaveBeenCalledTimes(1);
+    expect(store.get(routeStore.historyAvailabilityAtom).canBack).toBe(true);
+  });
+
   it("push で新しいエントリーへ状態を書き、戻る・進むで元の値を読み戻す", () => {
     const { routeStore, store } = setupNote("/home");
     const stateHome = history.state;

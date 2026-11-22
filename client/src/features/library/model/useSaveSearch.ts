@@ -2,6 +2,7 @@
 
 import { useCallback, useRef } from "react";
 import { useSetAtom } from "jotai";
+import { reenterLibraryFolderAtom } from "../../../entities/library/model/navigationActions";
 import { useToast } from "../../../shared/ui/useToast";
 import { smartFolderDialogAtom } from "./atoms";
 import {
@@ -25,7 +26,7 @@ export interface SaveSearchActions {
 
 export function useSaveSearch(nav: LibraryViewState & LibraryViewActions): SaveSearchActions {
   const view = nav.foldersStatus === "ready" ? nav.view : null;
-  const { openFolder } = nav;
+  const reenterFolder = useSetAtom(reenterLibraryFolderAtom);
   const editor = useSmartFolderEditor();
   const toast = useToast();
   const setDialog = useSetAtom(smartFolderDialogAtom);
@@ -44,7 +45,7 @@ export function useSaveSearch(nav: LibraryViewState & LibraryViewActions): SaveS
     const saved = await editor.update(folder.id, overwriteWrite(view));
     overwriting.current = false;
     if (!saved) return;
-    openFolder(folder.id);
+    reenterFolder(folder.id);
     let undone = false;
     toast.show({
       message: `「${folder.name}」を上書きしました`,
@@ -59,7 +60,7 @@ export function useSaveSearch(nav: LibraryViewState & LibraryViewActions): SaveS
       priority: "action",
       dismissOnUnmount: false,
     });
-  }, [view, editor, openFolder, toast]);
+  }, [view, editor, reenterFolder, toast]);
 
   return { offer: view ? saveOffer(view) : null, openSaveDialog, overwrite };
 }
