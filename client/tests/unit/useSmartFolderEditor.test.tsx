@@ -87,6 +87,25 @@ describe("更新", () => {
     ]);
   });
 
+  it("無効化されるのは保存したフォルダーの作品・値の一覧だけで、ほかのフォルダーの一覧は残る", async () => {
+    mockApi({ "PUT /api/smart-folders/:id": () => ({ ...userFolder }) });
+    const editor = setup();
+    const own = [
+      SMART_FOLDER_QUERY_KEYS.works(USER_ID, { sort: "added-desc" }),
+      SMART_FOLDER_QUERY_KEYS.groups(USER_ID, "prefix:cv", {}),
+    ];
+    const other = [
+      SMART_FOLDER_QUERY_KEYS.works("sf-other", { sort: "added-desc" }),
+      SMART_FOLDER_QUERY_KEYS.groups("sf-other", "prefix:cv", {}),
+    ];
+    for (const key of [...own, ...other]) queryClient.setQueryData(key, []);
+
+    await editor.update(USER_ID, write);
+
+    for (const key of own) expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    for (const key of other) expect(queryClient.getQueryState(key)?.isInvalidated).toBe(false);
+  });
+
   it("404 でもトーストを出して一覧を取り直す。作品・値の一覧は取り直さない", async () => {
     mockApi({
       "PUT /api/smart-folders/:id": () =>
