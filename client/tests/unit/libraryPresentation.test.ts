@@ -141,7 +141,7 @@ describe("computeCollectionStatsDisplay", () => {
 
 describe("formatFilterChipLabel（チップの内部表現を隠す）", () => {
   it("組み込みの擬似タグは「グループ分けのラベル/値」に変換する", () => {
-    expect(formatFilterChipLabel(nt("@year/2024"))).toBe("追加日/2024");
+    expect(formatFilterChipLabel(nt("@year/2024"))).toBe("追加年/2024");
   });
 
   it("実タグはフルパスのまま変更しない", () => {

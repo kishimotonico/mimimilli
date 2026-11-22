@@ -79,7 +79,7 @@ describe("FilterChipBand のチップ", () => {
     const groupByButtons = screen
       .getAllByRole("button")
       .filter((b) => b.className.includes("mll-qlist__item"));
-    expect(groupByButtons.map((b) => b.textContent)).toEqual(["CV", "タグ", "追加日"]);
+    expect(groupByButtons.map((b) => b.textContent)).toEqual(["CV", "タグ", "追加年"]);
   });
 });
 

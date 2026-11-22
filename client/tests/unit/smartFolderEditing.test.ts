@@ -84,9 +84,23 @@ describe("追加・複製", () => {
     expect(duplicateDraft({ ...fav, condition: fav.condition! }).sort).toBeNull();
   });
 
-  it("グループ分けの選択肢は定義済みの prefix 全部・全タグ・追加年", () => {
-    const options = groupByOptions([{ prefix: "cv" }, { prefix: "サークル" }] as never, null);
+  it("グループ分けの選択肢は定義済みの prefix 全部・タグ・追加年で、ラベルは getGroupByLabel と同じ", () => {
+    const prefixes = [
+      { prefix: "cv", label: "CV" },
+      { prefix: "サークル", label: "サークル" },
+    ] as never;
+    const options = groupByOptions(prefixes, null);
     expect(options.map((o) => o.key)).toEqual(["prefix:cv", "prefix:サークル", "tag", "addedYear"]);
+    expect(options.map((o) => o.label)).toEqual(["CV", "サークル", "タグ", "追加年"]);
+  });
+
+  it("今のグループ分けが定義に無い prefix なら、タグの前に足す", () => {
+    const options = groupByOptions([] as never, { kind: "prefix", prefix: "気分" });
+    expect(options.map((o) => [o.key, o.label])).toEqual([
+      ["prefix:気分", "気分"],
+      ["tag", "タグ"],
+      ["addedYear", "追加年"],
+    ]);
   });
 });
 

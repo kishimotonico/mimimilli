@@ -9,7 +9,7 @@ export function getGroupByLabel(groupBy: GroupBy, tagPrefixes: TagPrefix[] = [])
     case "tag":
       return "タグ";
     case "addedYear":
-      return "追加日";
+      return "追加年";
     case "prefix":
       return resolveTagPrefix(groupBy.prefix, tagPrefixes).label;
   }
@@ -56,13 +56,10 @@ export interface GroupByRow {
 
 /** 「＋絞り込み」のグループ分け選択の行 = prefix 定義（定義順）＋ 組み込みの tag / addedYear（ADR-0005） */
 export function buildGroupByRows(tagPrefixes: TagPrefix[]): GroupByRow[] {
-  const prefixRows = tagPrefixes.map((p): GroupByRow => {
-    const groupBy: GroupBy = { kind: "prefix", prefix: p.prefix };
-    return { groupBy, name: p.label };
-  });
-  return [
-    ...prefixRows,
-    { groupBy: { kind: "tag" }, name: "タグ" },
-    { groupBy: { kind: "addedYear" }, name: "追加日" },
+  const groupBys: GroupBy[] = [
+    ...tagPrefixes.map((p): GroupBy => ({ kind: "prefix", prefix: p.prefix })),
+    { kind: "tag" },
+    { kind: "addedYear" },
   ];
+  return groupBys.map((groupBy) => ({ groupBy, name: getGroupByLabel(groupBy, tagPrefixes) }));
 }

@@ -16,7 +16,11 @@ import {
   type SortId,
   type TagPrefix,
 } from "@mimimilli/shared";
-import type { GroupByKey } from "../../../entities/smart-folder/groupByKey";
+import {
+  buildGroupByRows,
+  getGroupByLabel,
+} from "../../../entities/library/smartFolderDefinitions";
+import { groupByKey, type GroupByKey } from "../../../entities/smart-folder/groupByKey";
 
 // ── 並べ替え ─────────────────────────────────────────────────
 
@@ -114,20 +118,21 @@ export interface GroupByOption {
   label: string;
 }
 
-/** 選べるのは、定義済みの prefix 全部・全タグ・追加年。今のグループ分けが定義に無ければ足す */
+/** 選べるのは、定義済みの prefix 全部・タグ・追加年（ラベルは getGroupByLabel）。今のグループ分けが定義に無ければ足す */
 export function groupByOptions(
   tagPrefixes: readonly TagPrefix[],
   current: GroupBy | null,
 ): GroupByOption[] {
-  const prefixes = tagPrefixes.map((p) => p.prefix);
-  if (current?.kind === "prefix" && !prefixes.includes(current.prefix)) {
-    prefixes.push(current.prefix);
+  const rows = buildGroupByRows([...tagPrefixes]);
+  const known = (groupBy: GroupBy) =>
+    rows.some((row) => groupByKey(row.groupBy) === groupByKey(groupBy));
+  if (current?.kind === "prefix" && !known(current)) {
+    rows.splice(rows.length - 2, 0, {
+      groupBy: current,
+      name: getGroupByLabel(current, [...tagPrefixes]),
+    });
   }
-  return [
-    ...prefixes.map((prefix) => ({ key: `prefix:${prefix}`, label: `${prefix}/` })),
-    { key: "tag", label: "全タグ" },
-    { key: "addedYear", label: "追加年" },
-  ];
+  return rows.map((row) => ({ key: groupByKey(row.groupBy), label: row.name }));
 }
 
 // ── 既定から追加・複製・グループ分けの追加 ─────────────────────

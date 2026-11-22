@@ -18,7 +18,7 @@ describe("smartFolderDefinitions", () => {
     expect(getGroupByLabel({ kind: "prefix", prefix: "cv" }, PREFIXES)).toBe("CV");
     expect(getGroupByLabel({ kind: "prefix", prefix: "気分" }, PREFIXES)).toBe("気分"); // 未登録は prefix をそのまま
     expect(getGroupByLabel({ kind: "tag" })).toBe("タグ");
-    expect(getGroupByLabel({ kind: "addedYear" })).toBe("追加日");
+    expect(getGroupByLabel({ kind: "addedYear" })).toBe("追加年");
   });
 
   it("buildGroupByRows は定義済みの prefix 全部（定義順）＋タグ＋追加年（ADR-0041「＋絞り込み」）", () => {
@@ -30,7 +30,7 @@ describe("smartFolderDefinitions", () => {
       { kind: "addedYear" },
     ]);
     expect(rows[0]).toEqual({ groupBy: { kind: "prefix", prefix: "cv" }, name: "CV" });
-    expect(rows.at(-1)).toEqual({ groupBy: { kind: "addedYear" }, name: "追加日" });
+    expect(rows.at(-1)).toEqual({ groupBy: { kind: "addedYear" }, name: "追加年" });
   });
 
   it("getSmartFolderIcon は条件のフォルダーを ID から、グループ分けのフォルダーをグループ分けから引き、未知の ID は既定のアイコン", () => {
