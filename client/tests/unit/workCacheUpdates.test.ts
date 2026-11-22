@@ -221,12 +221,14 @@ describe("bookmark の必須更新", () => {
 });
 
 describe("登録・スキャン完了の必須更新", () => {
-  it("登録は一覧系・facet・タグ・SF（件数プレビューを含む）・FS・診断・スキャンの記録を無効化し、詳細は触らない", async () => {
+  it("登録は登録の集合に加えて全詳細を無効化する（再登録で古い詳細・sourceRevision を残さない）", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterRegistration(queryClient);
 
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(REGISTRATION_VIEWS));
+    expect(sorted(invalidatedKeys(queryClient))).toEqual(
+      sorted([...REGISTRATION_VIEWS, "detail1", "source1", "detail2", "source2"]),
+    );
   });
 
   it("登録・解除は、サーバーの応答で候補一覧を置き換え、取得に失敗しても reject しない", async () => {
@@ -236,7 +238,7 @@ describe("登録・スキャン完了の必須更新", () => {
     });
     const queryClient = seededClient();
 
-    await updateCachesAfterUnregistration(queryClient, "w1");
+    await updateCachesAfterUnregistration(queryClient);
     expect(queryClient.getQueryData(KEYS.candidates)).toEqual({
       scanCompleted: true,
       candidates: [found],
@@ -269,23 +271,22 @@ describe("登録・スキャン完了の必須更新", () => {
 });
 
 describe("登録解除の必須更新", () => {
-  it("単体は対象作品のキャッシュ（詳細と source）を削除し、他の作品の詳細は残す", async () => {
+  it("単体は登録の集合を無効化するだけで、作品のキャッシュは消さない", async () => {
     const queryClient = seededClient();
 
-    await updateCachesAfterUnregistration(queryClient, "w1");
+    await updateCachesAfterUnregistration(queryClient);
 
-    expect(sorted(removedKeys(queryClient))).toEqual(sorted(["detail1", "source1"]));
+    expect(removedKeys(queryClient)).toEqual([]);
     expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(REGISTRATION_VIEWS));
   });
 
-  it("missing 一括は全詳細と登録の集合を無効化する", async () => {
+  it("missing 一括は登録の集合だけを無効化し、詳細は触らない", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterMissingUnregistration(queryClient);
 
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(
-      sorted([...REGISTRATION_VIEWS, "detail1", "source1", "detail2", "source2"]),
-    );
+    expect(removedKeys(queryClient)).toEqual([]);
+    expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(REGISTRATION_VIEWS));
   });
 });
 

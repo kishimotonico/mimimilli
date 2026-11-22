@@ -121,10 +121,14 @@ export async function updateCachesAfterBookmark(
 }
 
 /** 登録（候補一括・Files 単体）の成功後。取り直した候補を返す。取り直せなかったときは null */
-export function updateCachesAfterRegistration(
+export async function updateCachesAfterRegistration(
   queryClient: QueryClient,
 ): Promise<ScanCandidatesResponse | null> {
-  return invalidateRegistrationViews(queryClient);
+  const [candidates] = await Promise.all([
+    invalidateRegistrationViews(queryClient),
+    invalidateAllWorkDetails(queryClient),
+  ]);
+  return candidates;
 }
 
 export async function updateCachesAfterLibraryScan(queryClient: QueryClient): Promise<void> {
@@ -134,13 +138,8 @@ export async function updateCachesAfterLibraryScan(queryClient: QueryClient): Pr
   ]);
 }
 
-export async function updateCachesAfterUnregistration(
-  queryClient: QueryClient,
-  workId: string,
-): Promise<void> {
+export async function updateCachesAfterUnregistration(queryClient: QueryClient): Promise<void> {
   await invalidateRegistrationViews(queryClient);
-  // 表示中の詳細 observer が再描画で再取得しないよう、画面の後処理（選択解除）の直前に削除する
-  queryClient.removeQueries({ queryKey: WORK_QUERY_KEYS.detail(workId) });
 }
 
 /** 作品単位の読み直し（データ不整合の解消）の成功後 */
@@ -158,10 +157,7 @@ export async function updateCachesAfterWorkReload(
 export async function updateCachesAfterMissingUnregistration(
   queryClient: QueryClient,
 ): Promise<void> {
-  await Promise.all([
-    invalidateRegistrationViews(queryClient),
-    invalidateAllWorkDetails(queryClient),
-  ]);
+  await invalidateRegistrationViews(queryClient);
 }
 
 export async function updateCachesAfterIdentityReassign(
