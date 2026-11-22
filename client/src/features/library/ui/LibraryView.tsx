@@ -151,7 +151,6 @@ function LibraryViewBody({
           </div>
         ) : (
           <LibraryWorksBoundary
-            nav={nav}
             view={view}
             searchQuery={debouncedSearchQuery}
             viewMode={viewMode}

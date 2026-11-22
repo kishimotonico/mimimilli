@@ -9,6 +9,10 @@ import SmartFolderDialogHost from "../../src/features/library/ui/SmartFolderDial
 import { mockApi } from "../helpers/api";
 import { libraryRouteAtom } from "../../src/entities/library/model/navigationAtoms";
 import {
+  appRouteAtom,
+  openNowPlayingLayerAtom,
+} from "../../src/entities/navigation/model/appRouteStore";
+import {
   buildSmartFolder,
   createSmartFolderQueryClient,
   defaultSmartFolders,
@@ -79,39 +83,12 @@ function gate() {
   return { promise, release };
 }
 
-describe("保存中に閉じたダイアログの応答", () => {
-  it("編集の保存中に閉じて別の編集を開いても、応答でそのダイアログを閉じない", async () => {
+describe("作成の保存中に移った画面", () => {
+  it("保存中に層を開いたら、作ったあとも層と画面を動かさない", async () => {
     const held = gate();
     mockApi({
       "GET /api/tag-prefixes": [],
-      "GET /api/smart-folders": [...defaultSmartFolders(), folderA, folderB],
-      "PUT /api/smart-folders/:id": async ({ params }) => {
-        await held.promise;
-        return { ...folderA, id: params.id };
-      },
-    });
-    const store = renderHost();
-    const user = userEvent.setup();
-
-    act(() => store.set(smartFolderDialogAtom, { kind: "edit", folder: folderA }));
-    await user.click(await screen.findByRole("button", { name: "保存" }));
-    act(() => store.set(smartFolderDialogAtom, null));
-    act(() => store.set(smartFolderDialogAtom, { kind: "edit", folder: folderB }));
-    expect(await screen.findByRole("dialog", { name: "「乙」を編集" })).toBeInTheDocument();
-
-    held.release();
-    await act(async () => {
-      await held.promise;
-    });
-
-    expect(screen.getByRole("dialog", { name: "「乙」を編集" })).toBeInTheDocument();
-  });
-
-  it("作成の保存中に閉じて別の作成を開いたら、応答でそのダイアログを閉じず、作ったものへも移らない", async () => {
-    const held = gate();
-    mockApi({
-      "GET /api/tag-prefixes": [],
-      "GET /api/smart-folders": [...defaultSmartFolders(), folderA, folderB],
+      "GET /api/smart-folders": [...defaultSmartFolders(), folderA],
       "POST /api/smart-folders": async () => {
         await held.promise;
         return { ...folderA };
@@ -123,17 +100,31 @@ describe("保存中に閉じたダイアログの応答", () => {
 
     act(() => store.set(smartFolderDialogAtom, { kind: "save", draft }));
     await user.click(await screen.findByRole("button", { name: "保存" }));
-    act(() => store.set(smartFolderDialogAtom, null));
-    act(() => store.set(smartFolderDialogAtom, { kind: "duplicate", folder: folderB }));
-    expect(await screen.findByRole("dialog", { name: "「乙」を複製" })).toBeInTheDocument();
+    act(() => store.set(openNowPlayingLayerAtom));
 
     held.release();
     await act(async () => {
       await held.promise;
     });
 
-    expect(screen.getByRole("dialog", { name: "「乙」を複製" })).toBeInTheDocument();
+    await waitFor(() => expect(store.get(smartFolderDialogAtom)).toBeNull());
+    expect(store.get(appRouteAtom).layer).not.toBeNull();
     expect(store.get(libraryRouteAtom).folderId).toBe(before);
+  });
+
+  it("画面を動かさなかったときは、作ったフォルダーを開く", async () => {
+    mockApi({
+      "GET /api/tag-prefixes": [],
+      "GET /api/smart-folders": [...defaultSmartFolders(), folderA],
+      "POST /api/smart-folders": () => ({ ...folderA }),
+    });
+    const store = renderHost();
+    const user = userEvent.setup();
+
+    act(() => store.set(smartFolderDialogAtom, { kind: "save", draft }));
+    await user.click(await screen.findByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(store.get(libraryRouteAtom).folderId).toBe(folderA.id));
   });
 });
 

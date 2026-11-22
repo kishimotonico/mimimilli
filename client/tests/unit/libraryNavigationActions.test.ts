@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createStore } from "jotai";
-import { libraryRouteAtom } from "../../src/entities/library/model/navigationAtoms";
+import {
+  libraryPlaceAtom,
+  libraryRouteAtom,
+} from "../../src/entities/library/model/navigationAtoms";
 import { openNowPlayingLayerAtom } from "../../src/entities/navigation/model/appRouteStore";
-import { libraryPlaceOf } from "../../src/entities/library/model/libraryRouteTransitions";
 import { nt, nts } from "../helpers/tag";
 import { clearPendingOps, pendingWrites, seedAppMode, seedLibraryRoute } from "../helpers/route";
 import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
@@ -14,7 +16,7 @@ import {
   backToLibraryValueListAtom,
   normalizeLibraryFolderAtom,
   openLibraryFolderAtom,
-  enterLibraryFolderFromAtom,
+  settleLibraryFolderAtom,
   openLibraryGroupValueAtom,
   openLibraryTagAtom,
   removeLibraryTagAtom,
@@ -385,7 +387,7 @@ describe("履歴の積み方", () => {
     const store = setup({ folderId: "sf-own", sort: "title-asc" });
     clearPendingOps(store);
 
-    store.set(enterLibraryFolderFromAtom, libraryPlaceOf(store.get(appRouteAtom)), "sf-own");
+    store.set(settleLibraryFolderAtom, store.get(libraryPlaceAtom), "sf-own");
 
     expect(ops(store)).toEqual([["push", true]]);
     expect(lib(store)).toMatchObject({ folderId: "sf-own", sort: null });
@@ -393,11 +395,11 @@ describe("履歴の積み方", () => {
 
   it("await の間に層を開いた・別の画面へ移ったときは、画面と層を引き戻さない", () => {
     const layered = setup({ folderId: "sf-own", sort: "title-asc" });
-    const place = libraryPlaceOf(layered.get(appRouteAtom));
+    const place = layered.get(libraryPlaceAtom);
     layered.set(openNowPlayingLayerAtom);
     clearPendingOps(layered);
 
-    layered.set(enterLibraryFolderFromAtom, place, "sf-own");
+    layered.set(settleLibraryFolderAtom, place, "sf-own");
 
     expect(layered.get(appRouteAtom)).toMatchObject({
       mode: "library",
@@ -407,15 +409,28 @@ describe("履歴の積み方", () => {
     expect(pendingWrites(layered)).toEqual(["replace"]);
 
     const away = setup({ folderId: "sf-own" });
-    const awayPlace = libraryPlaceOf(away.get(appRouteAtom));
+    const awayPlace = away.get(libraryPlaceAtom);
     seedAppMode(away, "files");
     clearPendingOps(away);
 
-    away.set(enterLibraryFolderFromAtom, awayPlace, "sf-new");
+    away.set(settleLibraryFolderAtom, awayPlace, "sf-new");
 
     expect(away.get(appRouteAtom)).toMatchObject({ mode: "files" });
     expect(lib(away).folderId).toBe("sf-own");
     expect(pendingWrites(away)).toEqual([]);
+  });
+
+  it("作品詳細で始めて別の作品の詳細へ移っていたら、別の場所として引き戻さない", () => {
+    const store = setup({ folderId: "sf-own" });
+    seedAppMode(store, { workDetail: "work-a" });
+    const place = store.get(libraryPlaceAtom);
+    seedAppMode(store, { workDetail: "work-b" });
+    clearPendingOps(store);
+
+    store.set(settleLibraryFolderAtom, place, "sf-new");
+
+    expect(store.get(appRouteAtom)).toMatchObject({ mode: "workDetail", workId: "work-b" });
+    expect(pendingWrites(store)).toEqual([]);
   });
 
   it("通常の並び変更は積む指定なしの replace", () => {

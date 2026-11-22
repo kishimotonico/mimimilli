@@ -4,7 +4,7 @@
 import { resolveTagPrefix, type GroupBy, type TagPrefix } from "@mimimilli/shared";
 import type { IconName } from "../../shared/ui/Icon";
 
-export function getGroupByLabel(groupBy: GroupBy, tagPrefixes: TagPrefix[] = []): string {
+export function getGroupByLabel(groupBy: GroupBy, tagPrefixes: readonly TagPrefix[] = []): string {
   switch (groupBy.kind) {
     case "tag":
       return "タグ";
@@ -54,10 +54,17 @@ export interface GroupByRow {
   name: string;
 }
 
-/** 「＋絞り込み」のグループ分け選択の行 = prefix 定義（定義順）＋ 組み込みの tag / addedYear（ADR-0005） */
-export function buildGroupByRows(tagPrefixes: TagPrefix[]): GroupByRow[] {
+/** 「＋絞り込み」のグループ分け選択の行 = prefix 定義（定義順。今のグループ分けが定義に無ければそれも）＋ 組み込みの tag / addedYear（ADR-0005） */
+export function buildGroupByRows(
+  tagPrefixes: readonly TagPrefix[],
+  current: GroupBy | null = null,
+): GroupByRow[] {
+  const prefixes = tagPrefixes.map((p) => p.prefix);
+  if (current?.kind === "prefix" && !prefixes.includes(current.prefix)) {
+    prefixes.push(current.prefix);
+  }
   const groupBys: GroupBy[] = [
-    ...tagPrefixes.map((p): GroupBy => ({ kind: "prefix", prefix: p.prefix })),
+    ...prefixes.map((prefix): GroupBy => ({ kind: "prefix", prefix })),
     { kind: "tag" },
     { kind: "addedYear" },
   ];

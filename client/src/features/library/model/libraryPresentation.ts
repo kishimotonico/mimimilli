@@ -46,7 +46,7 @@ export function assertGroupValueItems<T extends GroupValueItem>(groupBy: GroupBy
 
 /** チップ表示用の文字列。design-system.md の「チップはフルパス表示」規約は維持しつつ、
  *  組み込みの擬似タグ（@year/2023等）だけ内部表現ではなく「グループ分けのラベル/値」（例:
- *  「追加日/2023」）に変換する。実タグはそのまま tag を返す。 */
+ *  「追加年/2023」）に変換する。実タグはそのまま tag を返す。 */
 export function formatFilterChipLabel(tag: NormalizedTag): string {
   const builtin = parseBuiltinPseudoTag(tag);
   if (!builtin || !isBuiltinPseudoTagKey(builtin.key)) return tag;

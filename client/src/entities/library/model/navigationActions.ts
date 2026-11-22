@@ -1,12 +1,12 @@
-import {
-  appRouteAction,
-  appRouteCorrection,
-  appRouteStore,
-} from "../../navigation/model/appRouteStore";
+import { atom } from "jotai";
+import { appRouteAction, appRouteCorrection } from "../../navigation/model/appRouteStore";
+import { libraryPlaceAtom } from "./navigationAtoms";
 import {
   addLibraryTag,
   clearLibrarySort,
-  enterLibraryFolderFrom,
+  isSamePlace,
+  reenterLibraryFolder,
+  type LibraryPlace,
   clearLibraryTags,
   deselectLibraryWork,
   backToLibraryValueList,
@@ -26,8 +26,7 @@ import {
 } from "./libraryRouteTransitions";
 
 export const openLibraryFolderAtom = appRouteAction(openLibraryFolder);
-/** 画面と層を引き戻さないよう、遷移の規則（層を落とす）は通さない */
-export const enterLibraryFolderFromAtom = appRouteStore.action(enterLibraryFolderFrom);
+export const reenterLibraryFolderAtom = appRouteAction(reenterLibraryFolder);
 export const openLibraryGroupValueAtom = appRouteAction(openLibraryGroupValue);
 export const selectLibraryGroupValueAtom = appRouteAction(selectLibraryGroupValue);
 export const openLibraryTagAtom = appRouteAction(openLibraryTag);
@@ -43,6 +42,16 @@ export const backToLibraryValueListAtom = appRouteAction(backToLibraryValueList)
 export const showLibraryWorkAtom = appRouteAction(showLibraryWork);
 
 export const replaceLibraryFolderAtom = appRouteCorrection(replaceLibraryFolder);
+
+/** await を挟む保存・追加のあと、始めたときと同じ場所なら folderId へ入り直す（遷移）。
+ *  その間に層を開いた・別の画面へ移ったときは、画面を動かさず補正だけ行う */
+export const settleLibraryFolderAtom = atom(
+  null,
+  (get, set, started: LibraryPlace, folderId: string) => {
+    if (isSamePlace(get(libraryPlaceAtom), started)) set(reenterLibraryFolderAtom, folderId);
+    else set(replaceLibraryFolderAtom, folderId, folderId);
+  },
+);
 export const normalizeLibraryFolderAtom = appRouteCorrection(normalizeLibraryFolder);
 export const clearLibrarySortAtom = appRouteCorrection(clearLibrarySort);
 /** 選択中の作品が絞り込みから外れた・存在しないときの選択解除 */

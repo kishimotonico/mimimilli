@@ -1,7 +1,6 @@
 import { Component, Suspense, useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { QueryErrorResetBoundary } from "@tanstack/react-query";
 import type { WorkListItem } from "@mimimilli/shared";
-import type { ReadyLibraryViewState } from "../model/useLibraryNavigation";
 import type { WorksView } from "../../../entities/library/resolveLibraryView";
 import { useSuspenseLibraryWorks } from "../model/useLibraryQueries";
 import { folderWorksResetKey } from "../model/folderWorksRequest";
@@ -22,7 +21,6 @@ interface WorksResult {
 // works query 自体を発行しないため、呼び出し側（LibraryView）でこの境界に入らない。
 
 interface Props {
-  nav: ReadyLibraryViewState;
   view: WorksView;
   searchQuery: string;
   viewMode: "list" | "grid";
@@ -77,7 +75,6 @@ function Works(props: Props) {
 }
 
 function ResolvedWorks({
-  nav,
   view,
   searchQuery,
   isPending,
@@ -88,7 +85,7 @@ function ResolvedWorks({
 }: Props & { result: WorksResult }) {
   const isNoResults =
     result.works.length === 0 &&
-    hasChipOrSearchRefinement({ selectedTags: nav.selectedTags, q: searchQuery });
+    hasChipOrSearchRefinement({ selectedTags: view.selectedTags, q: searchQuery });
   const noResultsKey = isNoResults ? folderWorksResetKey(view, searchQuery) : null;
   useEffect(() => onNoResultsChange(noResultsKey), [noResultsKey, onNoResultsChange]);
   useEffect(() => onWorksTotalChange(result.worksTotal), [result.worksTotal, onWorksTotalChange]);

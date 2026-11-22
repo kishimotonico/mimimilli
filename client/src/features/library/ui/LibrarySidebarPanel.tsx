@@ -1,8 +1,5 @@
 import { useRef, useState } from "react";
-import { useSetAtom, useStore } from "jotai";
-import { enterLibraryFolderFromAtom } from "../../../entities/library/model/navigationActions";
-import { libraryPlaceOf } from "../../../entities/library/model/libraryRouteTransitions";
-import { appRouteAtom } from "../../../entities/navigation/model/appRouteStore";
+import { useSetAtom } from "jotai";
 import { AnimatePresence } from "motion/react";
 import {
   isReadableSmartFolder,
@@ -24,6 +21,7 @@ import { buildFilterTag, type CollectionStatsDisplay } from "../model/libraryPre
 import { buildSidebarRows, type DataIntegrityCount } from "../model/sidebarRows";
 import { missingTemplates } from "../model/smartFolderEditing";
 import { useSidebarReorder } from "./useSidebarReorder";
+import { useBeginSettleLibraryFolder } from "../model/useSettleLibraryFolder";
 import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
 import GroupValuePopover from "./GroupValuePopover";
 import SidebarAddMenu from "./SidebarAddMenu";
@@ -74,8 +72,7 @@ export default function LibrarySidebarPanel({
   const [editing, setEditing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const setDialog = useSetAtom(smartFolderDialogAtom);
-  const store = useStore();
-  const enterFolderFrom = useSetAtom(enterLibraryFolderFromAtom);
+  const beginSettle = useBeginSettleLibraryFolder();
   const headerRef = useRef<HTMLDivElement>(null);
   const {
     openKey: overlayFolderId,
@@ -117,9 +114,9 @@ export default function LibrarySidebarPanel({
 
   const addFromTemplate = async (templateId: string) => {
     setMenuOpen(false);
-    const place = libraryPlaceOf(store.get(appRouteAtom));
+    const settle = beginSettle();
     const created = await editor.addFromTemplate(templateId);
-    if (created) enterFolderFrom(place, created.id);
+    if (created) settle(created.id);
   };
 
   return (

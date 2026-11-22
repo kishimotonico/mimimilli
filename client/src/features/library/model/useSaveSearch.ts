@@ -1,10 +1,7 @@
 // 今の絞り込みの保存の操作（検索を保存・上書き）。チップ列と＋メニューが使う。
 
 import { useCallback, useRef } from "react";
-import { useSetAtom, useStore } from "jotai";
-import { enterLibraryFolderFromAtom } from "../../../entities/library/model/navigationActions";
-import { libraryPlaceOf } from "../../../entities/library/model/libraryRouteTransitions";
-import { appRouteAtom } from "../../../entities/navigation/model/appRouteStore";
+import { useSetAtom } from "jotai";
 import { useToast } from "../../../shared/ui/useToast";
 import { smartFolderDialogAtom } from "./atoms";
 import {
@@ -17,6 +14,7 @@ import {
 import { draftOf, toWrite } from "./smartFolderEditing";
 import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
 import type { LibraryViewActions, LibraryViewState } from "./useLibraryNavigation";
+import { useBeginSettleLibraryFolder } from "./useSettleLibraryFolder";
 import { useSmartFolderEditor } from "./useSmartFolderEditor";
 
 export interface SaveSearchActions {
@@ -37,8 +35,7 @@ export function useOpenSaveDialog(view: ResolvedLibraryView | null): () => void 
 
 export function useSaveSearch(nav: LibraryViewState & LibraryViewActions): SaveSearchActions {
   const view = nav.foldersStatus === "ready" ? nav.view : null;
-  const store = useStore();
-  const enterFolderFrom = useSetAtom(enterLibraryFolderFromAtom);
+  const beginSettle = useBeginSettleLibraryFolder();
   const editor = useSmartFolderEditor();
   const toast = useToast();
   const openSaveDialog = useOpenSaveDialog(view);
@@ -49,12 +46,12 @@ export function useSaveSearch(nav: LibraryViewState & LibraryViewActions): SaveS
     if (overwriting.current) return;
     overwriting.current = true;
     const { folder } = view;
-    const place = libraryPlaceOf(store.get(appRouteAtom));
+    const settle = beginSettle();
     const before = toWrite(draftOf(folder));
     const saved = await editor.update(folder.id, overwriteWrite(view));
     overwriting.current = false;
     if (!saved) return;
-    enterFolderFrom(place, folder.id);
+    settle(folder.id);
     let undone = false;
     toast.show({
       message: `「${folder.name}」を上書きしました`,
@@ -69,7 +66,7 @@ export function useSaveSearch(nav: LibraryViewState & LibraryViewActions): SaveS
       priority: "action",
       dismissOnUnmount: false,
     });
-  }, [view, store, editor, enterFolderFrom, toast]);
+  }, [view, beginSettle, editor, toast]);
 
   return { offer: view ? saveOffer(view) : null, openSaveDialog, overwrite };
 }

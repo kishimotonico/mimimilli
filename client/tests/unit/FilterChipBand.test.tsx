@@ -68,7 +68,7 @@ describe("FilterChipBand のチップ", () => {
     expect(request?.body).toEqual({ groupBy: { kind: "tag" }, tags: ["cv/藤田茜"], q: "雨" });
   });
 
-  it("「＋絞り込み」のグループ分けは定義済みの prefix 全部・タグ・追加日", async () => {
+  it("「＋絞り込み」のグループ分けは定義済みの prefix 全部・タグ・追加年", async () => {
     renderFilterChipBand(undefined, {
       tagPrefixes: [
         { prefix: "cv", label: "CV", color: "cv", protected: true, displayPriority: 0 } as never,

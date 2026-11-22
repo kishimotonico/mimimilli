@@ -22,7 +22,6 @@ function renderBoundary(children: Parameters<typeof LibraryWorksBoundary>[0]["ch
   return render(
     <QueryClientProvider client={queryClient}>
       <LibraryWorksBoundary
-        nav={baseNav}
         view={baseView}
         searchQuery=""
         viewMode="list"
@@ -79,7 +78,6 @@ describe("LibraryWorksBoundary", () => {
       const nav = useLibraryNavigation();
       return (
         <LibraryWorksBoundary
-          nav={nav}
           view={nav.view as typeof baseView}
           searchQuery=""
           viewMode="list"

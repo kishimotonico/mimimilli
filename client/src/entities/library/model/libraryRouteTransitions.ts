@@ -57,37 +57,34 @@ export function openLibraryFolder(route: AppRoute, folderId: string): Transition
 /** 操作を始めたときにいた場所。await のあとに同じ場所にいるかを確かめるのに使う */
 export interface LibraryPlace {
   mode: AppRoute["mode"];
+  /** 作品詳細のときの作品 ID */
+  workId: string | null;
   layerOpen: boolean;
   folderId: string;
 }
 
 export function libraryPlaceOf(route: AppRoute): LibraryPlace {
-  return { mode: route.mode, layerOpen: route.layer !== null, folderId: route.library.folderId };
+  return {
+    mode: route.mode,
+    workId: route.mode === "workDetail" ? route.workId : null,
+    layerOpen: route.layer !== null,
+    folderId: route.library.folderId,
+  };
 }
 
-/** await を挟んだ保存・追加のあと、始めたときと同じ場所にいるときだけ folderId のスマートフォルダーへ
- *  入り直す（履歴を積む）。その間に層を開いた・別の画面やフォルダーへ移っていたら動かさず、
- *  開いているのがそのフォルダーなら入り直しだけ置き換えで行う */
-export function enterLibraryFolderFrom(
-  route: AppRoute,
-  place: LibraryPlace,
-  folderId: string,
-): Transition | null {
-  const now = libraryPlaceOf(route);
-  if (
-    now.mode === place.mode &&
-    now.layerOpen === place.layerOpen &&
-    now.folderId === place.folderId
-  ) {
-    return reenterLibraryFolder(route, folderId);
-  }
-  const library = replaceLibraryFolder(route, folderId, folderId);
-  return library && { route: { ...route, library }, replace: true };
+/** 始めた場所と今が同じ画面か。今は層が開いていないことも条件にする */
+export function isSamePlace(now: LibraryPlace, started: LibraryPlace): boolean {
+  return (
+    !now.layerOpen &&
+    now.mode === started.mode &&
+    now.workId === started.workId &&
+    now.folderId === started.folderId
+  );
 }
 
 /** 上書きのあと、同じスマートフォルダーへ入り直す。並びだけの上書きでURLが同じでも履歴を積み、
  *  戻るで上書き前の表示へ戻れるようにする */
-function reenterLibraryFolder(route: AppRoute, folderId: string): Transition {
+export function reenterLibraryFolder(route: AppRoute, folderId: string): Transition {
   return { ...openLibraryFolder(route, folderId), pushSameUrl: true };
 }
 

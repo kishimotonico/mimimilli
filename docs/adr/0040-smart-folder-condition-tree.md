@@ -108,7 +108,7 @@ type Condition =
 ```
 effective = and(
   スマートフォルダーの条件の子,
-  グループの値があればその述語（prefix → tag(prefix/値)、全タグ → tag(値)、追加年 → addedYear(値)）,
+  グループの値があればその述語（prefix → tag(prefix/値)、タグ → tag(値)、追加年 → addedYear(値)）,
   チップ（擬似タグ @year/2025 は addedYear に写す）,
   検索語があれば text(q),
 )
@@ -141,7 +141,7 @@ ADR-0008 の「core↔SQL二重実装の統制」を次のように改める。
 ```ts
 type GroupBy =
   | { kind: "prefix"; prefix: string } // cv/〇〇 → 値「〇〇」
-  | { kind: "tag" } // 全タグ
+  | { kind: "tag" } // タグ
   | { kind: "addedYear" };
 ```
 
@@ -172,7 +172,7 @@ shared にテンプレートを持ち、初回起動時に1回だけ投入する
 | `added`                                                  | 最近追加                                       | `added(30)`          | 追加日           | なし                                                                   |
 | `fav`                                                    | お気に入り                                     | `bookmarked`         | 「すべて」と同じ | なし                                                                   |
 | `error`                                                  | エラー                                         | `hasError`           | 「すべて」と同じ | なし                                                                   |
-| `by-cv`・`by-circle`・`by-category`・`by-tag`・`by-year` | CV別・サークル別・カテゴリ別・タグ別・追加年別 | なし                 | 「すべて」と同じ | `cv`・`サークル`・`カテゴリ` の prefix、全タグ、追加年                 |
+| `by-cv`・`by-circle`・`by-category`・`by-tag`・`by-year` | CV別・サークル別・カテゴリ別・タグ別・追加年別 | なし                 | 「すべて」と同じ | `cv`・`サークル`・`カテゴリ` の prefix、タグ、追加年                   |
 | `by-series`・`by-rating`                                 | シリーズ別・レーティング別                     | なし                 | 「すべて」と同じ | `シリーズ`・`rating` の prefix（最初は入れず、「既定から追加」で足す） |
 
 - 「すべて」は条件なし・グループ分けなし・削除不可を、画面だけでなくサーバーでも保証する。行は seed ではなく user migration で INSERT する。「すべて」が無い状態を扱うコードは書かない。fixture は migration を通らないので、fixture でも「すべて」が必ずある作りにする

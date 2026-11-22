@@ -72,7 +72,7 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
     expect(api.requestsTo(KEY)[0]?.body).toEqual({ groupBy: { kind: "prefix", prefix: "cv" } });
   });
 
-  it("タグ・追加日の groupBy をそのまま送る", async () => {
+  it("タグ・追加年の groupBy をそのまま送る", async () => {
     const tag = renderGroupValues({ kind: "tag" }, { folderId: "all" });
     await waitFor(() => expect(tag.result.current.isSuccess).toBe(true));
     const year = renderGroupValues({ kind: "addedYear" }, { folderId: "all" });

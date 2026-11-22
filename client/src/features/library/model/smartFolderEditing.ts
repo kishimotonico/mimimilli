@@ -16,10 +16,7 @@ import {
   type SortId,
   type TagPrefix,
 } from "@mimimilli/shared";
-import {
-  buildGroupByRows,
-  getGroupByLabel,
-} from "../../../entities/library/smartFolderDefinitions";
+import { buildGroupByRows } from "../../../entities/library/smartFolderDefinitions";
 import { groupByKey, type GroupByKey } from "../../../entities/smart-folder/groupByKey";
 
 // ── 並べ替え ─────────────────────────────────────────────────
@@ -123,15 +120,7 @@ export function groupByOptions(
   tagPrefixes: readonly TagPrefix[],
   current: GroupBy | null,
 ): GroupByOption[] {
-  const rows = buildGroupByRows([...tagPrefixes]);
-  const known = (groupBy: GroupBy) =>
-    rows.some((row) => groupByKey(row.groupBy) === groupByKey(groupBy));
-  if (current?.kind === "prefix" && !known(current)) {
-    rows.splice(rows.length - 2, 0, {
-      groupBy: current,
-      name: getGroupByLabel(current, [...tagPrefixes]),
-    });
-  }
+  const rows = buildGroupByRows(tagPrefixes, current);
   return rows.map((row) => ({ key: groupByKey(row.groupBy), label: row.name }));
 }
 

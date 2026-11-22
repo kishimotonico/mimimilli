@@ -1,4 +1,3 @@
-import { createElement } from "react";
 import { act, render, screen } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -18,7 +17,6 @@ describe("LibraryView: 0件の画面から選択つきのエントリーへ戻�
     const held = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const work = buildWork({ id: "w1", title: "作品1" });
     mockApi(
       appShellRoutes({
         "GET /api/smart-folders/:id/works": async ({ url }) => {
@@ -26,36 +24,34 @@ describe("LibraryView: 0件の画面から選択つきのエントリーへ戻�
           await held;
           return buildWorksPage([buildWorkListItem({ id: "w1" })]);
         },
-        "GET /api/works/:id": work,
+        "GET /api/works/:id": buildWork({ id: "w1", title: "作品1" }),
       }),
     );
     const store = createStore();
     seedLibraryRoute(store, { folderId: "all", q: "zzz", sort: "added-desc" });
     render(
-      createElement(
-        QueryClientProvider,
-        { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
-        createElement(
-          JotaiProvider,
-          { store },
-          createElement(
-            PlayerRuntimeProvider,
-            null,
-            createElement(
-              LibraryNavigationProvider,
-              null,
-              createElement(LibraryView, { dockedBarActive: false }),
-            ),
-          ),
-        ),
-      ),
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <JotaiProvider store={store}>
+          <PlayerRuntimeProvider>
+            <LibraryNavigationProvider>
+              <LibraryView dockedBarActive={false} />
+            </LibraryNavigationProvider>
+          </PlayerRuntimeProvider>
+        </JotaiProvider>
+      </QueryClientProvider>,
     );
-    await screen.findByRole("button", { name: "検索をクリア" });
 
-    act(() => seedLibraryRoute(store, { q: "", selectedWorkId: "w1" }));
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    try {
+      await screen.findByRole("button", { name: "検索をクリア" });
 
-    expect(store.get(libraryRouteAtom).selectedWorkId).toBe("w1");
-    release();
+      act(() => seedLibraryRoute(store, { q: "", selectedWorkId: "w1" }));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(store.get(libraryRouteAtom).selectedWorkId).toBe("w1");
+    } finally {
+      release();
+    }
   });
 });
