@@ -51,6 +51,13 @@ export interface SplitSelectedTagsResult {
 /** HTTP 境界で splitSelectedTags を通した後、core・adapter がそのまま使う構造化済みタグフィルタ */
 export type TagFilters = Pick<SplitSelectedTagsResult, "tags" | "yearValue">;
 
+/** 選択タグの正準な並び。組み込みの擬似タグ（year など）は実タグの後ろに置く。URL から読んだ route と
+ *  メモリ上の route が同じ並びになるよう、タグを足す・読む箇所はこれを通す */
+export function orderSelectedTags(tags: readonly NormalizedTag[]): NormalizedTag[] {
+  const isPseudo = (tag: NormalizedTag) => parseBuiltinPseudoTag(tag) !== null;
+  return [...tags.filter((tag) => !isPseudo(tag)), ...tags.filter(isPseudo)];
+}
+
 /**
  * 選択中タグ（selectedTagsAtom・URLの tags=・HTTPクエリの tags=）を実タグと組み込みの
  * 擬似タグへ分解する共通入口。client（URL復元）・server（HTTPスキーマの境界検証・フィルタ
@@ -65,13 +72,6 @@ export type TagFilters = Pick<SplitSelectedTagsResult, "tags" | "yearValue">;
  * UI操作は常に置き換え・単一選択を強制するが、URL・HTTPクエリは直接編集され得るため、
  * ここで同じ制約を検証する（ADR-0012 §2）。
  */
-/** 選択タグの正準な並び。組み込みの擬似タグ（year など）は実タグの後ろに置く。URL から読んだ route と
- *  メモリ上の route が同じ並びになるよう、タグを足す・読む箇所はこれを通す */
-export function orderSelectedTags(tags: readonly NormalizedTag[]): NormalizedTag[] {
-  const isPseudo = (tag: NormalizedTag) => parseBuiltinPseudoTag(tag) !== null;
-  return [...tags.filter((tag) => !isPseudo(tag)), ...tags.filter(isPseudo)];
-}
-
 export function splitSelectedTags(selectedTags: string[]): SplitSelectedTagsResult {
   let yearValue: string | null = null;
   const tags: NormalizedTag[] = [];
