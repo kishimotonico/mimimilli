@@ -1,4 +1,4 @@
-/* 再生中タブの没入モード（.mle-nowplaying__immersive*）。ビューポート全面を覆う fixed 面で z-index 40。
+/* 再生中の層の没入モード（.mle-nowplaying__immersive*）。ビューポート全面を覆う fixed 面で z-index 40。
    シーク行（now-playing.css の .mle-nowplaying__seek、z-index 41）だけが常にこの上に乗る。
    z-index の割り当ては docs/design-system.md の Overlay/z-index 一覧を参照。 */
 

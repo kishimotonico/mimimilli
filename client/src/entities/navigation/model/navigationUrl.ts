@@ -20,11 +20,13 @@ export interface FilesUrlState {
   selectedRelPath: string[] | null;
 }
 
-export type NavigationUrlState =
+export type NavigationScreenUrlState =
   | { mode: "library"; library: LibraryUrlState }
   | { mode: "files"; files: FilesUrlState }
-  | { mode: "nowPlaying" }
   | { mode: "workDetail"; workId: string };
+
+/** 画面の URL に、再生中の層を表す `np=1` を足すかどうかを持つ */
+export type NavigationUrlState = NavigationScreenUrlState & { np: boolean };
 
 export interface NavigationParseResult {
   state: NavigationUrlState;
@@ -44,6 +46,7 @@ function defaultResult(warnings: string[]): NavigationParseResult {
   const state: NavigationUrlState = {
     mode: "library",
     library: { ...DEFAULT_LIBRARY_URL_STATE },
+    np: false,
   };
   return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
 }
@@ -99,6 +102,7 @@ function parseSelectedRelPath(value: string, warnings: string[]): string[] | nul
 export function parseNavigationUrl(input: string | URL): NavigationParseResult {
   const url = input instanceof URL ? input : new URL(input, "http://mimimilli.local");
   const warnings: string[] = [];
+  const np = url.searchParams.get("np") === "1";
 
   if (url.hash) warnings.push(`未対応の URL hash を削除しました: ${url.hash}`);
 
@@ -129,16 +133,8 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
         selectedWorkId: url.searchParams.get("work") || null,
         q: url.searchParams.get("q") ?? "",
       },
+      np,
     };
-    return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
-  }
-
-  if (segments[0] === "now-playing") {
-    if (segments.length > 1) {
-      warnings.push(`再生中画面の階層として不正な URL を拒否しました: ${url.pathname}`);
-      return defaultResult(warnings);
-    }
-    const state: NavigationUrlState = { mode: "nowPlaying" };
     return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
   }
 
@@ -148,7 +144,7 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
       warnings.push(`作品詳細の階層として不正な URL を拒否しました: ${url.pathname}`);
       return defaultResult(warnings);
     }
-    const state: NavigationUrlState = { mode: "workDetail", workId };
+    const state: NavigationUrlState = { mode: "workDetail", workId, np };
     return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
   }
 
@@ -161,6 +157,7 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
     const state: NavigationUrlState = {
       mode: "files",
       files: { relPath: segments.slice(1), selectedRelPath },
+      np,
     };
     return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
   }
@@ -175,31 +172,26 @@ function encodeSegments(segments: string[]): string {
 
 export function serializeNavigationUrl(state: NavigationUrlState): string {
   const params = new URLSearchParams();
-
-  if (state.mode === "nowPlaying") {
-    return "/now-playing";
-  }
+  let pathname: string;
 
   if (state.mode === "workDetail") {
-    return `/work/${encodeURIComponent(state.workId)}`;
-  }
-
-  if (state.mode === "library") {
+    pathname = `/work/${encodeURIComponent(state.workId)}`;
+  } else if (state.mode === "library") {
     const { folderId, group, selectedTags, selectedWorkId, q } = state.library;
-    const pathname = `/library/${encodeURIComponent(folderId)}`;
+    pathname = `/library/${encodeURIComponent(folderId)}`;
     if (group !== null) params.set("group", group);
     for (const tag of selectedTags) params.append("tags", tag);
     if (selectedWorkId) params.set("work", selectedWorkId);
     if (q) params.set("q", q);
-    const search = params.toString();
-    return search ? `${pathname}?${search}` : pathname;
+  } else {
+    const suffix = encodeSegments(state.files.relPath);
+    pathname = suffix ? `/files/${suffix}` : "/files";
+    if (state.files.selectedRelPath?.length) {
+      params.set("sel", state.files.selectedRelPath.join("/"));
+    }
   }
 
-  const suffix = encodeSegments(state.files.relPath);
-  const pathname = suffix ? `/files/${suffix}` : "/files";
-  if (state.files.selectedRelPath?.length) {
-    params.set("sel", state.files.selectedRelPath.join("/"));
-  }
+  if (state.np) params.set("np", "1");
   const search = params.toString();
   return search ? `${pathname}?${search}` : pathname;
 }

@@ -1,4 +1,25 @@
-/* 再生中タブの通常モード（.mle-nowplaying*、没入モードを除く）。 */
+/* 再生中の層（.mle-layer）。トップバーを残して今の画面に重なる。自身のスタッキングコンテキストに
+   中身（.mle-nowplaying*）の z-index を閉じ込める。層は再生バー（32）より前、速度メニュー（50）より後ろ。 */
+.mle-layer {
+  position: fixed;
+  inset: 48px 0 0 0;
+  z-index: 34;
+  background: var(--paper-1);
+  animation: mle-layer-in 0.16s ease-out;
+}
+@keyframes mle-layer-in {
+  from {
+    opacity: 0;
+  }
+}
+.mle-layer__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+}
+
+/* 再生中の層の通常モード（.mle-nowplaying*、没入モードを除く）。 */
 
 .mle-nowplaying {
   --now-playing-w: calc(100vw - 96px);

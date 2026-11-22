@@ -38,15 +38,10 @@ export default function AddressBar() {
       {mode === "library" && <LibraryBreadcrumbs />}
       {mode === "files" && <FilesBreadcrumbs />}
       {mode === "workDetail" && <WorkDetailBreadcrumbs />}
-      {mode === "nowPlaying" && (
-        <div className="mle-crumbs">
-          <span className="mle-crumbs__seg is-last">再生中</span>
-        </div>
-      )}
 
       {mode === "library" && <LibraryGridControls />}
 
-      {mode !== "nowPlaying" && mode !== "workDetail" && (
+      {mode !== "workDetail" && (
         <div className="ml-2 inline-flex items-center gap-[1px] rounded-2 bg-paper-2 p-[2px]">
           <IconButton
             size="sm"

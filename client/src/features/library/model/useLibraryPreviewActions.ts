@@ -6,19 +6,18 @@ import {
   playingTrackIndexAtom,
   playingWorkIdAtom,
 } from "../../../entities/player/model/atoms";
-import type { SwitchableAppMode } from "../../../entities/navigation/model/appRoute";
 
 interface UseLibraryPreviewActionsOptions {
   selectedWork: Work | null;
   openWorkDetail: (workId: string) => void;
-  setAppMode: (mode: SwitchableAppMode) => void;
+  openNowPlaying: () => void;
 }
 
 /** 選択中作品プレビューの操作ハンドラーと、その作品が再生中かどうかの判定をまとめる。 */
 export function useLibraryPreviewActions({
   selectedWork,
   openWorkDetail,
-  setAppMode,
+  openNowPlaying,
 }: UseLibraryPreviewActionsOptions) {
   const playingWorkId = useAtomValue(playingWorkIdAtom);
   const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
@@ -29,7 +28,7 @@ export function useLibraryPreviewActions({
     if (selectedWork) openWorkDetail(selectedWork.id);
   }, [selectedWork, openWorkDetail]);
 
-  const handleGoToPlayingScreen = useCallback(() => setAppMode("nowPlaying"), [setAppMode]);
+  const handleGoToPlayingScreen = openNowPlaying;
 
   return {
     isPlaybackActive,

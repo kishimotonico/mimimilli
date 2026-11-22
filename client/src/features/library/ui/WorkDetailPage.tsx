@@ -7,8 +7,8 @@ import { workDetailIdAtom } from "../../../entities/work/model/navigationAtoms";
 import { workDetailQueryOptions } from "../../../entities/work/workDetailQueryOptions";
 import { allTagsQueryOptions } from "../../../entities/tag/allTagsQueryOptions";
 import {
+  openNowPlayingLayerAtom,
   replaceAppModeAtom,
-  setAppModeAtom,
 } from "../../../entities/navigation/model/appRouteStore";
 import {
   playerIsPlayingOrLoadingAtom,
@@ -26,7 +26,7 @@ export default function WorkDetailPage() {
   const playingWorkId = useAtomValue(playingWorkIdAtom);
   const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
   const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
-  const setAppMode = useSetAtom(setAppModeAtom);
+  const openNowPlaying = useSetAtom(openNowPlayingLayerAtom);
   const replaceAppMode = useSetAtom(replaceAppModeAtom);
   const nav = useLibraryNavigation();
   const { clickTag } = nav;
@@ -56,8 +56,6 @@ export default function WorkDetailPage() {
     [clickTag],
   );
 
-  const handleGoToPlayingScreen = useCallback(() => setAppMode("nowPlaying"), [setAppMode]);
-
   if (!work) {
     return (
       <div className="mx-auto flex h-full max-w-[880px] flex-col px-10 py-10">
@@ -83,7 +81,7 @@ export default function WorkDetailPage() {
         // 解除後の退避も、404と同じくreplaceで抜ける（上のuseEffect参照）
         onUnregistered={() => replaceAppMode("library")}
         onTagClick={handleTagClick}
-        onGoToPlayingScreen={isCurrentWorkPlaying ? handleGoToPlayingScreen : undefined}
+        onGoToPlayingScreen={isCurrentWorkPlaying ? openNowPlaying : undefined}
       />
     </div>
   );

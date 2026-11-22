@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { isHasErrorOnly } from "@mimimilli/shared";
 import { libraryViewModeAtom } from "../model/atoms";
-import { setAppModeAtom } from "../../../entities/navigation/model/appRouteStore";
+import { openNowPlayingLayerAtom } from "../../../entities/navigation/model/appRouteStore";
 import { openWorkDetailAtom } from "../../../entities/work/model/navigationActions";
 import { useLibraryNavigation, type ReadyLibraryNavigation } from "../model/useLibraryNavigation";
 import {
@@ -53,7 +53,7 @@ function LibraryViewBody({
 }: LibraryViewProps & { nav: ReadyLibraryNavigation }) {
   const { view, searchQuery } = nav;
   const debouncedSearchQuery = useLibraryDebouncedSearchQuery(searchQuery);
-  const setAppMode = useSetAtom(setAppModeAtom);
+  const openNowPlaying = useSetAtom(openNowPlayingLayerAtom);
   const openWorkDetail = useSetAtom(openWorkDetailAtom);
   const viewMode = useAtomValue(libraryViewModeAtom);
 
@@ -86,7 +86,7 @@ function LibraryViewBody({
   const previewActions = useLibraryPreviewActions({
     selectedWork,
     openWorkDetail,
-    setAppMode,
+    openNowPlaying,
   });
 
   return (

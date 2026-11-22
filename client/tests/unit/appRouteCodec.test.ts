@@ -26,10 +26,11 @@ const libraryRoute: AppRoute = {
 };
 
 describe("appRouteCodec", () => {
-  it("sort・seed・layer は URL に出さず、履歴エントリーの状態に書く", () => {
+  it("sort・seed は URL に出さず、層は np=1 で表し、履歴エントリーの状態に書く", () => {
     const { url, entryState } = appRouteCodec.serialize(libraryRoute);
 
     expect(url).not.toMatch(/sort|seed/);
+    expect(url).toMatch(/[?&]np=1$/);
     expect(entryState).toEqual({
       sort: "title-asc",
       seed: 4242,
@@ -41,7 +42,7 @@ describe("appRouteCodec", () => {
     expect(roundTrip(libraryRoute)).toEqual(libraryRoute);
   });
 
-  it("作品詳細・ファイルのエントリーでは sort・seed を読み戻さず現在値を保ち、layer は読む", () => {
+  it("作品詳細・ファイルのエントリーでは sort・seed を読み戻さず現在値を保ち、層は URL の np から読む", () => {
     const current: AppRoute = {
       ...libraryRoute,
       library: { ...libraryRoute.library, sort: "added-asc", seed: 7 },
@@ -49,11 +50,31 @@ describe("appRouteCodec", () => {
     };
     const entryState = { sort: "title-asc", seed: 4242, layer: libraryRoute.layer };
 
-    for (const url of ["/work/RJ99999999", "/files/dlsite"]) {
+    for (const url of ["/work/RJ99999999?np=1", "/files/dlsite?np=1"]) {
       const restored = appRouteCodec.parse(url, entryState).apply(current);
       expect(restored.library).toMatchObject({ sort: "added-asc", seed: 7 });
       expect(restored.layer).toEqual(libraryRoute.layer);
     }
+  });
+
+  it("URL に np=1 が無ければ、履歴エントリーの状態に層が書かれていても開かない", () => {
+    const entryState = { sort: null, seed: 1, layer: libraryRoute.layer };
+    expect(appRouteCodec.parse("/library/all", entryState).apply(libraryRoute).layer).toBeNull();
+  });
+
+  it("開き方は履歴エントリーの状態から読み、無ければ URL を直接開いたものとして扱う", () => {
+    const opened = (entryState: unknown) =>
+      appRouteCodec.parse("/library/all?np=1", entryState).apply(BASE_ROUTE).layer;
+
+    expect(opened({ layer: { kind: "nowPlaying", openedBy: "app" } })).toEqual({
+      kind: "nowPlaying",
+      openedBy: "app",
+    });
+    expect(opened(undefined)).toEqual({ kind: "nowPlaying", openedBy: "url" });
+    expect(opened({ layer: { kind: "nowPlaying", openedBy: "x" } })).toEqual({
+      kind: "nowPlaying",
+      openedBy: "url",
+    });
   });
 
   it("ライブラリ(X) → 作品詳細 → 戻る → 並びをYへ変更 → 進む → 戻る、でYが保たれる", () => {
@@ -87,9 +108,9 @@ describe("appRouteCodec", () => {
 
   it("読めない項目は現在の値を保つ", () => {
     const restored = appRouteCodec
-      .parse("/library/all", { sort: "nope", seed: "x", layer: { kind: "other" } })
+      .parse("/library/all?np=1", { sort: "nope", seed: "x", layer: { kind: "other" } })
       .apply(libraryRoute);
     expect(restored.library).toMatchObject({ sort: "title-asc", seed: 4242 });
-    expect(restored.layer).toEqual(libraryRoute.layer);
+    expect(restored.layer).toEqual({ kind: "nowPlaying", openedBy: "url" });
   });
 });

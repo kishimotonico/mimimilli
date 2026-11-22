@@ -8,7 +8,7 @@ export const librarySidebarOpenAtom = atomWithStorage<boolean>(
   true,
 );
 
-/** ライブラリ・作品詳細・再生中のいずれかにいる間だけ、サイドバーを出せる。ファイルは全幅 */
+/** ライブラリ・作品詳細にいる間だけ、サイドバーを出せる。ファイルは全幅。再生中の層は上に重なるだけで、サイドバーの状態は変えない */
 export const librarySidebarAvailableAtom = atom((get) => get(appModeAtom) !== "files");
 
 export const librarySidebarVisibleAtom = atom(

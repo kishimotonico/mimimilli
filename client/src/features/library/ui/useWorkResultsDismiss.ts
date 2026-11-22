@@ -1,4 +1,6 @@
+import { useStore } from "jotai";
 import { useEffect, type RefObject } from "react";
+import { layerAtom } from "../../../entities/navigation/model/appRouteStore";
 
 // 作品グリッド・作品リストの両方が使う結果面共通のEscape/背景クリック選択解除。
 export function useWorkResultsDismiss(
@@ -7,11 +9,13 @@ export function useWorkResultsDismiss(
   scrollRef: RefObject<HTMLDivElement | null>,
   itemSelector: string,
 ) {
+  const store = useStore();
   useEffect(() => {
     if (!isWorkSelected) return;
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (store.get(layerAtom) !== null) return;
 
       const target = event.target instanceof Element ? event.target : null;
       if (
@@ -27,7 +31,7 @@ export function useWorkResultsDismiss(
 
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [isWorkSelected, onDeselect]);
+  }, [isWorkSelected, onDeselect, store]);
 
   useEffect(() => {
     if (!isWorkSelected) return;

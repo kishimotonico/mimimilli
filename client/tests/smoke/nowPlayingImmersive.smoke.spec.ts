@@ -1,7 +1,7 @@
 import { expect, test } from "./fixtures";
 import { assertNoErrors, openApp, trackErrors, openNowPlayingFromBar } from "./support";
 
-test("再生中タブ: 没入モードでカバーが拡大クロップされてページに漏れず、シーク行の位置がモード切替前後で不変", async ({
+test("再生中の層: 没入モードでカバーが拡大クロップされてページに漏れず、シーク行の位置がモード切替前後で不変", async ({
   page,
 }) => {
   const tracker = trackErrors(page);

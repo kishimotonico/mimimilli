@@ -1,4 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { buildWork } from "../helpers/builders";
+import { mockApi } from "../helpers/api";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import NowPlayingView from "../../src/features/player/ui/NowPlayingView";
@@ -51,12 +54,20 @@ function baseCoreState() {
 }
 
 function renderNowPlayingImmersive() {
+  mockApi({
+    "GET /api/works/:id": buildWork({ id: "work-1", tags: [] }),
+    "GET /api/tag-prefixes": [],
+  });
   const store = createStore();
   store.set(playerCoreAtom, baseCoreState());
   const { container } = render(
-    <JotaiProvider store={store}>
-      <NowPlayingView onOpenWork={vi.fn()} />
-    </JotaiProvider>,
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <JotaiProvider store={store}>
+        <NowPlayingView onOpenWork={vi.fn()} onTagClick={vi.fn()} />
+      </JotaiProvider>
+    </QueryClientProvider>,
   );
   fireEvent.click(screen.getByRole("button", { name: "没入モードにする" }));
   const miniControls = container.querySelector(".mle-nowplaying__immersive-minicontrols");

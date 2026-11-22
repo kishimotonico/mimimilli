@@ -127,7 +127,7 @@ smokeテストの注意:
 
 ## プレイヤーのアーキテクチャ
 
-プレイヤーの UI と audio ランタイムは `client/src/features/player/`、再生状態機械とコマンド層は他 feature からも使うため `client/src/entities/player/model/` に置く。UIは「画面下バー + 右下ポップアップ」（`PlayerDock.tsx` が AnimatePresence で切替）と、ポップアップの展開ボタンなどから開く「再生中タブ」（`NowPlayingView.tsx`。通常モード⇄没入モード）の構成。再生中タブの表示中は `PlayerDock` を描画しない（下部バー/ポップアップと再生中タブは同時に出さない）。
+プレイヤーの UI と audio ランタイムは `client/src/features/player/`、再生状態機械とコマンド層は他 feature からも使うため `client/src/entities/player/model/` に置く。UIは「画面下バー + 右下ポップアップ」（`PlayerDock.tsx` が AnimatePresence で切替）と、バーとポップアップの ⤢ などから開く「再生中の層」（`NowPlayingLayer.tsx`。中身は `NowPlayingView.tsx` で通常モード⇄没入モード）の構成。層の開閉は `AppRoute.layer`（URL は下の画面に `np=1`）が正で、層が開いている間は `PlayerDock` を描画しない（下部バー/ポップアップと層は同時に出さない）。
 
 状態遷移は `PlayerController` 状態機械に集約している。model 層の分担（特記のないものは `features/player/model/`）:
 
@@ -139,7 +139,7 @@ smokeテストの注意:
   - `playerCurrentTimeAtom` / `playerDurationAtom`（**高頻度**。timeupdate 毎に更新。`usePlaybackProgress` を介して **BarSeekStrip / PopupSeek / NowPlayingScrub の3 leaf だけが subscribe**する。親コンポーネント（BarContent / PopupContent / NowPlayingView）や App.tsx は subscribe しないので再生中に上位が再レンダリングされない — この分離は**維持必須**）
 - `model/playerPresentationAtoms.ts`: プレイヤーの表示状態（いずれも localStorage 永続）
   - `playerUiModeAtom`（bar⇄popup）
-  - `nowPlayingViewModeAtom`（再生中タブの通常⇄没入）
+  - `nowPlayingViewModeAtom`（再生中の層の通常⇄没入）
 - `entities/player/model/audioEngine.ts`: 低レベル。`new Audio()`（DOM外）。load/play/pause/seek/setVolume/setPlaybackRate/setChannelSwap、timeupdate/durationchange/ended コールバック
 - `model/useAudioEngineLifecycle.ts`: エンジンの生成と、engine イベント→controller 入力・`loadTrack` コマンド→実ロード/シークの変換、last-played 送信。遷移判定は持たない。同一アセットを再利用する経路は `<audio>` の `play()` がすでに再生中だとイベントを発火しないため、reducer が再生中の status を loading に戻さない
 - `model/useResumePersistence.ts`: レジューム（playlistId/trackId/offsetSec）の保存・復元ポート
@@ -148,12 +148,13 @@ smokeテストの注意:
 - `entities/player/model/usePlayerActions.ts`: 状態を持たず `PlayerController` へ dispatch するだけの薄いアクション束。`play` / `togglePlay` / `seek` / `seekRelative` / `setVolume` / `setLoop` / `nextTrack` / `prevTrack` / `setTrackIndex` / `playWithResume` / `setPlaybackRate` / `setChannelSwap`（L⇄R入替）/ `setABPoint`・`setABPointAt`・`clearABRepeat`（A-Bリピート。a < b のときだけ成立、B→A の順で設定すると自動で入れ替え）。レジュームの定期保存は `persistTick`（5秒間隔、`status === "playing"` のときだけ実際に保存する）
 - `entities/player/model/usePlayWork.ts` / `workPlaybackRequest.ts`: 作品の再生開始の唯一の入口。`usePlayWork()` の `playWork(work, trackIndex)` / `resumeWork(work)` を各画面が直接呼ぶ。`requestWorkPlayback` が再生準備（`prepareWorkPlayback` → キャッシュ更新）と `PlayerController.playRequests` による鮮度確認（待ち中に後続要求・停止・別の再生開始があれば捨てる）、失敗時のトースト（root 再設定中のエラーは除く）を担い、通常再生と続きから再生の違いは開始処理だけ。root 再設定時は `rootReconfigurationController` が `stop()` を呼び、未完了の要求も無効になる
 - `model/usePlayer.ts`（`usePlayerRuntime`）: controller ⇄ audioEngine ⇄ atoms を橋渡しするランタイム。`<PlayerRuntime />` 内でだけ呼ぶ
-- `model/useNowPlayingImmersiveShell.ts`: 没入モード中、TopBar/AddressBar/サイドバーを inert 化し Escape で解除する
-- `ui/PlayerDock.tsx`: バー⇄ポップアップの外枠・層切替。再生中タブ表示中は描画しない
+- `model/useNowPlayingImmersiveShell.ts`: 没入モード中、TopBar/AddressBar/サイドバーを inert 化し、フォーカスを切替ボタンへ移す（Esc は層が受けて層ごと閉じる。没入の切り替えはボタンだけ）
+- `ui/PlayerDock.tsx`: バー⇄ポップアップの外枠・層切替。層が開いている間は描画しない
 - `ui/BarContent.tsx`（画面下バー）: カバー / トラック名 / 再生切替 + バー下辺に貼り付くシークバー（時間表示なし）。バークリックでポップアップへ
-- `ui/PopupContent.tsx`（右下ポップアップ）: 大カバー / シーク / 前・次・ループ / ±10秒 / 倍速 / 音量 / 再生中の作品へジャンプ / 再生中タブへ遷移
-- `ui/NowPlayingView.tsx`: 再生中タブ本体。通常モード（左カバー / 右トラックリストの横長2カラム + 下部固定バー）と没入モード（`NowPlayingImmersive.tsx`。ビューポート全面カバー）を切り替える
-- `ui/useSeekDrag.ts`: シーク操作の共通フック（バー・ポップアップ・再生中タブで共用）
+- `ui/PopupContent.tsx`（右下ポップアップ）: 大カバー / シーク / 前・次・ループ / ±10秒 / 倍速 / 音量 / 再生中の作品へジャンプ / 再生中の層を開く
+- `ui/NowPlayingLayer.tsx`: 再生中の層。層の開閉（`layerAtom`）・Esc・再生していないのに開いていたときの外し方（アプリで開いたなら履歴を1件戻り、それ以外は置き換えで `np` を外す）を持つ。
+- `ui/NowPlayingView.tsx`: 層の中身。通常モード（左カバー / 右トラックリストの横長2カラム + 下部固定バー）と没入モード（`NowPlayingImmersive.tsx`。ビューポート全面カバー）を切り替える
+- `ui/useSeekDrag.ts`: シーク操作の共通フック（バー・ポップアップ・再生中の層で共用）
 
 ### ⚠ 自動検証の限界（音声）
 

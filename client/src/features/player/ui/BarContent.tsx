@@ -16,6 +16,7 @@ interface BarContentProps {
   onPrev: () => void;
   onSeek: (t: number) => void;
   onSwitchToPopup: () => void;
+  onOpenNowPlaying: () => void;
   onSetVolume: (volume: number) => void;
   onStop: () => void;
   onRetryError: () => void;
@@ -29,6 +30,7 @@ export default function BarContent({
   onPrev,
   onSeek,
   onSwitchToPopup,
+  onOpenNowPlaying,
   onSetVolume,
   onStop,
   onRetryError,
@@ -135,6 +137,20 @@ export default function BarContent({
           }}
         >
           <I.chevD size={13} style={{ transform: "rotate(180deg)" }} />
+        </button>
+
+        <button
+          type="button"
+          className="mle-bar1__expand"
+          aria-label="再生中を開く"
+          data-np-open
+          title="再生中を開く"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenNowPlaying();
+          }}
+        >
+          <I.fs size={13} />
         </button>
 
         <button

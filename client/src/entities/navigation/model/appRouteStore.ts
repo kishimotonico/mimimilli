@@ -1,6 +1,9 @@
 import { atom } from "jotai";
 import { createRouteStore, type RouteTransition } from "../../../shared/model/routeStore";
-import { readHistoryEntryState } from "../../../shared/model/useRouteHistorySync";
+import {
+  navigationHistoryBack,
+  readHistoryEntryState,
+} from "../../../shared/model/useRouteHistorySync";
 import {
   appRouteCodec,
   createInitialAppRoute,
@@ -20,6 +23,21 @@ export const navigateAtom = appRouteStore.navigateAtom;
 export const navigationDirectionAtom = appRouteStore.directionAtom;
 export const navigationHistoryAvailabilityAtom = appRouteStore.historyAvailabilityAtom;
 
+/** 画面へ進む操作は必ず層を落とす。層が開いているあいだの遷移は、層のエントリーを置き換える。
+ *  層そのものを開く・閉じる操作はこの規則の外（appRouteStore.action を直接使う） */
+export function appRouteAction<A extends unknown[]>(
+  compute: (current: AppRoute, ...args: A) => RouteTransition<AppRoute> | null,
+) {
+  return appRouteStore.action((current: AppRoute, ...args: A) => {
+    const transition = compute(current, ...args);
+    if (!transition) return transition;
+    const route = { ...transition.route, layer: null };
+    return current.layer === null
+      ? { ...transition, route }
+      : { ...transition, route, replace: true };
+  });
+}
+
 export const appModeAtom = atom<AppMode>((get) => get(appRouteAtom).mode);
 
 export function switchAppMode(
@@ -30,13 +48,32 @@ export function switchAppMode(
   return { route: { mode, library: route.library, files: route.files, layer: route.layer } };
 }
 
-export const setAppModeAtom = appRouteStore.action(switchAppMode);
+export const setAppModeAtom = appRouteAction(switchAppMode);
 
 /** 404・削除など、現在の画面自体が無効になったための強制退避で使う。履歴を積まず
  *  現在のエントリを置き換える（戻るで無効な画面へ戻ってpush→retreatを繰り返すのを防ぐ）。 */
-export const replaceAppModeAtom = appRouteStore.action(
-  (route: AppRoute, mode: SwitchableAppMode) => {
-    const transition = switchAppMode(route, mode);
-    return transition && { ...transition, replace: true };
-  },
-);
+export const replaceAppModeAtom = appRouteAction((route: AppRoute, mode: SwitchableAppMode) => {
+  const transition = switchAppMode(route, mode);
+  return transition && { ...transition, replace: true };
+});
+
+export const layerAtom = atom((get) => get(appRouteAtom).layer);
+
+/** 再生中の層を今の画面に重ねる。履歴を1件積み、閉じるときに1件戻れるようにする */
+export function openNowPlayingLayer(route: AppRoute): RouteTransition<AppRoute> | null {
+  if (route.layer !== null) return null;
+  return { route: { ...route, layer: { kind: "nowPlaying", openedBy: "app" } } };
+}
+
+export const openNowPlayingLayerAtom = appRouteStore.action(openNowPlayingLayer);
+
+/** 層を閉じる。アプリの中で開いたなら履歴を1件戻り、それ以外は置き換えで np だけを外す。戻り先が無いときも置き換え */
+export const closeLayerAtom = atom(null, (get, set) => {
+  const { layer } = get(appRouteAtom);
+  if (layer === null) return;
+  if (layer.openedBy === "app" && get(navigationHistoryAvailabilityAtom).canBack) {
+    navigationHistoryBack();
+    return;
+  }
+  set(navigateAtom, (route) => ({ ...route, layer: null }), { replace: true });
+});

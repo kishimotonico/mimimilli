@@ -164,11 +164,11 @@ describe("PopupContent", () => {
     expect(screen.queryByRole("menu", { name: "再生速度" })).not.toBeInTheDocument();
   });
 
-  it("停止ボタンでonStopを、バーへ戻るでonFoldを、再生中タブ表示でonOpenNowPlayingを呼ぶ", () => {
+  it("停止ボタンでonStopを、バーへ戻るでonFoldを、⤢でonOpenNowPlayingを呼ぶ", () => {
     const handlers = renderPopup();
     fireEvent.click(screen.getByRole("button", { name: "再生を停止" }));
     fireEvent.click(screen.getByRole("button", { name: "バーへ戻る" }));
-    fireEvent.click(screen.getByRole("button", { name: "再生中タブを表示" }));
+    fireEvent.click(screen.getByRole("button", { name: "再生中を開く" }));
     expect(handlers.onStop).toHaveBeenCalledTimes(1);
     expect(handlers.onFold).toHaveBeenCalledTimes(1);
     expect(handlers.onOpenNowPlaying).toHaveBeenCalledTimes(1);

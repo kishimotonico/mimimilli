@@ -11,7 +11,7 @@ import {
 // 1440x960のみのカバレッジだと退行に気づけないため、専用にこの幅で検証する。
 test.use({ viewport: { width: 1024, height: 960 } });
 
-test("再生中タブ: 1024px幅ではコントロールがトランスポート/AB行の2段構成になり崩れない", async ({
+test("再生中の層: 1024px幅ではコントロールがトランスポート/AB行の2段構成になり崩れない", async ({
   page,
 }) => {
   const tracker = trackErrors(page);

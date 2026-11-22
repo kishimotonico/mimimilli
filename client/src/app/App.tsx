@@ -17,6 +17,7 @@ import TopBar from "./ui/TopBar";
 import AddressBar from "./ui/AddressBar";
 import { SETTINGS_QUERY_KEYS } from "../entities/settings/queryKeys";
 import PlayerDock from "../features/player/ui/PlayerDock";
+import NowPlayingLayerHost from "./ui/NowPlayingLayerHost";
 import { resolveAppStartupState } from "./model/resolveAppStartupState";
 import RootConfigurationScreen from "../features/setup/ui/RootConfigurationScreen";
 import StartupErrorScreen from "./ui/StartupErrorScreen";
@@ -188,7 +189,8 @@ export default function App() {
           topBar={<TopBar />}
           addressBar={<AddressBar />}
           sidebar={<LibrarySidebar />}
-          body={<AppBody onOpenWorkDetail={handleOpenWorkDetail} />}
+          body={<AppBody />}
+          layer={<NowPlayingLayerHost onOpenWork={handleOpenWorkDetail} />}
           transportBar={<PlayerDock onShowPlayingWork={handleOpenLibraryWork} />}
           overlays={
             <>

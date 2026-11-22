@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import { activeModalAtom } from "../../../shared/model/activeModalAtom";
+import { layerAtom } from "../../../entities/navigation/model/appRouteStore";
 import { librarySidebarOpenAtom } from "../model/sidebarAtoms";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
@@ -18,7 +19,10 @@ function isEditableTarget(target: EventTarget | null): boolean {
 /** アドレスバー左端のサイドバー開閉ボタン。Ctrl+B（Mac は ⌘B）でも切り替える。入力欄では奪わない */
 export default function SidebarToggleButton() {
   const [open, setOpen] = useAtom(librarySidebarOpenAtom);
-  const modalOpen = useAtomValue(activeModalAtom) !== null;
+  // 層が開いている間は、サイドバーが層の下に隠れているので受け付けない
+  const dialogOpen = useAtomValue(activeModalAtom) !== null;
+  const layerOpen = useAtomValue(layerAtom) !== null;
+  const modalOpen = dialogOpen || layerOpen;
 
   useEffect(() => {
     if (modalOpen) return;

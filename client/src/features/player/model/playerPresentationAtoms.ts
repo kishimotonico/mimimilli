@@ -15,7 +15,7 @@ export const playerUiModeAtom = atomWithStorage<PlayerUiMode>("mimimilli:playerU
 
 /**
  * 再生中で uiMode が bar のとき、画面下張り付きバーが表示される。
- * 再生中タブ（appMode）による抑制は AppShell / AppBody 側の合成に任せる。
+ * 再生中の層が開いている間の抑制は、AppShell と PlayerDock が layerAtom から合成する。
  */
 export const playerDockBarVisibleAtom = atom(
   (get) => get(playerIsActiveAtom) && get(playerUiModeAtom) === "bar",
@@ -43,7 +43,7 @@ export const playerPopupOffsetAtom = atomWithStorage<PlayerPopupOffset>(
 
 export type NowPlayingViewMode = "normal" | "immersive";
 
-/** 再生中タブの表示モード。localStorage に永続化し、次回もそのモードで開く。 */
+/** 再生中の層の表示モード。localStorage に永続化し、次回もそのモードで開く。 */
 export const nowPlayingViewModeAtom = atomWithStorage<NowPlayingViewMode>(
   "mimimilli:nowPlayingViewMode",
   "normal",
