@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { NO_AUTOFILL_PROPS } from "../../../shared/ui/noAutofill";
 import { useAtom, useAtomValue } from "jotai";
 import type { GroupBy, GroupValueItem, TagPrefix } from "@mimimilli/shared";
 import { getGroupByIcon, getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
@@ -66,6 +67,7 @@ export default function GroupValueList({
       <div className="mll-vsearch">
         <I.search size={13} />
         <input
+          {...NO_AUTOFILL_PROPS}
           type="text"
           value={contextQuery}
           onChange={(e) => setContextQuery(e.target.value)}

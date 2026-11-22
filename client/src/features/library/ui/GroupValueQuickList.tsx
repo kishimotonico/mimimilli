@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { NO_AUTOFILL_PROPS } from "../../../shared/ui/noAutofill";
 import { useAtom } from "jotai";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import type { GroupBy, GroupValueItem } from "@mimimilli/shared";
@@ -186,6 +187,7 @@ export default function GroupValueQuickList({
       <div className="mll-qlist__search">
         <I.search size={12} />
         <input
+          {...NO_AUTOFILL_PROPS}
           ref={searchRef}
           type="text"
           value={query}

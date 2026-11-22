@@ -1,5 +1,6 @@
 import type { InputHTMLAttributes, Ref } from "react";
 import { cn } from "../lib/cn";
+import { NO_AUTOFILL_PROPS } from "./noAutofill";
 
 export type TextInputFont = "sans" | "jp" | "mono";
 export type TextInputSurface = 0 | 1;
@@ -39,6 +40,7 @@ export default function TextInput({
         SURFACE_CLASS[surface],
         className,
       )}
+      {...NO_AUTOFILL_PROPS}
       {...rest}
     />
   );

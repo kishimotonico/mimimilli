@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { NO_AUTOFILL_PROPS } from "../../shared/ui/noAutofill";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
 import ToolButton from "../../shared/ui/ToolButton";
@@ -96,6 +97,7 @@ export default function TopBar() {
         <div className="mll-bar__search">
           <I.search size={13} />
           <input
+            {...NO_AUTOFILL_PROPS}
             ref={searchInputRef}
             value={draft}
             onChange={(e) => {

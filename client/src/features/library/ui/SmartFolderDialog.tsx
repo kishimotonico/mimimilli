@@ -1,4 +1,5 @@
 import { useId, useRef, useState } from "react";
+import { NO_AUTOFILL_PROPS } from "../../../shared/ui/noAutofill";
 import {
   ALL_SMART_FOLDER_ID,
   findSmartFolderTemplate,
@@ -132,6 +133,7 @@ export default function SmartFolderDialog({
         <div className="mll-fld">
           <label htmlFor={nameId}>名前</label>
           <input
+            {...NO_AUTOFILL_PROPS}
             ref={nameRef}
             id={nameId}
             type="text"

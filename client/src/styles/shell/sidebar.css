@@ -139,11 +139,26 @@
 .mll-sbrow.is-dragging {
   opacity: 0.35;
 }
-.mll-sbrow.is-drop-before {
-  box-shadow: inset 0 2px 0 var(--acc);
-}
+/* 挿入線は行の角丸に沿わない直線で、行と行の境目に出す */
+.mll-sbrow.is-drop-before,
 .mll-sbrow.is-drop-after {
-  box-shadow: inset 0 -2px 0 var(--acc);
+  position: relative;
+}
+.mll-sbrow.is-drop-before::after,
+.mll-sbrow.is-drop-after::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--acc);
+  pointer-events: none;
+}
+.mll-sbrow.is-drop-before::after {
+  top: -1px;
+}
+.mll-sbrow.is-drop-after::after {
+  bottom: -1px;
 }
 .mll-sbrow .grip {
   color: var(--ink-3);
