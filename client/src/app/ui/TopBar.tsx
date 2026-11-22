@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
+import ToolButton from "../../shared/ui/ToolButton";
 import { useAtomValue, useSetAtom } from "jotai";
 import { activeModalAtom } from "../../shared/model/activeModalAtom";
 import { useLibraryNavigation } from "../../features/library/model/useLibraryNavigation";
@@ -23,7 +24,7 @@ export default function TopBar() {
   const onSearchChange = nav.setSearchQuery;
   const searchQuery = nav.foldersStatus === "ready" ? nav.searchQuery : "";
   // 一覧が来るまでは検索の行き先（その一覧か「すべて」か）が決まらないので入力させない
-  const isSearchDisabled = nav.foldersStatus !== "ready";
+  const isSearchDisabled = nav.foldersStatus !== "ready" || mode === "files";
   const isPlaying = useAtomValue(playerIsActiveAtom);
   const playingTrack = useAtomValue(playingTrackTitleAtom);
   const playerStatus = useAtomValue(playerStatusAtom);
@@ -91,7 +92,7 @@ export default function TopBar() {
 
       <div className="mll-bar__spacer" />
 
-      {(mode === "library" || mode === "workDetail") && (
+      {(mode === "library" || mode === "workDetail" || mode === "files") && (
         <div className="mll-bar__search">
           <I.search size={13} />
           <input
@@ -155,6 +156,13 @@ export default function TopBar() {
         </div>
       )}
 
+      <ToolButton
+        icon={I.folder}
+        active={mode === "files"}
+        onClick={() => setAppMode(mode === "files" ? "library" : "files")}
+      >
+        ファイル
+      </ToolButton>
       <ScanEntryButton
         ring={ring}
         unseen={unseen}

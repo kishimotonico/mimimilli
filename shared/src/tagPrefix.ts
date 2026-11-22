@@ -121,7 +121,7 @@ export interface ResolvedTagPrefix {
 }
 
 /** prefix 文字列に対応する表示ラベル・色を解決する。ADR-0005 のラベル・色は tagPrefixes
- *  設定データが正であり、この関数を通すことでタグチップ・軸レール・スマートフォルダー等の
+ *  設定データが正であり、この関数を通すことでタグチップ・サイドバー・スマートフォルダー等の
  *  複数画面が同じ結果になる。未登録の prefix はラベルを prefix 文字列そのまま、色は
  *  null（呼び出し側の既定色）にする */
 export function resolveTagPrefix(

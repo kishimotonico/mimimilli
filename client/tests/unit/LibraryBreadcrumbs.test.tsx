@@ -55,20 +55,27 @@ function renderBreadcrumbs(nav: LibraryViewState & LibraryViewActions) {
 }
 
 describe("LibraryBreadcrumbs", () => {
-  it("値を選んでいなければスマートフォルダー名だけを出す", () => {
+  it("値を選んでいなければ「ライブラリ / スマートフォルダー名」を出し、「ライブラリ」は「すべて」へ戻る", () => {
     const nav = buildNav({ library: { folderId: "fav" } });
     renderBreadcrumbs(nav);
 
-    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["お気に入り"]);
-    fireEvent.click(screen.getByRole("button", { name: "お気に入り" }));
-    expect(nav.goToSegment).toHaveBeenCalledWith(0);
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "ライブラリ",
+      "お気に入り",
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "ライブラリ" }));
+    expect(nav.openFolder).toHaveBeenCalledWith("all");
   });
 
-  it("グループの値の作品一覧は「スマートフォルダー名 / 値」で、先頭クリックは値一覧へ戻る操作（goToSegment）", () => {
+  it("グループの値の作品一覧は「ライブラリ / スマートフォルダー名 / 値」で、スマートフォルダー名は値一覧へ戻る操作（goToSegment）", () => {
     const nav = buildNav({ library: { folderId: "by-cv", group: "藤田茜" } });
     renderBreadcrumbs(nav);
 
-    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["CV別", "藤田茜"]);
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "ライブラリ",
+      "CV別",
+      "藤田茜",
+    ]);
     fireEvent.click(screen.getByRole("button", { name: "CV別" }));
     expect(nav.goToSegment).toHaveBeenCalledWith(0);
   });
@@ -105,9 +112,9 @@ describe("LibraryBreadcrumbs", () => {
     sizeMock.restore();
   });
 
-  it("スマートフォルダー一覧が無い間は、仮の「すべて」を出さず空にする", () => {
+  it("スマートフォルダー一覧が無い間は、仮の「すべて」を出さず「ライブラリ」だけにする", () => {
     for (const foldersStatus of ["pending", "error"] as const) {
-      const { container, unmount } = renderBreadcrumbs({
+      const { unmount } = renderBreadcrumbs({
         foldersStatus,
         refetchFolders: vi.fn(),
         selectedWorkId: null,
@@ -115,7 +122,7 @@ describe("LibraryBreadcrumbs", () => {
         ...buildNavActions(),
       });
       expect(screen.queryByRole("button", { name: "すべて" })).toBeNull();
-      expect(container.querySelectorAll(".mle-crumbs__seg")).toHaveLength(0);
+      expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["ライブラリ"]);
       unmount();
     }
   });

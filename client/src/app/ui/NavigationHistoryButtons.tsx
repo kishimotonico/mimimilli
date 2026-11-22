@@ -14,14 +14,14 @@ export default function NavigationHistoryButtons() {
     <>
       <IconButton
         size="sm"
-        icon={I.arrowL}
+        icon={I.chevL}
         label="戻る"
         onClick={navigationHistoryBack}
         disabled={!canBack}
       />
       <IconButton
         size="sm"
-        icon={I.arrowR}
+        icon={I.chev}
         label="進む"
         onClick={navigationHistoryForward}
         disabled={!canForward}

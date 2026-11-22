@@ -86,7 +86,7 @@ async function warmUp(baseURL: string, timeoutMs: number): Promise<void> {
   try {
     const page = await browser.newPage();
     await page.goto(baseURL, { waitUntil: "domcontentloaded", timeout: timeoutMs });
-    await page.locator(".mle-col.is-axis").waitFor({ state: "visible", timeout: timeoutMs });
+    await page.locator(".mll-sidebar").waitFor({ state: "visible", timeout: timeoutMs });
   } finally {
     await browser.close();
   }

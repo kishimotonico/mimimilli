@@ -14,13 +14,13 @@ import ReconfigurationEntryEffect from "./ReconfigurationEntryEffect";
 import AppShell from "./AppShell";
 import AppBody from "./AppBody";
 import TopBar from "./ui/TopBar";
-import LeftNav from "./ui/LeftNav";
 import AddressBar from "./ui/AddressBar";
 import { SETTINGS_QUERY_KEYS } from "../entities/settings/queryKeys";
 import PlayerDock from "../features/player/ui/PlayerDock";
 import { resolveAppStartupState } from "./model/resolveAppStartupState";
 import RootConfigurationScreen from "../features/setup/ui/RootConfigurationScreen";
 import StartupErrorScreen from "./ui/StartupErrorScreen";
+import LibrarySidebar from "../features/library/ui/LibrarySidebar";
 import { LibraryNavigationProvider } from "../features/library/ui/LibraryNavigationProvider";
 import GlobalToast from "./ui/GlobalToast";
 import AppModals from "./ui/AppModals";
@@ -187,7 +187,7 @@ export default function App() {
         <AppShell
           topBar={<TopBar />}
           addressBar={<AddressBar />}
-          leftNav={<LeftNav />}
+          sidebar={<LibrarySidebar />}
           body={<AppBody onOpenWorkDetail={handleOpenWorkDetail} />}
           transportBar={<PlayerDock onShowPlayingWork={handleOpenLibraryWork} />}
           overlays={

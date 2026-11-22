@@ -9,8 +9,8 @@ import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import type { AnchoredPopoverFloatingRefCallback } from "../../../shared/ui/useAnchoredPopover";
 
 // 「＋絞り込み」の値ステージ。非ポータル版のポップオーバー本体。呼び出し側の
-// `.mll-tagband` は overflow をクリップしないため、軸レールのクイックオーバーレイ
-// （AxisQuickOverlay）と違いポータル不要。
+// `.mll-tagband` は overflow をクリップしないため、サイドバーのクイックオーバーレイ
+// （GroupQuickOverlay）と違いポータル不要。
 //
 // 呼び出し側（FilterChipAddButton）は `<AnimatePresence>` の直下で
 // `{isOpen && <AxisValuePopoverPanel key={axis} .../>}` のように条件レンダーする。

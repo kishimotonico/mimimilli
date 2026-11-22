@@ -27,7 +27,7 @@ export async function openApp(page: Page) {
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
   const bootTimeout = 20_000;
-  await expect(page.locator(".mle-col.is-axis")).toBeVisible({ timeout: bootTimeout });
+  await expect(page.locator(".mll-sidebar")).toBeVisible({ timeout: bootTimeout });
   await expect(
     page.locator(".mll-results .mle-col.is-results").getByRole("button").first(),
   ).toBeVisible({ timeout: bootTimeout });
@@ -131,4 +131,10 @@ export async function expectNoHorizontalOverflow(page: Page) {
     return doc.scrollWidth > doc.clientWidth + 1;
   });
   expect(overflowing, "横方向スクロールが発生している").toBe(false);
+}
+
+/** 再生バーを展開して、ポップアップの「再生中タブを表示」から再生中の画面へ進む */
+export async function openNowPlayingFromBar(page: Page) {
+  await page.locator(".mle-bar1").getByRole("button", { name: "バーを展開" }).click();
+  await page.getByRole("button", { name: "再生中タブを表示" }).click();
 }

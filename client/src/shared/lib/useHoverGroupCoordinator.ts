@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { isPointInTriangle, type Point } from "./pointInTriangle";
 
 // 「複数のトリガーが1つのポータル越しパネルを共有し、常に高々1つだけ開く」ホバーUI
-// （軸レールのクイックオーバーレイ等）の意図判定を一元管理するグループコーディネーター。
+// （サイドバーのクイックオーバーレイ等）の意図判定を一元管理するグループコーディネーター。
 // 各トリガー単独の開閉遅延・pointerイベント・トリガー⇄パネル間のタイマー共有という
 // useHoverIntent の役割に加え、トリガーからパネルへの斜め移動が他のトリガーの上を
 // 通過しても開閉が横取りされないよう、セーフトライアングル判定で他行の open 要求を
@@ -46,7 +46,7 @@ export interface UseHoverGroupCoordinatorOptions {
 export interface UseHoverGroupCoordinatorResult {
   /** 現在開いているトリガーのキー */
   openKey: string | null;
-  /** 現在開いているトリガーの要素（AxisQuickOverlay の anchorEl に渡す） */
+  /** 現在開いているトリガーの要素（GroupQuickOverlay の anchorEl に渡す） */
   openAnchorEl: HTMLElement | null;
   /** 現在openなオーナーのトークン。openKeyがnullの間はnull。 */
   ownerToken: HoverGroupOwnerToken | null;

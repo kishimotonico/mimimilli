@@ -92,7 +92,7 @@ export default function AxisValueList({
           <>
             {isFacetError && (
               // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- role="status"で非ブロッキング通知にする
-              <div className="mll-axis-error" role="status" aria-live="polite">
+              <div className="mle-col__notice" role="status" aria-live="polite">
                 <span>{getAxisLabel(axis, tagPrefixes)}の取得に失敗しました</span>
                 {onRetryFacets && (
                   <Button variant="ghost" icon={I.refresh} onClick={onRetryFacets}>
@@ -104,7 +104,7 @@ export default function AxisValueList({
             {axis === "tag" &&
               isTagPrefixesError && (
                 // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- role="status"で非ブロッキング通知にする
-                <div className="mll-axis-error" role="status" aria-live="polite">
+                <div className="mle-col__notice" role="status" aria-live="polite">
                   <span>分類軸の取得に失敗しました</span>
                   {onRetryTagPrefixes && (
                     <Button variant="ghost" icon={I.refresh} onClick={onRetryTagPrefixes}>

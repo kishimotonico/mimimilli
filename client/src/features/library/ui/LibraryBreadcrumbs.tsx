@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence } from "motion/react";
+import { ALL_SMART_FOLDER_ID } from "@mimimilli/shared";
 import Breadcrumbs from "../../../shared/ui/Breadcrumbs";
 import { getAxisLabel } from "../../../entities/library/axisDefinitions";
 import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
@@ -7,7 +8,10 @@ import { axisOfGroupBy } from "../model/libraryPresentation";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import GroupValuePopover from "./GroupValuePopover";
 
-/** 「スマートフォルダー名 / 値」。先頭はグループ分けの値一覧へ戻り、値は兄弟の値のドロップダウンを開く */
+export const LIBRARY_ROOT_LABEL = "ライブラリ";
+
+/** 「ライブラリ / スマートフォルダー名（/ 値）」。「ライブラリ」は「すべて」へ、スマートフォルダー名は
+ *  グループ分けの値一覧へ戻り、値は兄弟の値のドロップダウンを開く */
 export default function LibraryBreadcrumbs() {
   const nav = useLibraryNavigation();
   const view = nav.foldersStatus === "ready" ? nav.view : null;
@@ -19,9 +23,10 @@ export default function LibraryBreadcrumbs() {
   return (
     <>
       <Breadcrumbs
-        path={view?.breadcrumb ?? []}
+        path={[LIBRARY_ROOT_LABEL, ...(view?.breadcrumb ?? [])]}
         onNavigate={(index, anchor) => {
-          if (index === 0) nav.goToSegment(0);
+          if (index === 0) nav.openFolder(ALL_SMART_FOLDER_ID);
+          else if (index === 1) nav.goToSegment(0);
           else if (group !== null) setSiblingAnchor(anchor);
         }}
       />

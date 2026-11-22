@@ -1,17 +1,17 @@
 /* アドレスバーとパンくず（.mle-addr / .mle-crumbs*）。 */
 
 .mle-addr {
-  grid-column: 1 / 3;
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 12px;
+  gap: 2px;
+  padding: 0 8px;
   background: var(--paper-1);
   border-bottom: 1px solid var(--line-soft);
 }
 .mle-addr.is-lib .mle-crumbs {
   background: transparent;
-  padding-left: 0;
+  padding-left: 4px;
 }
 .mle-crumbs {
   position: relative;
@@ -67,4 +67,11 @@
 .mle-crumbs__measure .mle-crumbs__seg::before,
 .mle-crumbs__measure .mle-crumbs__sep::before {
   content: attr(data-label);
+}
+.mle-addr__sep {
+  flex: none;
+  width: 1px;
+  height: 16px;
+  margin: 0 6px;
+  background: var(--line);
 }

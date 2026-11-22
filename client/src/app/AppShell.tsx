@@ -9,11 +9,13 @@ import { useAtomValue } from "jotai";
 import type { ReactNode } from "react";
 import { playerDockBarVisibleAtom } from "../features/player/model/playerPresentationAtoms";
 import { appModeAtom } from "../entities/navigation/model/appRouteStore";
+import { librarySidebarVisibleAtom } from "../features/library/model/sidebarAtoms";
 
 interface AppShellProps {
   topBar: ReactNode;
   addressBar: ReactNode;
-  leftNav: ReactNode;
+  /** ライブラリ・作品詳細の左のサイドバー。出す・隠すは AppShell が決める */
+  sidebar: ReactNode;
   body: ReactNode;
   /** 常駐再生UI（PlayerDock。fixed オーバーレイなので自身で表示/非表示を制御する） */
   transportBar: ReactNode;
@@ -24,7 +26,7 @@ interface AppShellProps {
 export default function AppShell({
   topBar,
   addressBar,
-  leftNav,
+  sidebar,
   body,
   transportBar,
   overlays,
@@ -33,13 +35,14 @@ export default function AppShell({
   const isNowPlaying = useAtomValue(appModeAtom) === "nowPlaying";
   // 再生中タブでは PlayerDock 自体を描画しないため、docked bar 用の余白確保も対象外にする。
   const dockedBarActive = dockBarVisible && !isNowPlaying;
+  const sidebarVisible = useAtomValue(librarySidebarVisibleAtom);
 
   return (
     <div className={`mle-app ${dockedBarActive ? "has-docked-bar" : ""}`}>
-      <div className="mle-frame is-lib">
+      <div className={`mle-frame is-lib ${sidebarVisible ? "has-sidebar" : ""}`}>
         {topBar}
         {addressBar}
-        {leftNav}
+        {sidebarVisible && sidebar}
         <main className="mle-body">{body}</main>
       </div>
 

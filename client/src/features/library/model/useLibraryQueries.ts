@@ -14,7 +14,6 @@ import {
   useEditWorkSourceMutation,
   useRemoveWorkTagMutation,
 } from "../../../entities/work/model/workMutations";
-import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
 import { missingWorksCountQueryOptions } from "../../../entities/work/missingWorksCountQueryOptions";
 import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
 import {
@@ -22,7 +21,7 @@ import {
   folderWorksKey,
   folderWorksParams,
 } from "./workPatchInvalidation";
-import { axisOfGroupBy, computeCollectionStatsDisplay } from "./libraryPresentation";
+import { axisOfGroupBy } from "./libraryPresentation";
 import { useAxisFacetsQuery } from "./useAxisFacetsQuery";
 import type { ReadyLibraryViewState } from "./useLibraryNavigation";
 
@@ -93,8 +92,6 @@ export function useFolderGroupValuesQuery(view: ResolvedLibraryView) {
  * このフックは一覧を取得しない。
  */
 export function useLibrarySupportingQueries(nav: ReadyLibraryViewState) {
-  // 軸レール下部のライブラリ統計表示に使う。
-  const libraryStatsQuery = useQuery(libraryTotalQueryOptions);
   const groupValuesQuery = useFolderGroupValuesQuery(nav.view);
   const workDetailQuery = useQuery(workDetailQueryOptions(nav.selectedWorkId));
   const tagsQuery = useQuery(allTagsQueryOptions);
@@ -105,12 +102,6 @@ export function useLibrarySupportingQueries(nav: ReadyLibraryViewState) {
   } = useTagPrefixes();
 
   return {
-    libraryStats: computeCollectionStatsDisplay(
-      libraryStatsQuery.isLoading,
-      libraryStatsQuery.isError,
-      libraryStatsQuery.data?.total,
-      libraryStatsQuery.data?.stats,
-    ),
     facetItems: groupValuesQuery.data ?? [],
     isFacetLoading: groupValuesQuery.isLoading,
     isFacetError: groupValuesQuery.isError,

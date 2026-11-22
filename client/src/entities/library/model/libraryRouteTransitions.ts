@@ -48,7 +48,7 @@ function enter(
   });
 }
 
-/** サイドバー（軸レール）からスマートフォルダーへ入る。チップと検索語は持ち越さない */
+/** サイドバーからスマートフォルダーへ入る。チップと検索語は持ち越さない */
 export function openLibraryFolder(route: AppRoute, folderId: string): Transition {
   return {
     route: enter(route, { folderId, group: null, selectedTags: [], q: "" }),

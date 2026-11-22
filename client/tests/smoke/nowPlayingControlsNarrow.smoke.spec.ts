@@ -1,5 +1,11 @@
 import { expect, test } from "./fixtures";
-import { assertNoErrors, expectNoHorizontalOverflow, openApp, trackErrors } from "./support";
+import {
+  assertNoErrors,
+  expectNoHorizontalOverflow,
+  openApp,
+  trackErrors,
+  openNowPlayingFromBar,
+} from "./support";
 
 // 1024px（サポート下限）ではAB行がトランスポート下段へ退避する2段構成になる。
 // 1440x960のみのカバレッジだと退行に気づけないため、専用にこの幅で検証する。
@@ -13,10 +19,7 @@ test("再生中タブ: 1024px幅ではコントロールがトランスポート
 
   await page.getByText("ツンデレ後輩ちゃんの秘密のお世話ボイス", { exact: false }).click();
   await page.locator(".mle-prv").getByRole("button", { name: "最初から再生" }).click();
-  await page
-    .getByRole("navigation", { name: "メインナビゲーション" })
-    .getByRole("button", { name: "再生中" })
-    .click();
+  await openNowPlayingFromBar(page);
 
   const transport = page.locator(".mle-nowplaying__controls-transport");
   const abRow = page.locator(".mle-nowplaying__controls-ab");

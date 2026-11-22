@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { assertNoErrors, openApp, trackErrors } from "./support";
+import { assertNoErrors, openApp, trackErrors, openNowPlayingFromBar } from "./support";
 
 test("再生中タブ: 通常モードのトラックリストが多数トラックでも内部スクロールで最後まで到達できる", async ({
   page,
@@ -12,10 +12,7 @@ test("再生中タブ: 通常モードのトラックリストが多数トラッ
     .locator(".mle-prv")
     .getByRole("button", { name: /^(最初から再生|続きから再生)$/ })
     .click();
-  await page
-    .getByRole("navigation", { name: "メインナビゲーション" })
-    .getByRole("button", { name: "再生中" })
-    .click();
+  await openNowPlayingFromBar(page);
 
   const body = page.locator(".mle-nowplaying__body");
   await expect(body).toBeVisible();
@@ -43,10 +40,7 @@ test("再生中タブ: :modal存在下ではEscで最前面のdialogだけが閉
 
   await page.getByText("ツンデレ後輩ちゃんの秘密のお世話ボイス", { exact: false }).click();
   await page.locator(".mle-prv").getByRole("button", { name: "最初から再生" }).click();
-  await page
-    .getByRole("navigation", { name: "メインナビゲーション" })
-    .getByRole("button", { name: "再生中" })
-    .click();
+  await openNowPlayingFromBar(page);
   await page.getByRole("button", { name: "没入モードにする" }).click();
   await expect(page.locator(".mle-nowplaying__immersive-cover")).toBeVisible();
 

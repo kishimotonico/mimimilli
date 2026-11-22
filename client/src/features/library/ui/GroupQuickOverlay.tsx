@@ -9,22 +9,21 @@ import type { HoverGroupPanelHandlers } from "../../../shared/lib/useHoverGroupC
 import AxisValueQuickList from "./AxisValueQuickList";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 
-// 軸レール行のクイックオーバーレイ（ADR-0012 §7）。ホバー約200ms・フォーカス中の
-// ArrowRight で開く。軸行の右向き矢印・ArrowRightキーの操作方向と揃えて右側に出す。
-// 軸レールは画面左端に固定されているため、デスクトップ幅で右に余白が無いケースは
-// 実質発生せず、左右の反転フォールバックは設けない（モバイル幅は ADR-0006 の別設計）。
-// 位置決めは useAnchoredPopover の placement:"right" に一本化する（自前の位置計算は
-// 持たない）。軸レールの列は overflow: hidden auto でクリップされるため、
-// document.body へポータルし fixed 位置で表示する。
+// サイドバーのグループ分けの行のクイックオーバーレイ（ADR-0012 §7・ADR-0041）。ホバー約200ms・
+// フォーカス中の ArrowRight で開く。行の右向き矢印・ArrowRightキーの操作方向と揃えて右側に出す。
+// サイドバーは画面左端に固定されているため、デスクトップ幅で右に余白が無いケースは
+// 実質発生せず、左右の反転フォールバックは設けない。
+// 位置決めは useAnchoredPopover の placement:"right" に一本化する。サイドバーの列は
+// overflow でクリップされるため、document.body へポータルし fixed 位置で表示する。
 //
-// 呼び出し側（AxisColumn）は開いている軸ごとに異なる key で AnimatePresence の子として
+// 呼び出し側（LibrarySidebarPanel）は開いている行ごとに異なる key で AnimatePresence の子として
 // マウントする。退出アニメーション中もこのコンポーネントインスタンス自体はマウントされ
 // 続けるため、axis / anchorEl は AnimatePresence が凍結した最後の props のまま渡り続け、
 // クエリも常に有効な axis で購読され続ける（値の手動退避は不要）。
 
 const OVERLAY_WIDTH = 280;
 
-interface AxisQuickOverlayProps {
+interface GroupQuickOverlayProps {
   folderId: string;
   axis: AxisId;
   axisLabel: string;
@@ -40,7 +39,7 @@ interface AxisQuickOverlayProps {
   onPanelElChange: (el: HTMLElement | null) => void;
 }
 
-export default function AxisQuickOverlay({
+export default function GroupQuickOverlay({
   folderId,
   axis,
   axisLabel,
@@ -51,7 +50,7 @@ export default function AxisQuickOverlay({
   onClose,
   panelHandlers,
   onPanelElChange,
-}: AxisQuickOverlayProps) {
+}: GroupQuickOverlayProps) {
   const isPresent = useIsPresent();
   // 件数は主クリック（その値の作品一覧）の結果と一致させるため、絞り込み無しで数える
   const facetQuery = useAxisFacetsQuery(axis, { folderId });

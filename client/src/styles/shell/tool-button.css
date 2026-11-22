@@ -1,0 +1,27 @@
+/* トップバー・アドレスバーの道具ボタン（.mle-tool）。アイコン＋短いラベル。点灯は is-on。 */
+
+.mle-tool {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 6px;
+  color: var(--ink-1);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+.mle-tool:hover {
+  background: var(--paper-2);
+}
+.mle-tool.is-on {
+  background: var(--acc-soft);
+  color: var(--acc-ink);
+}
+.mle-tool.is-compact {
+  height: 26px;
+}

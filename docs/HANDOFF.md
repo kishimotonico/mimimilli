@@ -122,12 +122,12 @@ smokeテストの注意:
 - **ナビゲーションとURL同期**: 画面mode・Libraryの軸/タグ/選択作品/sort/検索語・Filesの場所/選択・作品詳細IDは `entities/navigation/model/appRouteStore.ts` の AppRoute 1つが正本で、各entityの `navigationAtoms.ts` はそこからの読み取り専用の派生。書き込みは各操作の write atom（次のrouteとpush/replaceを計算する純粋関数＋`navigate`）と履歴からの適用だけ。URLとの同期は `Providers` 直下の `NavigationHistorySync`（汎用の `shared/model/useRouteHistorySync.ts` に codec を渡す）が常時マウントで受け持つ（[ADR-0031](adr/0031-app-route-navigation.md)）。AddressBar の戻る/進む・パンくずも本物
 - **scanのジョブ追跡**: スナップショット・SSE接続・世代管理・終端検知は React 外の純 TS ストア（`entities/scan/model/scanJobStore.ts`）が持つ。`getState`/`subscribe`（状態）と `subscribeEvents`（終端などの一回きりの通知）、`start`/`cancel`/`attach`（サーバー上の実行中ジョブへの後乗り）/`reset`（ローカルの追跡だけを捨てる。サーバー側のジョブには触れない）を持つ。ストアは Jotai store ごとに1つ（`scanJobStoreAtom`）で、操作は Runtime のマウントに依存しない。React からは `useScanJob` の `useStoreSelector` 経由の hook で読む。`ScanRuntime` はイベントをトースト・キャッシュ更新へつなぐだけ
 - **DLsite取得ジョブの追跡**: scanと同じ形の純 TS ストア（`entities/dlsite/model/dlsiteJobStore.ts`、`useDlsiteJob`）がSSE接続と現在のジョブ状態を持つ。`DlsiteJobRuntime` がコードの終端を候補一覧・作品キャッシュの更新とエラートーストへつなぐ。未登録タブの行の状態と上のバーの輪は、このストアから読む。候補一覧（`GET /scan/candidates`）はキャッシュ由来の状態（未取得・取得済み・該当なし・失敗）だけを返し、取得中の表示はジョブの状態からだけ出す。サーバー状態は revision が進むものだけ取り込み、行の表示は候補の値とジョブで見た終端の結果のうち revision が大きい方を出す（ジョブの終端で候補一覧は取り直さない）。作品の詳細と一覧の無効化は、終端に達したコードを集め、ジョブの終わりにまとめて行う。終わりを見ないままミラーのジョブが替わったコードは結果不明として、無効化に加えて候補一覧を1回取り直す（[ADR-0038](adr/0038-dlsite-job-state-revision.md)）
-- **共通UIコンポーネント**: `client/src/shared/ui/` の `Button` / `IconButton` / `TagCombobox` を使う（CSSクラス直付けボタンは廃止済み。LeftNav と円形トランスポートだけ固有意匠のため例外）
+- **共通UIコンポーネント**: `client/src/shared/ui/` の `Button` / `IconButton` / `TagCombobox` を使う（CSSクラス直付けボタンは廃止済み。円形トランスポートとトップバー・アドレスバーの道具 `ToolButton` は固有意匠）
 - `App.tsx` はランタイム状態も TanStack Query も購読しない。`libraryTotalQuery` やスキャンの記録（`GET /scan/last`、キー `["scan", "last"]`）のような画面固有の購読は、それを使う消費者（`ScanModal` / `TopBar` の `useScanEntryStatus`）が自分で行う。この境界は `.oxlintrc.json` の `**/App.tsx` override で機械的に強制されており、`features/**/model/**` の import は deny-by-default（型モジュールだけ否定 glob で許可。player の `usePlayerActions` は `entities/player/model` にあるため制限対象外）
 
 ## プレイヤーのアーキテクチャ
 
-プレイヤーの UI と audio ランタイムは `client/src/features/player/`、再生状態機械とコマンド層は他 feature からも使うため `client/src/entities/player/model/` に置く。UIは「画面下バー + 右下ポップアップ」（`PlayerDock.tsx` が AnimatePresence で切替）と、左ナビゲーションから常時アクセスできる「再生中タブ」（`NowPlayingView.tsx`。通常モード⇄没入モード）の構成。再生中タブの表示中は `PlayerDock` を描画しない（下部バー/ポップアップと再生中タブは同時に出さない）。
+プレイヤーの UI と audio ランタイムは `client/src/features/player/`、再生状態機械とコマンド層は他 feature からも使うため `client/src/entities/player/model/` に置く。UIは「画面下バー + 右下ポップアップ」（`PlayerDock.tsx` が AnimatePresence で切替）と、ポップアップの展開ボタンなどから開く「再生中タブ」（`NowPlayingView.tsx`。通常モード⇄没入モード）の構成。再生中タブの表示中は `PlayerDock` を描画しない（下部バー/ポップアップと再生中タブは同時に出さない）。
 
 状態遷移は `PlayerController` 状態機械に集約している。model 層の分担（特記のないものは `features/player/model/`）:
 
@@ -148,7 +148,7 @@ smokeテストの注意:
 - `entities/player/model/usePlayerActions.ts`: 状態を持たず `PlayerController` へ dispatch するだけの薄いアクション束。`play` / `togglePlay` / `seek` / `seekRelative` / `setVolume` / `setLoop` / `nextTrack` / `prevTrack` / `setTrackIndex` / `playWithResume` / `setPlaybackRate` / `setChannelSwap`（L⇄R入替）/ `setABPoint`・`setABPointAt`・`clearABRepeat`（A-Bリピート。a < b のときだけ成立、B→A の順で設定すると自動で入れ替え）。レジュームの定期保存は `persistTick`（5秒間隔、`status === "playing"` のときだけ実際に保存する）
 - `entities/player/model/usePlayWork.ts` / `workPlaybackRequest.ts`: 作品の再生開始の唯一の入口。`usePlayWork()` の `playWork(work, trackIndex)` / `resumeWork(work)` を各画面が直接呼ぶ。`requestWorkPlayback` が再生準備（`prepareWorkPlayback` → キャッシュ更新）と `PlayerController.playRequests` による鮮度確認（待ち中に後続要求・停止・別の再生開始があれば捨てる）、失敗時のトースト（root 再設定中のエラーは除く）を担い、通常再生と続きから再生の違いは開始処理だけ。root 再設定時は `rootReconfigurationController` が `stop()` を呼び、未完了の要求も無効になる
 - `model/usePlayer.ts`（`usePlayerRuntime`）: controller ⇄ audioEngine ⇄ atoms を橋渡しするランタイム。`<PlayerRuntime />` 内でだけ呼ぶ
-- `model/useNowPlayingImmersiveShell.ts`: 没入モード中、TopBar/AddressBar/LeftNav を inert 化し Escape で解除する
+- `model/useNowPlayingImmersiveShell.ts`: 没入モード中、TopBar/AddressBar/サイドバーを inert 化し Escape で解除する
 - `ui/PlayerDock.tsx`: バー⇄ポップアップの外枠・層切替。再生中タブ表示中は描画しない
 - `ui/BarContent.tsx`（画面下バー）: カバー / トラック名 / 再生切替 + バー下辺に貼り付くシークバー（時間表示なし）。バークリックでポップアップへ
 - `ui/PopupContent.tsx`（右下ポップアップ）: 大カバー / シーク / 前・次・ループ / ±10秒 / 倍速 / 音量 / 再生中の作品へジャンプ / 再生中タブへ遷移

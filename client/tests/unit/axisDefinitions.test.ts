@@ -30,6 +30,7 @@ describe("axisDefinitions", () => {
   it("getSmartFolderIcon は既定のスマートフォルダー ID から引き、未知の ID は既定のアイコン", () => {
     expect(getSmartFolderIcon("fav")).toBe("star");
     expect(getSmartFolderIcon("error")).toBe("err");
-    expect(getSmartFolderIcon("sf-unknown")).toBe("gridS");
+    expect(getSmartFolderIcon("random")).toBe("shuffle");
+    expect(getSmartFolderIcon("sf-unknown")).toBe("funnel");
   });
 });

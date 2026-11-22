@@ -5,7 +5,7 @@
    設定・スキャン等のモーダルは dialog の top layer に出るため、ここではモーダルより下に置く。 */
 .mle-bar1 {
   position: fixed;
-  left: 56px;
+  left: 0;
   right: 0;
   bottom: 0;
   z-index: 32;

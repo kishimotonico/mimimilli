@@ -105,7 +105,7 @@ beforeEach(() => {
 });
 
 describe("root再設定中の画面", () => {
-  it("running中はRootConfigurationScreenのみが描画され、通常UI（LeftNav等）は出ない", async () => {
+  it("running中はRootConfigurationScreenのみが描画され、通常UI（サイドバー等）は出ない", async () => {
     renderAppWithSettings(
       settingsOf({
         status: "running",

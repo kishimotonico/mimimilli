@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
-import AxisColumn from "../../src/features/library/ui/AxisColumn";
+import LibrarySidebarPanel from "../../src/features/library/ui/LibrarySidebarPanel";
 import { mockApi } from "../helpers/api";
 import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
 import { buildAxisFacetItem, buildTagPrefix } from "../helpers/builders";
@@ -29,15 +29,19 @@ async function flushVirtualizer() {
 
 const PREFIXES = [buildTagPrefix({ prefix: "cv", label: "CV", color: "cv", protected: true })];
 
-function renderAxisColumn(props: Partial<React.ComponentProps<typeof AxisColumn>>) {
+function renderSidebar(props: Partial<React.ComponentProps<typeof LibrarySidebarPanel>>) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <div className="mle-app">
-        <AxisColumn
-          folders={defaultSmartFolders({ recent: 7, added: 0, fav: 4, error: 2 })}
+        <LibrarySidebarPanel
+          folders={{
+            status: "ready",
+            folders: defaultSmartFolders({ recent: 7, added: 0, fav: 4, error: 2 }),
+          }}
           activeFolderId="all"
           activeGroup={null}
+          dataIntegrity={{ status: "ready", count: 0 }}
           tagPrefixes={PREFIXES}
           onOpenFolder={vi.fn()}
           onOpenGroupValue={vi.fn()}
@@ -50,9 +54,9 @@ function renderAxisColumn(props: Partial<React.ComponentProps<typeof AxisColumn>
   );
 }
 
-describe("AxisColumn", () => {
-  it("ライブラリ統計を軸レール下部に常時表示する", () => {
-    renderAxisColumn({
+describe("LibrarySidebarPanel", () => {
+  it("ライブラリ統計をサイドバー最下部に常時表示する", () => {
+    renderSidebar({
       stats: { status: "ready", count: 12, trackCount: 34, durationSec: 3661 },
     });
 
@@ -60,13 +64,13 @@ describe("AxisColumn", () => {
   });
 
   it("統計取得に失敗した場合はエラー文言を表示する", () => {
-    renderAxisColumn({ stats: { status: "error" } });
+    renderSidebar({ stats: { status: "error" } });
 
     expect(screen.getByText("統計の取得に失敗しました")).toBeInTheDocument();
   });
 
   it("スマートフォルダーをサーバーの順に並べ、件数はサーバー応答の値を出す", () => {
-    renderAxisColumn({});
+    renderSidebar({});
 
     const names = screen
       .getAllByRole("button")
@@ -84,8 +88,11 @@ describe("AxisColumn", () => {
   });
 
   it("件数を出さないもの（条件が空・グループ分けあり）は件数を持っていても出さない", () => {
-    renderAxisColumn({
-      folders: defaultSmartFolders({ all: 11, random: 11, "by-cv": 3 }),
+    renderSidebar({
+      folders: {
+        status: "ready",
+        folders: defaultSmartFolders({ all: 11, random: 11, "by-cv": 3 }),
+      },
     });
 
     expect(screen.getByRole("button", { name: "すべて" })).toBeInTheDocument();
@@ -93,14 +100,67 @@ describe("AxisColumn", () => {
     expect(screen.getByRole("button", { name: "CV別" })).toBeInTheDocument();
   });
 
-  it("0件の行も隠さない", () => {
-    renderAxisColumn({});
+  it("エラー以外の0件の行は隠さない", () => {
+    renderSidebar({});
 
     expect(screen.getByRole("button", { name: "最近追加 0" })).toBeInTheDocument();
   });
 
+  it("見出しは「ライブラリ」だけで、総称は出さない", () => {
+    renderSidebar({});
+
+    expect(screen.getByText("ライブラリ")).toBeInTheDocument();
+    expect(screen.queryByText("スマートフォルダー")).toBeNull();
+    expect(screen.queryByText("項目")).toBeNull();
+  });
+
+  it("エラーの行の件数は赤い丸で出す", () => {
+    renderSidebar({});
+
+    const errorRow = screen.getByRole("button", { name: /^エラー/ });
+    expect(errorRow.querySelector(".ct")).toHaveClass("is-error");
+    expect(
+      screen.getByRole("button", { name: /^お気に入り/ }).querySelector(".ct"),
+    ).not.toHaveClass("is-error");
+  });
+
+  it("エラーの行は、作品数が0でもデータ不整合が残っていれば出し続ける", () => {
+    const folders = {
+      status: "ready" as const,
+      folders: defaultSmartFolders({ recent: 7, error: 0 }),
+    };
+    renderSidebar({ folders, dataIntegrity: { status: "ready", count: 3 } });
+
+    expect(screen.getByRole("button", { name: /^エラー/ })).toBeInTheDocument();
+  });
+
+  it("エラーの行は、作品数もデータ不整合も0なら隠す。ただし開いている間は残す", () => {
+    const folders = { status: "ready" as const, folders: defaultSmartFolders({ error: 0 }) };
+    const { unmount } = renderSidebar({ folders });
+    expect(screen.queryByRole("button", { name: /^エラー/ })).toBeNull();
+    unmount();
+
+    renderSidebar({ folders, activeFolderId: "error" });
+    expect(screen.getByRole("button", { name: /^エラー/ })).toBeInTheDocument();
+  });
+
+  it("データ不整合の件数が取得中・取得失敗のあいだは、エラーの行を0件として隠さない", () => {
+    const folders = { status: "ready" as const, folders: defaultSmartFolders({ error: 0 }) };
+    renderSidebar({ folders, dataIntegrity: { status: "unknown" } });
+
+    expect(screen.getByRole("button", { name: /^エラー/ })).toBeInTheDocument();
+  });
+
+  it("一覧の取得に失敗したときは再試行を出す", async () => {
+    const onRetry = vi.fn();
+    renderSidebar({ folders: { status: "error", onRetry } });
+
+    await userEvent.click(screen.getByRole("button", { name: /再試行/ }));
+    expect(onRetry).toHaveBeenCalled();
+  });
+
   it("旧のビュー軸・分類軸・スマートフォルダー欄は出さない", () => {
-    renderAxisColumn({});
+    renderSidebar({});
 
     expect(screen.queryByText("ビュー")).toBeNull();
     expect(screen.queryByText("分類軸")).toBeNull();
@@ -109,18 +169,21 @@ describe("AxisColumn", () => {
   });
 
   it("読めない行は開けるが件数もクイックオーバーレイも持たない", () => {
-    renderAxisColumn({
-      folders: [
-        ...defaultSmartFolders(),
-        buildSmartFolder({ id: "sf-broken", name: "壊れた行", condition: null }),
-      ],
+    renderSidebar({
+      folders: {
+        status: "ready",
+        folders: [
+          ...defaultSmartFolders(),
+          buildSmartFolder({ id: "sf-broken", name: "壊れた行", condition: null }),
+        ],
+      },
     });
 
     expect(screen.getByRole("button", { name: "壊れた行" })).not.toHaveAttribute("aria-expanded");
   });
 
   it("開いているスマートフォルダーに aria-current を付与する", () => {
-    renderAxisColumn({ activeFolderId: "fav" });
+    renderSidebar({ activeFolderId: "fav" });
 
     expect(screen.getByRole("button", { name: /お気に入り/ })).toHaveAttribute(
       "aria-current",
@@ -131,7 +194,7 @@ describe("AxisColumn", () => {
 
   it("行のクリックで onOpenFolder を呼ぶ", async () => {
     const onOpenFolder = vi.fn();
-    renderAxisColumn({ onOpenFolder });
+    renderSidebar({ onOpenFolder });
 
     await userEvent.click(screen.getByRole("button", { name: /お気に入り/ }));
     expect(onOpenFolder).toHaveBeenCalledWith("fav");
@@ -139,7 +202,7 @@ describe("AxisColumn", () => {
 
   it("初回レンダー直後（再レンダーを挟まない）の最初のホバーでもクイックオーバーレイが開く", async () => {
     mockApi({ "POST /api/smart-folders/:id/groups": [] });
-    renderAxisColumn({});
+    renderSidebar({});
 
     // マウント直後、再レンダーを一切挟まずに最初のpointerEnterを発火する。実ブラウザでは
     // 本物のホバーに必ず document レベルの pointermove が先行する（ホバーガードが
@@ -156,7 +219,7 @@ describe("AxisColumn", () => {
     mockApi({
       "POST /api/smart-folders/:id/groups": [buildAxisFacetItem({ value: "藤田茜", count: 3 })],
     });
-    renderAxisColumn({});
+    renderSidebar({});
 
     // ArrowRight で遅延なしに開く（openImmediately）。
     fireEvent.keyDown(screen.getByRole("button", { name: "CV別" }), { key: "ArrowRight" });
@@ -179,7 +242,7 @@ describe("AxisColumn", () => {
 
   it("軸A→B高速切替で新パネルが閉じず、検索欄フォーカスが奪われない", async () => {
     mockApi({ "POST /api/smart-folders/:id/groups": [] });
-    renderAxisColumn({});
+    renderSidebar({});
 
     fireEvent.keyDown(screen.getByRole("button", { name: "CV別" }), { key: "ArrowRight" });
     await waitFor(() => {
@@ -202,7 +265,7 @@ describe("AxisColumn", () => {
     });
     sizeMock = mockElementSize(260, 260);
     const onOpenGroupValue = vi.fn();
-    renderAxisColumn({ onOpenGroupValue });
+    renderSidebar({ onOpenGroupValue });
 
     fireEvent.keyDown(screen.getByRole("button", { name: "CV別" }), { key: "ArrowRight" });
     await flushVirtualizer();
@@ -221,7 +284,7 @@ describe("AxisColumn", () => {
     });
     sizeMock = mockElementSize(260, 260);
     const onAddTag = vi.fn();
-    renderAxisColumn({ onAddTag });
+    renderSidebar({ onAddTag });
 
     fireEvent.keyDown(screen.getByRole("button", { name: "CV別" }), { key: "ArrowRight" });
     await flushVirtualizer();

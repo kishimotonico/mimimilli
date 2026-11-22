@@ -2,7 +2,7 @@ import { useEffect, useRef, type RefObject } from "react";
 import { useLatest } from "../../../shared/lib/useLatest";
 
 /**
- * 没入モード中、アプリシェル（TopBar/AddressBar/LeftNav。`.mle-frame` 直下のうち
+ * 没入モード中、アプリシェル（TopBar/AddressBar/サイドバー。`.mle-frame` 直下のうち
  * main を除く要素）を inert にし、Escape で解除する。設定・スキャン等のモーダルを開く
  * トリガーは inert 化された領域にしかないためクリック経路では同時発生しないが、
  * ブラウザの戻る/進む（popstate）はUIのinertを経由せず appMode を直接書き換えるため、

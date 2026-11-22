@@ -83,7 +83,7 @@ export default function FileColumn({
                 エラー行＋再試行だけを出す（ContentColumnのファセット軸と同じパターン）。 */}
             {isError && (
               // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- ContentColumnの分類軸エラーと同様、role="status"で非ブロッキング通知にする
-              <div className="mll-axis-error" role="status" aria-live="polite">
+              <div className="mle-col__notice" role="status" aria-live="polite">
                 <span>フォルダー一覧の取得に失敗しました</span>
                 {onRetry && (
                   <Button variant="ghost" icon={I.refresh} onClick={onRetry}>

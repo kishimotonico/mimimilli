@@ -5,11 +5,12 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { assertNoErrors, expectNoHorizontalOverflow, openApp, trackErrors } from "./support";
 
-const rail = (page: Page) => page.locator(".mle-col.is-axis");
-const railRow = (page: Page, name: string) => rail(page).getByRole("button", { name, exact: true });
+const rail = (page: Page) => page.locator(".mll-sidebar");
+const railRow = (page: Page, name: string | RegExp) =>
+  rail(page).getByRole("button", typeof name === "string" ? { name, exact: true } : { name });
 const search = (page: Page) => page.getByPlaceholder(/ライブラリを検索/);
 
-test("ライブラリシェル: 軸レール・結果面・チップ列が表示される", async ({ page }) => {
+test("ライブラリシェル: サイドバー・結果面・チップ列が表示される", async ({ page }) => {
   const tracker = trackErrors(page);
   await openApp(page);
 
@@ -484,7 +485,8 @@ test("更新済みタブで変更内容を種類別に絞り込め、作品タ�
     .getByRole("button", { name: "【睡眠導入】環境音と読み聞かせ ~小雨の降る夜に~" })
     .click();
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole("button", { name: "ライブラリ" }).first()).toBeVisible();
+  await expect(page).toHaveURL(/\/work\//);
+  await expect(page.getByRole("button", { name: "作品を編集" })).toBeVisible();
 
   assertNoErrors(tracker);
 });
@@ -716,9 +718,129 @@ test("Files: 未登録の音声ファイルを作品として登録できる", a
   await dialog.getByRole("button", { name: "登録" }).click();
   await expect(preview.getByRole("button", { name: "登録解除" })).toBeVisible();
 
-  await page.getByRole("button", { name: "ライブラリ", exact: true }).click();
+  await page.getByRole("button", { name: "ライブラリへ戻る" }).click();
   await page.getByPlaceholder("ライブラリを検索（タイトル · CV · タグ · RJ ...）").fill("d00001");
   await expect(page.getByRole("button", { name: /FANZA単一ファイル|d00001/ })).toBeVisible();
+
+  assertNoErrors(tracker);
+});
+
+test("サイドバー: アドレスバーのボタンと Ctrl+B で隠す・出せて、再読み込み後と作品詳細でも保たれる", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  const toggle = page.getByRole("button", { name: "サイドバー" });
+  await expect(rail(page)).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+
+  await toggle.click();
+  await expect(rail(page)).toHaveCount(0);
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  expect(await page.evaluate(() => localStorage.getItem("mimimilli:librarySidebarOpen"))).toBe(
+    "false",
+  );
+
+  // openApp の初期化スクリプトは読み込みのたびに localStorage を消すため、保存済みの状態を積み直して再読み込みする
+  await page.addInitScript(() => {
+    localStorage.setItem("mimimilli:librarySidebarOpen", "false");
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("button", { name: "サイドバー" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  await expect(rail(page)).toHaveCount(0);
+
+  await page.getByText("夜更けの図書室で囁き朗読", { exact: false }).click();
+  await page.locator(".mle-prv").getByRole("button", { name: "全画面へ展開" }).click();
+  await expect(page).toHaveURL(/\/work\//);
+  await expect(rail(page)).toHaveCount(0);
+
+  await page.keyboard.press("Control+b");
+  await expect(rail(page)).toBeVisible();
+
+  await search(page).click();
+  await page.keyboard.press("Control+b");
+  await expect(rail(page)).toBeVisible();
+
+  assertNoErrors(tracker);
+});
+
+test("作品詳細: サイドバーの選択中の行は元のスマートフォルダーで、押すと一覧の状態のまま戻る", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await railRow(page, /^お気に入り/).click();
+  await expect(page).toHaveURL(/\/library\/fav/);
+  await page.getByText("夜更けの図書室で囁き朗読", { exact: false }).click();
+  await page.locator(".mle-prv").getByRole("button", { name: "全画面へ展開" }).click();
+  await expect(page).toHaveURL(/\/work\//);
+
+  await expect(railRow(page, /^お気に入り/)).toHaveAttribute("aria-current", "true");
+  const crumbs = page.locator(".mle-crumbs");
+  await expect(crumbs.getByRole("button", { name: "ライブラリ" })).toBeVisible();
+  await crumbs.getByRole("button", { name: "お気に入り" }).click();
+  await expect(page).toHaveURL(/\/library\/fav/);
+  await expect(page.locator(".mle-prv")).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/work\//);
+  await railRow(page, /^お気に入り/).click();
+  await expect(page).toHaveURL(/\/library\/fav/);
+  await expect(page.locator(".mle-prv")).toBeVisible();
+
+  assertNoErrors(tracker);
+});
+
+test("ファイル: トップバーのファイルボタンで全幅のカラム表示に移り、3通りの戻り方でライブラリの状態に戻る", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await railRow(page, /^お気に入り/).click();
+  await search(page).fill("朗読");
+  await expect(page).toHaveURL(/\/library\/fav\?q=/);
+  const libraryUrl = page.url();
+
+  const filesButton = page.getByRole("button", { name: "ファイル", exact: true });
+  await expect(filesButton).toHaveAttribute("aria-pressed", "false");
+
+  // ファイルボタンをもう一度押す
+  await filesButton.click();
+  await expect(page).toHaveURL(/\/files/);
+  await expect(filesButton).toHaveAttribute("aria-pressed", "true");
+  await expect(rail(page)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "サイドバー" })).toHaveCount(0);
+  await filesButton.click();
+  await expect(page).toHaveURL(libraryUrl);
+  await expect(rail(page)).toBeVisible();
+
+  // 「ライブラリへ戻る」
+  await filesButton.click();
+  await page.getByRole("button", { name: "ライブラリへ戻る" }).click();
+  await expect(page).toHaveURL(libraryUrl);
+
+  // ブラウザの戻る
+  await filesButton.click();
+  await expect(page).toHaveURL(/\/files/);
+  await page.goBack();
+  await expect(page).toHaveURL(libraryUrl);
+  await expect(railRow(page, /^お気に入り/)).toHaveAttribute("aria-current", "true");
+
+  assertNoErrors(tracker);
+});
+
+test("エラーの行: 件数を赤い丸で出す", async ({ page }) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  const errorRow = rail(page).getByRole("button", { name: /^エラー/ });
+  await expect(errorRow).toBeVisible();
+  await expect(errorRow.locator(".ct")).toHaveClass(/is-error/);
 
   assertNoErrors(tracker);
 });

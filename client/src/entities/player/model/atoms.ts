@@ -4,7 +4,7 @@
 //   - playerCoreAtom: position を除く core フィールド（isPlaying / currentWork / tracks 等）
 //     usePlayerRuntime の投影で意味的同一なら参照を維持するため timeupdate では更新されない
 //     → PlayerDock など state 全体が必要な leaf で subscribe する
-//   - 派生 atom: TopBar / LeftNav など一部の値だけ必要な購読者向け
+//   - 派生 atom: TopBar など一部の値だけ必要な購読者向け
 //   - playerCurrentTimeAtom / playerDurationAtom: timeupdate ごとに更新される高頻度 state
 //     → usePlaybackProgress hook 経由で BarSeekStrip / PopupSeek / NowPlayingScrub の
 //       3 leaf のみが subscribe する（親の BarContent / PopupContent / NowPlayingView は購読しない）

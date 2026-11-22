@@ -6,7 +6,6 @@
 
 @import "./base.css" layer(base);
 @import "./app-shell.css" layer(components);
-@import "./left-nav.css" layer(components);
 @import "./top-bar.css" layer(components);
 @import "./address-bar.css" layer(components);
 @import "./grid-controls.css" layer(components);
@@ -17,7 +16,8 @@
 @import "./collection-status.css" layer(components);
 @import "./load-more.css" layer(components);
 @import "./work-tile.css" layer(components);
-@import "./axis-rail.css" layer(components);
+@import "./sidebar.css" layer(components);
+@import "./tool-button.css" layer(components);
 @import "./work-row.css" layer(components);
 @import "./tag-band.css" layer(components);
 @import "./collage.css" layer(components);

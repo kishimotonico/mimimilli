@@ -34,22 +34,22 @@ export function getAxisIcon(axis: AxisId): IconName {
 }
 
 const SMART_FOLDER_ICONS: Record<string, IconName> = {
-  all: "gridS",
-  random: "refresh",
-  recent: "refresh",
+  all: "grid",
+  random: "shuffle",
+  recent: "clock",
   added: "add",
   fav: "star",
   error: "err",
   "by-cv": "user",
-  "by-circle": "folder",
-  "by-series": "bookmark",
-  "by-category": "list",
-  "by-tag": "filter",
-  "by-year": "refresh",
+  "by-circle": "house",
+  "by-series": "series",
+  "by-category": "steps",
+  "by-tag": "tag",
+  "by-year": "calendar",
 };
 
 export function getSmartFolderIcon(id: string): IconName {
-  return SMART_FOLDER_ICONS[id] ?? "gridS";
+  return SMART_FOLDER_ICONS[id] ?? "funnel";
 }
 
 export interface FacetAxisRow {

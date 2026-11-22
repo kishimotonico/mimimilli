@@ -13,22 +13,19 @@ import {
 import { axisOfGroupBy, buildWorksResetKey } from "../model/libraryPresentation";
 import { useLibrarySelectionCleanup } from "../model/useLibrarySelectionCleanup";
 import { useLibraryPreviewActions } from "../model/useLibraryPreviewActions";
-import AxisColumn from "./AxisColumn";
 import AxisValueList from "./AxisValueList";
 import BrokenFolderPane from "./BrokenFolderPane";
 import FilterChipBand from "./FilterChipBand";
 import LibraryResultsPane from "./LibraryResultsPane";
 import LibraryWorksBoundary from "./LibraryWorksBoundary";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
-import Button from "../../../shared/ui/Button";
-import { I } from "../../../shared/ui/Icon";
 
 interface LibraryViewProps {
   /** 画面下張り付きの再生バーが表示中か（結果面の末尾余白の確保に使う） */
   dockedBarActive: boolean;
 }
 
-/** スマートフォルダー一覧を取れるまで・取れなかったときは、サイドバーと結果面に状態を出す */
+/** スマートフォルダー一覧を取れるまで・取れなかったときは、結果面に状態を出す（サイドバーは自分で出す） */
 export default function LibraryView({ dockedBarActive }: LibraryViewProps) {
   const nav = useLibraryNavigation();
   if (nav.foldersStatus === "ready") {
@@ -36,35 +33,17 @@ export default function LibraryView({ dockedBarActive }: LibraryViewProps) {
   }
   const isError = nav.foldersStatus === "error";
   return (
-    <>
-      <div className="mle-col is-axis">
-        <div className="mle-col__list">
-          <div className="mll-axisgroup">
-            <div className="mll-axisgroup__hd">ライブラリ</div>
-            {isError && (
-              // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- <output> はフォーム計算結果向けの意味を持つため、読み込み失敗通知には role="status" を使う
-              <div className="mll-axis-error" role="status" aria-live="polite">
-                <span>一覧の取得に失敗しました</span>
-                <Button variant="ghost" icon={I.refresh} onClick={nav.refetchFolders}>
-                  再試行
-                </Button>
-              </div>
-            )}
-          </div>
+    <div className="mll-resultspane">
+      <div className="mll-results">
+        <div className="mll-results__content">
+          <CollectionStatus
+            variant="list"
+            kind={isError ? "error" : "loading"}
+            onRetry={isError ? nav.refetchFolders : undefined}
+          />
         </div>
       </div>
-      <div className="mll-resultspane">
-        <div className="mll-results">
-          <div className="mll-results__content">
-            <CollectionStatus
-              variant="list"
-              kind={isError ? "error" : "loading"}
-              onRetry={isError ? nav.refetchFolders : undefined}
-            />
-          </div>
-        </div>
-      </div>
-    </>
+    </div>
   );
 }
 
@@ -79,7 +58,6 @@ function LibraryViewBody({
   const viewMode = useAtomValue(libraryViewModeAtom);
 
   const {
-    libraryStats,
     facetItems,
     isFacetLoading,
     isFacetError,
@@ -113,17 +91,6 @@ function LibraryViewBody({
 
   return (
     <>
-      <AxisColumn
-        folders={nav.folders}
-        activeFolderId={view.folder.id}
-        activeGroup={view.kind === "works" ? view.group : null}
-        tagPrefixes={tagPrefixes}
-        stats={libraryStats}
-        onOpenFolder={nav.openFolder}
-        onOpenGroupValue={nav.openGroupValue}
-        onAddTag={nav.addTag}
-      />
-
       <div className="mll-resultspane">
         {view.kind !== "broken" && (
           // チップ列は結果面の常設ヘッダーとして .mll-results の外に置く。

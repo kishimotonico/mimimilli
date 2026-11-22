@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
+import LibrarySidebar from "../../src/features/library/ui/LibrarySidebar";
 import LibraryView from "../../src/features/library/ui/LibraryView";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import { apiError, mockApi } from "../helpers/api";
@@ -20,6 +21,7 @@ function renderLibrary() {
         createElement(
           LibraryNavigationProvider,
           null,
+          createElement(LibrarySidebar),
           createElement(LibraryView, { dockedBarActive: false }),
         ),
       ),
@@ -50,7 +52,7 @@ describe("LibraryView: スマートフォルダー一覧の取得状態", () => 
   });
 
   it("一覧を待つあいだは読み込み表示を出す", () => {
-    mockApi({ "GET /api/smart-folders": () => new Promise<Response>(() => {}) });
+    mockApi(appShellRoutes({ "GET /api/smart-folders": () => new Promise<Response>(() => {}) }));
     renderLibrary();
     expect(screen.getByRole("status")).toHaveTextContent("読み込み中");
   });

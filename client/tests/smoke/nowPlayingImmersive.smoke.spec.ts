@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { assertNoErrors, openApp, trackErrors } from "./support";
+import { assertNoErrors, openApp, trackErrors, openNowPlayingFromBar } from "./support";
 
 test("再生中タブ: 没入モードでカバーが拡大クロップされてページに漏れず、シーク行の位置がモード切替前後で不変", async ({
   page,
@@ -9,10 +9,7 @@ test("再生中タブ: 没入モードでカバーが拡大クロップされて
 
   await page.getByText("ツンデレ後輩ちゃんの秘密のお世話ボイス", { exact: false }).click();
   await page.locator(".mle-prv").getByRole("button", { name: "最初から再生" }).click();
-  await page
-    .getByRole("navigation", { name: "メインナビゲーション" })
-    .getByRole("button", { name: "再生中" })
-    .click();
+  await openNowPlayingFromBar(page);
 
   const seekRow = page.locator(".mle-nowplaying__seek");
   await expect(seekRow).toBeVisible();

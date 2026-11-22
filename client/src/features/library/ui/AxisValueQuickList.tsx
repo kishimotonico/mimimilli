@@ -16,7 +16,7 @@ import IconButton from "../../../shared/ui/IconButton";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { useAxisValueListNav } from "./useAxisValueListNav";
 
-// 軸レールのクイックオーバーレイ・「＋絞り込み」・チップの兄弟値ドロップダウン
+// サイドバーのクイックオーバーレイ・「＋絞り込み」・チップの兄弟値ドロップダウン
 // が共有する簡易値リスト。データ取得・フィルタ・ソートは値一覧本体
 // （AxisValueList / axisValueFilter / axisValueSort / axisValueHierarchy）と同じロジックを
 // 使い回し、描画だけを簡易化する（コラージュは持たない）。CV・サークルは数百〜数千件に

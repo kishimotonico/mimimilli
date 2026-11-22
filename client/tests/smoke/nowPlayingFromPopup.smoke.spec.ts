@@ -13,7 +13,7 @@ test("ポップアップの展開ボタンから再生中タブへ遷移し、�
     localStorage.setItem("mimimilli:nowPlayingViewMode", JSON.stringify("immersive"));
   });
   await page.reload({ waitUntil: "domcontentloaded" });
-  await expect(page.locator(".mle-col.is-axis")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(".mll-sidebar")).toBeVisible({ timeout: 20_000 });
 
   await page.getByText("ツンデレ後輩ちゃんの秘密のお世話ボイス", { exact: false }).click();
   await page.locator(".mle-prv").getByRole("button", { name: "最初から再生" }).click();
