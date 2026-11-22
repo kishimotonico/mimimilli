@@ -28,7 +28,7 @@ import { scanRecordKindSchema, workChangeKindSchema } from "./scan.ts";
 export const WORKS_DEFAULT_PAGE_SIZE = 200;
 
 /** tags= クエリを実タグと year 値へ一度だけ分解する。警告がある入力は拒否する。 */
-const tagFiltersQuerySchema = z
+export const tagFiltersQuerySchema = z
   .array(z.string())
   .default([])
   .superRefine((rawTags, ctx) => {

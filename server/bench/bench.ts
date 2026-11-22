@@ -44,7 +44,7 @@ async function measureCase(
     const start = performance.now();
     const res = await run();
     await res.arrayBuffer().catch(() => undefined);
-    if (res.status >= 500) {
+    if (res.status >= 400) {
       throw new Error(`${name}: HTTP ${res.status}`);
     }
     samples.push(performance.now() - start);
@@ -87,27 +87,28 @@ async function main(): Promise<void> {
     dlsiteCache: { path: join(dataDir, "db", "dlsite-cache.sqlite") },
   });
   const app = createApp(adapter);
+  const request = (path: string) => app.request(path, { headers: { Host: "127.0.0.1:8080" } });
 
   const cases: Array<{ name: string; path: string; run: () => Promise<Response> }> = [
     {
       name: "works-page-1",
       path: "/api/works",
-      run: async () => app.request("/api/works"),
+      run: async () => request("/api/works"),
     },
     {
       name: "works-deep-page",
       path: `/api/works?page=${manifest.deepPage}`,
-      run: async () => app.request(`/api/works?page=${manifest.deepPage}`),
+      run: async () => request(`/api/works?page=${manifest.deepPage}`),
     },
     {
       name: "works-search-q",
       path: `/api/works?q=${encodeURIComponent(manifest.sampleSearchQ)}`,
-      run: async () => app.request(`/api/works?q=${encodeURIComponent(manifest.sampleSearchQ)}`),
+      run: async () => request(`/api/works?q=${encodeURIComponent(manifest.sampleSearchQ)}`),
     },
     {
       name: "works-search-tag",
       path: `/api/works?tags=${encodeURIComponent(manifest.sampleTag)}`,
-      run: async () => app.request(`/api/works?tags=${encodeURIComponent(manifest.sampleTag)}`),
+      run: async () => request(`/api/works?tags=${encodeURIComponent(manifest.sampleTag)}`),
     },
     ...manifest.sorts.map((sort) => {
       const query =
@@ -116,29 +117,56 @@ async function main(): Promise<void> {
       return {
         name: `works-sort-${sort}`,
         path,
-        run: async () => app.request(path),
+        run: async () => request(path),
       };
     }),
     {
       name: "smart-folder-no-rules",
       path: `/api/smart-folders/${manifest.smartFolderNoRulesId}/works`,
-      run: async () => app.request(`/api/smart-folders/${manifest.smartFolderNoRulesId}/works`),
+      run: async () => request(`/api/smart-folders/${manifest.smartFolderNoRulesId}/works`),
     },
     {
       name: "smart-folder-with-rules",
       path: `/api/smart-folders/${manifest.smartFolderWithRulesId}/works`,
-      run: async () => app.request(`/api/smart-folders/${manifest.smartFolderWithRulesId}/works`),
+      run: async () => request(`/api/smart-folders/${manifest.smartFolderWithRulesId}/works`),
+    },
+    ...["cv", "サークル", "tag", "year"].map((axis) => {
+      const path = `/api/axes/${encodeURIComponent(axis)}`;
+      return { name: `values-${axis}`, path, run: async () => request(path) };
+    }),
+    {
+      name: "values-cv-in-smart-folder",
+      path: `/api/axes/cv?smartFolder=${manifest.smartFolderWithRulesId}`,
+      run: async () => request(`/api/axes/cv?smartFolder=${manifest.smartFolderWithRulesId}`),
+    },
+    {
+      name: "counts-views",
+      path: "/api/works?view=<recent|added|fav|error>&limit=1",
+      run: async () => {
+        let last: Response = new Response(null, { status: 200 });
+        for (const view of ["recent", "added", "fav", "error"]) {
+          last = await request(`/api/works?view=${view}&limit=1`);
+          await last.arrayBuffer();
+        }
+        return last;
+      },
+    },
+    {
+      name: "counts-smart-folder-total",
+      path: `/api/smart-folders/${manifest.smartFolderWithRulesId}/works?limit=1`,
+      run: async () =>
+        request(`/api/smart-folders/${manifest.smartFolderWithRulesId}/works?limit=1`),
     },
     {
       name: "fs-root",
       path: "/api/fs",
-      run: async () => app.request("/api/fs"),
+      run: async () => request("/api/fs"),
     },
     {
       name: "media-audio-resolve",
       path: `/api/media/audio/${manifest.sampleWorkId}/${manifest.sampleAudioRelPath}`,
       run: async () =>
-        app.request(`/api/media/audio/${manifest.sampleWorkId}/${manifest.sampleAudioRelPath}`),
+        request(`/api/media/audio/${manifest.sampleWorkId}/${manifest.sampleAudioRelPath}`),
     },
   ];
 
