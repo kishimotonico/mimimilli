@@ -59,7 +59,7 @@ function rjCodeNormalizedSql(alias: string): string {
 export function textSearchCondition(
   searchKey: string,
   rawQuery: string,
-): { conditions: string[]; bindings: string[] } {
+): { sql: string; bindings: string[] } {
   const rjKey = normalizeRjCode(rawQuery);
   const rjCondition = rjKey
     ? ` OR EXISTS (
@@ -72,8 +72,7 @@ export function textSearchCondition(
   const bindings = [searchKey, searchKey];
   if (rjKey) bindings.push(rjKey);
   return {
-    conditions: [
-      `(
+    sql: `(
       instr(works.title_sort_key, ?) > 0 OR EXISTS (
         SELECT 1
         FROM main.work_tags AS query_work_tags
@@ -82,7 +81,6 @@ export function textSearchCondition(
           AND instr(query_tags.search_key, ?) > 0
       )${rjCondition}
     )`,
-    ],
     bindings,
   };
 }

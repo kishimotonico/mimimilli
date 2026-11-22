@@ -32,7 +32,7 @@ import {
   type SeedPlaylistSpec,
 } from "./data.ts";
 import type { SmartFolderRow } from "../../adapter/classification.ts";
-import { insertFromTemplate } from "../../core/smartFolderPolicy.ts";
+import { insertFromTemplate } from "../../core/smartFolderTemplateRow.ts";
 import { requireConfiguredRoot } from "../../core/rootFolder.ts";
 import { createFixtureScenario, type FixtureRootReconfiguration } from "./scenarios.ts";
 

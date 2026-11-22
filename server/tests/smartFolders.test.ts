@@ -496,13 +496,13 @@ groupsLibrary(
       ["耳かき", 1],
     ]);
     assert.deepEqual(await groupPairs(harness, "all", { groupBy: { kind: "addedYear" } }), [
-      [String(new Date().getFullYear()), 3],
+      [String(new Date().getUTCFullYear()), 3],
     ]);
   },
 );
 
 groupsLibrary("値一覧はチップ・@year で母集団を絞る", async (harness) => {
-  const year = new Date().getFullYear();
+  const year = new Date().getUTCFullYear();
   assert.deepEqual(await groupPairs(harness, "all", { groupBy: { kind: "tag" }, tags: ["cv/y"] }), [
     ["cv/y", 2],
     ["ASMR", 1],

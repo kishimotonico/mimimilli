@@ -17,6 +17,7 @@ import type {
   Work,
 } from "@mimimilli/shared";
 import type { SmartFolderInsert, SmartFolderRow } from "../../adapter/classification.ts";
+import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import type { Db } from "./db.ts";
 import {
   appSettings,
@@ -25,6 +26,8 @@ import {
   tagPrefixes,
   workStates,
 } from "./userSchema.ts";
+
+const smartFolderLogger = getCategoryLogger("db");
 
 export class UserWorkStateRepository {
   private readonly db: Db;
@@ -369,24 +372,44 @@ export class UserWorkStateRepository {
   }
 }
 
-function readJsonColumn<T>(raw: string | null, schema: z.ZodType<T>): T | undefined {
-  if (raw === null) return undefined;
+type ColumnProblem = { column: string; issues: unknown };
+type ColumnRead<T> = { ok: true; value: T } | { ok: false; problem: ColumnProblem };
+
+function readJsonColumn<T>(column: string, raw: string, schema: z.ZodType<T>): ColumnRead<T> {
+  let json: unknown;
   try {
-    const parsed = schema.safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data : undefined;
-  } catch {
-    return undefined;
+    json = JSON.parse(raw);
+  } catch (error) {
+    return { ok: false, problem: { column, issues: formatError(error) } };
   }
+  const parsed = schema.safeParse(json);
+  return parsed.success
+    ? { ok: true, value: parsed.data }
+    : { ok: false, problem: { column, issues: parsed.error.issues } };
 }
 
-/** condition・sort・groupBy のどれか1つでも読めなければ、3つとも null の壊れた行にする */
+/** condition・sort・groupBy のどれか1つでも読めなければ、3つとも null の壊れた行にする。壊れた行は読むたびに警告する */
 function toSmartFolderRow(r: typeof smartFolders.$inferSelect): SmartFolderRow {
   const base = { id: r.id, name: r.name, position: r.position, createdAt: r.createdAt };
-  const condition = readJsonColumn(r.conditionJson, conditionTreeSchema);
+  const condition =
+    r.conditionJson === null
+      ? ({ ok: false, problem: { column: "condition_json", issues: "null" } } as const)
+      : readJsonColumn("condition_json", r.conditionJson, conditionTreeSchema);
   const sort = sortIdSchema.nullable().safeParse(r.sort);
-  const groupBy = r.groupByJson === null ? null : readJsonColumn(r.groupByJson, groupBySchema);
-  if (condition === undefined || !sort.success || groupBy === undefined) {
+  const groupBy =
+    r.groupByJson === null
+      ? ({ ok: true, value: null } as const)
+      : readJsonColumn("group_by_json", r.groupByJson, groupBySchema);
+  const problems: ColumnProblem[] = [];
+  if (!condition.ok) problems.push(condition.problem);
+  if (!sort.success) problems.push({ column: "sort", issues: sort.error.issues });
+  if (!groupBy.ok) problems.push(groupBy.problem);
+  if (!condition.ok || !sort.success || !groupBy.ok) {
+    smartFolderLogger.warn("壊れたスマートフォルダーの行を読み込めません", {
+      smartFolderId: r.id,
+      problems,
+    });
     return { ...base, condition: null, sort: null, groupBy: null };
   }
-  return { ...base, condition, sort: sort.data, groupBy };
+  return { ...base, condition: condition.value, sort: sort.data, groupBy: groupBy.value };
 }

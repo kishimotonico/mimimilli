@@ -370,8 +370,8 @@ export class WorkQueryRepository {
       bindings: Array<string | number>;
       sort: SortId;
       seed: number | undefined;
-      page: number | undefined;
-      limit: number | undefined;
+      page: number;
+      limit: number;
     },
     root: string,
   ): WorksPage {
@@ -389,17 +389,14 @@ export class WorkQueryRepository {
 
       const orderBindings: number[] = [];
       const orderSql = worksOrderSql(sort, seed, orderBindings);
-      const paginationSql = page !== undefined && limit !== undefined ? "LIMIT ? OFFSET ?" : "";
-      const paginationBindings =
-        page !== undefined && limit !== undefined ? [limit, (page - 1) * limit] : [];
       const rows = this.db.sqlite
         .query(`
         ${WORK_LIST_ROW_SELECT}
         ${whereSql}
         ORDER BY ${orderSql}
-        ${paginationSql}
+        LIMIT ? OFFSET ?
       `)
-        .all(...bindings, ...orderBindings, ...paginationBindings) as RawWorkListRow[];
+        .all(...bindings, ...orderBindings, limit, (page - 1) * limit) as RawWorkListRow[];
       const { items, skipped } = this.mapWorkListRows(rows, root);
       logDataIntegritySkips(queryWorksLogger, "query-works", skipped);
       const stats = { trackCount: statsRow.trackCount, durationSec: statsRow.durationSec };

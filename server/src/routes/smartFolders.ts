@@ -29,7 +29,7 @@ import {
 } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter/index.ts";
 import type { SmartFolderRow } from "../adapter/classification.ts";
-import { insertFromTemplate } from "../core/smartFolderPolicy.ts";
+import { insertFromTemplate } from "../core/smartFolderTemplateRow.ts";
 import { apiError, conflict, invalidRequest, notFound } from "../lib/httpError.ts";
 import { readJsonBody } from "../lib/jsonBody.ts";
 import type { ScanRecordStore } from "../scanRecord.ts";

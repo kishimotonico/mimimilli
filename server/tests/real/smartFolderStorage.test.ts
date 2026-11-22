@@ -13,6 +13,7 @@ import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { smartFolders } from "../../src/adapters/real/userSchema.ts";
 import { createWorkRepos } from "../helpers/workTestUtils.ts";
+import { captureLogs, categoryRecords } from "../helpers/logCapture.ts";
 import { makeTestDirectory, makeTestScope } from "../helpers/sampleLibrary.ts";
 
 function openAdapter(directory: ReturnType<typeof makeTestDirectory>) {
@@ -156,4 +157,55 @@ test("読めない行があっても一覧は成功し、壊れた行を null �
     }),
   });
   assert.equal(fix.status, 200);
+});
+
+test("読めないスマートフォルダーの行は、行ごとに id・列・原因を警告に出す", async (t) => {
+  const directory = makeTestDirectory("sf-broken-log");
+  t.after(directory.cleanup);
+  const adapter = openAdapter(directory);
+  const app = createApp(adapter);
+  const db = directory.own(
+    openDb({
+      kind: "files",
+      catalogPath: join(directory.path, "catalog.sqlite"),
+      userPath: join(directory.path, "user.sqlite"),
+    }),
+  );
+  const healthy = {
+    conditionJson: '{"type":"and","children":[{"type":"hasError"}]}',
+    sort: "added-desc",
+    createdAt: "2026-07-19T00:00:00.000Z",
+  };
+  db.user
+    .insert(smartFolders)
+    .values([
+      { id: "broken-json", name: "壊れJSON", ...healthy, conditionJson: "{", position: 100 },
+      { id: "broken-sort", name: "壊れsort", ...healthy, sort: "unknown", position: 101 },
+      { id: "ok-error", name: "エラー確認", ...healthy, position: 102 },
+    ])
+    .run();
+
+  await captureLogs(
+    async (records) => {
+      const res = await app.request("/api/smart-folders");
+      assert.equal(res.status, 200);
+      const warns = categoryRecords(records, "db").filter((r) => r.level === "warning");
+      const byId = new Map(
+        warns.map((r) => [
+          r.properties.smartFolderId as string,
+          r.properties.problems as Array<{ column: string }>,
+        ]),
+      );
+      assert.deepEqual([...byId.keys()].sort(), ["broken-json", "broken-sort"]);
+      assert.deepEqual(
+        byId.get("broken-json")!.map((p) => p.column),
+        ["condition_json"],
+      );
+      assert.deepEqual(
+        byId.get("broken-sort")!.map((p) => p.column),
+        ["sort"],
+      );
+    },
+    { categories: ["db"] },
+  );
 });

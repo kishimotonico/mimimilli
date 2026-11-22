@@ -57,8 +57,7 @@ function leaf(condition: Exclude<Condition, { type: "and" | "or" | "not" }>, ctx
       return { sql: "works.status != 'ok'", bindings: [] };
     case "text": {
       if (condition.q === "") return { sql: "1", bindings: [] };
-      const text = textSearchCondition(japaneseSortKey(condition.q), condition.q);
-      return { sql: text.conditions[0]!, bindings: text.bindings };
+      return textSearchCondition(japaneseSortKey(condition.q), condition.q);
     }
   }
 }

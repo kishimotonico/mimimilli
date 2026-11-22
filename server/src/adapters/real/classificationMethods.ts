@@ -9,7 +9,7 @@ import {
   type TagPrefixUpdate,
 } from "@mimimilli/shared";
 import type { SmartFolderInsert, SmartFolderRow } from "../../adapter/classification.ts";
-import { insertFromTemplate } from "../../core/smartFolderPolicy.ts";
+import { insertFromTemplate } from "../../core/smartFolderTemplateRow.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips } from "./dataIntegrity.ts";

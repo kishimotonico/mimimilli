@@ -1,8 +1,8 @@
 {
-  "id": "856fee79-eb98-4ff6-bc80-833fe4c05f88",
-  "prevId": "ccd16dff-0215-4313-aa9a-0fe3f351d5fd",
   "version": "6",
   "dialect": "sqlite",
+  "id": "856fee79-eb98-4ff6-bc80-833fe4c05f88",
+  "prevId": "ccd16dff-0215-4313-aa9a-0fe3f351d5fd",
   "tables": {
     "audio_probe_cache": {
       "name": "audio_probe_cache",
@@ -149,11 +149,11 @@
         "playlists_work_id_works_id_fk": {
           "name": "playlists_work_id_works_id_fk",
           "tableFrom": "playlists",
-          "columnsFrom": ["work_id"],
           "tableTo": "works",
+          "columnsFrom": ["work_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -309,20 +309,20 @@
         "tracks_work_id_works_id_fk": {
           "name": "tracks_work_id_works_id_fk",
           "tableFrom": "tracks",
-          "columnsFrom": ["work_id"],
           "tableTo": "works",
+          "columnsFrom": ["work_id"],
           "columnsTo": ["id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "tracks_work_id_playlist_id_playlists_work_id_id_fk": {
           "name": "tracks_work_id_playlist_id_playlists_work_id_id_fk",
           "tableFrom": "tracks",
-          "columnsFrom": ["work_id", "playlist_id"],
           "tableTo": "playlists",
+          "columnsFrom": ["work_id", "playlist_id"],
           "columnsTo": ["work_id", "id"],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -575,9 +575,11 @@
   "views": {},
   "enums": {},
   "_meta": {
-    "columns": {},
     "schemas": {},
-    "tables": {}
+    "tables": {},
+    "columns": {
+      "\"tags\".\"facet_sort_key\"": "\"tags\".\"value_sort_key\""
+    }
   },
   "internal": {
     "indexes": {}
