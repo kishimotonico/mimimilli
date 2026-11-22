@@ -147,6 +147,37 @@ describe("GroupValueList list 表示（ADR-0012 §5）", () => {
     sizeMock.restore();
   });
 
+  it("並びを変えて取得中になっても、押した列見出しはそのまま残りフォーカスを保つ", async () => {
+    const sizeMock = mockElementSize(600, 600);
+    const user = userEvent.setup();
+    const store = createStore();
+    store.set(libraryViewModeAtom, "list");
+    const element = (isLoading: boolean) => (
+      <JotaiProvider store={store}>
+        <GroupValueList
+          groupBy={CV}
+          sort="count-desc"
+          onSortChange={vi.fn()}
+          groupValueItems={isLoading ? [] : [makeItem({ value: "a" })]}
+          isGroupValuesLoading={isLoading}
+          tagPrefixes={[]}
+          onSelectValue={vi.fn()}
+        />
+      </JotaiProvider>
+    );
+    const { rerender } = render(element(false));
+    await flushVirtualizer();
+
+    const header = screen.getByRole("button", { name: /件数/ });
+    await user.click(header);
+    expect(document.activeElement).toBe(header);
+
+    rerender(element(true));
+    expect(screen.getByRole("button", { name: /件数/ })).toBe(header);
+    expect(document.activeElement).toBe(header);
+    sizeMock.restore();
+  });
+
   it("行はサーバーが返した順のまま並ぶ", async () => {
     const sizeMock = mockElementSize(600, 600);
     renderGroupValueList({

@@ -38,8 +38,6 @@ function renderRows(items: GroupValueItem[], onSelect = vi.fn()) {
     <GroupValueRows
       groupByLabel="CV"
       rows={flattenGroupValueRows(items)}
-      sort="name-asc"
-      onSortChange={vi.fn()}
       fallbackIcon="user"
       resetKey="cv:name:asc"
       onSelect={onSelect}
@@ -157,8 +155,6 @@ describe("GroupValueRows のキーボード移動", () => {
       <GroupValueRows
         groupByLabel="CV"
         rows={flattenGroupValueRows(makeItems(6))}
-        sort="name-asc"
-        onSortChange={vi.fn()}
         fallbackIcon="user"
         resetKey="cv:name:asc"
         onSelect={vi.fn()}

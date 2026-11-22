@@ -34,8 +34,6 @@ const LIST_PADDING_END = 4;
 interface GroupValueRowsProps {
   groupByLabel: string;
   rows: GroupValueHierarchyRow[];
-  sort: GroupSortId;
-  onSortChange: (sort: GroupSortId) => void;
   fallbackIcon: IconName;
   /** グループ分け・並び順・検索語が変わったらスクロール位置をリセットするための key */
   resetKey: string;
@@ -79,11 +77,34 @@ function SortHeaderButton({
   );
 }
 
+/** list 表示の列見出し。読み込み中も外れないよう、行の一覧とは別に置く（押した見出しにフォーカスが残る） */
+export function GroupValueRowsHeader({
+  sort,
+  onSortChange,
+}: {
+  sort: GroupSortId;
+  onSortChange: (sort: GroupSortId) => void;
+}) {
+  return (
+    <div className="mll-vlist-hd">
+      <span aria-hidden="true" />
+      {GROUP_SORT_COLUMNS.map((opt) => (
+        <SortHeaderButton
+          key={opt.id}
+          sortKey={opt.id}
+          label={opt.label}
+          align={opt.id === "name" ? "start" : "end"}
+          sort={sort}
+          onSortChange={onSortChange}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function GroupValueRows({
   groupByLabel,
   rows,
-  sort,
-  onSortChange,
   fallbackIcon,
   resetKey,
   onSelect,
@@ -119,19 +140,6 @@ export default function GroupValueRows({
 
   return (
     <>
-      <div className="mll-vlist-hd">
-        <span aria-hidden="true" />
-        {GROUP_SORT_COLUMNS.map((opt) => (
-          <SortHeaderButton
-            key={opt.id}
-            sortKey={opt.id}
-            label={opt.label}
-            align={opt.id === "name" ? "start" : "end"}
-            sort={sort}
-            onSortChange={onSortChange}
-          />
-        ))}
-      </div>
       {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- onFocusはキーボード移動位置の追従用。フォーカスは子のボタンが受ける */}
       <div
         ref={scrollRef}

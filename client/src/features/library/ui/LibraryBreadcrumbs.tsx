@@ -33,7 +33,7 @@ export default function LibraryBreadcrumbs() {
       <AnimatePresence>
         {view && siblingAnchor && group !== null && groupBy !== null && groupSort !== null && (
           <GroupValuePopover
-            key="siblings"
+            key={`siblings:${view.folder.id}:${groupSort}`}
             placement="below"
             folderId={view.folder.id}
             groupBy={groupBy}

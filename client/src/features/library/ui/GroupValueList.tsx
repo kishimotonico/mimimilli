@@ -7,7 +7,7 @@ import { groupByKey } from "../../../entities/smart-folder/groupByKey";
 import { buildGroupValueDisplayRows } from "../model/groupValueDisplayRows";
 import { libraryTileSizeAtom, libraryViewModeAtom } from "../model/atoms";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
-import GroupValueRows from "./GroupValueRows";
+import GroupValueRows, { GroupValueRowsHeader } from "./GroupValueRows";
 import GroupValueGrid from "./GroupValueGrid";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
@@ -86,6 +86,9 @@ export default function GroupValueList({
       </div>
 
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+        {viewMode === "list" && (isGroupValuesLoading || groupValueItems.length > 0) && (
+          <GroupValueRowsHeader sort={sort} onSortChange={onSortChange} />
+        )}
         {isGroupValuesLoading ? (
           <CollectionStatus variant={viewMode === "grid" ? "grid" : "list"} kind="loading" />
         ) : isGroupValuesError && groupValueItems.length === 0 ? (
@@ -150,8 +153,6 @@ export default function GroupValueList({
               <GroupValueRows
                 groupByLabel={groupByLabel}
                 rows={rows}
-                sort={sort}
-                onSortChange={onSortChange}
                 fallbackIcon={fallbackIcon}
                 resetKey={resetKey}
                 onSelect={handleSelect}
