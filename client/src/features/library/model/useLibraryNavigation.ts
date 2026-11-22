@@ -115,7 +115,7 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
 
   useEffect(() => {
     if (folders) normalizeFolder(folders);
-  }, [folders, library.folderId, normalizeFolder]);
+  }, [folders, library.folderId, library.group, normalizeFolder]);
 
   const actions = useMemo<LibraryViewActions>(() => {
     const run = (action: () => void) =>

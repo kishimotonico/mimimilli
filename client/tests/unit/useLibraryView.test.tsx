@@ -45,10 +45,32 @@ describe("useLibraryView", () => {
     expect(result.current.foldersStatus).toBe("ready");
   });
 
+  it("同じ folderId のまま、グループ分けの無いフォルダーへ group 付きの route が戻ってきたら group を落とす", async () => {
+    const { store, result } = setup({ folderId: "fav" });
+    await waitFor(() => expect(result.current.foldersStatus).toBe("ready"));
+
+    act(() => seedLibraryRoute(store, { group: "x" }));
+
+    await waitFor(() => expect(store.get(libraryRouteAtom).group).toBeNull());
+  });
+
   it("存在するスマートフォルダーの route は動かさない", async () => {
     const { store, result } = setup({ folderId: "fav" });
     await waitFor(() => expect(result.current.foldersStatus).toBe("ready"));
     expect(store.get(libraryRouteAtom).folderId).toBe("fav");
+  });
+
+  it("再描画を待たない連続操作でも、先に積んだチップが消えない", async () => {
+    const { store, result } = setup({ folderId: "all" });
+    await waitFor(() => expect(result.current.foldersStatus).toBe("ready"));
+    const before = result.current;
+
+    act(() => {
+      before.clickTag(nt("cv/藤田茜"), { ctrlKey: false, metaKey: false });
+      before.addTag(nt("cv/霧島レイ"));
+    });
+
+    expect(store.get(libraryRouteAtom).selectedTags).toEqual(["cv/藤田茜", "cv/霧島レイ"]);
   });
 
   it("操作の参照は view が変わっても変わらず、呼ばれた時点の最新の view を読む", async () => {

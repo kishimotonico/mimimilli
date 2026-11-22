@@ -29,11 +29,10 @@ import {
 
 const smartFolderLogger = getCategoryLogger("db");
 
-/** 警告済みの壊れた行（id → 問題の署名）。一覧を取るたびに同じ警告を重ねない。直った行は忘れる */
-const reportedBrokenFolders = new Map<string, string>();
-
 export class UserWorkStateRepository {
   private readonly db: Db;
+  /** 警告済みの壊れた行（id → 問題の署名）。一覧を取るたびに同じ警告を重ねない。直った行は忘れる */
+  private readonly reportedBrokenFolders = new Map<string, string>();
 
   constructor(db: Db) {
     this.db = db;
@@ -256,12 +255,12 @@ export class UserWorkStateRepository {
       .from(smartFolders)
       .orderBy(asc(smartFolders.position), asc(smartFolders.createdAt), asc(smartFolders.id))
       .all()
-      .map(toSmartFolderRow);
+      .map((row) => toSmartFolderRow(row, this.reportedBrokenFolders));
   }
 
   getSmartFolder(id: string): SmartFolderRow | null {
     const r = this.db.user.select().from(smartFolders).where(eq(smartFolders.id, id)).get();
-    return r ? toSmartFolderRow(r) : null;
+    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
   }
 
   /** 既にある ID は飛ばして末尾へ追加し、flagKey を立てる */
@@ -333,7 +332,7 @@ export class UserWorkStateRepository {
       .where(eq(smartFolders.id, id))
       .returning()
       .get();
-    return r ? toSmartFolderRow(r) : null;
+    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
   }
 
   updateSmartFolderSort(id: string, sort: SortId | null): SmartFolderRow | null {
@@ -343,7 +342,7 @@ export class UserWorkStateRepository {
       .where(eq(smartFolders.id, id))
       .returning()
       .get();
-    return r ? toSmartFolderRow(r) : null;
+    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
   }
 
   /** 全件の順序を置き換える。渡された集合が今の集合と一致しなければ null */
@@ -394,7 +393,10 @@ function readJsonColumn<T>(column: string, raw: string, schema: z.ZodType<T>): C
 }
 
 /** condition・sort・groupBy のどれか1つでも読めなければ、3つとも null の壊れた行にする。壊れた行は同じ問題につき1回だけ警告する */
-function toSmartFolderRow(r: typeof smartFolders.$inferSelect): SmartFolderRow {
+function toSmartFolderRow(
+  r: typeof smartFolders.$inferSelect,
+  reportedBrokenFolders: Map<string, string>,
+): SmartFolderRow {
   const base = { id: r.id, name: r.name, position: r.position, createdAt: r.createdAt };
   const condition =
     r.conditionJson === null
