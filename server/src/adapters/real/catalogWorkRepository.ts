@@ -55,7 +55,7 @@ export class CatalogWorkRepository {
         .values({
           name,
           searchKey: japaneseSortKey(name),
-          facetSortKey: japaneseSortKey(parsed.kind === "annotated" ? parsed.value : name),
+          valueSortKey: japaneseSortKey(parsed.kind === "annotated" ? parsed.value : name),
         })
         .onConflictDoNothing()
         .run();

@@ -1,4 +1,4 @@
-import { createRandomSeed, sortIdSchema } from "@mimimilli/shared";
+import { createRandomSeed, isRandomSeed, sortIdSchema } from "@mimimilli/shared";
 import type { SortId } from "../../library/types";
 import type { RouteCodec, RouteParseResult } from "../../../shared/model/useRouteHistorySync";
 import {
@@ -108,7 +108,7 @@ function applyEntryState(route: AppRoute, entryState: unknown): AppRoute {
     library: {
       ...route.library,
       sort: sortResult.success ? sortResult.data : route.library.sort,
-      seed: typeof seed === "number" && Number.isInteger(seed) ? seed : route.library.seed,
+      seed: isRandomSeed(seed) ? seed : route.library.seed,
     },
   };
 }

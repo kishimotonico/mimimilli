@@ -57,6 +57,15 @@ describe("appRouteCodec", () => {
     }
   });
 
+  it("履歴エントリーの seed がサーバー契約の範囲（0〜0x7fffffff の整数）外なら現在値を保つ", () => {
+    const seedOf = (seed: unknown) =>
+      appRouteCodec.parse("/library/all", { sort: null, seed }).apply(libraryRoute).library.seed;
+
+    expect(seedOf(0)).toBe(0);
+    expect(seedOf(0x7fffffff)).toBe(0x7fffffff);
+    for (const seed of [-1, 0x80000000, 1.5, "7", null]) expect(seedOf(seed)).toBe(4242);
+  });
+
   it("URL に np=1 が無ければ、履歴エントリーの状態に層が書かれていても開かない", () => {
     const entryState = { sort: null, seed: 1, layer: libraryRoute.layer };
     expect(appRouteCodec.parse("/library/all", entryState).apply(libraryRoute).layer).toBeNull();

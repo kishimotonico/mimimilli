@@ -195,7 +195,7 @@ export default function SmartFolderDialog({
         </div>
       </div>
       <div className="mll-dlg-f">
-        <Button type="button" variant="outline" size="sm" onClick={onClose}>
+        <Button type="button" variant="quiet" size="sm" onClick={onClose}>
           キャンセル
         </Button>
         <Button type="submit" variant="primary" size="sm" disabled={!canSave}>

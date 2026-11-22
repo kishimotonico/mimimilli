@@ -128,6 +128,12 @@ describe("saveSearchDraft", () => {
       saveSearchDraft(works({ folderId: "all", selectedTags: nts(["cv/藤田", "asmr"]) })).name,
     ).toBe("藤田・asmr");
   });
+
+  it("値にスラッシュを含むタグは、最初のスラッシュより後ろ全部を名前にする", () => {
+    expect(saveSearchDraft(works({ folderId: "all", selectedTags: nts(["cv/a/b"]) })).name).toBe(
+      "a/b",
+    );
+  });
 });
 
 describe("overwriteWrite", () => {

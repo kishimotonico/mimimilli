@@ -113,7 +113,6 @@ function LibraryViewBody({
             }
             onAddTag={nav.addTag}
             onRemoveTag={nav.removeTag}
-            onClearAll={nav.clearTags}
             worksTotal={view.kind === "works" ? worksTotal : undefined}
             valueListItemCount={view.kind === "value-list" ? groupValueItems.length : undefined}
             save={

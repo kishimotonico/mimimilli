@@ -597,7 +597,7 @@ export class WorkQueryRepository {
                    works.cover_image AS cover_image,
                    works.cover_width AS cover_width,
                    works.cover_height AS cover_height,
-                   tags.facet_sort_key AS sort_key
+                   tags.value_sort_key AS sort_key
             FROM main.works
             INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
             INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id

@@ -19,9 +19,16 @@ export const sortIdSchema = z.enum([
 ]);
 export type SortId = z.infer<typeof sortIdSchema>;
 
-/** random ソート用 seed。0x7fffffff 以下の非負整数。 */
+/** random ソート用 seed の上限。契約（GET /smart-folders/:id/works の seed）の範囲と同じ */
+export const MAX_RANDOM_SEED = 0x7fffffff;
+
+export function isRandomSeed(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= MAX_RANDOM_SEED;
+}
+
+/** random ソート用 seed。0 以上 MAX_RANDOM_SEED 以下の整数。 */
 export function createRandomSeed(): number {
-  return crypto.getRandomValues(new Uint32Array(1))[0]! & 0x7fffffff;
+  return crypto.getRandomValues(new Uint32Array(1))[0]! & MAX_RANDOM_SEED;
 }
 
 // ── 値一覧 ───────────────────────────────────────────────────

@@ -119,6 +119,40 @@ test("値の作品一覧で「＋絞り込み」からチップを足せる", as
   assertNoErrors(tracker);
 });
 
+test("サイドバーのクイックオーバーレイ: 値の主クリックでその値の一覧へ進み、追加ボタンは行き先どおりにチップを足す", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  const overlay = page.locator(".mll-qoverlay");
+  const quickList = overlay.getByRole("group", { name: "CVの値一覧" });
+  await railRow(page, "CV別").hover();
+  await quickList.getByRole("button", { name: /^霧島レイ(?!を)/ }).click();
+  await expect(page).toHaveURL(/\/library\/by-cv\?group=/);
+  expect(new URL(page.url()).searchParams.get("group")).toBe("霧島レイ");
+  await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveCount(0);
+
+  // 作品一覧が開いているとき、追加ボタンはその一覧にチップを足す
+  await railRow(page, "CV別").hover();
+  await expect(quickList.getByRole("button", { name: "霧島レイをAND追加" })).toHaveCount(0);
+  await quickList.getByRole("button", { name: "天音かなでをAND追加" }).click();
+  await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["cv/天音かなで"]);
+  expect(new URL(page.url()).searchParams.get("group")).toBe("霧島レイ");
+
+  // 値一覧が開いているとき、追加ボタンは「すべて」＋そのチップへ進む
+  await railRow(page, "CV別").click();
+  await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveCount(0);
+  await page.mouse.move(1200, 600);
+  await expect(overlay).toHaveCount(0);
+  await railRow(page, "CV別").hover();
+  await quickList.getByRole("button", { name: "霧島レイをAND追加" }).click();
+  await expect(page).toHaveURL(/\/library\/all/);
+  await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["cv/霧島レイ"]);
+
+  assertNoErrors(tracker);
+});
+
 test("値一覧でも検索でき、入力すると「すべて」の検索結果へ移る", async ({ page }) => {
   const tracker = trackErrors(page);
   await openApp(page);
@@ -129,7 +163,7 @@ test("値一覧でも検索でき、入力すると「すべて」の検索結�
 
   await expect(search(page)).toBeEnabled();
   await expect(valueList.getByRole("button", { name: /をAND追加/ })).toHaveCount(0);
-  await expect(page.locator(".mll-tagband__count")).toHaveText(/分類（件数はライブラリ全体）/);
+  await expect(page.locator(".mll-tagband__count")).toHaveText(/^\d+ 分類$/);
 
   await search(page).fill("霧島");
   await expect(page).toHaveURL(/\/library\/all\?q=/);

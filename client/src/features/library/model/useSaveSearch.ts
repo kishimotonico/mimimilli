@@ -9,7 +9,6 @@ import {
   overwriteWrite,
   saveOffer,
   saveDialogTarget,
-  type OverwritableFolder,
   type SaveOffer,
 } from "./saveSearch";
 import { draftOf, toWrite } from "./smartFolderEditing";
@@ -40,9 +39,9 @@ export function useSaveSearch(nav: LibraryViewState & LibraryViewActions): SaveS
     if (view?.kind !== "works" || !isOverwritable(view)) return;
     if (overwriting.current) return;
     overwriting.current = true;
-    const folder = view.folder as OverwritableFolder;
+    const { folder } = view;
     const before = toWrite(draftOf(folder));
-    const saved = await editor.update(folder.id, overwriteWrite({ ...view, folder }));
+    const saved = await editor.update(folder.id, overwriteWrite(view));
     overwriting.current = false;
     if (!saved) return;
     openFolder(folder.id);

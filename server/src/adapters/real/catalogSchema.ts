@@ -95,7 +95,7 @@ export const tags = sqliteTable("tags", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull().unique(),
   searchKey: text("search_key").notNull(),
-  facetSortKey: text("facet_sort_key").notNull(),
+  valueSortKey: text("value_sort_key").notNull(),
 });
 
 export const workTags = sqliteTable(

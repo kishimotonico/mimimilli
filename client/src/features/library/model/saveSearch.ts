@@ -6,8 +6,10 @@ import {
   buildEffectiveCondition,
   normalizeSearchQuery,
   parseTag,
+  isReadableSmartFolder,
   smartFolderPermissions,
   splitSelectedTags,
+  type ReadableSmartFolder,
   type SmartFolder,
   type SmartFolderWrite,
 } from "@mimimilli/shared";
@@ -16,17 +18,22 @@ import { type SmartFolderDialogTarget, type SmartFolderDraft } from "./smartFold
 
 export type WorksView = Extract<ResolvedLibraryView, { kind: "works" }>;
 
-/** 上書きの対象にできる自作のスマートフォルダー（条件を変えられ、グループ分けを持たない） */
-export type OverwritableFolder = SmartFolder & { condition: NonNullable<SmartFolder["condition"]> };
-
 export type SaveOffer = "save" | "overwrite";
 
-export function isOverwritable(view: WorksView): boolean {
+/** 上書きの対象にできる自作のスマートフォルダー（条件を変えられ、グループ分けを持たない） */
+export type OverwritableView = WorksView & { folder: ReadableSmartFolder };
+
+export function isOverwritable(view: WorksView): view is OverwritableView {
   return (
-    view.folder.condition !== null &&
+    isReadableSmartFolder(view.folder) &&
     view.groupBy === null &&
     smartFolderPermissions(view.folder).editCondition
   );
+}
+
+/** グループの値・チップ・検索語のどれかで絞り込んでいる */
+export function isRefined(view: WorksView): boolean {
+  return view.group !== null || view.selectedTags.length > 0 || normalizeSearchQuery(view.q) !== "";
 }
 
 /** チップ列の右端に出す保存の操作。無ければ null */
@@ -35,9 +42,7 @@ export function saveOffer(view: ResolvedLibraryView): SaveOffer | null {
   if (isOverwritable(view) && (view.selectedTags.length > 0 || view.sortDeviates)) {
     return "overwrite";
   }
-  const filtered =
-    view.group !== null || view.selectedTags.length > 0 || normalizeSearchQuery(view.q) !== "";
-  return filtered ? "save" : null;
+  return isRefined(view) ? "save" : null;
 }
 
 function effectiveCondition(view: WorksView) {
@@ -79,7 +84,7 @@ export function saveSearchDraft(view: WorksView): SmartFolderDraft {
 }
 
 /** 「上書き」の中身。条件に今の絞り込みを足し、並びを変えていればそれを既定の並びにする */
-export function overwriteWrite(view: WorksView & { folder: OverwritableFolder }): SmartFolderWrite {
+export function overwriteWrite(view: OverwritableView): SmartFolderWrite {
   const { folder } = view;
   return {
     name: folder.name,

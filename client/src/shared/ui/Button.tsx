@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from "react";
 import { cn } from "../lib/cn";
 import type { IconFC } from "./Icon";
 
-export type ButtonVariant = "primary" | "ghost" | "outline" | "quiet" | "danger" | "danger-quiet";
+export type ButtonVariant = "primary" | "ghost" | "quiet" | "danger" | "danger-quiet";
 export type ButtonSize = "sm" | "md" | "lg";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -29,7 +29,7 @@ function stateClass(variant: ButtonVariant, active: boolean, disabled: boolean):
   if (disabled) {
     return variant === "primary" || variant === "danger"
       ? "cursor-not-allowed bg-paper-2 text-ink-4"
-      : cn("cursor-not-allowed text-ink-4", variant === "outline" && "border border-line");
+      : "cursor-not-allowed text-ink-4";
   }
   if (active) return "bg-acc-soft text-acc-ink";
   switch (variant) {
@@ -37,8 +37,6 @@ function stateClass(variant: ButtonVariant, active: boolean, disabled: boolean):
       return "bg-ink-0 text-paper-1 hover:bg-acc";
     case "ghost":
       return "bg-paper-2 text-ink-1 hover:bg-paper-3 hover:text-ink-0";
-    case "outline":
-      return "border border-line bg-paper-1 text-ink-0 hover:bg-paper-2";
     case "quiet":
       return "bg-transparent text-ink-2 hover:bg-paper-2 hover:text-ink-0";
     case "danger":

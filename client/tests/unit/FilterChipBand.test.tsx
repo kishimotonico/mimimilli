@@ -26,7 +26,6 @@ function renderFilterChipBand(
         groupValueScope={{ folderId: "fav", group: null, tags: ["cv/藤田茜"], q: "雨" }}
         onAddTag={() => {}}
         onRemoveTag={() => {}}
-        onClearAll={() => {}}
         worksTotal={worksTotal}
         {...overrides}
       />
@@ -39,21 +38,20 @@ describe("FilterChipBand のチップ", () => {
     renderFilterChipBand();
 
     expect(screen.queryByRole("button", { name: "cv/藤田茜" })).toBeNull();
-    await userEvent.click(screen.getByText("cv/藤田茜"));
+    await userEvent.click(screen.getByText("藤田茜"));
 
     expect(api.requestsTo("POST /api/smart-folders/:id/groups")).toHaveLength(0);
   });
 
-  it("×で個別解除し、すべてクリアで全解除する", async () => {
+  it("×で個別解除でき、AND ラベルと「すべてクリア」は無い", async () => {
     const onRemoveTag = vi.fn();
-    const onClearAll = vi.fn();
-    renderFilterChipBand(undefined, { onRemoveTag, onClearAll });
+    renderFilterChipBand(undefined, { onRemoveTag });
 
     await userEvent.click(screen.getByRole("button", { name: "cv/藤田茜を解除" }));
     expect(onRemoveTag).toHaveBeenCalledWith("cv/藤田茜");
 
-    await userEvent.click(screen.getByRole("button", { name: "すべてクリア" }));
-    expect(onClearAll).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "すべてクリア" })).toBeNull();
+    expect(screen.queryByText("AND")).toBeNull();
   });
 
   it("「＋絞り込み」の候補は開いている一覧の条件・チップ・検索語を母集団にして POST /:id/groups で取る", async () => {
@@ -98,16 +96,16 @@ describe("FilterChipBand の件数表示", () => {
 });
 
 describe("値一覧ペイン表示中の件数ラベルと＋絞り込みの扱い（ADR-0026）", () => {
-  it("valueListItemCount指定時は絞り込み後件数の代わりにライブラリ全体である旨のラベルを出す", () => {
+  it("valueListItemCount指定時は絞り込み後件数の代わりに分類数を出す", () => {
     renderFilterChipBand(undefined, { valueListItemCount: 12, groupValueScope: undefined });
-    expect(screen.getByText("12分類（件数はライブラリ全体）")).toBeInTheDocument();
+    expect(screen.getByText("12 分類")).toBeInTheDocument();
     expect(screen.queryByText(/^\d+ 件$/)).toBeNull();
   });
 
   it("valueListItemCount指定時は worksTotal が渡っても絞り込み後件数を出さない", () => {
     renderFilterChipBand(120, { valueListItemCount: 12 });
     expect(screen.queryByText("120 件")).toBeNull();
-    expect(screen.getByText("12分類（件数はライブラリ全体）")).toBeInTheDocument();
+    expect(screen.getByText("12 分類")).toBeInTheDocument();
   });
 
   it("valueListItemCount指定時は「＋絞り込み」ボタンを出さない（値一覧はAND追加を提供しない）", () => {

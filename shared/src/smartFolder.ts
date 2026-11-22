@@ -3,7 +3,6 @@ import { z } from "zod";
 import { tagFiltersQuerySchema } from "./api.ts";
 import {
   conditionKey,
-  EMPTY_CONDITION,
   conditionSchema,
   conditionTreeSchema,
   isEmptyCondition,
@@ -11,7 +10,7 @@ import {
   prefixSchema,
   type Condition,
 } from "./condition.ts";
-import { sortIdSchema, type SortId } from "./library.ts";
+import { MAX_RANDOM_SEED, sortIdSchema, type SortId } from "./library.ts";
 import { scanRecordKindSchema, workChangeKindSchema } from "./scan.ts";
 
 // ── グループ分け ─────────────────────────────────────────────
@@ -101,7 +100,7 @@ export const smartFolderWorksRequestSchema = z
     /** グループ分けの選択中の値 */
     group: z.string().min(1).optional(),
     sort: sortIdSchema,
-    seed: z.coerce.number().int().min(0).max(0x7fffffff).optional(),
+    seed: z.coerce.number().int().min(0).max(MAX_RANDOM_SEED).optional(),
     page: z.coerce.number().int().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(500).optional(),
     scanRecord: scanRecordKindSchema.optional(),
@@ -252,7 +251,13 @@ export function smartFolderPermissions(
       edit: false,
     };
   }
-  const isTemplate = findSmartFolderTemplate(folder.id) !== undefined;
+  return readablePermissions(folder.id);
+}
+
+/** 条件を読めるスマートフォルダーの権限。テンプレートの規則だけで決まる */
+function readablePermissions(id: string): SmartFolderPermissions {
+  const isAll = id === ALL_SMART_FOLDER_ID;
+  const isTemplate = findSmartFolderTemplate(id) !== undefined;
   return {
     rename: !isAll,
     editCondition: !isTemplate,
@@ -288,7 +293,7 @@ export function updateViolation(
   existing: Pick<SmartFolder, "id" | "name">,
   write: SmartFolderWrite,
 ): PolicyViolation | null {
-  const permissions = smartFolderPermissions({ id: existing.id, condition: EMPTY_CONDITION });
+  const permissions = readablePermissions(existing.id);
   const template = findSmartFolderTemplate(existing.id);
   if (template && !permissions.editCondition && !sameTemplateDefinition(template, write)) {
     return forbidden("既定のスマートフォルダーの条件・グループ分けは変更できません");
