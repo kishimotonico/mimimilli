@@ -1,21 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { useAtom, useSetAtom } from "jotai";
+import { useSetAtom } from "jotai";
 import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
-import type { SortId } from "@mimimilli/shared";
+import type { GroupSortId, SortId } from "@mimimilli/shared";
 import { SORT_OPTIONS } from "../../../entities/library/types";
-import { groupValueSortAtom } from "../model/atoms";
 import {
+  clearLibraryGroupSortAtom,
   clearLibrarySortAtom,
   reshuffleLibrarySeedAtom,
 } from "../../../entities/library/model/navigationActions";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
-import {
-  GROUP_VALUE_SORT_OPTIONS,
-  selectGroupValueSortKey,
-  type GroupValueSortKey,
-} from "../model/groupValueSort";
+import { GROUP_SORT_OPTIONS, getGroupSortLabel } from "../model/groupValueSort";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import { usePopoverDismissal } from "../../../shared/ui/usePopoverDismissal";
@@ -24,14 +20,9 @@ function getSortLabel(sortId: SortId): string | undefined {
   return SORT_OPTIONS.find((opt) => opt.id === sortId)?.label;
 }
 
-function getGroupValueSortLabel(key: GroupValueSortKey): string {
-  return GROUP_VALUE_SORT_OPTIONS.find((opt) => opt.id === key)?.label ?? key;
-}
-
-// ADR-0012 帰結: ソートは UI が単一系・state が二重。結果面が値一覧のときは
-// groupValueSortAtom（名前/件数/総時間）、作品一覧のときは今の並び（履歴エントリーの状態。
-// ADR-0041）を接続先として切り替える。今の並びが解決後の既定から外れているときだけ
-// 「この並びを既定にする」を出し、スマートフォルダーの既定の並びとして保存する。
+// 結果面が値一覧のときは今の値の並び（8種）、作品一覧のときは今の並び（9種）を、どちらも履歴エントリーの
+// 状態（ADR-0041）として変える。今の並びが解決後の既定から外れているときだけ「この並びを既定にする」を出し、
+// スマートフォルダーの既定の並び（値一覧なら値の並び）として保存する。
 export default function LibrarySortMenu() {
   const nav = useLibraryNavigation();
   if (nav.foldersStatus !== "ready") {
@@ -42,37 +33,42 @@ export default function LibrarySortMenu() {
       </div>
     );
   }
-  return <ReadySortMenu view={nav.view} setSort={nav.setSort} />;
+  return <ReadySortMenu view={nav.view} setSort={nav.setSort} setGroupSort={nav.setGroupSort} />;
 }
 
 function ReadySortMenu({
   view,
   setSort,
+  setGroupSort,
 }: {
   view: ResolvedLibraryView;
   setSort: (sort: SortId) => void;
+  setGroupSort: (groupSort: GroupSortId) => void;
 }) {
   const editor = useSmartFolderEditor();
   const [savingDefault, setSavingDefault] = useState(false);
-  const [groupValueSort, setGroupValueSort] = useAtom(groupValueSortAtom);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
   const reshuffle = useSetAtom(reshuffleLibrarySeedAtom);
   const clearCurrentSort = useSetAtom(clearLibrarySortAtom);
+  const clearCurrentGroupSort = useSetAtom(clearLibraryGroupSortAtom);
 
-  const isValueListPane = view.kind === "value-list";
   const disabled = view.kind === "broken";
   const sort = view.kind === "works" ? view.sort : null;
-  const currentSortLabel = isValueListPane
-    ? getGroupValueSortLabel(groupValueSort.key)
-    : sort && getSortLabel(sort);
+  const currentSortLabel =
+    view.kind === "value-list" ? getGroupSortLabel(view.groupSort) : sort && getSortLabel(sort);
 
   const saveAsDefault = async () => {
-    if (view.kind !== "works") return;
+    if (view.kind === "broken") return;
     setSavingDefault(true);
-    const saved = await editor.saveDefaultSort(view.folder.id, view.sort);
+    if (view.kind === "value-list") {
+      const saved = await editor.saveDefaultGroupSort(view.folder.id, view.groupSort);
+      if (saved) clearCurrentGroupSort({ folderId: view.folder.id, groupSort: view.groupSort });
+    } else {
+      const saved = await editor.saveDefaultSort(view.folder.id, view.sort);
+      if (saved) clearCurrentSort({ folderId: view.folder.id, sort: view.sort });
+    }
     setSavingDefault(false);
-    if (saved) clearCurrentSort({ folderId: view.folder.id, sort: view.sort });
   };
 
   const buttonTitle = currentSortLabel ? `並び替え: ${currentSortLabel}` : "並び替え";
@@ -110,7 +106,9 @@ function ReadySortMenu({
   };
 
   const showReshuffle = view.kind === "works" && sort === "random";
-  const canSaveAsDefault = view.kind === "works" && view.sortDeviates;
+  const canSaveAsDefault =
+    (view.kind === "works" && view.sortDeviates) ||
+    (view.kind === "value-list" && view.groupSortDeviates);
 
   return (
     <div className="mle-sortmenu" ref={sortRef}>
@@ -147,21 +145,21 @@ function ReadySortMenu({
           tabIndex={-1}
           onKeyDown={handleMenuKeyDown}
         >
-          {isValueListPane
-            ? GROUP_VALUE_SORT_OPTIONS.map((opt) => (
+          {view.kind === "value-list"
+            ? GROUP_SORT_OPTIONS.map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
                   role="menuitemradio"
-                  aria-checked={groupValueSort.key === opt.id}
-                  className={`mle-sortmenu__item ${groupValueSort.key === opt.id ? "is-checked" : ""}`}
+                  aria-checked={view.groupSort === opt.id}
+                  className={`mle-sortmenu__item ${view.groupSort === opt.id ? "is-checked" : ""}`}
                   onClick={() => {
-                    setGroupValueSort(selectGroupValueSortKey(groupValueSort, opt.id));
+                    setGroupSort(opt.id);
                     closeSortMenu();
                   }}
                 >
                   <span className="check">
-                    {groupValueSort.key === opt.id && <I.check size={14} />}
+                    {view.groupSort === opt.id && <I.check size={14} />}
                   </span>
                   <span className="label">{opt.label}</span>
                 </button>

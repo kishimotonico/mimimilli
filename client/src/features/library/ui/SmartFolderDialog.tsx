@@ -5,11 +5,13 @@ import {
   findSmartFolderTemplate,
   rootChildren,
   smartFolderPermissions,
+  type GroupSortId,
   type SmartFolderPermissions,
   type SmartFolderWrite,
   type SortId,
   type TagPrefix,
 } from "@mimimilli/shared";
+import { GROUP_SORT_OPTIONS } from "../model/groupValueSort";
 import { SORT_OPTIONS } from "../../../entities/library/types";
 import { groupByFromKey, groupByKey } from "../../../entities/smart-folder/groupByKey";
 import Button from "../../../shared/ui/Button";
@@ -83,9 +85,8 @@ export default function SmartFolderDialog({
   onSave,
   onClose,
 }: SmartFolderDialogProps) {
-  const [draft, setDraft] = useState<SmartFolderDraft>(() =>
-    withSelectableSort(initialDraft(target, tagPrefixes), allSort),
-  );
+  const [initial] = useState(() => withSelectableSort(initialDraft(target, tagPrefixes), allSort));
+  const [draft, setDraft] = useState<SmartFolderDraft>(initial);
   const [saving, setSaving] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
   const sortRef = useRef<HTMLSelectElement>(null);
@@ -93,6 +94,7 @@ export default function SmartFolderDialog({
   const nameId = useId();
   const groupId = useId();
   const sortId = useId();
+  const groupSortId = useId();
   const permissions =
     target.kind === "edit" ? smartFolderPermissions(target.folder) : FULL_PERMISSIONS;
   const close = () => {
@@ -174,7 +176,9 @@ export default function SmartFolderDialog({
             id={groupId}
             value={groupByKey(draft.groupBy)}
             disabled={!permissions.editGroupBy}
-            onChange={(event) => setDraft(withGroupBy(draft, groupByFromKey(event.target.value)))}
+            onChange={(event) =>
+              setDraft(withGroupBy(draft, groupByFromKey(event.target.value), initial))
+            }
           >
             {target.kind !== "group" && <option value="">なし</option>}
             {options.map((option) => (
@@ -184,8 +188,26 @@ export default function SmartFolderDialog({
             ))}
           </select>
         </div>
+        {draft.groupSort !== null && (
+          <div className="mll-fld">
+            <label htmlFor={groupSortId}>値の並び</label>
+            <select
+              id={groupSortId}
+              value={draft.groupSort}
+              onChange={(event) =>
+                setDraft({ ...draft, groupSort: event.target.value as GroupSortId })
+              }
+            >
+              {GROUP_SORT_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="mll-fld">
-          <label htmlFor={sortId}>既定の並び</label>
+          <label htmlFor={sortId}>{draft.groupBy === null ? "既定の並び" : "作品の並び"}</label>
           <select
             ref={sortRef}
             id={sortId}

@@ -1,75 +1,72 @@
-// 値一覧（GroupValueList）のソート状態・ソート計算。ADR-0012 §5・帰結。
-// ソートは UI が単一系・state が二重: ソートメニュー（LibrarySortMenu）と list の列見出し
-// クリック（GroupValueList）は同じ GroupValueSortState への別入口だが、作品一覧のソート状態
-// （route.library.sort）とは別に保持する。総時間ソート中に値を選択しても作品一覧が無効なソートキーを
-// 受け取らないようにするための分離（ADR-0012 帰結）。
+// 値一覧の並び（GroupSortId）の語彙と、列見出しの切り替え規則（ADR-0040・ADR-0041）。
+// 並べるのはサーバー（POST /smart-folders/:id/groups）で、client は選んだ ID を送るだけ。
 
-import type { GroupSortId, GroupValueItem } from "@mimimilli/shared";
+import type { GroupSortId } from "@mimimilli/shared";
 
-export type GroupValueSortKey = "name" | "count" | "duration";
 export type SortDirection = "asc" | "desc";
 
-export interface GroupValueSortState {
-  key: GroupValueSortKey;
-  direction: SortDirection;
-}
+/** 値一覧の列見出しになる並びの軸。最近追加した順・最近再生した順は列を持たない */
+export type GroupSortColumn = "name" | "count" | "duration";
 
-export function toGroupSortId(sort: GroupValueSortState): GroupSortId {
-  return `${sort.key}-${sort.direction}`;
-}
+/** 並びメニューの項目（表示順）。向きは ID に含まれる */
+export const GROUP_SORT_OPTIONS: { id: GroupSortId; label: string }[] = [
+  { id: "count-desc", label: "件数（多い順）" },
+  { id: "count-asc", label: "件数（少ない順）" },
+  { id: "name-asc", label: "名前（あ→ん）" },
+  { id: "name-desc", label: "名前（ん→あ）" },
+  { id: "duration-desc", label: "総時間（長い順）" },
+  { id: "duration-asc", label: "総時間（短い順）" },
+  { id: "added-desc", label: "最近追加した順" },
+  { id: "last-played", label: "最近再生した順" },
+];
 
-export const DEFAULT_GROUP_VALUE_SORT: GroupValueSortState = { key: "count", direction: "desc" };
-
-export const GROUP_VALUE_SORT_OPTIONS: { id: GroupValueSortKey; label: string }[] = [
+export const GROUP_SORT_COLUMNS: { id: GroupSortColumn; label: string }[] = [
   { id: "name", label: "名前" },
   { id: "count", label: "件数" },
   { id: "duration", label: "総時間" },
 ];
 
-/** ソートキーの既定の向き（メニューから新しいキーへ切り替えたとき・列見出しを初めて
- *  クリックしたときに使う）。名前は昇順、件数・総時間は降順が自然な初期値。 */
-function defaultDirectionFor(key: GroupValueSortKey): SortDirection {
-  return key === "name" ? "asc" : "desc";
+export function getGroupSortLabel(sort: GroupSortId): string {
+  return GROUP_SORT_OPTIONS.find((option) => option.id === sort)?.label ?? sort;
 }
 
-/** ソートメニューからキーを選ぶ（既に選択中のキーなら何もしない）。 */
-export function selectGroupValueSortKey(
-  current: GroupValueSortState,
-  key: GroupValueSortKey,
-): GroupValueSortState {
-  if (current.key === key) return current;
-  return { key, direction: defaultDirectionFor(key) };
+export function groupSortColumn(sort: GroupSortId): GroupSortColumn | null {
+  switch (sort) {
+    case "name-asc":
+    case "name-desc":
+      return "name";
+    case "count-asc":
+    case "count-desc":
+      return "count";
+    case "duration-asc":
+    case "duration-desc":
+      return "duration";
+    default:
+      return null;
+  }
 }
 
-/** list の列見出しクリック。同じ列なら昇順降順を反転、別の列なら既定の向きへ切り替える。 */
-export function toggleGroupValueSort(
-  current: GroupValueSortState,
-  key: GroupValueSortKey,
-): GroupValueSortState {
-  if (current.key !== key) return { key, direction: defaultDirectionFor(key) };
-  return { key, direction: current.direction === "asc" ? "desc" : "asc" };
+export function groupSortDirection(sort: GroupSortId): SortDirection {
+  return sort.endsWith("-asc") ? "asc" : "desc";
 }
 
-/** 値からソートキー（表示名）を導く。既定は表示名（value）そのままの単純比較。 */
-function groupValueNameKey(item: GroupValueItem): string {
-  return item.value;
+/** 名前順のとき、入れ子タグを階層で見せる（ADR-0012 §5） */
+export function isNameSort(sort: GroupSortId): boolean {
+  return groupSortColumn(sort) === "name";
 }
 
-export function sortGroupValueItems(
-  items: GroupValueItem[],
-  sort: GroupValueSortState,
-): GroupValueItem[] {
-  const dir = sort.direction === "asc" ? 1 : -1;
-  return [...items].sort((a, b) => {
-    let cmp = 0;
-    if (sort.key === "name") {
-      cmp = groupValueNameKey(a).localeCompare(groupValueNameKey(b), "ja");
-    } else if (sort.key === "count") {
-      cmp = a.count - b.count;
-    } else {
-      cmp = a.durationSec - b.durationSec;
-    }
-    if (cmp === 0) cmp = groupValueNameKey(a).localeCompare(groupValueNameKey(b), "ja");
-    return cmp * dir;
-  });
+/** 列を初めて選ぶときの向き。名前は昇順、件数・総時間は降順が自然な初期値 */
+function defaultDirectionFor(column: GroupSortColumn): SortDirection {
+  return column === "name" ? "asc" : "desc";
+}
+
+/** 列見出しのクリック。同じ列なら向きを反転し、別の列（最近追加・最近再生からを含む）なら既定の向きで選ぶ */
+export function toggleGroupSortColumn(current: GroupSortId, column: GroupSortColumn): GroupSortId {
+  const direction =
+    groupSortColumn(current) === column
+      ? groupSortDirection(current) === "asc"
+        ? "desc"
+        : "asc"
+      : defaultDirectionFor(column);
+  return `${column}-${direction}`;
 }

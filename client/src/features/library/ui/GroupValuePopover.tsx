@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
 import { useIsPresent } from "motion/react";
-import type { GroupBy, GroupValueItem } from "@mimimilli/shared";
+import type { GroupBy, GroupSortId, GroupValueItem } from "@mimimilli/shared";
 import { useAnchoredPopover } from "../../../shared/ui/useAnchoredPopover";
 import type { HoverGroupPanelHandlers } from "../../../shared/lib/useHoverGroupCoordinator";
 import GroupValuePopoverPanel, { GROUP_VALUE_PLACEMENTS } from "./GroupValuePopoverPanel";
@@ -20,6 +20,8 @@ interface GroupValuePopoverProps {
   folderId: string;
   groupBy: GroupBy;
   groupByLabel: string;
+  /** そのフォルダーの保存済みの値の並び。開いている間だけ列見出しで変えられる */
+  groupSort: GroupSortId;
   anchorEl: HTMLElement | null;
   /** 選択中の値（チェック表示） */
   selectedValue: string | null;
@@ -38,6 +40,7 @@ export default function GroupValuePopover({
   folderId,
   groupBy,
   groupByLabel,
+  groupSort,
   anchorEl,
   selectedValue,
   onSelectValue,
@@ -74,6 +77,7 @@ export default function GroupValuePopover({
       groupByLabel={groupByLabel}
       // 件数は主クリック（その値の作品一覧）の結果と一致させるため、絞り込み無しで数える
       scope={{ folderId }}
+      initialGroupSort={groupSort}
       placement={placement}
       setFloating={setPanelEl}
       floatingStyles={floatingStyles}

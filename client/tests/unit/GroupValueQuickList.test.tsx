@@ -1,10 +1,10 @@
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider as JotaiProvider, createStore } from "jotai";
-import type { GroupBy, GroupValueItem } from "@mimimilli/shared";
+import type { GroupBy, GroupSortId, GroupValueItem } from "@mimimilli/shared";
 import GroupValueQuickList from "../../src/features/library/ui/GroupValueQuickList";
-import { groupValueSortAtom } from "../../src/features/library/model/atoms";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 
 const CV: GroupBy = { kind: "prefix", prefix: "cv" };
@@ -14,13 +14,14 @@ afterEach(() => {
   clearResizeObservers();
 });
 
+/** サーバーが件数の多い順（既定の並び）で返した形 */
 function makeItems(count: number): GroupValueItem[] {
   return Array.from({ length: count }, (_, i) => ({
     value: `値${String(i).padStart(4, "0")}`,
     count: i,
     durationSec: 0,
     covers: [],
-  }));
+  })).reverse();
 }
 
 async function flushVirtualizer(size = { width: 260, height: 260 }) {
@@ -30,11 +31,35 @@ async function flushVirtualizer(size = { width: 260, height: 260 }) {
   });
 }
 
-function renderQuickList(props: Partial<React.ComponentProps<typeof GroupValueQuickList>> = {}) {
+type QuickListProps = Omit<
+  React.ComponentProps<typeof GroupValueQuickList>,
+  "sort" | "onSortChange"
+> & { sort?: GroupSortId; onSortChange?: (sort: GroupSortId) => void };
+
+/** 並びは呼び出し側（GroupValuePopoverPanel）が持つので、テストでも状態を持つ側を用意する */
+function QuickListHarness({
+  sort: initialSort = "count-desc",
+  onSortChange,
+  ...props
+}: QuickListProps) {
+  const [sort, setSort] = useState<GroupSortId>(initialSort);
+  return (
+    <GroupValueQuickList
+      {...props}
+      sort={sort}
+      onSortChange={(next) => {
+        setSort(next);
+        onSortChange?.(next);
+      }}
+    />
+  );
+}
+
+function renderQuickList(props: Partial<QuickListProps> = {}) {
   const store = createStore();
   const result = render(
     <JotaiProvider store={store}>
-      <GroupValueQuickList
+      <QuickListHarness
         groupBy={CV}
         groupByLabel="CV"
         items={[]}
@@ -403,16 +428,17 @@ describe("GroupValueQuickList のソート（アイコンボタン＋インラ�
     sizeMock.restore();
   });
 
-  it("ソート変更は groupValueSortAtom へ書き込み、メイン値一覧と共有する", async () => {
+  it("並びの変更は onSortChange へ渡し、保存はしない（開いている間だけの状態）", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
-    const { store } = renderQuickList({ items: makeItems(5) });
+    const onSortChange = vi.fn();
+    renderQuickList({ items: makeItems(5), onSortChange });
     await flushVirtualizer();
 
     await user.click(screen.getByRole("button", { name: /^並び替え/ }));
     await user.click(screen.getByRole("button", { name: "名前" }));
 
-    expect(store.get(groupValueSortAtom)).toEqual({ key: "name", direction: "asc" });
+    expect(onSortChange).toHaveBeenCalledWith("name-asc");
     sizeMock.restore();
   });
 });

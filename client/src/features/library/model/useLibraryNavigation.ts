@@ -5,7 +5,12 @@
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useTransition } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useQuery } from "@tanstack/react-query";
-import { type NormalizedTag, type SmartFolder, type SortId } from "@mimimilli/shared";
+import {
+  type GroupSortId,
+  type NormalizedTag,
+  type SmartFolder,
+  type SortId,
+} from "@mimimilli/shared";
 import { libraryRouteAtom } from "../../../entities/library/model/navigationAtoms";
 import {
   addLibraryTagAtom,
@@ -20,6 +25,7 @@ import {
   selectLibraryGroupValueAtom,
   selectLibraryWorkAtom,
   setLibrarySearchQueryAtom,
+  setLibraryGroupSortAtom,
   setLibrarySortAtom,
 } from "../../../entities/library/model/navigationActions";
 import {
@@ -72,6 +78,7 @@ export interface LibraryViewActions {
   setSearchQuery: (q: string) => void;
   selectWork: (id: string | null) => void;
   setSort: (sort: SortId) => void;
+  setGroupSort: (groupSort: GroupSortId) => void;
   /** グループの値の作品一覧から、そのスマートフォルダーの値一覧へ戻る */
   backToValueList: () => void;
 }
@@ -99,6 +106,7 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
   const setSearchQuery = useSetAtom(setLibrarySearchQueryAtom);
   const selectWork = useSetAtom(selectLibraryWorkAtom);
   const setSort = useSetAtom(setLibrarySortAtom);
+  const setGroupSort = useSetAtom(setLibraryGroupSortAtom);
   const backToValueList = useSetAtom(backToLibraryValueListAtom);
 
   const normalizeFolder = useSetAtom(normalizeLibraryFolderAtom);
@@ -140,6 +148,7 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
       setSearchQuery: (q) => withFolders((f) => setSearchQuery(q, f)),
       selectWork,
       setSort: (sort) => run(() => setSort(sort)),
+      setGroupSort: (groupSort) => run(() => setGroupSort(groupSort)),
       backToValueList: () => withFolders((f) => backToValueList(f)),
     };
   }, [
@@ -154,6 +163,7 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
     setSearchQuery,
     selectWork,
     setSort,
+    setGroupSort,
     backToValueList,
   ]);
 

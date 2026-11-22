@@ -20,19 +20,21 @@ const libraryRoute: AppRoute = {
     selectedTags: ["cv/水瀬なずな"],
     selectedWorkId: "RJ01234567",
     sort: "title-asc",
+    groupSort: "name-desc",
     seed: 4242,
   },
   layer: { kind: "nowPlaying", openedBy: "app" },
 };
 
 describe("appRouteCodec", () => {
-  it("sort・seed は URL に出さず、層は np=1 で表し、履歴エントリーの状態に書く", () => {
+  it("sort・groupSort・seed は URL に出さず、層は np=1 で表し、履歴エントリーの状態に書く", () => {
     const { url, entryState } = appRouteCodec.serialize(libraryRoute);
 
     expect(url).not.toMatch(/sort|seed/);
     expect(url).toMatch(/[?&]np=1$/);
     expect(entryState).toEqual({
       sort: "title-asc",
+      groupSort: "name-desc",
       seed: 4242,
       layer: { kind: "nowPlaying", openedBy: "app" },
     });
@@ -56,16 +58,35 @@ describe("appRouteCodec", () => {
   it("作品詳細・ファイルのエントリーでは sort・seed を読み戻さず現在値を保ち、層は URL の np から読む", () => {
     const current: AppRoute = {
       ...libraryRoute,
-      library: { ...libraryRoute.library, sort: "added-asc", seed: 7 },
+      library: { ...libraryRoute.library, sort: "added-asc", groupSort: "count-asc", seed: 7 },
       layer: null,
     };
-    const entryState = { sort: "title-asc", seed: 4242, layer: libraryRoute.layer };
+    const entryState = {
+      sort: "title-asc",
+      groupSort: "name-desc",
+      seed: 4242,
+      layer: libraryRoute.layer,
+    };
 
     for (const url of ["/work/RJ99999999?np=1", "/files/dlsite?np=1"]) {
       const restored = appRouteCodec.parse(url, entryState).apply(current);
-      expect(restored.library).toMatchObject({ sort: "added-asc", seed: 7 });
+      expect(restored.library).toMatchObject({
+        sort: "added-asc",
+        groupSort: "count-asc",
+        seed: 7,
+      });
       expect(restored.layer).toEqual(libraryRoute.layer);
     }
+  });
+
+  it("履歴エントリーの groupSort は null を含め読み戻し、読めない値なら現在値を保つ", () => {
+    const groupSortOf = (groupSort: unknown) =>
+      appRouteCodec.parse("/library/all", { sort: null, groupSort, seed: 1 }).apply(libraryRoute)
+        .library.groupSort;
+
+    expect(groupSortOf("last-played")).toBe("last-played");
+    expect(groupSortOf(null)).toBeNull();
+    for (const invalid of ["name", "random", 1]) expect(groupSortOf(invalid)).toBe("name-desc");
   });
 
   it("履歴エントリーの seed がサーバー契約の範囲（0〜0x7fffffff の整数）外なら現在値を保つ", () => {

@@ -7,6 +7,7 @@ import {
   parseBuiltinPseudoTag,
   type NormalizedTag,
   type SmartFolder,
+  type GroupSortId,
   type SortId,
 } from "@mimimilli/shared";
 import type { RouteTransition } from "../../../shared/model/routeStore";
@@ -34,7 +35,7 @@ function appendTag(tags: NormalizedTag[], tag: NormalizedTag): NormalizedTag[] {
   return [...base, tag];
 }
 
-/** 入り直し。今の並びを捨て、新しい seed にする */
+/** 入り直し。今の並び（作品・値）を捨て、新しい seed にする */
 function enter(
   route: AppRoute,
   patch: Pick<LibraryRoute, "folderId" | "group" | "selectedTags" | "q">,
@@ -43,6 +44,7 @@ function enter(
     ...patch,
     selectedWorkId: null,
     sort: null,
+    groupSort: null,
     seed: createRandomSeed(),
   });
 }
@@ -210,6 +212,23 @@ export function selectLibraryWork(route: AppRoute, id: string | null): Transitio
 export function setLibrarySort(route: AppRoute, sort: SortId): Transition | null {
   if (route.library.sort === sort) return null;
   return { route: withLibrary(route, { sort }), replace: true };
+}
+
+/** 値一覧の並びメニューでの変更。今の値の並びとして履歴エントリーへ書く */
+export function setLibraryGroupSort(route: AppRoute, groupSort: GroupSortId): Transition | null {
+  if (route.library.groupSort === groupSort) return null;
+  return { route: withLibrary(route, { groupSort }), replace: true };
+}
+
+/** 今の値の並びを既定として保存したあと、今の並びを外して既定に従わせる。保存を始めたときと
+ *  同じスマートフォルダー・同じ並びにいるときだけ外す */
+export function clearLibraryGroupSort(
+  route: AppRoute,
+  saved: { folderId: string; groupSort: GroupSortId },
+): LibraryRoute | null {
+  const { library } = route;
+  if (library.folderId !== saved.folderId || library.groupSort !== saved.groupSort) return null;
+  return { ...library, groupSort: null };
 }
 
 /** 今の並びを既定として保存したあと、今の並びを外して既定に従わせる。保存を始めたときと

@@ -1,72 +1,80 @@
 import { describe, expect, it } from "vitest";
-import type { GroupValueItem } from "@mimimilli/shared";
 import {
-  DEFAULT_GROUP_VALUE_SORT,
-  selectGroupValueSortKey,
-  sortGroupValueItems,
-  toggleGroupValueSort,
+  GROUP_SORT_OPTIONS,
+  groupSortColumn,
+  groupSortDirection,
+  isNameSort,
+  toggleGroupSortColumn,
 } from "../../src/features/library/model/groupValueSort";
+import { buildGroupValueDisplayRows } from "../../src/features/library/model/groupValueDisplayRows";
+import type { GroupValueItem } from "@mimimilli/shared";
 
-function item(value: string, count: number, durationSec: number): GroupValueItem {
-  return { value, count, durationSec, covers: [] };
+function item(value: string): GroupValueItem {
+  return {
+    value,
+    sortKey: value,
+    lastAddedAt: "2026-01-01T00:00:00.000Z",
+    lastPlayedAt: null,
+    count: 1,
+    durationSec: 0,
+    covers: [],
+  };
 }
 
-describe("sortGroupValueItems", () => {
-  it("count 降順（既定）で並べる", () => {
-    const items = [item("b", 1, 0), item("a", 3, 0), item("c", 2, 0)];
-    const sorted = sortGroupValueItems(items, DEFAULT_GROUP_VALUE_SORT);
-    expect(sorted.map((i) => i.value)).toEqual(["a", "c", "b"]);
+describe("値の並びの語彙", () => {
+  it("メニューは8種で、向きは ID に含まれる", () => {
+    expect(GROUP_SORT_OPTIONS.map((option) => option.id)).toEqual([
+      "count-desc",
+      "count-asc",
+      "name-asc",
+      "name-desc",
+      "duration-desc",
+      "duration-asc",
+      "added-desc",
+      "last-played",
+    ]);
+    expect(groupSortColumn("name-desc")).toBe("name");
+    expect(groupSortDirection("name-desc")).toBe("desc");
+    expect(groupSortDirection("count-asc")).toBe("asc");
   });
 
-  it("name 昇順は既定実装で表示名（value）の単純比較になる", () => {
-    const items = [item("う", 1, 0), item("あ", 1, 0), item("い", 1, 0)];
-    const sorted = sortGroupValueItems(items, { key: "name", direction: "asc" });
-    expect(sorted.map((i) => i.value)).toEqual(["あ", "い", "う"]);
-  });
-
-  it("duration 降順で並べる", () => {
-    const items = [item("a", 1, 10), item("b", 1, 30), item("c", 1, 20)];
-    const sorted = sortGroupValueItems(items, { key: "duration", direction: "desc" });
-    expect(sorted.map((i) => i.value)).toEqual(["b", "c", "a"]);
-  });
-
-  it("count 昇順で並べる（direction反転）", () => {
-    const items = [item("b", 3, 0), item("a", 1, 0), item("c", 2, 0)];
-    const sorted = sortGroupValueItems(items, { key: "count", direction: "asc" });
-    expect(sorted.map((i) => i.value)).toEqual(["a", "c", "b"]);
+  it("最近追加・最近再生は列を持たない", () => {
+    expect(groupSortColumn("added-desc")).toBeNull();
+    expect(groupSortColumn("last-played")).toBeNull();
+    expect(isNameSort("added-desc")).toBe(false);
   });
 });
 
-describe("toggleGroupValueSort（list 列見出しクリック）", () => {
+describe("toggleGroupSortColumn（list 列見出しクリック）", () => {
   it("同じ列を再クリックすると昇順降順が反転する", () => {
-    const first = toggleGroupValueSort({ key: "count", direction: "desc" }, "count");
-    expect(first).toEqual({ key: "count", direction: "asc" });
-    const second = toggleGroupValueSort(first, "count");
-    expect(second).toEqual({ key: "count", direction: "desc" });
+    expect(toggleGroupSortColumn("count-desc", "count")).toBe("count-asc");
+    expect(toggleGroupSortColumn("count-asc", "count")).toBe("count-desc");
   });
 
-  it("別の列をクリックすると既定の向きへ切り替わる（nameは昇順、count/durationは降順）", () => {
-    expect(toggleGroupValueSort({ key: "count", direction: "asc" }, "name")).toEqual({
-      key: "name",
-      direction: "asc",
-    });
-    expect(toggleGroupValueSort({ key: "name", direction: "asc" }, "duration")).toEqual({
-      key: "duration",
-      direction: "desc",
-    });
+  it("別の列（最近追加・最近再生からを含む）は既定の向きで選ぶ（nameは昇順、count/durationは降順）", () => {
+    expect(toggleGroupSortColumn("count-asc", "name")).toBe("name-asc");
+    expect(toggleGroupSortColumn("name-asc", "duration")).toBe("duration-desc");
+    expect(toggleGroupSortColumn("last-played", "count")).toBe("count-desc");
+    expect(toggleGroupSortColumn("added-desc", "name")).toBe("name-asc");
   });
 });
 
-describe("selectGroupValueSortKey（ソートメニュー選択）", () => {
-  it("別のキーを選ぶと既定の向きへ切り替わる", () => {
-    expect(selectGroupValueSortKey({ key: "count", direction: "desc" }, "name")).toEqual({
-      key: "name",
-      direction: "asc",
-    });
+describe("buildGroupValueDisplayRows", () => {
+  it("サーバーが並べた順をそのまま見せる（入れ子の値が無ければ名前順でも並べ替えない）", () => {
+    const rows = buildGroupValueDisplayRows([item("う"), item("あ"), item("い")], "", "name-asc");
+    expect(rows.map((row) => row.label)).toEqual(["う", "あ", "い"]);
   });
 
-  it("同じキーを選んでも向きは変わらない（メニューはトグルしない）", () => {
-    const current = { key: "count", direction: "asc" } as const;
-    expect(selectGroupValueSortKey(current, "count")).toEqual(current);
+  it("入れ子の値は名前順のときだけ階層にする", () => {
+    const items = [item("cv/a"), item("cv/b")];
+    expect(buildGroupValueDisplayRows(items, "", "name-asc").map((row) => row.kind)).toEqual([
+      "heading",
+      "value",
+      "value",
+    ]);
+    expect(buildGroupValueDisplayRows(items, "", "count-desc").map((row) => row.label)).toEqual([
+      "cv/a",
+      "cv/b",
+    ]);
   });
 });

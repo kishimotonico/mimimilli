@@ -29,6 +29,8 @@ function renderGroupValueList(
     <JotaiProvider store={store}>
       <GroupValueList
         groupBy={CV}
+        sort="count-desc"
+        onSortChange={vi.fn()}
         groupValueItems={[]}
         tagPrefixes={[]}
         onSelectValue={vi.fn()}
@@ -127,31 +129,39 @@ describe("GroupValueList list 表示（ADR-0012 §5）", () => {
     sizeMock.restore();
   });
 
-  it("列見出しクリックでソートが切り替わり、再クリックで昇順降順が反転する", async () => {
+  it("列見出しクリックは切り替え後の並びを onSortChange へ渡す（件数降順なら、件数は反転・名前は昇順）", async () => {
     const sizeMock = mockElementSize(600, 600);
     const user = userEvent.setup();
+    const onSortChange = vi.fn();
+    renderGroupValueList({ groupValueItems: [makeItem({ value: "a" })], onSortChange });
+    await flushVirtualizer();
+
+    await user.click(screen.getByRole("button", { name: /名前/ }));
+    expect(onSortChange).toHaveBeenLastCalledWith("name-asc");
+
+    await user.click(screen.getByRole("button", { name: /件数/ }));
+    expect(onSortChange).toHaveBeenLastCalledWith("count-asc");
+
+    await user.click(screen.getByRole("button", { name: /総時間/ }));
+    expect(onSortChange).toHaveBeenLastCalledWith("duration-desc");
+    sizeMock.restore();
+  });
+
+  it("行はサーバーが返した順のまま並ぶ", async () => {
+    const sizeMock = mockElementSize(600, 600);
     renderGroupValueList({
+      sort: "name-desc",
       groupValueItems: [
-        makeItem({ value: "b", count: 1 }),
-        makeItem({ value: "a", count: 3 }),
-        makeItem({ value: "c", count: 2 }),
+        makeItem({ value: "c" }),
+        makeItem({ value: "a" }),
+        makeItem({ value: "b" }),
       ],
     });
     await flushVirtualizer();
 
-    const getOrder = () =>
-      Array.from(document.querySelectorAll(".mll-vrow__nm")).map((el) => el.textContent);
-
-    // 既定は件数降順
-    expect(getOrder()).toEqual(["a", "c", "b"]);
-
-    await user.click(screen.getByRole("button", { name: /名前/ }));
-    await flushVirtualizer();
-    expect(getOrder()).toEqual(["a", "b", "c"]);
-
-    await user.click(screen.getByRole("button", { name: /名前/ }));
-    await flushVirtualizer();
-    expect(getOrder()).toEqual(["c", "b", "a"]);
+    expect(
+      Array.from(document.querySelectorAll(".mll-vrow__nm")).map((el) => el.textContent),
+    ).toEqual(["c", "a", "b"]);
     sizeMock.restore();
   });
 
@@ -361,6 +371,8 @@ describe("GroupValueList コンテキスト検索（ADR-0012 §6）", () => {
       <JotaiProvider store={store}>
         <GroupValueList
           groupBy={CV}
+          sort="count-desc"
+          onSortChange={vi.fn()}
           groupValueItems={[makeItem({ value: "藤田茜" })]}
           tagPrefixes={[]}
           onSelectValue={vi.fn()}
@@ -377,6 +389,8 @@ describe("GroupValueList コンテキスト検索（ADR-0012 §6）", () => {
       <JotaiProvider store={store}>
         <GroupValueList
           groupBy={CIRCLE}
+          sort="count-desc"
+          onSortChange={vi.fn()}
           groupValueItems={[makeItem({ value: "夜想曲" })]}
           tagPrefixes={[]}
           onSelectValue={vi.fn()}

@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { NO_AUTOFILL_PROPS } from "../../../shared/ui/noAutofill";
-import { useAtom } from "jotai";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
-import type { GroupBy, GroupValueItem } from "@mimimilli/shared";
+import type { GroupBy, GroupSortId, GroupValueItem } from "@mimimilli/shared";
 import {
-  GROUP_VALUE_SORT_OPTIONS,
-  toggleGroupValueSort,
-  type GroupValueSortState,
+  GROUP_SORT_COLUMNS,
+  getGroupSortLabel,
+  groupSortColumn,
+  groupSortDirection,
+  toggleGroupSortColumn,
+  type GroupSortColumn,
 } from "../model/groupValueSort";
-import { groupValueSortAtom } from "../model/atoms";
 import { groupByKey } from "../../../entities/smart-folder/groupByKey";
 import { buildGroupValueDisplayRows } from "../model/groupValueDisplayRows";
 import { isGroupValueRowArrowKey } from "../model/groupValueRowNav";
@@ -18,7 +19,7 @@ import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { useGroupValueListNav } from "./useGroupValueListNav";
 
 // サイドバーのクイックオーバーレイ・「＋絞り込み」・チップの兄弟値ドロップダウン
-// が共有する簡易値リスト。データ取得・フィルタ・ソートは値一覧本体
+// が共有する簡易値リスト。データ取得・フィルタ・並びの規則は値一覧本体
 // （GroupValueList / groupValueFilter / groupValueSort / groupValueHierarchy）と同じロジックを
 // 使い回し、描画だけを簡易化する（コラージュは持たない）。CV・サークルは数百〜数千件に
 // なりうるため、値一覧本体（GroupValueRows）と同じ @tanstack/react-virtual で仮想化する
@@ -40,6 +41,9 @@ interface GroupValueQuickListProps {
    *  検索欄へフォーカスし直すため、groupBy 単体ではなくこの値の変化も見る */
   isOpen: boolean;
   items: GroupValueItem[];
+  /** 今の並び。サーバーがこの順で返す。開いている間だけの一時状態で、保存はしない */
+  sort: GroupSortId;
+  onSortChange: (sort: GroupSortId) => void;
   isLoading?: boolean;
   isError?: boolean;
   isSelected: (tag: string) => boolean;
@@ -54,8 +58,8 @@ interface GroupValueQuickListProps {
 }
 
 interface SortMenuProps {
-  sort: GroupValueSortState;
-  onToggle: (id: (typeof GROUP_VALUE_SORT_OPTIONS)[number]["id"]) => void;
+  sort: GroupSortId;
+  onToggle: (column: GroupSortColumn) => void;
 }
 
 /** ソート切替メニュー。height:0↔auto の collapse で開閉する。
@@ -69,9 +73,10 @@ function SortMenu({ sort, onToggle }: SortMenuProps) {
     <motion.div style={{ overflow: "hidden" }} inert={!isPresent} {...v}>
       {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- ソート切替はボタン列で表現する */}
       <div className="mll-qlist__sort" role="group" aria-label="並び替え">
-        {GROUP_VALUE_SORT_OPTIONS.map((opt) => {
-          const isActive = sort.key === opt.id;
-          const directionLabel = isActive ? (sort.direction === "asc" ? "昇順" : "降順") : null;
+        {GROUP_SORT_COLUMNS.map((opt) => {
+          const isActive = groupSortColumn(sort) === opt.id;
+          const direction = groupSortDirection(sort);
+          const directionLabel = isActive ? (direction === "asc" ? "昇順" : "降順") : null;
           return (
             <button
               key={opt.id}
@@ -83,7 +88,7 @@ function SortMenu({ sort, onToggle }: SortMenuProps) {
             >
               {opt.label}
               {isActive && (
-                <span className={`chev ${sort.direction === "asc" ? "is-asc" : ""}`}>
+                <span className={`chev ${direction === "asc" ? "is-asc" : ""}`}>
                   <I.chevD size={11} />
                 </span>
               )}
@@ -100,6 +105,8 @@ export default function GroupValueQuickList({
   groupByLabel,
   isOpen,
   items,
+  sort,
+  onSortChange,
   isLoading,
   isError,
   isSelected,
@@ -110,7 +117,6 @@ export default function GroupValueQuickList({
 }: GroupValueQuickListProps) {
   const groupKey = groupByKey(groupBy);
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useAtom(groupValueSortAtom);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const sortToggleRef = useRef<HTMLButtonElement>(null);
@@ -125,10 +131,10 @@ export default function GroupValueQuickList({
     setSortMenuOpen(false);
   }, [groupKey, isOpen]);
 
-  const currentSortLabel = GROUP_VALUE_SORT_OPTIONS.find((opt) => opt.id === sort.key)?.label ?? "";
+  const currentSortLabel = getGroupSortLabel(sort);
 
   const rows = buildGroupValueDisplayRows(items, query, sort);
-  const resetKey = `${groupKey}:${sort.key}:${sort.direction}:${query}`;
+  const resetKey = `${groupKey}:${sort}:${query}`;
 
   const {
     scrollRef,
@@ -218,7 +224,7 @@ export default function GroupValueQuickList({
           <SortMenu
             key="sort-menu"
             sort={sort}
-            onToggle={(id) => setSort(toggleGroupValueSort(sort, id))}
+            onToggle={(column) => onSortChange(toggleGroupSortColumn(sort, column))}
           />
         )}
       </AnimatePresence>

@@ -1,7 +1,12 @@
 import { useCallback } from "react";
-import type { GroupValueItem } from "@mimimilli/shared";
-import type { GroupValueSortKey, GroupValueSortState } from "../model/groupValueSort";
-import { GROUP_VALUE_SORT_OPTIONS, toggleGroupValueSort } from "../model/groupValueSort";
+import type { GroupSortId, GroupValueItem } from "@mimimilli/shared";
+import {
+  GROUP_SORT_COLUMNS,
+  groupSortColumn,
+  groupSortDirection,
+  toggleGroupSortColumn,
+  type GroupSortColumn,
+} from "../model/groupValueSort";
 import type { GroupValueHierarchyRow } from "../model/groupValueHierarchy";
 import { isGroupValueRowArrowKey } from "../model/groupValueRowNav";
 import { formatDuration } from "../../../shared/lib/format";
@@ -16,7 +21,7 @@ const ROW_COLLAGE_SIZE = 32;
 const INDENT_PER_DEPTH = 14;
 
 // 値一覧の list 表示（ADR-0012 §5）。2×2コラージュ(32px)/名前/件数/総時間 の列を持つ行。
-// 列見出しクリックはソートメニューと同じ GroupValueSortState への別入口（groupValueSort.ts）。
+// 列見出しクリックはソートメニューと同じ今の値の並びを変える（groupValueSort.ts）。最近追加・最近再生のときはどの列も選択表示にしない。
 // 入れ子タグ（名前順ソート時のみ）は groupValueHierarchy.ts の階層行を depth ぶんインデントし、
 // 実タグとして存在しない中間ノードは選択不可の見出し行として描画する。
 
@@ -29,8 +34,8 @@ const LIST_PADDING_END = 4;
 interface GroupValueRowsProps {
   groupByLabel: string;
   rows: GroupValueHierarchyRow[];
-  sort: GroupValueSortState;
-  onSortChange: (sort: GroupValueSortState) => void;
+  sort: GroupSortId;
+  onSortChange: (sort: GroupSortId) => void;
   fallbackIcon: IconName;
   /** グループ分け・並び順・検索語が変わったらスクロール位置をリセットするための key */
   resetKey: string;
@@ -47,25 +52,26 @@ function SortHeaderButton({
   sort,
   onSortChange,
 }: {
-  sortKey: GroupValueSortKey;
+  sortKey: GroupSortColumn;
   label: string;
   align: "start" | "end";
-  sort: GroupValueSortState;
-  onSortChange: (sort: GroupValueSortState) => void;
+  sort: GroupSortId;
+  onSortChange: (sort: GroupSortId) => void;
 }) {
-  const isActive = sort.key === sortKey;
-  const directionLabel = isActive ? (sort.direction === "asc" ? "昇順" : "降順") : null;
+  const isActive = groupSortColumn(sort) === sortKey;
+  const direction = groupSortDirection(sort);
+  const directionLabel = isActive ? (direction === "asc" ? "昇順" : "降順") : null;
   return (
     <button
       type="button"
       className={`mll-vlist-hd__sort ${isActive ? "is-active" : ""}`}
       style={align === "start" ? { justifyContent: "flex-start" } : undefined}
       aria-label={directionLabel ? `${label}（${directionLabel}）` : label}
-      onClick={() => onSortChange(toggleGroupValueSort(sort, sortKey))}
+      onClick={() => onSortChange(toggleGroupSortColumn(sort, sortKey))}
     >
       {label}
       {isActive && (
-        <span className={`chev ${sort.direction === "asc" ? "is-asc" : ""}`}>
+        <span className={`chev ${direction === "asc" ? "is-asc" : ""}`}>
           <I.chevD size={11} />
         </span>
       )}
@@ -115,7 +121,7 @@ export default function GroupValueRows({
     <>
       <div className="mll-vlist-hd">
         <span aria-hidden="true" />
-        {GROUP_VALUE_SORT_OPTIONS.map((opt) => (
+        {GROUP_SORT_COLUMNS.map((opt) => (
           <SortHeaderButton
             key={opt.id}
             sortKey={opt.id}

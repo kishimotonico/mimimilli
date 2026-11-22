@@ -3,6 +3,7 @@ import { appRouteAction, appRouteCorrection } from "../../navigation/model/appRo
 import { libraryPlaceAtom } from "./navigationAtoms";
 import {
   addLibraryTag,
+  clearLibraryGroupSort,
   clearLibrarySort,
   isSamePlace,
   reenterLibraryFolder,
@@ -20,6 +21,7 @@ import {
   searchLibraryInAll,
   selectLibraryGroupValue,
   selectLibraryWork,
+  setLibraryGroupSort,
   setLibrarySearchQuery,
   setLibrarySort,
   showLibraryWork,
@@ -35,6 +37,7 @@ export const removeLibraryTagAtom = appRouteAction(removeLibraryTag);
 export const clearLibraryTagsAtom = appRouteAction(clearLibraryTags);
 export const selectLibraryWorkAtom = appRouteAction(selectLibraryWork);
 export const setLibrarySortAtom = appRouteAction(setLibrarySort);
+export const setLibraryGroupSortAtom = appRouteAction(setLibraryGroupSort);
 export const reshuffleLibrarySeedAtom = appRouteAction(reshuffleLibrarySeed);
 export const setLibrarySearchQueryAtom = appRouteAction(setLibrarySearchQuery);
 export const searchLibraryInAllAtom = appRouteAction(searchLibraryInAll);
@@ -54,5 +57,6 @@ export const settleLibraryFolderAtom = atom(
 );
 export const normalizeLibraryFolderAtom = appRouteCorrection(normalizeLibraryFolder);
 export const clearLibrarySortAtom = appRouteCorrection(clearLibrarySort);
+export const clearLibraryGroupSortAtom = appRouteCorrection(clearLibraryGroupSort);
 /** 選択中の作品が絞り込みから外れた・存在しないときの選択解除 */
 export const deselectLibraryWorkAtom = appRouteCorrection(deselectLibraryWork);

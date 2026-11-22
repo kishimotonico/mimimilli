@@ -3,7 +3,7 @@
 // このフック自体は素通しするだけ。
 
 import { createElement, type ReactNode } from "react";
-import type { GroupBy } from "@mimimilli/shared";
+import type { GroupBy, GroupSortId } from "@mimimilli/shared";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,13 +20,22 @@ function wrapperFor(queryClient: QueryClient) {
     createElement(QueryClientProvider, { client: queryClient }, children);
 }
 
-function renderGroupValues(groupBy: GroupBy | null, scope: GroupValueScope) {
+function renderGroupValues(
+  groupBy: GroupBy | null,
+  scope: GroupValueScope,
+  groupSort: GroupSortId | null = "count-desc",
+) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return renderHook(
-    ({ groupBy, scope }: { groupBy: GroupBy | null; scope: GroupValueScope }) =>
-      useGroupValuesQuery(groupBy, scope),
-    { wrapper: wrapperFor(queryClient), initialProps: { groupBy, scope } },
+    ({ groupBy, scope, groupSort }: Props) => useGroupValuesQuery(groupBy, scope, groupSort),
+    { wrapper: wrapperFor(queryClient), initialProps: { groupBy, scope, groupSort } },
   );
+}
+
+interface Props {
+  groupBy: GroupBy | null;
+  scope: GroupValueScope;
+  groupSort: GroupSortId | null;
 }
 
 describe("useGroupValuesQuery のスコープ素通し", () => {
@@ -88,6 +97,31 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
     ]);
   });
 
+  it("値の並びは要求に含め、変わると別クエリとして取り直す", async () => {
+    const { result, rerender } = renderGroupValues(
+      { kind: "prefix", prefix: "cv" },
+      { folderId: "by-cv" },
+      "name-asc",
+    );
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(api.requestsTo(KEY)[0]?.body).toMatchObject({ groupSort: "name-asc" });
+
+    rerender({
+      groupBy: { kind: "prefix", prefix: "cv" },
+      scope: { folderId: "by-cv" },
+      groupSort: "last-played",
+    });
+
+    await waitFor(() => expect(api.requestsTo(KEY)).toHaveLength(2));
+    expect(api.requestsTo(KEY)[1]?.body).toMatchObject({ groupSort: "last-played" });
+  });
+
+  it("値の並びが null のときは取得しない", () => {
+    renderGroupValues({ kind: "prefix", prefix: "cv" }, { folderId: "by-cv" }, null);
+
+    expect(api.requestsTo(KEY)).toHaveLength(0);
+  });
+
   it("groupBy が null のときは取得しない", () => {
     renderGroupValues(null, { folderId: "all" });
 
@@ -98,7 +132,7 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const { result, rerender } = renderHook(
       ({ scope }: { scope: GroupValueScope }) =>
-        useGroupValuesQuery({ kind: "prefix", prefix: "cv" }, scope),
+        useGroupValuesQuery({ kind: "prefix", prefix: "cv" }, scope, "count-desc"),
       {
         wrapper: wrapperFor(queryClient),
         initialProps: { scope: { folderId: "all" } as GroupValueScope },

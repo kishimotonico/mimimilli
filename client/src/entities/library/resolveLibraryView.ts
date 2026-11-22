@@ -5,6 +5,7 @@ import {
   ALL_SMART_FOLDER_ID,
   type Condition,
   type GroupBy,
+  type GroupSortId,
   type NormalizedTag,
   type SmartFolder,
   type SortId,
@@ -35,6 +36,10 @@ export type ResolvedLibraryView =
       kind: "value-list";
       condition: Condition;
       groupBy: GroupBy;
+      /** 解決済みの値の並び（今の並び → フォルダーの既定） */
+      groupSort: GroupSortId;
+      /** 今の並びが既定から外れているか（「この並びを既定にする」を出すか） */
+      groupSortDeviates: boolean;
       breadcrumb: string[];
     })
   /** 開けない。folder: 行が読めない／sort: 「すべて」の並びを継承するが、その並びが読めない */
@@ -58,7 +63,17 @@ export function resolveLibraryView(
 
   const groupBy = folder.groupBy;
   if (groupBy !== null && library.group === null) {
-    return { folder, kind: "value-list", condition, groupBy, breadcrumb: [folder.name] };
+    // グループ分けのある行は値の並びも必ず持つ（保存時に検証される）
+    const defaultGroupSort = folder.groupSort!;
+    return {
+      folder,
+      kind: "value-list",
+      condition,
+      groupBy,
+      groupSort: library.groupSort ?? defaultGroupSort,
+      groupSortDeviates: library.groupSort !== null && library.groupSort !== defaultGroupSort,
+      breadcrumb: [folder.name],
+    };
   }
 
   const defaultSort = folder.sort ?? all?.sort ?? null;

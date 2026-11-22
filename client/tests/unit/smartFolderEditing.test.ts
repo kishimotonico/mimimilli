@@ -90,9 +90,28 @@ describe("追加・複製", () => {
     const byYear = defaultSmartFolders().find((folder) => folder.id === "by-year")!;
     const copy = duplicateDraft({ ...byYear, condition: byYear.condition! });
     expect(copy.groupSort).toBe("name-desc");
-    expect(withGroupBy(copy, { kind: "tag" }).groupSort).toBe("count-desc");
-    expect(withGroupBy(copy, { kind: "addedYear" }).groupSort).toBe("name-desc");
-    expect(withGroupBy(copy, null)).toMatchObject({ groupBy: null, groupSort: null });
+    expect(withGroupBy(copy, { kind: "tag" }, copy).groupSort).toBe("count-desc");
+    expect(withGroupBy(copy, { kind: "addedYear" }, copy).groupSort).toBe("name-desc");
+    expect(withGroupBy(copy, null, copy)).toMatchObject({ groupBy: null, groupSort: null });
+  });
+
+  it("別のグループ分けへ切り替えて開いたときのグループ分けへ戻すと、保存済みの値の並びに戻る", () => {
+    const initial = {
+      groupBy: { kind: "prefix", prefix: "cv" } as const,
+      groupSort: "last-played" as const,
+    };
+    const draft = { ...duplicateDraft(defaultSmartFolders()[0] as never), ...initial };
+
+    const toYear = withGroupBy(draft, { kind: "addedYear" }, initial);
+    expect(toYear.groupSort).toBe("name-desc");
+
+    const back = withGroupBy(toYear, { kind: "prefix", prefix: "cv" }, initial);
+    expect(back.groupSort).toBe("last-played");
+
+    const none = withGroupBy(back, null, initial);
+    expect(withGroupBy(none, { kind: "prefix", prefix: "cv" }, initial).groupSort).toBe(
+      "last-played",
+    );
   });
 
   it("グループ分けの選択肢は定義済みの prefix 全部・タグ・追加年で、ラベルは getGroupByLabel と同じ", () => {

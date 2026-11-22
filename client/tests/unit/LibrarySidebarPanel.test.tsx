@@ -216,6 +216,32 @@ describe("LibrarySidebarPanel", () => {
     });
   });
 
+  it("クイックオーバーレイはそのフォルダーの保存済みの値の並びで開き、列見出しでの変更は開いている間だけの一時状態", async () => {
+    const api = mockApi({
+      "POST /api/smart-folders/:id/groups": [buildGroupValueItem({ value: "2025", count: 3 })],
+    });
+    renderSidebar({});
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "追加年別" }), { key: "ArrowRight" });
+    await waitFor(() =>
+      expect(api.requestsTo("POST /api/smart-folders/:id/groups")).toHaveLength(1),
+    );
+    expect(api.requestsTo("POST /api/smart-folders/:id/groups")[0]?.body).toMatchObject({
+      groupSort: "name-desc",
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /^並び替え/ }));
+    await userEvent.click(screen.getByRole("button", { name: "件数" }));
+
+    await waitFor(() =>
+      expect(api.requestsTo("POST /api/smart-folders/:id/groups")).toHaveLength(2),
+    );
+    expect(api.requestsTo("POST /api/smart-folders/:id/groups")[1]?.body).toMatchObject({
+      groupSort: "count-desc",
+    });
+    expect(api.requestsTo("PUT /api/smart-folders/:id/group-sort")).toHaveLength(0);
+  });
+
   it("オーバーレイ閉鎖（退出）中も値一覧が空にならない", async () => {
     mockApi({
       "POST /api/smart-folders/:id/groups": [buildGroupValueItem({ value: "藤田茜", count: 3 })],

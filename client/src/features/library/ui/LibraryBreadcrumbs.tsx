@@ -36,6 +36,7 @@ export default function LibraryBreadcrumbs() {
             placement="below"
             folderId={view.folder.id}
             groupBy={groupBy}
+            groupSort={view.folder.groupSort!}
             groupByLabel={getGroupByLabel(groupBy, tagPrefixes)}
             anchorEl={siblingAnchor}
             selectedValue={group}

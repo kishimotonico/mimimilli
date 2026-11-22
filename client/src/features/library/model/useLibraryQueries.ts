@@ -76,10 +76,12 @@ export function useLibraryDebouncedSearchQuery(searchQuery: string) {
 /** 開いているスマートフォルダー自身の値一覧（グループ分け）。サイドバーのクイックオーバーレイ・
  *  パンくずの兄弟値と同じ母集団（絞り込み無し）なので、同じ query を共有する */
 export function useFolderGroupValuesQuery(view: ResolvedLibraryView) {
-  const groupBy = view.kind === "value-list" ? view.groupBy : null;
-  return useGroupValuesQuery(groupBy, {
-    folderId: view.folder.id,
-  });
+  const valueList = view.kind === "value-list" ? view : null;
+  return useGroupValuesQuery(
+    valueList?.groupBy ?? null,
+    { folderId: view.folder.id },
+    valueList?.groupSort ?? null,
+  );
 }
 
 /**

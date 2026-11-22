@@ -233,6 +233,7 @@ export default function LibrarySidebarPanel({
             placement="right"
             folderId={overlayFolder.id}
             groupBy={overlayGroupBy}
+            groupSort={overlayFolder.groupSort!}
             groupByLabel={getGroupByLabel(overlayGroupBy, tagPrefixes)}
             anchorEl={openAnchorEl}
             selectedValue={overlayFolder.id === activeFolderId ? activeGroup : null}

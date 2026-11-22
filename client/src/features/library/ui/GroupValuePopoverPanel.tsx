@@ -1,6 +1,6 @@
 import { motion, useIsPresent } from "motion/react";
-import type { CSSProperties } from "react";
-import type { GroupBy, GroupValueItem } from "@mimimilli/shared";
+import { useState, type CSSProperties } from "react";
+import type { GroupBy, GroupSortId, GroupValueItem } from "@mimimilli/shared";
 import { useGroupValuesQuery, type GroupValueScope } from "../model/useGroupValuesQuery";
 import GroupValueQuickList from "./GroupValueQuickList";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
@@ -26,6 +26,8 @@ interface GroupValuePopoverPanelProps {
   groupByLabel: string;
   /** 候補を数える母集団 */
   scope: GroupValueScope;
+  /** 開いたときの値の並び。列見出しでの変更は開いている間だけ有効な一時状態 */
+  initialGroupSort: GroupSortId;
   placement: keyof typeof GROUP_VALUE_PLACEMENTS;
   setFloating: AnchoredPopoverFloatingRefCallback;
   floatingStyles: CSSProperties;
@@ -41,6 +43,7 @@ export default function GroupValuePopoverPanel({
   groupBy,
   groupByLabel,
   scope,
+  initialGroupSort,
   placement,
   setFloating,
   floatingStyles,
@@ -51,7 +54,8 @@ export default function GroupValuePopoverPanel({
   close,
 }: GroupValuePopoverPanelProps) {
   const isPresent = useIsPresent();
-  const groupValuesQuery = useGroupValuesQuery(groupBy, scope);
+  const [groupSort, setGroupSort] = useState(initialGroupSort);
+  const groupValuesQuery = useGroupValuesQuery(groupBy, scope, groupSort);
   const { popoverScale } = useMotionVariants();
   const { position, origin } = GROUP_VALUE_PLACEMENTS[placement];
   const variant = popoverScale({ origin });
@@ -70,6 +74,8 @@ export default function GroupValuePopoverPanel({
         groupByLabel={groupByLabel}
         isOpen={isPresent}
         items={groupValuesQuery.data ?? []}
+        sort={groupSort}
+        onSortChange={setGroupSort}
         isLoading={groupValuesQuery.isLoading}
         isError={groupValuesQuery.isError}
         isSelected={isSelected}

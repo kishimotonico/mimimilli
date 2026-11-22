@@ -10,6 +10,7 @@ import {
   isBrokenSmartFolder,
   isReadableSmartFolder,
   type SmartFolder,
+  type GroupSortId,
   type SmartFolderWrite,
   type SortId,
 } from "@mimimilli/shared";
@@ -21,6 +22,7 @@ import {
   reorderSmartFolders,
   restoreSmartFolder,
   updateSmartFolder,
+  updateSmartFolderGroupSort,
   updateSmartFolderSort,
 } from "../../../entities/smart-folder/api";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
@@ -39,6 +41,8 @@ export interface SmartFolderEditor {
   update: (id: string, data: SmartFolderWrite, failureMessage?: string) => Promise<boolean>;
   /** 既定の並びだけを変える。定義の結果は変わらないので、作品・値の一覧は取り直さない */
   saveDefaultSort: (id: string, sort: SortId) => Promise<boolean>;
+  /** 値一覧の既定の並びだけを変える。作品・値の一覧は取り直さない（並びは要求に含まれる） */
+  saveDefaultGroupSort: (id: string, groupSort: GroupSortId) => Promise<boolean>;
   /** 削除して「元に戻す」を出す。開いている（保持しているものも含む）なら「すべて」へ置き換えで移る */
   remove: (folder: SmartFolder) => Promise<void>;
 }
@@ -189,6 +193,10 @@ export function useSmartFolderEditor(): SmartFolderEditor {
       saveDefaultSort: async (id, sort) =>
         (await commit("並びを既定にできませんでした", "folders", () =>
           updateSmartFolderSort(id, sort),
+        )) !== null,
+      saveDefaultGroupSort: async (id, groupSort) =>
+        (await commit("値の並びを既定にできませんでした", "folders", () =>
+          updateSmartFolderGroupSort(id, groupSort),
         )) !== null,
       remove: async (folder) => {
         await commit(

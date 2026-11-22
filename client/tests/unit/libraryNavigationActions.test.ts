@@ -26,6 +26,8 @@ import {
   selectLibraryGroupValueAtom,
   selectLibraryWorkAtom,
   setLibrarySearchQueryAtom,
+  setLibraryGroupSortAtom,
+  clearLibraryGroupSortAtom,
   setLibrarySortAtom,
 } from "../../src/entities/library/model/navigationActions";
 
@@ -547,6 +549,47 @@ describe("0件時の「すべて」で探す（searchLibraryInAllAtom）", () =>
     });
     expect(lib(store).seed).not.toBe(3);
     expect(pendingWrites(store)).toEqual(["push"]);
+  });
+});
+
+describe("今の値の並び", () => {
+  it("setLibraryGroupSortAtom は今の値の並びを replace で書き、同じ並びなら何もしない", () => {
+    const store = setup({ folderId: "by-cv" });
+    clearPendingOps(store);
+
+    store.set(setLibraryGroupSortAtom, "name-asc");
+    expect(lib(store).groupSort).toBe("name-asc");
+    expect(pendingWrites(store)).toEqual(["replace"]);
+
+    clearPendingOps(store);
+    store.set(setLibraryGroupSortAtom, "name-asc");
+    expect(pendingWrites(store)).toEqual([]);
+  });
+
+  it("サイドバーから入り直すと今の値の並びは既定に戻り、値を選んで戻っても保たれる", () => {
+    const store = setup({ folderId: "by-cv", groupSort: "last-played", sort: "title-asc" });
+
+    store.set(selectLibraryGroupValueAtom, "藤田茜", folders);
+    expect(lib(store)).toMatchObject({ group: "藤田茜", groupSort: "last-played" });
+
+    store.set(backToLibraryValueListAtom, folders);
+    expect(lib(store)).toMatchObject({ group: null, groupSort: "last-played" });
+
+    store.set(openLibraryFolderAtom, "by-cv");
+    expect(lib(store).groupSort).toBeNull();
+    expect(lib(store).sort).toBeNull();
+  });
+
+  it("clearLibraryGroupSortAtom は保存を始めたときと同じフォルダー・同じ並びのときだけ今の並びを外す", () => {
+    const store = setup({ folderId: "by-cv", groupSort: "name-asc" });
+
+    store.set(clearLibraryGroupSortAtom, { folderId: "by-circle", groupSort: "name-asc" });
+    expect(lib(store).groupSort).toBe("name-asc");
+    store.set(clearLibraryGroupSortAtom, { folderId: "by-cv", groupSort: "count-asc" });
+    expect(lib(store).groupSort).toBe("name-asc");
+
+    store.set(clearLibraryGroupSortAtom, { folderId: "by-cv", groupSort: "name-asc" });
+    expect(lib(store).groupSort).toBeNull();
   });
 });
 

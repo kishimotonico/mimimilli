@@ -11,7 +11,6 @@ import LibrarySortMenu from "../../src/features/library/ui/LibrarySortMenu";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import { LibraryNavigationContext } from "../../src/features/library/model/libraryNavigationContext";
 import { libraryRouteAtom } from "../../src/entities/library/model/navigationAtoms";
-import { groupValueSortAtom } from "../../src/features/library/model/atoms";
 import { apiError, mockApi } from "../helpers/api";
 import { buildSmartFolder, defaultSmartFolders, seedSmartFolders } from "../helpers/smartFolders";
 import { seedLibraryRoute } from "../helpers/route";
@@ -20,11 +19,14 @@ import { buildNav } from "./fixtures/libraryNav";
 function renderSortMenu(options?: {
   folderId?: string;
   sort?: string | null;
+  groupSort?: string | null;
   folders?: SmartFolder[];
   put?: (id: string) => unknown;
 }) {
   const api = mockApi({
     "GET /api/smart-folders": options?.folders ?? defaultSmartFolders(),
+    "PUT /api/smart-folders/:id/group-sort": ({ params }) =>
+      buildSmartFolder({ id: params.id, name: "保存済み" }),
     "PUT /api/smart-folders/:id/sort": ({ params }) =>
       options?.put ? options.put(params.id) : buildSmartFolder({ id: params.id, name: "保存済み" }),
   });
@@ -32,6 +34,7 @@ function renderSortMenu(options?: {
   seedLibraryRoute(store, {
     folderId: options?.folderId ?? "all",
     sort: options && "sort" in options ? (options.sort as "added-desc" | null) : "added-desc",
+    groupSort: (options?.groupSort ?? null) as "count-desc" | null,
   });
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -166,36 +169,50 @@ describe("LibrarySortMenu", () => {
     expect(screen.queryByRole("menu", { name: "並び替え" })).not.toBeInTheDocument();
   });
 
-  it("値一覧では名前/件数/総時間のメニューを出し、groupValueSortAtomへ書き込む（ADR-0012帰結）", () => {
+  it("値一覧では8種の並びを出し、今の値の並びを route へ書く（作品の並びには影響しない）", () => {
     const { store } = renderSortMenu({ folderId: "by-cv", sort: "duration-desc" });
     const button = screen.getByRole("button", { name: "並び替え" });
 
     expect(button).toBeEnabled();
-    expect(button).toHaveAttribute("title", "並び替え: 件数");
+    expect(button).toHaveAttribute("title", "並び替え: 件数（多い順）");
 
     fireEvent.click(button);
     const menu = screen.getByRole("menu", { name: "並び替え" });
-    expect(within(menu).getByRole("menuitemradio", { name: "名前" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitemradio", { name: "件数" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitemradio", { name: "総時間" })).toBeInTheDocument();
+    expect(
+      within(menu)
+        .getAllByRole("menuitemradio")
+        .map((item) => item.textContent),
+    ).toEqual([
+      "件数（多い順）",
+      "件数（少ない順）",
+      "名前（あ→ん）",
+      "名前（ん→あ）",
+      "総時間（長い順）",
+      "総時間（短い順）",
+      "最近追加した順",
+      "最近再生した順",
+    ]);
+    expect(within(menu).getByRole("menuitemradio", { name: "件数（多い順）" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
     expect(within(menu).queryByRole("menuitemradio", { name: /タイトル/ })).not.toBeInTheDocument();
     expect(within(menu).queryByRole("menuitem", { name: /既定にする/ })).not.toBeInTheDocument();
 
-    fireEvent.click(within(menu).getByRole("menuitemradio", { name: "名前" }));
-    expect(store.get(groupValueSortAtom)).toEqual({ key: "name", direction: "asc" });
-    // 値一覧のソートは今の並びに影響しない
+    fireEvent.click(within(menu).getByRole("menuitemradio", { name: "名前（あ→ん）" }));
+    expect(store.get(libraryRouteAtom).groupSort).toBe("name-asc");
     expect(currentSort(store)).toBe("duration-desc");
   });
 
-  it("値一覧へ切り替えても、作品一覧へ戻ったときの今の並びは壊れない（二重state）", () => {
+  it("値一覧へ切り替えても、作品一覧へ戻ったときの今の並びは壊れない", () => {
     const { store } = renderSortMenu({ folderId: "all", sort: "duration-desc" });
 
     act(() => {
       seedLibraryRoute(store, { folderId: "by-cv" });
     });
     fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
-    fireEvent.click(screen.getByRole("menuitemradio", { name: "総時間" }));
-    expect(store.get(groupValueSortAtom)).toEqual({ key: "duration", direction: "desc" });
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "総時間（長い順）" }));
+    expect(store.get(libraryRouteAtom).groupSort).toBe("duration-desc");
     expect(currentSort(store)).toBe("duration-desc");
 
     act(() => {
@@ -205,6 +222,18 @@ describe("LibrarySortMenu", () => {
       "title",
       "並び替え: 再生時間（長い順）",
     );
+  });
+
+  it("値の並びが既定から外れているときだけ「この並びを既定にする」を出し、保存すると今の並びが外れる", async () => {
+    const { store, api } = renderSortMenu({ folderId: "by-cv", groupSort: "name-asc" });
+    fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "この並びを既定にする" }));
+
+    await waitFor(() => expect(store.get(libraryRouteAtom).groupSort).toBeNull());
+    const [request] = api.requestsTo("PUT /api/smart-folders/:id/group-sort");
+    expect(request?.params.id).toBe("by-cv");
+    expect(request?.body).toEqual({ groupSort: "name-asc" });
+    expect(api.requestsTo("PUT /api/smart-folders/:id/sort")).toHaveLength(0);
   });
 
   it("解決後の並びがランダムのときだけ「並べ直す」を表示し、押すとseedが変わる", () => {

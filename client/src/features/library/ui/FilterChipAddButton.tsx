@@ -1,6 +1,11 @@
 import { useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
-import type { GroupBy, NormalizedTag, TagPrefix } from "@mimimilli/shared";
+import {
+  defaultGroupSort,
+  type GroupBy,
+  type NormalizedTag,
+  type TagPrefix,
+} from "@mimimilli/shared";
 import {
   buildGroupByRows,
   getGroupByLabel,
@@ -131,6 +136,7 @@ export default function FilterChipAddButton({
             groupByLabel={getGroupByLabel(pickedGroupBy, tagPrefixes)}
             // 件数は現在の絞り込み込みの集計にする（「追加したら何件になるか」を示す）
             scope={scope}
+            initialGroupSort={defaultGroupSort(pickedGroupBy)}
             placement="below"
             floatingStyles={floatingStyles}
             setFloating={setFloating}

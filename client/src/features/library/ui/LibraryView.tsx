@@ -138,6 +138,8 @@ function LibraryViewBody({
             <div className="mll-results__content">
               <GroupValueList
                 groupBy={view.groupBy}
+                sort={view.groupSort}
+                onSortChange={nav.setGroupSort}
                 groupValueItems={groupValueItems}
                 tagPrefixes={tagPrefixes}
                 isGroupValuesLoading={isGroupValuesLoading}

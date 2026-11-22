@@ -54,6 +54,14 @@ export async function updateSmartFolderSort(id: string, sort: SortId | null): Pr
   return putParsed(smartFolderSchema, `${folderPath(id)}/sort`, { sort });
 }
 
+/** 値一覧の既定の並びだけを更新する。ほかの列は触らない */
+export async function updateSmartFolderGroupSort(
+  id: string,
+  groupSort: GroupSortId,
+): Promise<SmartFolder> {
+  return putParsed(smartFolderSchema, `${folderPath(id)}/group-sort`, { groupSort });
+}
+
 export async function deleteSmartFolder(id: string): Promise<void> {
   await deleteVoid(folderPath(id));
 }

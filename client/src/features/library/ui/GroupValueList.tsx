@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { NO_AUTOFILL_PROPS } from "../../../shared/ui/noAutofill";
-import { useAtom, useAtomValue } from "jotai";
-import type { GroupBy, GroupValueItem, TagPrefix } from "@mimimilli/shared";
+import { useAtomValue } from "jotai";
+import type { GroupBy, GroupSortId, GroupValueItem, TagPrefix } from "@mimimilli/shared";
 import { getGroupByIcon, getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
 import { groupByKey } from "../../../entities/smart-folder/groupByKey";
 import { buildGroupValueDisplayRows } from "../model/groupValueDisplayRows";
-import { groupValueSortAtom, libraryTileSizeAtom, libraryViewModeAtom } from "../model/atoms";
+import { libraryTileSizeAtom, libraryViewModeAtom } from "../model/atoms";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import GroupValueRows from "./GroupValueRows";
 import GroupValueGrid from "./GroupValueGrid";
@@ -13,12 +13,15 @@ import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 
 // グループの値一覧の本実装（ADR-0012 §5）。grid/list はユーザーの libraryViewModeAtom に
-// 従い、値のソートは groupValueSortAtom（ソートメニュー・list列見出しの二重入口・単一state。
-// ADR-0012 帰結）。入れ子タグ（スラッシュ複数）は名前順ソートのときだけ階層表示にし、
-// 件数・総時間ソートではフルパスの平坦表示にフォールバックする（groupValueHierarchy.ts）。
+// 従い、値の並びは route の今の値の並び（ソートメニュー・list列見出しが同じ状態を変える）。
+// 入れ子タグ（スラッシュ複数）は名前順のときだけ階層表示にし、それ以外はサーバーの順の
+// フルパス平坦表示にする（groupValueHierarchy.ts）。
 
 interface GroupValueListProps {
   groupBy: GroupBy;
+  /** 解決済みの今の値の並び */
+  sort: GroupSortId;
+  onSortChange: (sort: GroupSortId) => void;
   groupValueItems: GroupValueItem[];
   tagPrefixes: TagPrefix[];
   isGroupValuesLoading?: boolean;
@@ -32,6 +35,8 @@ interface GroupValueListProps {
 
 export default function GroupValueList({
   groupBy,
+  sort,
+  onSortChange,
   groupValueItems,
   tagPrefixes,
   isGroupValuesLoading,
@@ -43,7 +48,6 @@ export default function GroupValueList({
 }: GroupValueListProps) {
   const viewMode = useAtomValue(libraryViewModeAtom);
   const tileSize = useAtomValue(libraryTileSizeAtom);
-  const [sort, setSort] = useAtom(groupValueSortAtom);
 
   // コンテキスト検索（ADR-0012 §6）: 表示中の値に対するクライアント側の絞り込み。
   // 全体検索（URL の q=）とは別 state で、URL には載せずグループ分けの切り替えでリセットする。
@@ -56,7 +60,7 @@ export default function GroupValueList({
   const rows = buildGroupValueDisplayRows(groupValueItems, contextQuery, sort);
   const fallbackIcon = getGroupByIcon(groupBy);
   const groupByLabel = getGroupByLabel(groupBy, tagPrefixes);
-  const resetKey = `${groupKey}:${sort.key}:${sort.direction}:${contextQuery}`;
+  const resetKey = `${groupKey}:${sort}:${contextQuery}`;
 
   const handleSelect = (item: GroupValueItem) => onSelectValue(item.value);
 
@@ -147,7 +151,7 @@ export default function GroupValueList({
                 groupByLabel={groupByLabel}
                 rows={rows}
                 sort={sort}
-                onSortChange={setSort}
+                onSortChange={onSortChange}
                 fallbackIcon={fallbackIcon}
                 resetKey={resetKey}
                 onSelect={handleSelect}

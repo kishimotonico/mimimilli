@@ -134,6 +134,18 @@ describe("既定の並びの保存", () => {
     expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
   });
 
+  it("値の並びの保存は group-sort へ送り、一覧だけを取り直す", async () => {
+    const api = mockApi({ "PUT /api/smart-folders/:id/group-sort": () => ({ ...userFolder }) });
+    const editor = setup();
+
+    expect(await editor.saveDefaultGroupSort(USER_ID, "last-played")).toBe(true);
+
+    expect(api.requestsTo("PUT /api/smart-folders/:id/group-sort")[0]!.body).toEqual({
+      groupSort: "last-played",
+    });
+    expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
+  });
+
   it("409 でもトーストを出して一覧を取り直す", async () => {
     mockApi({
       "PUT /api/smart-folders/:id/sort": () => apiError(409, "conflict", "競合しました"),

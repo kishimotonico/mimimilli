@@ -152,9 +152,16 @@ export function draftOf(folder: ReadableSmartFolder): SmartFolderDraft {
   };
 }
 
-/** グループ分けを変えた下書き。値の並びはそのグループ分けの初期値に戻す */
-export function withGroupBy(draft: SmartFolderDraft, groupBy: GroupBy | null): SmartFolderDraft {
-  return { ...draft, groupBy, groupSort: groupBy === null ? null : defaultGroupSort(groupBy) };
+/** グループ分けを変えた下書き。値の並びは、ダイアログを開いたときのグループ分けに戻したなら開いたときの値、
+ *  別のグループ分けならそのグループ分けの初期値にする */
+export function withGroupBy(
+  draft: SmartFolderDraft,
+  groupBy: GroupBy | null,
+  initial: Pick<SmartFolderDraft, "groupBy" | "groupSort">,
+): SmartFolderDraft {
+  if (groupBy === null) return { ...draft, groupBy, groupSort: null };
+  const restored = initial.groupBy !== null && groupByKey(initial.groupBy) === groupByKey(groupBy);
+  return { ...draft, groupBy, groupSort: restored ? initial.groupSort : defaultGroupSort(groupBy) };
 }
 
 /** 絞り込みの無い複製の下書き。元の定義と既定の並び（継承ならそのまま継承）を写す */

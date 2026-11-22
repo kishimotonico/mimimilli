@@ -199,6 +199,46 @@ describe("resolveLibraryView: 並びの解決（今の並び → フォルダー
   });
 });
 
+describe("resolveLibraryView: 値の並びの解決（今の並び → フォルダーの既定）", () => {
+  const valueList = (view: ReturnType<typeof resolveLibraryView>) => {
+    if (view.kind !== "value-list") throw new Error(`値一覧ではありません: ${view.kind}`);
+    return view;
+  };
+
+  it("今の値の並びが無ければフォルダーの既定の値の並び", () => {
+    const byCv = valueList(resolveLibraryView(route({ folderId: "by-cv" }), folders));
+    const byYear = valueList(resolveLibraryView(route({ folderId: "by-year" }), folders));
+
+    expect(byCv).toMatchObject({ groupSort: "count-desc", groupSortDeviates: false });
+    expect(byYear).toMatchObject({ groupSort: "name-desc", groupSortDeviates: false });
+  });
+
+  it("今の値の並びが最優先で、既定と違えば外れている", () => {
+    const view = valueList(
+      resolveLibraryView(route({ folderId: "by-cv", groupSort: "last-played" }), folders),
+    );
+
+    expect(view).toMatchObject({ groupSort: "last-played", groupSortDeviates: true });
+  });
+
+  it("今の値の並びが既定と同じなら外れていない", () => {
+    const view = valueList(
+      resolveLibraryView(route({ folderId: "by-cv", groupSort: "count-desc" }), folders),
+    );
+
+    expect(view.groupSortDeviates).toBe(false);
+  });
+
+  it("値を選んだ作品一覧は値の並びに影響されない", () => {
+    const view = resolveLibraryView(
+      route({ folderId: "by-cv", group: "藤田茜", groupSort: "name-asc" }),
+      folders,
+    );
+
+    expect(view.kind).toBe("works");
+  });
+});
+
 describe("resolveLibraryView: seed", () => {
   it("解決後の並びが random のときだけ seed を渡す（今の並びで random にした場合）", () => {
     const view = resolveLibraryView(route({ folderId: "all", sort: "random", seed: 7 }), folders);
