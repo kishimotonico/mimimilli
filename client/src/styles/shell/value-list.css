@@ -22,12 +22,17 @@
 .mll-vsearch input::placeholder {
   color: var(--ink-3);
 }
-.mll-vlist-hd {
+/* 見出しと行は同じ列・同じ左右の余白にする（右は行末の追加ボタンの分） */
+.mll-vlist-hd,
+.mll-vrow__main {
   display: grid;
   grid-template-columns: 32px 1fr 72px 88px;
   gap: 8px;
   align-items: center;
-  padding: 4px 6px 4px 4px;
+  padding-inline: 4px 30px;
+}
+.mll-vlist-hd {
+  padding-block: 4px;
 }
 .mll-vlist-hd__sort {
   display: inline-flex;
@@ -74,14 +79,10 @@
   color: var(--ink-0);
 }
 .mll-vrow__main {
-  display: grid;
-  grid-template-columns: 32px 1fr 72px 88px;
-  gap: 8px;
-  align-items: center;
   width: 100%;
   block-size: 42px;
   box-sizing: border-box;
-  padding: 5px 30px 5px 4px;
+  padding-block: 5px;
   cursor: pointer;
   text-align: left;
   color: inherit;
