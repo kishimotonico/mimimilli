@@ -349,6 +349,22 @@ export class UserWorkStateRepository {
     return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
   }
 
+  updateSmartFolderCondition(
+    id: string,
+    change: { condition: Condition; sort?: SortId | null },
+  ): SmartFolderRow | null {
+    const r = this.db.user
+      .update(smartFolders)
+      .set({
+        conditionJson: JSON.stringify(change.condition),
+        ...(change.sort === undefined ? {} : { sort: change.sort }),
+      })
+      .where(eq(smartFolders.id, id))
+      .returning()
+      .get();
+    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
+  }
+
   /** グループ分けのある行だけを更新する。グループ分けを外す更新と交差しても、値の並びだけが残る行を作らない */
   updateSmartFolderGroupSort(id: string, groupSort: GroupSortId): SmartFolderRow | null {
     const r = this.db.user

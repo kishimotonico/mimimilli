@@ -1,4 +1,5 @@
 import type {
+  Condition,
   GroupSortId,
   SmartFolderWrite,
   SortId,
@@ -95,6 +96,17 @@ export function createClassificationMethods(state: FixtureState): Classification
       folder.sort = input.sort;
       folder.groupBy = input.groupBy;
       folder.groupSort = input.groupSort;
+      return folder;
+    },
+
+    async updateSmartFolderCondition(
+      id: string,
+      change: { condition: Condition; sort?: SortId | null },
+    ): Promise<SmartFolderRow | null> {
+      const folder = state.smartFolders.find((f) => f.id === id);
+      if (!folder) return null;
+      folder.condition = change.condition;
+      if (change.sort !== undefined) folder.sort = change.sort;
       return folder;
     },
 

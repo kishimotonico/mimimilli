@@ -238,6 +238,59 @@ contract(
   },
 );
 
+contract(
+  "条件の更新は、条件と指定した既定の並びだけを書き、名前・グループ分け・値の並びを触らない",
+  async (harness) => {
+    const tag = { type: "and", children: [{ type: "tag", tag: "ASMR" }] };
+    const created = await harness.send<SmartFolder>(
+      "POST",
+      "/api/smart-folders",
+      write("雨", EMPTY, { sort: "title-asc" }),
+    );
+    const path = `/api/smart-folders/${created.body.id}/condition`;
+    // 別の保存で名前と既定の並びが変わっても、条件の更新は巻き戻さない
+    await harness.send(
+      "PUT",
+      `/api/smart-folders/${created.body.id}`,
+      write("晴れ", EMPTY, { sort: "random" }),
+    );
+
+    const res = await harness.send<SmartFolder>("PUT", path, { condition: tag });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body.condition, tag);
+    assert.equal(res.body.name, "晴れ");
+    assert.equal(res.body.sort, "random");
+
+    const withSort = await harness.send<SmartFolder>("PUT", path, {
+      condition: EMPTY,
+      sort: "title-desc",
+    });
+    assert.equal(withSort.body.sort, "title-desc");
+    assert.deepEqual(withSort.body.condition, EMPTY);
+    const inherit = await harness.send<SmartFolder>("PUT", path, { condition: tag, sort: null });
+    assert.equal(inherit.body.sort, null);
+    assert.equal(inherit.body.name, "晴れ");
+  },
+);
+
+contract("条件の更新は、不正な条件・未知のキー・存在しない行・既定の行を弾く", async (harness) => {
+  const created = await create(harness, "雨");
+  const path = `/api/smart-folders/${created.id}/condition`;
+
+  assert.equal((await harness.send("PUT", path, { condition: { type: "nope" } })).status, 400);
+  assert.equal((await harness.send("PUT", path, { condition: EMPTY, name: "x" })).status, 400);
+  assert.equal((await harness.send("PUT", path, { condition: EMPTY, sort: "x" })).status, 400);
+  assert.equal(
+    (await harness.send("PUT", "/api/smart-folders/sf-nope/condition", { condition: EMPTY }))
+      .status,
+    404,
+  );
+  assert.equal(
+    (await harness.send("PUT", "/api/smart-folders/fav/condition", { condition: EMPTY })).status,
+    403,
+  );
+});
+
 contract("既定のグループ分けでも値の並びは変えられ、既定の並びは固定でない", async (harness) => {
   const byCv = (await list(harness)).find((f) => f.id === "by-cv")!;
   assert.equal(byCv.groupSort, "count-desc");

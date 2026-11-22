@@ -65,6 +65,14 @@ export type SmartFolderWrite = z.infer<typeof smartFolderWriteSchema>;
 export const smartFolderSortWriteSchema = z.strictObject({ sort: sortIdSchema.nullable() });
 export type SmartFolderSortWrite = z.infer<typeof smartFolderSortWriteSchema>;
 
+/** PUT /:id/condition のボディ。検索の上書きと、その取り消し。条件と、変えるときだけ既定の並びを更新し、
+ *  名前・グループ分け・値の並びは触らない（sort を省けば既定の並びも触らない） */
+export const smartFolderConditionWriteSchema = z.strictObject({
+  condition: conditionSchema,
+  sort: sortIdSchema.nullable().optional(),
+});
+export type SmartFolderConditionWrite = z.infer<typeof smartFolderConditionWriteSchema>;
+
 /** PUT /:id/group-sort のボディ。値一覧の並びだけを更新する */
 export const smartFolderGroupSortWriteSchema = z.strictObject({ groupSort: groupSortIdSchema });
 export type SmartFolderGroupSortWrite = z.infer<typeof smartFolderGroupSortWriteSchema>;
@@ -392,6 +400,23 @@ export function sortViolation(
     return forbidden("壊れたスマートフォルダーは編集できません");
   }
   if (!readablePermissions(existing.id).inheritSort && sort === null) {
+    return invalid("「すべて」の既定の並びは空にできません");
+  }
+  return null;
+}
+
+/** 条件の更新（検索の上書き）の違反。壊れた行と既定のスマートフォルダーは条件を変えられず、
+ *  「すべて」の既定の並びは空にできない */
+export function conditionViolation(
+  existing: Pick<SmartFolder, "id" | "condition">,
+  change: Pick<SmartFolderConditionWrite, "sort">,
+): PolicyViolation | null {
+  const permissions = smartFolderPermissions(existing);
+  if (!permissions.edit) return forbidden("壊れたスマートフォルダーは編集できません");
+  if (!permissions.editCondition) {
+    return forbidden("既定のスマートフォルダーの条件・グループ分けは変更できません");
+  }
+  if (!permissions.inheritSort && change.sort === null) {
     return invalid("「すべて」の既定の並びは空にできません");
   }
   return null;

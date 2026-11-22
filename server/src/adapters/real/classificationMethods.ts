@@ -1,6 +1,7 @@
 import {
   DEFAULT_TAG_PREFIXES,
   SMART_FOLDER_TEMPLATES,
+  type Condition,
   type GroupSortId,
   type SmartFolderWrite,
   type SortId,
@@ -89,6 +90,12 @@ export function createClassificationMethods(deps: {
     },
     async updateSmartFolderSort(id: string, sort: SortId | null): Promise<SmartFolderRow | null> {
       return user.updateSmartFolderSort(id, sort);
+    },
+    async updateSmartFolderCondition(
+      id: string,
+      change: { condition: Condition; sort?: SortId | null },
+    ): Promise<SmartFolderRow | null> {
+      return user.updateSmartFolderCondition(id, change);
     },
     async updateSmartFolderGroupSort(
       id: string,

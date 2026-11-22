@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  conditionViolation,
   groupSortViolation,
   smartFolderPermissions,
   sortViolation,
@@ -80,6 +81,17 @@ test("並びだけの更新の違反: 壊れた行は 403 相当、「すべて�
   assert.equal(sortViolation(folder("all"), null)?.kind, "invalid");
   assert.equal(sortViolation(folder("all"), "title-asc"), null);
   assert.equal(sortViolation(folder("fav"), null), null);
+});
+
+test("条件の更新の違反: 壊れた行と既定の行は 403 相当、「すべて」以外は通る", () => {
+  assert.equal(
+    conditionViolation(folder("sf-00000000-0000-4000-8000-000000000001", null), {})?.kind,
+    "forbidden",
+  );
+  assert.equal(conditionViolation(folder("fav"), {})?.kind, "forbidden");
+  const own = folder("sf-00000000-0000-4000-8000-000000000001");
+  assert.equal(conditionViolation(own, {}), null);
+  assert.equal(conditionViolation(own, { sort: null }), null);
 });
 
 test("値の並びだけの更新の違反: 壊れた行は 403 相当、グループ分けの無い行は 400 相当", () => {

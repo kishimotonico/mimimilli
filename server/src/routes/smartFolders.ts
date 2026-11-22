@@ -5,6 +5,7 @@
 //   POST   /smart-folders/from-template    テンプレートの固定 ID で追加
 //   POST   /smart-folders/restore          削除した行を同じ ID・位置・作成日時で戻す
 //   PUT    /smart-folders/:id              更新
+//   PUT    /smart-folders/:id/condition    条件（と、変えるときだけ既定の並び）だけを更新（検索の上書き・取り消し）
 //   PUT    /smart-folders/:id/sort         既定の並びだけを更新
 //   PUT    /smart-folders/:id/group-sort   値一覧の並びだけを更新
 //   DELETE /smart-folders/:id              削除
@@ -13,12 +14,14 @@
 import { Hono } from "hono";
 import { z, type ZodError } from "zod";
 import {
+  conditionViolation,
   deleteViolation,
   findSmartFolderTemplate,
   needsCount,
   groupSortViolation,
   restoreViolation,
   smartFolderFromTemplateSchema,
+  smartFolderConditionWriteSchema,
   smartFolderGroupSortWriteSchema,
   smartFolderOrderSchema,
   smartFolderRestoreSchema,
@@ -159,6 +162,21 @@ export function smartFoldersRoute(adapter: DataAdapter, scanRecord: ScanRecordSt
     if (!existing) notFoundFolder(id);
     rejectViolation(updateViolation(existing, data));
     const row = await adapter.updateSmartFolder(id, data);
+    if (!row) notFoundFolder(id);
+    return c.json(await singleWithCount(adapter, row));
+  });
+
+  app.put("/smart-folders/:id/condition", async (c) => {
+    const id = c.req.param("id");
+    const data = await readJsonBody(
+      c,
+      smartFolderConditionWriteSchema,
+      writeInvalidMessage("スマートフォルダーの条件が不正です"),
+    );
+    const existing = await adapter.getSmartFolder(id);
+    if (!existing) notFoundFolder(id);
+    rejectViolation(conditionViolation(existing, data));
+    const row = await adapter.updateSmartFolderCondition(id, data);
     if (!row) notFoundFolder(id);
     return c.json(await singleWithCount(adapter, row));
   });

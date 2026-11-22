@@ -32,6 +32,11 @@ export interface ClassificationAdapter {
   updateSmartFolder(id: string, input: SmartFolderWrite): Promise<SmartFolderRow | null>;
   /** 既定の並びの列だけを更新する。ほかの列は触らない */
   updateSmartFolderSort(id: string, sort: SortId | null): Promise<SmartFolderRow | null>;
+  /** 条件の列と、sort があるときだけ既定の並びの列を更新する。ほかの列は触らない */
+  updateSmartFolderCondition(
+    id: string,
+    change: { condition: Condition; sort?: SortId | null },
+  ): Promise<SmartFolderRow | null>;
   /** 値一覧の並びの列だけを更新する。ほかの列は触らない。行がない、またはグループ分けがなければ null */
   updateSmartFolderGroupSort(id: string, groupSort: GroupSortId): Promise<SmartFolderRow | null>;
   /** 全件の順序を置き換える。渡された集合が今の集合と一致しなければ null */
