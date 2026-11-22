@@ -36,6 +36,10 @@ export const smartFolderWriteSchema = z.strictObject({
 });
 export type SmartFolderWrite = z.infer<typeof smartFolderWriteSchema>;
 
+/** PUT /:id/sort のボディ。既定の並びだけを更新する */
+export const smartFolderSortWriteSchema = z.strictObject({ sort: sortIdSchema.nullable() });
+export type SmartFolderSortWrite = z.infer<typeof smartFolderSortWriteSchema>;
+
 /** 一覧の1行。condition・sort・groupBy のどれか1つでも読めない行は壊れた行で、3つとも null で返す。
  *  壊れた行は削除と作り直しだけができる。正常な行の sort の null は「『すべて』と同じ」 */
 export const smartFolderSchema = z.object({
@@ -302,6 +306,20 @@ export function updateViolation(
     return forbidden("「すべて」の名前は変更できません");
   }
   if (!permissions.inheritSort && write.sort === null) {
+    return invalid("「すべて」の既定の並びは空にできません");
+  }
+  return null;
+}
+
+/** 既定の並びだけの更新の違反。壊れた行は編集できず、「すべて」は並びを空にできない */
+export function sortViolation(
+  existing: Pick<SmartFolder, "id" | "condition">,
+  sort: SortId | null,
+): PolicyViolation | null {
+  if (!smartFolderPermissions(existing).edit) {
+    return forbidden("壊れたスマートフォルダーは編集できません");
+  }
+  if (!readablePermissions(existing.id).inheritSort && sort === null) {
     return invalid("「すべて」の既定の並びは空にできません");
   }
   return null;

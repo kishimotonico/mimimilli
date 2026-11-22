@@ -3,7 +3,7 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { libraryRouteAtom } from "../../../entities/library/model/navigationAtoms";
 import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
-import { isReadableSmartFolder, type SortId } from "@mimimilli/shared";
+import type { SortId } from "@mimimilli/shared";
 import { SORT_OPTIONS } from "../../../entities/library/types";
 import { groupValueSortAtom } from "../model/atoms";
 import {
@@ -70,10 +70,9 @@ function ReadySortMenu({
     : getSortLabel(sort);
 
   const saveAsDefault = async () => {
-    const { folder } = view;
-    if (view.kind === "broken" || !isReadableSmartFolder(folder)) return;
+    if (view.kind === "broken") return;
     setSavingDefault(true);
-    const saved = await editor.saveDefaultSort(folder, sort);
+    const saved = await editor.saveDefaultSort(view.folder.id, sort);
     setSavingDefault(false);
     if (saved) clearCurrentSort({ folderId: routeFolderId, sort });
   };

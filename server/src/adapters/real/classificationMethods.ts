@@ -2,6 +2,7 @@ import {
   DEFAULT_TAG_PREFIXES,
   SMART_FOLDER_TEMPLATES,
   type SmartFolderWrite,
+  type SortId,
   type TagPrefix,
   type TagPrefixCandidate,
   type TagPrefixCreate,
@@ -84,6 +85,9 @@ export function createClassificationMethods(deps: {
     },
     async updateSmartFolder(id: string, input: SmartFolderWrite): Promise<SmartFolderRow | null> {
       return user.updateSmartFolder(id, input);
+    },
+    async updateSmartFolderSort(id: string, sort: SortId | null): Promise<SmartFolderRow | null> {
+      return user.updateSmartFolderSort(id, sort);
     },
     async reorderSmartFolders(ids: string[]): Promise<SmartFolderRow[] | null> {
       return user.reorderSmartFolders(ids);

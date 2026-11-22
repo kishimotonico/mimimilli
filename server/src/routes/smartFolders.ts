@@ -5,6 +5,7 @@
 //   POST   /smart-folders/from-template    テンプレートの固定 ID で追加
 //   POST   /smart-folders/restore          削除した行を同じ ID・位置・作成日時で戻す
 //   PUT    /smart-folders/:id              更新
+//   PUT    /smart-folders/:id/sort         既定の並びだけを更新
 //   DELETE /smart-folders/:id              削除
 //   GET    /smart-folders/:id/works        作品一覧（scanRecord でスキャン記録の作品に絞れる）
 //   POST   /smart-folders/:id/groups       値一覧・「＋絞り込み」候補
@@ -18,7 +19,9 @@ import {
   smartFolderFromTemplateSchema,
   smartFolderOrderSchema,
   smartFolderRestoreSchema,
+  smartFolderSortWriteSchema,
   smartFolderWriteSchema,
+  sortViolation,
   updateViolation,
   type PolicyViolation,
   type SmartFolder,
@@ -153,6 +156,17 @@ export function smartFoldersRoute(adapter: DataAdapter, scanRecord: ScanRecordSt
     if (!existing) notFoundFolder(id);
     rejectViolation(updateViolation(existing, data));
     const row = await adapter.updateSmartFolder(id, data);
+    if (!row) notFoundFolder(id);
+    return c.json(await singleWithCount(adapter, row));
+  });
+
+  app.put("/smart-folders/:id/sort", async (c) => {
+    const id = c.req.param("id");
+    const data = await readJsonBody(c, smartFolderSortWriteSchema, "既定の並びが不正です");
+    const existing = await adapter.getSmartFolder(id);
+    if (!existing) notFoundFolder(id);
+    rejectViolation(sortViolation(existing, data.sort));
+    const row = await adapter.updateSmartFolderSort(id, data.sort);
     if (!row) notFoundFolder(id);
     return c.json(await singleWithCount(adapter, row));
   });

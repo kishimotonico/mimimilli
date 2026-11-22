@@ -131,6 +131,58 @@ contract("更新は名前・条件・並び・グループ分けを置き換え�
   assert.equal(missing.status, 404);
 });
 
+contract(
+  "既定の並びだけの更新は、ほかの列を触らず、「すべて」の並びは空にできない",
+  async (harness) => {
+    const created = await create(harness, "自作", {
+      type: "and",
+      children: [{ type: "bookmarked" }],
+    });
+    const renamed = await harness.send<SmartFolder>("PUT", `/api/smart-folders/${created.id}`, {
+      name: "別タブで改名",
+      condition: { type: "and", children: [{ type: "played" }] },
+      sort: "added-desc",
+      groupBy: { kind: "addedYear" },
+    });
+    assert.equal(renamed.status, 200);
+
+    const res = await harness.send<SmartFolder>("PUT", `/api/smart-folders/${created.id}/sort`, {
+      sort: "title-asc",
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.sort, "title-asc");
+    assert.equal(res.body.name, "別タブで改名");
+    assert.deepEqual(res.body.condition, { type: "and", children: [{ type: "played" }] });
+    assert.deepEqual(res.body.groupBy, { kind: "addedYear" });
+
+    const inherit = await harness.send<SmartFolder>(
+      "PUT",
+      `/api/smart-folders/${created.id}/sort`,
+      {
+        sort: null,
+      },
+    );
+    assert.equal(inherit.status, 200);
+    assert.equal(inherit.body.sort, null);
+
+    const all = await harness.send("PUT", "/api/smart-folders/all/sort", { sort: null });
+    assert.equal(all.status, 400);
+    const allOk = await harness.send<SmartFolder>("PUT", "/api/smart-folders/all/sort", {
+      sort: "title-asc",
+    });
+    assert.equal(allOk.status, 200);
+    assert.equal(allOk.body.sort, "title-asc");
+    assert.equal(
+      (await harness.send("PUT", "/api/smart-folders/sf-nope/sort", { sort: null })).status,
+      404,
+    );
+    assert.equal(
+      (await harness.send("PUT", `/api/smart-folders/${created.id}/sort`, { sort: "x" })).status,
+      400,
+    );
+  },
+);
+
 contract("既定のものは名前・既定の並びだけ変えられ、条件とグループ分けは弾く", async (harness) => {
   const recent = (await list(harness)).find((f) => f.id === "recent")!;
   const ok = await harness.send<SmartFolder>("PUT", "/api/smart-folders/recent", {

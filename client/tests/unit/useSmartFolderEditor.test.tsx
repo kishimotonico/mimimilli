@@ -106,31 +106,60 @@ describe("更新", () => {
 });
 
 describe("既定の並びの保存", () => {
-  const readable = { ...userFolder, condition: write.condition };
-
-  it("並びだけを変えた定義を送り、一覧だけを取り直す", async () => {
-    const api = mockApi({ "PUT /api/smart-folders/:id": () => ({ ...userFolder }) });
+  it("並びだけを送り、一覧だけを取り直す", async () => {
+    const api = mockApi({ "PUT /api/smart-folders/:id/sort": () => ({ ...userFolder }) });
     const editor = setup();
 
-    expect(await editor.saveDefaultSort(readable, "random")).toBe(true);
+    expect(await editor.saveDefaultSort(USER_ID, "random")).toBe(true);
 
-    expect(api.requestsTo("PUT /api/smart-folders/:id")[0]!.body).toEqual({
-      name: "自作",
-      condition: write.condition,
-      sort: "random",
-      groupBy: null,
-    });
+    expect(api.requestsTo("PUT /api/smart-folders/:id/sort")[0]!.body).toEqual({ sort: "random" });
     expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
   });
 
   it("409 でもトーストを出して一覧を取り直す", async () => {
-    mockApi({ "PUT /api/smart-folders/:id": () => apiError(409, "conflict", "競合しました") });
+    mockApi({
+      "PUT /api/smart-folders/:id/sort": () => apiError(409, "conflict", "競合しました"),
+    });
     const editor = setup();
 
-    expect(await editor.saveDefaultSort(readable, "random")).toBe(false);
+    expect(await editor.saveDefaultSort(USER_ID, "random")).toBe(false);
 
     expect(toasts()[0]).toMatchObject({ message: "競合しました", variant: "error" });
     expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
+  });
+});
+
+describe("更新とグループ分けの変更", () => {
+  const grouped = { ...userFolder, groupBy: { kind: "tag" as const } };
+
+  async function updateWith(next: typeof grouped | typeof userFolder, route: string | null) {
+    mockApi({ "PUT /api/smart-folders/:id": () => ({ ...next }) });
+    const editor = setup();
+    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), [grouped]);
+    if (route) seedLibraryRoute(store, { folderId: route, group: "cv/x" });
+    clearPendingOps(store);
+    await editor.update(USER_ID, { ...write, groupBy: next.groupBy });
+  }
+
+  it("開いている一覧のグループ分けを変えたら、履歴を積まずに入り直して ?group= を外す", async () => {
+    await updateWith(userFolder, USER_ID);
+
+    expect(store.get(libraryRouteAtom)).toMatchObject({ folderId: USER_ID, group: null });
+    expect(pendingWrites(store)).toEqual(["replace"]);
+  });
+
+  it("グループ分けが同じなら route は動かさない", async () => {
+    await updateWith(grouped, USER_ID);
+
+    expect(store.get(libraryRouteAtom).group).toBe("cv/x");
+    expect(pendingWrites(store)).toEqual([]);
+  });
+
+  it("開いていない一覧のグループ分けを変えても route は動かさない", async () => {
+    await updateWith(userFolder, "fav");
+
+    expect(store.get(libraryRouteAtom).folderId).toBe("fav");
+    expect(pendingWrites(store)).toEqual([]);
   });
 });
 
@@ -161,6 +190,46 @@ describe("並べ替え", () => {
 
     expect(toasts()[0]).toMatchObject({ message: "過不足があります", variant: "error" });
     expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
+  });
+});
+
+describe("並べ替えの直列化", () => {
+  it("連続した並べ替えは1本ずつ送り、待つ間は最新の順だけを送って最新の順が残る", async () => {
+    const base = defaultSmartFolders();
+    const orders = [
+      base.map((f) => f.id).reverse(),
+      [...base.map((f) => f.id)].sort(),
+      base.map((f) => f.id),
+    ];
+    const releases: Array<() => void> = [];
+    const sent: string[][] = [];
+    mockApi({
+      "PUT /api/smart-folders/order": async ({ body }) => {
+        const ids = (body as { ids: string[] }).ids;
+        sent.push(ids);
+        await new Promise<void>((resolve) => releases.push(resolve));
+        const byId = new Map(base.map((f) => [f.id, f]));
+        return ids.map((id, position) => ({ ...byId.get(id)!, position }));
+      },
+    });
+    const editor = setup();
+    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), base);
+
+    const first = editor.reorder(orders[0]!);
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+    const second = editor.reorder(orders[1]!);
+    const third = editor.reorder(orders[2]!);
+    await Promise.all([second, third]);
+    expect(sent).toHaveLength(1);
+
+    releases[0]!();
+    await vi.waitFor(() => expect(sent).toHaveLength(2));
+    expect(sent[1]).toEqual(orders[2]);
+    releases[1]!();
+    await first;
+
+    const final = queryClient.getQueryData<{ id: string }[]>(SMART_FOLDER_QUERY_KEYS.all());
+    expect(final?.map((f) => f.id)).toEqual(orders[2]);
   });
 });
 

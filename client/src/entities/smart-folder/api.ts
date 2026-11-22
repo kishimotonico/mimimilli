@@ -48,6 +48,11 @@ export async function updateSmartFolder(id: string, data: SmartFolderWrite): Pro
   return putParsed(smartFolderSchema, folderPath(id), data);
 }
 
+/** 既定の並びだけを更新する。ほかの列は触らない */
+export async function updateSmartFolderSort(id: string, sort: SortId | null): Promise<SmartFolder> {
+  return putParsed(smartFolderSchema, `${folderPath(id)}/sort`, { sort });
+}
+
 export async function deleteSmartFolder(id: string): Promise<void> {
   await deleteVoid(folderPath(id));
 }

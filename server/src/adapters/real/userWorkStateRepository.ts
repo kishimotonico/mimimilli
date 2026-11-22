@@ -10,6 +10,7 @@ import type {
   Condition,
   ResumeBody,
   SmartFolderWrite,
+  SortId,
   TagPrefix,
   TagPrefixCreate,
   TagPrefixUpdate,
@@ -323,6 +324,16 @@ export class UserWorkStateRepository {
         sort: input.sort,
         groupByJson: input.groupBy === null ? null : JSON.stringify(input.groupBy),
       })
+      .where(eq(smartFolders.id, id))
+      .returning()
+      .get();
+    return r ? toSmartFolderRow(r) : null;
+  }
+
+  updateSmartFolderSort(id: string, sort: SortId | null): SmartFolderRow | null {
+    const r = this.db.user
+      .update(smartFolders)
+      .set({ sort })
       .where(eq(smartFolders.id, id))
       .returning()
       .get();

@@ -69,7 +69,10 @@ export function createRouteStore<R>(readInitial: () => R): RouteStore<R> {
       const route = typeof next === "function" ? (next as (current: R) => R)(current) : next;
       if (route === current) return;
       const write: HistoryWrite = options.replace ? "replace" : "push";
-      set(pendingOpsAtom, [...get(pendingOpsAtom), { route, write, pushSameUrl: options.pushSameUrl === true }]);
+      set(pendingOpsAtom, [
+        ...get(pendingOpsAtom),
+        { route, write, pushSameUrl: options.pushSameUrl === true },
+      ]);
       set(directionAtom, options.direction ?? "forward");
       set(baseRouteAtom, route);
     },

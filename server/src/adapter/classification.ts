@@ -2,6 +2,7 @@ import type {
   Condition,
   SmartFolder,
   SmartFolderWrite,
+  SortId,
   TagPrefix,
   TagPrefixCandidate,
   TagPrefixCreate,
@@ -28,6 +29,8 @@ export interface ClassificationAdapter {
     folder: SmartFolderInsert & { position: number },
   ): Promise<SmartFolderRow | null>;
   updateSmartFolder(id: string, input: SmartFolderWrite): Promise<SmartFolderRow | null>;
+  /** 既定の並びの列だけを更新する。ほかの列は触らない */
+  updateSmartFolderSort(id: string, sort: SortId | null): Promise<SmartFolderRow | null>;
   /** 全件の順序を置き換える。渡された集合が今の集合と一致しなければ null */
   reorderSmartFolders(ids: string[]): Promise<SmartFolderRow[] | null>;
   deleteSmartFolder(id: string): Promise<boolean>;
