@@ -189,7 +189,9 @@ export default function SmartFolderDialog({
               <option value="">{`「すべて」と同じ（${sortLabel(allSort)}）`}</option>
             )}
             {permissions.inheritSort && allSort === null && draft.sort === null && (
-              <option value="" hidden disabled />
+              <option value="" hidden disabled>
+                選択してください
+              </option>
             )}
             {SORT_OPTIONS.map((option) => (
               <option key={option.id} value={option.id}>
