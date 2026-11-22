@@ -63,6 +63,8 @@ export interface LibraryPlace {
   workId: string | null;
   layerOpen: boolean;
   folderId: string;
+  /** 操作を始めたときの絞り込み・選択・並び（待つ間にユーザーが変えたかを見分ける） */
+  library: string;
 }
 
 export function libraryPlaceOf(route: AppRoute): LibraryPlace {
@@ -71,6 +73,14 @@ export function libraryPlaceOf(route: AppRoute): LibraryPlace {
     workId: route.mode === "workDetail" ? route.workId : null,
     layerOpen: route.layer !== null,
     folderId: route.library.folderId,
+    library: JSON.stringify([
+      route.library.group,
+      route.library.selectedTags,
+      route.library.selectedWorkId,
+      route.library.q,
+      route.library.sort,
+      route.library.groupSort,
+    ]),
   };
 }
 
@@ -80,7 +90,8 @@ export function isSamePlace(now: LibraryPlace, started: LibraryPlace): boolean {
     !now.layerOpen &&
     now.mode === started.mode &&
     now.workId === started.workId &&
-    now.folderId === started.folderId
+    now.folderId === started.folderId &&
+    now.library === started.library
   );
 }
 

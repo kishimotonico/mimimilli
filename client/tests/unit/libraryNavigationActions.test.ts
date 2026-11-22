@@ -407,8 +407,8 @@ describe("履歴の積み方", () => {
       mode: "library",
       layer: { kind: "nowPlaying" },
     });
-    expect(lib(layered)).toMatchObject({ folderId: "sf-own", sort: null });
-    expect(pendingWrites(layered)).toEqual(["replace"]);
+    expect(lib(layered)).toMatchObject({ folderId: "sf-own", sort: "title-asc" });
+    expect(pendingWrites(layered)).toEqual([]);
 
     const away = setup({ folderId: "sf-own" });
     const awayPlace = away.get(libraryPlaceAtom);
@@ -420,6 +420,27 @@ describe("履歴の積み方", () => {
     expect(away.get(appRouteAtom)).toMatchObject({ mode: "files" });
     expect(lib(away).folderId).toBe("sf-own");
     expect(pendingWrites(away)).toEqual([]);
+  });
+
+  it("待つ間に検索語・チップ・選択・並びを変えていたら、入り直してそれを消さない", () => {
+    const changes: Array<Parameters<typeof seedLibraryRoute>[1]> = [
+      { q: "藤田" },
+      { selectedTags: nts(["ASMR"]) },
+      { selectedWorkId: "work-1" },
+      { sort: "title-desc" },
+      { groupSort: "name-asc" },
+    ];
+    for (const change of changes) {
+      const store = setup({ folderId: "sf-own", sort: "title-asc" });
+      const place = store.get(libraryPlaceAtom);
+      seedLibraryRoute(store, change);
+      clearPendingOps(store);
+
+      store.set(settleLibraryFolderAtom, place, "sf-own");
+
+      expect(lib(store)).toMatchObject(change);
+      expect(pendingWrites(store)).toEqual([]);
+    }
   });
 
   it("作品詳細で始めて別の作品の詳細へ移っていたら、別の場所として引き戻さない", () => {

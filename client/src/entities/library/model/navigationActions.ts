@@ -46,13 +46,12 @@ export const showLibraryWorkAtom = appRouteAction(showLibraryWork);
 
 export const replaceLibraryFolderAtom = appRouteCorrection(replaceLibraryFolder);
 
-/** await を挟む保存・追加のあと、始めたときと同じ場所なら folderId へ入り直す（遷移）。
- *  その間に層を開いた・別の画面へ移ったときは、画面を動かさず補正だけ行う */
+/** await を挟む保存・追加のあと、始めたときと同じ場所（画面・層・フォルダー・絞り込み・選択・並び）なら
+ *  folderId へ入り直す（遷移）。その間に何かを変えていたら、ユーザーの今の状態を残して何もしない */
 export const settleLibraryFolderAtom = atom(
   null,
   (get, set, started: LibraryPlace, folderId: string) => {
     if (isSamePlace(get(libraryPlaceAtom), started)) set(reenterLibraryFolderAtom, folderId);
-    else set(replaceLibraryFolderAtom, folderId, folderId);
   },
 );
 export const normalizeLibraryFolderAtom = appRouteCorrection(normalizeLibraryFolder);
