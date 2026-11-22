@@ -102,7 +102,8 @@ export async function updateCachesAfterPlaybackPrepared(
   await invalidateSmartFolderCounts(queryClient);
 }
 
-/** excludedListKey は画面が apply で揃え済みの一覧。その key だけ無効化しない */
+/** excludedListKey は画面が apply で揃え済みの一覧。その key だけ無効化しない。
+ *  お気に入りはグループの値の件数・総時間に効くので値一覧も取り直す（再生は取り直さない。ADR-0040「件数」） */
 export async function updateCachesAfterBookmark(
   queryClient: QueryClient,
   change: { workId: string; bookmarked: boolean },
@@ -116,6 +117,7 @@ export async function updateCachesAfterBookmark(
     queryClient.invalidateQueries({
       predicate: (query) => isWorkListQuery(query) && query.queryHash !== excludedHash,
     }),
+    queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allGroupValues() }),
     invalidateSmartFolderCounts(queryClient),
   ]);
 }

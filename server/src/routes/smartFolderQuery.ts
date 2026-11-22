@@ -3,9 +3,8 @@
 // 木の組み立ては shared の buildEffectiveCondition に任せる。
 import {
   buildEffectiveCondition,
-  normalizeTag,
+  normalizeGroupValue,
   smartFolderGroupsRequestSchema,
-  tagSchema,
   smartFolderWorksRequestSchema,
   WORKS_DEFAULT_PAGE_SIZE,
   type GroupValueItem,
@@ -31,25 +30,13 @@ function selectedGroup(
   if (value === undefined) return undefined;
   const by = folder.groupBy;
   if (by === null) invalidRequest("グループ分けのないスマートフォルダーです");
-  switch (by.kind) {
-    case "addedYear":
-      if (!/^\d{4}$/.test(value)) invalidRequest("追加年は4桁の年で指定してください");
-      return { by, value };
-    case "tag":
-      return { by, value: validGroupTag(value) };
-    case "prefix": {
-      const tag = validGroupTag(`${by.prefix}/${value}`);
-      if (!tag.startsWith(`${by.prefix}/`)) invalidRequest("グループの値が不正です");
-      return { by, value: tag.slice(by.prefix.length + 1) };
-    }
+  const normalized = normalizeGroupValue(by, value);
+  if (normalized === null) {
+    invalidRequest(
+      by.kind === "addedYear" ? "追加年は4桁の年で指定してください" : "グループの値が不正です",
+    );
   }
-}
-
-function validGroupTag(tag: string): string {
-  const parsed = tagSchema.safeParse(tag);
-  const normalized = parsed.success ? normalizeTag(parsed.data) : null;
-  if (normalized === null) invalidRequest("グループの値が不正です");
-  return normalized;
+  return { by, value: normalized };
 }
 
 /** sort=random で seed が無い、契約にないキーを送るなど、契約に合わない要求は 400 */

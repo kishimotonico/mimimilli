@@ -10,6 +10,7 @@ export * from "./error.ts";
 export * from "./workPlacement.ts";
 export * from "./library.ts";
 export * from "./condition.ts";
+export * from "./groupFilter.ts";
 export * from "./smartFolder.ts";
 export * from "./pseudoTag.ts";
 export * from "./tagPrefix.ts";

@@ -9,26 +9,25 @@
 //   GET    /smart-folders/:id/works        作品一覧（scanRecord でスキャン記録の作品に絞れる）
 //   POST   /smart-folders/:id/groups       値一覧・「＋絞り込み」候補
 import { Hono } from "hono";
-import { z } from "zod";
+import { z, type ZodError } from "zod";
 import {
+  deleteViolation,
   findSmartFolderTemplate,
   needsCount,
+  restoreViolation,
   smartFolderFromTemplateSchema,
   smartFolderOrderSchema,
   smartFolderRestoreSchema,
   smartFolderWriteSchema,
+  updateViolation,
+  type PolicyViolation,
   type SmartFolder,
   type SmartFolderWrite,
 } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter/index.ts";
 import type { SmartFolderRow } from "../adapter/classification.ts";
-import {
-  assertDeletable,
-  assertRestorable,
-  assertUpdatable,
-  insertFromTemplate,
-} from "../core/smartFolderPolicy.ts";
-import { conflict, invalidRequest, notFound } from "../lib/httpError.ts";
+import { insertFromTemplate } from "../core/smartFolderPolicy.ts";
+import { apiError, conflict, invalidRequest, notFound } from "../lib/httpError.ts";
 import { readJsonBody } from "../lib/jsonBody.ts";
 import type { ScanRecordStore } from "../scanRecord.ts";
 import {
@@ -61,6 +60,17 @@ async function singleWithCount(adapter: DataAdapter, row: SmartFolderRow): Promi
   return item!;
 }
 
+/** 条件の検証エラーは、スキーマが返す文言（保存できない理由）をそのまま返す。それ以外は固定の文言 */
+function writeInvalidMessage(fallback: string): (error: ZodError) => string {
+  return (error) => error.issues.find((issue) => issue.code === "custom")?.message ?? fallback;
+}
+
+function rejectViolation(violation: PolicyViolation | null): void {
+  if (violation === null) return;
+  if (violation.kind === "forbidden") throw apiError("forbidden", violation.message);
+  invalidRequest(violation.message);
+}
+
 function notFoundFolder(id: string): never {
   notFound(`スマートフォルダーが見つかりません: ${id}`);
 }
@@ -84,7 +94,7 @@ export function smartFoldersRoute(adapter: DataAdapter, scanRecord: ScanRecordSt
     const data = await readJsonBody(
       c,
       smartFolderWriteSchema,
-      "スマートフォルダーの作成内容が不正です",
+      writeInvalidMessage("スマートフォルダーの作成内容が不正です"),
     );
     const row = await adapter.appendSmartFolder({
       id: `sf-${crypto.randomUUID()}`,
@@ -124,9 +134,9 @@ export function smartFoldersRoute(adapter: DataAdapter, scanRecord: ScanRecordSt
     const data = await readJsonBody(
       c,
       smartFolderRestoreSchema,
-      "復元するスマートフォルダーの内容が不正です",
+      writeInvalidMessage("復元するスマートフォルダーの内容が不正です"),
     );
-    assertRestorable(data);
+    rejectViolation(restoreViolation(data));
     const row = await adapter.restoreSmartFolder(data);
     if (!row) conflict(`すでにあるスマートフォルダーです: ${data.id}`);
     return c.json(await singleWithCount(adapter, row), 201);
@@ -137,11 +147,11 @@ export function smartFoldersRoute(adapter: DataAdapter, scanRecord: ScanRecordSt
     const data: SmartFolderWrite = await readJsonBody(
       c,
       smartFolderWriteSchema,
-      "スマートフォルダーの更新内容が不正です",
+      writeInvalidMessage("スマートフォルダーの更新内容が不正です"),
     );
     const existing = await adapter.getSmartFolder(id);
     if (!existing) notFoundFolder(id);
-    assertUpdatable(existing, data);
+    rejectViolation(updateViolation(existing, data));
     const row = await adapter.updateSmartFolder(id, data);
     if (!row) notFoundFolder(id);
     return c.json(await singleWithCount(adapter, row));
@@ -151,7 +161,7 @@ export function smartFoldersRoute(adapter: DataAdapter, scanRecord: ScanRecordSt
     const id = c.req.param("id");
     const existing = await adapter.getSmartFolder(id);
     if (!existing) notFoundFolder(id);
-    assertDeletable(existing);
+    rejectViolation(deleteViolation(existing));
     if (!(await adapter.deleteSmartFolder(id))) notFoundFolder(id);
     return c.body(null, 204);
   });

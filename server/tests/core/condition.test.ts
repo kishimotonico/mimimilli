@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { HTTPException } from "hono/http-exception";
-import { buildEffectiveCondition, type Condition, type GroupBy } from "@mimimilli/shared";
+import {
+  buildEffectiveCondition,
+  conditionSchema,
+  groupChipTag,
+  groupPredicate,
+  normalizeGroupValue,
+  type Condition,
+  type GroupBy,
+} from "@mimimilli/shared";
 import { createFixtureAdapter } from "../../src/adapters/fixture/index.ts";
 import { matchCondition } from "../../src/core/condition.ts";
 import {
@@ -50,6 +58,41 @@ test("buildEffectiveCondition はフォルダー・グループの値・チッ�
     { type: "and", children: [{ type: "tag", tag: "cv/水瀬" }] },
   );
   assert.deepEqual(buildEffectiveCondition({ condition: folder }), folder);
+});
+
+test("buildEffectiveCondition は検索語を trim し、空なら text を足さない。保存できる形のままになる", () => {
+  const base: Condition = { type: "and", children: [{ type: "bookmarked" }] };
+  const trimmed = buildEffectiveCondition({ condition: base, q: "  雨音 \t" });
+  assert.deepEqual(trimmed, {
+    type: "and",
+    children: [{ type: "bookmarked" }, { type: "text", q: "雨音" }],
+  });
+  assert.deepEqual(conditionSchema.parse(trimmed), trimmed);
+  for (const q of ["", "   ", "\u3000 \n"]) {
+    const effective = buildEffectiveCondition({ condition: base, q });
+    assert.deepEqual(effective, base, JSON.stringify(q));
+    assert.ok(conditionSchema.safeParse(effective).success);
+  }
+});
+
+test("グループの値の検証・述語・チップは1か所の規則で決まる", () => {
+  const cv: GroupBy = { kind: "prefix", prefix: "cv" };
+  assert.equal(normalizeGroupValue(cv, " 水瀬 "), "水瀬");
+  assert.equal(normalizeGroupValue(cv, "  "), null);
+  assert.equal(normalizeGroupValue({ kind: "tag" }, "CV/水瀬"), "cv/水瀬");
+  assert.equal(normalizeGroupValue({ kind: "tag" }, "@year/2025"), null);
+  assert.equal(normalizeGroupValue({ kind: "addedYear" }, "2025"), "2025");
+  for (const year of ["25", "20255", "２０２５", "abcd", ""]) {
+    assert.equal(normalizeGroupValue({ kind: "addedYear" }, year), null, year);
+  }
+  assert.deepEqual(groupPredicate(cv, "水瀬"), { type: "tag", tag: "cv/水瀬" });
+  assert.deepEqual(groupPredicate({ kind: "addedYear" }, "2025"), {
+    type: "addedYear",
+    year: "2025",
+  });
+  assert.equal(groupChipTag(cv, "水瀬"), "cv/水瀬");
+  assert.equal(groupChipTag({ kind: "tag" }, "耳かき"), "耳かき");
+  assert.equal(groupChipTag({ kind: "addedYear" }, "2025"), "@year/2025");
 });
 
 test("matchCondition は長さ不明・未再生・基準時刻ちょうどを意味表どおりに扱う", () => {

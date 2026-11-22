@@ -7,50 +7,9 @@ import {
   groupByOptions,
   missingTemplates,
   reorderIds,
-  smartFolderPermissions,
   withoutRootChild,
 } from "../../src/features/library/model/smartFolderEditing";
-import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
-
-describe("smartFolderPermissions", () => {
-  const byId = (id: string) => defaultSmartFolders().find((folder) => folder.id === id)!;
-
-  it("自作は何でも変えられる", () => {
-    expect(smartFolderPermissions(buildSmartFolder())).toEqual({
-      rename: true,
-      editCondition: true,
-      editGroupBy: true,
-      inheritSort: true,
-      remove: true,
-      edit: true,
-    });
-  });
-
-  it("既定は名前・並び・削除だけ。条件とグループ分けは変えられない", () => {
-    const permissions = smartFolderPermissions(byId("by-cv"));
-    expect(permissions).toMatchObject({
-      rename: true,
-      editCondition: false,
-      editGroupBy: false,
-      remove: true,
-    });
-  });
-
-  it("「すべて」は名前・条件・グループ分け・削除ができず、並びを継承にもできない", () => {
-    expect(smartFolderPermissions(byId("all"))).toMatchObject({
-      rename: false,
-      editCondition: false,
-      editGroupBy: false,
-      inheritSort: false,
-      remove: false,
-    });
-  });
-
-  it("壊れた行は削除だけ", () => {
-    const permissions = smartFolderPermissions(buildSmartFolder({ condition: null }));
-    expect(permissions).toMatchObject({ edit: false, remove: true, rename: false });
-  });
-});
+import { defaultSmartFolders } from "../helpers/smartFolders";
 
 describe("reorderIds", () => {
   const ids = ["a", "b", "c", "d"];

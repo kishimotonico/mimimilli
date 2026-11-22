@@ -3,8 +3,8 @@
 // コンポーネントの配線から切り離してテスト可能にする。
 
 import {
-  buildBuiltinPseudoTag,
-  normalizeTag,
+  groupChipTag,
+  normalizeGroupValue,
   parseBuiltinPseudoTag,
   TagNormalizationError,
   type GroupValueItem,
@@ -25,42 +25,22 @@ import { groupByKey } from "./smartFolderEditing";
  *  tag は GroupValueItem.value が既に完全なタグ文字列（ADR-0005）、
  *  addedYear は擬似タグ（@year/値）、prefix は "prefix/値" の実タグとして表現する。 */
 export function buildFilterTag(groupBy: GroupBy, value: string): NormalizedTag {
-  switch (groupBy.kind) {
-    case "tag": {
-      const normalized = normalizeTag(value);
-      if (normalized === null) throw new TagNormalizationError(value);
-      return normalized;
-    }
-    case "addedYear":
-      return buildBuiltinPseudoTag("year", value);
-    case "prefix": {
-      const normalized = normalizeTag(`${groupBy.prefix}/${value}`);
-      if (normalized === null) throw new TagNormalizationError(`${groupBy.prefix}/${value}`);
-      return normalized;
-    }
-  }
+  const normalized = normalizeGroupValue(groupBy, value);
+  if (normalized === null) throw new TagNormalizationError(value);
+  return groupChipTag(groupBy, normalized);
 }
 
-/** サーバー由来の値一覧から、buildFilterTag が正規化できない値を取り除く。
- *  グループの値一覧はこれを通ったデータだけを描画対象にすることで、不正値による
- *  render中throw（RootErrorBoundaryへの巻き込み）を経路として残さない。 */
-export function filterValidGroupValueItems<T extends GroupValueItem>(
-  groupBy: GroupBy,
-  items: T[],
-): T[] {
-  return items.filter((item) => {
-    try {
-      buildFilterTag(groupBy, item.value);
-      return true;
-    } catch (cause) {
-      if (!(cause instanceof TagNormalizationError)) throw cause;
-      console.warn(
-        `グループ分け「${groupByKey(groupBy)}」の値「${item.value}」を正規化できないためスキップしました`,
-        cause,
+/** サーバーの値一覧が、グループの値として使えるものだけかを確かめる。使えない値はサーバーとの契約違反なので、
+ *  読み飛ばさず一覧の取得エラーにする（描画中の throw にしない） */
+export function assertGroupValueItems<T extends GroupValueItem>(groupBy: GroupBy, items: T[]): T[] {
+  for (const item of items) {
+    if (normalizeGroupValue(groupBy, item.value) === null) {
+      throw new Error(
+        `グループ分け「${groupByKey(groupBy)}」の値「${item.value}」はグループの値として使えません`,
       );
-      return false;
     }
-  });
+  }
+  return items;
 }
 
 /** チップ表示用の文字列。design-system.md の「チップはフルパス表示」規約は維持しつつ、
@@ -69,9 +49,7 @@ export function filterValidGroupValueItems<T extends GroupValueItem>(
 export function formatFilterChipLabel(tag: NormalizedTag): string {
   const builtin = parseBuiltinPseudoTag(tag);
   if (!builtin) return tag;
-  const groupBy: GroupBy =
-    builtin.key === "year" ? { kind: "addedYear" } : { kind: "prefix", prefix: builtin.key };
-  return `${getGroupByLabel(groupBy)}/${builtin.value}`;
+  return `${getGroupByLabel({ kind: "addedYear" })}/${builtin.value}`;
 }
 
 /** 作品一覧の描画結果（グリッド・リスト・エラー境界）を再マウントすべきタイミングを表す

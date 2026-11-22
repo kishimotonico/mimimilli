@@ -1,20 +1,15 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useRef, useState } from "react";
 import { useSetAtom } from "jotai";
 import { AnimatePresence } from "motion/react";
-import { monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
-import { extractInstruction } from "@atlaskit/pragmatic-drag-and-drop-hitbox/list-item";
 import {
-  ALL_SMART_FOLDER_ID,
-  type Condition,
+  isReadableSmartFolder,
+  smartFolderPermissions,
   type NormalizedTag,
   type SmartFolder,
   type TagPrefix,
 } from "@mimimilli/shared";
 import { getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
-import {
-  useHoverGroupCoordinator,
-  type HoverGroupTriggerHandlers,
-} from "../../../shared/lib/useHoverGroupCoordinator";
+import { useHoverGroupCoordinator } from "../../../shared/lib/useHoverGroupCoordinator";
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
@@ -23,61 +18,14 @@ import { usePopoverDismissal } from "../../../shared/ui/usePopoverDismissal";
 import { formatDuration } from "../../../shared/lib/format";
 import { smartFolderDialogAtom } from "../model/atoms";
 import type { CollectionStatsDisplay } from "../model/libraryPresentation";
-import { buildSidebarRows, type DataIntegrityCount, type SidebarRow } from "../model/sidebarRows";
-import { missingTemplates, reorderIds, smartFolderPermissions } from "../model/smartFolderEditing";
+import { buildSidebarRows, type DataIntegrityCount } from "../model/sidebarRows";
+import { missingTemplates } from "../model/smartFolderEditing";
+import { useSidebarReorder } from "./useSidebarReorder";
 import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
 import GroupQuickOverlay from "./GroupQuickOverlay";
 import SidebarAddMenu from "./SidebarAddMenu";
-import SidebarEditRow, { SMART_FOLDER_DRAG_TYPE } from "./SidebarEditRow";
-
-interface SidebarRowItemProps {
-  row: SidebarRow;
-  isActive: boolean;
-  isOverlayOpen: boolean;
-  onSelect: () => void;
-  getTriggerHandlers: (key: string) => HoverGroupTriggerHandlers;
-  openImmediately: (key: string, el: HTMLElement | null) => void;
-}
-
-function SidebarRowItem({
-  row,
-  isActive,
-  isOverlayOpen,
-  onSelect,
-  getTriggerHandlers,
-  openImmediately,
-}: SidebarRowItemProps) {
-  const rowRef = useRef<HTMLButtonElement>(null);
-
-  const handleKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
-    if (!row.hasQuickOverlay || isOverlayOpen) return;
-    if (event.key === "ArrowRight") {
-      event.preventDefault();
-      openImmediately(row.id, rowRef.current);
-    }
-  };
-
-  const Icon = I[row.icon];
-  return (
-    <button
-      ref={rowRef}
-      type="button"
-      className={`mll-sbrow ${isActive ? "is-on" : ""}`}
-      aria-current={isActive ? "true" : undefined}
-      aria-expanded={row.hasQuickOverlay ? isOverlayOpen : undefined}
-      onClick={onSelect}
-      onKeyDown={handleKeyDown}
-      {...(row.hasQuickOverlay ? getTriggerHandlers(row.id) : undefined)}
-    >
-      <Icon size={15} />
-      <span className="nm">{row.name}</span>
-      {row.count !== null && (
-        <span className={`ct ${row.countTone === "error" ? "is-error" : ""}`}>{row.count}</span>
-      )}
-      {row.hasQuickOverlay && <I.chev size={12} className="chev" />}
-    </button>
-  );
-}
+import SidebarEditRow from "./SidebarEditRow";
+import SidebarRowItem from "./SidebarRowItem";
 
 export type SidebarFolders =
   | { status: "ready"; folders: SmartFolder[] }
@@ -97,8 +45,6 @@ interface LibrarySidebarPanelProps {
   /** 「今の検索を保存」。保存のダイアログを開く */
   onSaveSearch?: () => void;
   onOpenFolder: (folderId: string) => void;
-  /** 開いているスマートフォルダーを消したとき、「すべて」へ置き換えで移る */
-  onReplaceFolder: (folderId: string) => void;
   /** クイックオーバーレイの値。主クリックも Ctrl+クリックもその値の作品一覧へ進む */
   onOpenGroupValue: (folderId: string, group: string) => void;
   /** クイックオーバーレイの追加ボタン */
@@ -115,7 +61,6 @@ export default function LibrarySidebarPanel({
   filtered = false,
   onSaveSearch,
   onOpenFolder,
-  onReplaceFolder,
   onOpenGroupValue,
   onAddTag,
 }: LibrarySidebarPanelProps) {
@@ -146,40 +91,16 @@ export default function LibrarySidebarPanel({
     anchorRef: headerRef,
   });
 
-  const orderedIds = readyFolders.map((folder) => folder.id);
-  const orderedIdsRef = useRef(orderedIds);
-  orderedIdsRef.current = orderedIds;
-  const reorderRef = useRef(editor.reorder);
-  reorderRef.current = editor.reorder;
-  const closeOverlayRef = useRef(closeOverlay);
-  closeOverlayRef.current = closeOverlay;
-
-  useEffect(() => {
-    if (!editing) return;
-    return monitorForElements({
-      canMonitor: ({ source }) => source.data.type === SMART_FOLDER_DRAG_TYPE,
-      onDragStart: () => closeOverlayRef.current(),
-      onDrop: ({ source, location }) => {
-        const target = location.current.dropTargets[0];
-        if (!target) return;
-        const operation = extractInstruction(target.data)?.operation;
-        if (operation !== "reorder-before" && operation !== "reorder-after") return;
-        const next = reorderIds(
-          orderedIdsRef.current,
-          String(source.data.id),
-          String(target.data.id),
-          operation,
-        );
-        if (next) void reorderRef.current(next);
-      },
-    });
-  }, [editing]);
+  useSidebarReorder({
+    enabled: editing,
+    orderedIds: readyFolders.map((folder) => folder.id),
+    reorder: editor.reorder,
+    onDragStart: closeOverlay,
+  });
 
   const activeFolder = readyFolders.find((folder) => folder.id === activeFolderId) ?? null;
   const duplicateSource =
-    activeFolder && activeFolder.condition !== null && !filtered
-      ? (activeFolder as SmartFolder & { condition: Condition })
-      : null;
+    activeFolder && isReadableSmartFolder(activeFolder) && !filtered ? activeFolder : null;
 
   const startEditing = () => {
     closeOverlay();
@@ -273,18 +194,9 @@ export default function LibrarySidebarPanel({
               canRemove={permissions.remove}
               draggableEnabled={!isMobile}
               onEdit={() => {
-                if (folder.condition !== null) {
-                  setDialog({
-                    kind: "edit",
-                    folder: folder as SmartFolder & { condition: Condition },
-                  });
-                }
+                if (isReadableSmartFolder(folder)) setDialog({ kind: "edit", folder });
               }}
-              onRemove={() =>
-                void editor.remove(folder, () => {
-                  if (folder.id === activeFolderId) onReplaceFolder(ALL_SMART_FOLDER_ID);
-                })
-              }
+              onRemove={() => void editor.remove(folder)}
             />
           );
         })}

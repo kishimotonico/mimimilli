@@ -2,10 +2,8 @@
 // 権限・並べ替え・条件の表示・グループ分けの選択肢・複製と追加の下書きを持つ。
 
 import {
-  ALL_SMART_FOLDER_ID,
   EMPTY_CONDITION,
   SMART_FOLDER_TEMPLATES,
-  findSmartFolderTemplate,
   rootChildren,
   type Condition,
   type GroupBy,
@@ -16,41 +14,6 @@ import {
   type SortId,
   type TagPrefix,
 } from "@mimimilli/shared";
-
-export interface SmartFolderPermissions {
-  rename: boolean;
-  editCondition: boolean;
-  editGroupBy: boolean;
-  /** 既定の並びを「『すべて』と同じ」（null）にできるか */
-  inheritSort: boolean;
-  remove: boolean;
-  /** 編集のダイアログを開けるか。壊れた行は削除だけ */
-  edit: boolean;
-}
-
-/** 権限を決めるのはテンプレートの固定 ID だけ。サーバーの assertUpdatable・assertDeletable と同じ規則 */
-export function smartFolderPermissions(folder: SmartFolder): SmartFolderPermissions {
-  if (folder.condition === null) {
-    return {
-      rename: false,
-      editCondition: false,
-      editGroupBy: false,
-      inheritSort: false,
-      remove: true,
-      edit: false,
-    };
-  }
-  const isAll = folder.id === ALL_SMART_FOLDER_ID;
-  const isTemplate = findSmartFolderTemplate(folder.id) !== undefined;
-  return {
-    rename: !isAll,
-    editCondition: !isTemplate,
-    editGroupBy: !isTemplate,
-    inheritSort: !isAll,
-    remove: !isAll,
-    edit: true,
-  };
-}
 
 // ── 並べ替え ─────────────────────────────────────────────────
 

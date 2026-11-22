@@ -188,13 +188,13 @@ describe("bookmark の必須更新", () => {
     });
   });
 
-  it("一覧（works の list 形と smartFolderWorks）とスマートフォルダーの件数だけを無効化し、総件数・グループの値・詳細は無効化しない", async () => {
+  it("一覧（works の list 形と smartFolderWorks）・グループの値・スマートフォルダーの件数だけを無効化し、総件数・詳細は無効化しない", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterBookmark(queryClient, { workId: "w1", bookmarked: true });
 
     expect(sorted(invalidatedKeys(queryClient))).toEqual(
-      sorted(["list", "otherList", "smartWorks", "smartFolders"]),
+      sorted(["list", "otherList", "smartWorks", "groupValues", "smartFolders"]),
     );
   });
 

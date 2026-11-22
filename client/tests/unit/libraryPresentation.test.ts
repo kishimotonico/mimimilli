@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { GroupValueItem } from "@mimimilli/shared";
 import { ApiRequestError } from "../../src/shared/api/http";
 import { nt } from "../helpers/tag";
@@ -7,7 +7,7 @@ import {
   buildWorksResetKey,
   computeCollectionStatsDisplay,
   computeIsNoResultsDueToFilter,
-  filterValidGroupValueItems,
+  assertGroupValueItems,
   formatFilterChipLabel,
   shouldClearSelectionOnFilterMiss,
   shouldClearSelectionOnWorkNotFound,
@@ -29,24 +29,17 @@ describe("buildFilterTag", () => {
   });
 });
 
-describe("filterValidGroupValueItems", () => {
-  it("正規化できない値をスキップしconsole.warnする", () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-    const result = filterValidGroupValueItems({ kind: "tag" }, [
-      groupValueItem("cv/藤田茜"),
-      groupValueItem("   "),
-    ]);
-
-    expect(result).toEqual([groupValueItem("cv/藤田茜")]);
-    expect(warn).toHaveBeenCalledTimes(1);
-    warn.mockRestore();
+describe("assertGroupValueItems", () => {
+  it("グループの値として使えない値があれば、読み飛ばさず投げる", () => {
+    expect(() =>
+      assertGroupValueItems({ kind: "tag" }, [groupValueItem("cv/藤田茜"), groupValueItem("   ")]),
+    ).toThrow("使えません");
   });
 
-  it("すべて正規化できる値ならそのまま返す", () => {
-    const items = [groupValueItem("cv/藤田茜"), groupValueItem("cv/霧島レイ")];
+  it("すべて使える値ならそのまま返す", () => {
+    const items = [groupValueItem("藤田茜"), groupValueItem("霧島レイ")];
 
-    expect(filterValidGroupValueItems({ kind: "prefix", prefix: "cv" }, items)).toEqual(items);
+    expect(assertGroupValueItems({ kind: "prefix", prefix: "cv" }, items)).toBe(items);
   });
 });
 

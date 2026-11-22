@@ -3,7 +3,8 @@
 // 絞り込みを重ねた1本の木の組み立て（buildEffectiveCondition）は、サーバーの評価と
 // クライアントの保存が同じ規則を使うためここに置く。
 import { z } from "zod";
-import type { TagFilters } from "./pseudoTag.ts";
+import { groupPredicate } from "./groupFilter.ts";
+import { YEAR_VALUE_PATTERN, type TagFilters } from "./pseudoTag.ts";
 import type { GroupBy } from "./smartFolder.ts";
 import { normalizeTag, tagSchema } from "./tagNormalize.ts";
 
@@ -75,7 +76,7 @@ function treeSchema(
       object({ type: z.literal("bookmarked") }),
       object({ type: z.literal("played"), withinDays: positiveInt.optional() }),
       object({ type: z.literal("added"), withinDays: positiveInt }),
-      object({ type: z.literal("addedYear"), year: z.string().regex(/^\d{4}$/) }),
+      object({ type: z.literal("addedYear"), year: z.string().regex(YEAR_VALUE_PATTERN) }),
       object({ type: z.literal("hasError") }),
       object({ type: z.literal("text"), q }),
     ]),
@@ -186,18 +187,13 @@ export interface EffectiveConditionInput {
   group?: { by: GroupBy; value: string };
   /** チップ。擬似タグ @year/… は分解済みの yearValue で届く */
   tags?: TagFilters;
+  /** 前後の空白は落とす（保存スキーマの text と同じ正規形）。空なら text を足さない */
   q?: string;
 }
 
-function groupPredicate(by: GroupBy, value: string): Condition {
-  switch (by.kind) {
-    case "prefix":
-      return { type: "tag", tag: `${by.prefix}/${value}` };
-    case "tag":
-      return { type: "tag", tag: value };
-    case "addedYear":
-      return { type: "addedYear", year: value };
-  }
+/** 検索語の正規形（前後の空白を落とす）。空なら絞り込みに効かない。保存スキーマの text と同じ規則 */
+export function normalizeSearchQuery(q: string | undefined): string {
+  return q?.trim() ?? "";
 }
 
 /** スマートフォルダー・グループの値・チップ・検索語から1本の木を作る。
@@ -209,7 +205,8 @@ export function buildEffectiveCondition(input: EffectiveConditionInput): Conditi
   for (const tag of input.tags?.tags ?? []) children.push({ type: "tag", tag });
   if (input.tags?.yearValue != null)
     children.push({ type: "addedYear", year: input.tags.yearValue });
-  if (input.q) children.push({ type: "text", q: input.q });
+  const q = normalizeSearchQuery(input.q);
+  if (q) children.push({ type: "text", q });
   return children.length === 0 ? EMPTY_CONDITION : { type: "and", children };
 }
 

@@ -55,10 +55,14 @@ export function openLibraryFolder(route: AppRoute, folderId: string): Transition
   };
 }
 
-/** 開いているスマートフォルダーが消えたとき、履歴を積まずに入り直す */
-export function replaceLibraryFolder(route: AppRoute, folderId: string): Transition | null {
-  if (route.mode !== "library") return null;
-  return { ...openLibraryFolder(route, folderId), replace: true };
+/** 開いているスマートフォルダーが消えたとき、履歴を積まずに入り直す。作品詳細などライブラリ以外の画面で
+ *  保持しているライブラリの folderId も置き換え、画面はそのまま保つ */
+export function replaceLibraryFolder(route: AppRoute, folderId: string): Transition {
+  const entered = openLibraryFolder(route, folderId).route;
+  return {
+    route: route.mode === "library" ? entered : { ...route, library: entered.library },
+    replace: true,
+  };
 }
 
 /** サイドバーのクイックオーバーレイから、グループの値の作品一覧へ入る */

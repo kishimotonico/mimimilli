@@ -1,5 +1,11 @@
 import { useId, useRef, useState } from "react";
-import { rootChildren, type SortId, type TagPrefix } from "@mimimilli/shared";
+import {
+  rootChildren,
+  smartFolderPermissions,
+  type SmartFolderPermissions,
+  type SortId,
+  type TagPrefix,
+} from "@mimimilli/shared";
 import { SORT_OPTIONS } from "../../../entities/library/types";
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
@@ -14,12 +20,10 @@ import {
   groupByKey,
   groupByOptions,
   groupDraft,
-  smartFolderPermissions,
   toWrite,
   withoutRootChild,
   type SmartFolderDialogTarget,
   type SmartFolderDraft,
-  type SmartFolderPermissions,
 } from "../model/smartFolderEditing";
 
 interface SmartFolderDialogProps {

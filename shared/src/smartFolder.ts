@@ -2,6 +2,8 @@
 import { z } from "zod";
 import { tagFiltersQuerySchema } from "./api.ts";
 import {
+  conditionKey,
+  EMPTY_CONDITION,
   conditionSchema,
   conditionTreeSchema,
   isEmptyCondition,
@@ -54,6 +56,10 @@ export type ReadableSmartFolder = SmartFolder & { condition: Condition };
 
 export function isBrokenSmartFolder(item: SmartFolder): item is BrokenSmartFolder {
   return item.condition === null;
+}
+
+export function isReadableSmartFolder(item: SmartFolder): item is ReadableSmartFolder {
+  return item.condition !== null;
 }
 
 export const smartFolderListSchema = z.array(smartFolderSchema);
@@ -215,4 +221,100 @@ export type SmartFolderFromTemplate = z.infer<typeof smartFolderFromTemplateSche
 
 export function findSmartFolderTemplate(id: string): SmartFolderTemplate | undefined {
   return SMART_FOLDER_TEMPLATES.find((template) => template.id === id);
+}
+
+// ── 編集の権限 ───────────────────────────────────────────────
+
+/** 権限を決めるのはテンプレートの固定 ID と、条件を読めるかだけ。条件の意味では決めない。
+ *  client の UI の出し分けと server の検証が、この規則を共有する */
+export interface SmartFolderPermissions {
+  rename: boolean;
+  editCondition: boolean;
+  editGroupBy: boolean;
+  /** 既定の並びを「『すべて』と同じ」（null）にできるか */
+  inheritSort: boolean;
+  remove: boolean;
+  /** 編集できるか。壊れた行は削除だけ */
+  edit: boolean;
+}
+
+export function smartFolderPermissions(
+  folder: Pick<SmartFolder, "id" | "condition">,
+): SmartFolderPermissions {
+  const isAll = folder.id === ALL_SMART_FOLDER_ID;
+  if (folder.condition === null) {
+    return {
+      rename: false,
+      editCondition: false,
+      editGroupBy: false,
+      inheritSort: false,
+      remove: !isAll,
+      edit: false,
+    };
+  }
+  const isTemplate = findSmartFolderTemplate(folder.id) !== undefined;
+  return {
+    rename: !isAll,
+    editCondition: !isTemplate,
+    editGroupBy: !isTemplate,
+    inheritSort: !isAll,
+    remove: !isAll,
+    edit: true,
+  };
+}
+
+/** 権限の違反。forbidden は 403、invalid は 400 に写す */
+export interface PolicyViolation {
+  kind: "forbidden" | "invalid";
+  message: string;
+}
+
+const forbidden = (message: string): PolicyViolation => ({ kind: "forbidden", message });
+const invalid = (message: string): PolicyViolation => ({ kind: "invalid", message });
+
+function sameTemplateDefinition(
+  template: SmartFolderTemplate,
+  folder: { condition: Condition; groupBy: GroupBy | null },
+): boolean {
+  return (
+    conditionKey(folder.condition) === conditionKey(template.condition) &&
+    JSON.stringify(folder.groupBy) === JSON.stringify(template.groupBy)
+  );
+}
+
+/** 更新の違反。既定のものは名前・既定の並びだけ変えられる。「すべて」は名前も変えられず、並びを null にもできない。
+ *  壊れた行への上書きも同じ規則で通す（UI は削除だけを出すが、API は定義が規則に合う作り直しを受ける） */
+export function updateViolation(
+  existing: Pick<SmartFolder, "id" | "name">,
+  write: SmartFolderWrite,
+): PolicyViolation | null {
+  const permissions = smartFolderPermissions({ id: existing.id, condition: EMPTY_CONDITION });
+  const template = findSmartFolderTemplate(existing.id);
+  if (template && !permissions.editCondition && !sameTemplateDefinition(template, write)) {
+    return forbidden("既定のスマートフォルダーの条件・グループ分けは変更できません");
+  }
+  if (!permissions.rename && write.name !== existing.name) {
+    return forbidden("「すべて」の名前は変更できません");
+  }
+  if (!permissions.inheritSort && write.sort === null) {
+    return invalid("「すべて」の既定の並びは空にできません");
+  }
+  return null;
+}
+
+export function deleteViolation(
+  existing: Pick<SmartFolder, "id" | "condition">,
+): PolicyViolation | null {
+  return smartFolderPermissions(existing).remove ? null : forbidden("「すべて」は削除できません");
+}
+
+/** テンプレートの固定 ID の行は、条件・グループ分けがテンプレートと一致するときだけ戻せる */
+export function restoreViolation(restore: SmartFolderRestore): PolicyViolation | null {
+  const template = findSmartFolderTemplate(restore.id);
+  if (template && !sameTemplateDefinition(template, restore)) {
+    return invalid(
+      "既定のスマートフォルダーは、条件・グループ分けがテンプレートと同じものだけ戻せます",
+    );
+  }
+  return null;
 }

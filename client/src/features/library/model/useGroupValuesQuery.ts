@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { GroupBy, NormalizedTag } from "@mimimilli/shared";
 import { getSmartFolderGroups } from "../../../entities/smart-folder/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
-import { filterValidGroupValueItems } from "./libraryPresentation";
+import { assertGroupValueItems } from "./libraryPresentation";
 import { groupByKey } from "./smartFolderEditing";
 
 /** 候補を数える母集団。サイドバーの値一覧は絞り込み無し、「＋絞り込み」は開いている一覧の状態 */
@@ -30,7 +30,7 @@ export function useGroupValuesQuery(groupBy: GroupBy | null, scope: GroupValueSc
         groupBy: groupBy!,
         ...filter,
       });
-      return filterValidGroupValueItems(groupBy!, items);
+      return assertGroupValueItems(groupBy!, items);
     },
     enabled: groupBy !== null,
   });

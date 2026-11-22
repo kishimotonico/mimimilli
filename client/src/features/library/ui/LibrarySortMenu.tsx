@@ -3,8 +3,7 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { libraryRouteAtom } from "../../../entities/library/model/navigationAtoms";
 import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { SortId } from "@mimimilli/shared";
+import { isReadableSmartFolder, type SortId } from "@mimimilli/shared";
 import { SORT_OPTIONS } from "../../../entities/library/types";
 import { groupValueSortAtom } from "../model/atoms";
 import {
@@ -12,15 +11,12 @@ import {
   reshuffleLibrarySeedAtom,
 } from "../../../entities/library/model/navigationActions";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
+import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
 import {
   GROUP_VALUE_SORT_OPTIONS,
   selectGroupValueSortKey,
   type GroupValueSortKey,
 } from "../model/groupValueSort";
-import { updateSmartFolder } from "../../../entities/smart-folder/api";
-import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
-import { apiErrorMessage } from "../../../shared/lib/apiError";
-import { useToast } from "../../../shared/ui/useToast";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import { usePopoverDismissal } from "../../../shared/ui/usePopoverDismissal";
@@ -58,7 +54,8 @@ function ReadySortMenu({
   setSort: (sort: SortId) => void;
 }) {
   const routeFolderId = useAtomValue(libraryRouteAtom).folderId;
-  const queryClient = useQueryClient();
+  const editor = useSmartFolderEditor();
+  const [savingDefault, setSavingDefault] = useState(false);
   const [groupValueSort, setGroupValueSort] = useAtom(groupValueSortAtom);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
@@ -72,24 +69,14 @@ function ReadySortMenu({
     ? getGroupValueSortLabel(groupValueSort.key)
     : getSortLabel(sort);
 
-  const toast = useToast();
-  const saveAsDefault = useMutation({
-    mutationFn: (saved: { folderId: string; routeFolderId: string; sort: SortId }) => {
-      if (view.kind === "broken") throw new Error("読めないスマートフォルダーは保存できません");
-      const { folder } = view;
-      return updateSmartFolder(saved.folderId, {
-        name: folder.name,
-        condition: view.condition,
-        sort: saved.sort,
-        groupBy: folder.groupBy,
-      });
-    },
-    onSuccess: async (_result, saved) => {
-      await queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.all() });
-      clearCurrentSort({ folderId: saved.routeFolderId, sort: saved.sort });
-    },
-    onError: (err) => toast.error(apiErrorMessage(err, "並びを既定にできませんでした")),
-  });
+  const saveAsDefault = async () => {
+    const { folder } = view;
+    if (view.kind === "broken" || !isReadableSmartFolder(folder)) return;
+    setSavingDefault(true);
+    const saved = await editor.saveDefaultSort(folder, sort);
+    setSavingDefault(false);
+    if (saved) clearCurrentSort({ folderId: routeFolderId, sort });
+  };
 
   const buttonTitle = currentSortLabel ? `並び替え: ${currentSortLabel}` : "並び替え";
 
@@ -203,9 +190,9 @@ function ReadySortMenu({
               type="button"
               role="menuitem"
               className="mle-sortmenu__item"
-              disabled={saveAsDefault.isPending}
+              disabled={savingDefault}
               onClick={() => {
-                saveAsDefault.mutate({ folderId: view.folder.id, routeFolderId, sort });
+                void saveAsDefault();
                 closeSortMenu();
               }}
             >

@@ -4,16 +4,15 @@
 import {
   ALL_SMART_FOLDER_ID,
   buildEffectiveCondition,
+  normalizeSearchQuery,
+  parseTag,
+  smartFolderPermissions,
   splitSelectedTags,
   type SmartFolder,
   type SmartFolderWrite,
 } from "@mimimilli/shared";
 import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
-import {
-  smartFolderPermissions,
-  type SmartFolderDialogTarget,
-  type SmartFolderDraft,
-} from "./smartFolderEditing";
+import { type SmartFolderDialogTarget, type SmartFolderDraft } from "./smartFolderEditing";
 
 export type WorksView = Extract<ResolvedLibraryView, { kind: "works" }>;
 
@@ -36,7 +35,8 @@ export function saveOffer(view: ResolvedLibraryView): SaveOffer | null {
   if (isOverwritable(view) && (view.selectedTags.length > 0 || view.sortDeviates)) {
     return "overwrite";
   }
-  const filtered = view.group !== null || view.selectedTags.length > 0 || view.q !== "";
+  const filtered =
+    view.group !== null || view.selectedTags.length > 0 || normalizeSearchQuery(view.q) !== "";
   return filtered ? "save" : null;
 }
 
@@ -55,9 +55,10 @@ function effectiveCondition(view: WorksView) {
 function defaultName(view: WorksView): string {
   if (view.group !== null) return view.group;
   if (view.selectedTags.length > 0) {
-    return view.selectedTags.map((tag) => tag.split("/").pop()).join("・");
+    return view.selectedTags.map((tag) => parseTag(tag).value).join("・");
   }
-  return view.q !== "" ? view.q : `${view.folder.name}（コピー）`;
+  const q = normalizeSearchQuery(view.q);
+  return q !== "" ? q : `${view.folder.name}（コピー）`;
 }
 
 /** 並びを変えていないときに写す元の既定の並び。「すべて」は継承（null）にして、同じ並びで見え続けるようにする */

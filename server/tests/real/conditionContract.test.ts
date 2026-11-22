@@ -64,9 +64,9 @@ const tagSets = [
   ["cv/水瀬なずな", "asmr", "気分/睡眠用"],
   ["cv/霧島レイ", "気分/作業用"],
   ["cv/水瀬なずな", "催眠", "シリーズ/夜"],
-  ["サークル/夜想曲", "添い寝"],
+  ["サークル/夜想曲", "添い寝", "ASMR", "サークル/Alpha"],
   [],
-  ["耳かき", "催眠"],
+  ["耳かき", "催眠", "cv"],
 ];
 
 function coverFor(index: number, id: string): WorkSummary["cover"] {
@@ -252,7 +252,7 @@ function normalizeGroupValues(items: GroupValueItem[]) {
   }));
 }
 
-test("条件の木の一覧は fixture と real で作品 ID 列・total・stats が一致する", async () => {
+test("条件の木の一覧は fixture と real で作品の項目全体・total・stats が一致する", async () => {
   const { fixture, real } = await setup();
   for (const condition of trees) {
     const sort = pick(sortIdSchema.options);
@@ -267,11 +267,7 @@ test("条件の木の一覧は fixture と real で作品 ID 列・total・stats
     const expected = await fixture.queryWorks(query, ctx);
     const actual = await real.queryWorks(query, ctx);
     const label = JSON.stringify(query);
-    assert.deepEqual(
-      actual.items.map((work) => work.id),
-      expected.items.map((work) => work.id),
-      `ordered IDs: ${label}`,
-    );
+    assert.deepEqual(actual.items, expected.items, `items: ${label}`);
     assert.equal(actual.total, expected.total, `total: ${label}`);
     assert.deepEqual(actual.stats, expected.stats, `stats: ${label}`);
   }
@@ -341,6 +337,26 @@ const semanticCases: Array<{ name: string; condition: Condition; expected: strin
     expected: ids((w) => !w.tags.some((t) => t.startsWith("cv/"))),
   },
   {
+    name: "tag は完全一致で、cv は cv/… に一致せず、接頭辞なしの cv だけに一致する",
+    condition: and(tag("cv")),
+    expected: ids((w) => w.tags.some((t) => t === "cv")),
+  },
+  {
+    name: "tag の値は大文字小文字を区別する（asmr は ASMR に一致しない）",
+    condition: and(tag("asmr")),
+    expected: ids((w) => w.tags.some((t) => t === "asmr")),
+  },
+  {
+    name: "tag の ASMR は asmr に一致しない",
+    condition: and(tag("ASMR")),
+    expected: ids((w) => w.tags.some((t) => t === "ASMR")),
+  },
+  {
+    name: "hasPrefix は cv/ で始まるタグだけに一致し、接頭辞なしの cv を含まない",
+    condition: and({ type: "hasPrefix", prefix: "cv" }),
+    expected: ids((w) => w.tags.some((t) => t.startsWith("cv/"))),
+  },
+  {
     name: "hasError は missing と error の両方",
     condition: and({ type: "hasError" }),
     expected: ids((w) => w.status !== "ok"),
@@ -363,6 +379,32 @@ test("意味表の境界が独立に書いた期待値と fixture・real の両�
         `${name} (${kind})`,
       );
     }
+  }
+});
+
+test("circleName は独立に書いた期待値（サークルタグの値のバイト順の先頭）と fixture・real の両方で一致する", async () => {
+  const adapters = await setup();
+  const circle = (work: WorkSummary): string | null => {
+    const values = work.tags.filter((t) => t.startsWith("サークル/")).map((t) => t.slice(5));
+    return values.sort()[0] ?? null;
+  };
+  const expected = dataset.map((work) => [work.id, circle(work)]);
+  assert.ok(
+    expected.some(([, name]) => name === "Alpha"),
+    "複数サークルは先頭を採る",
+  );
+  assert.ok(expected.some(([, name]) => name === null));
+  const query = { condition: and(), sort: "id-asc" as const, page: 1, limit: 500 };
+  for (const [kind, adapter] of [
+    ["fixture", adapters.fixture],
+    ["real", adapters.real],
+  ] as const) {
+    const page = await adapter.queryWorks(query, ctx);
+    assert.deepEqual(
+      page.items.map((work) => [work.id, work.circleName]),
+      expected,
+      kind,
+    );
   }
 });
 

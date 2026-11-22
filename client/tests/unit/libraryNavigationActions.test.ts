@@ -40,16 +40,17 @@ describe("開いているスマートフォルダーを消したときの入り�
     expect(pendingWrites(store)).toEqual(["replace"]);
   });
 
-  it("作品詳細では何もしない", () => {
+  it("作品詳細では画面を保ったまま、保持しているライブラリの folderId を置き換える", () => {
     const store = createStore();
-    seedLibraryRoute(store, { folderId: "added" });
+    seedLibraryRoute(store, { folderId: "added", q: "x", selectedTags: nts(["cv/a"]) });
     seedAppMode(store, { workDetail: "work-1" });
     clearPendingOps(store);
 
     store.set(replaceLibraryFolderAtom, "all");
 
-    expect(lib(store).folderId).toBe("added");
-    expect(pendingWrites(store)).toEqual([]);
+    expect(lib(store)).toMatchObject({ folderId: "all", q: "", selectedTags: [] });
+    expect(store.get(appRouteAtom)).toMatchObject({ mode: "workDetail", workId: "work-1" });
+    expect(pendingWrites(store)).toEqual(["replace"]);
   });
 });
 

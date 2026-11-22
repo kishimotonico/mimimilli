@@ -50,6 +50,8 @@ describe("saveOffer", () => {
   it("すべて・既定のものは、チップか検索語があれば「検索を保存」で、上書きは出さない", () => {
     expect(saveOffer(view({ folderId: "all", selectedTags: nts(["ASMR"]) }))).toBe("save");
     expect(saveOffer(view({ folderId: "all", q: "雨" }))).toBe("save");
+    expect(saveOffer(view({ folderId: "all", q: "  " }))).toBeNull();
+    expect(saveOffer(view({ folderId: "sf-own", q: " \u3000" }))).toBeNull();
     expect(saveOffer(view({ folderId: "fav", selectedTags: nts(["ASMR"]) }))).toBe("save");
     expect(saveOffer(view({ folderId: "fav", sort: "title-asc" }))).toBeNull();
   });
@@ -70,6 +72,17 @@ describe("saveOffer", () => {
 });
 
 describe("saveSearchDraft", () => {
+  it("検索語は前後の空白を落として保存し、空白だけなら text を足さない（保存は常に通る）", () => {
+    const padded = saveSearchDraft(works({ folderId: "all", q: "  雨 " }));
+    expect(padded.condition).toEqual({ type: "and", children: [{ type: "text", q: "雨" }] });
+    const blank = saveSearchDraft(
+      works({ folderId: "all", selectedTags: nts(["asmr"]), q: "   " }),
+    );
+    expect(blank.condition).toEqual({ type: "and", children: [{ type: "tag", tag: "asmr" }] });
+    expect(conditionSchema.safeParse(padded.condition).success).toBe(true);
+    expect(conditionSchema.safeParse(blank.condition).success).toBe(true);
+  });
+
   it("元の条件・値・チップ・@year・検索語を条件にまとめ、グループ分けを外し、並びを変えていなければ継承", () => {
     const draft = saveSearchDraft(
       works({

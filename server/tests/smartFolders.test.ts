@@ -346,6 +346,18 @@ contract("作品一覧は条件・チップ・検索語・グループの値を 
     [harness.workId("b")],
   );
 
+  const padded = await harness.json<WorksPage>(
+    `/api/smart-folders/${folder.id}/works?sort=title-asc&q=%20%20b%20`,
+  );
+  assert.deepEqual(
+    padded.body.items.map((w) => w.id),
+    [harness.workId("b")],
+  );
+  const blank = await harness.json<WorksPage>(
+    `/api/smart-folders/${folder.id}/works?sort=title-asc&q=%20%20`,
+  );
+  assert.equal(blank.body.total, 2);
+
   const byCv = await harness.json<WorksPage>(
     `/api/smart-folders/by-cv/works?sort=title-asc&group=y`,
   );
@@ -381,26 +393,78 @@ contract("random は seed を送れば作品一覧を返す", async (harness) =>
   assert.equal(res.body.items.length, 3);
 });
 
-contract("値一覧は自身の groupBy でも任意の groupBy でも同じ口で取れる", async (harness) => {
-  const own = await harness.send<Array<{ value: string; count: number }>>(
-    "POST",
-    "/api/smart-folders/by-cv/groups",
-    { groupBy: { kind: "prefix", prefix: "cv" } },
-  );
-  assert.equal(own.status, 200);
-  assert.deepEqual(own.body.map((item) => [item.value, item.count]).sort(), [
-    ["x", 1],
-    ["y", 1],
+const groupsLibrary = defineContract({
+  works: [
+    { key: "a", tags: ["cv/x", "ASMR"] },
+    { key: "b", tags: ["cv/y", "ASMR"] },
+    { key: "c", tags: ["cv/y", "耳かき"] },
+  ],
+});
+
+type GroupItems = Array<{ value: string; count: number }>;
+
+async function groupPairs(harness: ContractHarness, folderId: string, body: unknown) {
+  const res = await harness.send<GroupItems>("POST", `/api/smart-folders/${folderId}/groups`, body);
+  assert.equal(res.status, 200);
+  return res.body.map((item) => [item.value, item.count]);
+}
+
+groupsLibrary(
+  "値一覧は件数の多い順で、同数なら値のバイト順。自身の groupBy でも任意の groupBy でも同じ口で取れる",
+  async (harness) => {
+    assert.deepEqual(
+      await groupPairs(harness, "by-cv", { groupBy: { kind: "prefix", prefix: "cv" } }),
+      [
+        ["y", 2],
+        ["x", 1],
+      ],
+    );
+    assert.deepEqual(await groupPairs(harness, "all", { groupBy: { kind: "tag" } }), [
+      ["ASMR", 2],
+      ["cv/y", 2],
+      ["cv/x", 1],
+      ["耳かき", 1],
+    ]);
+    assert.deepEqual(await groupPairs(harness, "all", { groupBy: { kind: "addedYear" } }), [
+      [String(new Date().getFullYear()), 3],
+    ]);
+  },
+);
+
+groupsLibrary("値一覧はチップ・@year で母集団を絞る", async (harness) => {
+  const year = new Date().getFullYear();
+  assert.deepEqual(await groupPairs(harness, "all", { groupBy: { kind: "tag" }, tags: ["cv/y"] }), [
+    ["cv/y", 2],
+    ["ASMR", 1],
+    ["耳かき", 1],
   ]);
-
-  const candidates = await harness.send<Array<{ value: string }>>(
-    "POST",
-    "/api/smart-folders/all/groups",
-    { groupBy: { kind: "tag" }, tags: ["cv/x"] },
+  assert.deepEqual(
+    await groupPairs(harness, "all", {
+      groupBy: { kind: "prefix", prefix: "cv" },
+      tags: ["ASMR"],
+    }),
+    [
+      ["x", 1],
+      ["y", 1],
+    ],
   );
-  assert.equal(candidates.status, 200);
-  assert.ok(candidates.body.some((item) => item.value === "asmr" || item.value === "ASMR"));
+  assert.deepEqual(
+    await groupPairs(harness, "all", {
+      groupBy: { kind: "prefix", prefix: "cv" },
+      tags: [`@year/${year}`],
+    }),
+    [
+      ["y", 2],
+      ["x", 1],
+    ],
+  );
+  assert.deepEqual(
+    await groupPairs(harness, "all", { groupBy: { kind: "tag" }, tags: [`@year/${year - 1}`] }),
+    [],
+  );
+});
 
+contract("値一覧の要求が契約に合わなければ400、無いスマートフォルダーは404", async (harness) => {
   const bad = await harness.send("POST", "/api/smart-folders/all/groups", {
     groupBy: { kind: "nope" },
   });

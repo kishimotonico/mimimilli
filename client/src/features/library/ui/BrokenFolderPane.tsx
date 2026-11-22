@@ -1,23 +1,19 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ALL_SMART_FOLDER_ID } from "@mimimilli/shared";
-import { deleteSmartFolder } from "../../../entities/smart-folder/api";
-import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
+import { useState } from "react";
+import type { SmartFolder } from "@mimimilli/shared";
 import Button from "../../../shared/ui/Button";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import { I } from "../../../shared/ui/Icon";
-import { useLibraryNavigation } from "../model/useLibraryNavigation";
+import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
 
 /** 条件が読めないスマートフォルダー。開けないので、削除だけを出す（ADR-0040） */
-export default function BrokenFolderPane({ folderId }: { folderId: string }) {
-  const queryClient = useQueryClient();
-  const { openFolder } = useLibraryNavigation();
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteSmartFolder(folderId),
-    onSuccess: async () => {
-      openFolder(ALL_SMART_FOLDER_ID);
-      await queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.all() });
-    },
-  });
+export default function BrokenFolderPane({ folder }: { folder: SmartFolder }) {
+  const editor = useSmartFolderEditor();
+  const [pending, setPending] = useState(false);
+  const remove = async () => {
+    setPending(true);
+    await editor.remove(folder);
+    setPending(false);
+  };
   return (
     <div className="mll-results">
       <div className="mll-results__content">
@@ -26,12 +22,7 @@ export default function BrokenFolderPane({ folderId }: { folderId: string }) {
           kind="empty"
           message="このスマートフォルダーは読めません"
           action={
-            <Button
-              variant="primary"
-              icon={I.x}
-              disabled={deleteMutation.isPending}
-              onClick={() => deleteMutation.mutate()}
-            >
+            <Button variant="primary" icon={I.x} disabled={pending} onClick={() => void remove()}>
               削除
             </Button>
           }

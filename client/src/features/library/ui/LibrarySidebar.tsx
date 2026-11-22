@@ -55,7 +55,6 @@ export default function LibrarySidebar() {
         if (mode !== "library" && folderId === activeFolderId) setAppMode("library");
         else nav.openFolder(folderId);
       }}
-      onReplaceFolder={nav.replaceFolder}
       onOpenGroupValue={nav.openGroupValue}
       onAddTag={nav.addTag}
     />

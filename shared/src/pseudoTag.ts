@@ -31,8 +31,12 @@ export function parseBuiltinPseudoTag(tag: NormalizedTag): ParsedBuiltinPseudoTa
   return { key: rest.slice(0, slashIndex), value: rest.slice(slashIndex + 1) };
 }
 
-/** year 擬似タグの値（addedAt の年）は4桁の数字のみ許容する */
-const YEAR_VALUE_PATTERN = /^\d{4}$/;
+/** 年（addedAt の年）は4桁の数字のみ許容する。year 擬似タグ・addedYear 述語・追加年のグループの値が使う */
+export const YEAR_VALUE_PATTERN = /^\d{4}$/;
+
+export function isYearValue(value: string): boolean {
+  return YEAR_VALUE_PATTERN.test(value);
+}
 
 export interface SplitSelectedTagsResult {
   /** 実タグとして work.tags と完全一致させるもの */
@@ -82,7 +86,7 @@ export function splitSelectedTags(selectedTags: string[]): SplitSelectedTagsResu
         warnings.push(`未知の擬似タグを拒否しました: ${rawTag}`);
         continue;
       }
-      if (!YEAR_VALUE_PATTERN.test(builtin.value)) {
+      if (!isYearValue(builtin.value)) {
         warnings.push(`year擬似タグの値が4桁の数字ではありません: ${rawTag}`);
         continue;
       }
