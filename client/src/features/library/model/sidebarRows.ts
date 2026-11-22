@@ -14,6 +14,8 @@ export interface SidebarRow {
   /** 条件が hasError だけの行は件数を赤い丸で出す */
   countTone: "plain" | "error";
   hasQuickOverlay: boolean;
+  /** 通常は隠れる行（編集の状態でだけ見える） */
+  dimmed: boolean;
 }
 
 /** 0件で隠す行か。作品数とデータ不整合の両方が0と分かったときだけ隠し、開いている行は残す */
@@ -38,6 +40,7 @@ function toRow(folder: SmartFolder): SidebarRow {
       count: null,
       countTone: "plain",
       hasQuickOverlay: false,
+      dimmed: false,
     };
   }
   return {
@@ -47,15 +50,20 @@ function toRow(folder: SmartFolder): SidebarRow {
     count: showsCount({ condition, groupBy: folder.groupBy }) ? folder.count : null,
     countTone: isHasErrorOnly(condition) ? "error" : "plain",
     hasQuickOverlay: folder.groupBy !== null,
+    dimmed: false,
   };
 }
 
+/** 編集の状態（editing）では、0件で隠れる行も見せる */
 export function buildSidebarRows(
   folders: SmartFolder[],
   activeFolderId: string,
   integrity: DataIntegrityCount,
+  editing = false,
 ): SidebarRow[] {
-  return folders
-    .filter((folder) => !isHidden(folder, activeFolderId, integrity))
-    .map((folder) => toRow(folder));
+  return folders.flatMap((folder) => {
+    const hidden = isHidden(folder, activeFolderId, integrity);
+    if (hidden && !editing) return [];
+    return [{ ...toRow(folder), dimmed: hidden }];
+  });
 }

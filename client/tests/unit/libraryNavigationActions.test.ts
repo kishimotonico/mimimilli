@@ -13,6 +13,7 @@ import {
   openLibraryGroupValueAtom,
   openLibraryTagAtom,
   removeLibraryTagAtom,
+  replaceLibraryFolderAtom,
   reshuffleLibrarySeedAtom,
   searchLibraryInAllAtom,
   selectLibraryGroupValueAtom,
@@ -28,6 +29,29 @@ function setup(patch: Parameters<typeof seedLibraryRoute>[1] = {}) {
 }
 
 const lib = (store: ReturnType<typeof createStore>) => store.get(libraryRouteAtom);
+
+describe("開いているスマートフォルダーを消したときの入り直し（replaceLibraryFolderAtom）", () => {
+  it("ライブラリでは履歴を積まずに置き換える", () => {
+    const store = setup({ folderId: "added", q: "x" });
+
+    store.set(replaceLibraryFolderAtom, "all");
+
+    expect(lib(store)).toMatchObject({ folderId: "all", q: "" });
+    expect(pendingWrites(store)).toEqual(["replace"]);
+  });
+
+  it("作品詳細では何もしない", () => {
+    const store = createStore();
+    seedLibraryRoute(store, { folderId: "added" });
+    seedAppMode(store, { workDetail: "work-1" });
+    clearPendingOps(store);
+
+    store.set(replaceLibraryFolderAtom, "all");
+
+    expect(lib(store).folderId).toBe("added");
+    expect(pendingWrites(store)).toEqual([]);
+  });
+});
 
 describe("サイドバーからの入り直し（openLibraryFolderAtom）", () => {
   it("フォルダーを切り替えるとチップ・検索語・グループの値・選択中の作品・今の並びを消し、新しい seed を入れる", () => {

@@ -55,6 +55,12 @@ export function openLibraryFolder(route: AppRoute, folderId: string): Transition
   };
 }
 
+/** 開いているスマートフォルダーが消えたとき、履歴を積まずに入り直す */
+export function replaceLibraryFolder(route: AppRoute, folderId: string): Transition | null {
+  if (route.mode !== "library") return null;
+  return { ...openLibraryFolder(route, folderId), replace: true };
+}
+
 /** サイドバーのクイックオーバーレイから、グループの値の作品一覧へ入る */
 export function openLibraryGroupValue(
   route: AppRoute,

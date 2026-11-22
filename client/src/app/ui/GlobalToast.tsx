@@ -1,5 +1,7 @@
 import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useLayoutEffect } from "react";
+import { layerAtom } from "../../entities/navigation/model/appRouteStore";
+import { playerDockBarVisibleAtom } from "../../features/player/model/playerPresentationAtoms";
 import Toast from "../../shared/ui/Toast";
 import { toastRequestsAtom, type ToastRequest } from "../../shared/model/toastRequestsAtom";
 
@@ -33,6 +35,10 @@ function pickToastRequest(requests: Map<string, ToastRequest>): [string, ToastRe
 // 等の個別の振る舞いは各要求のonActionに閉じる（design-system.md「単一ホストの優先順位チェーン」）。
 export default function GlobalToast() {
   const toastRequests = useAtomValue(toastRequestsAtom);
+  // AppShell と同じ条件（層が開いている間は PlayerDock を描画しない）で、再生バーが実際に出ているときだけ上へ避ける
+  const dockBarVisible = useAtomValue(playerDockBarVisibleAtom);
+  const layerOpen = useAtomValue(layerAtom) !== null;
+  const aboveDock = dockBarVisible && !layerOpen;
   const setToastRequests = useSetAtom(toastRequestsAtom);
 
   const dismissToastRequest = useCallback(
@@ -68,6 +74,7 @@ export default function GlobalToast() {
   return (
     <Toast
       requestKey={request.requestKey}
+      aboveDock={aboveDock}
       message={request.message}
       variant={request.variant}
       actionLabel={request.actionLabel}

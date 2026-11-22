@@ -15,6 +15,7 @@ import {
   openLibraryGroupValueAtom,
   openLibraryTagAtom,
   removeLibraryTagAtom,
+  replaceLibraryFolderAtom,
   searchLibraryInAllAtom,
   selectLibraryGroupValueAtom,
   selectLibraryWorkAtom,
@@ -58,6 +59,8 @@ export type LibraryViewState = ReadyLibraryViewState | UnavailableLibraryViewSta
 export interface LibraryViewActions {
   /** サイドバーからの入り直し。今の並びを捨て、チップと検索語を消す */
   openFolder: (folderId: string) => void;
+  /** 開いていたスマートフォルダーが消えたとき、履歴を積まずに入り直す */
+  replaceFolder: (folderId: string) => void;
   openGroupValue: (folderId: string, group: string) => void;
   /** 値一覧の値・パンくずの兄弟値。開いているスマートフォルダーの中で値を選ぶ */
   selectGroupValue: (group: string) => void;
@@ -91,6 +94,7 @@ export function useLibraryView(): {
   const [isPending, startTransition] = useTransition();
 
   const openFolder = useSetAtom(openLibraryFolderAtom);
+  const replaceFolder = useSetAtom(replaceLibraryFolderAtom);
   const openGroupValue = useSetAtom(openLibraryGroupValueAtom);
   const selectGroupValue = useSetAtom(selectLibraryGroupValueAtom);
   const removeTag = useSetAtom(removeLibraryTagAtom);
@@ -120,6 +124,7 @@ export function useLibraryView(): {
     };
     return {
       openFolder: (folderId) => run(() => openFolder(folderId)),
+      replaceFolder: (folderId) => run(() => replaceFolder(folderId)),
       openGroupValue: (folderId, group) => run(() => openGroupValue(folderId, group)),
       selectGroupValue: (group) => run(() => selectGroupValue(group)),
       removeTag: (tag) => run(() => removeTag(tag)),
@@ -138,6 +143,7 @@ export function useLibraryView(): {
   }, [
     heldKind,
     openFolder,
+    replaceFolder,
     openGroupValue,
     selectGroupValue,
     removeTag,

@@ -13,6 +13,7 @@ import {
   type ScanRecordKind,
   type WorkChangeKind,
   type SmartFolder,
+  type SmartFolderRestore,
   type SmartFolderWrite,
   type SortId,
   type WorksPage,
@@ -22,6 +23,25 @@ const folderPath = (id: string) => `/smart-folders/${encodeURIComponent(id)}`;
 
 export async function listSmartFolders(): Promise<SmartFolder[]> {
   return getParsed(smartFolderListSchema, "/smart-folders");
+}
+
+export async function createSmartFolder(data: SmartFolderWrite): Promise<SmartFolder> {
+  return postParsed(smartFolderSchema, "/smart-folders", data);
+}
+
+/** 全件の順序を置き換える。応答は並べ替え後の一覧（件数入り） */
+export async function reorderSmartFolders(ids: string[]): Promise<SmartFolder[]> {
+  return putParsed(smartFolderListSchema, "/smart-folders/order", { ids });
+}
+
+/** テンプレートの固定 ID で追加する */
+export async function createSmartFolderFromTemplate(templateId: string): Promise<SmartFolder> {
+  return postParsed(smartFolderSchema, "/smart-folders/from-template", { templateId });
+}
+
+/** 削除した行を同じ ID・位置・作成日時で戻す */
+export async function restoreSmartFolder(data: SmartFolderRestore): Promise<SmartFolder> {
+  return postParsed(smartFolderSchema, "/smart-folders/restore", data);
 }
 
 export async function updateSmartFolder(id: string, data: SmartFolderWrite): Promise<SmartFolder> {

@@ -101,3 +101,210 @@
   font-size: var(--fs-secondary);
   line-height: var(--lh-secondary);
 }
+
+/* 見出しの ＋・編集と、編集の状態（ADR-0041・ADR-0042） */
+.mll-sidebar__hd {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.mll-sidebar__hd > span {
+  flex: 1;
+}
+.mll-sidebar__done {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--acc-ink);
+  cursor: pointer;
+}
+.mll-sidebar__done:hover {
+  background: var(--paper-2);
+}
+.mll-sbrow.is-editing {
+  gap: 4px;
+  padding-right: 2px;
+  cursor: default;
+}
+.mll-sbrow.is-editing:hover {
+  background: var(--paper-2);
+}
+.mll-sbrow.is-dimmed {
+  opacity: 0.5;
+}
+.mll-sbrow.is-dragging {
+  opacity: 0.35;
+}
+.mll-sbrow.is-drop-before {
+  box-shadow: inset 0 2px 0 var(--acc);
+}
+.mll-sbrow.is-drop-after {
+  box-shadow: inset 0 -2px 0 var(--acc);
+}
+.mll-sbrow .grip {
+  color: var(--ink-3);
+  cursor: grab;
+}
+.mll-sbrow .act {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  color: var(--ink-2);
+}
+.mll-sbrow button.act {
+  cursor: pointer;
+}
+.mll-sbrow button.act:hover {
+  background: var(--paper-3);
+  color: var(--ink-0);
+}
+.mll-sbmenu {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 4px;
+  right: 4px;
+  z-index: 12;
+  display: grid;
+  gap: 1px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-1);
+  box-shadow: var(--shadow-pop);
+  letter-spacing: 0;
+  font-family: var(--font-jp);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-1);
+}
+.mll-sbmenu .mh {
+  padding: 6px 8px 2px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+}
+.mll-sbmenu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 5px;
+  text-align: left;
+  cursor: pointer;
+}
+.mll-sbmenu button:hover {
+  background: var(--paper-2);
+}
+.mll-sbmenu .none {
+  padding: 4px 8px 6px;
+  color: var(--ink-3);
+}
+.mll-sbmenu hr {
+  margin: 3px 0;
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+/* 編集のダイアログ */
+.mll-dlg-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+}
+.mll-dlg-h > span {
+  flex: 1;
+}
+.mll-dlg-b {
+  display: grid;
+  gap: 12px;
+  padding: 4px 16px 14px;
+  overflow-y: auto;
+}
+.mll-fld {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+.mll-fld.is-top {
+  align-items: start;
+}
+.mll-fld.is-top > .lb {
+  padding-top: 6px;
+}
+.mll-fld > label,
+.mll-fld > .lb {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.mll-fld input[type="text"],
+.mll-fld select {
+  min-width: 0;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--paper-1);
+  color: var(--ink-0);
+  font: inherit;
+}
+.mll-fld input[type="text"]:focus,
+.mll-fld select:focus {
+  outline: none;
+  border-color: var(--ink-3);
+}
+.mll-fld input:disabled,
+.mll-fld select:disabled {
+  background: var(--paper-2);
+  color: var(--ink-2);
+  cursor: not-allowed;
+}
+.mll-condsum {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--paper-2);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-1);
+}
+.mll-condlist {
+  display: grid;
+  gap: 4px;
+}
+.mll-condrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px 3px 10px;
+  border-radius: 6px;
+  background: var(--paper-2);
+  font-size: 12px;
+  color: var(--ink-1);
+}
+.mll-condrow > span {
+  flex: 1;
+  min-width: 0;
+}
+.mll-dlg-f {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--line-soft);
+}

@@ -170,10 +170,11 @@ Toast を複数箇所で描画すると、独立した2つのインスタンス�
 致命的ではないと判断できる場合に限り許容する（負ける相手が手動クローズのみのerrorに
 限られ、再実行が1操作で済むなど）。
 
-### Toast の表示寿命・種別
+### Toast の表示寿命・種別・見た目
 
-`variant`（`"info" | "success" | "warning" | "error"`）で成功・警告・失敗をアイコンと
-`--state-success` / `--state-warning` / `--state-danger`（`tokens.css`）の配色で区別する。
+見た目は構想モック v13 の `.toast` に合わせる。画面下の中央に、`--ink-0` の地・`--paper-1` の文字・角丸8px・11.5px・padding 8px 14px・影 `0 10px 24px -10px`（`--shadow-ink` 16%）で出す。操作ボタンは `--r-mustard` の太字（`Button` の `quiet` を上書き）、閉じるは `IconButton`（xs・`bare`）。画面下の再生バー（`playerDockBarVisibleAtom` が真で、再生中の層が開いていないとき）が出ているときは、`GlobalToast` が `aboveDock` を渡して84px、無いときは20pxの高さに置く。モーダル dialog の中へ出るときは再生バーを避けない。出入りは `fadeSlideUp` を下から上へ向けた形で、reduced-motion のときは動かさない（opacity の値は変えず duration を0にする）。
+
+`variant`（`"info" | "success" | "warning" | "error"`）はアイコンの色（`currentColor` / `--toast-success` / `--toast-warning` / `--toast-danger`。暗い地の上で読めるトースト専用のトークン）で成功・警告・失敗を区別する。`error` だけは左に `--state-danger` の3pxの縁も付け、暗い地の中でも区別がつくようにする。
 表示寿命は種別ではなくaction有無で決まる： action無しは5秒（`TOAST_AUTO_DISMISS_MS`）、
 action付きは10秒（`TOAST_ACTION_AUTO_DISMISS_MS`）で自動的に閉じる。hover中・内部要素への
 focus中はタイマーを止め、離れると残り時間から再開する。`variant="error"` だけは自動消滅
@@ -205,7 +206,7 @@ focus中はタイマーを止め、離れると残り時間から再開する。
 サイドバー（`.mll-sidebar`、`features/library/ui/LibrarySidebar`）:
 
 - 幅は 208px 固定。幅の変更はない。背景は `--paper-1`、右辺に `--line`。上から見出し、行、最下部の統計
-- 見出しは「ライブラリ」1つ。Geist 10px・600・字間 0.08em・`--ink-2`。総称（スマートフォルダー・項目）は画面に出さない。見出しの ＋ と編集は編集の段で足す
+- 見出しは「ライブラリ」1つ。Geist 10px・600・字間 0.08em・`--ink-2`。総称（スマートフォルダー・項目）は画面に出さない。右端に ＋（追加メニュー）と ✎（編集の状態へ入る）を `IconButton`（xs・22px）で置く
 - 行（`.mll-sbrow`）は高さ 29px・左右 8px・角丸 6px、アイコン 15px、名前は 12px の `--ink-1`。hover は `--paper-2`。選択中は `--paper-4`・`--ink-0`・太字で、アイコンと `chev` は `--acc`。グループ分けを持つ行は右端に 12px の `chev`（通常は `--ink-3`）を置く
 - 件数（`.ct`）は JetBrains Mono 10.5px・`--ink-2`・tabular-nums。出す行は shared の `showsCount` で決め、条件が空のもの（すべて・ランダム）とグループ分けを持つものには出さない。条件が `hasError` だけの行は赤い丸（`.ct.is-error`、`--state-danger` 地に `--paper-1` の文字、padding 0 6px）で出す
 - 0件で隠す行（shared の `isHiddenWhenEmpty`、既定では「エラー」）は、その条件の作品数と診断上のデータ不整合の件数（ADR-0039、`DataIntegrityWarningBanner` と同じ `scanDiagnosticsQueryOptions`）の両方が0と分かったときだけ隠す。開いている行は残し、別のスマートフォルダーへ移ったら隠す。件数の取得中・取得失敗は0件として扱わず、隠さない（判定は `model/sidebarRows.ts`）
@@ -213,6 +214,15 @@ focus中はタイマーを止め、離れると残り時間から再開する。
 - 開閉の状態は端末の `localStorage`（`mimimilli:librarySidebarOpen`）に保存し、画面幅では自動で切り替えない。作品詳細でも同じ状態を使う。切り替えはアドレスバー左端のボタン（`SidebarToggleButton`）と Ctrl+B（Mac は ⌘B）。入力欄・テキストエリア・セレクト・contenteditable にフォーカスがあるときは Ctrl+B を奪わない
 - 作品詳細では、選択中の行は元のスマートフォルダー。その行を押すと、保持しているライブラリの状態（スマートフォルダー・グループの値・チップ・検索語・今の並び・seed）のまま一覧へ戻る。別の行を押すと入り直す（チップ・検索語・今の並びを捨てる）
 - グループ分けを持つ行は、ホバー約200ms・フォーカス中の ArrowRight でクイックオーバーレイを右に出す（`GroupQuickOverlay`、値の操作は後述）
+
+サイドバーの編集（構成と挙動の正は ADR-0041・ADR-0042、見た目の正は[構想モック v13](https://claude.ai/artifact/7a3AkWuZisApFV6SZAnkg4)）:
+
+- 編集の状態: 見出しの ✎ で入り、見出し右端の「完了」（Geist 10.5px・600・`--acc-ink`）で抜ける。入っている間は ＋・✎ を出さない。0件で隠れる行も `.is-dimmed`（opacity .5）で見せる。行は選択できず、グループ分けの行のクイックオーバーレイも出さない
+- 編集の行（`.mll-sbrow.is-editing`、`SidebarEditRow`）: 左からグリップ（`.grip`、`--ink-3`、grab）・アイコン・名前・編集 `.act`・削除 `.act`（22px 角・角丸 4px、hover は `--paper-3`）。権限が無い操作は同じ幅の空きにする（「すべて」の削除、壊れた行の編集）。モバイル幅（768px 未満、`useMediaQuery`）ではグリップを出さずドラッグも登録しない
+- 並べ替え: 行全体がドラッグ元で、行の上半分・下半分で前後を決める（hitbox の list-item）。ドロップ位置は自前の線で示す（前: `.is-drop-before` は上辺、後: `.is-drop-after` は下辺に `--acc` の 2px の `inset box-shadow`）。ドラッグ中の行は `.is-dragging`（opacity .35）。ドロップ後に全件の順序を PUT し、画面には先に反映する（失敗したら一覧を取り直す）
+- 追加メニュー（`.mll-sbmenu`、`SidebarAddMenu`）: 見出しの下に左右 4px 空けて全幅で出す。上から「「〇〇」を複製」（開いているスマートフォルダー名。絞り込みが無いときだけ）、「グループ分けを追加」、区切り線、小見出し「既定から追加」と今ない既定のテンプレート（無ければ `.none`「すべて追加済み」）。外側のクリック・Escape で閉じる。選ぶとダイアログを開く（既定から追加は即作成）。作ったらそのスマートフォルダーを開く
+- 編集のダイアログ（`SmartFolderDialog`、`Modal` 620）: 見出し「「〇〇」を編集」「「〇〇」を複製」「グループ分けを追加」と閉じるボタン、名前・条件・グループ分け・既定の並び、フッターにキャンセル（`Button` の `outline`）と保存（`primary`）。条件はルート直下の子ごとに `.mll-condrow`（`--paper-2` 地、12px）で、まとまり（or・not(or)）は1行。自作・複製・追加では行の × で外せる。既定は × なしで、グループ分けも選べない。「すべて」は名前も選べず、既定の並びに「「すべて」と同じ」を出さない。条件が空のときは「なし（すべての作品）」。保存に失敗したらサーバーの文言をトーストで見せ、ダイアログを開いたままにする
+- 削除: 確認なしで削除し、トースト「「〇〇」を削除しました」の「元に戻す」で同じ ID・位置・作成日時のまま戻す。壊れた行には「元に戻す」を出さない。トーストは既存の `useToast`（単一ホスト）を使う
 
 トップバーの道具（`.mle-tool`、`shared/ui/ToolButton`）はアイコン15px＋短いラベルで、高さ 28px（アドレスバー内は 26px）・左右 9px・角丸 6px、Geist 11px・500。点灯は `--acc-soft` 地に `--acc-ink`。ファイルボタンとスキャン（ラベル付き。実行中のリングと新しい項目の点はアイコンに重ねる）はトップバーの検索欄の右に置き、ファイルにいる間はファイルボタンが点灯し、検索欄は無効で出す。ファイルから戻る操作は3つで、ファイルボタンをもう一度押す・「ライブラリへ戻る」・ブラウザの戻る。どれで戻っても、ライブラリの状態は保持したまま戻る。再生バーはファイルでも出す。
 
@@ -293,7 +303,7 @@ UI 全体は `client/src/styles/shell/index.css` の `@layer base` で `body { u
 テキストラベルを持つ操作ボタンは `client/src/shared/ui/Button.tsx` に集約する（アイコンのみのボタンは `IconButton`）。生の `<button>` を都度スタイリングしない。
 
 - サイズは `sm`（既定・26px）/ `md`（34px）/ `lg`（36px）の3段。いずれも `rounded-pill` の錠剤形で統一し、サイズで角丸の形状は変えない
-- variantは `primary`（主操作）/ `ghost`（副操作）/ `quiet`（主操作と対になるキャンセル）/ `danger`（破壊的操作の確定、coral塗り＋白文字）/ `danger-quiet`（進行中の操作を止めるだけの中止、coralの淡い背景＋アウトライン）の5種
+- variantは `primary`（主操作）/ `ghost`（副操作）/ `outline`（枠つきの副操作。`--line` の枠・`--paper-1` 地、hover は `--paper-2`）/ `quiet`（主操作と対になるキャンセル）/ `danger`（破壊的操作の確定、coral塗り＋白文字）/ `danger-quiet`（進行中の操作を止めるだけの中止、coralの淡い背景＋アウトライン）の6種
 - `quiet` は「確定操作の隣に並ぶキャンセル」専用。単独で置かれるフッターの「閉じる」（対になる確定操作が無いモーダルの離脱ボタン）は `quiet` にしない。`quiet` は背景が透明でホバーするまでボタンと分かりにくいため、常時可視の背景が要る単独の離脱操作には `ghost` を使う（`SettingsModal` フッターの「閉じる」が実例）
 - `danger` と `danger-quiet` は重みが異なる。取り消せない操作の最終確定（`ConfirmDialog` の確定ボタン等）はダイアログ内で最も目を引く必要があるため `danger` を使う。進行中の処理をその場で止めるだけの操作（ツールバー・フッターの「中止」）はより控えめな `danger-quiet` を使う
 - モーダルのキャンセルは `quiet`、閉じる（×）は `IconButton` を使う。ヘッダーの×ボタン用に生の`<button>`でアイコンだけを描画しない

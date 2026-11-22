@@ -40,11 +40,16 @@ export default function LibrarySidebar() {
       dataIntegrity={dataIntegrity}
       tagPrefixes={tagPrefixes}
       stats={stats}
+      filtered={
+        ready?.view.kind === "works" &&
+        (ready.view.group !== null || ready.view.selectedTags.length > 0 || ready.view.q !== "")
+      }
       onOpenFolder={(folderId) => {
         // 作品詳細・再生中から元のスマートフォルダーの行を押したときは、保持している状態のまま戻る
         if (mode !== "library" && folderId === activeFolderId) setAppMode("library");
         else nav.openFolder(folderId);
       }}
+      onReplaceFolder={nav.replaceFolder}
       onOpenGroupValue={nav.openGroupValue}
       onAddTag={nav.addTag}
     />

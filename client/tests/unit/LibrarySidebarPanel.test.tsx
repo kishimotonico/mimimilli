@@ -44,6 +44,7 @@ function renderSidebar(props: Partial<React.ComponentProps<typeof LibrarySidebar
           dataIntegrity={{ status: "ready", count: 0 }}
           tagPrefixes={PREFIXES}
           onOpenFolder={vi.fn()}
+          onReplaceFolder={vi.fn()}
           onOpenGroupValue={vi.fn()}
           onAddTag={vi.fn()}
           stats={{ status: "loading" }}

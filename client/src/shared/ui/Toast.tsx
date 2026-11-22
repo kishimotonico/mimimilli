@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
+import { cn } from "../lib/cn";
 import { useMotionVariants } from "./useMotionVariants";
 import { useTopmostOpenModalDialog } from "./useTopmostOpenModalDialog";
 import { I, type IconFC } from "./Icon";
@@ -20,11 +21,12 @@ const VARIANT_ICON: Record<ToastVariant, IconFC> = {
   error: I.err,
 };
 
+// 暗い地の上で読める色（トークンはトースト専用）。error だけ左に --state-danger の縁も付ける
 const VARIANT_COLOR: Record<ToastVariant, string> = {
-  info: "var(--ink-2)",
-  success: "var(--state-success)",
-  warning: "var(--state-warning)",
-  error: "var(--state-danger)",
+  info: "currentColor",
+  success: "var(--toast-success)",
+  warning: "var(--toast-warning)",
+  error: "var(--toast-danger)",
 };
 
 interface ToastProps {
@@ -38,6 +40,8 @@ interface ToastProps {
   /** 要求ごとに一意な値。Reactのkeyとして使い、文面が同じでも別要求なら寿命タイマーを
    *  独立させる（未指定時はmessageで代用する） */
   requestKey?: string;
+  /** 画面下の再生バーの上に出す */
+  aboveDock?: boolean;
 }
 
 function syncPopoverVisibility(el: HTMLElement, visible: boolean) {
@@ -148,7 +152,13 @@ function ToastContent({
 }: ToastContentProps) {
   const { fadeSlideUp } = useMotionVariants();
   const isPresent = useIsPresent();
-  const v = fadeSlideUp();
+  const base = fadeSlideUp();
+  // 画面下から上へ出入りする
+  const v = {
+    ...base,
+    initial: { opacity: 0, y: 8 },
+    exit: { ...(base.exit as object), opacity: 0, y: 8 },
+  };
   const hasAction = Boolean(actionLabel && onAction);
   const durationMs =
     variant === "error" ? null : hasAction ? TOAST_ACTION_AUTO_DISMISS_MS : TOAST_AUTO_DISMISS_MS;
@@ -159,16 +169,31 @@ function ToastContent({
       inert={!isPresent}
       {...v}
       {...timerHandlers}
-      className="pointer-events-auto flex items-center gap-2 rounded-2 border border-line-soft bg-paper-1 px-3 py-2 shadow-pop"
+      className={cn(
+        "pointer-events-auto flex items-center gap-3 rounded-[8px] bg-ink-0 px-[14px] py-2 text-paper-1",
+        "shadow-[0_10px_24px_-10px_color-mix(in_oklch,var(--shadow-ink)_16%,transparent)]",
+        variant === "error" && "border-l-[3px] border-l-[var(--state-danger)]",
+      )}
     >
       <VariantIcon size={14} style={{ color: VARIANT_COLOR[variant] }} />
-      <span className="font-jp text-body text-ink-1">{message}</span>
+      <span className="font-jp text-[11.5px] leading-[1.5]">{message}</span>
       {hasAction && (
-        <Button variant="ghost" onClick={onAction}>
+        <Button
+          variant="quiet"
+          onClick={onAction}
+          className="h-auto px-1 py-0.5 text-[11.5px] font-semibold text-[var(--r-mustard)] hover:bg-paper-1/15 hover:text-[var(--r-mustard)]"
+        >
           {actionLabel}
         </Button>
       )}
-      <IconButton icon={I.x} label="閉じる" size="sm" onClick={onDismiss} />
+      <IconButton
+        icon={I.x}
+        label="閉じる"
+        size="xs"
+        variant="bare"
+        className="text-paper-1/70 hover:bg-paper-1/15 hover:text-paper-1"
+        onClick={onDismiss}
+      />
     </motion.output>
   );
 }
@@ -187,6 +212,7 @@ export default function Toast({
   onAction,
   onDismiss,
   requestKey,
+  aboveDock = false,
 }: ToastProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
   const topmostOpenDialog = useTopmostOpenModalDialog();
@@ -208,7 +234,10 @@ export default function Toast({
     <div
       ref={popoverRef}
       popover={rendersAsDialogChild ? undefined : "manual"}
-      className="pointer-events-none fixed inset-x-0 top-[58px] m-0 w-full max-w-none flex justify-center border-none bg-transparent p-0"
+      className={cn(
+        "pointer-events-none fixed inset-x-0 top-auto m-0 h-auto w-full max-w-none flex justify-center border-none bg-transparent p-0",
+        aboveDock && !rendersAsDialogChild ? "bottom-[84px]" : "bottom-5",
+      )}
     >
       <AnimatePresence onExitComplete={handleExitComplete}>
         {message != null && (
