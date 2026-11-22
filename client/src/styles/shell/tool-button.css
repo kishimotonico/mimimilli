@@ -10,7 +10,7 @@
   border-radius: 6px;
   color: var(--ink-1);
   font-family: var(--font-sans);
-  font-size: 11px;
+  font-size: var(--fs-control);
   font-weight: 500;
   line-height: 1;
   white-space: nowrap;

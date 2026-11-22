@@ -21,7 +21,7 @@
 .mll-sidebar__hd {
   padding: 8px 6px 4px 8px;
   font-family: var(--font-sans);
-  font-size: 10px;
+  font-size: var(--fs-label);
   line-height: 1.4;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -37,7 +37,7 @@
   border-radius: 6px;
   color: var(--ink-1);
   font-family: var(--font-jp);
-  font-size: 12px;
+  font-size: var(--fs-body);
   line-height: 1.4;
   text-align: left;
   cursor: pointer;
@@ -180,14 +180,14 @@
   box-shadow: var(--shadow-pop);
   letter-spacing: 0;
   font-family: var(--font-jp);
-  font-size: 12px;
+  font-size: var(--fs-body);
   font-weight: 400;
   color: var(--ink-1);
 }
 .mll-sbmenu .mh {
   padding: 6px 8px 2px;
   font-family: var(--font-sans);
-  font-size: 10px;
+  font-size: var(--fs-label);
   font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--ink-2);
@@ -249,7 +249,7 @@
 .mll-fld > label,
 .mll-fld > .lb {
   font-family: var(--font-sans);
-  font-size: 11px;
+  font-size: var(--fs-control);
   font-weight: 500;
   color: var(--ink-2);
 }
@@ -279,7 +279,7 @@
   padding: 6px 10px;
   border-radius: 6px;
   background: var(--paper-2);
-  font-size: 12px;
+  font-size: var(--fs-body);
   line-height: 1.6;
   color: var(--ink-1);
 }
@@ -294,7 +294,7 @@
   padding: 3px 4px 3px 10px;
   border-radius: 6px;
   background: var(--paper-2);
-  font-size: 12px;
+  font-size: var(--fs-body);
   color: var(--ink-1);
 }
 .mll-condrow > span {
