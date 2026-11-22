@@ -83,15 +83,15 @@ test("並びだけの更新の違反: 壊れた行は 403 相当、「すべて�
   assert.equal(sortViolation(folder("fav"), null), null);
 });
 
-test("条件の更新の違反: 壊れた行と既定の行は 403 相当、「すべて」以外は通る", () => {
+test("条件の更新の違反: 壊れた行と既定の行（「すべて」を含む）は 403 相当、自作は通る", () => {
   assert.equal(
-    conditionViolation(folder("sf-00000000-0000-4000-8000-000000000001", null), {})?.kind,
+    conditionViolation(folder("sf-00000000-0000-4000-8000-000000000001", null))?.kind,
     "forbidden",
   );
-  assert.equal(conditionViolation(folder("fav"), {})?.kind, "forbidden");
+  assert.equal(conditionViolation(folder("fav"))?.kind, "forbidden");
+  assert.equal(conditionViolation(folder("all"))?.kind, "forbidden");
   const own = folder("sf-00000000-0000-4000-8000-000000000001");
-  assert.equal(conditionViolation(own, {}), null);
-  assert.equal(conditionViolation(own, { sort: null }), null);
+  assert.equal(conditionViolation(own), null);
 });
 
 test("値の並びだけの更新の違反: 壊れた行は 403 相当、グループ分けの無い行は 400 相当", () => {

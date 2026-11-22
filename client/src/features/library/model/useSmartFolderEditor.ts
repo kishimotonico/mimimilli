@@ -87,7 +87,7 @@ export function useSmartFolderEditor(): SmartFolderEditor {
       }
     };
 
-    /** 作成・追加の成功応答の行を、一覧の再取得を待たず ID 単位で反映する。件数・順序は続く再取得で取り直す */
+    /** 作成・追加・定義の更新の成功応答の行を、一覧の再取得を待たず ID 単位で反映する。件数・順序は続く再取得で取り直す */
     const upsertFolder = (row: SmartFolder) =>
       queryClient.setQueryData<SmartFolder[]>(SMART_FOLDER_QUERY_KEYS.all(), (prev) => {
         if (prev === undefined) return prev;
@@ -202,8 +202,11 @@ export function useSmartFolderEditor(): SmartFolderEditor {
         const before = queryClient
           .getQueryData<SmartFolder[]>(SMART_FOLDER_QUERY_KEYS.all())
           ?.find((folder) => folder.id === id);
-        const saved = await commit(failureMessage, { definitionOf: id }, () =>
-          updateSmartFolder(id, data),
+        const saved = await commit(
+          failureMessage,
+          { definitionOf: id },
+          () => updateSmartFolder(id, data),
+          upsertFolder,
         );
         // 開いている一覧の ?group= は古いグループ分けの値なので、一覧が更新されたあとに入り直して外す
         if (
@@ -220,8 +223,11 @@ export function useSmartFolderEditor(): SmartFolderEditor {
         change,
         failureMessage = "スマートフォルダーを上書きできませんでした",
       ) =>
-        (await commit(failureMessage, { definitionOf: id }, () =>
-          updateSmartFolderCondition(id, change),
+        (await commit(
+          failureMessage,
+          { definitionOf: id },
+          () => updateSmartFolderCondition(id, change),
+          upsertFolder,
         )) !== null,
       saveDefaultSort: async (id, sort) =>
         (await commit("並びを既定にできませんでした", "folders", () =>

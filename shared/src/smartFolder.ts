@@ -405,19 +405,14 @@ export function sortViolation(
   return null;
 }
 
-/** 条件の更新（検索の上書き）の違反。壊れた行と既定のスマートフォルダーは条件を変えられず、
- *  「すべて」の既定の並びは空にできない */
+/** 条件の更新（検索の上書き）の違反。壊れた行と既定のスマートフォルダー（「すべて」を含む）は条件を変えられない */
 export function conditionViolation(
   existing: Pick<SmartFolder, "id" | "condition">,
-  change: Pick<SmartFolderConditionWrite, "sort">,
 ): PolicyViolation | null {
   const permissions = smartFolderPermissions(existing);
   if (!permissions.edit) return forbidden("壊れたスマートフォルダーは編集できません");
   if (!permissions.editCondition) {
     return forbidden("既定のスマートフォルダーの条件・グループ分けは変更できません");
-  }
-  if (!permissions.inheritSort && change.sort === null) {
-    return invalid("「すべて」の既定の並びは空にできません");
   }
   return null;
 }

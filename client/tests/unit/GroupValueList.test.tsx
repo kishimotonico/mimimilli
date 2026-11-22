@@ -178,6 +178,25 @@ describe("GroupValueList list 表示（ADR-0012 §5）", () => {
     sizeMock.restore();
   });
 
+  it("通知は列見出しより上に出し、値の絞り込みが0件のときは列見出しを出さない", async () => {
+    const sizeMock = mockElementSize(600, 600);
+    const user = userEvent.setup();
+    renderGroupValueList({
+      groupValueItems: [makeItem({ value: "a" })],
+      isGroupValuesError: true,
+    });
+    await flushVirtualizer();
+
+    const notice = document.querySelector(".mle-col__notice")!;
+    const header = document.querySelector(".mll-vlist-hd")!;
+    expect(notice.compareDocumentPosition(header) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await user.type(screen.getByPlaceholderText("値を絞り込み"), "zzz");
+    expect(screen.getByText("該当する値がありません")).toBeInTheDocument();
+    expect(document.querySelector(".mll-vlist-hd")).toBeNull();
+    sizeMock.restore();
+  });
+
   it("行はサーバーが返した順のまま並ぶ", async () => {
     const sizeMock = mockElementSize(600, 600);
     renderGroupValueList({

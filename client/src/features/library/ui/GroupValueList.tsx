@@ -64,6 +64,9 @@ export default function GroupValueList({
 
   const handleSelect = (item: GroupValueItem) => onSelectValue(item.value);
 
+  // 取得失敗・タグ設定エラーの通知は、一覧が出ているときだけ見出しの上に出す
+  const showStatusNotices =
+    !isGroupValuesLoading && !(isGroupValuesError && groupValueItems.length === 0);
   const showSearchMiss = groupValueItems.length > 0 && rows.length === 0 && contextQuery.length > 0;
 
   return (
@@ -86,19 +89,7 @@ export default function GroupValueList({
       </div>
 
       <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-        {viewMode === "list" && (isGroupValuesLoading || groupValueItems.length > 0) && (
-          <GroupValueRowsHeader sort={sort} onSortChange={onSortChange} />
-        )}
-        {isGroupValuesLoading ? (
-          <CollectionStatus variant={viewMode === "grid" ? "grid" : "list"} kind="loading" />
-        ) : isGroupValuesError && groupValueItems.length === 0 ? (
-          // キャッシュが無い＝初回取得失敗のときだけ一覧全体をエラー画面に置き換える。
-          <CollectionStatus
-            variant={viewMode === "grid" ? "grid" : "list"}
-            kind="error"
-            onRetry={onRetryGroupValues}
-          />
-        ) : (
+        {showStatusNotices && (
           <>
             {isGroupValuesError && (
               // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- role="status"で非ブロッキング通知にする
@@ -123,6 +114,24 @@ export default function GroupValueList({
                   )}
                 </div>
               )}
+          </>
+        )}
+        {viewMode === "list" &&
+          !showSearchMiss &&
+          (isGroupValuesLoading || groupValueItems.length > 0) && (
+            <GroupValueRowsHeader sort={sort} onSortChange={onSortChange} />
+          )}
+        {isGroupValuesLoading ? (
+          <CollectionStatus variant={viewMode === "grid" ? "grid" : "list"} kind="loading" />
+        ) : isGroupValuesError && groupValueItems.length === 0 ? (
+          // キャッシュが無い＝初回取得失敗のときだけ一覧全体をエラー画面に置き換える。
+          <CollectionStatus
+            variant={viewMode === "grid" ? "grid" : "list"}
+            kind="error"
+            onRetry={onRetryGroupValues}
+          />
+        ) : (
+          <>
             {groupValueItems.length === 0 ? (
               <CollectionStatus
                 variant={viewMode === "grid" ? "grid" : "list"}

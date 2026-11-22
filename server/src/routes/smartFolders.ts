@@ -175,7 +175,7 @@ export function smartFoldersRoute(adapter: DataAdapter, scanRecord: ScanRecordSt
     );
     const existing = await adapter.getSmartFolder(id);
     if (!existing) notFoundFolder(id);
-    rejectViolation(conditionViolation(existing, data));
+    rejectViolation(conditionViolation(existing));
     const row = await adapter.updateSmartFolderCondition(id, data);
     if (!row) notFoundFolder(id);
     return c.json(await singleWithCount(adapter, row));

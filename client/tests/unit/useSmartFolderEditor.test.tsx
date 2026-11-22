@@ -194,6 +194,25 @@ describe("条件だけの更新（検索の上書き）", () => {
     ]);
   });
 
+  it("応答の行（上書き後の条件）を、一覧の再取得が失敗する前に一覧のキャッシュへ反映する", async () => {
+    const overwritten = {
+      ...userFolder,
+      condition: { type: "and" as const, children: [{ type: "bookmarked" as const }] },
+    };
+    mockApi({ "PUT /api/smart-folders/:id/condition": () => overwritten });
+    const editor = setup();
+    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), [...defaultSmartFolders(), userFolder]);
+    vi.spyOn(queryClient, "invalidateQueries").mockImplementation(async () => {});
+
+    await editor.overwriteCondition(USER_ID, { condition: overwritten.condition });
+
+    expect(
+      queryClient
+        .getQueryData<(typeof userFolder)[]>(SMART_FOLDER_QUERY_KEYS.all())
+        ?.find((folder) => folder.id === USER_ID)?.condition,
+    ).toEqual(overwritten.condition);
+  });
+
   it("失敗はトーストに出して一覧を取り直す", async () => {
     mockApi({
       "PUT /api/smart-folders/:id/condition": () => apiError(404, "not_found", "見つかりません"),
