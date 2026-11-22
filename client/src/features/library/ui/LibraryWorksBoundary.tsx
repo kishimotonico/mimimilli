@@ -27,7 +27,8 @@ interface Props {
   searchQuery: string;
   viewMode: "list" | "grid";
   isPending: boolean;
-  onNoResultsChange: (isNoResults: boolean) => void;
+  /** 絞り込みで0件の一覧を表示しているとき、その一覧の resetKey。そうでなければ null */
+  onNoResultsChange: (noResultsKey: string | null) => void;
   onWorksTotalChange: (worksTotal: number | undefined) => void;
   children: (result: WorksResult, isPending: boolean) => ReactNode;
 }
@@ -77,6 +78,7 @@ function Works(props: Props) {
 
 function ResolvedWorks({
   nav,
+  view,
   searchQuery,
   isPending,
   onNoResultsChange,
@@ -87,7 +89,8 @@ function ResolvedWorks({
   const isNoResults =
     result.works.length === 0 &&
     hasChipOrSearchRefinement({ selectedTags: nav.selectedTags, q: searchQuery });
-  useEffect(() => onNoResultsChange(isNoResults), [isNoResults, onNoResultsChange]);
+  const noResultsKey = isNoResults ? folderWorksResetKey(view, searchQuery) : null;
+  useEffect(() => onNoResultsChange(noResultsKey), [noResultsKey, onNoResultsChange]);
   useEffect(() => onWorksTotalChange(result.worksTotal), [result.worksTotal, onWorksTotalChange]);
   // アンマウント時（エラー捕捉）は未確定へ戻す。すでに表示済みのSuspense境界が再サスペンド
   // した場合はアンマウントされず非表示のまま保持されるため、その経路はSuspenseフォールバック

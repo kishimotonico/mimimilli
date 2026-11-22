@@ -70,7 +70,11 @@ function LibraryViewBody({
     refetchTagPrefixes,
     refetchGroupValues,
   } = useLibrarySupportingQueries(nav);
-  const [isNoResultsDueToFilter, setIsNoResultsDueToFilter] = useState(false);
+  const [noResultsKey, setNoResultsKey] = useState<string | null>(null);
+  // 0件と報告された一覧が、route の今の一覧と同じときだけ「絞り込みで0件」とする。デバウンス中や
+  // 戻る・進むの直後に、前の一覧の結果を引きずらない
+  const isNoResultsDueToFilter =
+    view.kind === "works" && noResultsKey === folderWorksResetKey(view, view.q);
   const [worksTotal, setWorksTotal] = useState<number | undefined>(undefined);
 
   const isErrorView = view.kind === "works" && isHasErrorOnly(view.condition);
@@ -152,7 +156,7 @@ function LibraryViewBody({
             searchQuery={debouncedSearchQuery}
             viewMode={viewMode}
             isPending={nav.isPending}
-            onNoResultsChange={setIsNoResultsDueToFilter}
+            onNoResultsChange={setNoResultsKey}
             onWorksTotalChange={setWorksTotal}
           >
             {(result, isPending) => (
