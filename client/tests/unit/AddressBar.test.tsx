@@ -12,6 +12,7 @@ import AddressBar from "../../src/app/ui/AddressBar";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import { libraryViewModeAtom } from "../../src/features/library/model/atoms";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
+import { defaultSmartFolderItems, seedSmartFolders } from "../helpers/smartFolders";
 import { mockApi } from "../helpers/api";
 import { buildSettings } from "../helpers/builders";
 import { seedAppMode, seedLibraryRoute, seedFilesRoute } from "../helpers/route";
@@ -20,7 +21,7 @@ afterEach(cleanup);
 
 function renderAddressBar(options?: {
   mode?: "library" | "files";
-  activeAxis?: string;
+  folderId?: string;
   libraryViewMode?: "list" | "grid";
   rootFolder?: string;
   filesRelPath?: string[];
@@ -28,17 +29,18 @@ function renderAddressBar(options?: {
   const settings = buildSettings({ rootFolder: options?.rootFolder ?? "/library" });
   mockApi({
     "GET /api/settings": settings,
-    "GET /api/smart-folders": [],
+    "GET /api/smart-folders": defaultSmartFolderItems(),
     "GET /api/tag-prefixes": [],
   });
   const store = createStore();
   seedAppMode(store, options?.mode ?? "library");
-  seedLibraryRoute(store, { activeAxis: (options?.activeAxis ?? "all") as never });
+  seedLibraryRoute(store, { folderId: options?.folderId ?? "all" });
   store.set(libraryViewModeAtom, options?.libraryViewMode ?? "list");
   if (options?.filesRelPath) seedFilesRoute(store, { relPath: options.filesRelPath });
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), settings);
+  seedSmartFolders(queryClient);
 
   render(
     createElement(
@@ -57,19 +59,19 @@ function renderAddressBar(options?: {
 
 describe("AddressBar のビュー切替ボタン", () => {
   it("作品一覧を表示する軸ではリスト/グリッドが選好どおり active になる", () => {
-    renderAddressBar({ activeAxis: "all", libraryViewMode: "list" });
+    renderAddressBar({ folderId: "all", libraryViewMode: "list" });
 
     expect(screen.getByLabelText("リスト")).toBeEnabled();
     expect(screen.getByLabelText("リスト")).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByLabelText("グリッド")).toHaveAttribute("aria-pressed", "false");
 
     cleanup();
-    renderAddressBar({ activeAxis: "all", libraryViewMode: "grid" });
+    renderAddressBar({ folderId: "all", libraryViewMode: "grid" });
     expect(screen.getByLabelText("グリッド")).toHaveAttribute("aria-pressed", "true");
   });
 
   it("facet 軸（値一覧）でも viewMode=grid ならグリッドボタンが active になる", () => {
-    renderAddressBar({ activeAxis: "circle", libraryViewMode: "grid" });
+    renderAddressBar({ folderId: "by-circle", libraryViewMode: "grid" });
 
     expect(screen.getByLabelText("グリッド")).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByLabelText("リスト")).toHaveAttribute("aria-pressed", "false");

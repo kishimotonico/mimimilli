@@ -1,37 +1,31 @@
-// 軸の値一覧データ取得（GET /axes/:axis）の共通フック。値一覧本体（AxisValueList）と
-// クイックオーバーレイ・チップドロップダウンが同じ query キー・同じ取得ロジックを
-// 共有するために切り出す（軸レール以外の任意の軸も問い合わせられる）。
+// 値の候補（POST /smart-folders/:id/groups）の共通フック。サイドバーのクイックオーバーレイと
+// 「＋絞り込み」が同じ query キー・同じ取得ロジックを共有する。
 
 import { useQuery } from "@tanstack/react-query";
-import type { FacetAxisId, NormalizedTag } from "@mimimilli/shared";
-import { getAxisFacets } from "../api";
+import type { NormalizedTag } from "@mimimilli/shared";
+import { getSmartFolderGroups } from "../../../entities/smart-folder/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
-import { buildTagFilterParams, filterValidFacetItems } from "./libraryPresentation";
+import type { AxisId } from "../../../entities/library/types";
+import { filterValidFacetItems, groupByOfAxis } from "./libraryPresentation";
 
-// selectedTags は集計に含めるタグ。件数基準（何を含めて集計するか）は呼び出し側の責務で、
-// 値一覧本体は無条件集計として空配列を、「＋絞り込み」ポップオーバーは現在の選択タグを渡す。
-// このフック自体は渡されたタグをそのままAND条件として渡すだけで、軸やintentを見ない。
-//
-// smartFolderId はスマートフォルダー表示中だけ渡す。生のルールではなくIDをサーバーへ渡し、
-// フォルダー条件適用後の集合を集計元にする。
-export function useAxisFacetsQuery(
-  axis: FacetAxisId | null,
-  selectedTags: NormalizedTag[] = [],
-  smartFolderId?: string,
-) {
-  const filterParams = {
-    ...buildTagFilterParams(selectedTags),
-    ...(smartFolderId ? { smartFolderId } : {}),
-  };
-  // smartFolderId 付きはキーの依存関係をそのフォルダーIDで表し、フォルダー保存・削除時に
-  // そのフォルダーの分だけを無効化できるようにする（通常のfacetsとは別系統）
-  const queryKey = smartFolderId
-    ? WORK_QUERY_KEYS.scopedFacets(smartFolderId, axis ?? "", buildTagFilterParams(selectedTags))
-    : WORK_QUERY_KEYS.facets(axis ?? "", filterParams);
+/** 候補を数える母集団。サイドバーの値一覧は絞り込み無し、「＋絞り込み」は開いている一覧の状態 */
+export interface FacetScope {
+  folderId: string;
+  group?: string | null;
+  tags?: NormalizedTag[];
+  q?: string;
+}
+
+export function useAxisFacetsQuery(axis: AxisId | null, scope: FacetScope) {
+  const { folderId, group = null, tags = [], q = "" } = scope;
+  const filter = { group, tags, q };
   return useQuery({
-    queryKey,
+    queryKey: WORK_QUERY_KEYS.scopedFacets(folderId, axis ?? "", filter),
     queryFn: async () => {
-      const items = await getAxisFacets(axis!, filterParams);
+      const items = await getSmartFolderGroups(folderId, {
+        groupBy: groupByOfAxis(axis!),
+        ...filter,
+      });
       return filterValidFacetItems(axis!, items);
     },
     enabled: axis !== null,

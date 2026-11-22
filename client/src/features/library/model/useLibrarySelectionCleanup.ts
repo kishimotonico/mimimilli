@@ -3,10 +3,10 @@ import {
   shouldClearSelectionOnFilterMiss,
   shouldClearSelectionOnWorkNotFound,
 } from "./libraryPresentation";
-import type { LibraryViewActions, LibraryViewState } from "./useLibraryNavigation";
+import type { ReadyLibraryNavigation } from "./useLibraryNavigation";
 
 interface UseLibrarySelectionCleanupOptions {
-  nav: LibraryViewState & LibraryViewActions;
+  nav: ReadyLibraryNavigation;
   isNoResultsDueToFilter: boolean;
   workDetailError: unknown;
 }

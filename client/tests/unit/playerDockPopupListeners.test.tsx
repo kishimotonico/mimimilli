@@ -1,10 +1,12 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { describe, expect, it, vi } from "vitest";
 import PlayerDock from "../../src/features/player/ui/PlayerDock";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import { PLAYER_CORE_INITIAL, playerCoreAtom } from "../../src/entities/player/model/atoms";
 import { playerUiModeAtom } from "../../src/features/player/model/playerPresentationAtoms";
+import { createSmartFolderQueryClient } from "../helpers/smartFolders";
 import { buildPlayerDockProps } from "./fixtures/playerDock";
 
 // PopupContent はモックしない: 再生速度メニュー（usePopoverDismissal 経由）のリスナーが
@@ -54,11 +56,13 @@ function renderPlayerDock() {
   });
   store.set(playerUiModeAtom, "popup");
   return render(
-    <JotaiProvider store={store}>
-      <LibraryNavigationProvider>
-        <PlayerDock {...buildPlayerDockProps()} />
-      </LibraryNavigationProvider>
-    </JotaiProvider>,
+    <QueryClientProvider client={createSmartFolderQueryClient()}>
+      <JotaiProvider store={store}>
+        <LibraryNavigationProvider>
+          <PlayerDock {...buildPlayerDockProps()} />
+        </LibraryNavigationProvider>
+      </JotaiProvider>
+    </QueryClientProvider>,
   );
 }
 

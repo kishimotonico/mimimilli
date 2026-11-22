@@ -31,7 +31,6 @@ interface AxisValueRowsProps {
   rows: AxisValueHierarchyRow[];
   sort: AxisValueSortState;
   onSortChange: (sort: AxisValueSortState) => void;
-  isSelected: (item: AxisFacetItem) => boolean;
   fallbackIcon: IconName;
   /** 軸・並び順・検索語が変わったらスクロール位置をリセットするための key */
   resetKey: string;
@@ -79,7 +78,6 @@ export default function AxisValueRows({
   rows,
   sort,
   onSortChange,
-  isSelected,
   fallbackIcon,
   resetKey,
   onSelect,
@@ -155,42 +153,36 @@ export default function AxisValueRows({
                     {row.label}
                   </div>
                 ) : (
-                  (() => {
-                    const on = isSelected(row.item);
-                    return (
-                      <div className={`mll-vrow ${on ? "is-on" : ""}`}>
-                        <button
-                          type="button"
-                          className="mll-vrow__main"
-                          data-flat-index={virtualRow.index}
-                          tabIndex={virtualRow.index === rovingIndex ? 0 : -1}
-                          style={{ paddingLeft: 4 + indent }}
-                          title={row.depth > 0 ? row.item.value : undefined}
-                          aria-pressed={on}
-                          onClick={(e) =>
-                            onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
-                          }
-                          onKeyDown={(e) => {
-                            if (!isAxisValueRowArrowKey(e.key)) return;
-                            e.preventDefault();
-                            moveFocus(e.key);
-                          }}
-                        >
-                          <CoverCollage
-                            covers={row.item.covers}
-                            size={ROW_COLLAGE_SIZE}
-                            fallbackIcon={fallbackIcon}
-                            requestWidth={collageRequestWidth}
-                          />
-                          <span className="mll-vrow__nm">{row.label}</span>
-                          <span className="mll-vrow__count">{row.item.count}</span>
-                          <span className="mll-vrow__dur">
-                            {formatDuration(row.item.durationSec) ?? "0:00"}
-                          </span>
-                        </button>
-                      </div>
-                    );
-                  })()
+                  <div className="mll-vrow">
+                    <button
+                      type="button"
+                      className="mll-vrow__main"
+                      data-flat-index={virtualRow.index}
+                      tabIndex={virtualRow.index === rovingIndex ? 0 : -1}
+                      style={{ paddingLeft: 4 + indent }}
+                      title={row.depth > 0 ? row.item.value : undefined}
+                      onClick={(e) =>
+                        onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
+                      }
+                      onKeyDown={(e) => {
+                        if (!isAxisValueRowArrowKey(e.key)) return;
+                        e.preventDefault();
+                        moveFocus(e.key);
+                      }}
+                    >
+                      <CoverCollage
+                        covers={row.item.covers}
+                        size={ROW_COLLAGE_SIZE}
+                        fallbackIcon={fallbackIcon}
+                        requestWidth={collageRequestWidth}
+                      />
+                      <span className="mll-vrow__nm">{row.label}</span>
+                      <span className="mll-vrow__count">{row.item.count}</span>
+                      <span className="mll-vrow__dur">
+                        {formatDuration(row.item.durationSec) ?? "0:00"}
+                      </span>
+                    </button>
+                  </div>
                 )}
               </div>
             );

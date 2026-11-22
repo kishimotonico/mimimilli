@@ -89,7 +89,7 @@ const KEYS = {
   facets: WORK_QUERY_KEYS.facets("circle"),
   tags: TAG_QUERY_KEYS.all(),
   smartWorks: SMART_FOLDER_QUERY_KEYS.works("sf-1"),
-  smartPreview: SMART_FOLDER_QUERY_KEYS.preview([{ axis: "circle", op: "eq", value: "c" }]),
+  smartFolders: SMART_FOLDER_QUERY_KEYS.all(),
   fs: FILE_SYSTEM_QUERY_KEYS.directory("dlsite"),
   diagnostics: SCAN_QUERY_KEYS.diagnostics(),
   scanRecord: SCAN_QUERY_KEYS.last(),
@@ -112,7 +112,7 @@ function seededClient(): QueryClient {
   queryClient.setQueryData(KEYS.facets, []);
   queryClient.setQueryData(KEYS.tags, []);
   queryClient.setQueryData(KEYS.smartWorks, structuredClone(emptyPages));
-  queryClient.setQueryData(KEYS.smartPreview, 3);
+  queryClient.setQueryData(KEYS.smartFolders, []);
   queryClient.setQueryData(KEYS.fs, { entries: [] });
   queryClient.setQueryData(KEYS.diagnostics, buildScanDiagnostics());
   queryClient.setQueryData(KEYS.scanRecord, { finishedAt: null });
@@ -139,7 +139,7 @@ const LIBRARY_VIEWS: KeyName[] = [
   "facets",
   "tags",
   "smartWorks",
-  "smartPreview",
+  "smartFolders",
 ];
 const REGISTRATION_VIEWS: KeyName[] = [...LIBRARY_VIEWS, "fs", "diagnostics", "scanRecord"];
 
@@ -168,7 +168,8 @@ describe("再生開始時の投影反映", () => {
     await updateCachesAfterPlaybackPrepared(queryClient, prepared);
 
     expect(queryClient.getQueryData(KEYS.detail1)).toEqual(prepared);
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(LIBRARY_VIEWS));
+    // 件数（スマートフォルダー一覧）だけを取り直し、開いている一覧の並びは動かさない（ADR-0040）
+    expect(invalidatedKeys(queryClient)).toEqual(["smartFolders"]);
   });
 });
 
@@ -187,13 +188,13 @@ describe("bookmark の必須更新", () => {
     });
   });
 
-  it("一覧（works の list 形と smartFolderWorks）だけを無効化し、総件数・facet・詳細は無効化しない", async () => {
+  it("一覧（works の list 形と smartFolderWorks）とスマートフォルダーの件数だけを無効化し、総件数・facet・詳細は無効化しない", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterBookmark(queryClient, { workId: "w1", bookmarked: true });
 
     expect(sorted(invalidatedKeys(queryClient))).toEqual(
-      sorted(["list", "favList", "smartWorks", "smartPreview"]),
+      sorted(["list", "favList", "smartWorks", "smartFolders"]),
     );
   });
 

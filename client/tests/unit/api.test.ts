@@ -456,62 +456,120 @@ describe("library api", () => {
     expect(ids.toSorted()).toEqual(["work-1", "work-2", "work-3", "work-4"]);
   });
 
-  it("getAxisFacets fetches /api/axes/:axis", async () => {
-    const mockFacets = [{ value: "cv/水瀬なずな", count: 3, durationSec: 1200, covers: [] }];
-    mockFetch.mockResolvedValue(makeResponse(mockFacets));
-    const result = await libraryApi.getAxisFacets("cv");
-    expect(mockFetch).toHaveBeenCalledWith("/api/axes/cv");
-    expect(result).toEqual(mockFacets);
-  });
-
-  it("getAxisFacets は自軸除外後のフィルタ（tags/tagOp）をクエリへ渡す。組み込み軸の擬似タグも tags に含まれる", async () => {
-    mockFetch.mockResolvedValue(makeResponse([]));
-    await libraryApi.getAxisFacets("cv", {
-      tags: ["サークル/月白製作所", "@year/2024"],
-      tagOp: "AND",
-    });
-    expect(mockFetch).toHaveBeenCalledWith(
-      "/api/axes/cv?tags=%E3%82%B5%E3%83%BC%E3%82%AF%E3%83%AB%2F%E6%9C%88%E7%99%BD%E8%A3%BD%E4%BD%9C%E6%89%80&tags=%40year%2F2024&tagOp=AND",
-    );
-  });
-
-  it("getAxisFacets はフィルタ省略時クエリ無しでフェッチする", async () => {
-    mockFetch.mockResolvedValue(makeResponse([]));
-    await libraryApi.getAxisFacets("cv", {});
-    expect(mockFetch).toHaveBeenCalledWith("/api/axes/cv");
-  });
-
   it("listSmartFolders fetches /api/smart-folders", async () => {
     mockFetch.mockResolvedValue(makeResponse([]));
     await smartFolderApi.listSmartFolders();
     expect(mockFetch).toHaveBeenCalledWith("/api/smart-folders");
   });
 
-  it("evalSmartFolder fetches /api/smart-folders/:id/works", async () => {
+  it("getSmartFolderWorks は解決済みの sort・ページを送り、空の q・tags・group・seed は含めない", async () => {
     const mockPage = {
       items: [makeWorkListItem({ id: "work-1" })],
       total: 1,
       stats: { trackCount: 0, durationSec: 0 },
     };
     mockFetch.mockResolvedValue(makeResponse(mockPage));
-    const result = await smartFolderApi.evalSmartFolder("sf-1", { page: 1, limit: 200 });
-    expect(mockFetch).toHaveBeenCalledWith("/api/smart-folders/sf-1/works?page=1&limit=200");
+    const result = await smartFolderApi.getSmartFolderWorks("sf-1", {
+      q: "",
+      tags: [],
+      group: null,
+      sort: "added-desc",
+      seed: 7,
+      page: 1,
+      limit: 200,
+    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/smart-folders/sf-1/works?sort=added-desc&page=1&limit=200",
+    );
     expect(result).toEqual(mockPage);
   });
 
-  it("evalSmartFolder は tags（保持中フィルタ）もクエリへ渡す。組み込み軸の擬似タグも tags に含まれる", async () => {
+  it("getSmartFolderWorks は tags・q・group を渡し、tagOp は送らない。擬似タグも tags に含まれる", async () => {
     mockFetch.mockResolvedValue(
       makeResponse({ items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } }),
     );
-    await smartFolderApi.evalSmartFolder("sf-1", {
-      page: 1,
-      limit: 200,
+    await smartFolderApi.getSmartFolderWorks("by-cv", {
+      q: "雨",
       tags: ["cv/藤田茜", "ASMR", "@year/2024"],
-      tagOp: "AND",
+      group: "霧島レイ",
+      sort: "title-asc",
+      seed: undefined,
+      page: 2,
+      limit: 200,
     });
-    expect(mockFetch).toHaveBeenCalledWith(
-      "/api/smart-folders/sf-1/works?tags=cv%2F%E8%97%A4%E7%94%B0%E8%8C%9C&tags=ASMR&tags=%40year%2F2024&tagOp=AND&page=1&limit=200",
+    const url = new URL(String(mockFetch.mock.calls.at(-1)![0]), "http://localhost");
+    expect(url.pathname).toBe("/api/smart-folders/by-cv/works");
+    expect(url.searchParams.get("q")).toBe("雨");
+    expect(url.searchParams.getAll("tags")).toEqual(["cv/藤田茜", "ASMR", "@year/2024"]);
+    expect(url.searchParams.get("group")).toBe("霧島レイ");
+    expect(url.searchParams.get("sort")).toBe("title-asc");
+    expect(url.searchParams.has("tagOp")).toBe(false);
+    expect(url.searchParams.get("page")).toBe("2");
+  });
+
+  it("getSmartFolderWorks は sort=random のときだけ seed を送る", async () => {
+    mockFetch.mockResolvedValue(
+      makeResponse({ items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } }),
     );
+    const base = { q: "", tags: [], group: null, page: 1, limit: 200 };
+    await smartFolderApi.getSmartFolderWorks("random", { ...base, sort: "random", seed: 42 });
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      "/api/smart-folders/random/works?sort=random&seed=42&page=1&limit=200",
+    );
+  });
+
+  it("getSmartFolderGroups は groupBy だけを body に POST する（自身の値一覧）", async () => {
+    mockFetch.mockResolvedValue(makeResponse([]));
+    await smartFolderApi.getSmartFolderGroups("by-cv", {
+      groupBy: { kind: "prefix", prefix: "cv" },
+    });
+    const [url, init] = mockFetch.mock.calls.at(-1)!;
+    expect(url).toBe("/api/smart-folders/by-cv/groups");
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(String(init?.body))).toEqual({ groupBy: { kind: "prefix", prefix: "cv" } });
+  });
+
+  it("getSmartFolderGroups は候補用に group・tags・q も body へ渡す", async () => {
+    mockFetch.mockResolvedValue(makeResponse([]));
+    await smartFolderApi.getSmartFolderGroups("all", {
+      groupBy: { kind: "tag" },
+      group: "x",
+      tags: ["ASMR"],
+      q: "雨",
+    });
+    const [, init] = mockFetch.mock.calls.at(-1)!;
+    expect(JSON.parse(String(init?.body))).toEqual({
+      groupBy: { kind: "tag" },
+      group: "x",
+      tags: ["ASMR"],
+      q: "雨",
+    });
+  });
+
+  it("updateSmartFolder は PUT /api/smart-folders/:id へ保存内容を送る", async () => {
+    const item = {
+      id: "sf-1",
+      name: "お気に入り",
+      condition: { type: "and", children: [] },
+      sort: "title-asc",
+      groupBy: null,
+      position: 0,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      count: null,
+    };
+    mockFetch.mockResolvedValue(makeResponse(item));
+    const write = {
+      name: "お気に入り",
+      condition: { type: "and" as const, children: [] },
+      sort: "title-asc" as const,
+      groupBy: null,
+    };
+    const result = await smartFolderApi.updateSmartFolder("sf-1", write);
+    const [url, init] = mockFetch.mock.calls.at(-1)!;
+    expect(url).toBe("/api/smart-folders/sf-1");
+    expect(init?.method).toBe("PUT");
+    expect(JSON.parse(String(init?.body))).toEqual(write);
+    expect(result.sort).toBe("title-asc");
   });
 
   it("exportLibrary POSTs to /api/export and returns parsed response", async () => {

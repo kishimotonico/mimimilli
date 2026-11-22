@@ -26,7 +26,13 @@ async function invalidateLibraryViews(queryClient: QueryClient): Promise<void> {
     queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() }),
     queryClient.invalidateQueries({ queryKey: TAG_QUERY_KEYS.all() }),
     queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() }),
+    invalidateSmartFolderCounts(queryClient),
   ]);
+}
+
+/** スマートフォルダー一覧（件数入り）だけを取り直す。開いている一覧の並びは動かさない */
+function invalidateSmartFolderCounts(queryClient: QueryClient): Promise<void> {
+  return queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.all() });
 }
 
 async function invalidateRegistrationViews(
@@ -93,7 +99,7 @@ export async function updateCachesAfterPlaybackPrepared(
   work: Work,
 ): Promise<void> {
   queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), work);
-  await invalidateLibraryViews(queryClient);
+  await invalidateSmartFolderCounts(queryClient);
 }
 
 /** excludedListKey は画面が apply で揃え済みの一覧。その key だけ無効化しない */
@@ -106,9 +112,12 @@ export async function updateCachesAfterBookmark(
     prev ? { ...prev, bookmarked: change.bookmarked } : prev,
   );
   const excludedHash = excludedListKey === null ? null : hashKey(excludedListKey);
-  await queryClient.invalidateQueries({
-    predicate: (query) => isWorkListQuery(query) && query.queryHash !== excludedHash,
-  });
+  await Promise.all([
+    queryClient.invalidateQueries({
+      predicate: (query) => isWorkListQuery(query) && query.queryHash !== excludedHash,
+    }),
+    invalidateSmartFolderCounts(queryClient),
+  ]);
 }
 
 /** 登録（候補一括・Files 単体）の成功後。取り直した候補を返す。取り直せなかったときは null */

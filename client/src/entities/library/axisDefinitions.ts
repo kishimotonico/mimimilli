@@ -1,54 +1,16 @@
-// 軸（AxisId）のメタデータと判定を一元管理する。
-// ADR-0005 により分類軸は固定 enum ではなく「登録済み prefix そのもの」になった。
-// 判定はIDの形で決まる: ビュー集合 / "tag" / "smart-*" 以外はすべてファセット軸
-// （組み込みの "year" と任意の prefix 軸）。ラベル・軸レールへの表示は
-// サーバーの prefix 定義（GET /tag-prefixes）から引く。
+// 「＋絞り込み」の軸（prefix・タグ・追加年）とチップのラベル・アイコン。
+// ラベルは tag_prefixes の定義から引く（ADR-0005）。
 
-import {
-  isSmartFolderAxisId,
-  resolveTagPrefix,
-  smartFolderIdFromAxisId,
-  VIEW_IDS,
-  type TagPrefix,
-  type ViewId,
-} from "@mimimilli/shared";
+import { resolveTagPrefix, type TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "./types";
 import type { IconName } from "../../shared/ui/Icon";
-
-const VIEW_AXIS_LABELS: Record<ViewId, string> = {
-  all: "すべての作品",
-  recent: "最近再生",
-  added: "最近追加",
-  fav: "お気に入り",
-  error: "エラー",
-};
 
 const BUILTIN_AXIS_LABELS: Record<string, string> = {
   tag: "タグ",
   year: "追加日",
 };
 
-export const VIEW_AXES = new Set<string>(VIEW_IDS);
-
-export function isViewAxis(axis: AxisId): axis is ViewId {
-  return VIEW_AXES.has(axis);
-}
-
-export function isSmartAxis(axis: AxisId): boolean {
-  return isSmartFolderAxisId(axis);
-}
-
-export function isFacetAxis(axis: AxisId): boolean {
-  return !isViewAxis(axis) && axis !== "tag" && !isSmartAxis(axis);
-}
-
-export function getSmartFolderId(axis: AxisId): string {
-  return smartFolderIdFromAxisId(axis);
-}
-
 export function getAxisLabel(axis: AxisId, tagPrefixes: TagPrefix[] = []): string {
-  if (isSmartAxis(axis)) return "スマートフォルダー";
-  if (isViewAxis(axis)) return VIEW_AXIS_LABELS[axis];
   const builtin = BUILTIN_AXIS_LABELS[axis];
   if (builtin) return builtin;
   return resolveTagPrefix(axis, tagPrefixes).label;
@@ -65,16 +27,29 @@ const PREFIX_ICONS: Record<string, IconName> = {
 const BUILTIN_AXIS_ICONS: Record<string, IconName> = {
   tag: "filter",
   year: "refresh",
+};
+
+export function getAxisIcon(axis: AxisId): IconName {
+  return BUILTIN_AXIS_ICONS[axis] ?? PREFIX_ICONS[axis] ?? "folder";
+}
+
+const SMART_FOLDER_ICONS: Record<string, IconName> = {
   all: "gridS",
+  random: "refresh",
   recent: "refresh",
   added: "add",
   fav: "star",
   error: "err",
+  "by-cv": "user",
+  "by-circle": "folder",
+  "by-series": "bookmark",
+  "by-category": "list",
+  "by-tag": "filter",
+  "by-year": "refresh",
 };
 
-export function getAxisIcon(axis: AxisId): IconName {
-  if (isSmartAxis(axis)) return "gridS";
-  return BUILTIN_AXIS_ICONS[axis] ?? PREFIX_ICONS[axis] ?? "folder";
+export function getSmartFolderIcon(id: string): IconName {
+  return SMART_FOLDER_ICONS[id] ?? "gridS";
 }
 
 export interface FacetAxisRow {
@@ -83,24 +58,7 @@ export interface FacetAxisRow {
   icon: IconName;
 }
 
-export interface ViewAxisRow {
-  id: AxisId;
-  name: string;
-  icon: IconName;
-}
-
-/** ビュー軸の行。軸レール（AxisColumn）のビューグループが使う。 */
-export function buildViewAxisRows(): ViewAxisRow[] {
-  return VIEW_IDS.map((id) => ({
-    id,
-    name: VIEW_AXIS_LABELS[id],
-    icon: getAxisIcon(id),
-  }));
-}
-
-/** 分類軸の行 = prefix 定義（定義順）＋ 組み込みの tag / year（ADR-0005）。
- *  軸レール（AxisColumn）と「＋絞り込み」の軸選択ステージ（FilterChipAddButton）
- *  が共有する。 */
+/** 「＋絞り込み」の軸選択の行 = prefix 定義（定義順）＋ 組み込みの tag / year（ADR-0005） */
 export function buildFacetAxisRows(tagPrefixes: TagPrefix[]): FacetAxisRow[] {
   const prefixRows = tagPrefixes.map((p) => ({
     id: p.prefix,

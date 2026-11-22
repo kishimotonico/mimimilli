@@ -1,14 +1,31 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 import AxisColumn from "../../src/features/library/ui/AxisColumn";
 import { mockApi } from "../helpers/api";
+import { buildSmartFolderItem, defaultSmartFolderItems } from "../helpers/smartFolders";
 import { buildAxisFacetItem, buildTagPrefix } from "../helpers/builders";
+
+let sizeMock: { restore: () => void } | null = null;
 
 afterEach(() => {
   cleanup();
+  clearResizeObservers();
+  sizeMock?.restore();
+  sizeMock = null;
 });
+
+async function flushVirtualizer() {
+  await waitFor(() => {
+    expect(document.querySelector('.mll-qlist__body[role="group"]')).toBeInTheDocument();
+  });
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+    flushAllResizeObservers({ width: 260, height: 260 });
+  });
+}
 
 const PREFIXES = [buildTagPrefix({ prefix: "cv", label: "CV", color: "cv", protected: true })];
 
@@ -18,13 +35,12 @@ function renderAxisColumn(props: Partial<React.ComponentProps<typeof AxisColumn>
     <QueryClientProvider client={queryClient}>
       <div className="mle-app">
         <AxisColumn
-          activeAxis="all"
-          tagPrefixes={[]}
-          smartFolders={[]}
-          onSelectAxis={vi.fn()}
-          selectedTags={[]}
-          onToggleTag={vi.fn()}
-          onReplaceTag={vi.fn()}
+          folders={defaultSmartFolderItems({ recent: 7, added: 0, fav: 4, error: 2 })}
+          activeFolderId="all"
+          activeGroup={null}
+          tagPrefixes={PREFIXES}
+          onOpenFolder={vi.fn()}
+          onOpenGroupValue={vi.fn()}
           onAddTag={vi.fn()}
           stats={{ status: "loading" }}
           {...props}
@@ -49,68 +65,87 @@ describe("AxisColumn", () => {
     expect(screen.getByText("統計の取得に失敗しました")).toBeInTheDocument();
   });
 
-  it("エラー行は、エラー作品もデータ不整合も無いときだけ隠す", () => {
-    const { unmount } = renderAxisColumn({ errorViewCount: 0, dataIntegrityCount: 0 });
-    expect(screen.queryByRole("button", { name: /エラー/ })).toBeNull();
-    unmount();
+  it("スマートフォルダーをサーバーの順に並べ、件数はサーバー応答の値を出す", () => {
+    renderAxisColumn({});
 
-    renderAxisColumn({ errorViewCount: 0, dataIntegrityCount: 2 });
-    expect(screen.getByRole("button", { name: /エラー/ })).toBeInTheDocument();
+    const names = screen
+      .getAllByRole("button")
+      .map((button) => button.textContent ?? "")
+      .filter((text) => text !== "");
+    expect(names.slice(0, 6)).toEqual([
+      "すべて",
+      "ランダム",
+      "最近再生7",
+      "最近追加0",
+      "お気に入り4",
+      "エラー2",
+    ]);
+    expect(screen.getByRole("button", { name: "CV別" })).toBeInTheDocument();
   });
 
-  it("選択中のビュー項目に aria-current を付与する", () => {
+  it("件数を出さないもの（条件が空・グループ分けあり）は件数を持っていても出さない", () => {
     renderAxisColumn({
-      activeAxis: "fav",
+      folders: defaultSmartFolderItems({ all: 11, random: 11, "by-cv": 3 }),
     });
+
+    expect(screen.getByRole("button", { name: "すべて" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "ランダム" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "CV別" })).toBeInTheDocument();
+  });
+
+  it("0件の行も隠さない", () => {
+    renderAxisColumn({});
+
+    expect(screen.getByRole("button", { name: "最近追加 0" })).toBeInTheDocument();
+  });
+
+  it("旧のビュー軸・分類軸・スマートフォルダー欄は出さない", () => {
+    renderAxisColumn({});
+
+    expect(screen.queryByText("ビュー")).toBeNull();
+    expect(screen.queryByText("分類軸")).toBeNull();
+    expect(screen.queryByText(/新規スマートフォルダー/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /^タグ$/ })).toBeNull();
+  });
+
+  it("読めない行は開けるが件数もクイックオーバーレイも持たない", () => {
+    renderAxisColumn({
+      folders: [
+        ...defaultSmartFolderItems(),
+        buildSmartFolderItem({ id: "sf-broken", name: "壊れた行", condition: null }),
+      ],
+    });
+
+    expect(screen.getByRole("button", { name: "壊れた行" })).not.toHaveAttribute("aria-expanded");
+  });
+
+  it("開いているスマートフォルダーに aria-current を付与する", () => {
+    renderAxisColumn({ activeFolderId: "fav" });
 
     expect(screen.getByRole("button", { name: /お気に入り/ })).toHaveAttribute(
       "aria-current",
       "true",
     );
-    expect(screen.getByRole("button", { name: /すべての作品/ })).not.toHaveAttribute(
-      "aria-current",
-    );
+    expect(screen.getByRole("button", { name: "すべて" })).not.toHaveAttribute("aria-current");
   });
 
-  it("tagPrefixes 取得失敗時、CV等のprefix軸が無言で消えず分類軸グループにエラー行を出す", () => {
-    renderAxisColumn({
-      isTagPrefixesError: true,
-    });
+  it("行のクリックで onOpenFolder を呼ぶ", async () => {
+    const onOpenFolder = vi.fn();
+    renderAxisColumn({ onOpenFolder });
 
-    expect(screen.getByText("分類軸の取得に失敗しました")).toBeInTheDocument();
-    // 組み込みのタグ・追加日は tagPrefixes に依存しないため引き続き表示される
-    expect(screen.getByRole("button", { name: /タグ/ })).toBeInTheDocument();
-  });
-
-  it("エラー行の再試行ボタンをクリックすると onRetryTagPrefixes を呼ぶ", async () => {
-    const onRetry = vi.fn();
-    renderAxisColumn({
-      isTagPrefixesError: true,
-      onRetryTagPrefixes: onRetry,
-    });
-
-    await userEvent.click(screen.getByRole("button", { name: "再試行" }));
-    expect(onRetry).toHaveBeenCalledTimes(1);
-  });
-
-  it("tagPrefixes 取得成功時はエラー行を出さず、prefix軸を表示する", () => {
-    renderAxisColumn({
-      tagPrefixes: PREFIXES,
-    });
-
-    expect(screen.queryByText("分類軸の取得に失敗しました")).toBeNull();
-    expect(screen.getByRole("button", { name: /CV/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /お気に入り/ }));
+    expect(onOpenFolder).toHaveBeenCalledWith("fav");
   });
 
   it("初回レンダー直後（再レンダーを挟まない）の最初のホバーでもクイックオーバーレイが開く", async () => {
-    mockApi({ "GET /api/axes/:axis": [] });
-    renderAxisColumn({ tagPrefixes: PREFIXES });
+    mockApi({ "POST /api/smart-folders/:id/groups": [] });
+    renderAxisColumn({});
 
     // マウント直後、再レンダーを一切挟まずに最初のpointerEnterを発火する。実ブラウザでは
     // 本物のホバーに必ず document レベルの pointermove が先行する（ホバーガードが
     // 誤起動と区別する材料）ため、テストでも先に発火させておく。
     fireEvent.pointerMove(document);
-    fireEvent.pointerEnter(screen.getByRole("button", { name: /CV/ }));
+    fireEvent.pointerEnter(screen.getByRole("button", { name: "CV別" }));
 
     await waitFor(() => {
       expect(document.querySelector(".mll-qoverlay")).toBeInTheDocument();
@@ -118,11 +153,13 @@ describe("AxisColumn", () => {
   });
 
   it("オーバーレイ閉鎖（退出）中もfacet一覧が空にならない", async () => {
-    mockApi({ "GET /api/axes/:axis": [buildAxisFacetItem({ value: "藤田茜", count: 3 })] });
-    renderAxisColumn({ tagPrefixes: PREFIXES });
+    mockApi({
+      "POST /api/smart-folders/:id/groups": [buildAxisFacetItem({ value: "藤田茜", count: 3 })],
+    });
+    renderAxisColumn({});
 
     // ArrowRight で遅延なしに開く（openImmediately）。
-    fireEvent.keyDown(screen.getByRole("button", { name: /CV/ }), { key: "ArrowRight" });
+    fireEvent.keyDown(screen.getByRole("button", { name: "CV別" }), { key: "ArrowRight" });
 
     // 読み込み完了で「項目がありません」（空表示）が出ないこと（＝1件のfacetが一覧に載っている）
     // を、一覧本体（role="group"）の出現で確認する。
@@ -141,21 +178,57 @@ describe("AxisColumn", () => {
   });
 
   it("軸A→B高速切替で新パネルが閉じず、検索欄フォーカスが奪われない", async () => {
-    mockApi({ "GET /api/axes/:axis": [] });
-    renderAxisColumn({ tagPrefixes: PREFIXES });
+    mockApi({ "POST /api/smart-folders/:id/groups": [] });
+    renderAxisColumn({});
 
-    fireEvent.keyDown(screen.getByRole("button", { name: /CV/ }), { key: "ArrowRight" });
+    fireEvent.keyDown(screen.getByRole("button", { name: "CV別" }), { key: "ArrowRight" });
     await waitFor(() => {
       expect(screen.getByLabelText("CVの値を検索")).toBeInTheDocument();
     });
 
     // 退出アニメーション完了を待たず、別軸へ即座に切り替える（openImmediately）。
-    fireEvent.keyDown(screen.getByRole("button", { name: /追加日/ }), { key: "ArrowRight" });
+    fireEvent.keyDown(screen.getByRole("button", { name: "追加年別" }), { key: "ArrowRight" });
 
     await waitFor(() => {
       expect(document.activeElement).toBe(screen.getByLabelText("追加日の値を検索"));
     });
     // 新パネルが開いたまま維持されている（閉じていない）。
     expect(screen.getByLabelText("追加日の値を検索")).toBeInTheDocument();
+  });
+
+  it("クイックオーバーレイの値は主クリックもCtrl+クリックもその値の作品一覧（onOpenGroupValue）へ進む", async () => {
+    mockApi({
+      "POST /api/smart-folders/:id/groups": [buildAxisFacetItem({ value: "藤田茜", count: 3 })],
+    });
+    sizeMock = mockElementSize(260, 260);
+    const onOpenGroupValue = vi.fn();
+    renderAxisColumn({ onOpenGroupValue });
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "CV別" }), { key: "ArrowRight" });
+    await flushVirtualizer();
+    fireEvent.click(await screen.findByRole("button", { name: /^藤田茜 ?3/ }));
+    expect(onOpenGroupValue).toHaveBeenLastCalledWith("by-cv", "藤田茜");
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "CV別" }), { key: "ArrowRight" });
+    await flushVirtualizer();
+    fireEvent.click(await screen.findByRole("button", { name: /^藤田茜 ?3/ }), { ctrlKey: true });
+    expect(onOpenGroupValue).toHaveBeenLastCalledWith("by-cv", "藤田茜");
+  });
+
+  it("クイックオーバーレイの追加ボタンは値をチップの候補として onAddTag へ渡す", async () => {
+    mockApi({
+      "POST /api/smart-folders/:id/groups": [buildAxisFacetItem({ value: "藤田茜", count: 3 })],
+    });
+    sizeMock = mockElementSize(260, 260);
+    const onAddTag = vi.fn();
+    renderAxisColumn({ onAddTag });
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "CV別" }), { key: "ArrowRight" });
+    await flushVirtualizer();
+    await screen.findByRole("button", { name: /^藤田茜 ?3/ });
+    const addButton = document.querySelector<HTMLButtonElement>(".mll-qlist__add");
+    expect(addButton).not.toBeNull();
+    fireEvent.click(addButton!);
+    expect(onAddTag).toHaveBeenCalledWith("cv/藤田茜");
   });
 });

@@ -62,10 +62,10 @@ describe("Breadcrumbs", () => {
     stubWidths(container, 200, 800);
 
     fireEvent.click(screen.getByRole("button", { name: "c" }));
-    expect(onNavigate).toHaveBeenCalledWith(3);
+    expect(onNavigate).toHaveBeenCalledWith(3, screen.getByRole("button", { name: "c" }));
 
     fireEvent.click(screen.getByRole("button", { name: "ルート" }));
-    expect(onNavigate).toHaveBeenCalledWith(0);
+    expect(onNavigate).toHaveBeenCalledWith(0, screen.getByRole("button", { name: "ルート" }));
   });
 
   it("幅測定用クローンのラベルはテキストノードではないため、getByTextが実体と二重ヒットしない", () => {

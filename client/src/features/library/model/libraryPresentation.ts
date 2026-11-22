@@ -7,34 +7,22 @@ import {
   isBuiltinPseudoTagAxis,
   normalizeTag,
   parseBuiltinAxisTag,
-  parseTag,
   TagNormalizationError,
   type AxisFacetItem,
   type CollectionStats,
-  type FacetAxisId,
+  type GroupBy,
   type NormalizedTag,
-  type WorksQueryInput,
 } from "@mimimilli/shared";
 import { ApiRequestError } from "../../../shared/api/http";
-import type { AxisId, SortId, ViewMode } from "../../../entities/library/types";
-import { getAxisLabel, isSmartAxis, isViewAxis } from "../../../entities/library/axisDefinitions";
-import { computeResultsPaneKind } from "../../../entities/library/resultsPane";
-
-export { computeResultsPaneKind } from "../../../entities/library/resultsPane";
+import type { AxisId } from "../../../entities/library/types";
+import { getAxisLabel } from "../../../entities/library/axisDefinitions";
 
 // 組み込み軸の擬似タグ（year 等、ADR-0012 §2）の構築・解析・検証は shared/pseudoTag.ts に
 // 集約している（client・server の両方が同じ実装を使うため）。isBuiltinPseudoTagAxis /
 // buildBuiltinAxisTag / parseBuiltinAxisTag / splitSelectedTags は @mimimilli/shared から
 // 直接importする。
 
-/** グリッド／リストの決定は libraryViewModeAtom のみに依存する（ADR-0012 §3・§5）。
- *  works（作品一覧）・value-list（値一覧）の両方がグリッド表示に従う。 */
-export function isGridViewActive(axis: AxisId, viewMode: ViewMode): boolean {
-  const kind = computeResultsPaneKind(axis);
-  return (kind === "works" || kind === "value-list") && viewMode === "grid";
-}
-
-/** facet/tag 軸の値一覧で1項目を選んだときに selectedTagsAtom へ追加する完全なタグ文字列を組み立てる。
+/** facet/tag 軸の値一覧で1項目を選んだときにチップへ足す完全なタグ文字列を組み立てる。
  *  tag 軸は AxisFacetItem.value が既に完全なタグ文字列（ADR-0005）、
  *  year のようなタグ由来でない組み込み軸は擬似タグ、それ以外の facet 軸
  *  （prefix 定義に基づく実タグ由来の軸）は "軸/値" の実タグとして表現する。 */
@@ -66,15 +54,24 @@ export function filterValidFacetItems<T extends AxisFacetItem>(axis: AxisId, ite
   });
 }
 
-// ── 軸レール・チップの入口共通「置き換え既定」（ADR-0013） ─────────────
+/** グループ分けの種類に対応する軸 ID（prefix 軸・タグ・追加年）。軸 ID は値一覧の部品が
+ *  ラベル・アイコン・値→タグの変換に使う */
+export function axisOfGroupBy(groupBy: GroupBy): AxisId {
+  switch (groupBy.kind) {
+    case "prefix":
+      return groupBy.prefix;
+    case "tag":
+      return "tag";
+    case "addedYear":
+      return "year";
+  }
+}
 
-/** タグ文字列が属する軸ID。チップの兄弟値ドロップダウンで問い合わせる facet 軸を
- *  決めるのに使う。フラットタグは "tag" 軸（値一覧に全フラットタグが並ぶ）を返す。 */
-export function axisOfFilterTag(tag: NormalizedTag): AxisId {
-  const builtin = parseBuiltinAxisTag(tag);
-  if (builtin) return builtin.axis;
-  const parsed = parseTag(tag);
-  return parsed.kind === "flat" ? "tag" : parsed.prefix;
+/** 「＋絞り込み」の軸選択で選ばれた軸のグループ分け */
+export function groupByOfAxis(axis: AxisId): GroupBy {
+  if (axis === "tag") return { kind: "tag" };
+  if (axis === "year") return { kind: "addedYear" };
+  return { kind: "prefix", prefix: axis };
 }
 
 /** チップ表示用の文字列。design-system.md の「チップはフルパス表示」規約は維持しつつ、
@@ -86,97 +83,19 @@ export function formatFilterChipLabel(tag: NormalizedTag): string {
   return `${getAxisLabel(builtin.axis)}/${builtin.value}`;
 }
 
-// ── works query のパラメータ ──────────────────────────────────
-
-interface WorksParamsInput {
-  activeAxis: AxisId;
-  sort: SortId;
-  searchQuery: string;
-  selectedTags: NormalizedTag[];
-  /** sort="random" のときだけ使う。呼び出し側の library.seed 由来 */
-  randomSeed?: number;
-}
-
-/** selectedTagsAtom（組み込み軸の擬似タグ混じり）を works query の tags フィールドへ変換する。
- *  通常の works query（buildWorksParams）とスマートフォルダー評価（buildSmartFolderFilterParams）
- *  で共通のロジック。組み込み軸（year等）専用のクエリパラメータは持たない（ADR-0012 §2）。
- *  擬似タグの解釈（実タグ／yearへの分解）はサーバー側の共通フィルタ解釈層が一度だけ行う
- *  （shared/pseudoTag.ts） */
-export interface TagFilterParams {
-  tags?: string[];
-  tagOp?: "AND";
-}
-
-export interface SmartFolderFilterParams extends TagFilterParams {
-  q?: string;
-}
-
-/** works query・軸ファセットクエリ・スマートフォルダー評価が共通で使うタグ→クエリ変換。
- *  渡すタグの取捨選択は呼び出し側の責務で、値一覧本体（AxisValueRows/AxisValueGrid）は
- *  常に無条件集計、「＋絞り込み」ポップオーバー（AxisValuePopoverPanel）は現在の選択
- *  タグ込みで呼び分ける。 */
-export function buildTagFilterParams(selectedTags: NormalizedTag[]): TagFilterParams {
-  return selectedTags.length > 0 ? { tags: selectedTags, tagOp: "AND" } : {};
-}
-
-/** 通常軸（ビュー軸）の works query パラメータ。結果面が works で非スマート軸であることは
- *  呼び出し側（LibraryWorksBoundary の NormalWorks）が保証する。 */
-export function buildNormalWorksParams(input: WorksParamsInput): WorksQueryInput {
-  const { activeAxis, sort, searchQuery, selectedTags, randomSeed } = input;
-  const p: WorksQueryInput = { sort, ...buildTagFilterParams(selectedTags) };
-  if (searchQuery) p.q = searchQuery;
-  if (isViewAxis(activeAxis) && activeAxis !== "all") {
-    p.view = activeAxis as WorksQueryInput["view"];
-  }
-  if (sort === "random" && randomSeed !== undefined) p.seed = randomSeed;
-  return p;
-}
-
-/** works 種の結果面（ビュー軸・スマートフォルダー軸）以外は works query を発行しない。
- *  スマートフォルダーは別 query（evalSmartFolder）で取得する。 */
-export function buildWorksParams(input: WorksParamsInput): WorksQueryInput | null {
-  const { activeAxis } = input;
-  if (computeResultsPaneKind(activeAxis) !== "works" || isSmartAxis(activeAxis)) return null;
-  return buildNormalWorksParams(input);
-}
-
-/** スマートフォルダー評価API（GET /smart-folders/:id/works）へ渡す追加フィルタ。
- *  tags・q いずれもフォルダーのルール（OR・除外を含む）全体に対する追加の AND 条件として
- *  適用される（ADR-0012）。フィルタが無ければキーを持たないオブジェクトを返す
- *  （クエリキーの安定のため）。 */
-export function buildSmartFolderFilterParams(
-  selectedTags: NormalizedTag[],
-  searchQuery: string,
-): SmartFolderFilterParams {
-  const params: SmartFolderFilterParams = buildTagFilterParams(selectedTags);
-  if (searchQuery) params.q = searchQuery;
-  return params;
-}
-
 /** 作品一覧の描画結果（グリッド・リスト・エラー境界）を再マウントすべきタイミングを表す
- *  安定なキー。スマート軸は sort をフォルダー自身が保持し、この sort が API へ渡らない
- *  （LibrarySortMenu も参照）ため、nav.sort をキーへ混ぜると効いていない変化で無意味な
- *  再マウントが起きる。 */
+ *  安定なキー */
 export interface WorksResetKeyInput {
-  activeAxis: AxisId;
+  folderId: string;
+  group: string | null;
   selectedTags: NormalizedTag[];
-  sort: SortId;
+  sort: string;
   searchQuery: string;
+  seed: number | undefined;
 }
 
 export function buildWorksResetKey(input: WorksResetKeyInput): string {
-  const { activeAxis, selectedTags, sort, searchQuery } = input;
-  return JSON.stringify({
-    axis: activeAxis,
-    tags: selectedTags,
-    sort: isSmartAxis(activeAxis) ? undefined : sort,
-    search: searchQuery,
-  });
-}
-
-/** ファセット一覧（GET /axes/:axis）を取得すべき軸。value-list 種の結果面のみ */
-export function getFacetAxisForQuery(activeAxis: AxisId): FacetAxisId | null {
-  return computeResultsPaneKind(activeAxis) === "value-list" ? (activeAxis as FacetAxisId) : null;
+  return JSON.stringify(input);
 }
 
 /**

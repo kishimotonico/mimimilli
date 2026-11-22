@@ -101,8 +101,14 @@ export function usePopoverDismissal({
     },
   });
 
+  // 基準要素は描画のたびに確かめるが、変わったときだけ渡す。同じ要素を毎回 setState すると、
+  // 保留中の更新があるとき再描画が連鎖して Maximum update depth になる
+  const referenceRef = useRef<HTMLElement | null | undefined>(undefined);
   useLayoutEffect(() => {
-    refs.setReference(anchorRef.current);
+    const node = anchorRef.current;
+    if (referenceRef.current === node) return;
+    referenceRef.current = node;
+    refs.setReference(node);
   });
 
   const dismiss = useDismiss(context, {

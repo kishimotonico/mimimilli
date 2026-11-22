@@ -2,7 +2,8 @@ import { useLayoutEffect, useRef, useState } from "react";
 
 interface BreadcrumbsProps {
   path: string[];
-  onNavigate: (index: number) => void;
+  /** anchor はクリックされたセグメントのボタン（ポップオーバーの基準位置に使える） */
+  onNavigate: (index: number, anchor: HTMLElement) => void;
 }
 
 /** 中間階層を省略した表示に切り替えるべきか判定する。コンテナ幅は狭幅化・ペイン
@@ -57,7 +58,7 @@ export default function Breadcrumbs({ path, onNavigate }: BreadcrumbsProps) {
           ) : (
             <button
               className={`mle-crumbs__seg ${item.index === path.length - 1 ? "is-last" : ""}`}
-              onClick={() => onNavigate(item.index)}
+              onClick={(event) => onNavigate(item.index, event.currentTarget)}
             >
               {path[item.index]}
             </button>

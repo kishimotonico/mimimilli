@@ -35,7 +35,6 @@ interface AxisValueGridProps {
   axisLabel: string;
   rows: AxisValueHierarchyRow[];
   tileSize: number;
-  isSelected: (item: AxisFacetItem) => boolean;
   fallbackIcon: IconName;
   resetKey: string;
   /** クリック（既定=置き換え）・Ctrl/Cmd+クリック（トグル、ADR-0012 §7・ADR-0013の
@@ -48,7 +47,6 @@ export default function AxisValueGrid({
   axisLabel,
   rows,
   tileSize,
-  isSelected,
   fallbackIcon,
   resetKey,
   onSelect,
@@ -138,16 +136,14 @@ export default function AxisValueGrid({
                 {rowItems.map((row, localIndex) => {
                   const flatIndex = start + localIndex;
                   const parentPath = row.depth > 0 ? parentPathOf(row) : null;
-                  const on = isSelected(row.item);
                   return (
-                    <div key={row.path} className={`mll-vtile ${on ? "is-on" : ""}`}>
+                    <div key={row.path} className="mll-vtile">
                       <button
                         type="button"
                         className="mll-vtile__main"
                         data-flat-index={flatIndex}
                         tabIndex={flatIndex === rovingIndex ? 0 : -1}
                         title={parentPath ? row.item.value : undefined}
-                        aria-pressed={on}
                         onClick={(e) =>
                           onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
                         }

@@ -8,13 +8,14 @@ import {
   type AnchoredPopoverFloatingRefCallback,
 } from "../../../shared/ui/useAnchoredPopover";
 import AxisValuePopoverPanel from "./AxisValuePopoverPanel";
+import type { FacetScope } from "../model/useAxisFacetsQuery";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { I } from "../../../shared/ui/Icon";
 
 const POPOVER_WIDTH = 240;
 
 // チップ列の「＋絞り込み」（ADR-0012 §2）。軸→値の2段オーバーレイ。
-// 既定は AND 追加、Ctrl/Cmd+クリックで置き換えへ反転する。
+// 選んだ値はチップとして足す。候補は定義済みの prefix 全部・タグ・追加年（ADR-0041）。
 //
 // 軸選択ステージ・値ステージともに、それぞれ独立した `<AnimatePresence>` で
 // 条件レンダーする。軸を選ぶと軸選択ステージが退出し値ステージが入場する
@@ -24,9 +25,9 @@ const POPOVER_WIDTH = 240;
 interface FilterChipAddButtonProps {
   tagPrefixes: TagPrefix[];
   selectedTags: NormalizedTag[];
-  /** 表示中のスマートフォルダーID。候補件数をフォルダー条件適用後にする */
-  smartFolderId?: string;
-  onAddValue: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
+  /** 候補を数える母集団（開いている一覧の条件・値・チップ・検索語） */
+  scope: FacetScope;
+  onAddValue: (tag: NormalizedTag) => void;
 }
 
 function AxisPickerStage({
@@ -73,7 +74,7 @@ function AxisPickerStage({
 export default function FilterChipAddButton({
   tagPrefixes,
   selectedTags,
-  smartFolderId,
+  scope,
   onAddValue,
 }: FilterChipAddButtonProps) {
   const [open, setOpen] = useState(false);
@@ -127,12 +128,10 @@ export default function FilterChipAddButton({
             floatingStyles={floatingStyles}
             setFloating={setFloating}
             selectedTags={selectedTags}
-            // 既定=AND追加の入口（ADR-0013）。件数基準は現在の選択タグ込みの集計にする
-            // （「追加したら何件になるか」を示す）
-            countTags={selectedTags}
-            smartFolderId={smartFolderId}
-            onSelect={(tag, opts) => {
-              onAddValue(tag, opts);
+            // 件数は現在の絞り込み込みの集計にする（「追加したら何件になるか」を示す）
+            scope={scope}
+            onSelect={(tag) => {
+              onAddValue(tag);
               close();
             }}
             close={close}

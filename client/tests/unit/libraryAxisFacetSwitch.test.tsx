@@ -8,21 +8,17 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useLibrarySupportingQueries } from "../../src/features/library/model/useLibraryQueries";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
+import { buildNav } from "./fixtures/libraryNav";
 import { mockApi } from "../helpers/api";
 import { buildAxisFacetItem, buildScanDiagnostics, buildWorksPage } from "../helpers/builders";
 
-const baseNav: LibraryViewState = {
-  activeAxis: "cv",
-  selectedTags: [],
-  selectedWorkId: null,
-  sort: "added-desc",
-};
+const baseNav = buildNav({ library: { folderId: "by-cv" } });
 
 describe("分類軸切替時の facetItems 系列（R2 機序調査）", () => {
   beforeEach(() => {
     mockApi({
-      "GET /api/axes/:axis": ({ params }) =>
-        params.axis === "cv"
+      "POST /api/smart-folders/:id/groups": ({ params }) =>
+        params.id === "by-cv"
           ? Array.from({ length: 8 }, (_, i) => buildAxisFacetItem({ value: `cv${i}` }))
           : [],
       "GET /api/scan/diagnostics": buildScanDiagnostics(),
@@ -37,13 +33,13 @@ describe("分類軸切替時の facetItems 系列（R2 機序調査）", () => {
     vi.unstubAllGlobals();
   });
 
-  it("CV(8件)からタグ(0件)へ切替えても、activeAxis=='tag' の描画で facetItems が8件のまま観測されることはない", async () => {
+  it("CV別(8件)からタグ別(0件)へ切替えても、タグ別の描画で facetItems が8件のまま観測されることはない", async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const history: Array<{ axis: string; facetItemsLength: number }> = [];
+    const history: Array<{ folderId: string; facetItemsLength: number }> = [];
 
     function Probe({ nav }: { nav: LibraryViewState }) {
       const { facetItems } = useLibrarySupportingQueries(nav);
-      history.push({ axis: nav.activeAxis, facetItemsLength: facetItems.length });
+      history.push({ folderId: nav.view.folder.id, facetItemsLength: facetItems.length });
       return null;
     }
 
@@ -60,20 +56,22 @@ describe("分類軸切替時の facetItems 系列（R2 機序調査）", () => {
     );
 
     await waitFor(() =>
-      expect(history.some((h) => h.axis === "cv" && h.facetItemsLength === 8)).toBe(true),
+      expect(history.some((h) => h.folderId === "by-cv" && h.facetItemsLength === 8)).toBe(true),
     );
 
-    const navTag: LibraryViewState = { ...baseNav, activeAxis: "tag" };
+    const navTag = buildNav({ library: { folderId: "by-tag" } });
     await act(async () => {
       rerender(createElement(Wrapper, null, createElement(Probe, { nav: navTag })));
     });
 
     await waitFor(() =>
-      expect(history.some((h) => h.axis === "tag" && h.facetItemsLength === 0)).toBe(true),
+      expect(history.some((h) => h.folderId === "by-tag" && h.facetItemsLength === 0)).toBe(true),
     );
 
-    // ファセットは作品結果とは独立したクエリなので、タグ軸描画にCV軸の項目を混在させない。
-    const staleTagRenders = history.filter((h) => h.axis === "tag" && h.facetItemsLength === 8);
+    // ファセットは作品結果とは独立したクエリなので、タグ別の描画にCV別の項目を混在させない。
+    const staleTagRenders = history.filter(
+      (h) => h.folderId === "by-tag" && h.facetItemsLength === 8,
+    );
     expect(staleTagRenders).toEqual([]);
   });
 });

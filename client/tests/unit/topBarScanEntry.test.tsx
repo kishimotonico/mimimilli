@@ -20,6 +20,8 @@ import {
 } from "../helpers/builders";
 import { workspacePath } from "@mimimilli/shared";
 import { seedAppMode } from "../helpers/route";
+import { seedSmartFolders } from "../helpers/smartFolders";
+import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import ScanEntrySeenRecorder from "../../src/features/scan/ui/ScanEntrySeenRecorder";
 import { scanModalOpenAtom } from "../../src/entities/scan/model/atoms";
 
@@ -68,6 +70,7 @@ function renderTopBar(seed: Seed = {}) {
       seed.diagnostics ?? buildScanDiagnostics(),
     );
   }
+  seedSmartFolders(queryClient);
   if (seed.seen) localStorage.setItem(SEEN_KEY, JSON.stringify(seed.seen));
 
   const store = createStore();
@@ -82,7 +85,11 @@ function renderTopBar(seed: Seed = {}) {
       createElement(
         JotaiProvider,
         { store },
-        createElement(Fragment, null, createElement(TopBar), createElement(SeenRecorder)),
+        createElement(
+          LibraryNavigationProvider,
+          null,
+          createElement(Fragment, null, createElement(TopBar), createElement(SeenRecorder)),
+        ),
       ),
     ),
   );

@@ -1,7 +1,7 @@
 // routeとブラウザー履歴の同期。route の項目は codec の parse/serialize だけが知り、
 // ここはURLと履歴エントリーの状態の比較とpush/replaceだけを受け持つ（ADR-0031・ADR-0041）。
-import { useStore, useAtomValue } from "jotai";
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useStore } from "jotai";
+import { useLayoutEffect, useRef } from "react";
 import type { NavigationDirection, RouteStore } from "./routeStore";
 
 export interface SerializedRoute {
@@ -75,9 +75,6 @@ export function navigationHistoryForward(): void {
 
 export function useRouteHistorySync<R>(routeStore: RouteStore<R>, codec: RouteCodec<R>): void {
   const store = useStore();
-  const route = useAtomValue(routeStore.routeAtom);
-  // route が元の値へ戻ったバッチでも、未反映の書き込み要求を必ず消化する
-  const pendingWrite = useAtomValue(routeStore.sync.pendingWriteAtom);
   const indexRef = useRef(0);
   const maxIndexRef = useRef(0);
   const initializedRef = useRef(false);
@@ -107,6 +104,11 @@ export function useRouteHistorySync<R>(routeStore: RouteStore<R>, codec: RouteCo
         history.replaceState(stateWithMarker(index), "", parsed.canonicalUrl);
       }
       store.set(sync.applyFromHistoryAtom, parsed.apply, direction);
+      // 履歴エントリーに状態が無い・読めなかった項目は、適用後の route の値を置き換えで書く
+      const { url, entryState } = codec.serialize(store.get(routeStore.routeAtom));
+      if (!sameEntryState(readHistoryEntryState(history.state), entryState)) {
+        history.replaceState(stateWithMarker(index, entryState), "", url);
+      }
     };
 
     if (!initializedRef.current) {
@@ -125,27 +127,31 @@ export function useRouteHistorySync<R>(routeStore: RouteStore<R>, codec: RouteCo
       applyLocation(next, index === null, direction, event.state);
     };
 
+    // navigate ごとの履歴操作を、描画を待たずに呼ばれた順で1つずつ反映する。描画後の effect で
+    // まとめて書くと、直前の replace の内容が、続く push の前のエントリーに残らない
+    const writePending = () => {
+      for (const { route, write } of store.set(sync.takePendingOpsAtom)) {
+        const { url: nextUrl, entryState } = codec.serialize(route);
+        const urlChanged = nextUrl !== currentUrl();
+        const stateChanged = !sameEntryState(readHistoryEntryState(history.state), entryState);
+        if (!urlChanged && !stateChanged) continue;
+
+        if (write === "push" && urlChanged) {
+          const nextIndex = indexRef.current + 1;
+          moveTo(nextIndex, nextIndex);
+          history.pushState(stateWithMarker(nextIndex, entryState), "", nextUrl);
+        } else {
+          history.replaceState(stateWithMarker(indexRef.current, entryState), "", nextUrl);
+        }
+      }
+    };
+    const unsubscribe = store.sub(sync.pendingOpsAtom, writePending);
+    writePending();
+
     window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
+    return () => {
+      unsubscribe();
+      window.removeEventListener("popstate", handlePopState);
+    };
   }, [codec, routeStore, store]);
-
-  useEffect(() => {
-    if (pendingWrite !== null) store.set(routeStore.sync.consumePendingWriteAtom);
-    const { url: nextUrl, entryState } = codec.serialize(route);
-    const urlChanged = nextUrl !== currentUrl();
-    const stateChanged = !sameEntryState(readHistoryEntryState(history.state), entryState);
-    if (!urlChanged && !stateChanged) return;
-
-    if (pendingWrite === "push" && urlChanged) {
-      const nextIndex = indexRef.current + 1;
-      indexRef.current = nextIndex;
-      maxIndexRef.current = nextIndex;
-      writeMaxIndex(nextIndex);
-      store.set(routeStore.sync.historyAvailabilityAtom, { canBack: true, canForward: false });
-      history.pushState(stateWithMarker(nextIndex, entryState), "", nextUrl);
-      return;
-    }
-
-    history.replaceState(stateWithMarker(indexRef.current, entryState), "", nextUrl);
-  }, [codec, pendingWrite, route, routeStore, store]);
 }

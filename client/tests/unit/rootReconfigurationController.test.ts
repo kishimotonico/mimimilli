@@ -98,6 +98,18 @@ describe("resetReconfigurationAffectedQueries", () => {
     expect(result.current.isPending).toBe(false);
   });
 
+  it("スマートフォルダー一覧はデータを残したまま取り直す（サイドバーの前提を空にしない）", () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), [{ id: "all" }]);
+    queryClient.setQueryData(WORK_QUERY_KEYS.all(), { stale: true });
+
+    resetReconfigurationAffectedQueries(queryClient);
+
+    expect(queryClient.getQueryData(SMART_FOLDER_QUERY_KEYS.all())).toEqual([{ id: "all" }]);
+    expect(queryClient.getQueryState(SMART_FOLDER_QUERY_KEYS.all())?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryData(WORK_QUERY_KEYS.all())).toBeUndefined();
+  });
+
   it("settingsクエリなど再設定に無関係なキャッシュは対象にしない", () => {
     const queryClient = new QueryClient();
     queryClient.setQueryData(["settings"], { rootFolder: "/audio/library" });

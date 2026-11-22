@@ -40,7 +40,6 @@ function renderRows(items: AxisFacetItem[], onSelect = vi.fn()) {
       rows={flattenAxisValueRows(items)}
       sort={{ key: "name", direction: "asc" }}
       onSortChange={vi.fn()}
-      isSelected={() => false}
       fallbackIcon="user"
       resetKey="cv:name:asc"
       onSelect={onSelect}
@@ -160,7 +159,6 @@ describe("AxisValueRows のキーボード移動", () => {
         rows={flattenAxisValueRows(makeItems(6))}
         sort={{ key: "name", direction: "asc" }}
         onSortChange={vi.fn()}
-        isSelected={() => false}
         fallbackIcon="user"
         resetKey="cv:name:asc"
         onSelect={vi.fn()}

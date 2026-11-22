@@ -12,6 +12,7 @@ import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { libraryViewModeAtom } from "../../src/features/library/model/atoms";
 import { playerUiModeAtom } from "../../src/features/player/model/playerPresentationAtoms";
 import { mockApi } from "../helpers/api";
+import { defaultSmartFolderItems } from "../helpers/smartFolders";
 import {
   buildScanDiagnostics,
   buildSettings,
@@ -28,9 +29,10 @@ beforeEach(() => {
   sizeMock = mockElementSize(300, 600);
   mockApi({
     "GET /api/works": buildWorksPage([WORK]),
+    "GET /api/smart-folders/:id/works": buildWorksPage([WORK]),
     "GET /api/settings": buildSettings({ rootFolder: "/root" }),
     "GET /api/tag-prefixes": [],
-    "GET /api/smart-folders": [],
+    "GET /api/smart-folders": defaultSmartFolderItems(),
     "GET /api/tags": [],
     "GET /api/axes/:axis": [],
     "GET /api/works/missing-count": { count: 0 },

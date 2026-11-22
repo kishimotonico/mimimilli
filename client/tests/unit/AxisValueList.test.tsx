@@ -6,7 +6,6 @@ import type { AxisFacetItem } from "@mimimilli/shared";
 import AxisValueList from "../../src/features/library/ui/AxisValueList";
 import { libraryTileSizeAtom, libraryViewModeAtom } from "../../src/features/library/model/atoms";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
-import { nts } from "../helpers/tag";
 
 afterEach(() => {
   cleanup();
@@ -29,9 +28,7 @@ function renderAxisValueList(
         axis="cv"
         facetItems={[]}
         tagPrefixes={[]}
-        selectedTags={[]}
-        onReplace={vi.fn()}
-        onToggle={vi.fn()}
+        onSelectValue={vi.fn()}
         {...props}
       />
     </JotaiProvider>,
@@ -155,55 +152,43 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     sizeMock.restore();
   });
 
-  it("値をクリックすると完全なタグ文字列で onReplace を呼ぶ（既定=置き換え、ADR-0012 §7）", async () => {
+  it("値をクリックするとその値で onSelectValue を呼ぶ（ADR-0041）", async () => {
     const sizeMock = mockElementSize(600, 600);
-    const onReplace = vi.fn();
+    const onSelectValue = vi.fn();
     const user = userEvent.setup();
-    renderAxisValueList({ axis: "cv", facetItems: [makeItem({ value: "藤田茜" })], onReplace });
+    renderAxisValueList({
+      axis: "cv",
+      facetItems: [makeItem({ value: "藤田茜" })],
+      onSelectValue,
+    });
     await flushVirtualizer();
 
     const row = getRow(".mll-vrow", "藤田茜");
     await user.click(row.querySelector(".mll-vrow__main") as HTMLElement);
-    expect(onReplace).toHaveBeenCalledWith("cv/藤田茜");
+    expect(onSelectValue).toHaveBeenCalledWith("藤田茜");
     sizeMock.restore();
   });
 
-  it("Ctrl+クリックはAND追加（onToggle）へ反転する（ADR-0012 §7）", async () => {
+  it("Ctrl+クリックでも主クリックと同じくその値の作品一覧へ進む（反転しない。ADR-0041）", async () => {
     const sizeMock = mockElementSize(600, 600);
-    const onToggle = vi.fn();
-    const onReplace = vi.fn();
+    const onSelectValue = vi.fn();
     renderAxisValueList({
       axis: "cv",
       facetItems: [makeItem({ value: "藤田茜" })],
-      onToggle,
-      onReplace,
+      onSelectValue,
     });
     await flushVirtualizer();
 
     const row = getRow(".mll-vrow", "藤田茜");
     fireEvent.click(row.querySelector(".mll-vrow__main") as HTMLElement, { ctrlKey: true });
-    expect(onToggle).toHaveBeenCalledWith("cv/藤田茜");
-    expect(onReplace).not.toHaveBeenCalled();
+    expect(onSelectValue).toHaveBeenCalledTimes(1);
+    expect(onSelectValue).toHaveBeenCalledWith("藤田茜");
     sizeMock.restore();
   });
 
   it("値一覧の行にはAND追加ボタンが無い（値一覧は独立した全作品入口。ADR-0026）", async () => {
     const sizeMock = mockElementSize(600, 600);
     renderAxisValueList({ axis: "cv", facetItems: [makeItem({ value: "藤田茜" })] });
-    await flushVirtualizer();
-
-    const row = getRow(".mll-vrow", "藤田茜");
-    expect(within(row).queryByRole("button", { name: /AND追加/ })).toBeNull();
-    sizeMock.restore();
-  });
-
-  it("選択済みの行にもAND追加ボタンは表示されない", async () => {
-    const sizeMock = mockElementSize(600, 600);
-    renderAxisValueList({
-      axis: "cv",
-      facetItems: [makeItem({ value: "藤田茜" })],
-      selectedTags: nts(["cv/藤田茜"]),
-    });
     await flushVirtualizer();
 
     const row = getRow(".mll-vrow", "藤田茜");
@@ -300,9 +285,7 @@ describe("AxisValueList grid 表示", () => {
           axis="cv"
           facetItems={[makeItem()]}
           tagPrefixes={[]}
-          selectedTags={[]}
-          onReplace={vi.fn()}
-          onToggle={vi.fn()}
+          onSelectValue={vi.fn()}
         />
       </JotaiProvider>,
     );
@@ -373,9 +356,7 @@ describe("AxisValueList コンテキスト検索（ADR-0012 §6）", () => {
           axis="cv"
           facetItems={[makeItem({ value: "藤田茜" })]}
           tagPrefixes={[]}
-          selectedTags={[]}
-          onReplace={vi.fn()}
-          onToggle={vi.fn()}
+          onSelectValue={vi.fn()}
         />
       </JotaiProvider>,
     );
@@ -391,9 +372,7 @@ describe("AxisValueList コンテキスト検索（ADR-0012 §6）", () => {
           axis="circle"
           facetItems={[makeItem({ value: "夜想曲" })]}
           tagPrefixes={[]}
-          selectedTags={[]}
-          onReplace={vi.fn()}
-          onToggle={vi.fn()}
+          onSelectValue={vi.fn()}
         />
       </JotaiProvider>,
     );

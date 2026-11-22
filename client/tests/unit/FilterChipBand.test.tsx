@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach, beforeEach } from "vitest";
+import { describe, expect, it, afterEach, beforeEach, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -8,7 +8,7 @@ import { mockApi, type ApiMock } from "../helpers/api";
 let api: ApiMock;
 
 beforeEach(() => {
-  api = mockApi({ "GET /api/axes/:axis": [] });
+  api = mockApi({ "POST /api/smart-folders/:id/groups": [] });
 });
 
 afterEach(cleanup);
@@ -23,9 +23,9 @@ function renderFilterChipBand(
       <FilterChipBand
         tagPrefixes={[]}
         selectedTags={["cv/藤田茜", "サークル/月白製作所"]}
-        onReplace={() => {}}
-        onToggle={() => {}}
+        facetScope={{ folderId: "fav", group: null, tags: ["cv/藤田茜"], q: "雨" }}
         onAddTag={() => {}}
+        onRemoveTag={() => {}}
         onClearAll={() => {}}
         worksTotal={worksTotal}
         {...overrides}
@@ -34,16 +34,54 @@ function renderFilterChipBand(
   );
 }
 
-describe("FilterChipBand のチップクリック", () => {
-  it("兄弟値ドロップダウンは既定=置き換えの入口なので、facet 集計を無条件（フィルタ無し）で行う（件数基準を主クリックの結果と一致させる）", async () => {
+describe("FilterChipBand のチップ", () => {
+  it("チップ本体のクリックでは兄弟値ドロップダウンを開かない（ADR-0041）", async () => {
     renderFilterChipBand();
 
-    await userEvent.click(screen.getByRole("button", { name: "cv/藤田茜" }));
+    expect(screen.queryByRole("button", { name: "cv/藤田茜" })).toBeNull();
+    await userEvent.click(screen.getByText("cv/藤田茜"));
 
-    await waitFor(() => expect(api.requestsTo("GET /api/axes/:axis")).toHaveLength(1));
-    const [request] = api.requestsTo("GET /api/axes/:axis");
-    expect(request?.params.axis).toBe("cv");
-    expect(request?.url.search).toBe("");
+    expect(api.requestsTo("POST /api/smart-folders/:id/groups")).toHaveLength(0);
+  });
+
+  it("×で個別解除し、すべてクリアで全解除する", async () => {
+    const onRemoveTag = vi.fn();
+    const onClearAll = vi.fn();
+    renderFilterChipBand(undefined, { onRemoveTag, onClearAll });
+
+    await userEvent.click(screen.getByRole("button", { name: "cv/藤田茜を解除" }));
+    expect(onRemoveTag).toHaveBeenCalledWith("cv/藤田茜");
+
+    await userEvent.click(screen.getByRole("button", { name: "すべてクリア" }));
+    expect(onClearAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("「＋絞り込み」の候補は開いている一覧の条件・チップ・検索語を母集団にして POST /:id/groups で取る", async () => {
+    renderFilterChipBand();
+
+    await userEvent.click(screen.getByRole("button", { name: /絞り込み$/ }));
+    await userEvent.click(screen.getByRole("button", { name: "タグ" }));
+
+    await waitFor(() =>
+      expect(api.requestsTo("POST /api/smart-folders/:id/groups")).toHaveLength(1),
+    );
+    const [request] = api.requestsTo("POST /api/smart-folders/:id/groups");
+    expect(request?.params.id).toBe("fav");
+    expect(request?.body).toEqual({ groupBy: { kind: "tag" }, tags: ["cv/藤田茜"], q: "雨" });
+  });
+
+  it("「＋絞り込み」の軸は定義済みの prefix 全部・タグ・追加日", async () => {
+    renderFilterChipBand(undefined, {
+      tagPrefixes: [
+        { prefix: "cv", label: "CV", color: "cv", protected: true, displayPriority: 0 } as never,
+      ],
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /絞り込み$/ }));
+    const axes = screen
+      .getAllByRole("button")
+      .filter((b) => b.className.includes("mll-qlist__item"));
+    expect(axes.map((b) => b.textContent)).toEqual(["CV", "タグ", "追加日"]);
   });
 });
 
@@ -61,7 +99,7 @@ describe("FilterChipBand の件数表示", () => {
 
 describe("値一覧ペイン表示中の件数ラベルと＋絞り込みの扱い（ADR-0026）", () => {
   it("valueListItemCount指定時は絞り込み後件数の代わりにライブラリ全体である旨のラベルを出す", () => {
-    renderFilterChipBand(undefined, { valueListItemCount: 12 });
+    renderFilterChipBand(undefined, { valueListItemCount: 12, facetScope: undefined });
     expect(screen.getByText("12分類（件数はライブラリ全体）")).toBeInTheDocument();
     expect(screen.queryByText(/^\d+ 件$/)).toBeNull();
   });
@@ -77,7 +115,7 @@ describe("値一覧ペイン表示中の件数ラベルと＋絞り込みの扱�
     expect(screen.queryByRole("button", { name: /絞り込み$/ })).toBeNull();
   });
 
-  it("valueListItemCount未指定時は従来どおり「＋絞り込み」ボタンを出す（回帰確認）", () => {
+  it("valueListItemCount未指定時は「＋絞り込み」ボタンを出す（回帰確認）", () => {
     renderFilterChipBand();
     expect(screen.getByRole("button", { name: /絞り込み$/ })).toBeInTheDocument();
   });

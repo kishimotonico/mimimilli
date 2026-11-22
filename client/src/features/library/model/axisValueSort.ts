@@ -1,7 +1,7 @@
 // 値一覧（AxisValueList）のソート状態・ソート計算。ADR-0012 §5・帰結。
 // ソートは UI が単一系・state が二重: ソートメニュー（LibrarySortMenu）と list の列見出し
 // クリック（AxisValueList）は同じ AxisValueSortState への別入口だが、作品一覧のソート状態
-// （sortAtom）とは別に保持する。総時間ソート中に値を選択しても作品一覧が無効なソートキーを
+// （route.library.sort）とは別に保持する。総時間ソート中に値を選択しても作品一覧が無効なソートキーを
 // 受け取らないようにするための分離（ADR-0012 帰結）。
 
 import type { AxisFacetItem } from "@mimimilli/shared";

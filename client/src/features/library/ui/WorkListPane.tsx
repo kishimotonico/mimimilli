@@ -5,17 +5,10 @@ import {
   playingWorkIdAtom,
 } from "../../../entities/player/model/atoms";
 import type { WorkResultsProps } from "./workResultsProps";
-import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
 import { usePlayWork } from "../../../entities/player/model/usePlayWork";
 import WorkRow from "./WorkRow";
-import CollectionStatus from "../../../shared/ui/CollectionStatus";
-import SmartFolderEmptyAction, {
-  SMART_FOLDER_EMPTY_HINT,
-  SMART_FOLDER_EMPTY_MESSAGE,
-} from "./SmartFolderEmptyAction";
+import WorksEmptyState from "./WorksEmptyState";
 import LoadMore from "./LoadMore";
-import { I } from "../../../shared/ui/Icon";
-import Button from "../../../shared/ui/Button";
 import { useVirtualList } from "../../../shared/ui/useVirtualList";
 import { useWorkResultsDismiss } from "./useWorkResultsDismiss";
 import { useListKeyboardNav } from "../../../shared/ui/useListKeyboardNav";
@@ -39,13 +32,10 @@ export default function WorkListPane({
   isPending = false,
   dockedBarActive = false,
   pagination: { hasNextPage = false, worksTotal, isFetchingNextPage = false, onLoadMore },
-  emptyState: { searchQuery, isSmartFolder = false, onClearSearch, onEditSmartFolderRules },
+  emptyState: { searchQuery, onClearSearch },
 }: WorkResultsProps) {
-  const axis = nav.activeAxis;
   const selectedWorkId = nav.selectedWorkId;
-  const hasSelectedTags = nav.selectedTags.length > 0;
   const onWorkSelect = nav.selectWork;
-  const onClearAllFilters = nav.clearTags;
   const onDeselect = useCallback(() => onWorkSelect(null), [onWorkSelect]);
   const { playWork } = usePlayWork();
   const playingWorkId = useAtomValue(playingWorkIdAtom);
@@ -146,35 +136,12 @@ export default function WorkListPane({
     <div className={`mle-col is-results ${isPending ? "is-pending" : ""}`}>
       <div ref={setListContainer} className="mle-col__list">
         {works.length === 0 ? (
-          isSmartFolder ? (
-            <CollectionStatus
-              variant="list"
-              kind="empty"
-              message={SMART_FOLDER_EMPTY_MESSAGE}
-              hint={SMART_FOLDER_EMPTY_HINT}
-              action={
-                <SmartFolderEmptyAction
-                  hasSelectedTags={hasSelectedTags}
-                  onEditRules={() => onEditSmartFolderRules?.()}
-                  onClearFilters={() => onClearAllFilters?.()}
-                />
-              }
-            />
-          ) : (
-            <CollectionStatus
-              variant="list"
-              kind="empty"
-              message={buildEmptyWorksMessage(searchQuery, hasSelectedTags)}
-              hint={buildEmptyWorksHint(axis, Boolean(searchQuery) || hasSelectedTags)}
-              action={
-                searchQuery ? (
-                  <Button variant="ghost" icon={I.x} onClick={onClearSearch}>
-                    検索をクリア
-                  </Button>
-                ) : undefined
-              }
-            />
-          )
+          <WorksEmptyState
+            variant="list"
+            nav={nav}
+            searchQuery={searchQuery}
+            onClearSearch={onClearSearch}
+          />
         ) : (
           <div style={wrapperStyle}>
             {virtualItems.map((virtualRow) => (

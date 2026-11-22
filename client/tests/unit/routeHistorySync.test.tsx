@@ -158,8 +158,9 @@ describe.each(scenarios)("useRouteHistorySync（$name）", ({ codec, initial }) 
     });
   });
 
-  it("同期がURLへ書くまでの push → push → replace は push 1回にまとまる", () => {
+  it("同じ描画の前に続けた push → push → replace は、呼ばれた順に push 2回と replace 1回で書く", () => {
     const { routeStore, store } = setup("/home");
+    replaceState.mockClear();
 
     act(() => {
       store.set(routeStore.navigateAtom, (r) => ({ ...r, page: "a" }));
@@ -168,10 +169,11 @@ describe.each(scenarios)("useRouteHistorySync（$name）", ({ codec, initial }) 
     });
 
     expect(currentUrl()).toBe("/b?q=x");
-    expect(pushState).toHaveBeenCalledTimes(1);
+    expect(pushState).toHaveBeenCalledTimes(2);
+    expect(replaceState).toHaveBeenCalledTimes(1);
   });
 
-  it("同一バッチで元の route へ戻したあとの replace は push にならない", () => {
+  it("元の route へ戻す navigate も、呼ばれた順に別の操作として書く", () => {
     const { routeStore, store } = setup("/home");
     const original = store.get(routeStore.routeAtom);
 
@@ -179,10 +181,9 @@ describe.each(scenarios)("useRouteHistorySync（$name）", ({ codec, initial }) 
       store.set(routeStore.navigateAtom, (r) => ({ ...r, page: "other" }));
       store.set(routeStore.navigateAtom, original);
     });
-    act(() => store.set(routeStore.navigateAtom, (r) => ({ ...r, q: "x" }), { replace: true }));
 
-    expect(currentUrl()).toBe("/home?q=x");
-    expect(pushState).not.toHaveBeenCalled();
+    expect(currentUrl()).toBe("/home");
+    expect(pushState).toHaveBeenCalledTimes(2);
   });
 
   it("URLが変わらない route の変更は履歴へ書かない", () => {
@@ -350,5 +351,40 @@ describe("useRouteHistorySync の履歴エントリーの状態", () => {
     expect(pushState).not.toHaveBeenCalled();
     expect(entryNote()).toBe("B");
     expect(currentUrl()).toBe("/home");
+  });
+});
+
+describe("useRouteHistorySync: 描画前に続けた操作の順序", () => {
+  function setupNote(url: string) {
+    history.replaceState(null, "", url);
+    const routeStore = createRouteStore<NoteRoute>(() =>
+      noteCodec.parse(window.location.href, history.state?.__mimimilliRouteEntry).apply({
+        page: "home",
+        q: "",
+        note: "fresh",
+      }),
+    );
+    return { routeStore, store: mount(routeStore, noteCodec) };
+  }
+
+  it("replace の直後、描画の前に push しても、前のエントリーに replace の内容が残る", () => {
+    const { routeStore, store } = setupNote("/home");
+    replaceState.mockClear();
+    pushState.mockClear();
+
+    act(() => {
+      store.set(routeStore.navigateAtom, (r) => ({ ...r, note: "B" }), { replace: true });
+      store.set(routeStore.navigateAtom, (r) => ({ ...r, page: "next", note: "N" }));
+    });
+
+    expect(replaceState).toHaveBeenCalledTimes(1);
+    expect(replaceState.mock.calls[0]?.[0]).toMatchObject({
+      __mimimilliRouteEntry: { note: "B" },
+    });
+    expect(pushState).toHaveBeenCalledTimes(1);
+    expect(replaceState.mock.invocationCallOrder[0]).toBeLessThan(
+      pushState.mock.invocationCallOrder[0]!,
+    );
+    expect(history.state.__mimimilliRouteEntry.note).toBe("N");
   });
 });

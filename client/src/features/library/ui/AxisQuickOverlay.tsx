@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
 import { motion, useIsPresent } from "motion/react";
-import type { FacetAxisId, NormalizedTag } from "@mimimilli/shared";
+import type { NormalizedTag } from "@mimimilli/shared";
 import type { AxisId } from "../../../entities/library/types";
 import { useAxisFacetsQuery } from "../model/useAxisFacetsQuery";
 import { buildFilterTag } from "../model/libraryPresentation";
@@ -25,33 +25,36 @@ import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 const OVERLAY_WIDTH = 280;
 
 interface AxisQuickOverlayProps {
+  folderId: string;
   axis: AxisId;
   axisLabel: string;
   anchorEl: HTMLElement | null;
-  selectedTags: NormalizedTag[];
-  onSelectValue: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
-  /** ホバー/フォーカス時の＋ボタン（冪等なAND追加。ADR-0013） */
-  onAddValue: (tag: NormalizedTag) => void;
+  /** 開いているグループの値（そのスマートフォルダーを開いているとき） */
+  selectedValue: string | null;
+  /** 主クリックも Ctrl/Cmd+クリックも、その値の作品一覧へ進む（ADR-0041） */
+  onSelectValue: (value: string) => void;
+  /** ホバー/フォーカス時の＋ボタン。作品一覧ならチップを足し、値一覧なら「すべて」＋そのチップ */
+  onAddTag: (tag: NormalizedTag) => void;
   onClose: () => void;
   panelHandlers: HoverGroupPanelHandlers;
   onPanelElChange: (el: HTMLElement | null) => void;
 }
 
 export default function AxisQuickOverlay({
+  folderId,
   axis,
   axisLabel,
   anchorEl,
-  selectedTags,
+  selectedValue,
   onSelectValue,
-  onAddValue,
+  onAddTag,
   onClose,
   panelHandlers,
   onPanelElChange,
 }: AxisQuickOverlayProps) {
   const isPresent = useIsPresent();
-  // クイックオーバーレイは既定=置き換えの入口（ADR-0013）なので、件数基準は無条件集計に
-  // する（主クリックの結果と一致させる）。isSelected は実際の selectedTags で行う。
-  const facetQuery = useAxisFacetsQuery(axis as FacetAxisId, []);
+  // 件数は主クリック（その値の作品一覧）の結果と一致させるため、絞り込み無しで数える
+  const facetQuery = useAxisFacetsQuery(axis, { folderId });
   const { popoverScale } = useMotionVariants();
   const variant = popoverScale({ origin: "left center" });
 
@@ -91,16 +94,13 @@ export default function AxisQuickOverlay({
         items={facetQuery.data ?? []}
         isLoading={facetQuery.isLoading}
         isError={facetQuery.isError}
-        isSelected={(value) => selectedTags.includes(buildFilterTag(axis, value))}
-        onSelect={(item, e) => {
-          onSelectValue(buildFilterTag(axis, item.value), {
-            ctrlKey: e.ctrlKey,
-            metaKey: e.metaKey,
-          });
+        isSelected={(value) => value === selectedValue}
+        onSelect={(item) => {
+          onSelectValue(item.value);
           close();
         }}
         onAdd={(item) => {
-          onAddValue(buildFilterTag(axis, item.value));
+          onAddTag(buildFilterTag(axis, item.value));
         }}
         close={close}
       />

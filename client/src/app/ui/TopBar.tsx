@@ -3,12 +3,7 @@ import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
 import { useAtomValue, useSetAtom } from "jotai";
 import { activeModalAtom } from "../../shared/model/activeModalAtom";
-import {
-  activeAxisAtom,
-  librarySearchQueryAtom,
-} from "../../entities/library/model/navigationAtoms";
-import { setLibrarySearchQueryAtom } from "../../entities/library/model/navigationActions";
-import { computeResultsPaneKind } from "../../entities/library/resultsPane";
+import { useLibraryNavigation } from "../../features/library/model/useLibraryNavigation";
 import { appModeAtom, setAppModeAtom } from "../../entities/navigation/model/appRouteStore";
 import {
   playerIsActiveAtom,
@@ -24,12 +19,11 @@ export default function TopBar() {
   const { ring, unseen } = useScanEntryStatus();
   const mode = useAtomValue(appModeAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
-  const searchQuery = useAtomValue(librarySearchQueryAtom);
-  const onSearchChange = useSetAtom(setLibrarySearchQueryAtom);
-  const activeAxis = useAtomValue(activeAxisAtom);
-  // 値一覧は現在の絞り込みと独立した全作品の入口で、作品検索は効かない（ADR-0026）。
-  // 効かない入力欄を空のまま出し続けない（LibrarySortMenuのスマート軸disabledと同型）。
-  const isValueListPane = mode === "library" && computeResultsPaneKind(activeAxis) === "value-list";
+  const nav = useLibraryNavigation();
+  const onSearchChange = nav.setSearchQuery;
+  const searchQuery = nav.foldersStatus === "ready" ? nav.searchQuery : "";
+  // 一覧が来るまでは検索の行き先（その一覧か「すべて」か）が決まらないので入力させない
+  const isSearchDisabled = nav.foldersStatus !== "ready";
   const isPlaying = useAtomValue(playerIsActiveAtom);
   const playingTrack = useAtomValue(playingTrackTitleAtom);
   const playerStatus = useAtomValue(playerStatusAtom);
@@ -57,7 +51,6 @@ export default function TopBar() {
   // ⌘K / Ctrl+K で検索ボックスへフォーカスする。テキスト入力中は横取りしない。
   useEffect(() => {
     if (mode !== "library" && mode !== "workDetail") return;
-    if (isValueListPane) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== "k" || !(e.metaKey || e.ctrlKey)) return;
       const target = e.target instanceof HTMLElement ? e.target : null;
@@ -70,7 +63,7 @@ export default function TopBar() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [mode, isValueListPane]);
+  }, [mode]);
 
   return (
     <header className="mll-bar">
@@ -144,10 +137,9 @@ export default function TopBar() {
               previousFocusRef.current?.focus();
             }}
             placeholder={placeholder}
-            disabled={isValueListPane}
-            title={isValueListPane ? "値一覧では作品を検索できません" : undefined}
+            disabled={isSearchDisabled}
           />
-          {isValueListPane ? null : draft ? (
+          {draft ? (
             <IconButton
               size="sm"
               icon={I.x}

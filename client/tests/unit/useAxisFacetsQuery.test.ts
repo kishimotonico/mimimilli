@@ -1,74 +1,111 @@
-// 軸ファセット取得（GET /axes/:axis）が渡された selectedTags をそのままAND条件として
-// クエリへ渡す（軸による除外はしない）ことを検証する。件数基準（どのタグを渡すか）は
-// 呼び出し側の責務で、このフック自体は素通しするだけ。
+// 値の候補取得（POST /smart-folders/:id/groups）が渡されたスコープ（フォルダー・値・チップ・検索語）を
+// そのまま母集団として送ることを検証する。件数基準（何を渡すか）は呼び出し側の責務で、
+// このフック自体は素通しするだけ。
 
 import { createElement, type ReactNode } from "react";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useAxisFacetsQuery } from "../../src/features/library/model/useAxisFacetsQuery";
+import {
+  useAxisFacetsQuery,
+  type FacetScope,
+} from "../../src/features/library/model/useAxisFacetsQuery";
 import { mockApi, type ApiMock } from "../helpers/api";
 
-function renderFacets(axis: string | null, selectedTags: string[]) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const wrapper = ({ children }: { children: ReactNode }) =>
+const KEY = "POST /api/smart-folders/:id/groups";
+
+function wrapperFor(queryClient: QueryClient) {
+  return ({ children }: { children: ReactNode }) =>
     createElement(QueryClientProvider, { client: queryClient }, children);
+}
+
+function renderFacets(axis: string | null, scope: FacetScope) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return renderHook(
-    ({ axis, selectedTags }: { axis: string | null; selectedTags: string[] }) =>
-      useAxisFacetsQuery(axis, selectedTags),
-    { wrapper, initialProps: { axis, selectedTags } },
+    ({ axis, scope }: { axis: string | null; scope: FacetScope }) =>
+      useAxisFacetsQuery(axis, scope),
+    { wrapper: wrapperFor(queryClient), initialProps: { axis, scope } },
   );
 }
 
-describe("useAxisFacetsQuery のタグ素通し", () => {
+describe("useAxisFacetsQuery のスコープ素通し", () => {
   let api: ApiMock;
 
   beforeEach(() => {
-    api = mockApi({ "GET /api/axes/:axis": [] });
+    api = mockApi({ [KEY]: [] });
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("selectedTagsを軸に関わらずそのままAND条件として渡す（自軸除外はしない）", async () => {
-    const { result } = renderFacets("cv", ["cv/藤田茜", "サークル/月白製作所"]);
+  it("軸に対応する groupBy と、チップ・検索語・グループの値を自軸除外せずそのまま送る", async () => {
+    const { result } = renderFacets("cv", {
+      folderId: "by-circle",
+      group: "月白製作所",
+      tags: ["cv/藤田茜", "サークル/月白製作所"],
+      q: "雨",
+    });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    const urls = api.urlsTo("GET /api/axes/:axis");
-    expect(urls).toHaveLength(1);
-    expect(urls[0]).toContain("/api/axes/cv?");
-    expect(urls[0]).toContain("cv%2F"); // 自軸(cv)由来の選択タグも渡される
-    expect(urls[0]).toContain("tags=");
+    const [request] = api.requestsTo(KEY);
+    expect(api.requestsTo(KEY)).toHaveLength(1);
+    expect(request?.params.id).toBe("by-circle");
+    expect(request?.body).toEqual({
+      groupBy: { kind: "prefix", prefix: "cv" },
+      group: "月白製作所",
+      tags: ["cv/藤田茜", "サークル/月白製作所"],
+      q: "雨",
+    });
   });
 
-  it("selectedTagsが空なら無絞り込みでフェッチする（クエリ文字列なし）", async () => {
-    const { result } = renderFacets("cv", []);
+  it("スコープがフォルダーだけなら絞り込みを送らない", async () => {
+    const { result } = renderFacets("cv", { folderId: "by-cv" });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    const urls = api.urlsTo("GET /api/axes/:axis");
-    expect(urls[0]).toBe("/api/axes/cv");
+    expect(api.requestsTo(KEY)[0]?.body).toEqual({ groupBy: { kind: "prefix", prefix: "cv" } });
   });
 
-  it("selectedTags（フィルタ）が変わるとクエリキーが変わり、別クエリとして再フェッチする", async () => {
+  it("タグ・追加日の軸は groupBy の tag・addedYear に対応する", async () => {
+    const tag = renderFacets("tag", { folderId: "all" });
+    await waitFor(() => expect(tag.result.current.isSuccess).toBe(true));
+    const year = renderFacets("year", { folderId: "all" });
+    await waitFor(() => expect(year.result.current.isSuccess).toBe(true));
+
+    expect(api.requestsTo(KEY).map((request) => request.body)).toEqual([
+      { groupBy: { kind: "tag" } },
+      { groupBy: { kind: "addedYear" } },
+    ]);
+  });
+
+  it("axis が null のときは取得しない", () => {
+    renderFacets(null, { folderId: "all" });
+
+    expect(api.requestsTo(KEY)).toHaveLength(0);
+  });
+
+  it("スコープ（フィルタ）が変わるとクエリキーが変わり、別クエリとして再フェッチする", async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const wrapper = ({ children }: { children: ReactNode }) =>
-      createElement(QueryClientProvider, { client: queryClient }, children);
-
     const { result, rerender } = renderHook(
-      ({ selectedTags }: { selectedTags: string[] }) => useAxisFacetsQuery("cv", selectedTags),
-      { wrapper, initialProps: { selectedTags: [] as string[] } },
+      ({ scope }: { scope: FacetScope }) => useAxisFacetsQuery("cv", scope),
+      {
+        wrapper: wrapperFor(queryClient),
+        initialProps: { scope: { folderId: "all" } as FacetScope },
+      },
     );
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     await waitFor(() => expect(queryClient.isFetching()).toBe(0));
     api.clear();
 
-    rerender({ selectedTags: ["サークル/月白製作所"] });
+    rerender({ scope: { folderId: "all", tags: ["サークル/月白製作所"] } });
 
-    await waitFor(() => expect(api.urlsTo("GET /api/axes/:axis")).toHaveLength(1));
-    expect(api.urlsTo("GET /api/axes/:axis")[0]).toContain("tags=");
+    await waitFor(() => expect(api.requestsTo(KEY)).toHaveLength(1));
+    expect(api.requestsTo(KEY)[0]?.body).toEqual({
+      groupBy: { kind: "prefix", prefix: "cv" },
+      tags: ["サークル/月白製作所"],
+    });
   });
 });

@@ -1,10 +1,15 @@
-import { buildBuiltinAxisTag, splitSelectedTags, type NormalizedTag } from "@mimimilli/shared";
-import { getSmartFolderId, isSmartAxis, isViewAxis } from "../../library/axisDefinitions";
-import { computeResultsPaneKind } from "../../library/resultsPane";
-import type { AxisId, SortId } from "../../library/types";
+import {
+  ALL_SMART_FOLDER_ID,
+  buildBuiltinAxisTag,
+  splitSelectedTags,
+  type NormalizedTag,
+} from "@mimimilli/shared";
 
 export interface LibraryUrlState {
-  activeAxis: AxisId;
+  /** スマートフォルダーの ID。URL だけでは存在を決められない（resolveLibraryView が突き合わせる） */
+  folderId: string;
+  /** グループ分けで選んだ値。null なら値一覧 */
+  group: string | null;
   selectedTags: NormalizedTag[];
   selectedWorkId: string | null;
   q?: string;
@@ -27,10 +32,9 @@ export interface NavigationParseResult {
   warnings: string[];
 }
 
-export const DEFAULT_SORT: SortId = "added-desc";
-
 export const DEFAULT_LIBRARY_URL_STATE: LibraryUrlState = {
-  activeAxis: "all",
+  folderId: ALL_SMART_FOLDER_ID,
+  group: null,
   selectedTags: [],
   selectedWorkId: null,
   q: "",
@@ -67,15 +71,6 @@ function isSafeRelativeSegment(value: string): boolean {
     !value.includes("\\") &&
     !value.includes("\0")
   );
-}
-
-function parseAxis(value: string): AxisId | null {
-  if (value === "home") return null;
-  if (isViewAxis(value as AxisId) || value === "tag") return value;
-  if (isSmartAxis(value)) {
-    return getSmartFolderId(value) ? value : null;
-  }
-  return value.toLowerCase();
 }
 
 function uniqueNonEmpty(values: string[]): string[] {
@@ -120,31 +115,20 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
   }
 
   if (segments[0] === "library") {
-    const axisValue = segments[1] ?? "all";
-    const axis = parseAxis(axisValue);
-    if (!axis) {
-      warnings.push(`存在しないライブラリ軸を拒否しました: ${axisValue}`);
-      return defaultResult(warnings);
-    }
-
     if (segments.length > 2) {
-      warnings.push(`軸の階層として不正な URL を拒否しました: ${url.pathname}`);
+      warnings.push(`スマートフォルダーの階層として不正な URL を拒否しました: ${url.pathname}`);
       return defaultResult(warnings);
     }
-
-    const isValueList = computeResultsPaneKind(axis) === "value-list";
-    const selectedTags = isValueList
-      ? []
-      : parseAndValidateSelectedTags(url.searchParams.getAll("tags"), warnings);
-
-    const selectedWorkId = url.searchParams.get("work") || null;
-    // 値一覧は現在の絞り込みと独立した全作品の入口（ADR-0026）。効かないq・tagsを
-    // URLから復元しない。
-    const q = isValueList ? "" : (url.searchParams.get("q") ?? "");
-
+    const folderId = segments[1] ?? ALL_SMART_FOLDER_ID;
     const state: NavigationUrlState = {
       mode: "library",
-      library: { activeAxis: axis, selectedTags, selectedWorkId, q },
+      library: {
+        folderId,
+        group: url.searchParams.get("group") || null,
+        selectedTags: parseAndValidateSelectedTags(url.searchParams.getAll("tags"), warnings),
+        selectedWorkId: url.searchParams.get("work") || null,
+        q: url.searchParams.get("q") ?? "",
+      },
     };
     return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
   }
@@ -201,8 +185,9 @@ export function serializeNavigationUrl(state: NavigationUrlState): string {
   }
 
   if (state.mode === "library") {
-    const { activeAxis, selectedTags, selectedWorkId, q } = state.library;
-    const pathname = `/library/${encodeURIComponent(activeAxis)}`;
+    const { folderId, group, selectedTags, selectedWorkId, q } = state.library;
+    const pathname = `/library/${encodeURIComponent(folderId)}`;
+    if (group !== null) params.set("group", group);
     for (const tag of selectedTags) params.append("tags", tag);
     if (selectedWorkId) params.set("work", selectedWorkId);
     if (q) params.set("q", q);

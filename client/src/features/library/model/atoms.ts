@@ -4,16 +4,10 @@
 
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
-import { type SmartFolder, type TagPrefix } from "@mimimilli/shared";
-import type { AxisId, GridLayoutMode, ViewMode } from "../../../entities/library/types";
-import {
-  getAxisLabel,
-  getSmartFolderId,
-  isSmartAxis,
-} from "../../../entities/library/axisDefinitions";
+import type { GridLayoutMode, ViewMode } from "../../../entities/library/types";
 import { DEFAULT_AXIS_VALUE_SORT, type AxisValueSortState } from "./axisValueSort";
 
-// 値一覧のソート状態。sortAtom（作品一覧）とは別に保持する（ADR-0012 帰結）。
+// 値一覧のソート状態。今の並び（route.library.sort）とは別に保持する（ADR-0012 帰結）。
 // ソートメニューと list の列見出しクリックは同一のこの state への別入口。
 export const axisValueSortAtom = atom<AxisValueSortState>(DEFAULT_AXIS_VALUE_SORT);
 
@@ -25,20 +19,3 @@ export const libraryGridLayoutModeAtom = atomWithStorage<GridLayoutMode>(
   "mimimilli:libraryGridLayoutMode",
   "square",
 );
-
-// ── アドレスバーパス（純粋計算）────────────────────────────────
-
-// パンくずは「ライブラリ > 軸名」までを表す。絞り込みはチップ列だけが表現する
-// （ADR-0012 §2・帰結）。
-export function buildLibraryAddressPath(
-  axis: AxisId,
-  tagPrefixes: TagPrefix[],
-  smartFolders: SmartFolder[],
-): string[] {
-  if (axis === "all") return ["ライブラリ"];
-  if (isSmartAxis(axis)) {
-    const folder = smartFolders.find((sf) => sf.id === getSmartFolderId(axis));
-    return ["ライブラリ", folder?.name ?? getAxisLabel(axis, tagPrefixes)];
-  }
-  return ["ライブラリ", getAxisLabel(axis, tagPrefixes)];
-}

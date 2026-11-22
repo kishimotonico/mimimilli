@@ -1,25 +1,44 @@
-import { useAtomValue, useSetAtom } from "jotai";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { AnimatePresence } from "motion/react";
 import Breadcrumbs from "../../../shared/ui/Breadcrumbs";
-import { buildLibraryAddressPath } from "../model/atoms";
-import { activeAxisAtom } from "../../../entities/library/model/navigationAtoms";
-import { goToLibrarySegmentAtom } from "../../../entities/library/model/navigationActions";
-import { useLibraryTransition } from "../model/useLibraryNavigation";
+import { getAxisLabel } from "../../../entities/library/axisDefinitions";
 import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
-import { listSmartFolders } from "../../../entities/smart-folder/api";
-import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
+import { axisOfGroupBy } from "../model/libraryPresentation";
+import { useLibraryNavigation } from "../model/useLibraryNavigation";
+import GroupValuePopover from "./GroupValuePopover";
 
+/** 「スマートフォルダー名 / 値」。先頭はグループ分けの値一覧へ戻り、値は兄弟の値のドロップダウンを開く */
 export default function LibraryBreadcrumbs() {
-  const activeAxis = useAtomValue(activeAxisAtom);
+  const nav = useLibraryNavigation();
+  const view = nav.foldersStatus === "ready" ? nav.view : null;
   const { tagPrefixes } = useTagPrefixes();
-  const smartFoldersQuery = useQuery({
-    queryKey: SMART_FOLDER_QUERY_KEYS.all(),
-    queryFn: listSmartFolders,
-  });
-  const path = buildLibraryAddressPath(activeAxis, tagPrefixes, smartFoldersQuery.data ?? []);
-  const goToSegmentAtom = useSetAtom(goToLibrarySegmentAtom);
-  const startTransition = useLibraryTransition();
-  const goToSegment = (index: number) => startTransition(() => goToSegmentAtom(index));
+  const [siblingAnchor, setSiblingAnchor] = useState<HTMLElement | null>(null);
+  const group = view?.kind === "works" ? view.group : null;
+  const groupBy = view?.kind === "works" ? view.groupBy : null;
 
-  return <Breadcrumbs path={path} onNavigate={goToSegment} />;
+  return (
+    <>
+      <Breadcrumbs
+        path={view?.breadcrumb ?? []}
+        onNavigate={(index, anchor) => {
+          if (index === 0) nav.goToSegment(0);
+          else if (group !== null) setSiblingAnchor(anchor);
+        }}
+      />
+      <AnimatePresence>
+        {view && siblingAnchor && group !== null && groupBy !== null && (
+          <GroupValuePopover
+            key="siblings"
+            folderId={view.folder.id}
+            axis={axisOfGroupBy(groupBy)}
+            axisLabel={getAxisLabel(axisOfGroupBy(groupBy), tagPrefixes)}
+            anchorEl={siblingAnchor}
+            selectedValue={group}
+            onSelectValue={nav.selectGroupValue}
+            onClose={() => setSiblingAnchor(null)}
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
 }

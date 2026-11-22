@@ -1,54 +1,88 @@
 import { useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
+import { isHasErrorOnly } from "@mimimilli/shared";
 import { libraryViewModeAtom } from "../model/atoms";
-import { librarySearchQueryAtom } from "../../../entities/library/model/navigationAtoms";
 import { setAppModeAtom } from "../../../entities/navigation/model/appRouteStore";
 import { openWorkDetailAtom } from "../../../entities/work/model/navigationActions";
-import { setLibrarySearchQueryAtom } from "../../../entities/library/model/navigationActions";
-import { useLibraryNavigation } from "../model/useLibraryNavigation";
+import { useLibraryNavigation, type ReadyLibraryNavigation } from "../model/useLibraryNavigation";
 import {
   useLibraryDebouncedSearchQuery,
   useLibrarySupportingQueries,
   useMissingWorksCountQuery,
 } from "../model/useLibraryQueries";
-import {
-  buildWorksResetKey,
-  computeResultsPaneKind,
-  isGridViewActive,
-} from "../model/libraryPresentation";
-import { isSmartAxis, getSmartFolderId } from "../../../entities/library/axisDefinitions";
-import { useLibrarySmartFolderEditor } from "../model/useLibrarySmartFolderEditor";
+import { axisOfGroupBy, buildWorksResetKey } from "../model/libraryPresentation";
 import { useLibrarySelectionCleanup } from "../model/useLibrarySelectionCleanup";
 import { useLibraryPreviewActions } from "../model/useLibraryPreviewActions";
 import AxisColumn from "./AxisColumn";
 import AxisValueList from "./AxisValueList";
+import BrokenFolderPane from "./BrokenFolderPane";
 import FilterChipBand from "./FilterChipBand";
 import LibraryResultsPane from "./LibraryResultsPane";
-import SmartFolderEditorSection from "./SmartFolderEditorSection";
 import LibraryWorksBoundary from "./LibraryWorksBoundary";
+import CollectionStatus from "../../../shared/ui/CollectionStatus";
+import Button from "../../../shared/ui/Button";
+import { I } from "../../../shared/ui/Icon";
 
 interface LibraryViewProps {
   /** 画面下張り付きの再生バーが表示中か（結果面の末尾余白の確保に使う） */
   dockedBarActive: boolean;
 }
 
+/** スマートフォルダー一覧を取れるまで・取れなかったときは、サイドバーと結果面に状態を出す */
 export default function LibraryView({ dockedBarActive }: LibraryViewProps) {
-  const searchQuery = useAtomValue(librarySearchQueryAtom);
+  const nav = useLibraryNavigation();
+  if (nav.foldersStatus === "ready") {
+    return <LibraryViewBody nav={nav} dockedBarActive={dockedBarActive} />;
+  }
+  const isError = nav.foldersStatus === "error";
+  return (
+    <>
+      <div className="mle-col is-axis">
+        <div className="mle-col__list">
+          <div className="mll-axisgroup">
+            <div className="mll-axisgroup__hd">ライブラリ</div>
+            {isError && (
+              // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- <output> はフォーム計算結果向けの意味を持つため、読み込み失敗通知には role="status" を使う
+              <div className="mll-axis-error" role="status" aria-live="polite">
+                <span>一覧の取得に失敗しました</span>
+                <Button variant="ghost" icon={I.refresh} onClick={nav.refetchFolders}>
+                  再試行
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="mll-resultspane">
+        <div className="mll-results">
+          <div className="mll-results__content">
+            <CollectionStatus
+              variant="list"
+              kind={isError ? "error" : "loading"}
+              onRetry={isError ? nav.refetchFolders : undefined}
+            />
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function LibraryViewBody({
+  nav,
+  dockedBarActive,
+}: LibraryViewProps & { nav: ReadyLibraryNavigation }) {
+  const { view, searchQuery } = nav;
   const debouncedSearchQuery = useLibraryDebouncedSearchQuery(searchQuery);
-  const setSearchQuery = useSetAtom(setLibrarySearchQueryAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
   const openWorkDetail = useSetAtom(openWorkDetailAtom);
   const viewMode = useAtomValue(libraryViewModeAtom);
-  const nav = useLibraryNavigation();
 
   const {
-    errorViewCount,
-    dataIntegrityCount,
     libraryStats,
     facetItems,
     isFacetLoading,
     isFacetError,
-    smartFolders,
     selectedWork,
     workDetailQuery,
     tagSuggestions,
@@ -60,24 +94,16 @@ export default function LibraryView({ dockedBarActive }: LibraryViewProps) {
   const [isNoResultsDueToFilter, setIsNoResultsDueToFilter] = useState(false);
   const [worksTotal, setWorksTotal] = useState<number | undefined>(undefined);
 
-  const isErrorView = nav.activeAxis === "error";
+  const isErrorView = view.kind === "works" && isHasErrorOnly(view.condition);
   const missingWorksCountQuery = useMissingWorksCountQuery(isErrorView);
 
-  // ── 表示導出（純粋計算は model/libraryPresentation に集約） ──
-  const paneKind = computeResultsPaneKind(nav.activeAxis);
-  const showGrid = isGridViewActive(nav.activeAxis, viewMode);
-
-  const activeSmartFolder = isSmartAxis(nav.activeAxis)
-    ? (smartFolders.find((sf) => sf.id === getSmartFolderId(nav.activeAxis)) ?? null)
-    : null;
+  const showGrid = viewMode === "grid";
 
   useLibrarySelectionCleanup({
     nav,
     isNoResultsDueToFilter,
     workDetailError: workDetailQuery.error,
   });
-
-  const smartFolderEditor = useLibrarySmartFolderEditor({ nav, activeSmartFolder });
 
   const previewActions = useLibraryPreviewActions({
     selectedWork,
@@ -88,50 +114,54 @@ export default function LibraryView({ dockedBarActive }: LibraryViewProps) {
   return (
     <>
       <AxisColumn
-        activeAxis={nav.activeAxis}
+        folders={nav.folders}
+        activeFolderId={view.folder.id}
+        activeGroup={view.kind === "works" ? view.group : null}
         tagPrefixes={tagPrefixes}
-        isTagPrefixesError={isTagPrefixesError}
-        onRetryTagPrefixes={refetchTagPrefixes}
-        smartFolders={smartFolders}
-        selectedTags={nav.selectedTags}
-        errorViewCount={errorViewCount}
-        dataIntegrityCount={dataIntegrityCount}
         stats={libraryStats}
-        onSelectAxis={nav.setAxis}
-        onToggleTag={nav.toggleTag}
-        onReplaceTag={nav.replaceTag}
+        onOpenFolder={nav.openFolder}
+        onOpenGroupValue={nav.openGroupValue}
         onAddTag={nav.addTag}
-        onNewSmartFolder={smartFolderEditor.openNew}
       />
 
       <div className="mll-resultspane">
-        {/* チップ列は結果面の常設ヘッダーとして .mll-results の外に置く。
-            .mll-results 内側の作品プレビューは絶対配置でスライドインするため、
-            同じ .mll-results に同居させるとプレビューの下に隠れて操作できなくなる。 */}
-        <FilterChipBand
-          tagPrefixes={tagPrefixes}
-          selectedTags={nav.selectedTags}
-          smartFolderId={activeSmartFolder?.id}
-          onReplace={nav.replaceTag}
-          onToggle={nav.toggleTag}
-          onAddTag={nav.addTag}
-          onClearAll={nav.clearTags}
-          worksTotal={paneKind === "value-list" ? undefined : worksTotal}
-          valueListItemCount={paneKind === "value-list" ? facetItems.length : undefined}
-        />
-        {paneKind === "value-list" ? (
+        {view.kind !== "broken" && (
+          // チップ列は結果面の常設ヘッダーとして .mll-results の外に置く。
+          // .mll-results 内側の作品プレビューは絶対配置でスライドインするため、
+          // 同じ .mll-results に同居させるとプレビューの下に隠れて操作できなくなる。
+          <FilterChipBand
+            tagPrefixes={tagPrefixes}
+            selectedTags={nav.selectedTags}
+            facetScope={
+              view.kind === "works"
+                ? {
+                    folderId: view.folder.id,
+                    group: view.group,
+                    tags: view.selectedTags,
+                    q: debouncedSearchQuery,
+                  }
+                : undefined
+            }
+            onAddTag={nav.addTag}
+            onRemoveTag={nav.removeTag}
+            onClearAll={nav.clearTags}
+            worksTotal={view.kind === "works" ? worksTotal : undefined}
+            valueListItemCount={view.kind === "value-list" ? facetItems.length : undefined}
+          />
+        )}
+        {view.kind === "broken" ? (
+          <BrokenFolderPane folderId={view.folder.id} />
+        ) : view.kind === "value-list" ? (
           <div className="mll-results">
             <div className="mll-results__content">
               <AxisValueList
-                axis={nav.activeAxis}
+                axis={axisOfGroupBy(view.groupBy)}
                 facetItems={facetItems}
                 tagPrefixes={tagPrefixes}
-                selectedTags={nav.selectedTags}
                 isFacetLoading={isFacetLoading}
                 isFacetError={isFacetError}
                 isTagPrefixesError={isTagPrefixesError}
-                onReplace={nav.replaceTag}
-                onToggle={nav.toggleTag}
+                onSelectValue={nav.selectGroupValue}
                 onRetryFacets={refetchFacets}
                 onRetryTagPrefixes={refetchTagPrefixes}
               />
@@ -140,6 +170,7 @@ export default function LibraryView({ dockedBarActive }: LibraryViewProps) {
         ) : (
           <LibraryWorksBoundary
             nav={nav}
+            view={view}
             searchQuery={debouncedSearchQuery}
             viewMode={viewMode}
             isPending={nav.isPending}
@@ -151,22 +182,21 @@ export default function LibraryView({ dockedBarActive }: LibraryViewProps) {
                 nav={nav}
                 result={result}
                 worksQueryKey={buildWorksResetKey({
-                  activeAxis: nav.activeAxis,
-                  selectedTags: nav.selectedTags,
-                  sort: nav.sort,
+                  folderId: view.folder.id,
+                  group: view.group,
+                  selectedTags: view.selectedTags,
+                  sort: view.sort,
                   searchQuery: debouncedSearchQuery,
+                  seed: view.seed,
                 })}
                 isPending={isPending}
                 showGrid={showGrid}
                 dockedBarActive={dockedBarActive}
-                activeSmartFolder={activeSmartFolder}
                 isErrorView={isErrorView}
                 missingWorksCount={missingWorksCountQuery.data}
-                tagPrefixes={tagPrefixes}
                 tagSuggestions={tagSuggestions}
                 searchQuery={searchQuery}
-                onClearSearch={() => setSearchQuery("")}
-                onEditSmartFolderRules={smartFolderEditor.openEdit}
+                onClearSearch={() => nav.setSearchQuery("")}
                 selectedWork={selectedWork}
                 workDetailQuery={workDetailQuery}
                 previewActions={previewActions}
@@ -176,12 +206,6 @@ export default function LibraryView({ dockedBarActive }: LibraryViewProps) {
           </LibraryWorksBoundary>
         )}
       </div>
-
-      <SmartFolderEditorSection
-        editor={smartFolderEditor}
-        tagSuggestions={tagSuggestions}
-        tagPrefixes={tagPrefixes}
-      />
     </>
   );
 }

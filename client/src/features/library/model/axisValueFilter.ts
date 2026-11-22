@@ -1,5 +1,5 @@
 // 値一覧ヘッダのコンテキスト検索（ADR-0012 §6）。表示中の値リストに対するクライアント側の
-// 絞り込みで、librarySearchQueryAtom（全体検索・URL の q=）とは無関係。呼び出し側（AxisValueList）
+// 絞り込みで、全体検索（URL の q=）とは無関係。呼び出し側（AxisValueList）
 // が useState で保持し、軸切り替えでリセットする。
 
 import type { AxisFacetItem } from "@mimimilli/shared";

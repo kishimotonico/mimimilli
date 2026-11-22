@@ -15,11 +15,7 @@ import {
   filesSelectedPathAtom,
   openPathInFilesAtom,
 } from "../../src/entities/file-system/model/navigationAtoms";
-import {
-  librarySearchQueryAtom,
-  selectedTagsAtom,
-  sortAtom,
-} from "../../src/entities/library/model/navigationAtoms";
+import { libraryRouteAtom } from "../../src/entities/library/model/navigationAtoms";
 import type { Settings } from "@mimimilli/shared";
 import { mockApi, type ApiMock } from "../helpers/api";
 import { appShellRoutes } from "../helpers/appShellApi";
@@ -283,9 +279,9 @@ describe("root再設定とナビゲーションの既定化", () => {
     await waitFor(() => expect(store.get(appModeAtom)).toBe("library"));
     expect(store.get(filesRelPathAtom)).toEqual([]);
     expect(store.get(filesSelectedPathAtom)).toBeNull();
-    expect(store.get(selectedTagsAtom)).toEqual([]);
-    expect(store.get(librarySearchQueryAtom)).toBe("");
-    expect(store.get(sortAtom)).toBe("added-desc");
+    expect(store.get(libraryRouteAtom).selectedTags).toEqual([]);
+    expect(store.get(libraryRouteAtom).q).toBe("");
+    expect(store.get(libraryRouteAtom).sort).toBeNull();
     expect(currentUrl()).toBe("/library/all");
   });
 
@@ -305,9 +301,9 @@ describe("root再設定とナビゲーションの既定化", () => {
     );
 
     await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
-    expect(store.get(selectedTagsAtom)).toEqual([]);
-    expect(store.get(librarySearchQueryAtom)).toBe("");
-    expect(store.get(sortAtom)).toBe("added-desc");
+    expect(store.get(libraryRouteAtom).selectedTags).toEqual([]);
+    expect(store.get(libraryRouteAtom).q).toBe("");
+    expect(store.get(libraryRouteAtom).sort).toBeNull();
     expect(currentUrl()).toBe("/library/all");
   });
 

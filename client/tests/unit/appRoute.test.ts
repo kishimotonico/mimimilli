@@ -1,3 +1,4 @@
+import { pendingWrites } from "../helpers/route";
 import { afterEach, describe, expect, it } from "vitest";
 import { createStore } from "jotai";
 import {
@@ -5,18 +6,9 @@ import {
   createInitialAppRoute,
   type AppRoute,
 } from "../../src/entities/navigation/model/appRoute";
-import {
-  appRouteAtom,
-  appRouteStore,
-  setAppModeAtom,
-} from "../../src/entities/navigation/model/appRouteStore";
+import { appRouteAtom, setAppModeAtom } from "../../src/entities/navigation/model/appRouteStore";
 import { showLibraryWorkAtom } from "../../src/entities/library/model/navigationActions";
-import {
-  activeAxisAtom,
-  librarySearchQueryAtom,
-  selectedTagsAtom,
-  selectedWorkIdAtom,
-} from "../../src/entities/library/model/navigationAtoms";
+import { libraryRouteAtom } from "../../src/entities/library/model/navigationAtoms";
 import {
   filesRelPathAtom,
   openPathInFilesAtom,
@@ -73,8 +65,8 @@ describe("appRouteAtom と派生atom", () => {
     history.replaceState(null, "", "/library/all?tags=cv%2F%E8%97%A4%E7%94%B0%E8%8C%9C&q=abc");
     const store = createStore();
 
-    expect(store.get(selectedTagsAtom)).toEqual(["cv/藤田茜"]);
-    expect(store.get(librarySearchQueryAtom)).toBe("abc");
+    expect(store.get(libraryRouteAtom).selectedTags).toEqual(["cv/藤田茜"]);
+    expect(store.get(libraryRouteAtom).q).toBe("abc");
     expect(store.get(workDetailIdAtom)).toBeNull();
   });
 
@@ -98,9 +90,9 @@ describe("複数の項目を変える操作は1回の遷移になる", () => {
     store.set(showLibraryWorkAtom, "work-1");
 
     expect(store.get(appRouteAtom).mode).toBe("library");
-    expect(store.get(activeAxisAtom)).toBe("all");
-    expect(store.get(selectedWorkIdAtom)).toBe("work-1");
-    expect(store.get(appRouteStore.sync.pendingWriteAtom)).toBe("push");
+    expect(store.get(libraryRouteAtom).folderId).toBe("all");
+    expect(store.get(libraryRouteAtom).selectedWorkId).toBe("work-1");
+    expect(pendingWrites(store)).toEqual(["push"]);
   });
 
   it("「Filesで開く」はFiles表示中でもpushになる", () => {
@@ -110,6 +102,6 @@ describe("複数の項目を変える操作は1回の遷移になる", () => {
     store.set(openPathInFilesAtom, { path: "other/a.mp3", root: "/library" });
 
     expect(store.get(filesRelPathAtom)).toEqual(["other"]);
-    expect(store.get(appRouteStore.sync.pendingWriteAtom)).toBe("push");
+    expect(pendingWrites(store)).toEqual(["push"]);
   });
 });

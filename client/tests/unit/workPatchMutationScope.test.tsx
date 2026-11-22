@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Work } from "@mimimilli/shared";
+import { buildNav } from "./fixtures/libraryNav";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
 import { WorkDetailPatchScope } from "../../src/features/library/ui/preview/WorkDetailPatchScope";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
@@ -32,12 +33,7 @@ vi.mock("../../src/features/library/ui/preview/WorkStatusWarnings", () => ({
   WorkStatusWarnings: () => null,
 }));
 
-const baseNav: LibraryViewState = {
-  activeAxis: "all",
-  selectedTags: [],
-  selectedWorkId: "work-a",
-  sort: "added-desc",
-};
+const baseNav: LibraryViewState = buildNav({ library: { selectedWorkId: "work-a" } });
 
 function makeWork(id: string): Work {
   const playlist = buildResolvedPlaylist(1, ["track"]);

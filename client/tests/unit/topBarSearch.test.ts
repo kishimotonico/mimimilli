@@ -6,15 +6,15 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 import TopBar from "../../src/app/ui/TopBar";
-import {
-  librarySearchQueryAtom,
-  selectedWorkIdAtom,
-} from "../../src/entities/library/model/navigationAtoms";
+import { libraryRouteAtom } from "../../src/entities/library/model/navigationAtoms";
 import { appModeAtom } from "../../src/entities/navigation/model/appRouteStore";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import { buildScanDiagnostics, buildScanRecord } from "../helpers/builders";
+import { mockApi } from "../helpers/api";
 import { seedAppMode, seedLibraryRoute } from "../helpers/route";
+import { seedSmartFolders } from "../helpers/smartFolders";
+import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 
 const PLACEHOLDER = /ライブラリを検索/;
 
@@ -26,6 +26,7 @@ function renderTopBar(initialQuery = "") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
   });
+  seedSmartFolders(queryClient);
   queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), { scanCompleted: true, candidates: [] });
   queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
   queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
@@ -34,7 +35,11 @@ function renderTopBar(initialQuery = "") {
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(JotaiProvider, { store }, createElement(TopBar)),
+      createElement(
+        JotaiProvider,
+        { store },
+        createElement(LibraryNavigationProvider, null, createElement(TopBar)),
+      ),
     ),
   );
   return store;
@@ -47,7 +52,7 @@ describe("TopBar の検索入力", () => {
 
     fireEvent.change(input, { target: { value: "asmr" } });
     expect(input).toHaveValue("asmr");
-    expect(store.get(librarySearchQueryAtom)).toBe("asmr");
+    expect(store.get(libraryRouteAtom).q).toBe("asmr");
   });
 
   it("IME composition 中は atom へ反映せず表示だけ更新し、確定時に反映する", () => {
@@ -57,11 +62,11 @@ describe("TopBar の検索入力", () => {
     fireEvent.compositionStart(input);
     fireEvent.change(input, { target: { value: "あ" } });
     fireEvent.change(input, { target: { value: "あい" } });
-    expect(store.get(librarySearchQueryAtom)).toBe("");
+    expect(store.get(libraryRouteAtom).q).toBe("");
     expect(input).toHaveValue("あい");
 
     fireEvent.compositionEnd(input);
-    expect(store.get(librarySearchQueryAtom)).toBe("あい");
+    expect(store.get(libraryRouteAtom).q).toBe("あい");
   });
 
   it("クリアボタンで表示・atom ともに即時空になる", () => {
@@ -70,7 +75,7 @@ describe("TopBar の検索入力", () => {
     expect(input).toHaveValue("asmr");
 
     fireEvent.click(screen.getByRole("button", { name: "検索をクリア" }));
-    expect(store.get(librarySearchQueryAtom)).toBe("");
+    expect(store.get(libraryRouteAtom).q).toBe("");
     expect(input).toHaveValue("");
   });
 
@@ -113,7 +118,7 @@ describe("TopBar の検索入力", () => {
 
     fireEvent.keyDown(input, { key: "Escape" });
     expect(input).toHaveValue("");
-    expect(store.get(librarySearchQueryAtom)).toBe("");
+    expect(store.get(libraryRouteAtom).q).toBe("");
     expect(document.activeElement).toBe(input);
   });
 
@@ -138,7 +143,7 @@ describe("TopBar の検索入力", () => {
     fireEvent.compositionStart(input);
     fireEvent.keyDown(input, { key: "Escape", isComposing: true });
     expect(input).toHaveValue("asmr");
-    expect(store.get(librarySearchQueryAtom)).toBe("asmr");
+    expect(store.get(libraryRouteAtom).q).toBe("asmr");
   });
 
   it("作品詳細でも検索欄が使える", () => {
@@ -147,6 +152,7 @@ describe("TopBar の検索入力", () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
     });
+    seedSmartFolders(queryClient);
     queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), { scanCompleted: true, candidates: [] });
     queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
     queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
@@ -158,9 +164,7 @@ describe("TopBar の検索入力", () => {
         createElement(
           JotaiProvider,
           { store },
-          createElement(TopBar, {
-            notificationBell: createElement("span", { "aria-label": "通知" }),
-          }),
+          createElement(LibraryNavigationProvider, null, createElement(TopBar)),
         ),
       ),
     );
@@ -176,6 +180,7 @@ describe("TopBar の検索入力", () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
     });
+    seedSmartFolders(queryClient);
     queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), { scanCompleted: true, candidates: [] });
     queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
     queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
@@ -187,9 +192,7 @@ describe("TopBar の検索入力", () => {
         createElement(
           JotaiProvider,
           { store },
-          createElement(TopBar, {
-            notificationBell: createElement("span", { "aria-label": "通知" }),
-          }),
+          createElement(LibraryNavigationProvider, null, createElement(TopBar)),
         ),
       ),
     );
@@ -197,35 +200,108 @@ describe("TopBar の検索入力", () => {
     fireEvent.change(input, { target: { value: "asmr" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(store.get(appModeAtom)).toBe("library");
-    expect(store.get(selectedWorkIdAtom)).toBe("RJ501011");
+    expect(store.get(libraryRouteAtom).selectedWorkId).toBe("RJ501011");
   });
 });
 
-describe("値一覧ペイン表示中は作品検索を無効化する（ADR-0026）", () => {
-  it("value-list種の軸（facet軸）ではdisabled・tooltipを出す", () => {
-    const store = renderTopBar("");
-    act(() => seedLibraryRoute(store, { activeAxis: "cv" }));
-    const input = screen.getByPlaceholderText(PLACEHOLDER) as HTMLInputElement;
+describe("効いていない検索語は検索欄に出さない", () => {
+  it("値一覧を直接開いたとき、URL の q は検索欄に出ない", () => {
+    const store = createStore();
+    seedAppMode(store, "library");
+    seedLibraryRoute(store, { folderId: "by-cv", group: null, q: "foo" });
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+    });
+    seedSmartFolders(queryClient);
+    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), { scanCompleted: true, candidates: [] });
+    queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
+    queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
+    queryClient.setQueryData(WORK_QUERY_KEYS.scanNewCount(), 0);
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(
+          JotaiProvider,
+          { store },
+          createElement(LibraryNavigationProvider, null, createElement(TopBar)),
+        ),
+      ),
+    );
 
-    expect(input).toBeDisabled();
-    expect(input.title).toBe("値一覧では作品を検索できません");
+    expect(screen.getByPlaceholderText(PLACEHOLDER)).toHaveValue("");
   });
+});
 
-  it("works種の軸（all等）では有効", () => {
+describe("スマートフォルダー一覧を取れるまで", () => {
+  it("一覧が無い間は検索欄を入力できない", () => {
+    const store = createStore();
+    seedAppMode(store, "library");
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+    });
+    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), { scanCompleted: true, candidates: [] });
+    queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
+    queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), buildScanDiagnostics());
+    queryClient.setQueryData(WORK_QUERY_KEYS.scanNewCount(), 0);
+    mockApi({ "GET /api/smart-folders": () => new Promise<Response>(() => {}) });
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(
+          JotaiProvider,
+          { store },
+          createElement(LibraryNavigationProvider, null, createElement(TopBar)),
+        ),
+      ),
+    );
+
+    expect(screen.getByPlaceholderText(PLACEHOLDER)).toBeDisabled();
+  });
+});
+
+describe("値一覧・読めない行からの検索は「すべて」の検索結果へ移る（ADR-0041）", () => {
+  it("値一覧でも検索欄は有効", () => {
     const store = renderTopBar("");
-    act(() => seedLibraryRoute(store, { activeAxis: "all" }));
+    act(() => seedLibraryRoute(store, { folderId: "by-cv" }));
     const input = screen.getByPlaceholderText(PLACEHOLDER) as HTMLInputElement;
 
     expect(input).not.toBeDisabled();
   });
 
-  it("value-list表示中は⌘Kでフォーカスしない", () => {
+  it("値一覧で入力すると「すべて」の検索結果へ移り、チップは持ち込まない", () => {
     const store = renderTopBar("");
-    act(() => seedLibraryRoute(store, { activeAxis: "cv" }));
+    act(() => seedLibraryRoute(store, { folderId: "by-cv", selectedTags: ["cv/藤田茜"] }));
+    const input = screen.getByPlaceholderText(PLACEHOLDER);
+
+    fireEvent.change(input, { target: { value: "雨" } });
+    const { folderId, group, q, selectedTags } = store.get(libraryRouteAtom);
+    expect({ folderId, group, q, selectedTags }).toEqual({
+      folderId: "all",
+      group: null,
+      q: "雨",
+      selectedTags: [],
+    });
+  });
+
+  it("作品一覧ではその一覧のまま検索する", () => {
+    const store = renderTopBar("");
+    act(() => seedLibraryRoute(store, { folderId: "fav" }));
+    const input = screen.getByPlaceholderText(PLACEHOLDER);
+
+    fireEvent.change(input, { target: { value: "雨" } });
+    expect(store.get(libraryRouteAtom).folderId).toBe("fav");
+    expect(store.get(libraryRouteAtom).q).toBe("雨");
+  });
+
+  it("値一覧でも⌘Kで検索欄へフォーカスする", () => {
+    const store = renderTopBar("");
+    act(() => seedLibraryRoute(store, { folderId: "by-cv" }));
     const input = screen.getByPlaceholderText(PLACEHOLDER) as HTMLInputElement;
     input.blur();
 
     fireEvent.keyDown(window, { key: "k", metaKey: true });
-    expect(document.activeElement).not.toBe(input);
+    expect(document.activeElement).toBe(input);
   });
 });

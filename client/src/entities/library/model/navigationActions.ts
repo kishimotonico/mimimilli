@@ -1,26 +1,34 @@
 import { appRouteStore } from "../../navigation/model/appRouteStore";
 import {
   addLibraryTag,
+  clearLibrarySort,
   clearLibraryTags,
   goToLibrarySegment,
-  replaceLibraryTag,
+  openLibraryFolder,
+  openLibraryGroupValue,
+  openLibraryTag,
+  removeLibraryTag,
   reshuffleLibrarySeed,
+  searchLibraryInAll,
+  selectLibraryGroupValue,
   selectLibraryWork,
-  setLibraryAxis,
   setLibrarySearchQuery,
   setLibrarySort,
   showLibraryWork,
-  toggleLibraryTag,
 } from "./libraryRouteTransitions";
 
-export const setLibraryAxisAtom = appRouteStore.action(setLibraryAxis);
-export const toggleLibraryTagAtom = appRouteStore.action(toggleLibraryTag);
+export const openLibraryFolderAtom = appRouteStore.action(openLibraryFolder);
+export const openLibraryGroupValueAtom = appRouteStore.action(openLibraryGroupValue);
+export const selectLibraryGroupValueAtom = appRouteStore.action(selectLibraryGroupValue);
+export const openLibraryTagAtom = appRouteStore.action(openLibraryTag);
 export const addLibraryTagAtom = appRouteStore.action(addLibraryTag);
-export const replaceLibraryTagAtom = appRouteStore.action(replaceLibraryTag);
+export const removeLibraryTagAtom = appRouteStore.action(removeLibraryTag);
 export const clearLibraryTagsAtom = appRouteStore.action(clearLibraryTags);
 export const selectLibraryWorkAtom = appRouteStore.action(selectLibraryWork);
 export const setLibrarySortAtom = appRouteStore.action(setLibrarySort);
+export const clearLibrarySortAtom = appRouteStore.action(clearLibrarySort);
 export const reshuffleLibrarySeedAtom = appRouteStore.action(reshuffleLibrarySeed);
 export const setLibrarySearchQueryAtom = appRouteStore.action(setLibrarySearchQuery);
+export const searchLibraryInAllAtom = appRouteStore.action(searchLibraryInAll);
 export const goToLibrarySegmentAtom = appRouteStore.action(goToLibrarySegment);
 export const showLibraryWorkAtom = appRouteStore.action(showLibraryWork);

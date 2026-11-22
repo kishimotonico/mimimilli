@@ -7,15 +7,16 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WORKS_DEFAULT_PAGE_SIZE, type Work, type WorkListItem } from "@mimimilli/shared";
-import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
+import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import {
   useLibraryWorkPatchMutations,
   useLibrarySupportingQueries,
-  useSuspenseNormalLibraryWorks,
+  useSuspenseLibraryWorks,
 } from "../../src/features/library/model/useLibraryQueries";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
 import { mockApi, type ApiMock } from "../helpers/api";
+import { buildNav } from "./fixtures/libraryNav";
 import {
   buildResolvedPlaylist,
   buildScanDiagnostics,
@@ -27,12 +28,20 @@ import {
   buildWorksPage,
 } from "../helpers/builders";
 
-const baseNav: LibraryViewState = {
-  activeAxis: "all",
-  selectedTags: [],
-  selectedWorkId: "p1-w1",
-  sort: "added-desc",
-};
+const FOLDER_WORKS_ROUTE = "GET /api/smart-folders/:id/works";
+
+const baseNav: LibraryViewState = buildNav({ library: { selectedWorkId: "p1-w1" } });
+
+/** 表示中でない一覧キャッシュのキー。ページ以外の要求は解決済みの値で決まる */
+function folderListKey(folderId: string) {
+  return SMART_FOLDER_QUERY_KEYS.works(folderId, {
+    q: "",
+    tags: [],
+    group: null,
+    sort: "added-desc",
+    seed: undefined,
+  });
+}
 
 function makeWorkListItem(id: string, title = `作品 ${id}`): WorkListItem {
   return buildWorkListItem({ id, title, totalDurationSec: 60 });
@@ -56,7 +65,8 @@ function installApi(total = WORKS_DEFAULT_PAGE_SIZE + 50) {
 
   const api = mockApi({
     "GET /api/scan/diagnostics": buildScanDiagnostics(),
-    "GET /api/works": ({ url }) => {
+    "GET /api/works": buildWorksPage(),
+    [FOLDER_WORKS_ROUTE]: ({ url }) => {
       const page = Number(url.searchParams.get("page") ?? 1);
       const pageSize = WORKS_DEFAULT_PAGE_SIZE;
       const start = (page - 1) * pageSize;
@@ -103,7 +113,6 @@ function installApi(total = WORKS_DEFAULT_PAGE_SIZE + 50) {
     },
     "GET /api/tag-prefixes": [],
     "GET /api/tags": [],
-    "GET /api/smart-folders": [],
     "GET /api/settings": buildSettings({ rootFolder: "/lib" }),
   });
 
@@ -111,7 +120,7 @@ function installApi(total = WORKS_DEFAULT_PAGE_SIZE + 50) {
 }
 
 function worksCallUrls(api: ApiMock): string[] {
-  return api.urlsTo("GET /api/works");
+  return api.urlsTo(FOLDER_WORKS_ROUTE);
 }
 
 function renderLibraryHooks(nav: LibraryViewState, options?: { queryClient?: QueryClient }) {
@@ -133,9 +142,10 @@ function renderLibraryHooks(nav: LibraryViewState, options?: { queryClient?: Que
     );
   const hook = renderHook(
     () => {
-      const works = useSuspenseNormalLibraryWorks(nav, "");
+      if (nav.view.kind !== "works") throw new Error("作品一覧のビューが必要です");
+      const works = useSuspenseLibraryWorks(nav.view, "");
       const supporting = useLibrarySupportingQueries(nav);
-      const workPatchMutations = useLibraryWorkPatchMutations(nav, "");
+      const workPatchMutations = useLibraryWorkPatchMutations(nav.view, "");
       return { ...works, ...supporting, workPatchMutations };
     },
     { wrapper },
@@ -219,16 +229,16 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
     expect(result.current.selectedWork?.resume).toBeNull();
   });
 
-  it("ブックマーク解除（all ビュー）では非表示 fav キャッシュが stale 化されネットワークは発火しない", async () => {
+  it("ブックマーク解除（「すべて」）では非表示 fav キャッシュが stale 化されネットワークは発火しない", async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Infinity } },
     });
-    const favKey = WORK_QUERY_KEYS.list({ sort: "added-desc", view: "fav" });
+    const favKey = folderListKey("fav");
     const favWork = makeWorkListItem("p1-w1");
     favWork.bookmarked = true;
     queryClient.setQueryData(favKey, {
       pages: [{ items: [favWork], total: 1 }],
-      pageParams: [{ page: 1, seed: undefined }],
+      pageParams: [{ page: 1 }],
     });
 
     const { result } = renderLibraryHooks(baseNav, { queryClient });
@@ -245,7 +255,7 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
     });
 
     expect(worksCallUrls(api).length).toBe(worksCallsBeforePatch);
-    expect(worksCallUrls(api).some((u) => u.includes("view=fav"))).toBe(false);
+    expect(worksCallUrls(api).some((u) => u.includes("/smart-folders/fav/works"))).toBe(false);
 
     const favQuery = queryClient.getQueryCache().find({ queryKey: favKey });
     expect(favQuery?.isStale()).toBe(true);
@@ -258,18 +268,20 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
     });
   });
 
-  it("ブックマーク変更（fav ビュー）ではアクティブ一覧のみ reset され非表示キャッシュは消えない", async () => {
+  it("ブックマーク変更（お気に入りのスマートフォルダー）ではアクティブ一覧のみ reset され非表示キャッシュは消えない", async () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Infinity } },
     });
-    const allKey = WORK_QUERY_KEYS.list({ sort: "added-desc" });
+    const allKey = folderListKey("all");
     const allMarker = makeWorkListItem("all-marker");
     queryClient.setQueryData(allKey, {
       pages: [{ items: [allMarker], total: 1 }],
-      pageParams: [{ page: 1, seed: undefined }],
+      pageParams: [{ page: 1 }],
     });
 
-    const nav: LibraryViewState = { ...baseNav, activeAxis: "fav" };
+    const nav: LibraryViewState = buildNav({
+      library: { folderId: "fav", selectedWorkId: "p1-w1" },
+    });
     const { result } = renderLibraryHooks(nav, { queryClient });
 
     await waitFor(() => expect(result.current.works).toHaveLength(WORKS_DEFAULT_PAGE_SIZE));
@@ -284,14 +296,12 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
     });
 
     await waitFor(() => expect(worksCallUrls(api).length).toBeGreaterThan(worksCallsBeforePatch));
-    expect(worksCallUrls(api).some((u) => u.includes("view=fav") && u.includes("page=1"))).toBe(
-      true,
-    );
     expect(
       worksCallUrls(api).some(
-        (u) => !u.includes("view=fav") && !u.includes("limit=1") && u.includes("page=1"),
+        (u) => u.includes("/smart-folders/fav/works") && u.includes("page=1"),
       ),
-    ).toBe(false);
+    ).toBe(true);
+    expect(worksCallUrls(api).some((u) => !u.includes("/smart-folders/fav/works"))).toBe(false);
 
     const allQuery = queryClient.getQueryCache().find({ queryKey: allKey, exact: true });
     expect(allQuery?.state.data).toMatchObject({
