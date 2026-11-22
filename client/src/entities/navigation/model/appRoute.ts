@@ -5,6 +5,7 @@ import {
   isRandomSeed,
   sortIdSchema,
   type GroupSortId,
+  type NormalizedTag,
 } from "@mimimilli/shared";
 import type { SortId } from "../../library/types";
 import type {
@@ -158,16 +159,17 @@ function applyEntryState(route: AppRoute, entryState: unknown): AppRoute {
   };
 }
 
+/** LibraryRoute の全項目を検証する。項目を足すと型が合わなくなり、黙って捨てられない */
 const carryLibrarySchema = z.strictObject({
   folderId: z.string(),
   group: z.string().nullable(),
-  selectedTags: z.array(z.string()),
+  selectedTags: z.array(z.custom<NormalizedTag>((tag) => typeof tag === "string")),
   selectedWorkId: z.string().nullable(),
   q: z.string(),
   sort: sortIdSchema.nullable(),
   groupSort: groupSortIdSchema.nullable(),
   seed: z.number().refine(isRandomSeed),
-});
+}) satisfies z.ZodType<LibraryRoute>;
 
 /** 履歴から読んだ library を、URL から読む library と同じ規則で検証する。URL へ書いて読み戻して
  *  変わらず、警告も出ないものだけを通す */
@@ -183,7 +185,7 @@ function readCarryLibrary(value: unknown): LibraryRoute | null {
   const read = parseNavigationUrl(url);
   if (read.warnings.length > 0 || read.state.mode !== "library") return null;
   const library = { ...read.state.library, sort, groupSort, seed };
-  return libraryKey(library) === libraryKey(parsed.data as LibraryRoute) ? library : null;
+  return libraryKey(library) === libraryKey(parsed.data) ? library : null;
 }
 
 function readLayerCarry(entryState: unknown): LayerCarry | undefined {

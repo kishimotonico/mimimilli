@@ -4,6 +4,9 @@ import { createElement } from "react";
 import { Provider, createStore } from "jotai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appRouteCodec, createInitialAppRoute } from "../../src/entities/navigation/model/appRoute";
+import { addLibraryTag } from "../../src/entities/library/model/libraryRouteTransitions";
+import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
+import { nt } from "../helpers/tag";
 import { correctLibrary } from "../../src/entities/navigation/model/appRouteStore";
 import { createRouteStore } from "../../src/shared/model/routeStore";
 import { useRouteHistorySync } from "../../src/shared/model/useRouteHistorySync";
@@ -257,6 +260,43 @@ describe("層を閉じて下のエントリーへ戻る", () => {
     expect(store.get(routeStore.routeAtom)).toMatchObject({
       layer: null,
       library: { selectedTags: ["ASMR"], q: "雨" },
+    });
+  });
+
+  it("追加年→実タグの順に足したチップでも、層の補正を下へ引き継げる（メモリ上の並びが URL と同じ正準順）", () => {
+    const { routeStore, store } = setup();
+    const folders = [...defaultSmartFolders(), buildSmartFolder({ id: "sf-own" })];
+    for (const tag of [nt("@year/2024"), nt("cv/藤田茜")]) {
+      act(() =>
+        store.set(
+          routeStore.navigateAtom,
+          (route) => addLibraryTag(route, tag, folders)?.route ?? route,
+          { replace: true },
+        ),
+      );
+    }
+    const library = store.get(routeStore.routeAtom).library;
+    expect(library.selectedTags).toEqual(["ASMR", "cv/藤田茜", "@year/2024"]);
+    const belowUrl = currentUrl();
+    act(() =>
+      store.set(routeStore.navigateAtom, (route) => ({
+        ...route,
+        layer: { kind: "nowPlaying", openedBy: "app" },
+      })),
+    );
+    act(() =>
+      store.set(
+        routeStore.navigateAtom,
+        (route) => correctLibrary(route, { ...route.library, q: "補正" }).route,
+        { replace: true },
+      ),
+    );
+
+    popToBelow(library.seed, null, belowUrl);
+
+    expect(store.get(routeStore.routeAtom).library).toMatchObject({
+      selectedTags: ["ASMR", "cv/藤田茜", "@year/2024"],
+      q: "補正",
     });
   });
 });

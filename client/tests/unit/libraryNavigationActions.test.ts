@@ -330,6 +330,15 @@ describe("タグの行き先（ADR-0041 の表）", () => {
     expect(lib(store).selectedTags).toEqual(["cv/藤田茜", "@year/2024"]);
   });
 
+  it("addLibraryTagAtom: 追加年の擬似タグを先に足しても、チップは URL と同じ正準の並び（擬似タグは末尾）になる", () => {
+    const store = setup({ folderId: "fav" });
+
+    store.set(addLibraryTagAtom, nt("@year/2024"), folders);
+    store.set(addLibraryTagAtom, nt("cv/藤田茜"), folders);
+
+    expect(lib(store).selectedTags).toEqual(["cv/藤田茜", "@year/2024"]);
+  });
+
   it("addLibraryTagAtom: 実タグ year/2025 は単一選択の対象にならず共存する", () => {
     const store = setup({ selectedTags: nts(["year/2025"]) });
 

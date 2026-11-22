@@ -3,6 +3,7 @@ import {
   ALL_SMART_FOLDER_ID,
   createRandomSeed,
   isBuiltinPseudoTagKey,
+  orderSelectedTags,
   normalizeSearchQuery,
   parseBuiltinPseudoTag,
   type NormalizedTag,
@@ -32,7 +33,7 @@ function appendTag(tags: NormalizedTag[], tag: NormalizedTag): NormalizedTag[] {
     builtin && isBuiltinPseudoTagKey(builtin.key)
       ? tags.filter((t) => parseBuiltinPseudoTag(t)?.key !== builtin.key)
       : tags;
-  return [...base, tag];
+  return orderSelectedTags([...base, tag]);
 }
 
 /** 入り直し。今の並び（作品・値）を捨て、新しい seed にする */
