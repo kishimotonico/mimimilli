@@ -198,7 +198,7 @@ describe("並べ替えの直列化", () => {
     const base = defaultSmartFolders();
     const orders = [
       base.map((f) => f.id).reverse(),
-      [...base.map((f) => f.id)].sort(),
+      base.map((f) => f.id).sort(),
       base.map((f) => f.id),
     ];
     const releases: Array<() => void> = [];
