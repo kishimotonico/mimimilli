@@ -25,7 +25,7 @@ function renderSortMenu(options?: {
 }) {
   const api = mockApi({
     "GET /api/smart-folders": options?.folders ?? defaultSmartFolders(),
-    "PUT /api/smart-folders/:id": ({ params }) =>
+    "PUT /api/smart-folders/:id/sort": ({ params }) =>
       options?.put ? options.put(params.id) : buildSmartFolder({ id: params.id, name: "保存済み" }),
   });
   const store = createStore();
@@ -250,14 +250,9 @@ describe("LibrarySortMenu", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "この並びを既定にする" }));
 
     await waitFor(() => expect(currentSort(store)).toBeNull());
-    const [request] = api.requestsTo("PUT /api/smart-folders/:id");
+    const [request] = api.requestsTo("PUT /api/smart-folders/:id/sort");
     expect(request?.params.id).toBe("fav");
-    expect(request?.body).toEqual({
-      name: "お気に入り",
-      condition: { type: "and", children: [{ type: "bookmarked" }] },
-      sort: "title-asc",
-      groupBy: null,
-    });
+    expect(request?.body).toEqual({ sort: "title-asc" });
   });
 
   it("保存に失敗したらトーストを出し、今の並びは残す", async () => {
@@ -306,9 +301,9 @@ describe("LibrarySortMenu", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "この並びを既定にする" }));
 
     await waitFor(() => expect(currentSort(store)).toBeNull());
-    const [request] = api.requestsTo("PUT /api/smart-folders/:id");
+    const [request] = api.requestsTo("PUT /api/smart-folders/:id/sort");
     expect(request?.params.id).toBe("all");
-    expect(request?.body).toMatchObject({ sort: "title-asc" });
+    expect(request?.body).toEqual({ sort: "title-asc" });
   });
 
   it("並び替えはLibraryNavigationProviderが持つ単一のstartTransition（nav.setSort）を経由する", () => {
@@ -341,7 +336,7 @@ describe("LibrarySortMenu", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "この並びを既定にする" }));
 
     await waitFor(() => expect(currentSort(store)).toBeNull());
-    expect(api.requestsTo("PUT /api/smart-folders/:id")[0]?.params.id).toBe("all");
+    expect(api.requestsTo("PUT /api/smart-folders/:id/sort")[0]?.params.id).toBe("all");
   });
 });
 
@@ -368,13 +363,13 @@ describe("LibrarySortMenu: スマートフォルダー一覧が無い間", () =>
   it("取得中は並び替えを操作できず、PUT も飛ばない", () => {
     const api = renderUnavailable(() => new Promise<Response>(() => {}));
     expect(screen.getByRole("button", { name: "並び替え" })).toBeDisabled();
-    expect(api.requestsTo("PUT /api/smart-folders/:id")).toHaveLength(0);
+    expect(api.requestsTo("PUT /api/smart-folders/:id/sort")).toHaveLength(0);
   });
 
   it("取得に失敗したときも並び替えを操作できず、PUT も飛ばない", async () => {
     const api = renderUnavailable(() => apiError(500, "internal", "失敗"));
     await waitFor(() => expect(api.requestsTo("GET /api/smart-folders").length).toBeGreaterThan(0));
     expect(screen.getByRole("button", { name: "並び替え" })).toBeDisabled();
-    expect(api.requestsTo("PUT /api/smart-folders/:id")).toHaveLength(0);
+    expect(api.requestsTo("PUT /api/smart-folders/:id/sort")).toHaveLength(0);
   });
 });

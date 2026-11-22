@@ -1,12 +1,19 @@
 import { useState } from "react";
-import type { SmartFolder } from "@mimimilli/shared";
+import { smartFolderPermissions, type SmartFolder } from "@mimimilli/shared";
 import Button from "../../../shared/ui/Button";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import { I } from "../../../shared/ui/Icon";
 import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
 
-/** 条件が読めないスマートフォルダー。開けないので、削除だけを出す（ADR-0040） */
-export default function BrokenFolderPane({ folder }: { folder: SmartFolder }) {
+/** 開けないスマートフォルダー。行が読めないときは削除だけを出し（ADR-0040）、「すべて」は削除できない。
+ *  「すべて」の並びを継承していてその並びが読めないときは、行自体は壊れていないので削除を出さない */
+export default function BrokenFolderPane({
+  folder,
+  reason,
+}: {
+  folder: SmartFolder;
+  reason: "folder" | "sort";
+}) {
   const editor = useSmartFolderEditor();
   const [pending, setPending] = useState(false);
   const remove = async () => {
@@ -20,11 +27,17 @@ export default function BrokenFolderPane({ folder }: { folder: SmartFolder }) {
         <CollectionStatus
           variant="list"
           kind="empty"
-          message="このスマートフォルダーは読めません"
+          message={
+            reason === "folder"
+              ? "このスマートフォルダーは読めません"
+              : "「すべて」の並びが読めないため開けません"
+          }
           action={
-            <Button variant="primary" icon={I.x} disabled={pending} onClick={() => void remove()}>
-              削除
-            </Button>
+            reason === "folder" && smartFolderPermissions(folder).remove ? (
+              <Button variant="primary" icon={I.x} disabled={pending} onClick={() => void remove()}>
+                削除
+              </Button>
+            ) : undefined
           }
         />
       </div>

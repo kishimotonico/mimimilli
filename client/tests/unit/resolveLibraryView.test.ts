@@ -13,6 +13,11 @@ function route(patch: Partial<LibraryRoute> = {}): LibraryRoute {
 
 const folders = defaultSmartFolders();
 
+function works(view: ReturnType<typeof resolveLibraryView>) {
+  if (view.kind !== "works") throw new Error(`作品一覧ではありません: ${view.kind}`);
+  return view;
+}
+
 describe("resolveLibraryView: 存在しない ID・グループ", () => {
   it("存在しないスマートフォルダー ID は「すべて」の作品一覧になる", () => {
     const view = resolveLibraryView(route({ folderId: "sf-gone", group: "x" }), folders);
@@ -98,10 +103,10 @@ describe("resolveLibraryView: 値一覧と作品一覧", () => {
 describe("resolveLibraryView: 条件が読めない行", () => {
   const broken = buildSmartFolder({ id: "sf-broken", name: "壊れた", condition: null });
 
-  it("開けない状態（broken）を返し、並びは「すべて」の既定で解決する", () => {
+  it("開けない状態（broken・reason=folder）を返す", () => {
     const view = resolveLibraryView(route({ folderId: "sf-broken" }), [...folders, broken]);
 
-    expect(view).toMatchObject({ kind: "broken", breadcrumb: ["壊れた"], sort: "added-desc" });
+    expect(view).toMatchObject({ kind: "broken", reason: "folder", breadcrumb: ["壊れた"] });
     expect(view.folder.id).toBe("sf-broken");
   });
 
@@ -115,19 +120,54 @@ describe("resolveLibraryView: 条件が読めない行", () => {
   });
 });
 
+describe("resolveLibraryView: 「すべて」の行が壊れているとき", () => {
+  const brokenAll = buildSmartFolder({ id: "all", name: "すべて", condition: null, sort: null });
+  const withBrokenAll = folders.map((f) => (f.id === "all" ? brokenAll : f));
+
+  it("固有の並びを持つ正常なスマートフォルダーは開ける", () => {
+    const view = resolveLibraryView(route({ folderId: "recent" }), withBrokenAll);
+
+    expect(view).toMatchObject({ kind: "works", sort: "last-played" });
+  });
+
+  it("今の並びがあれば、継承するスマートフォルダーも開ける", () => {
+    const view = resolveLibraryView(route({ folderId: "fav", sort: "title-asc" }), withBrokenAll);
+
+    expect(view).toMatchObject({ kind: "works", sort: "title-asc" });
+  });
+
+  it("並びを継承する作品一覧は、理由つきで開けない状態になる", () => {
+    const view = resolveLibraryView(route({ folderId: "fav" }), withBrokenAll);
+
+    expect(view).toMatchObject({ kind: "broken", reason: "sort", breadcrumb: ["お気に入り"] });
+  });
+
+  it("値一覧は並びを要さないので開ける", () => {
+    expect(resolveLibraryView(route({ folderId: "by-cv" }), withBrokenAll).kind).toBe("value-list");
+  });
+
+  it("「すべて」自身は読めない行として開けない状態になる。存在しない ID も同じ", () => {
+    expect(resolveLibraryView(route({ folderId: "all" }), withBrokenAll)).toMatchObject({
+      kind: "broken",
+      reason: "folder",
+    });
+    expect(resolveLibraryView(route({ folderId: "sf-gone" }), withBrokenAll).folder.id).toBe("all");
+  });
+});
+
 describe("resolveLibraryView: 並びの解決（今の並び → フォルダーの既定 → 「すべて」の既定）", () => {
   it("今の並びが最優先", () => {
     const view = resolveLibraryView(route({ folderId: "recent", sort: "title-asc" }), folders);
 
-    expect(view.sort).toBe("title-asc");
-    expect(view.sortDeviates).toBe(true);
+    expect(works(view).sort).toBe("title-asc");
+    expect(works(view).sortDeviates).toBe(true);
   });
 
   it("今の並びが無ければフォルダーの既定の並び", () => {
     const view = resolveLibraryView(route({ folderId: "recent" }), folders);
 
-    expect(view.sort).toBe("last-played");
-    expect(view.sortDeviates).toBe(false);
+    expect(works(view).sort).toBe("last-played");
+    expect(works(view).sortDeviates).toBe(false);
   });
 
   it("フォルダーの既定が null（「すべて」と同じ）なら「すべて」の既定に従う", () => {
@@ -135,29 +175,27 @@ describe("resolveLibraryView: 並びの解決（今の並び → フォルダー
       f.id === "all" ? { ...f, sort: "title-desc" as const } : f,
     );
 
-    expect(resolveLibraryView(route({ folderId: "fav" }), folders).sort).toBe("added-desc");
-    expect(resolveLibraryView(route({ folderId: "fav" }), changedAll).sort).toBe("title-desc");
+    expect(works(resolveLibraryView(route({ folderId: "fav" }), folders)).sort).toBe("added-desc");
+    expect(works(resolveLibraryView(route({ folderId: "fav" }), changedAll)).sort).toBe(
+      "title-desc",
+    );
   });
 
   it("今の並びが解決後の既定と同じなら外れていない（メニューに保存を出さない）", () => {
     expect(
-      resolveLibraryView(route({ folderId: "fav", sort: "added-desc" }), folders).sortDeviates,
+      works(resolveLibraryView(route({ folderId: "fav", sort: "added-desc" }), folders))
+        .sortDeviates,
     ).toBe(false);
     expect(
-      resolveLibraryView(route({ folderId: "fav", sort: "title-asc" }), folders).sortDeviates,
+      works(resolveLibraryView(route({ folderId: "fav", sort: "title-asc" }), folders))
+        .sortDeviates,
     ).toBe(true);
   });
 
   it("今の並びが null なら外れない", () => {
-    expect(resolveLibraryView(route({ folderId: "all", sort: null }), folders).sortDeviates).toBe(
-      false,
-    );
-  });
-
-  it("値一覧でも並びは解決される", () => {
-    const view = resolveLibraryView(route({ folderId: "by-cv", sort: "title-asc" }), folders);
-
-    expect(view).toMatchObject({ kind: "value-list", sort: "title-asc", sortDeviates: true });
+    expect(
+      works(resolveLibraryView(route({ folderId: "all", sort: null }), folders)).sortDeviates,
+    ).toBe(false);
   });
 });
 

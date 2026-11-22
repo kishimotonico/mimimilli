@@ -64,17 +64,17 @@ function ReadySortMenu({
 
   const isValueListPane = view.kind === "value-list";
   const disabled = view.kind === "broken";
-  const sort = view.sort;
+  const sort = view.kind === "works" ? view.sort : null;
   const currentSortLabel = isValueListPane
     ? getGroupValueSortLabel(groupValueSort.key)
-    : getSortLabel(sort);
+    : sort && getSortLabel(sort);
 
   const saveAsDefault = async () => {
-    if (view.kind === "broken") return;
+    if (view.kind !== "works") return;
     setSavingDefault(true);
-    const saved = await editor.saveDefaultSort(view.folder.id, sort);
+    const saved = await editor.saveDefaultSort(view.folder.id, view.sort);
     setSavingDefault(false);
-    if (saved) clearCurrentSort({ folderId: routeFolderId, sort });
+    if (saved) clearCurrentSort({ folderId: routeFolderId, sort: view.sort });
   };
 
   const buttonTitle = currentSortLabel ? `並び替え: ${currentSortLabel}` : "並び替え";

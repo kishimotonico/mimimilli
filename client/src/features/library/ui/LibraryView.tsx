@@ -128,7 +128,7 @@ function LibraryViewBody({
           />
         )}
         {view.kind === "broken" ? (
-          <BrokenFolderPane folder={view.folder} />
+          <BrokenFolderPane folder={view.folder} reason={view.reason} />
         ) : view.kind === "value-list" ? (
           <div className="mll-results">
             <div className="mll-results__content">
