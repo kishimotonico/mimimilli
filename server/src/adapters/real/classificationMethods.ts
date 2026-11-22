@@ -1,6 +1,7 @@
 import {
   DEFAULT_TAG_PREFIXES,
   SMART_FOLDER_TEMPLATES,
+  type GroupSortId,
   type SmartFolderWrite,
   type SortId,
   type TagPrefix,
@@ -88,6 +89,12 @@ export function createClassificationMethods(deps: {
     },
     async updateSmartFolderSort(id: string, sort: SortId | null): Promise<SmartFolderRow | null> {
       return user.updateSmartFolderSort(id, sort);
+    },
+    async updateSmartFolderGroupSort(
+      id: string,
+      groupSort: GroupSortId,
+    ): Promise<SmartFolderRow | null> {
+      return user.updateSmartFolderGroupSort(id, groupSort);
     },
     async reorderSmartFolders(ids: string[]): Promise<SmartFolderRow[] | null> {
       return user.reorderSmartFolders(ids);

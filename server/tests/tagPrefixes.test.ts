@@ -142,13 +142,19 @@ test("resolveTagPrefix: 未登録 prefix は prefix 文字列をラベルにし�
 
 // ── グループの値の集計（動的 prefix）──────────────────────────
 
+/** 件数・時間・カバーだけを比べる。並びのキーと最新日時は値一覧の契約テストで見る */
+const countFields = (items: ReturnType<typeof buildGroupValues>) =>
+  items.map(({ sortKey: _k, lastAddedAt: _a, lastPlayedAt: _p, ...rest }) => rest);
+
 test("buildGroupValues: prefix のグループを集計できる（別 prefix は混入しない）", () => {
   const works = [
     summaryWith("W1", ["気分/睡眠用", "ASMR"]),
     summaryWith("W2", ["気分/睡眠用", "気分/作業用"]),
     summaryWith("W3", ["kibun/x", "気分/作業用"]),
   ];
-  const items = buildGroupValues({ kind: "prefix", prefix: "気分" }, works);
+  const items = countFields(
+    buildGroupValues({ kind: "prefix", prefix: "気分" }, works, "count-desc"),
+  );
   assert.deepEqual(items, [
     { value: "作業用", count: 2, durationSec: 0, covers: [] },
     { value: "睡眠用", count: 2, durationSec: 0, covers: [] },
@@ -160,12 +166,12 @@ test("buildGroupValues: tag は flat・annotated 双方を集計し、addedYear 
     summaryWith("W1", ["cv/x", "ASMR"], "2025-06-01T00:00:00.000Z"),
     summaryWith("W2", ["ASMR"], "2026-01-01T00:00:00.000Z"),
   ];
-  assert.deepEqual(buildGroupValues({ kind: "tag" }, works), [
+  assert.deepEqual(countFields(buildGroupValues({ kind: "tag" }, works, "count-desc")), [
     { value: "ASMR", count: 2, durationSec: 0, covers: [] },
     { value: "cv/x", count: 1, durationSec: 0, covers: [] },
   ]);
   assert.deepEqual(
-    buildGroupValues({ kind: "addedYear" }, works)
+    buildGroupValues({ kind: "addedYear" }, works, "count-desc")
       .map((i) => i.value)
       .sort(),
     ["2025", "2026"],
@@ -179,10 +185,12 @@ test("buildGroupValues: durationSecは同じ値に属する作品の合計、dur
     { ...summaryWith("W3", ["気分/睡眠用"]), totalDurationSec: null },
   ];
   assert.deepEqual(
-    buildGroupValues({ kind: "prefix", prefix: "気分" }, works).map(({ value, durationSec }) => ({
-      value,
-      durationSec,
-    })),
+    buildGroupValues({ kind: "prefix", prefix: "気分" }, works, "count-desc").map(
+      ({ value, durationSec }) => ({
+        value,
+        durationSec,
+      }),
+    ),
     [{ value: "睡眠用", durationSec: 1800 }],
   );
 });
@@ -201,7 +209,7 @@ test("buildGroupValues: coversは追加日時の新しい順で最大4件、cove
     { ...summaryWith("W5", ["気分/睡眠用"], "2026-01-04T00:00:00.000Z"), cover: cover(5) },
     { ...summaryWith("W6", ["気分/睡眠用"], "2026-01-06T00:00:00.000Z"), cover: cover(6) },
   ];
-  const [item] = buildGroupValues({ kind: "prefix", prefix: "気分" }, works);
+  const [item] = buildGroupValues({ kind: "prefix", prefix: "気分" }, works, "count-desc");
   assert.deepEqual(
     item?.covers.map((c) => c.image),
     ["cover-6.jpg", "cover-4.jpg", "cover-5.jpg", "cover-2.jpg"],

@@ -6,6 +6,7 @@
 //   POST   /smart-folders/restore          削除した行を同じ ID・位置・作成日時で戻す
 //   PUT    /smart-folders/:id              更新
 //   PUT    /smart-folders/:id/sort         既定の並びだけを更新
+//   PUT    /smart-folders/:id/group-sort   値一覧の並びだけを更新
 //   DELETE /smart-folders/:id              削除
 //   GET    /smart-folders/:id/works        作品一覧（scanRecord でスキャン記録の作品に絞れる）
 //   POST   /smart-folders/:id/groups       値一覧・「＋絞り込み」候補
@@ -15,8 +16,10 @@ import {
   deleteViolation,
   findSmartFolderTemplate,
   needsCount,
+  groupSortViolation,
   restoreViolation,
   smartFolderFromTemplateSchema,
+  smartFolderGroupSortWriteSchema,
   smartFolderOrderSchema,
   smartFolderRestoreSchema,
   smartFolderSortWriteSchema,
@@ -168,6 +171,20 @@ export function smartFoldersRoute(adapter: DataAdapter, scanRecord: ScanRecordSt
     rejectViolation(sortViolation(existing, data.sort));
     const row = await adapter.updateSmartFolderSort(id, data.sort);
     if (!row) notFoundFolder(id);
+    return c.json(await singleWithCount(adapter, row));
+  });
+
+  app.put("/smart-folders/:id/group-sort", async (c) => {
+    const id = c.req.param("id");
+    const data = await readJsonBody(c, smartFolderGroupSortWriteSchema, "値一覧の並びが不正です");
+    const existing = await adapter.getSmartFolder(id);
+    if (!existing) notFoundFolder(id);
+    rejectViolation(groupSortViolation(existing));
+    const row = await adapter.updateSmartFolderGroupSort(id, data.groupSort);
+    if (!row) {
+      if (!(await adapter.getSmartFolder(id))) notFoundFolder(id);
+      conflict("グループ分けが外されたため、値の並びを保存できません");
+    }
     return c.json(await singleWithCount(adapter, row));
   });
 

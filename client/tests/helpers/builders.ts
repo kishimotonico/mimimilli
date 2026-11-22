@@ -289,6 +289,9 @@ export function buildFsListing(
 export function buildGroupValueItem(overrides: Partial<GroupValueItem> = {}): GroupValueItem {
   return groupValueItemSchema.parse({
     value: "値",
+    sortKey: overrides.value ?? "値",
+    lastAddedAt: "2026-01-01T00:00:00.000Z",
+    lastPlayedAt: null,
     count: 1,
     durationSec: 0,
     covers: [],

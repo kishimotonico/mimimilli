@@ -29,13 +29,14 @@ export const appSettings = sqliteTable("app_settings", {
 });
 
 /** スマートフォルダー（ADR-0040）。condition_json は木、sort の null は「『すべて』と同じ」、
- *  group_by_json の null はグループ分けなし。並びは position の昇順 */
+ *  group_by_json の null はグループ分けなし。group_sort はグループ分けがあるときだけ値を持つ。並びは position の昇順 */
 export const smartFolders = sqliteTable("smart_folders", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   conditionJson: text("condition_json").notNull(),
   sort: text("sort"),
   groupByJson: text("group_by_json"),
+  groupSort: text("group_sort"),
   position: integer("position").notNull(),
   createdAt: text("created_at").notNull(),
 });

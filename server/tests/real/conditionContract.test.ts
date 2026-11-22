@@ -7,10 +7,12 @@ import { join } from "node:path";
 import { after, test } from "node:test";
 import {
   emptyDlsiteState,
+  groupSortIdSchema,
   sortIdSchema,
   type Condition,
   type GroupValueItem,
   type GroupBy,
+  type GroupSortId,
   type Work,
   type WorkSummary,
 } from "@mimimilli/shared";
@@ -67,6 +69,7 @@ const tagSets = [
   ["サークル/夜想曲", "添い寝", "ASMR", "サークル/Alpha"],
   [],
   ["耳かき", "催眠", "cv"],
+  ["hoge/fuga/piyo/aaa/bbb", "hoge/fuga/ccc", "hoge/ddd"],
 ];
 
 function coverFor(index: number, id: string): WorkSummary["cover"] {
@@ -202,6 +205,7 @@ const groupBys: GroupBy[] = [
   { kind: "prefix", prefix: "cv" },
   { kind: "prefix", prefix: "気分" },
   { kind: "prefix", prefix: "tag" },
+  { kind: "prefix", prefix: "hoge" },
   { kind: "tag" },
   { kind: "addedYear" },
 ];
@@ -252,6 +256,29 @@ function normalizeGroupValues(items: GroupValueItem[]) {
   }));
 }
 
+type ValueKeys = Omit<GroupValueItem, "covers">;
+
+/** 並びの意味を core・SQL と独立に書いた比較。第1キーで並べ、同順位は読み・値の UTF-16 順ではなく UTF-8 バイト順 */
+function expectedValueOrder(items: ValueKeys[], groupSort: GroupSortId): string[] {
+  const bytes = (a: string, b: string) => Buffer.compare(Buffer.from(a), Buffer.from(b));
+  const name = (a: ValueKeys, b: ValueKeys) =>
+    bytes(a.sortKey, b.sortKey) || bytes(a.value, b.value);
+  const primary: Record<GroupSortId, (a: ValueKeys, b: ValueKeys) => number> = {
+    "count-desc": (a, b) => b.count - a.count || name(a, b),
+    "count-asc": (a, b) => a.count - b.count || name(a, b),
+    "name-asc": name,
+    "name-desc": (a, b) => name(b, a),
+    "duration-desc": (a, b) => b.durationSec - a.durationSec || name(a, b),
+    "duration-asc": (a, b) => a.durationSec - b.durationSec || name(a, b),
+    "added-desc": (a, b) => bytes(b.lastAddedAt, a.lastAddedAt) || name(a, b),
+    "last-played": (a, b) =>
+      a.lastPlayedAt === null || b.lastPlayedAt === null
+        ? Number(a.lastPlayedAt === null) - Number(b.lastPlayedAt === null) || name(a, b)
+        : bytes(b.lastPlayedAt, a.lastPlayedAt) || name(a, b),
+  };
+  return [...items].sort(primary[groupSort]).map((item) => item.value);
+}
+
 test("条件の木の一覧は fixture と real で作品の項目全体・total・stats が一致する", async () => {
   const { fixture, real } = await setup();
   for (const condition of trees) {
@@ -273,14 +300,36 @@ test("条件の木の一覧は fixture と real で作品の項目全体・total
   }
 });
 
-test("条件の木のグループの値一覧は fixture と real で値・件数・時間・カバーが一致する", async () => {
+test("条件の木のグループの値一覧は fixture と real で値・件数・時間・読み・最新日時・カバー・並びが一致する", async () => {
   const { fixture, real } = await setup();
+  let turn = 0;
   for (const condition of trees) {
     for (const groupBy of groupBys) {
+      const groupSort = groupSortIdSchema.options[turn++ % groupSortIdSchema.options.length]!;
       assert.deepEqual(
-        normalizeGroupValues(await real.groupWorks({ condition, groupBy }, ctx)),
-        normalizeGroupValues(await fixture.groupWorks({ condition, groupBy }, ctx)),
-        JSON.stringify({ condition, groupBy }),
+        normalizeGroupValues(await real.groupWorks({ condition, groupBy, groupSort }, ctx)),
+        normalizeGroupValues(await fixture.groupWorks({ condition, groupBy, groupSort }, ctx)),
+        JSON.stringify({ condition, groupBy, groupSort }),
+      );
+    }
+  }
+});
+
+test("値一覧の8種の並びは、同順位（値が同数・同時間・同日時・再生なし）も含めて fixture と real で一致する", async () => {
+  const { fixture, real } = await setup();
+  for (const groupBy of groupBys) {
+    for (const groupSort of groupSortIdSchema.options) {
+      const actual = normalizeGroupValues(
+        await real.groupWorks({ condition: and(), groupBy, groupSort }, ctx),
+      );
+      const expected = normalizeGroupValues(
+        await fixture.groupWorks({ condition: and(), groupBy, groupSort }, ctx),
+      );
+      assert.deepEqual(actual, expected, JSON.stringify({ groupBy, groupSort }));
+      assert.deepEqual(
+        actual.map((item) => item.value),
+        expectedValueOrder(actual, groupSort),
+        `独立の期待値: ${JSON.stringify({ groupBy, groupSort })}`,
       );
     }
   }

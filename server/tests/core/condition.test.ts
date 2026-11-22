@@ -177,7 +177,10 @@ test("queryFolderWorks / queryFolderGroups は条件・グループの値・チ�
   const groups = await queryFolderGroups(
     adapter,
     folder,
-    parseSmartFolderGroupsRequest({ groupBy: { kind: "prefix", prefix: "cv" } }),
+    parseSmartFolderGroupsRequest({
+      groupBy: { kind: "prefix", prefix: "cv" },
+      groupSort: "count-desc",
+    }),
   );
   assert.deepEqual(groups.map((g) => [g.value, g.count]).sort(), [
     ["a", 1],

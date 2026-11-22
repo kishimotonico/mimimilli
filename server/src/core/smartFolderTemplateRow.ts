@@ -13,6 +13,7 @@ export function insertFromTemplate(
     condition: template.condition,
     sort: template.sort,
     groupBy: template.groupBy,
+    groupSort: template.groupSort,
     createdAt,
   };
 }

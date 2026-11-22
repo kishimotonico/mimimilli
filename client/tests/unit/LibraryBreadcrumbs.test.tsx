@@ -101,6 +101,7 @@ describe("LibraryBreadcrumbs", () => {
     );
     expect(api.requestsTo("POST /api/smart-folders/:id/groups")[0]?.body).toEqual({
       groupBy: { kind: "prefix", prefix: "cv" },
+      groupSort: "count-desc",
     });
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));

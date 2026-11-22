@@ -124,7 +124,7 @@ test("real: カバー実体欠損作品は値一覧の covers から除外され
   const res = await app.request("/api/smart-folders/all/groups", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ groupBy: { kind: "addedYear" } }),
+    body: JSON.stringify({ groupBy: { kind: "addedYear" }, groupSort: "count-desc" }),
   });
   assert.equal(res.status, 200);
   const items = groupValueListSchema.parse(await res.json());

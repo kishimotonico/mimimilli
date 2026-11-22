@@ -1,7 +1,8 @@
 import { QueryClient } from "@tanstack/react-query";
 import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
-import { SMART_FOLDER_TEMPLATES, type SmartFolder } from "@mimimilli/shared";
+import { defaultGroupSort, SMART_FOLDER_TEMPLATES, type SmartFolder } from "@mimimilli/shared";
 
+/** groupBy を渡したときの値の並びはそのグループ分けの初期値。明示すれば上書きできる */
 export function buildSmartFolder(overrides: Partial<SmartFolder> = {}): SmartFolder {
   return {
     id: "sf-00000000-0000-4000-8000-000000000001",
@@ -9,6 +10,7 @@ export function buildSmartFolder(overrides: Partial<SmartFolder> = {}): SmartFol
     condition: { type: "and", children: [] },
     sort: null,
     groupBy: null,
+    groupSort: overrides.groupBy ? defaultGroupSort(overrides.groupBy) : null,
     position: 0,
     createdAt: "2026-01-01T00:00:00.000Z",
     count: null,
@@ -25,6 +27,7 @@ export function defaultSmartFolders(counts: Record<string, number> = {}): SmartF
       condition: template.condition,
       sort: template.sort,
       groupBy: template.groupBy,
+      groupSort: template.groupSort,
       position,
       count: counts[template.id] ?? null,
     }),

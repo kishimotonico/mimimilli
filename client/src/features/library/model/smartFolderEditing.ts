@@ -3,11 +3,13 @@
 
 import {
   EMPTY_CONDITION,
+  defaultGroupSort,
   SMART_FOLDER_TEMPLATES,
   isPredicate,
   rootChildren,
   type Condition,
   type GroupBy,
+  type GroupSortId,
   type Predicate,
   type ReadableSmartFolder,
   type SmartFolder,
@@ -137,6 +139,7 @@ export interface SmartFolderDraft {
   condition: Condition;
   sort: SortId | null;
   groupBy: GroupBy | null;
+  groupSort: GroupSortId | null;
 }
 
 export function draftOf(folder: ReadableSmartFolder): SmartFolderDraft {
@@ -145,7 +148,13 @@ export function draftOf(folder: ReadableSmartFolder): SmartFolderDraft {
     condition: folder.condition,
     sort: folder.sort,
     groupBy: folder.groupBy,
+    groupSort: folder.groupSort,
   };
+}
+
+/** グループ分けを変えた下書き。値の並びはそのグループ分けの初期値に戻す */
+export function withGroupBy(draft: SmartFolderDraft, groupBy: GroupBy | null): SmartFolderDraft {
+  return { ...draft, groupBy, groupSort: groupBy === null ? null : defaultGroupSort(groupBy) };
 }
 
 /** 絞り込みの無い複製の下書き。元の定義と既定の並び（継承ならそのまま継承）を写す */
@@ -155,7 +164,13 @@ export function duplicateDraft(folder: ReadableSmartFolder): SmartFolderDraft {
 
 /** 条件なしのグループ分けのスマートフォルダーの下書き */
 export function groupDraft(groupBy: GroupBy): SmartFolderDraft {
-  return { name: "", condition: EMPTY_CONDITION, sort: null, groupBy };
+  return {
+    name: "",
+    condition: EMPTY_CONDITION,
+    sort: null,
+    groupBy,
+    groupSort: defaultGroupSort(groupBy),
+  };
 }
 
 export type SmartFolderDialogTarget =

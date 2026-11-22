@@ -36,7 +36,10 @@ try {
       await json("/api/smart-folders/all/groups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groupBy: { kind: "prefix", prefix: "cv" } }),
+        body: JSON.stringify({
+          groupBy: { kind: "prefix", prefix: "cv" },
+          groupSort: "count-desc",
+        }),
       }),
     ),
   );

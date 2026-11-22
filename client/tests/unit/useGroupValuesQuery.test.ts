@@ -58,6 +58,7 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
     expect(request?.params.id).toBe("by-circle");
     expect(request?.body).toEqual({
       groupBy: { kind: "prefix", prefix: "cv" },
+      groupSort: "count-desc",
       group: "月白製作所",
       tags: ["cv/藤田茜", "サークル/月白製作所"],
       q: "雨",
@@ -69,7 +70,10 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(api.requestsTo(KEY)[0]?.body).toEqual({ groupBy: { kind: "prefix", prefix: "cv" } });
+    expect(api.requestsTo(KEY)[0]?.body).toEqual({
+      groupBy: { kind: "prefix", prefix: "cv" },
+      groupSort: "count-desc",
+    });
   });
 
   it("タグ・追加年の groupBy をそのまま送る", async () => {
@@ -79,8 +83,8 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
     await waitFor(() => expect(year.result.current.isSuccess).toBe(true));
 
     expect(api.requestsTo(KEY).map((request) => request.body)).toEqual([
-      { groupBy: { kind: "tag" } },
-      { groupBy: { kind: "addedYear" } },
+      { groupBy: { kind: "tag" }, groupSort: "count-desc" },
+      { groupBy: { kind: "addedYear" }, groupSort: "count-desc" },
     ]);
   });
 
@@ -110,6 +114,7 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
     await waitFor(() => expect(api.requestsTo(KEY)).toHaveLength(1));
     expect(api.requestsTo(KEY)[0]?.body).toEqual({
       groupBy: { kind: "prefix", prefix: "cv" },
+      groupSort: "count-desc",
       tags: ["サークル/月白製作所"],
     });
   });

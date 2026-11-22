@@ -147,6 +147,7 @@ test("HTTP smart folder は壊れた作品を除外する", async (t) => {
     condition: { type: "and", children: [{ type: "tag", tag: "cv/正常" }] },
     sort: "id-asc",
     groupBy: null,
+    groupSort: null,
     createdAt: "2026-07-19T00:00:00.000Z",
   })!;
   const adapter = fileAdapter(directory);

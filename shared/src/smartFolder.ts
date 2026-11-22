@@ -10,7 +10,13 @@ import {
   prefixSchema,
   type Condition,
 } from "./condition.ts";
-import { MAX_RANDOM_SEED, sortIdSchema, type SortId } from "./library.ts";
+import {
+  groupSortIdSchema,
+  MAX_RANDOM_SEED,
+  sortIdSchema,
+  type GroupSortId,
+  type SortId,
+} from "./library.ts";
 import { scanRecordKindSchema, workChangeKindSchema } from "./scan.ts";
 
 // ── グループ分け ─────────────────────────────────────────────
@@ -22,25 +28,49 @@ export const groupBySchema = z.discriminatedUnion("kind", [
 ]);
 export type GroupBy = z.infer<typeof groupBySchema>;
 
+/** グループ分けを付けたときの値の並びの初期値。追加年は新しい年が先、それ以外は件数の多い順 */
+export function defaultGroupSort(groupBy: GroupBy): GroupSortId {
+  return groupBy.kind === "addedYear" ? "name-desc" : "count-desc";
+}
+
+/** グループ分けと値の並びは、グループ分けがあるときだけ両方が揃う */
+function hasConsistentGroupSort(folder: {
+  groupBy: GroupBy | null;
+  groupSort: GroupSortId | null;
+}): boolean {
+  return (folder.groupBy === null) === (folder.groupSort === null);
+}
+
+const GROUP_SORT_MISMATCH = { message: "値の並びはグループ分けがあるときだけ指定します" };
+
 // ── 保存形 ───────────────────────────────────────────────────
 
 const smartFolderNameSchema = z.string().trim().min(1);
 
 /** POST・PUT のボディ。条件は保存できる形だけを通し、正規化して返す */
-export const smartFolderWriteSchema = z.strictObject({
-  name: smartFolderNameSchema,
-  condition: conditionSchema,
-  /** null は「『すべて』と同じ」 */
-  sort: sortIdSchema.nullable(),
-  groupBy: groupBySchema.nullable(),
-});
+export const smartFolderWriteSchema = z
+  .strictObject({
+    name: smartFolderNameSchema,
+    condition: conditionSchema,
+    /** 値を選んだ後（グループ分けなしは全体）の作品一覧の並び。null は「『すべて』と同じ」 */
+    sort: sortIdSchema.nullable(),
+    groupBy: groupBySchema.nullable(),
+    /** 値一覧の並び。グループ分けがあるときだけ必須で、「すべて」からの継承は無い */
+    groupSort: groupSortIdSchema.nullable(),
+  })
+  .refine(hasConsistentGroupSort, GROUP_SORT_MISMATCH);
 export type SmartFolderWrite = z.infer<typeof smartFolderWriteSchema>;
 
 /** PUT /:id/sort のボディ。既定の並びだけを更新する */
 export const smartFolderSortWriteSchema = z.strictObject({ sort: sortIdSchema.nullable() });
 export type SmartFolderSortWrite = z.infer<typeof smartFolderSortWriteSchema>;
 
-/** 一覧の1行。condition・sort・groupBy のどれか1つでも読めない行は壊れた行で、3つとも null で返す。
+/** PUT /:id/group-sort のボディ。値一覧の並びだけを更新する */
+export const smartFolderGroupSortWriteSchema = z.strictObject({ groupSort: groupSortIdSchema });
+export type SmartFolderGroupSortWrite = z.infer<typeof smartFolderGroupSortWriteSchema>;
+
+/** 一覧の1行。condition・sort・groupBy・groupSort のどれか1つでも読めない行（groupBy と groupSort の組が合わない行を含む）は
+ *  壊れた行で、4つとも null で返す。
  *  壊れた行は削除と作り直しだけができる。正常な行の sort の null は「『すべて』と同じ」 */
 export const smartFolderSchema = z.object({
   id: z.string(),
@@ -48,6 +78,7 @@ export const smartFolderSchema = z.object({
   condition: conditionTreeSchema.nullable(),
   sort: sortIdSchema.nullable(),
   groupBy: groupBySchema.nullable(),
+  groupSort: groupSortIdSchema.nullable(),
   position: z.number().int().nonnegative(),
   createdAt: z.string(),
   /** 件数を出す・0件で隠すかの判定に要るものだけ数える。それ以外は null */
@@ -76,22 +107,25 @@ export type SmartFolderOrder = z.infer<typeof smartFolderOrderSchema>;
 
 const USER_SMART_FOLDER_ID = /^sf-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export const smartFolderRestoreSchema = z.strictObject({
-  id: z
-    .string()
-    .refine(
-      (id) =>
-        USER_SMART_FOLDER_ID.test(id) ||
-        (id !== ALL_SMART_FOLDER_ID && SMART_FOLDER_TEMPLATES.some((t) => t.id === id)),
-      { message: "復元できない ID です" },
-    ),
-  name: smartFolderNameSchema,
-  condition: conditionSchema,
-  sort: sortIdSchema.nullable(),
-  groupBy: groupBySchema.nullable(),
-  position: z.number().int().nonnegative(),
-  createdAt: z.iso.datetime({ offset: true }),
-});
+export const smartFolderRestoreSchema = z
+  .strictObject({
+    id: z
+      .string()
+      .refine(
+        (id) =>
+          USER_SMART_FOLDER_ID.test(id) ||
+          (id !== ALL_SMART_FOLDER_ID && SMART_FOLDER_TEMPLATES.some((t) => t.id === id)),
+        { message: "復元できない ID です" },
+      ),
+    name: smartFolderNameSchema,
+    condition: conditionSchema,
+    sort: sortIdSchema.nullable(),
+    groupBy: groupBySchema.nullable(),
+    groupSort: groupSortIdSchema.nullable(),
+    position: z.number().int().nonnegative(),
+    createdAt: z.iso.datetime({ offset: true }),
+  })
+  .refine(hasConsistentGroupSort, GROUP_SORT_MISMATCH);
 export type SmartFolderRestore = z.infer<typeof smartFolderRestoreSchema>;
 
 // ── 作品一覧・値一覧の要求 ────────────────────────────────────
@@ -120,6 +154,8 @@ export type SmartFolderWorksRequest = z.infer<typeof smartFolderWorksRequestSche
  *  値一覧では tags・q・group を送らない */
 export const smartFolderGroupsRequestSchema = z.strictObject({
   groupBy: groupBySchema,
+  /** 返す値の並び */
+  groupSort: groupSortIdSchema,
   group: z.string().min(1).optional(),
   tags: tagFiltersQuerySchema,
   q: z.string().default(""),
@@ -156,6 +192,8 @@ export interface SmartFolderTemplate {
   /** null は「『すべて』と同じ」 */
   sort: SortId | null;
   groupBy: GroupBy | null;
+  /** グループ分けがあるテンプレートだけ持つ */
+  groupSort: GroupSortId | null;
   /** 初回起動時に投入する */
   seeded: boolean;
 }
@@ -165,18 +203,43 @@ const grouped = (
   id: string,
   name: string,
   groupBy: GroupBy,
-  seeded = true,
-): SmartFolderTemplate => ({ id, name, condition: and(), sort: null, groupBy, seeded });
+  options: { seeded?: boolean; sort?: SortId } = {},
+): SmartFolderTemplate => ({
+  id,
+  name,
+  condition: and(),
+  sort: options.sort ?? null,
+  groupBy,
+  groupSort: defaultGroupSort(groupBy),
+  seeded: options.seeded ?? true,
+});
 
 export const SMART_FOLDER_TEMPLATES: readonly SmartFolderTemplate[] = [
-  { id: "all", name: "すべて", condition: and(), sort: "added-desc", groupBy: null, seeded: true },
-  { id: "random", name: "ランダム", condition: and(), sort: "random", groupBy: null, seeded: true },
+  {
+    id: "all",
+    name: "すべて",
+    condition: and(),
+    sort: "added-desc",
+    groupBy: null,
+    groupSort: null,
+    seeded: true,
+  },
+  {
+    id: "random",
+    name: "ランダム",
+    condition: and(),
+    sort: "random",
+    groupBy: null,
+    groupSort: null,
+    seeded: true,
+  },
   {
     id: "recent",
     name: "最近再生",
     condition: and({ type: "played" }),
     sort: "last-played",
     groupBy: null,
+    groupSort: null,
     seeded: true,
   },
   {
@@ -185,6 +248,7 @@ export const SMART_FOLDER_TEMPLATES: readonly SmartFolderTemplate[] = [
     condition: and({ type: "added", withinDays: 30 }),
     sort: "added-desc",
     groupBy: null,
+    groupSort: null,
     seeded: true,
   },
   {
@@ -193,6 +257,7 @@ export const SMART_FOLDER_TEMPLATES: readonly SmartFolderTemplate[] = [
     condition: and({ type: "bookmarked" }),
     sort: null,
     groupBy: null,
+    groupSort: null,
     seeded: true,
   },
   {
@@ -201,6 +266,7 @@ export const SMART_FOLDER_TEMPLATES: readonly SmartFolderTemplate[] = [
     condition: and({ type: "hasError" }),
     sort: null,
     groupBy: null,
+    groupSort: null,
     seeded: true,
   },
   grouped("by-cv", "CV別", { kind: "prefix", prefix: "cv" }),
@@ -208,8 +274,13 @@ export const SMART_FOLDER_TEMPLATES: readonly SmartFolderTemplate[] = [
   grouped("by-category", "カテゴリ別", { kind: "prefix", prefix: "カテゴリ" }),
   grouped("by-tag", "タグ別", { kind: "tag" }),
   grouped("by-year", "追加年別", { kind: "addedYear" }),
-  grouped("by-series", "シリーズ別", { kind: "prefix", prefix: "シリーズ" }, false),
-  grouped("by-rating", "レーティング別", { kind: "prefix", prefix: "rating" }, false),
+  grouped(
+    "by-series",
+    "シリーズ別",
+    { kind: "prefix", prefix: "シリーズ" },
+    { seeded: false, sort: "title-asc" },
+  ),
+  grouped("by-rating", "レーティング別", { kind: "prefix", prefix: "rating" }, { seeded: false }),
 ];
 
 export const smartFolderTemplateIdSchema = z.enum(
@@ -292,7 +363,7 @@ function sameTemplateDefinition(
   );
 }
 
-/** 更新の違反。既定のものは名前・既定の並びだけ変えられる。「すべて」は名前も変えられず、並びを null にもできない。
+/** 更新の違反。既定のものは名前・既定の並び・値の並びだけ変えられる。「すべて」は名前も変えられず、並びを null にもできない。
  *  壊れた行への上書きも同じ規則で通す（UI は削除だけを出すが、API は定義が規則に合う作り直しを受ける） */
 export function updateViolation(
   existing: Pick<SmartFolder, "id" | "name">,
@@ -322,6 +393,19 @@ export function sortViolation(
   }
   if (!readablePermissions(existing.id).inheritSort && sort === null) {
     return invalid("「すべて」の既定の並びは空にできません");
+  }
+  return null;
+}
+
+/** 値一覧の並びだけの更新の違反。壊れた行は編集できず、グループ分けの無い行には値の並びが無い */
+export function groupSortViolation(
+  existing: Pick<SmartFolder, "id" | "condition" | "groupBy">,
+): PolicyViolation | null {
+  if (!smartFolderPermissions(existing).edit) {
+    return forbidden("壊れたスマートフォルダーは編集できません");
+  }
+  if (existing.groupBy === null) {
+    return invalid("グループ分けのないスマートフォルダーに値の並びはありません");
   }
   return null;
 }

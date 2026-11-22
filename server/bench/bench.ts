@@ -279,7 +279,10 @@ async function main(): Promise<void> {
       name: `cond-groups-${name}`,
       path: `(adapter.groupWorks ${name})`,
       run: async () => (
-        await adapter.groupWorks({ condition: emptyCondition, groupBy }, ctx),
+        await adapter.groupWorks(
+          { condition: emptyCondition, groupBy, groupSort: "count-desc" },
+          ctx,
+        ),
         done()
       ),
     })),
@@ -288,7 +291,11 @@ async function main(): Promise<void> {
       path: "(adapter.groupWorks cv, 条件あり)",
       run: async () => (
         await adapter.groupWorks(
-          { condition: cvCondition, groupBy: { kind: "prefix", prefix: "cv" } },
+          {
+            condition: cvCondition,
+            groupBy: { kind: "prefix", prefix: "cv" },
+            groupSort: "count-desc",
+          },
           ctx,
         ),
         done()

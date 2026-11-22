@@ -38,7 +38,11 @@ export function groupWorksByCondition(
   query: ConditionGroupQuery,
   ctx: EvalContext,
 ): GroupValueItem[] {
-  return buildGroupValues(query.groupBy, works.filter(createMatcher(query.condition, ctx)));
+  return buildGroupValues(
+    query.groupBy,
+    works.filter(createMatcher(query.condition, ctx)),
+    query.groupSort,
+  );
 }
 
 export function countWorksByConditions(

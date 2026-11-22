@@ -110,6 +110,9 @@ export interface CoverLocation {
 
 export interface GroupValueRow {
   value: string;
+  sortKey: string;
+  lastAddedAt: string;
+  lastPlayedAt: string | null;
   count: number;
   durationSec: number;
   coversJson: string;

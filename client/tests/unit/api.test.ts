@@ -508,6 +508,7 @@ describe("library api", () => {
       condition: { type: "and", children: [] },
       sort: "title-asc",
       groupBy: null,
+      groupSort: null,
       position: 0,
       createdAt: "2026-01-01T00:00:00.000Z",
       count: null,
@@ -518,6 +519,7 @@ describe("library api", () => {
       condition: { type: "and" as const, children: [] },
       sort: "title-asc" as const,
       groupBy: null,
+      groupSort: null,
     };
     const result = await smartFolderApi.updateSmartFolder("sf-1", write);
     const [url, init] = mockFetch.mock.calls.at(-1)!;
@@ -535,6 +537,7 @@ describe("library api", () => {
         condition: { type: "and", children: [] },
         sort: null,
         groupBy: null,
+        groupSort: null,
         position: 0,
         createdAt: "2026-01-01T00:00:00.000Z",
         count: null,

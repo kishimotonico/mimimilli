@@ -65,7 +65,12 @@ describe("FilterChipBand のチップ", () => {
     );
     const [request] = api.requestsTo("POST /api/smart-folders/:id/groups");
     expect(request?.params.id).toBe("fav");
-    expect(request?.body).toEqual({ groupBy: { kind: "tag" }, tags: ["cv/藤田茜"], q: "雨" });
+    expect(request?.body).toEqual({
+      groupBy: { kind: "tag" },
+      groupSort: "count-desc",
+      tags: ["cv/藤田茜"],
+      q: "雨",
+    });
   });
 
   it("「＋絞り込み」のグループ分けは定義済みの prefix 全部・タグ・追加年", async () => {

@@ -4,6 +4,7 @@ import { buildSidebarRows } from "../../src/features/library/model/sidebarRows";
 import {
   conditionRowText,
   duplicateDraft,
+  withGroupBy,
   groupByOptions,
   missingTemplates,
   reorderIds,
@@ -79,9 +80,19 @@ describe("追加・複製", () => {
       condition: random.condition,
       sort: "random",
       groupBy: null,
+      groupSort: null,
     });
     const fav = defaultSmartFolders().find((folder) => folder.id === "fav")!;
     expect(duplicateDraft({ ...fav, condition: fav.condition! }).sort).toBeNull();
+  });
+
+  it("グループ分けのあるものの複製は値の並びも写し、グループ分けを変えた下書きは初期値に戻す", () => {
+    const byYear = defaultSmartFolders().find((folder) => folder.id === "by-year")!;
+    const copy = duplicateDraft({ ...byYear, condition: byYear.condition! });
+    expect(copy.groupSort).toBe("name-desc");
+    expect(withGroupBy(copy, { kind: "tag" }).groupSort).toBe("count-desc");
+    expect(withGroupBy(copy, { kind: "addedYear" }).groupSort).toBe("name-desc");
+    expect(withGroupBy(copy, null)).toMatchObject({ groupBy: null, groupSort: null });
   });
 
   it("グループ分けの選択肢は定義済みの prefix 全部・タグ・追加年で、ラベルは getGroupByLabel と同じ", () => {

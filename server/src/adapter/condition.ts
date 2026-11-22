@@ -1,5 +1,5 @@
 // 条件の木をアダプタへ渡す入力の型（ADR-0040）。
-import type { Condition, GroupBy, SortId } from "@mimimilli/shared";
+import type { Condition, GroupBy, GroupSortId, SortId } from "@mimimilli/shared";
 
 /** 評価コンテキスト。now は route が1リクエストにつき1回作る（エポックミリ秒） */
 export interface EvalContext {
@@ -20,4 +20,6 @@ export interface ConditionWorksQuery {
 export interface ConditionGroupQuery {
   condition: Condition;
   groupBy: GroupBy;
+  /** 返す値の並び。同順位は読み・値の UTF-8 バイト順（降順の並びは両方を逆順） */
+  groupSort: GroupSortId;
 }

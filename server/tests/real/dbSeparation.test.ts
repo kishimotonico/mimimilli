@@ -47,6 +47,7 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
       condition: { type: "and", children: [] },
       sort: "added-desc",
       groupBy: null,
+      groupSort: null,
       createdAt: "2026-07-19T00:00:00.000Z",
     }),
   );

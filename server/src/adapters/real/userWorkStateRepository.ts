@@ -1,8 +1,9 @@
-import { asc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, eq, gte, isNotNull, sql } from "drizzle-orm";
 import type { z } from "zod";
 import {
   conditionTreeSchema,
   groupBySchema,
+  groupSortIdSchema,
   sortIdSchema,
   tagPrefixSchema,
 } from "@mimimilli/shared";
@@ -10,6 +11,7 @@ import type {
   Condition,
   ResumeBody,
   SmartFolderWrite,
+  GroupSortId,
   SortId,
   TagPrefix,
   TagPrefixCreate,
@@ -313,6 +315,7 @@ export class UserWorkStateRepository {
         conditionJson: JSON.stringify(folder.condition),
         sort: folder.sort,
         groupByJson: folder.groupBy === null ? null : JSON.stringify(folder.groupBy),
+        groupSort: folder.groupSort,
         position: folder.position,
         createdAt: folder.createdAt,
       })
@@ -328,6 +331,7 @@ export class UserWorkStateRepository {
         conditionJson: JSON.stringify(input.condition),
         sort: input.sort,
         groupByJson: input.groupBy === null ? null : JSON.stringify(input.groupBy),
+        groupSort: input.groupSort,
       })
       .where(eq(smartFolders.id, id))
       .returning()
@@ -340,6 +344,17 @@ export class UserWorkStateRepository {
       .update(smartFolders)
       .set({ sort })
       .where(eq(smartFolders.id, id))
+      .returning()
+      .get();
+    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
+  }
+
+  /** グループ分けのある行だけを更新する。グループ分けを外す更新と交差しても、値の並びだけが残る行を作らない */
+  updateSmartFolderGroupSort(id: string, groupSort: GroupSortId): SmartFolderRow | null {
+    const r = this.db.user
+      .update(smartFolders)
+      .set({ groupSort })
+      .where(and(eq(smartFolders.id, id), isNotNull(smartFolders.groupByJson)))
       .returning()
       .get();
     return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
@@ -393,7 +408,7 @@ function readJsonColumn<T>(column: string, raw: string, schema: z.ZodType<T>): C
   return parsed.success ? { ok: true, value: parsed.data } : failed(column, parsed.error.issues);
 }
 
-/** condition・sort・groupBy のどれか1つでも読めなければ、3つとも null の壊れた行にする。壊れた行は同じ問題につき1回だけ警告する */
+/** condition・sort・groupBy・groupSort のどれか1つでも読めない、または groupBy と groupSort の組が合わなければ、4つとも null の壊れた行にする。壊れた行は同じ問題につき1回だけ警告する */
 function toSmartFolderRow(
   r: typeof smartFolders.$inferSelect,
   reportedBrokenFolders: Map<string, string>,
@@ -405,11 +420,18 @@ function toSmartFolderRow(
     r.groupByJson === null
       ? ({ ok: true, value: null } as const)
       : readJsonColumn("group_by_json", r.groupByJson, groupBySchema);
+  const groupSort = groupSortIdSchema.nullable().safeParse(r.groupSort);
   const problems: ColumnProblem[] = [];
   if (!condition.ok) problems.push(condition.problem);
   if (!sort.success) problems.push({ column: "sort", reason: sort.error.issues });
   if (!groupBy.ok) problems.push(groupBy.problem);
-  if (!condition.ok || !sort.success || !groupBy.ok) {
+  if (!groupSort.success) problems.push({ column: "group_sort", reason: groupSort.error.issues });
+  const mismatched =
+    groupBy.ok && groupSort.success && (groupBy.value === null) !== (groupSort.data === null);
+  if (mismatched) {
+    problems.push({ column: "group_sort", reason: "group_by_json と group_sort の組が合いません" });
+  }
+  if (!condition.ok || !sort.success || !groupBy.ok || !groupSort.success || mismatched) {
     const signature = JSON.stringify(problems);
     if (reportedBrokenFolders.get(r.id) !== signature) {
       reportedBrokenFolders.set(r.id, signature);
@@ -418,8 +440,14 @@ function toSmartFolderRow(
         problems,
       });
     }
-    return { ...base, condition: null, sort: null, groupBy: null };
+    return { ...base, condition: null, sort: null, groupBy: null, groupSort: null };
   }
   reportedBrokenFolders.delete(r.id);
-  return { ...base, condition: condition.value, sort: sort.data, groupBy: groupBy.value };
+  return {
+    ...base,
+    condition: condition.value,
+    sort: sort.data,
+    groupBy: groupBy.value,
+    groupSort: groupSort.data,
+  };
 }

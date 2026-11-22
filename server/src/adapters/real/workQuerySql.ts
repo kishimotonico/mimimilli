@@ -1,4 +1,4 @@
-import type { SortId } from "@mimimilli/shared";
+import type { GroupSortId, SortId } from "@mimimilli/shared";
 import { normalizeRjCode } from "../../core/worksQuery.ts";
 
 /** SQLite の IN 句パラメータ上限を避けるため、配列を一定件数ごとに分割する */
@@ -130,7 +130,22 @@ export const WORKS_QUERY_FROM = `
   FROM main.works
   INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id`;
 
-export function groupValueSql(baseSelect: string): string {
+const NAME_ASC = "sortKey COLLATE BINARY ASC, value COLLATE BINARY ASC";
+const NAME_DESC = "sortKey COLLATE BINARY DESC, value COLLATE BINARY DESC";
+
+/** 値一覧の並び。同順位は読み・値の BINARY 順（降順の並びは両方を逆順）。core の GROUP_SORT_COMPARATORS と同じ */
+const GROUP_VALUE_ORDER: Record<GroupSortId, string> = {
+  "count-desc": `count DESC, ${NAME_ASC}`,
+  "count-asc": `count ASC, ${NAME_ASC}`,
+  "name-asc": NAME_ASC,
+  "name-desc": NAME_DESC,
+  "duration-desc": `durationSec DESC, ${NAME_ASC}`,
+  "duration-asc": `durationSec ASC, ${NAME_ASC}`,
+  "added-desc": `lastAddedAt COLLATE BINARY DESC, ${NAME_ASC}`,
+  "last-played": `lastPlayedAt IS NULL, lastPlayedAt COLLATE BINARY DESC, ${NAME_ASC}`,
+};
+
+export function groupValueSql(baseSelect: string, groupSort: GroupSortId): string {
   return `
     WITH base AS (${baseSelect}),
     ranked_covers AS (
@@ -157,10 +172,13 @@ export function groupValueSql(baseSelect: string): string {
       base.value AS value,
       COUNT(*) AS count,
       COALESCE(SUM(base.duration_sec), 0) AS durationSec,
+      MAX(base.added_at) AS lastAddedAt,
+      MAX(base.last_played_at) AS lastPlayedAt,
+      MIN(base.sort_key) AS sortKey,
       COALESCE(covers_agg.covers_json, '[]') AS coversJson
     FROM base
     LEFT JOIN covers_agg ON covers_agg.value = base.value
     GROUP BY base.value
-    ORDER BY count DESC, base.sort_key COLLATE BINARY ASC, base.value COLLATE BINARY ASC
+    ORDER BY ${GROUP_VALUE_ORDER[groupSort]}
   `;
 }

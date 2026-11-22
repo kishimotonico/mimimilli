@@ -104,6 +104,7 @@ export function useSmartFolderEditor(): SmartFolderEditor {
           condition: folder.condition,
           sort: folder.sort,
           groupBy: folder.groupBy,
+          groupSort: folder.groupSort,
           position: folder.position,
           createdAt: folder.createdAt,
         }),

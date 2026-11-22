@@ -4,7 +4,7 @@
 // （route.library.sort）とは別に保持する。総時間ソート中に値を選択しても作品一覧が無効なソートキーを
 // 受け取らないようにするための分離（ADR-0012 帰結）。
 
-import type { GroupValueItem } from "@mimimilli/shared";
+import type { GroupSortId, GroupValueItem } from "@mimimilli/shared";
 
 export type GroupValueSortKey = "name" | "count" | "duration";
 export type SortDirection = "asc" | "desc";
@@ -12,6 +12,10 @@ export type SortDirection = "asc" | "desc";
 export interface GroupValueSortState {
   key: GroupValueSortKey;
   direction: SortDirection;
+}
+
+export function toGroupSortId(sort: GroupValueSortState): GroupSortId {
+  return `${sort.key}-${sort.direction}`;
 }
 
 export const DEFAULT_GROUP_VALUE_SORT: GroupValueSortState = { key: "count", direction: "desc" };

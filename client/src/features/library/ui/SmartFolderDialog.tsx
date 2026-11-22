@@ -24,6 +24,7 @@ import {
   groupByOptions,
   groupDraft,
   toWrite,
+  withGroupBy,
   withoutRootChild,
   type SmartFolderDialogTarget,
   type SmartFolderDraft,
@@ -173,9 +174,7 @@ export default function SmartFolderDialog({
             id={groupId}
             value={groupByKey(draft.groupBy)}
             disabled={!permissions.editGroupBy}
-            onChange={(event) =>
-              setDraft({ ...draft, groupBy: groupByFromKey(event.target.value) })
-            }
+            onChange={(event) => setDraft(withGroupBy(draft, groupByFromKey(event.target.value)))}
           >
             {target.kind !== "group" && <option value="">なし</option>}
             {options.map((option) => (

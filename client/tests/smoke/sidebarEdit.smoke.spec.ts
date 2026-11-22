@@ -12,7 +12,7 @@ const dialog = (page: Page) => page.getByRole("dialog");
 
 async function createFolder(page: Page, body: Record<string, unknown>): Promise<string> {
   const res = await page.request.post("/api/smart-folders", {
-    data: { name: "自作", sort: null, groupBy: null, ...body },
+    data: { name: "自作", sort: null, groupBy: null, groupSort: null, ...body },
   });
   expect(res.status()).toBe(201);
   return ((await res.json()) as { id: string }).id;

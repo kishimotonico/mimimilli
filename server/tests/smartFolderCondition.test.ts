@@ -122,12 +122,23 @@ test("既定テンプレート: 13本・初回11本・固定IDで、条件は保
       condition: t.condition,
       sort: t.sort,
       groupBy: t.groupBy,
+      groupSort: t.groupSort,
     });
     assert.ok(parsed.success, t.id);
     assert.deepEqual(parsed.data.condition, t.condition);
   }
   const all = SMART_FOLDER_TEMPLATES[0]!;
   assert.deepEqual([all.id, all.sort, all.groupBy], ["all", "added-desc", null]);
+});
+
+test("既定テンプレートの値の並び: 追加年別は名前の降順、ほかのグループ分けは件数の多い順、シリーズ別の作品はタイトル順", () => {
+  const byId = (id: string) => SMART_FOLDER_TEMPLATES.find((t) => t.id === id)!;
+  for (const t of SMART_FOLDER_TEMPLATES) {
+    const expected = t.groupBy === null ? null : t.id === "by-year" ? "name-desc" : "count-desc";
+    assert.equal(t.groupSort, expected, t.id);
+  }
+  assert.equal(byId("by-series").sort, "title-asc");
+  assert.equal(byId("by-cv").sort, null);
 });
 
 test("作品一覧の要求: sort 必須、random は seed 必須、契約にないキーは受け付けない", () => {
@@ -183,6 +194,7 @@ test("復元できる ID は sf-<uuid> と all 以外のテンプレート ID", 
     condition: and(),
     sort: null,
     groupBy: null,
+    groupSort: null,
     position: 0,
     createdAt: "2026-01-01T00:00:00.000Z",
   };
@@ -202,6 +214,7 @@ test("壊れた行は condition が null の行", () => {
     condition: null,
     sort: null,
     groupBy: null,
+    groupSort: null,
     position: 0,
     createdAt: "t",
     count: null,

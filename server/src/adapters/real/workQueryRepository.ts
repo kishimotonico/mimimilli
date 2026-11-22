@@ -8,6 +8,7 @@ import {
   workPlacementOf,
 } from "@mimimilli/shared";
 import type {
+  GroupSortId,
   GroupValueItem,
   Condition,
   GroupBy,
@@ -518,7 +519,7 @@ export class WorkQueryRepository {
   /** 条件の木に一致する作品を、グループ分けの値ごとに集計する（ADR-0040） */
   groupWorksByCondition(query: ConditionGroupQuery, ctx: EvalContext): GroupValueItem[] {
     const compiled = compileCondition(query.condition, ctx);
-    return this.groupValueItems(query.groupBy, [compiled.sql], compiled.bindings);
+    return this.groupValueItems(query.groupBy, query.groupSort, [compiled.sql], compiled.bindings);
   }
 
   /** 条件ごとの一致件数を1回の走査で数える。入力と同じ順で返す */
@@ -534,6 +535,7 @@ export class WorkQueryRepository {
 
   private groupValueItems(
     groupBy: GroupBy,
+    groupSort: GroupSortId,
     conditions: string[],
     bindings: Array<string | number>,
   ): GroupValueItem[] {
@@ -544,10 +546,12 @@ export class WorkQueryRepository {
     if (groupBy.kind === "addedYear") {
       rows = this.db.sqlite
         .query(
-          groupValueSql(`
+          groupValueSql(
+            `
             SELECT substr(work_states.added_at, 1, 4) AS value,
                    works.id AS work_id,
                    work_states.added_at AS added_at,
+                   work_states.last_played_at AS last_played_at,
                    works.total_duration_sec AS duration_sec,
                    works.cover_image AS cover_image,
                    works.cover_width AS cover_width,
@@ -556,16 +560,20 @@ export class WorkQueryRepository {
             FROM main.works
             INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
             ${filterWhere}
-          `),
+          `,
+            groupSort,
+          ),
         )
         .all(...bindings) as GroupValueRow[];
     } else if (groupBy.kind === "tag") {
       rows = this.db.sqlite
         .query(
-          groupValueSql(`
+          groupValueSql(
+            `
             SELECT tags.name AS value,
                    works.id AS work_id,
                    work_states.added_at AS added_at,
+                   work_states.last_played_at AS last_played_at,
                    works.total_duration_sec AS duration_sec,
                    works.cover_image AS cover_image,
                    works.cover_width AS cover_width,
@@ -576,7 +584,9 @@ export class WorkQueryRepository {
             INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id
             INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
             ${filterWhere}
-          `),
+          `,
+            groupSort,
+          ),
         )
         .all(...bindings) as GroupValueRow[];
     } else {
@@ -586,10 +596,12 @@ export class WorkQueryRepository {
       ];
       rows = this.db.sqlite
         .query(
-          groupValueSql(`
+          groupValueSql(
+            `
             SELECT substr(tags.name, instr(tags.name, '/') + 1) AS value,
                    works.id AS work_id,
                    work_states.added_at AS added_at,
+                   work_states.last_played_at AS last_played_at,
                    works.total_duration_sec AS duration_sec,
                    works.cover_image AS cover_image,
                    works.cover_width AS cover_width,
@@ -600,7 +612,9 @@ export class WorkQueryRepository {
             INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id
             INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
             WHERE ${prefixConditions.join(" AND ")}
-          `),
+          `,
+            groupSort,
+          ),
         )
         .all(groupBy.prefix, ...bindings) as GroupValueRow[];
     }
@@ -613,6 +627,9 @@ export class WorkQueryRepository {
 
     return rows.map((row) => ({
       value: row.value,
+      sortKey: row.sortKey,
+      lastAddedAt: row.lastAddedAt,
+      lastPlayedAt: row.lastPlayedAt,
       count: row.count,
       durationSec: row.durationSec,
       covers: (

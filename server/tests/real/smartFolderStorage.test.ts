@@ -46,6 +46,7 @@ test("migration が入れる「すべて」は shared のテンプレートと�
   assert.equal(row.name, template.name);
   assert.equal(row.sort, template.sort);
   assert.equal(row.groupBy, template.groupBy);
+  assert.equal(row.groupSort, template.groupSort);
   assert.equal(row.position, 0);
   assert.ok(row.condition && conditionKey(row.condition) === conditionKey(template.condition));
   assert.ok(Number.isFinite(Date.parse(row.createdAt)));
@@ -75,6 +76,7 @@ test("既定は初回だけ投入され、全部消しても再起動で戻ら�
     condition: findSmartFolderTemplate("fav")!.condition,
     sort: null,
     groupBy: null,
+    groupSort: null,
     createdAt: new Date().toISOString(),
   });
   assert.equal(added?.position, 1);
@@ -125,6 +127,30 @@ test("読めない行があっても一覧は成功し、壊れた行を null �
         position: 102,
         createdAt,
       },
+      {
+        id: "broken-group-sort",
+        name: "壊れgroupSort",
+        ...healthy,
+        groupSort: "unknown",
+        position: 104,
+        createdAt,
+      },
+      {
+        id: "orphan-group-sort",
+        name: "グループ分けなしに値の並び",
+        ...healthy,
+        groupSort: "count-desc",
+        position: 105,
+        createdAt,
+      },
+      {
+        id: "missing-group-sort",
+        name: "グループ分けありで値の並びなし",
+        ...healthy,
+        groupByJson: '{"kind":"tag"}',
+        position: 106,
+        createdAt,
+      },
       { id: "ok-error", name: "エラー確認", ...healthy, position: 103, createdAt },
     ])
     .run();
@@ -132,11 +158,18 @@ test("読めない行があっても一覧は成功し、壊れた行を null �
   const res = await app.request("/api/smart-folders");
   assert.equal(res.status, 200);
   const folders = (await res.json()) as SmartFolder[];
-  for (const id of ["broken-json", "broken-sort", "broken-group"]) {
+  for (const id of [
+    "broken-json",
+    "broken-sort",
+    "broken-group",
+    "broken-group-sort",
+    "orphan-group-sort",
+    "missing-group-sort",
+  ]) {
     const row = folders.find((f) => f.id === id)!;
     assert.deepEqual(
-      [row.condition, row.sort, row.groupBy, row.count],
-      [null, null, null, null],
+      [row.condition, row.sort, row.groupBy, row.groupSort, row.count],
+      [null, null, null, null, null],
       id,
     );
   }
@@ -154,6 +187,7 @@ test("読めない行があっても一覧は成功し、壊れた行を null �
       condition: { type: "and", children: [] },
       sort: "added-desc",
       groupBy: null,
+      groupSort: null,
     }),
   });
   assert.equal(fix.status, 200);
@@ -163,6 +197,7 @@ test("読めない行があっても一覧は成功し、壊れた行を null �
     condition: { type: "and", children: [] },
     sort: "added-desc",
     groupBy: null,
+    groupSort: null,
     position: 101,
     createdAt: "2026-07-19T00:00:00.000Z",
     count: null,

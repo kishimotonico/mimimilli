@@ -8,6 +8,7 @@ import {
   smartFolderListSchema,
   smartFolderSchema,
   worksPageSchema,
+  type GroupSortId,
   type GroupValueItem,
   type GroupBy,
   type ScanRecordKind,
@@ -115,6 +116,7 @@ export async function getAllWorks(
 
 export interface SmartFolderGroupsParams {
   groupBy: GroupBy;
+  groupSort: GroupSortId;
   /** 「＋絞り込み」の候補でだけ使う。自身の値一覧では送らない */
   group?: string | null;
   tags?: string[];
@@ -125,7 +127,10 @@ export async function getSmartFolderGroups(
   id: string,
   params: SmartFolderGroupsParams,
 ): Promise<GroupValueItem[]> {
-  const body: Record<string, unknown> = { groupBy: params.groupBy };
+  const body: Record<string, unknown> = {
+    groupBy: params.groupBy,
+    groupSort: params.groupSort,
+  };
   if (params.group) body.group = params.group;
   if (params.tags && params.tags.length > 0) body.tags = params.tags;
   if (params.q) body.q = params.q;

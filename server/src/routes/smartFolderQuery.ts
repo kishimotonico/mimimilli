@@ -96,6 +96,7 @@ export async function queryFolderGroups(
         q: request.q,
       }),
       groupBy: request.groupBy,
+      groupSort: request.groupSort,
     },
     { now },
   );

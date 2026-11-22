@@ -38,8 +38,27 @@ export function createRandomSeed(): number {
 export const groupValueCoverSchema = coverValueSchema.extend({ workId: z.string() });
 export type GroupValueCover = z.infer<typeof groupValueCoverSchema>;
 
+/** 値一覧の並び（向き込み）。名前は読み（sortKey）の順 */
+export const groupSortIdSchema = z.enum([
+  "count-desc",
+  "count-asc",
+  "name-asc",
+  "name-desc",
+  "duration-desc",
+  "duration-asc",
+  "added-desc",
+  "last-played",
+]);
+export type GroupSortId = z.infer<typeof groupSortIdSchema>;
+
 export const groupValueItemSchema = z.object({
   value: z.string(),
+  /** 値の読み。名前順の第1キー */
+  sortKey: z.string(),
+  /** その値に属する作品の追加日時の最大 */
+  lastAddedAt: z.string(),
+  /** その値に属する作品の最終再生日時の最大。1件も再生していなければ null */
+  lastPlayedAt: z.string().nullable(),
   count: z.number().int().nonnegative(),
   /** その値に属する全作品の再生時間合計（秒）。totalDurationSec が未知（null）の作品は合算から除く */
   durationSec: z.number().nonnegative(),

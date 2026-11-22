@@ -105,6 +105,7 @@ describe("saveSearchDraft", () => {
       },
       sort: null,
       groupBy: null,
+      groupSort: null,
     });
     expect(conditionSchema.safeParse(draft.condition).success).toBe(true);
   });
@@ -157,6 +158,7 @@ describe("overwriteWrite", () => {
       },
       sort: "added-desc",
       groupBy: null,
+      groupSort: null,
     });
   });
 

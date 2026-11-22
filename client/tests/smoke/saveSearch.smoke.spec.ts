@@ -63,6 +63,7 @@ test("自作のスマートフォルダーにチップを足して上書きし�
       condition: { type: "and", children: [{ type: "text", q: "ボイス" }] },
       sort: null,
       groupBy: null,
+      groupSort: null,
     },
   });
   expect(created.status()).toBe(201);

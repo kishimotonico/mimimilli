@@ -25,6 +25,7 @@ function createFolderRequest(name: string, headers: Record<string, string>) {
       condition: { type: "and", children: [] },
       sort: "added-desc",
       groupBy: null,
+      groupSort: null,
     }),
   };
 }
@@ -193,6 +194,7 @@ contract(
       condition: { type: "and", children: [] },
       sort: "added-desc",
       groupBy: null,
+      groupSort: null,
     });
     for (const headers of [
       { "Content-Type": "text/plain" },
@@ -221,6 +223,7 @@ contract("パラメータ付き・大文字小文字違いのapplication/jsonは
         condition: { type: "and", children: [] },
         sort: "added-desc",
         groupBy: null,
+        groupSort: null,
       }),
     });
     assert.equal(res.status, 201, type);

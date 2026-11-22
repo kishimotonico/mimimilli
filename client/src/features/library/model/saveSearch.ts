@@ -79,6 +79,7 @@ export function saveSearchDraft(view: WorksView): SmartFolderDraft {
     condition: effectiveCondition(view),
     sort: view.sortDeviates ? view.sort : savedSortOf(view.folder),
     groupBy: null,
+    groupSort: null,
   };
 }
 
@@ -90,6 +91,7 @@ export function overwriteWrite(view: OverwritableView): SmartFolderWrite {
     condition: effectiveCondition(view),
     sort: view.sortDeviates ? view.sort : folder.sort,
     groupBy: folder.groupBy,
+    groupSort: folder.groupSort,
   };
 }
 

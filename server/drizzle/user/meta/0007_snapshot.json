@@ -83,6 +83,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "group_sort": {
+          "name": "group_sort",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "position": {
           "name": "position",
           "type": "integer",

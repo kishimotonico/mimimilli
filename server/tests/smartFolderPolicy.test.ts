@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  groupSortViolation,
   smartFolderPermissions,
   sortViolation,
   updateViolation,
@@ -17,6 +18,7 @@ const folder = (id: string, condition: SmartFolder["condition"] = EMPTY): SmartF
   condition,
   sort: null,
   groupBy: null,
+  groupSort: null,
   position: 0,
   createdAt: "2026-01-01T00:00:00.000Z",
   count: null,
@@ -80,12 +82,27 @@ test("並びだけの更新の違反: 壊れた行は 403 相当、「すべて�
   assert.equal(sortViolation(folder("fav"), null), null);
 });
 
+test("値の並びだけの更新の違反: 壊れた行は 403 相当、グループ分けの無い行は 400 相当", () => {
+  const grouped = {
+    ...folder("by-cv"),
+    groupBy: { kind: "tag" } as const,
+    groupSort: "count-desc" as const,
+  };
+  assert.equal(groupSortViolation(grouped), null);
+  assert.equal(groupSortViolation(folder("fav"))?.kind, "invalid");
+  assert.equal(
+    groupSortViolation(folder("sf-00000000-0000-4000-8000-000000000001", null))?.kind,
+    "forbidden",
+  );
+});
+
 test("更新の違反は値で返り、種別は 403 相当と 400 相当に分かれる", () => {
   const write = (patch: Partial<SmartFolderWrite>): SmartFolderWrite => ({
     name: "all",
     condition: EMPTY,
     sort: "added-desc",
     groupBy: null,
+    groupSort: null,
     ...patch,
   });
   const all = { id: "all", name: "all" };
@@ -113,6 +130,7 @@ async function put(harness: ContractHarness, id: string, patch: Partial<SmartFol
     condition: now.condition,
     sort: now.sort ?? "added-desc",
     groupBy: now.groupBy,
+    groupSort: now.groupSort,
     ...patch,
   });
 }
@@ -123,6 +141,7 @@ contract("サーバーの検証は shared の権限と同じ結果になる", as
     condition: EMPTY,
     sort: "added-desc",
     groupBy: null,
+    groupSort: null,
   });
   for (const id of ["all", "fav", "by-cv", created.body.id]) {
     const permissions = smartFolderPermissions(await current(harness, id));
@@ -140,7 +159,7 @@ contract("サーバーの検証は shared の権限と同じ結果になる", as
       `${id}: 条件`,
     );
     assert.equal(
-      (await put(harness, id, { groupBy: { kind: "tag" } })).status,
+      (await put(harness, id, { groupBy: { kind: "tag" }, groupSort: "count-desc" })).status,
       status(permissions.editGroupBy, 403),
       `${id}: グループ分け`,
     );

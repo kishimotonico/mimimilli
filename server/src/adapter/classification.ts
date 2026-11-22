@@ -1,6 +1,7 @@
 import type {
   Condition,
   SmartFolder,
+  GroupSortId,
   SmartFolderWrite,
   SortId,
   TagPrefix,
@@ -19,7 +20,7 @@ export interface ClassificationAdapter {
   reorderTagPrefixes(order: string[]): Promise<TagPrefix[] | null>;
   deleteTagPrefix(prefix: string): Promise<boolean>;
   listTagPrefixCandidates(): Promise<TagPrefixCandidate[]>;
-  /** position の昇順。読めない行は condition・sort・groupBy が null の壊れた行で返す */
+  /** position の昇順。読めない行は condition・sort・groupBy・groupSort が null の壊れた行で返す */
   listSmartFolders(): Promise<SmartFolderRow[]>;
   getSmartFolder(id: string): Promise<SmartFolderRow | null>;
   /** 末尾へ追加する。ID が既にあれば null */
@@ -31,6 +32,8 @@ export interface ClassificationAdapter {
   updateSmartFolder(id: string, input: SmartFolderWrite): Promise<SmartFolderRow | null>;
   /** 既定の並びの列だけを更新する。ほかの列は触らない */
   updateSmartFolderSort(id: string, sort: SortId | null): Promise<SmartFolderRow | null>;
+  /** 値一覧の並びの列だけを更新する。ほかの列は触らない。行がない、またはグループ分けがなければ null */
+  updateSmartFolderGroupSort(id: string, groupSort: GroupSortId): Promise<SmartFolderRow | null>;
   /** 全件の順序を置き換える。渡された集合が今の集合と一致しなければ null */
   reorderSmartFolders(ids: string[]): Promise<SmartFolderRow[] | null>;
   deleteSmartFolder(id: string): Promise<boolean>;
