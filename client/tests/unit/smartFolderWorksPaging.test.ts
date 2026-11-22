@@ -22,16 +22,15 @@ const baseNav: LibraryViewState = {
   selectedTags: [],
   selectedWorkId: null,
   sort: "added-desc",
+  seed: 42_195,
 };
 
 function makeWork(id: string): WorkListItem {
   return buildWorkListItem({ id, title: `作品 ${id}`, totalDurationSec: 60 });
 }
 
-function installApi(
-  options: { total?: number; randomSeed?: number; folderSort?: "added-desc" | "random" } = {},
-): ApiMock {
-  const { total = WORKS_DEFAULT_PAGE_SIZE + 50, randomSeed, folderSort = "added-desc" } = options;
+function installApi(options: { total?: number } = {}): ApiMock {
+  const { total = WORKS_DEFAULT_PAGE_SIZE + 50 } = options;
   return mockApi({
     [FOLDER_WORKS_ROUTE]: ({ url }) => {
       const page = Number(url.searchParams.get("page") ?? 1);
@@ -41,15 +40,14 @@ function installApi(
       const items: WorkListItem[] = Array.from({ length: count }, (_, i) =>
         makeWork(`p${page}-w${i + 1}`),
       );
-      return buildWorksPage(items, {
-        total,
-        ...(page === 1 &&
-          folderSort === "random" &&
-          randomSeed !== undefined && { seed: randomSeed }),
-      });
+      return buildWorksPage(items, { total });
     },
     "GET /api/smart-folders": [
-      buildSmartFolder({ id: SMART_FOLDER_ID, name: "テストスマートフォルダー", sort: folderSort }),
+      buildSmartFolder({
+        id: SMART_FOLDER_ID,
+        name: "テストスマートフォルダー",
+        sort: "added-desc",
+      }),
     ],
     "GET /api/tag-prefixes": [],
     "GET /api/tags": [],
@@ -130,12 +128,8 @@ describe("スマートフォルダー軸のページング", () => {
     await waitFor(() => expect(result.current.hasNextPage).toBe(false));
   });
 
-  it("random ソート時、page=1 の seed が page=2 リクエストに引き継がれる", async () => {
-    api = installApi({
-      total: WORKS_DEFAULT_PAGE_SIZE + 50,
-      randomSeed: 42_195,
-      folderSort: "random",
-    });
+  it("page=1 から library.seed を送り、page=2 にも引き継ぐ", async () => {
+    api = installApi({ total: WORKS_DEFAULT_PAGE_SIZE + 50 });
 
     const { result } = renderWorks(baseNav);
 
@@ -145,9 +139,44 @@ describe("スマートフォルダー軸のページング", () => {
       await result.current.fetchNextPage();
     });
 
+    expect(smartFolderCallUrls(api)[0]).toContain("seed=42195");
     const page2Urls = smartFolderCallUrls(api).filter((u) => u.includes("page=2"));
     expect(page2Urls).toHaveLength(1);
     expect(page2Urls[0]).toContain("seed=42195");
+  });
+
+  it("seed が変わるとqueryKeyが変わり、そのseedで再取得する（seedの違うエントリーへの戻る・進む）", async () => {
+    api = installApi({ total: WORKS_DEFAULT_PAGE_SIZE });
+
+    let nav: LibraryViewState = { ...baseNav, seed: 111 };
+    const { result, rerender } = renderHook(() => useSuspenseSmartLibraryWorks(nav, ""), {
+      wrapper: ({ children }: { children: ReactNode }) =>
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(
+            JotaiProvider,
+            { store: createStore() },
+            createElement(Suspense, { fallback: null }, children),
+          ),
+        ),
+    });
+
+    await waitFor(() => expect(result.current.works).toHaveLength(WORKS_DEFAULT_PAGE_SIZE));
+    expect(smartFolderCallUrls(api).at(-1)).toContain("seed=111");
+
+    nav = { ...nav, seed: 222 };
+    rerender();
+    await waitFor(() =>
+      expect(smartFolderCallUrls(api).some((u) => u.includes("seed=222"))).toBe(true),
+    );
+
+    nav = { ...nav, seed: 111 };
+    rerender();
+    await waitFor(() => expect(result.current.works).toHaveLength(WORKS_DEFAULT_PAGE_SIZE));
+    expect(smartFolderCallUrls(api).filter((u) => u.includes("seed=111")).length).toBeGreaterThan(
+      0,
+    );
   });
 });
 

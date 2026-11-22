@@ -4,9 +4,12 @@ import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import type { SortId } from "@mimimilli/shared";
 import { SORT_OPTIONS } from "../../../entities/library/types";
-import { axisValueSortAtom, reshuffleLibraryRandomSeedAtom } from "../model/atoms";
+import { axisValueSortAtom } from "../model/atoms";
 import { activeAxisAtom, sortAtom } from "../../../entities/library/model/navigationAtoms";
-import { setLibrarySortAtom } from "../../../entities/library/model/navigationActions";
+import {
+  reshuffleLibrarySeedAtom,
+  setLibrarySortAtom,
+} from "../../../entities/library/model/navigationActions";
 import { useLibraryTransition } from "../model/useLibraryNavigation";
 import { isSmartAxis, getSmartFolderId } from "../../../entities/library/axisDefinitions";
 import { computeResultsPaneKind } from "../model/libraryPresentation";
@@ -44,7 +47,7 @@ export default function LibrarySortMenu() {
   const [axisValueSort, setAxisValueSort] = useAtom(axisValueSortAtom);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
-  const reshuffle = useSetAtom(reshuffleLibraryRandomSeedAtom);
+  const reshuffle = useSetAtom(reshuffleLibrarySeedAtom);
 
   const isValueListPane = computeResultsPaneKind(activeAxis) === "value-list";
   const onSmartAxis = isSmartAxis(activeAxis);

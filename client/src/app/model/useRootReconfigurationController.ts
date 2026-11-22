@@ -4,7 +4,7 @@ import { useStore } from "jotai";
 import { usePlayerActions } from "../../entities/player/model/usePlayerActions";
 import { activeModalAtom } from "../../shared/model/activeModalAtom";
 import { navigateAtom } from "../../entities/navigation/model/appRouteStore";
-import { DEFAULT_APP_ROUTE } from "../../entities/navigation/model/appRoute";
+import { createInitialAppRoute } from "../../entities/navigation/model/appRoute";
 import { RESET } from "jotai/utils";
 import { clearScanCandidateLocalState } from "../../entities/scan/model/atoms";
 import { scanEntrySeenAtom } from "../../features/scan/model/scanEntrySeen";
@@ -26,7 +26,8 @@ export function useRootReconfigurationController(): RootReconfigurationControlle
         stopPlayback: stop,
         closeActiveModal: () => store.set(activeModalAtom, null),
         scanJob: store.get(scanJobStoreAtom),
-        navigateToDefaultRoute: () => store.set(navigateAtom, DEFAULT_APP_ROUTE, { replace: true }),
+        navigateToDefaultRoute: () =>
+          store.set(navigateAtom, createInitialAppRoute(), { replace: true }),
         clearScanCandidateLocalState: () => {
           clearScanCandidateLocalState(store);
           store.set(scanEntrySeenAtom, RESET);

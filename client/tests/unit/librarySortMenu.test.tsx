@@ -9,8 +9,8 @@ import type { SmartFolder } from "@mimimilli/shared";
 import LibrarySortMenu from "../../src/features/library/ui/LibrarySortMenu";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import { LibraryTransitionContext } from "../../src/features/library/model/libraryTransitionContext";
-import { sortAtom } from "../../src/entities/library/model/navigationAtoms";
-import { axisValueSortAtom, randomSeedAtom } from "../../src/features/library/model/atoms";
+import { seedAtom, sortAtom } from "../../src/entities/library/model/navigationAtoms";
+import { axisValueSortAtom } from "../../src/features/library/model/atoms";
 import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
 import { mockApi } from "../helpers/api";
 import { buildSmartFolder } from "../helpers/builders";
@@ -189,10 +189,10 @@ describe("LibrarySortMenu", () => {
       seedLibraryRoute(store, { sort: "random" });
     });
     const reshuffleButton = screen.getByRole("button", { name: "再シャッフル" });
-    const seedBefore = store.get(randomSeedAtom);
+    const seedBefore = store.get(seedAtom);
 
     fireEvent.click(reshuffleButton);
-    expect(store.get(randomSeedAtom)).not.toBe(seedBefore);
+    expect(store.get(seedAtom)).not.toBe(seedBefore);
 
     act(() => {
       seedLibraryRoute(store, { sort: "added-desc" });

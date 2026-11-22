@@ -1,4 +1,5 @@
 import { atom } from "jotai";
+import { DEFAULT_SORT } from "../../navigation/model/navigationUrl";
 import { appRouteAtom } from "../../navigation/model/appRouteStore";
 
 export const librarySearchQueryAtom = atom((get) => get(appRouteAtom).library.q ?? "");
@@ -7,4 +8,5 @@ export const activeAxisAtom = atom((get) => get(appRouteAtom).library.activeAxis
 // year 軸のような組み込み軸は "year/2024" 形式の擬似タグとして同じ配列に載る。
 export const selectedTagsAtom = atom((get) => get(appRouteAtom).library.selectedTags);
 export const selectedWorkIdAtom = atom((get) => get(appRouteAtom).library.selectedWorkId);
-export const sortAtom = atom((get) => get(appRouteAtom).library.sort);
+export const sortAtom = atom((get) => get(appRouteAtom).library.sort ?? DEFAULT_SORT);
+export const seedAtom = atom((get) => get(appRouteAtom).library.seed);

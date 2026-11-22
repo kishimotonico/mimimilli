@@ -93,7 +93,7 @@ interface WorksParamsInput {
   sort: SortId;
   searchQuery: string;
   selectedTags: NormalizedTag[];
-  /** sort="random" のときだけ使う。呼び出し側の randomSeedAtom 由来 */
+  /** sort="random" のときだけ使う。呼び出し側の library.seed 由来 */
   randomSeed?: number;
 }
 

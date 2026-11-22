@@ -10,6 +10,7 @@ import {
   activeAxisAtom,
   selectedTagsAtom,
   selectedWorkIdAtom,
+  seedAtom,
   sortAtom,
 } from "../../../entities/library/model/navigationAtoms";
 import {
@@ -30,6 +31,7 @@ export interface LibraryViewState {
   selectedTags: NormalizedTag[];
   selectedWorkId: string | null;
   sort: SortId;
+  seed: number;
   isPending: boolean;
 }
 
@@ -62,6 +64,7 @@ export function useLibraryView(): {
   const selectedTags = useAtomValue(selectedTagsAtom);
   const selectedWorkId = useAtomValue(selectedWorkIdAtom);
   const sort = useAtomValue(sortAtom);
+  const seed = useAtomValue(seedAtom);
   const [isPending, startTransition] = useTransition();
 
   const setAxis = useSetAtom(setLibraryAxisAtom);
@@ -110,8 +113,8 @@ export function useLibraryView(): {
   ]);
 
   const navigation = useMemo(
-    () => ({ activeAxis, selectedTags, selectedWorkId, sort, isPending, ...actions }),
-    [activeAxis, selectedTags, selectedWorkId, sort, isPending, actions],
+    () => ({ activeAxis, selectedTags, selectedWorkId, sort, seed, isPending, ...actions }),
+    [activeAxis, selectedTags, selectedWorkId, sort, seed, isPending, actions],
   );
 
   return { navigation, startTransition };

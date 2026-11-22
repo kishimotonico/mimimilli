@@ -1,15 +1,18 @@
 import { atom } from "jotai";
 import { createRouteStore, type RouteTransition } from "../../../shared/model/routeStore";
+import { readHistoryEntryState } from "../../../shared/model/useRouteHistorySync";
 import {
   appRouteCodec,
-  DEFAULT_APP_ROUTE,
+  createInitialAppRoute,
   type AppMode,
   type AppRoute,
   type SwitchableAppMode,
 } from "./appRoute";
 
 export const appRouteStore = createRouteStore<AppRoute>(() =>
-  appRouteCodec.parse(window.location.href).apply(DEFAULT_APP_ROUTE),
+  appRouteCodec
+    .parse(window.location.href, readHistoryEntryState(window.history.state))
+    .apply(createInitialAppRoute()),
 );
 
 export const appRouteAtom = appRouteStore.routeAtom;
@@ -24,7 +27,7 @@ export function switchAppMode(
   mode: SwitchableAppMode,
 ): RouteTransition<AppRoute> | null {
   if (route.mode === mode) return null;
-  return { route: { mode, library: route.library, files: route.files } };
+  return { route: { mode, library: route.library, files: route.files, layer: route.layer } };
 }
 
 export const setAppModeAtom = appRouteStore.action(switchAppMode);

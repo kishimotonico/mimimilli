@@ -9,7 +9,6 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WORKS_DEFAULT_PAGE_SIZE } from "@mimimilli/shared";
 import { useSuspenseNormalLibraryWorks } from "../../src/features/library/model/useLibraryQueries";
-import { randomSeedAtom } from "../../src/features/library/model/atoms";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
 import type { WorkListItem } from "@mimimilli/shared";
 import { mockApi, type ApiMock } from "../helpers/api";
@@ -20,28 +19,25 @@ const baseNav: LibraryViewState = {
   selectedTags: [],
   selectedWorkId: null,
   sort: "added-desc",
+  seed: 1,
 };
 
 function makeWork(id: string): WorkListItem {
   return buildWorkListItem({ id, title: `作品 ${id}`, totalDurationSec: 60 });
 }
 
-function installApi(options: { total?: number; randomSeed?: number } = {}): ApiMock {
-  const { total = WORKS_DEFAULT_PAGE_SIZE + 50, randomSeed } = options;
+function installApi(options: { total?: number } = {}): ApiMock {
+  const { total = WORKS_DEFAULT_PAGE_SIZE + 50 } = options;
   return mockApi({
     "GET /api/works": ({ url }) => {
       const page = Number(url.searchParams.get("page") ?? 1);
-      const sort = url.searchParams.get("sort") ?? "added-desc";
       const pageSize = WORKS_DEFAULT_PAGE_SIZE;
       const start = (page - 1) * pageSize;
       const count = Math.max(0, Math.min(pageSize, total - start));
       const items: WorkListItem[] = Array.from({ length: count }, (_, i) =>
         makeWork(`p${page}-w${i + 1}`),
       );
-      return buildWorksPage(items, {
-        total,
-        ...(page === 1 && sort === "random" && randomSeed !== undefined && { seed: randomSeed }),
-      });
+      return buildWorksPage(items, { total });
     },
     "GET /api/tag-prefixes": [],
     "GET /api/tags": [],
@@ -127,9 +123,9 @@ describe("ライブラリ works 一覧のページング", () => {
   });
 
   it("random ソート時、page=1 の seed が page=2 リクエストに引き継がれる", async () => {
-    api = installApi({ total: WORKS_DEFAULT_PAGE_SIZE + 50, randomSeed: 42_195 });
+    api = installApi({ total: WORKS_DEFAULT_PAGE_SIZE + 50 });
 
-    const nav: LibraryViewState = { ...baseNav, sort: "random" };
+    const nav: LibraryViewState = { ...baseNav, sort: "random", seed: 42_195 };
     const { result } = renderWorks(nav);
 
     await waitFor(() => expect(result.current.works).toHaveLength(WORKS_DEFAULT_PAGE_SIZE));
@@ -143,13 +139,11 @@ describe("ライブラリ works 一覧のページング", () => {
     expect(page2Urls[0]).toContain("seed=42195");
   });
 
-  it("random ソート時、page=1 のリクエストに randomSeedAtom の値を送る", async () => {
-    api = installApi({ total: WORKS_DEFAULT_PAGE_SIZE, randomSeed: 999 });
+  it("random ソート時、page=1 のリクエストに library.seed を送る", async () => {
+    api = installApi({ total: WORKS_DEFAULT_PAGE_SIZE });
 
-    const store = createStore();
-    store.set(randomSeedAtom, 12_345);
-    const nav: LibraryViewState = { ...baseNav, sort: "random" };
-    const { result } = renderWorks(nav, "", store);
+    const nav: LibraryViewState = { ...baseNav, sort: "random", seed: 12_345 };
+    const { result } = renderWorks(nav);
 
     await waitFor(() => expect(result.current.works).toHaveLength(WORKS_DEFAULT_PAGE_SIZE));
 
@@ -157,12 +151,10 @@ describe("ライブラリ works 一覧のページング", () => {
     expect(page1Urls[0]).toContain("seed=12345");
   });
 
-  it("random ソート時、randomSeedAtom を変えるとqueryKeyが変わり別クエリとして再取得する（再シャッフル）", async () => {
-    api = installApi({ total: WORKS_DEFAULT_PAGE_SIZE, randomSeed: 999 });
+  it("random ソート時、seed を変えるとqueryKeyが変わり別クエリとして再取得する（再シャッフル）", async () => {
+    api = installApi({ total: WORKS_DEFAULT_PAGE_SIZE });
 
-    const store = createStore();
-    store.set(randomSeedAtom, 111);
-    const nav: LibraryViewState = { ...baseNav, sort: "random" };
+    let nav: LibraryViewState = { ...baseNav, sort: "random", seed: 111 };
     const { result, rerender } = renderHook(() => useSuspenseNormalLibraryWorks(nav, ""), {
       wrapper: ({ children }: { children: ReactNode }) =>
         createElement(
@@ -170,7 +162,7 @@ describe("ライブラリ works 一覧のページング", () => {
           { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
           createElement(
             JotaiProvider,
-            { store },
+            { store: createStore() },
             createElement(Suspense, { fallback: null }, children),
           ),
         ),
@@ -180,9 +172,7 @@ describe("ライブラリ works 一覧のページング", () => {
     const urlsBefore = api.urlsTo("GET /api/works").filter((u) => u.includes("page=1"));
     expect(urlsBefore.at(-1)).toContain("seed=111");
 
-    act(() => {
-      store.set(randomSeedAtom, 222);
-    });
+    nav = { ...nav, seed: 222 };
     rerender();
 
     await waitFor(() => {

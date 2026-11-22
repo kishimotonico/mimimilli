@@ -7,7 +7,6 @@ export interface LibraryUrlState {
   activeAxis: AxisId;
   selectedTags: NormalizedTag[];
   selectedWorkId: string | null;
-  sort: SortId;
   q?: string;
 }
 
@@ -34,21 +33,8 @@ export const DEFAULT_LIBRARY_URL_STATE: LibraryUrlState = {
   activeAxis: "all",
   selectedTags: [],
   selectedWorkId: null,
-  sort: DEFAULT_SORT,
   q: "",
 };
-
-const SORTS = new Set<SortId>([
-  "added-desc",
-  "added-asc",
-  "title-asc",
-  "title-desc",
-  "duration-desc",
-  "duration-asc",
-  "last-played",
-  "random",
-  "id-asc",
-]);
 
 function defaultResult(warnings: string[]): NavigationParseResult {
   const state: NavigationUrlState = {
@@ -152,18 +138,13 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
       : parseAndValidateSelectedTags(url.searchParams.getAll("tags"), warnings);
 
     const selectedWorkId = url.searchParams.get("work") || null;
-    const sortValue = url.searchParams.get("sort");
-    const sort = sortValue && SORTS.has(sortValue as SortId) ? (sortValue as SortId) : DEFAULT_SORT;
-    if (sortValue && sort === DEFAULT_SORT && sortValue !== DEFAULT_SORT) {
-      warnings.push(`存在しない sort を既定値へ戻しました: ${sortValue}`);
-    }
     // 値一覧は現在の絞り込みと独立した全作品の入口（ADR-0026）。効かないq・tagsを
     // URLから復元しない。
     const q = isValueList ? "" : (url.searchParams.get("q") ?? "");
 
     const state: NavigationUrlState = {
       mode: "library",
-      library: { activeAxis: axis, selectedTags, selectedWorkId, sort, q },
+      library: { activeAxis: axis, selectedTags, selectedWorkId, q },
     };
     return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
   }
@@ -220,13 +201,10 @@ export function serializeNavigationUrl(state: NavigationUrlState): string {
   }
 
   if (state.mode === "library") {
-    const { activeAxis, selectedTags, selectedWorkId, sort, q } = state.library;
+    const { activeAxis, selectedTags, selectedWorkId, q } = state.library;
     const pathname = `/library/${encodeURIComponent(activeAxis)}`;
     for (const tag of selectedTags) params.append("tags", tag);
     if (selectedWorkId) params.set("work", selectedWorkId);
-    // スマート軸の sort はフォルダー自身が保持し、この URL の sort= は効かない
-    // （LibrarySortMenu 参照）。効いていない値をURLへ残さない
-    if (!isSmartAxis(activeAxis) && sort !== DEFAULT_SORT) params.set("sort", sort);
     if (q) params.set("q", q);
     const search = params.toString();
     return search ? `${pathname}?${search}` : pathname;

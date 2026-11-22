@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createStore } from "jotai";
 import {
   appRouteCodec,
-  DEFAULT_APP_ROUTE,
+  createInitialAppRoute,
   type AppRoute,
 } from "../../src/entities/navigation/model/appRoute";
 import {
@@ -24,6 +24,8 @@ import {
 import { workDetailIdAtom } from "../../src/entities/work/model/navigationAtoms";
 import { nts } from "../helpers/tag";
 
+const BASE_ROUTE = createInitialAppRoute();
+
 const initialUrl = `${window.location.pathname}${window.location.search}`;
 
 afterEach(() => {
@@ -31,8 +33,8 @@ afterEach(() => {
 });
 
 const filteredLibrary: AppRoute = {
-  ...DEFAULT_APP_ROUTE,
-  library: { ...DEFAULT_APP_ROUTE.library, selectedTags: nts(["cv/藤田茜"]), q: "朗読" },
+  ...BASE_ROUTE,
+  library: { ...BASE_ROUTE.library, selectedTags: nts(["cv/藤田茜"]), q: "朗読" },
 };
 
 describe("appRouteCodec", () => {
@@ -43,14 +45,14 @@ describe("appRouteCodec", () => {
       files: { relPath: ["dlsite"], selectedRelPath: null },
     };
 
-    expect(appRouteCodec.serialize(route)).toBe("/files/dlsite");
-    expect(appRouteCodec.serialize(filteredLibrary)).toBe(
+    expect(appRouteCodec.serialize(route).url).toBe("/files/dlsite");
+    expect(appRouteCodec.serialize(filteredLibrary).url).toBe(
       "/library/all?tags=cv%2F%E8%97%A4%E7%94%B0%E8%8C%9C&q=%E6%9C%97%E8%AA%AD",
     );
   });
 
   it("URLの適用は他の画面の状態を現在のrouteから保つ", () => {
-    const next = appRouteCodec.parse("/files/dlsite").apply(filteredLibrary);
+    const next = appRouteCodec.parse("/files/dlsite", undefined).apply(filteredLibrary);
 
     expect(next.mode).toBe("files");
     expect(next.files).toEqual({ relPath: ["dlsite"], selectedRelPath: null });
@@ -58,10 +60,10 @@ describe("appRouteCodec", () => {
   });
 
   it("作品詳細IDは作品詳細の画面だけが持つ", () => {
-    const detail = appRouteCodec.parse("/work/RJ01").apply(DEFAULT_APP_ROUTE);
+    const detail = appRouteCodec.parse("/work/RJ01", undefined).apply(BASE_ROUTE);
     expect(detail).toMatchObject({ mode: "workDetail", workId: "RJ01" });
 
-    const back = appRouteCodec.parse("/library/all").apply(detail);
+    const back = appRouteCodec.parse("/library/all", undefined).apply(detail);
     expect("workId" in back).toBe(false);
   });
 });

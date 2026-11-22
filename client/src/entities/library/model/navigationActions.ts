@@ -4,6 +4,7 @@ import {
   clearLibraryTags,
   goToLibrarySegment,
   replaceLibraryTag,
+  reshuffleLibrarySeed,
   selectLibraryWork,
   setLibraryAxis,
   setLibrarySearchQuery,
@@ -19,6 +20,7 @@ export const replaceLibraryTagAtom = appRouteStore.action(replaceLibraryTag);
 export const clearLibraryTagsAtom = appRouteStore.action(clearLibraryTags);
 export const selectLibraryWorkAtom = appRouteStore.action(selectLibraryWork);
 export const setLibrarySortAtom = appRouteStore.action(setLibrarySort);
+export const reshuffleLibrarySeedAtom = appRouteStore.action(reshuffleLibrarySeed);
 export const setLibrarySearchQueryAtom = appRouteStore.action(setLibrarySearchQuery);
 export const goToLibrarySegmentAtom = appRouteStore.action(goToLibrarySegment);
 export const showLibraryWorkAtom = appRouteStore.action(showLibraryWork);

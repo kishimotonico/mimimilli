@@ -37,6 +37,7 @@ export function openPathInFiles(
     route: {
       mode: "files",
       library: route.library,
+      layer: route.layer,
       files: { relPath: segments.slice(0, -1), selectedRelPath: toSelectedRelPath(relativePath) },
     },
   };

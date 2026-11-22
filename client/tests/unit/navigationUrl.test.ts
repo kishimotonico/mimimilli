@@ -8,9 +8,9 @@ import {
 
 describe("navigation URL codec", () => {
   // "cv"・"tag"は値一覧種の軸（tags/qを消去する独立入口）になったため、
-  // タグ・work・sortのエンコード/デコード自体を検証するこれらのテストはworks種の
+  // タグ・workのエンコード/デコード自体を検証するこれらのテストはworks種の
   // 軸（all）で行う。
-  it("round-trips a Japanese library axis with a tag filter, work, and sort", () => {
+  it("round-trips a Japanese library axis with a tag filter and work", () => {
     const state: NavigationUrlState = {
       mode: "library",
       library: {
@@ -18,13 +18,12 @@ describe("navigation URL codec", () => {
         activeAxis: "all",
         selectedTags: ["cv/水瀬なずな"],
         selectedWorkId: "RJ01234567",
-        sort: "title-asc",
       },
     };
 
     const url = serializeNavigationUrl(state);
     expect(url).toBe(
-      "/library/all?tags=cv%2F%E6%B0%B4%E7%80%AC%E3%81%AA%E3%81%9A%E3%81%AA&work=RJ01234567&sort=title-asc",
+      "/library/all?tags=cv%2F%E6%B0%B4%E7%80%AC%E3%81%AA%E3%81%9A%E3%81%AA&work=RJ01234567",
     );
     expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
   });
@@ -91,24 +90,12 @@ describe("navigation URL codec", () => {
     });
   });
 
-  it("omits sort= for a smart folder axis, since its sort is not the effective one", () => {
-    const state: NavigationUrlState = {
-      mode: "library",
-      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "smart-sleep-long", sort: "title-asc" },
-    };
+  it("ignores sort= in the URL, since sort lives in the history entry state", () => {
+    const result = parseNavigationUrl("/library/all?sort=title-asc");
 
-    const url = serializeNavigationUrl(state);
-    expect(url).toBe("/library/smart-sleep-long");
-  });
-
-  it("still writes sort= for a normal axis (regression check for the smart-axis suppression)", () => {
-    const state: NavigationUrlState = {
-      mode: "library",
-      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "all", sort: "title-asc" },
-    };
-
-    const url = serializeNavigationUrl(state);
-    expect(url).toBe("/library/all?sort=title-asc");
+    expect(result.state).toEqual({ mode: "library", library: DEFAULT_LIBRARY_URL_STATE });
+    expect(result.canonicalUrl).toBe("/library/all");
+    expect(result.warnings).toEqual([]);
   });
 
   it("strips tags= and q= for a value-list axis URL, even if present (ADR-0026)", () => {
@@ -263,16 +250,6 @@ describe("navigation URL codec", () => {
     });
     expect(result.warnings[0]).toContain("選択タグを検証しました");
     expect(result.warnings[0]).toContain("@year/2024");
-  });
-
-  it("warns and restores the default sort for an invalid value", () => {
-    const result = parseNavigationUrl("/library/all?sort=nope");
-
-    expect(result.state).toEqual({
-      mode: "library",
-      library: DEFAULT_LIBRARY_URL_STATE,
-    });
-    expect(result.warnings).toEqual(["存在しない sort を既定値へ戻しました: nope"]);
   });
 
   it("round-trips the full-screen work detail route", () => {

@@ -9,16 +9,21 @@ import { buildSmartFolderFilterParams } from "./libraryPresentation";
 import { patchBookmarkedInQueryCache } from "./workPatchListCache";
 import type { LibraryViewState } from "./useLibraryNavigation";
 
+/** スマートフォルダーの作品一覧の query key。seed は並びの一部なのでキーに含める */
+export function smartFolderWorksKey(nav: LibraryViewState, searchQuery: string): QueryKey {
+  return SMART_FOLDER_QUERY_KEYS.works(getSmartFolderId(nav.activeAxis), {
+    ...buildSmartFolderFilterParams(nav.selectedTags, searchQuery),
+    seed: nav.seed,
+  });
+}
+
 export function smartOrWorksListKey(
   nav: LibraryViewState,
   worksParams: object | null,
   searchQuery: string,
 ): QueryKey | null {
   if (isSmartAxis(nav.activeAxis)) {
-    return SMART_FOLDER_QUERY_KEYS.works(
-      getSmartFolderId(nav.activeAxis),
-      buildSmartFolderFilterParams(nav.selectedTags, searchQuery),
-    );
+    return smartFolderWorksKey(nav, searchQuery);
   }
   return worksParams !== null ? WORK_QUERY_KEYS.list(worksParams) : null;
 }

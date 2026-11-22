@@ -10,8 +10,6 @@ import {
   useSuspenseInfiniteQuery,
 } from "@tanstack/react-query";
 import { useState } from "react";
-import { useAtomValue } from "jotai";
-import { randomSeedAtom } from "./atoms";
 import {
   WORKS_DEFAULT_PAGE_SIZE,
   type SmartFolder,
@@ -49,7 +47,11 @@ import {
   useEditWorkSourceMutation,
   useRemoveWorkTagMutation,
 } from "../../../entities/work/model/workMutations";
-import { bookmarkActiveListHandler, smartOrWorksListKey } from "./workPatchInvalidation";
+import {
+  bookmarkActiveListHandler,
+  smartFolderWorksKey,
+  smartOrWorksListKey,
+} from "./workPatchInvalidation";
 import { getSmartFolderId } from "../../../entities/library/axisDefinitions";
 import type { LibraryViewState } from "./useLibraryNavigation";
 
@@ -72,19 +74,18 @@ function getNextWorksPageParam(
 ): WorksPageParam | undefined {
   const loadedCount = allPages.reduce((sum, page) => sum + page.items.length, 0);
   if (lastPage.items.length === 0 || loadedCount >= lastPage.total) return undefined;
-  return { page: lastPageParam.page + 1, seed: lastPage.seed ?? lastPageParam.seed };
+  return { page: lastPageParam.page + 1, seed: lastPageParam.seed };
 }
 
 /** Suspense 境界配下でのみ使う通常作品一覧。親で enabled を切り替えない。 */
 export function useSuspenseNormalLibraryWorks(nav: LibraryViewState, searchQuery: string) {
-  const randomSeed = useAtomValue(randomSeedAtom);
   // 呼び出し側は通常軸だけをマウントする。スマート軸は専用の子コンポーネントが担当する。
   const normalWorksParams = buildNormalWorksParams({
     activeAxis: nav.activeAxis,
     sort: nav.sort,
     searchQuery,
     selectedTags: nav.selectedTags,
-    randomSeed,
+    randomSeed: nav.seed,
   });
 
   const query = useSuspenseInfiniteQuery({
@@ -118,7 +119,7 @@ export function useSuspenseSmartLibraryWorks(nav: LibraryViewState, searchQuery:
   const smartAxisId = getSmartFolderId(nav.activeAxis);
   const filterParams = buildSmartFolderFilterParams(nav.selectedTags, searchQuery);
   const query = useSuspenseInfiniteQuery({
-    queryKey: SMART_FOLDER_QUERY_KEYS.works(smartAxisId, filterParams),
+    queryKey: smartFolderWorksKey(nav, searchQuery),
     queryFn: ({ pageParam, signal }) =>
       evalSmartFolder(
         smartAxisId,
@@ -130,7 +131,7 @@ export function useSuspenseSmartLibraryWorks(nav: LibraryViewState, searchQuery:
         },
         { signal },
       ),
-    initialPageParam: { page: 1, seed: undefined } as WorksPageParam,
+    initialPageParam: { page: 1, seed: nav.seed } as WorksPageParam,
     getNextPageParam: getNextWorksPageParam,
   });
   return toSuspenseWorksResult(query);
@@ -208,14 +209,13 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
  *  意図コマンドを独立した mutation として提供する。ブックマークだけは表示中の一覧を
  *  画面側で揃え、その一覧の再取得を省く */
 export function useLibraryWorkPatchMutations(nav: LibraryViewState, searchQuery: string) {
-  const randomSeed = useAtomValue(randomSeedAtom);
   const debouncedSearchQuery = useLibraryDebouncedSearchQuery(searchQuery);
   const worksParams = buildWorksParams({
     activeAxis: nav.activeAxis,
     sort: nav.sort,
     searchQuery: debouncedSearchQuery,
     selectedTags: nav.selectedTags,
-    randomSeed,
+    randomSeed: nav.seed,
   });
   const activeListQueryKey = smartOrWorksListKey(nav, worksParams, debouncedSearchQuery);
 

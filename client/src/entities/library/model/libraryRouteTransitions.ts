@@ -1,14 +1,18 @@
 // Library の各操作が現在のrouteから次のrouteとpush/replaceを決める（ADR-0012・ADR-0013・ADR-0031）。
-import { isBuiltinPseudoTagAxis, parseBuiltinAxisTag, type NormalizedTag } from "@mimimilli/shared";
+import {
+  createRandomSeed,
+  isBuiltinPseudoTagAxis,
+  parseBuiltinAxisTag,
+  type NormalizedTag,
+} from "@mimimilli/shared";
 import type { RouteTransition } from "../../../shared/model/routeStore";
-import type { AppRoute } from "../../navigation/model/appRoute";
-import type { LibraryUrlState } from "../../navigation/model/navigationUrl";
+import type { AppRoute, LibraryRoute } from "../../navigation/model/appRoute";
 import { computeResultsPaneKind } from "../resultsPane";
 import type { AxisId, SortId } from "../types";
 
 type Transition = RouteTransition<AppRoute>;
 
-function withLibrary(route: AppRoute, patch: Partial<LibraryUrlState>): AppRoute {
+function withLibrary(route: AppRoute, patch: Partial<LibraryRoute>): AppRoute {
   return { ...route, library: { ...route.library, ...patch } };
 }
 
@@ -26,7 +30,7 @@ function appendTag(tags: NormalizedTag[], tag: NormalizedTag): NormalizedTag[] {
  *  効かない条件を入力欄・チップに残さないよう、遷移時にq・tags（yearの擬似タグ込み）を
  *  消去する。sort・表示モードは軸に依存しないため触らない。 */
 export function setLibraryAxis(route: AppRoute, axis: AxisId): Transition {
-  const patch: Partial<LibraryUrlState> = { activeAxis: axis, selectedWorkId: null };
+  const patch: Partial<LibraryRoute> = { activeAxis: axis, selectedWorkId: null };
   if (computeResultsPaneKind(axis) === "value-list") {
     patch.selectedTags = [];
     patch.q = "";
@@ -77,6 +81,10 @@ export function setLibrarySort(route: AppRoute, sort: SortId): Transition | null
   return { route: withLibrary(route, { sort }), replace: true };
 }
 
+export function reshuffleLibrarySeed(route: AppRoute): Transition {
+  return { route: withLibrary(route, { seed: createRandomSeed() }), replace: true };
+}
+
 export function setLibrarySearchQuery(route: AppRoute, q: string): Transition | null {
   if ((route.library.q ?? "") === q) return null;
   return { route: withLibrary(route, { q }), replace: true };
@@ -95,6 +103,7 @@ export function showLibraryWork(route: AppRoute, workId: string): Transition {
       mode: "library",
       library: { ...next.library, selectedWorkId: workId },
       files: next.files,
+      layer: next.layer,
     },
   };
 }
