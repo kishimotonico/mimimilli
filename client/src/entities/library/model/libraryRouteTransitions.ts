@@ -3,6 +3,7 @@ import {
   ALL_SMART_FOLDER_ID,
   createRandomSeed,
   isBuiltinPseudoTagKey,
+  normalizeSearchQuery,
   parseBuiltinPseudoTag,
   type NormalizedTag,
   type SortId,
@@ -176,12 +177,13 @@ export function setLibrarySearchQuery(
   q: string,
   held: HeldLibrary,
 ): Transition | null {
+  const next = normalizeSearchQuery(q);
   if (held === "works") {
-    if ((route.library.q ?? "") === q) return null;
-    return { route: withLibrary(route, { q }), replace: true };
+    if ((route.library.q ?? "") === next) return null;
+    return { route: withLibrary(route, { q: next }), replace: true };
   }
-  if (q === "") return null;
-  return { route: toAll(route, [], q, { entering: true }) };
+  if (next === "") return null;
+  return { route: toAll(route, [], next, { entering: true }) };
 }
 
 /** 0件のとき、同じチップと検索語のまま「すべて」で探す */

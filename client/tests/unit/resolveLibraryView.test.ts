@@ -39,6 +39,14 @@ describe("resolveLibraryView: 存在しない ID・グループ", () => {
   });
 });
 
+describe("resolveLibraryView: 検索語", () => {
+  it("空白だけの検索語は空として解決する", () => {
+    const view = resolveLibraryView(route({ folderId: "fav", q: "  " }), folders);
+
+    expect(view).toMatchObject({ kind: "works", q: "" });
+  });
+});
+
 describe("resolveLibraryView: 値一覧と作品一覧", () => {
   it("グループ分けを持つフォルダーで group が無ければ値一覧", () => {
     const view = resolveLibraryView(route({ folderId: "by-cv" }), folders);

@@ -13,6 +13,7 @@ import {
   type SmartFolder,
   type SmartFolderWrite,
 } from "@mimimilli/shared";
+import { hasChipOrSearchRefinement } from "../../../entities/library/refinement";
 import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
 import { type SmartFolderDialogTarget, type SmartFolderDraft } from "./smartFolderEditing";
 
@@ -33,7 +34,7 @@ export function isOverwritable(view: WorksView): view is OverwritableView {
 
 /** グループの値・チップ・検索語のどれかで絞り込んでいる */
 export function isRefined(view: WorksView): boolean {
-  return view.group !== null || view.selectedTags.length > 0 || normalizeSearchQuery(view.q) !== "";
+  return view.group !== null || hasChipOrSearchRefinement(view);
 }
 
 /** チップ列の右端に出す保存の操作。無ければ null */

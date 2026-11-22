@@ -364,6 +364,24 @@ describe("検索欄の入力（setLibrarySearchQueryAtom）", () => {
     expect(pendingWrites(store)).toEqual([]);
   });
 
+  it("値一覧での空白だけの入力は何もしない", () => {
+    const store = setup({ folderId: "by-cv", group: null });
+    clearPendingOps(store);
+
+    store.set(setLibrarySearchQueryAtom, "  ", "value-list");
+
+    expect(lib(store).folderId).toBe("by-cv");
+    expect(pendingWrites(store)).toEqual([]);
+  });
+
+  it("作品一覧の検索語は前後の空白を落として持つ", () => {
+    const store = setup({ folderId: "fav" });
+
+    store.set(setLibrarySearchQueryAtom, " 藤田 ", "works");
+
+    expect(lib(store).q).toBe("藤田");
+  });
+
   it("読めない行を保持しているときも「すべて」の検索結果へ移る", () => {
     const store = setup({ folderId: "sf-broken" });
 

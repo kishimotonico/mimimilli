@@ -44,6 +44,10 @@ describe("assertGroupValueItems", () => {
 });
 
 describe("computeIsNoResultsDueToFilter", () => {
+  it("空白だけの検索語は絞り込みに数えない", () => {
+    expect(computeIsNoResultsDueToFilter(true, 0, "  ", [], false, false)).toBe(false);
+  });
+
   it("is false when the list is just naturally empty (no search/filter)", () => {
     expect(computeIsNoResultsDueToFilter(true, 0, "", [], false, false)).toBe(false);
   });

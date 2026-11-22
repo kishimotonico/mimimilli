@@ -3,6 +3,7 @@
 
 import {
   ALL_SMART_FOLDER_ID,
+  normalizeSearchQuery,
   type Condition,
   type GroupBy,
   type NormalizedTag,
@@ -76,7 +77,7 @@ export function resolveLibraryView(
     group,
     groupBy,
     selectedTags: library.selectedTags,
-    q: library.q ?? "",
+    q: normalizeSearchQuery(library.q),
     seed: base.sort === "random" ? library.seed : undefined,
     breadcrumb: group === null ? [folder.name] : [folder.name, group],
   };

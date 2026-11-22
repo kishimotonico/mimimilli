@@ -1,4 +1,5 @@
 import { ALL_SMART_FOLDER_ID } from "@mimimilli/shared";
+import { hasChipOrSearchRefinement } from "../../../entities/library/refinement";
 import Button from "../../../shared/ui/Button";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import { I } from "../../../shared/ui/Icon";
@@ -16,7 +17,7 @@ interface Props {
 export default function WorksEmptyState({ variant, nav, searchQuery, onClearSearch }: Props) {
   const { view, selectedTags } = nav;
   const hasSelectedTags = selectedTags.length > 0;
-  const isFiltered = Boolean(searchQuery) || hasSelectedTags;
+  const isFiltered = hasChipOrSearchRefinement({ selectedTags, q: searchQuery });
   const canSearchInAll = isFiltered && view.folder.id !== ALL_SMART_FOLDER_ID;
   return (
     <CollectionStatus

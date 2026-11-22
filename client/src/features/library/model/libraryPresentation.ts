@@ -2,6 +2,7 @@
 // query 結果と Jotai state を組み合わせて「何を表示するか」を決める部分を、
 // コンポーネントの配線から切り離してテスト可能にする。
 
+import { hasChipOrSearchRefinement } from "../../../entities/library/refinement";
 import {
   groupChipTag,
   normalizeGroupValue,
@@ -90,7 +91,7 @@ export function computeIsNoResultsDueToFilter(
     !isWorksLoading &&
     !isWorksError &&
     worksCount === 0 &&
-    (Boolean(searchQuery) || selectedTags.length > 0)
+    hasChipOrSearchRefinement({ selectedTags, q: searchQuery })
   );
 }
 
