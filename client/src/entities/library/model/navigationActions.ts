@@ -5,7 +5,7 @@ import {
   addLibraryTag,
   clearLibraryGroupSort,
   clearLibrarySort,
-  isSamePlace,
+  isSameScreen,
   reenterLibraryFolder,
   type LibraryPlace,
   clearLibraryTags,
@@ -46,12 +46,16 @@ export const showLibraryWorkAtom = appRouteAction(showLibraryWork);
 
 export const replaceLibraryFolderAtom = appRouteCorrection(replaceLibraryFolder);
 
-/** await を挟む保存・追加のあと、始めたときと同じ場所（画面・層・フォルダー・絞り込み・選択・並び）なら
- *  folderId へ入り直す（遷移）。その間に何かを変えていたら、ユーザーの今の状態を残して何もしない */
+/** await を挟む保存・追加のあとの入り直し。library が始めたときのままなら、同じ画面（層なし）では
+ *  folderId へ入り直す（遷移）。画面や層が変わっていたら、画面と層は動かさず保持中の library だけを
+ *  入り直した状態にする（補正）。library をユーザーが変えていたら、その状態を残して何もしない */
 export const settleLibraryFolderAtom = atom(
   null,
   (get, set, started: LibraryPlace, folderId: string) => {
-    if (isSamePlace(get(libraryPlaceAtom), started)) set(reenterLibraryFolderAtom, folderId);
+    const now = get(libraryPlaceAtom);
+    if (now.library !== started.library) return;
+    if (isSameScreen(now, started)) set(reenterLibraryFolderAtom, folderId);
+    else set(replaceLibraryFolderAtom, folderId, folderId);
   },
 );
 export const normalizeLibraryFolderAtom = appRouteCorrection(normalizeLibraryFolder);

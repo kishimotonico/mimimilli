@@ -396,7 +396,12 @@ describe("履歴の積み方", () => {
   });
 
   it("await の間に層を開いた・別の画面へ移ったときは、画面と層を引き戻さない", () => {
-    const layered = setup({ folderId: "sf-own", sort: "title-asc" });
+    const layered = setup({
+      folderId: "sf-own",
+      sort: "title-asc",
+      selectedTags: nts(["ASMR"]),
+      q: "雨",
+    });
     const place = layered.get(libraryPlaceAtom);
     layered.set(openNowPlayingLayerAtom);
     clearPendingOps(layered);
@@ -407,8 +412,13 @@ describe("履歴の積み方", () => {
       mode: "library",
       layer: { kind: "nowPlaying" },
     });
-    expect(lib(layered)).toMatchObject({ folderId: "sf-own", sort: "title-asc" });
-    expect(pendingWrites(layered)).toEqual([]);
+    expect(lib(layered)).toMatchObject({
+      folderId: "sf-own",
+      sort: null,
+      selectedTags: [],
+      q: "",
+    });
+    expect(pendingWrites(layered)).toEqual(["replace"]);
 
     const away = setup({ folderId: "sf-own" });
     const awayPlace = away.get(libraryPlaceAtom);
@@ -422,13 +432,14 @@ describe("履歴の積み方", () => {
     expect(pendingWrites(away)).toEqual([]);
   });
 
-  it("待つ間に検索語・チップ・選択・並びを変えていたら、入り直してそれを消さない", () => {
+  it("待つ間に検索語・チップ・選択・並び・seed を変えていたら、入り直してそれを消さない", () => {
     const changes: Array<Parameters<typeof seedLibraryRoute>[1]> = [
       { q: "藤田" },
       { selectedTags: nts(["ASMR"]) },
       { selectedWorkId: "work-1" },
       { sort: "title-desc" },
       { groupSort: "name-asc" },
+      { seed: 12345 },
     ];
     for (const change of changes) {
       const store = setup({ folderId: "sf-own", sort: "title-asc" });
