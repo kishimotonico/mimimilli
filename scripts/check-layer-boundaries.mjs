@@ -8,7 +8,10 @@ import {
   SERVER_LAYER_RULES,
 } from "./layer-boundary-rules.mjs";
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// テストが本物のツリーを汚さず検査できるよう、検査対象のルートは環境変数で差し替えられる
+const repoRoot = process.env.LAYER_BOUNDARY_ROOT
+  ? path.resolve(process.env.LAYER_BOUNDARY_ROOT)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sourceExtensions = new Set([".ts", ".tsx"]);
 
 async function walk(dir) {
