@@ -67,7 +67,7 @@ describe("LibraryBreadcrumbs", () => {
     expect(nav.openFolder).toHaveBeenCalledWith("all");
   });
 
-  it("グループの値の作品一覧は「ライブラリ / スマートフォルダー名 / 値」で、スマートフォルダー名は値一覧へ戻る操作（goToSegment）", () => {
+  it("グループの値の作品一覧は「ライブラリ / スマートフォルダー名 / 値」で、スマートフォルダー名は値一覧へ戻る操作（backToValueList）", () => {
     const nav = buildNav({ library: { folderId: "by-cv", group: "藤田茜" } });
     renderBreadcrumbs(nav);
 
@@ -77,7 +77,7 @@ describe("LibraryBreadcrumbs", () => {
       "藤田茜",
     ]);
     fireEvent.click(screen.getByRole("button", { name: "CV別" }));
-    expect(nav.goToSegment).toHaveBeenCalledWith(0);
+    expect(nav.backToValueList).toHaveBeenCalledWith();
   });
 
   it("値をクリックすると兄弟の値のドロップダウンが開き、選ぶと selectGroupValue を呼ぶ", async () => {

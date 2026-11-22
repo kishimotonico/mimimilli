@@ -41,7 +41,7 @@ export function buildNav(
     setSearchQuery: vi.fn(),
     selectWork: vi.fn(),
     setSort: vi.fn(),
-    goToSegment: vi.fn(),
+    backToValueList: vi.fn(),
     ...rest,
   };
 }

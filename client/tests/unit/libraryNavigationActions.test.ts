@@ -3,12 +3,14 @@ import { createStore } from "jotai";
 import { libraryRouteAtom } from "../../src/entities/library/model/navigationAtoms";
 import { nt, nts } from "../helpers/tag";
 import { clearPendingOps, pendingWrites, seedAppMode, seedLibraryRoute } from "../helpers/route";
+import { resolveLibraryView } from "../../src/entities/library/resolveLibraryView";
+import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
 import { appRouteStore, appRouteAtom } from "../../src/entities/navigation/model/appRouteStore";
 import {
   addLibraryTagAtom,
   clearLibrarySortAtom,
   clearLibraryTagsAtom,
-  goToLibrarySegmentAtom,
+  backToLibraryValueListAtom,
   openLibraryFolderAtom,
   reenterLibraryFolderAtom,
   openLibraryGroupValueAtom,
@@ -31,11 +33,21 @@ function setup(patch: Parameters<typeof seedLibraryRoute>[1] = {}) {
 
 const lib = (store: ReturnType<typeof createStore>) => store.get(libraryRouteAtom);
 
+const folders = [
+  ...defaultSmartFolders(),
+  buildSmartFolder({ id: "by-cv", groupBy: { kind: "prefix", prefix: "cv" } }),
+  buildSmartFolder({ id: "sf-own" }),
+  buildSmartFolder({ id: "sf-broken", condition: null }),
+];
+
+/** 今の route を解決した結果。画面が遷移関数へ渡すものと同じ */
+const viewOf = (store: ReturnType<typeof createStore>) => resolveLibraryView(lib(store), folders);
+
 describe("開いているスマートフォルダーを消したときの入り直し（replaceLibraryFolderAtom）", () => {
   it("ライブラリでは履歴を積まずに置き換える", () => {
     const store = setup({ folderId: "added", q: "x" });
 
-    store.set(replaceLibraryFolderAtom, "all");
+    store.set(replaceLibraryFolderAtom, "added", "all");
 
     expect(lib(store)).toMatchObject({ folderId: "all", q: "" });
     expect(pendingWrites(store)).toEqual(["replace"]);
@@ -47,7 +59,7 @@ describe("開いているスマートフォルダーを消したときの入り�
     seedAppMode(store, { workDetail: "work-1" });
     clearPendingOps(store);
 
-    store.set(replaceLibraryFolderAtom, "all");
+    store.set(replaceLibraryFolderAtom, "added", "all");
 
     expect(lib(store)).toMatchObject({ folderId: "all", q: "", selectedTags: [] });
     expect(store.get(appRouteAtom)).toMatchObject({ mode: "workDetail", workId: "work-1" });
@@ -116,7 +128,7 @@ describe("グループの値の選択（selectLibraryGroupValueAtom）", () => {
       seed: 5,
     });
 
-    store.set(selectLibraryGroupValueAtom, "藤田茜");
+    store.set(selectLibraryGroupValueAtom, "藤田茜", viewOf(store));
 
     expect(lib(store)).toMatchObject({
       group: "藤田茜",
@@ -136,7 +148,7 @@ describe("グループの値の選択（selectLibraryGroupValueAtom）", () => {
       selectedWorkId: "work-1",
     });
 
-    store.set(selectLibraryGroupValueAtom, "霧島レイ");
+    store.set(selectLibraryGroupValueAtom, "霧島レイ", viewOf(store));
 
     expect(lib(store)).toMatchObject({
       group: "霧島レイ",
@@ -150,13 +162,13 @@ describe("グループの値の選択（selectLibraryGroupValueAtom）", () => {
     const store = setup({ folderId: "by-cv", group: "藤田茜" });
     clearPendingOps(store);
 
-    store.set(selectLibraryGroupValueAtom, "藤田茜");
+    store.set(selectLibraryGroupValueAtom, "藤田茜", viewOf(store));
 
     expect(pendingWrites(store)).toEqual([]);
   });
 });
 
-describe("パンくずの先頭（goToLibrarySegmentAtom）", () => {
+describe("値一覧へ戻る（backToLibraryValueListAtom）", () => {
   it("値の作品一覧から、そのスマートフォルダーの値一覧へ戻る。チップ・検索語は消す", () => {
     const store = setup({
       folderId: "by-cv",
@@ -165,7 +177,7 @@ describe("パンくずの先頭（goToLibrarySegmentAtom）", () => {
       q: "x",
     });
 
-    store.set(goToLibrarySegmentAtom, 0);
+    store.set(backToLibraryValueListAtom, viewOf(store));
 
     expect(lib(store)).toMatchObject({ folderId: "by-cv", group: null, selectedTags: [], q: "" });
   });
@@ -174,17 +186,9 @@ describe("パンくずの先頭（goToLibrarySegmentAtom）", () => {
     const store = setup({ folderId: "by-cv", group: null });
     clearPendingOps(store);
 
-    store.set(goToLibrarySegmentAtom, 0);
+    store.set(backToLibraryValueListAtom, viewOf(store));
 
     expect(pendingWrites(store)).toEqual([]);
-  });
-
-  it("先頭以外のセグメントでは何もしない", () => {
-    const store = setup({ folderId: "by-cv", group: "藤田茜" });
-
-    store.set(goToLibrarySegmentAtom, 1);
-
-    expect(lib(store).group).toBe("藤田茜");
   });
 });
 
@@ -198,7 +202,7 @@ describe("タグの行き先（ADR-0041 の表）", () => {
       sort: "title-asc",
     });
 
-    store.set(openLibraryTagAtom, nt("cv/霧島レイ"));
+    store.set(openLibraryTagAtom, nt("cv/霧島レイ"), viewOf(store));
 
     expect(lib(store)).toMatchObject({
       folderId: "all",
@@ -217,7 +221,7 @@ describe("タグの行き先（ADR-0041 の表）", () => {
       seed: 9,
     });
 
-    store.set(openLibraryTagAtom, nt("cv/藤田茜"));
+    store.set(openLibraryTagAtom, nt("cv/藤田茜"), viewOf(store));
 
     expect(lib(store)).toMatchObject({ selectedTags: ["cv/藤田茜"], sort: "title-asc", seed: 9 });
   });
@@ -226,7 +230,7 @@ describe("タグの行き先（ADR-0041 の表）", () => {
     const store = createStore();
     seedAppMode(store, { workDetail: "work-1" });
 
-    store.set(openLibraryTagAtom, nt("cv/藤田茜"));
+    store.set(openLibraryTagAtom, nt("cv/藤田茜"), viewOf(store));
 
     const route = store.get(appRouteAtom);
     expect(route.mode).toBe("library");
@@ -237,7 +241,7 @@ describe("タグの行き先（ADR-0041 の表）", () => {
   it("addLibraryTagAtom: 作品一覧ならその一覧にチップを足す（フォルダーは変えない）", () => {
     const store = setup({ folderId: "fav", selectedTags: nts(["サークル/月白製作所"]) });
 
-    store.set(addLibraryTagAtom, nt("cv/藤田茜"), "works");
+    store.set(addLibraryTagAtom, nt("cv/藤田茜"), viewOf(store));
 
     expect(lib(store)).toMatchObject({
       folderId: "fav",
@@ -248,7 +252,7 @@ describe("タグの行き先（ADR-0041 の表）", () => {
   it("addLibraryTagAtom: 値一覧なら「すべて」＋そのチップ", () => {
     const store = setup({ folderId: "by-cv", group: null });
 
-    store.set(addLibraryTagAtom, nt("cv/藤田茜"), "value-list");
+    store.set(addLibraryTagAtom, nt("cv/藤田茜"), viewOf(store));
 
     expect(lib(store)).toMatchObject({
       folderId: "all",
@@ -261,7 +265,7 @@ describe("タグの行き先（ADR-0041 の表）", () => {
   it("addLibraryTagAtom: 読めない行を保持しているときも「すべて」＋そのチップ", () => {
     const store = setup({ folderId: "sf-broken" });
 
-    store.set(addLibraryTagAtom, nt("cv/藤田茜"), "broken");
+    store.set(addLibraryTagAtom, nt("cv/藤田茜"), viewOf(store));
 
     expect(lib(store)).toMatchObject({ folderId: "all", selectedTags: ["cv/藤田茜"] });
   });
@@ -271,7 +275,7 @@ describe("タグの行き先（ADR-0041 の表）", () => {
     seedLibraryRoute(store, { folderId: "fav" });
     seedAppMode(store, { workDetail: "work-1" });
 
-    store.set(addLibraryTagAtom, nt("cv/藤田茜"), "works");
+    store.set(addLibraryTagAtom, nt("cv/藤田茜"), viewOf(store));
 
     expect(store.get(appRouteAtom).mode).toBe("library");
     expect(lib(store)).toMatchObject({ folderId: "fav", selectedTags: ["cv/藤田茜"] });
@@ -281,7 +285,7 @@ describe("タグの行き先（ADR-0041 の表）", () => {
     const store = setup({ selectedTags: nts(["cv/藤田茜"]), selectedWorkId: "work-1" });
     clearPendingOps(store);
 
-    store.set(addLibraryTagAtom, nt("cv/藤田茜"), "works");
+    store.set(addLibraryTagAtom, nt("cv/藤田茜"), viewOf(store));
 
     expect(lib(store).selectedTags).toEqual(["cv/藤田茜"]);
     expect(lib(store).selectedWorkId).toBe("work-1");
@@ -291,7 +295,7 @@ describe("タグの行き先（ADR-0041 の表）", () => {
   it("addLibraryTagAtom: 組み込み擬似タグは同じキーで排他してから追加する（year）", () => {
     const store = setup({ selectedTags: nts(["cv/藤田茜", "@year/2023"]) });
 
-    store.set(addLibraryTagAtom, nt("@year/2024"), "works");
+    store.set(addLibraryTagAtom, nt("@year/2024"), viewOf(store));
 
     expect(lib(store).selectedTags).toEqual(["cv/藤田茜", "@year/2024"]);
   });
@@ -299,7 +303,7 @@ describe("タグの行き先（ADR-0041 の表）", () => {
   it("addLibraryTagAtom: 実タグ year/2025 は単一選択の対象にならず共存する", () => {
     const store = setup({ selectedTags: nts(["year/2025"]) });
 
-    store.set(addLibraryTagAtom, nt("@year/2024"), "works");
+    store.set(addLibraryTagAtom, nt("@year/2024"), viewOf(store));
 
     expect(lib(store).selectedTags).toEqual(["year/2025", "@year/2024"]);
   });
@@ -307,7 +311,7 @@ describe("タグの行き先（ADR-0041 の表）", () => {
   it("addLibraryTagAtom: 選択中の作品をクリアする", () => {
     const store = setup({ selectedWorkId: "work-1" });
 
-    store.set(addLibraryTagAtom, nt("cv/藤田茜"), "works");
+    store.set(addLibraryTagAtom, nt("cv/藤田茜"), viewOf(store));
 
     expect(lib(store).selectedWorkId).toBeNull();
   });
@@ -367,7 +371,7 @@ describe("検索欄の入力（setLibrarySearchQueryAtom）", () => {
     const store = setup({ folderId: "fav", selectedTags: nts(["ASMR"]) });
     clearPendingOps(store);
 
-    store.set(setLibrarySearchQueryAtom, "藤田", "works");
+    store.set(setLibrarySearchQueryAtom, "藤田", viewOf(store));
 
     expect(lib(store)).toMatchObject({ folderId: "fav", q: "藤田", selectedTags: ["ASMR"] });
     expect(pendingWrites(store)).toEqual(["replace"]);
@@ -378,7 +382,7 @@ describe("検索欄の入力（setLibrarySearchQueryAtom）", () => {
     const store = setup({ q: "藤田" });
     clearPendingOps(store);
 
-    store.set(setLibrarySearchQueryAtom, "藤田", "works");
+    store.set(setLibrarySearchQueryAtom, "藤田", viewOf(store));
 
     expect(pendingWrites(store)).toEqual([]);
   });
@@ -387,7 +391,7 @@ describe("検索欄の入力（setLibrarySearchQueryAtom）", () => {
     const store = setup({ folderId: "by-cv", group: null });
     clearPendingOps(store);
 
-    store.set(setLibrarySearchQueryAtom, "藤田", "value-list");
+    store.set(setLibrarySearchQueryAtom, "藤田", viewOf(store));
 
     expect(lib(store)).toMatchObject({ folderId: "all", group: null, selectedTags: [], q: "藤田" });
     expect(pendingWrites(store)).toEqual(["push"]);
@@ -397,7 +401,7 @@ describe("検索欄の入力（setLibrarySearchQueryAtom）", () => {
     const store = setup({ folderId: "by-cv", group: null });
     clearPendingOps(store);
 
-    store.set(setLibrarySearchQueryAtom, "", "value-list");
+    store.set(setLibrarySearchQueryAtom, "", viewOf(store));
 
     expect(lib(store).folderId).toBe("by-cv");
     expect(pendingWrites(store)).toEqual([]);
@@ -407,7 +411,7 @@ describe("検索欄の入力（setLibrarySearchQueryAtom）", () => {
     const store = setup({ folderId: "by-cv", group: null });
     clearPendingOps(store);
 
-    store.set(setLibrarySearchQueryAtom, "  ", "value-list");
+    store.set(setLibrarySearchQueryAtom, "  ", viewOf(store));
 
     expect(lib(store).folderId).toBe("by-cv");
     expect(pendingWrites(store)).toEqual([]);
@@ -416,7 +420,7 @@ describe("検索欄の入力（setLibrarySearchQueryAtom）", () => {
   it("作品一覧の検索語は入力のまま持つ（入力中の空白を消さない）", () => {
     const store = setup({ folderId: "fav" });
 
-    store.set(setLibrarySearchQueryAtom, "藤田 ", "works");
+    store.set(setLibrarySearchQueryAtom, "藤田 ", viewOf(store));
 
     expect(lib(store).q).toBe("藤田 ");
   });
@@ -424,7 +428,7 @@ describe("検索欄の入力（setLibrarySearchQueryAtom）", () => {
   it("読めない行を保持しているときも「すべて」の検索結果へ移る", () => {
     const store = setup({ folderId: "sf-broken" });
 
-    store.set(setLibrarySearchQueryAtom, "藤田", "broken");
+    store.set(setLibrarySearchQueryAtom, "藤田", viewOf(store));
 
     expect(lib(store)).toMatchObject({ folderId: "all", q: "藤田" });
   });
@@ -440,7 +444,7 @@ describe("0件時の「すべて」で探す（searchLibraryInAllAtom）", () =>
       seed: 3,
     });
 
-    store.set(searchLibraryInAllAtom);
+    store.set(searchLibraryInAllAtom, viewOf(store));
 
     expect(lib(store)).toMatchObject({
       folderId: "all",

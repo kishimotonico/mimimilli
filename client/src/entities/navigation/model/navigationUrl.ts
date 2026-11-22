@@ -12,7 +12,7 @@ export interface LibraryUrlState {
   group: string | null;
   selectedTags: NormalizedTag[];
   selectedWorkId: string | null;
-  q?: string;
+  q: string;
 }
 
 export interface FilesUrlState {

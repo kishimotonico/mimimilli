@@ -45,11 +45,10 @@ export function createInitialAppRoute(): AppRoute {
 }
 
 /** 履歴エントリーに書く部分 */
-interface AppRouteEntryState {
-  sort: SortId | null;
-  seed: number;
-  layer: RouteLayer;
-}
+type AppRouteEntryState = { layer: RouteLayer } & (
+  | { sort: SortId | null; seed: number }
+  | { sort?: undefined; seed?: undefined }
+);
 
 export function toNavigationUrlState(route: AppRoute): NavigationUrlState {
   const np = route.layer !== null;
@@ -65,7 +64,9 @@ export function toNavigationUrlState(route: AppRoute): NavigationUrlState {
   }
 }
 
+/** sort・seed は library 画面のエントリーにだけ書く（読む側の applyEntryState と対称） */
 export function toEntryState(route: AppRoute): AppRouteEntryState {
+  if (route.mode !== "library") return { layer: route.layer };
   const { sort, seed } = route.library;
   return { sort, seed, layer: route.layer };
 }

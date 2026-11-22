@@ -108,7 +108,7 @@ type LibraryRoute = {
   group: string | null; // グループ分けで選んだ値。null なら値一覧
   selectedTags: NormalizedTag[]; // チップ
   selectedWorkId: string | null;
-  q?: string;
+  q: string;
   sort: SortId | null; // 今の並び。null なら既定の並び
   seed: number; // ランダムの seed
 };

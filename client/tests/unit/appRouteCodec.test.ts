@@ -38,6 +38,17 @@ describe("appRouteCodec", () => {
     });
   });
 
+  it("作品詳細・ファイルのエントリーには sort・seed を書かない", () => {
+    const layer = libraryRoute.layer;
+    expect(appRouteCodec.serialize({ ...libraryRoute, mode: "files" }).entryState).toEqual({
+      layer,
+    });
+    expect(
+      appRouteCodec.serialize({ ...libraryRoute, mode: "workDetail", workId: "RJ01234567" })
+        .entryState,
+    ).toEqual({ layer });
+  });
+
   it("URL と履歴エントリーの状態から同じ route を読み戻す", () => {
     expect(roundTrip(libraryRoute)).toEqual(libraryRoute);
   });

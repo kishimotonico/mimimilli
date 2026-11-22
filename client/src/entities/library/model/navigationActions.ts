@@ -4,7 +4,7 @@ import {
   clearLibrarySort,
   clearLibraryTags,
   deselectLibraryWork,
-  goToLibrarySegment,
+  backToLibraryValueList,
   openLibraryFolder,
   openLibraryGroupValue,
   openLibraryTag,
@@ -33,7 +33,7 @@ export const setLibrarySortAtom = appRouteAction(setLibrarySort);
 export const reshuffleLibrarySeedAtom = appRouteAction(reshuffleLibrarySeed);
 export const setLibrarySearchQueryAtom = appRouteAction(setLibrarySearchQuery);
 export const searchLibraryInAllAtom = appRouteAction(searchLibraryInAll);
-export const goToLibrarySegmentAtom = appRouteAction(goToLibrarySegment);
+export const backToLibraryValueListAtom = appRouteAction(backToLibraryValueList);
 export const showLibraryWorkAtom = appRouteAction(showLibraryWork);
 
 export const replaceLibraryFolderAtom = appRouteCorrection(replaceLibraryFolder);

@@ -10,7 +10,7 @@ import { libraryRouteAtom } from "../../../entities/library/model/navigationAtom
 import {
   addLibraryTagAtom,
   clearLibraryTagsAtom,
-  goToLibrarySegmentAtom,
+  backToLibraryValueListAtom,
   openLibraryFolderAtom,
   openLibraryGroupValueAtom,
   openLibraryTagAtom,
@@ -27,7 +27,6 @@ import {
 } from "../../../entities/library/resolveLibraryView";
 import { smartFoldersQueryOptions } from "../../../entities/smart-folder/queryOptions";
 import { LibraryNavigationContext } from "./libraryNavigationContext";
-import { LibraryTransitionContext, type StartLibraryTransition } from "./libraryTransitionContext";
 
 interface LibraryViewStateBase {
   selectedWorkId: string | null;
@@ -72,7 +71,8 @@ export interface LibraryViewActions {
   setSearchQuery: (q: string) => void;
   selectWork: (id: string | null) => void;
   setSort: (sort: SortId) => void;
-  goToSegment: (index: number) => void;
+  /** グループの値の作品一覧から、そのスマートフォルダーの値一覧へ戻る */
+  backToValueList: () => void;
 }
 
 export interface TagClickModifiers {
@@ -80,10 +80,7 @@ export interface TagClickModifiers {
   metaKey: boolean;
 }
 
-export function useLibraryView(): {
-  navigation: LibraryViewState & LibraryViewActions;
-  startTransition: StartLibraryTransition;
-} {
+export function useLibraryView(): LibraryViewState & LibraryViewActions {
   const library = useAtomValue(libraryRouteAtom);
   const foldersQuery = useQuery(smartFoldersQueryOptions);
   const folders = foldersQuery.data;
@@ -101,42 +98,39 @@ export function useLibraryView(): {
   const setSearchQuery = useSetAtom(setLibrarySearchQueryAtom);
   const selectWork = useSetAtom(selectLibraryWorkAtom);
   const setSort = useSetAtom(setLibrarySortAtom);
-  const goToSegment = useSetAtom(goToLibrarySegmentAtom);
+  const backToValueList = useSetAtom(backToLibraryValueListAtom);
 
   const view = useMemo(
     () => (folders ? resolveLibraryView(library, folders) : null),
     [library, folders],
   );
-  const heldKind = view?.kind ?? null;
 
   const actions = useMemo<LibraryViewActions>(() => {
     const run = (action: () => void) =>
       startTransition(() => {
         action();
       });
-    // 一覧が無い間は保持しているライブラリの種別が決まらないので、種別に依存する操作は行わない
-    const add = (tag: NormalizedTag) => {
-      if (heldKind !== null) run(() => addTag(tag, heldKind));
+    // 一覧が無い間は保持しているライブラリが決まらないので、それに依存する操作は行わない
+    const withView = (action: (view: ResolvedLibraryView) => void) => {
+      if (view !== null) run(() => action(view));
     };
     return {
       openFolder: (folderId) => run(() => openFolder(folderId)),
       openGroupValue: (folderId, group) => run(() => openGroupValue(folderId, group)),
-      selectGroupValue: (group) => run(() => selectGroupValue(group)),
+      selectGroupValue: (group) => withView((v) => selectGroupValue(group, v)),
       removeTag: (tag) => run(() => removeTag(tag)),
-      addTag: add,
+      addTag: (tag) => withView((v) => addTag(tag, v)),
       clickTag: (tag, { ctrlKey, metaKey }) =>
-        ctrlKey || metaKey ? add(tag) : run(() => openTag(tag)),
+        withView((v) => (ctrlKey || metaKey ? addTag(tag, v) : openTag(tag, v))),
       clearTags: () => run(() => clearTags()),
-      searchInAll: () => run(() => searchInAll()),
-      setSearchQuery: (q) => {
-        if (heldKind !== null) run(() => setSearchQuery(q, heldKind));
-      },
+      searchInAll: () => withView((v) => searchInAll(v)),
+      setSearchQuery: (q) => withView((v) => setSearchQuery(q, v)),
       selectWork,
       setSort: (sort) => run(() => setSort(sort)),
-      goToSegment: (index) => run(() => goToSegment(index)),
+      backToValueList: () => withView((v) => backToValueList(v)),
     };
   }, [
-    heldKind,
+    view,
     openFolder,
     openGroupValue,
     selectGroupValue,
@@ -148,7 +142,7 @@ export function useLibraryView(): {
     setSearchQuery,
     selectWork,
     setSort,
-    goToSegment,
+    backToValueList,
   ]);
 
   const navigation = useMemo<LibraryViewState>(() => {
@@ -170,9 +164,7 @@ export function useLibraryView(): {
     };
   }, [folders, view, foldersQuery.isError, refetch, library.selectedWorkId, isPending]);
 
-  const value = useMemo(() => ({ ...navigation, ...actions }), [navigation, actions]);
-
-  return { navigation: value, startTransition };
+  return useMemo(() => ({ ...navigation, ...actions }), [navigation, actions]);
 }
 
 const EMPTY_TAGS: NormalizedTag[] = [];
@@ -181,11 +173,4 @@ export function useLibraryNavigation(): LibraryViewState & LibraryViewActions {
   const navigation = useContext(LibraryNavigationContext);
   if (navigation === null) throw new Error("LibraryNavigationProvider が必要です");
   return navigation;
-}
-
-/** アクションのみ必要な消費者用。useLibraryNavigation() の state 購読を避ける。 */
-export function useLibraryTransition(): StartLibraryTransition {
-  const startTransition = useContext(LibraryTransitionContext);
-  if (startTransition === null) throw new Error("LibraryNavigationProvider が必要です");
-  return startTransition;
 }

@@ -1,3 +1,5 @@
+import { resolveLibraryView } from "../../src/entities/library/resolveLibraryView";
+import { defaultSmartFolders } from "../helpers/smartFolders";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStore } from "jotai";
 import {
@@ -89,7 +91,11 @@ describe("再生中の層の遷移", () => {
 
   it("層からタグへ進むと、層のエントリーを置き換えて「すべて」＋タグへ移る", () => {
     const store = openedStore("files");
-    store.set(openLibraryTagAtom, nts(["cv/藤田茜"])[0]);
+    store.set(
+      openLibraryTagAtom,
+      nts(["cv/藤田茜"])[0],
+      resolveLibraryView(store.get(appRouteAtom).library, defaultSmartFolders()),
+    );
 
     expect(pendingWrites(store)).toEqual(["replace"]);
     const route = store.get(appRouteAtom);
@@ -142,7 +148,7 @@ describe("再生中の層の遷移", () => {
     expect(store.get(appRouteAtom)).toMatchObject({ layer: { kind: "nowPlaying" } });
     expect(store.get(appRouteAtom).library.sort).toBeNull();
 
-    store.set(replaceLibraryFolderAtom, "all");
+    store.set(replaceLibraryFolderAtom, "sf-x", "all");
     expect(store.get(appRouteAtom)).toMatchObject({ layer: { kind: "nowPlaying" } });
     expect(store.get(appRouteAtom).library.folderId).toBe("all");
     expect(pendingWrites(store)).toEqual(["replace", "replace"]);

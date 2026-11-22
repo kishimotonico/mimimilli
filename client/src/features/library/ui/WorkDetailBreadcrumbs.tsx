@@ -27,7 +27,7 @@ export default function WorkDetailBreadcrumbs() {
       path={path}
       onNavigate={(index) => {
         if (index === 0) nav.openFolder(ALL_SMART_FOLDER_ID);
-        else if (index === 1 && hasHeldGroup) nav.goToSegment(0);
+        else if (index === 1 && hasHeldGroup) nav.backToValueList();
         else if (index < path.length - 1) setAppMode("library");
       }}
     />

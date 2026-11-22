@@ -25,7 +25,7 @@ export default function LibraryBreadcrumbs() {
         path={[LIBRARY_ROOT_LABEL, ...(view?.breadcrumb ?? [])]}
         onNavigate={(index, anchor) => {
           if (index === 0) nav.openFolder(ALL_SMART_FOLDER_ID);
-          else if (index === 1) nav.goToSegment(0);
+          else if (index === 1) nav.backToValueList();
           else if (group !== null) setSiblingAnchor(anchor);
         }}
       />

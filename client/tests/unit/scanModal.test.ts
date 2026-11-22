@@ -19,6 +19,7 @@ import {
 import * as workApi from "../../src/entities/work/api";
 import ScanModal from "../../src/features/scan/ui/ScanModal";
 import GlobalToast from "../../src/app/ui/GlobalToast";
+import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { refreshScanCandidates } from "../../src/entities/scan/scanCandidatesCache";
 import { scanResultsRefreshedAtom } from "../../src/entities/scan/model/atoms";
@@ -1296,7 +1297,7 @@ describe("ScanModal", () => {
     fireEvent.click(within(unregistered).getByRole("button", { name: "1件を追加" }));
 
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["works"] }));
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["groupValues"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: SMART_FOLDER_QUERY_KEYS.allGroups() });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["smartFolderWorks"] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: SCAN_QUERY_KEYS.last() });
   });
@@ -1382,7 +1383,9 @@ describe("ScanModal", () => {
       }),
     );
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["works"] });
-    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["groupValues"] });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({
+      queryKey: SMART_FOLDER_QUERY_KEYS.allGroups(),
+    });
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["smartFolderWorks"] });
   });
 

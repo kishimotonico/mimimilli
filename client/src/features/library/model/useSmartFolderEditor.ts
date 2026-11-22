@@ -4,7 +4,7 @@
 
 import { useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSetAtom, useStore } from "jotai";
+import { useSetAtom } from "jotai";
 import {
   ALL_SMART_FOLDER_ID,
   type GroupBy,
@@ -14,7 +14,6 @@ import {
   type SmartFolderWrite,
   type SortId,
 } from "@mimimilli/shared";
-import { libraryRouteAtom } from "../../../entities/library/model/navigationAtoms";
 import { replaceLibraryFolderAtom } from "../../../entities/library/model/navigationActions";
 import {
   createSmartFolder,
@@ -63,7 +62,6 @@ type Refresh = "none" | "folders" | { definitionOf: string };
 export function useSmartFolderEditor(): SmartFolderEditor {
   const queryClient = useQueryClient();
   const toast = useToast();
-  const store = useStore();
   const replaceFolder = useSetAtom(replaceLibraryFolderAtom);
 
   return useMemo<SmartFolderEditor>(() => {
@@ -187,7 +185,7 @@ export function useSmartFolderEditor(): SmartFolderEditor {
           (row) => {
             // 開いている一覧の ?group= は古いグループ分けの値なので、入り直して外す
             const regrouped = before !== undefined && !sameGroupBy(before.groupBy, row.groupBy);
-            if (regrouped && store.get(libraryRouteAtom).folderId === id) replaceFolder(id);
+            if (regrouped) replaceFolder(id, id);
           },
         );
         return saved !== null;
@@ -202,13 +200,11 @@ export function useSmartFolderEditor(): SmartFolderEditor {
           "folders",
           () => deleteSmartFolder(folder.id),
           () => {
-            if (store.get(libraryRouteAtom).folderId === folder.id) {
-              replaceFolder(ALL_SMART_FOLDER_ID);
-            }
+            replaceFolder(folder.id, ALL_SMART_FOLDER_ID);
             showDeleted(folder);
           },
         );
       },
     };
-  }, [queryClient, toast, store, replaceFolder]);
+  }, [queryClient, toast, replaceFolder]);
 }

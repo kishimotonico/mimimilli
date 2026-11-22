@@ -75,7 +75,7 @@ export function resolveLibraryView(
     group,
     groupBy,
     selectedTags: library.selectedTags,
-    q: library.q ?? "",
+    q: library.q,
     sort,
     sortDeviates: library.sort !== null && library.sort !== defaultSort,
     seed: sort === "random" ? library.seed : undefined,

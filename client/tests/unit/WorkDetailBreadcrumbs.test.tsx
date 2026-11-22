@@ -51,7 +51,7 @@ describe("WorkDetailBreadcrumbs", () => {
     const store = renderCrumbs(nav);
 
     fireEvent.click(screen.getByRole("button", { name: "CV別" }));
-    expect(nav.goToSegment).toHaveBeenCalledWith(0);
+    expect(nav.backToValueList).toHaveBeenCalledWith();
 
     fireEvent.click(screen.getByRole("button", { name: "藤田茜" }));
     expect(store.get(appModeAtom)).toBe("library");
@@ -62,7 +62,7 @@ describe("WorkDetailBreadcrumbs", () => {
     const store = renderCrumbs(nav);
 
     fireEvent.click(screen.getByRole("button", { name: "お気に入り" }));
-    expect(nav.goToSegment).not.toHaveBeenCalled();
+    expect(nav.backToValueList).not.toHaveBeenCalled();
     expect(store.get(appModeAtom)).toBe("library");
   });
 });
