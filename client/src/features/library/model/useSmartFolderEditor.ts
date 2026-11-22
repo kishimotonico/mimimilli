@@ -2,7 +2,7 @@
 // 失敗はサーバーの文言のままトーストで見せ、一覧を取り直す（404/409 のような食い違いも含む）。
 // 成功のあとの無効化もここ1か所で決める。
 
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSetAtom, useStore } from "jotai";
 import {
@@ -46,8 +46,16 @@ export interface SmartFolderEditor {
 }
 
 function sameGroupBy(a: GroupBy | null, b: GroupBy | null): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+  if (a === null || b === null) return a === b;
+  if (a.kind !== b.kind) return false;
+  return a.kind === "prefix" && b.kind === "prefix" ? a.prefix === b.prefix : true;
 }
+
+/** 並べ替えの保存の待ち行列。フックの再マウントをまたいで直列を保つため、モジュールで持つ */
+const reorderQueue: { running: boolean; waiting: string[] | null } = {
+  running: false,
+  waiting: null,
+};
 
 /** 変更が一覧のどこへ効くか。none は応答でキャッシュを直接更新したとき */
 type Refresh = "none" | "folders" | "definition";
@@ -57,10 +65,6 @@ export function useSmartFolderEditor(): SmartFolderEditor {
   const toast = useToast();
   const store = useStore();
   const replaceFolder = useSetAtom(replaceLibraryFolderAtom);
-  const reorderQueue = useRef<{ running: boolean; waiting: string[] | null }>({
-    running: false,
-    waiting: null,
-  });
 
   return useMemo<SmartFolderEditor>(() => {
     const refreshFolders = () =>
@@ -141,29 +145,28 @@ export function useSmartFolderEditor(): SmartFolderEditor {
         await queryClient.cancelQueries({ queryKey: key });
         const before = queryClient.getQueryData<SmartFolder[]>(key);
         if (before) queryClient.setQueryData(key, applyOrder(before, ids));
-        const queue = reorderQueue.current;
-        if (queue.running) {
-          queue.waiting = ids;
+        if (reorderQueue.running) {
+          reorderQueue.waiting = ids;
           return;
         }
-        queue.running = true;
+        reorderQueue.running = true;
         try {
           let next: string[] | null = ids;
           while (next) {
             const sending: string[] = next;
-            queue.waiting = null;
+            reorderQueue.waiting = null;
             await commit(
               "並び順を保存できませんでした",
               "none",
               () => reorderSmartFolders(sending),
               (rows) => {
-                if (queue.waiting === null) queryClient.setQueryData(key, rows);
+                if (reorderQueue.waiting === null) queryClient.setQueryData(key, rows);
               },
             );
-            next = queue.waiting;
+            next = reorderQueue.waiting;
           }
         } finally {
-          queue.running = false;
+          reorderQueue.running = false;
         }
       },
       create: (data) =>
@@ -206,5 +209,5 @@ export function useSmartFolderEditor(): SmartFolderEditor {
         );
       },
     };
-  }, [queryClient, toast, store, replaceFolder, reorderQueue]);
+  }, [queryClient, toast, store, replaceFolder]);
 }

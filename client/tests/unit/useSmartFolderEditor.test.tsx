@@ -233,6 +233,37 @@ describe("並べ替えの直列化", () => {
   });
 });
 
+describe("並べ替えの直列化: 再マウント", () => {
+  it("フックを作り直しても、送信中の保存があれば待ってから最新の順だけを送る", async () => {
+    const base = defaultSmartFolders();
+    const ids = base.map((f) => f.id);
+    const releases: Array<() => void> = [];
+    const sent: string[][] = [];
+    mockApi({
+      "PUT /api/smart-folders/order": async ({ body }) => {
+        sent.push((body as { ids: string[] }).ids);
+        await new Promise<void>((resolve) => releases.push(resolve));
+        return base;
+      },
+    });
+    const first = setup();
+    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), base);
+    const inFlight = first.reorder([...ids].reverse());
+    await vi.waitFor(() => expect(sent).toHaveLength(1));
+
+    const remounted = setup();
+    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), base);
+    await remounted.reorder(ids);
+    expect(sent).toHaveLength(1);
+
+    releases[0]!();
+    await vi.waitFor(() => expect(sent).toHaveLength(2));
+    expect(sent[1]).toEqual(ids);
+    releases[1]!();
+    await inFlight;
+  });
+});
+
 describe("削除", () => {
   it("開いているスマートフォルダーを消したら、履歴を積まずに「すべて」へ移り、元に戻すを出す", async () => {
     mockApi({ "DELETE /api/smart-folders/:id": apiNoContent() });

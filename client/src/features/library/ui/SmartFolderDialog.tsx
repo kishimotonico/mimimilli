@@ -29,7 +29,8 @@ import {
 interface SmartFolderDialogProps {
   target: SmartFolderDialogTarget;
   /** 「『すべて』と同じ」の表示に使う「すべて」の既定の並び */
-  allSort: SortId;
+  /** 「すべて」の並び。読めないときは null（「すべて」と同じを選べない） */
+  allSort: SortId | null;
   tagPrefixes: readonly TagPrefix[];
   /** 保存できたら true。失敗はダイアログを開いたままにする */
   onSave: (draft: ReturnType<typeof toWrite>) => Promise<boolean>;
@@ -90,7 +91,8 @@ export default function SmartFolderDialog({
 
   const children = rootChildren(draft.condition);
   const options = groupByOptions(tagPrefixes, draft.groupBy);
-  const canSave = !saving && draft.name.trim() !== "";
+  const needsSort = permissions.inheritSort && allSort === null && draft.sort === null;
+  const canSave = !saving && draft.name.trim() !== "" && !needsSort;
 
   const save = async () => {
     if (!canSave) return;
@@ -183,8 +185,11 @@ export default function SmartFolderDialog({
               })
             }
           >
-            {permissions.inheritSort && (
+            {permissions.inheritSort && allSort !== null && (
               <option value="">{`「すべて」と同じ（${sortLabel(allSort)}）`}</option>
+            )}
+            {permissions.inheritSort && allSort === null && draft.sort === null && (
+              <option value="" hidden disabled />
             )}
             {SORT_OPTIONS.map((option) => (
               <option key={option.id} value={option.id}>

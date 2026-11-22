@@ -224,6 +224,7 @@ smart_folders(id TEXT PK, name TEXT, condition_json TEXT, sort TEXT NULL,
 - 既定の並びだけの更新: `PUT /smart-folders/:id/sort`（`{ sort }`）。ほかの列は触らないので、別タブでの編集を巻き戻さない。「すべて」の並びは null にできない
 - 削除の取り消し: サーバーは削除をすぐ行う。取り消しは、同じ ID・位置・作成日時の行をそのまま戻す復元の口で行う。履歴に残った `/library/<id>` が、戻したあとも同じ行を指すようにするため
 - 読めない行: `condition` を null にし、壊れていることを示す形で返す。クライアントの `resolveLibraryView`（[ADR-0041](0041-library-sidebar-shell-navigation.md)）はこの行を開けない状態（削除だけできる）として扱い、件数の対象からも外す
+  - 壊れた「すべて」は UI から直す手段を設けず、データを手で直すものとする。それまで「すべて」の並びを継承する作品一覧は開けず、継承する行にも固有の並びを付けて救える
 
 ### 条件の編集
 

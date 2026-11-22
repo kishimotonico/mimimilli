@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   smartFolderPermissions,
+  sortViolation,
   updateViolation,
   type SmartFolder,
   type SmartFolderWrite,
@@ -67,6 +68,16 @@ test("壊れた行は編集のダイアログを開けず、削除だけ。壊�
     },
   );
   assert.equal(smartFolderPermissions(folder("all", null)).remove, false);
+});
+
+test("並びだけの更新の違反: 壊れた行は 403 相当、「すべて」の空は 400 相当", () => {
+  assert.equal(
+    sortViolation(folder("sf-00000000-0000-4000-8000-000000000001", null), "title-asc")?.kind,
+    "forbidden",
+  );
+  assert.equal(sortViolation(folder("all"), null)?.kind, "invalid");
+  assert.equal(sortViolation(folder("all"), "title-asc"), null);
+  assert.equal(sortViolation(folder("fav"), null), null);
 });
 
 test("更新の違反は値で返り、種別は 403 相当と 400 相当に分かれる", () => {

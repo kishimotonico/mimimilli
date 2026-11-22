@@ -18,7 +18,7 @@ export default function SmartFolderDialogHost() {
     nav.foldersStatus === "ready"
       ? (nav.folders.find((folder) => folder.id === ALL_SMART_FOLDER_ID)?.sort ?? null)
       : null;
-  if (!dialog || allSort === null) return null;
+  if (!dialog) return null;
 
   const save = async (data: ReturnType<typeof toWrite>) => {
     if (dialog.kind === "edit") {
