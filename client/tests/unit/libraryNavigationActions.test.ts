@@ -324,6 +324,20 @@ describe("タグの行き先（ADR-0041 の表）", () => {
   });
 });
 
+describe("補正は画面を動かさない", () => {
+  it("作品詳細で保持しているライブラリの並びを外しても、作品詳細のまま置き換える", () => {
+    const store = setup({ folderId: "sf-own", sort: "title-asc" });
+    seedAppMode(store, { workDetail: "work-1" });
+    clearPendingOps(store);
+
+    store.set(clearLibrarySortAtom, { folderId: "sf-own", sort: "title-asc" });
+
+    expect(store.get(appRouteAtom)).toMatchObject({ mode: "workDetail", workId: "work-1" });
+    expect(lib(store).sort).toBeNull();
+    expect(pendingWrites(store)).toEqual(["replace"]);
+  });
+});
+
 describe("履歴の積み方", () => {
   const ops = (store: ReturnType<typeof createStore>) =>
     store.get(appRouteStore.sync.pendingOpsAtom).map((op) => [op.write, op.pushSameUrl]);

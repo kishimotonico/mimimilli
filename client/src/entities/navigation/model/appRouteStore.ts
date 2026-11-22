@@ -9,6 +9,7 @@ import {
   createInitialAppRoute,
   type AppMode,
   type AppRoute,
+  type LibraryRoute,
   type SwitchableAppMode,
 } from "./appRoute";
 
@@ -38,15 +39,14 @@ export function appRouteAction<A extends unknown[]>(
   });
 }
 
-/** 補正: 開いている画面の route を事実に合わせ直す（選択解除・消えたフォルダーからの退避など）。
- *  await のあとに走っても層を閉じないよう、層を保ち、履歴は常に置き換える */
+/** 補正: 開いている画面の library を事実に合わせ直す（選択解除・消えたフォルダーからの退避など）。
+ *  await のあとに走っても画面と層を動かさないよう library だけを差し替え、履歴は常に置き換える */
 export function appRouteCorrection<A extends unknown[]>(
-  compute: (current: AppRoute, ...args: A) => RouteTransition<AppRoute> | null,
+  compute: (current: AppRoute, ...args: A) => LibraryRoute | null,
 ) {
   return appRouteStore.action((current: AppRoute, ...args: A) => {
-    const transition = compute(current, ...args);
-    if (!transition) return transition;
-    return { ...transition, route: { ...transition.route, layer: current.layer }, replace: true };
+    const library = compute(current, ...args);
+    return library && { route: { ...current, library }, replace: true };
   });
 }
 

@@ -62,14 +62,9 @@ export function reenterLibraryFolder(route: AppRoute, folderId: string): Transit
   return { ...openLibraryFolder(route, folderId), pushSameUrl: true };
 }
 
-/** 開いているスマートフォルダーが消えたとき、履歴を積まずに入り直す。作品詳細などライブラリ以外の画面で
- *  保持しているライブラリの folderId も置き換え、画面はそのまま保つ */
-export function replaceLibraryFolder(route: AppRoute, folderId: string): Transition {
-  const entered = openLibraryFolder(route, folderId).route;
-  return {
-    route: route.mode === "library" ? entered : { ...route, library: entered.library },
-    replace: true,
-  };
+/** 開いているスマートフォルダーが消えた・グループ分けが変わったとき、保持しているライブラリを入り直す（補正） */
+export function replaceLibraryFolder(route: AppRoute, folderId: string): LibraryRoute {
+  return openLibraryFolder(route, folderId).route.library;
 }
 
 /** サイドバーのクイックオーバーレイから、グループの値の作品一覧へ入る */
@@ -167,10 +162,16 @@ export function setLibrarySort(route: AppRoute, sort: SortId): Transition | null
 export function clearLibrarySort(
   route: AppRoute,
   saved: { folderId: string; sort: SortId },
-): Transition | null {
+): LibraryRoute | null {
   const { library } = route;
   if (library.folderId !== saved.folderId || library.sort !== saved.sort) return null;
-  return { route: withLibrary(route, { sort: null }), replace: true };
+  return { ...library, sort: null };
+}
+
+/** 選択中の作品を外す（補正） */
+export function deselectLibraryWork(route: AppRoute): LibraryRoute | null {
+  const { library } = route;
+  return library.selectedWorkId === null ? null : { ...library, selectedWorkId: null };
 }
 
 export function reshuffleLibrarySeed(route: AppRoute): Transition {

@@ -1,9 +1,9 @@
-import type { AppRoute } from "../../navigation/model/appRoute";
 import { appRouteAction, appRouteCorrection } from "../../navigation/model/appRouteStore";
 import {
   addLibraryTag,
   clearLibrarySort,
   clearLibraryTags,
+  deselectLibraryWork,
   goToLibrarySegment,
   openLibraryFolder,
   openLibraryGroupValue,
@@ -39,6 +39,4 @@ export const showLibraryWorkAtom = appRouteAction(showLibraryWork);
 export const replaceLibraryFolderAtom = appRouteCorrection(replaceLibraryFolder);
 export const clearLibrarySortAtom = appRouteCorrection(clearLibrarySort);
 /** 選択中の作品が絞り込みから外れた・存在しないときの選択解除 */
-export const deselectLibraryWorkAtom = appRouteCorrection((route: AppRoute) =>
-  selectLibraryWork(route, null),
-);
+export const deselectLibraryWorkAtom = appRouteCorrection(deselectLibraryWork);
