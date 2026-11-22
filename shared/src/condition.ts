@@ -44,7 +44,9 @@ export const prefixSchema = z
   .transform((s) => s.toLowerCase())
   .refine((s) => !s.includes("/"), { message: "prefix にスラッシュは使えません" });
 
-const positiveInt = z.number().int().positive();
+/** 日数の上限（約100年）。基準時刻からの日付計算が範囲外にならない値 */
+export const MAX_WITHIN_DAYS = 36500;
+const positiveInt = z.number().int().positive().max(MAX_WITHIN_DAYS);
 
 type ObjectFactory = <T extends z.ZodRawShape>(shape: T) => z.ZodObject<T>;
 

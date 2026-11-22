@@ -33,6 +33,11 @@ import { removeIdentityConflictPath } from "../../core/identityConflicts.ts";
 import { fileRegisterNaming, folderRegisterNaming } from "../../core/workRegisterPreview.ts";
 import { validateResumeRequest } from "../../core/resumeValidation.ts";
 import { assertRegistrationAllowed } from "../../core/workRegistrationGuard.ts";
+import {
+  countWorksByConditions,
+  groupWorksByCondition,
+  queryWorksByCondition,
+} from "../../core/conditionQuery.ts";
 import { applyWorksQuery, toWorksPage } from "../../core/worksQuery.ts";
 import { isPathWithin } from "../../lib/path.ts";
 import { buildFullWorkFromState, checkWorkPlacement } from "./playback.ts";
@@ -142,8 +147,23 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
   }
 
   return {
-    async queryWorks(params: WorksQuery): Promise<WorksPage> {
+    async queryWorksLegacy(params: WorksQuery): Promise<WorksPage> {
       return toWorksPage(applyWorksQuery(composeWorks(state), params), requireFixtureRoot(state));
+    },
+
+    async queryWorks(query, ctx) {
+      return toWorksPage(
+        queryWorksByCondition(composeWorks(state), query, ctx),
+        requireFixtureRoot(state),
+      );
+    },
+
+    async groupWorks(query, ctx) {
+      return groupWorksByCondition(composeWorks(state), query, ctx);
+    },
+
+    async countByConditions(conditions, ctx) {
+      return countWorksByConditions(composeWorks(state), conditions, ctx);
     },
 
     getWorkRegisterPreview,

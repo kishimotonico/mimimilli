@@ -353,7 +353,7 @@ test("rescan無しのファイル差し替え後、getWorkはcatalogの総時間
     tagOp: "AND",
     sort: "added-desc",
   };
-  const beforePage = await adapter.queryWorks(baseQuery);
+  const beforePage = await adapter.queryWorksLegacy(baseQuery);
   assert.equal(beforePage.items.find((item) => item.id === id)?.totalDurationSec, 5);
 
   writeWav(join(workDir, "whole.wav"), 8);
@@ -364,7 +364,7 @@ test("rescan無しのファイル差し替え後、getWorkはcatalogの総時間
   assert.equal(track?.durationSec, 5);
   assert.equal(afterWork.totalDurationSec, 5);
 
-  const afterPage = await adapter.queryWorks(baseQuery);
+  const afterPage = await adapter.queryWorksLegacy(baseQuery);
   assert.equal(afterPage.items.find((item) => item.id === id)?.totalDurationSec, 5);
 });
 
@@ -414,7 +414,7 @@ test("rescan無しのファイル差し替え後、prepareWorkPlaybackは総時�
   assert.equal(track?.durationSec, 8);
   assert.equal(prepared.totalDurationSec, 8);
 
-  const page = await adapter.queryWorks({
+  const page = await adapter.queryWorksLegacy({
     q: "",
     tags: EMPTY_TAG_FILTERS,
     tagOp: "AND",
@@ -452,7 +452,7 @@ test("createWorkの応答取得は登録時の投影総時間を変えない", a
   const createdWork = await adapter.getWork(created.snapshot.id);
   assert.equal(createdWork?.totalDurationSec, 5);
 
-  const page = await adapter.queryWorks({
+  const page = await adapter.queryWorksLegacy({
     q: "",
     tags: EMPTY_TAG_FILTERS,
     tagOp: "AND",
@@ -462,7 +462,7 @@ test("createWorkの応答取得は登録時の投影総時間を変えない", a
 
   const viewed = await adapter.getWork(created.snapshot.id);
   assert.equal(viewed?.totalDurationSec, 5);
-  const afterPage = await adapter.queryWorks({
+  const afterPage = await adapter.queryWorksLegacy({
     q: "",
     tags: EMPTY_TAG_FILTERS,
     tagOp: "AND",

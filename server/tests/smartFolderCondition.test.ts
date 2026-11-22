@@ -210,3 +210,12 @@ test("壊れた行は condition が null の行", () => {
 test("読み出し用は空白だけの text.q も通す", () => {
   assert.ok(conditionTreeSchema.safeParse(and({ type: "text", q: "  " })).success);
 });
+
+test("withinDays は 36500 日までで、書き込み・読み出しの両方で上限を超えると弾く", () => {
+  for (const type of ["added", "played"] as const) {
+    assert.ok(conditionSchema.safeParse(and({ type, withinDays: 36500 })).success);
+    assert.ok(!conditionSchema.safeParse(and({ type, withinDays: 36501 })).success);
+    assert.ok(!conditionSchema.safeParse(and({ type, withinDays: 1e9 })).success);
+    assert.ok(!conditionTreeSchema.safeParse(and({ type, withinDays: 1e9 })).success);
+  }
+});

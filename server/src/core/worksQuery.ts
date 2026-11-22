@@ -90,18 +90,23 @@ function filterByIds(works: WorkSummary[], ids: string[] | undefined): WorkSumma
   return works.filter((work) => idSet.has(work.id));
 }
 
-export function filterByQuery(works: WorkSummary[], q: string): WorkSummary[] {
-  if (!q) return works;
+/** 作品検索の部分一致（タイトル・タグ・RJ/VJコード）の判定関数。q ごとの正規化は1回だけ行う。q が空なら全作品が一致 */
+export function textMatcher(q: string): (work: WorkSummary) => boolean {
+  if (!q) return () => true;
   const normalizedQuery = japaneseSortKey(q);
   const rjQuery = normalizeRjCode(q);
-  return works.filter((work) => {
+  return (work) => {
     if (japaneseSortKey(work.title).includes(normalizedQuery)) return true;
     if (work.tags.some((tag) => japaneseSortKey(tag).includes(normalizedQuery))) return true;
-    if (rjQuery && work.dlsite.rjCode && normalizeRjCode(work.dlsite.rjCode).includes(rjQuery)) {
-      return true;
-    }
-    return false;
-  });
+    return Boolean(
+      rjQuery && work.dlsite.rjCode && normalizeRjCode(work.dlsite.rjCode).includes(rjQuery),
+    );
+  };
+}
+
+export function filterByQuery(works: WorkSummary[], q: string): WorkSummary[] {
+  if (!q) return works;
+  return works.filter(textMatcher(q));
 }
 
 // タグ絞り込みは完全一致（ADR-0005 決定6。prefix は大文字小文字を無視、値は区別）

@@ -21,7 +21,7 @@ export async function fetchDlsiteOfWorks(
         (work): work is NonNullable<typeof work> => work !== null && work !== undefined,
       )
     : (
-        await adapter.queryWorks({
+        await adapter.queryWorksLegacy({
           q: "",
           tags: { tags: [], yearValue: null },
           tagOp: "AND",

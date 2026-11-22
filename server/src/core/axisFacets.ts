@@ -2,7 +2,7 @@
 // 軸ID は "tag"（全タグ。flat・annotated 双方）・"year"（追加日の年）・
 // 任意の prefix 文字列（ADR-0005）。
 import { parseTag } from "@mimimilli/shared";
-import type { AxisFacetsQuery, AxisFacetItem, WorkSummary } from "@mimimilli/shared";
+import type { AxisFacetsQuery, AxisFacetItem, GroupBy, WorkSummary } from "@mimimilli/shared";
 import { EMPTY_TAG_FILTERS } from "@mimimilli/shared";
 import { compareJapaneseSortKeys, compareUtf8Bytes } from "./japaneseSortKey.ts";
 import { filterByTags, filterByYear } from "./worksQuery.ts";
@@ -53,6 +53,37 @@ export function buildAxisFacets(
     }
   }
 
+  return facetItems(membersByValue);
+}
+
+/** グループ分けの値ごとに、件数・総時間・代表カバーを集計して count 降順で返す。0件の値は含まれない */
+export function buildGroupFacets(groupBy: GroupBy, works: WorkSummary[]): AxisFacetItem[] {
+  const membersByValue = new Map<string, WorkSummary[]>();
+  const addMember = (value: string, work: WorkSummary) => {
+    const members = membersByValue.get(value);
+    if (members) members.push(work);
+    else membersByValue.set(value, [work]);
+  };
+  for (const work of works) {
+    if (groupBy.kind === "addedYear") {
+      addMember(work.addedAt.slice(0, 4), work);
+      continue;
+    }
+    for (const tag of work.tags) {
+      if (groupBy.kind === "tag") {
+        addMember(tag, work);
+        continue;
+      }
+      const parsed = parseTag(tag);
+      if (parsed.kind === "annotated" && parsed.prefix === groupBy.prefix) {
+        addMember(parsed.value, work);
+      }
+    }
+  }
+  return facetItems(membersByValue);
+}
+
+function facetItems(membersByValue: Map<string, WorkSummary[]>): AxisFacetItem[] {
   return [...membersByValue.entries()]
     .map(([value, members]) => ({
       value,

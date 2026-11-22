@@ -1,6 +1,11 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { WORKS_DEFAULT_PAGE_SIZE } from "@mimimilli/shared";
+import {
+  WORKS_DEFAULT_PAGE_SIZE,
+  type Condition,
+  type GroupBy,
+  type SortId,
+} from "@mimimilli/shared";
 import { createApp } from "../src/app.ts";
 import { createRealAdapter } from "../src/adapters/real/index.ts";
 import { openDb } from "../src/adapters/real/db.ts";
@@ -170,6 +175,148 @@ async function main(): Promise<void> {
     },
   ];
 
+  const countConditions: Condition[] = [
+    { type: "and", children: [{ type: "played" }] },
+    { type: "and", children: [{ type: "added", withinDays: 30 }] },
+    { type: "and", children: [{ type: "bookmarked" }] },
+    { type: "and", children: [{ type: "hasError" }] },
+  ];
+  const ctx = { now: Date.now() };
+  const emptyCondition: Condition = { type: "and", children: [] };
+  const cvCondition: Condition = {
+    type: "and",
+    children: [{ type: "tag", tag: manifest.sampleTag }],
+  };
+  const listQuery = (condition: Condition, sort: SortId, page = 1, seed?: number) => ({
+    condition,
+    sort,
+    seed,
+    page,
+    limit: WORKS_DEFAULT_PAGE_SIZE,
+  });
+  const done = async () => new Response(null, { status: 200 });
+  const conditionCases: typeof cases = [
+    {
+      name: "cond-list-page-1",
+      path: "(adapter.queryWorks 条件なし)",
+      run: async () => (
+        await adapter.queryWorks(listQuery(emptyCondition, "added-desc"), ctx),
+        done()
+      ),
+    },
+    {
+      name: "cond-list-deep-page",
+      path: `(adapter.queryWorks page=${manifest.deepPage})`,
+      run: async () => (
+        await adapter.queryWorks(listQuery(emptyCondition, "added-desc", manifest.deepPage), ctx),
+        done()
+      ),
+    },
+    {
+      name: "cond-list-text",
+      path: "(adapter.queryWorks text)",
+      run: async () => (
+        await adapter.queryWorks(
+          listQuery(
+            { type: "and", children: [{ type: "text", q: manifest.sampleSearchQ }] },
+            "added-desc",
+          ),
+          ctx,
+        ),
+        done()
+      ),
+    },
+    {
+      name: "cond-list-tag-folder",
+      path: "(adapter.queryWorks tag, title-asc)",
+      run: async () => (await adapter.queryWorks(listQuery(cvCondition, "title-asc"), ctx), done()),
+    },
+    {
+      name: "cond-list-random",
+      path: "(adapter.queryWorks random)",
+      run: async () => (
+        await adapter.queryWorks(listQuery(emptyCondition, "random", 1, 42), ctx),
+        done()
+      ),
+    },
+    {
+      name: "cond-list-not-duration",
+      path: "(adapter.queryWorks not(duration))",
+      run: async () => (
+        await adapter.queryWorks(
+          listQuery(
+            {
+              type: "and",
+              children: [
+                { type: "not", child: { type: "duration", op: "lte", sec: 3600 } },
+                { type: "or", children: [{ type: "bookmarked" }, { type: "hasError" }] },
+              ],
+            },
+            "added-desc",
+          ),
+          ctx,
+        ),
+        done()
+      ),
+    },
+    ...(
+      [
+        ["cv", { kind: "prefix", prefix: "cv" }],
+        ["サークル", { kind: "prefix", prefix: "サークル" }],
+        ["tag", { kind: "tag" }],
+        ["year", { kind: "addedYear" }],
+      ] satisfies Array<[string, GroupBy]>
+    ).map(([name, groupBy]) => ({
+      name: `cond-groups-${name}`,
+      path: `(adapter.groupWorks ${name})`,
+      run: async () => (
+        await adapter.groupWorks({ condition: emptyCondition, groupBy }, ctx),
+        done()
+      ),
+    })),
+    {
+      name: "cond-groups-cv-in-folder",
+      path: "(adapter.groupWorks cv, 条件あり)",
+      run: async () => (
+        await adapter.groupWorks(
+          { condition: cvCondition, groupBy: { kind: "prefix", prefix: "cv" } },
+          ctx,
+        ),
+        done()
+      ),
+    },
+    {
+      name: "cond-counts-4",
+      path: "(adapter.countByConditions 4条件を1往復)",
+      run: async () => (await adapter.countByConditions(countConditions, ctx), done()),
+    },
+    {
+      name: "cond-counts-4-each",
+      path: "(adapter.countByConditions 4条件を1条件ずつ)",
+      run: async () => {
+        for (const condition of countConditions) await adapter.countByConditions([condition], ctx);
+        return done();
+      },
+    },
+    {
+      name: "cond-counts-with-hasPrefix",
+      path: "(adapter.countByConditions 4条件 + not(hasPrefix))",
+      run: async () => (
+        await adapter.countByConditions(
+          [
+            ...countConditions,
+            {
+              type: "and",
+              children: [{ type: "not", child: { type: "hasPrefix", prefix: "cv" } }],
+            },
+          ],
+          ctx,
+        ),
+        done()
+      ),
+    },
+  ];
+
   const db = openDb({
     kind: "files",
     catalogPath: manifest.catalogDb,
@@ -186,7 +333,7 @@ async function main(): Promise<void> {
   };
 
   const results: BenchCaseResult[] = [];
-  for (const benchCase of [...cases, listSummariesCase]) {
+  for (const benchCase of [...cases, ...conditionCases, listSummariesCase]) {
     process.stdout.write(`Benchmarking ${benchCase.name}...`);
     results.push(
       await measureCase(benchCase.name, benchCase.path, benchCase.run, warmup, iterations),

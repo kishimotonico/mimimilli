@@ -214,7 +214,7 @@ test("UUID 重複: 後に検出された方が再採番されメタファイル�
   const metaB = JSON.parse(readFileSync(join(root, "work-b", "mimimilli.json"), "utf-8"));
   assert.equal(metaA.id, id);
   assert.equal(metaB.id, id);
-  const works = await adapter.queryWorks({
+  const works = await adapter.queryWorksLegacy({
     q: "",
     tags: EMPTY_TAG_FILTERS,
     tagOp: "AND",
@@ -769,8 +769,14 @@ test("増分スキャン: 2回目に検出したduplicate UUIDはidentity confli
   const copiedMeta = JSON.parse(readFileSync(join(duplicateDir, "mimimilli.json"), "utf-8"));
   assert.equal(copiedMeta.id, source.id);
   assert.equal(
-    (await adapter.queryWorks({ q: "", tags: EMPTY_TAG_FILTERS, tagOp: "AND", sort: "id-asc" }))
-      .total,
+    (
+      await adapter.queryWorksLegacy({
+        q: "",
+        tags: EMPTY_TAG_FILTERS,
+        tagOp: "AND",
+        sort: "id-asc",
+      })
+    ).total,
     2,
   );
 });

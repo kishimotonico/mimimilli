@@ -89,7 +89,7 @@ contract(
   "adapterのqueryWorksは ids で該当作品のみへ絞り込み、他のフィルタ・ページングと組み合わせられる",
   async (harness) => {
     const base = worksQuerySchema.parse({});
-    const subset = await harness.adapter.queryWorks({
+    const subset = await harness.adapter.queryWorksLegacy({
       ...base,
       page: 1,
       limit: 10,
@@ -98,7 +98,7 @@ contract(
     assert.deepEqual(sortedIds(subset.items), idsOf(harness, ["a", "c"]));
     assert.equal(subset.total, 2);
 
-    const paged = await harness.adapter.queryWorks({
+    const paged = await harness.adapter.queryWorksLegacy({
       ...base,
       sort: "id-asc",
       page: 1,
@@ -115,7 +115,7 @@ contract(
 
 contract("adapterのqueryWorksは数万件のidsを渡しても束縛数の上限に当たらない", async (harness) => {
   const unknown = Array.from({ length: 40000 }, (_, index) => `unknown-${index}`);
-  const page = await harness.adapter.queryWorks({
+  const page = await harness.adapter.queryWorksLegacy({
     ...worksQuerySchema.parse({}),
     page: 1,
     limit: 10,
@@ -126,12 +126,76 @@ contract("adapterのqueryWorksは数万件のidsを渡しても束縛数の上�
 });
 
 contract("adapterのqueryWorksは空のidsを空集合として扱う", async (harness) => {
-  const page = await harness.adapter.queryWorks({
+  const page = await harness.adapter.queryWorksLegacy({
     ...worksQuerySchema.parse({}),
     page: 1,
     limit: 10,
     ids: [],
   });
+  assert.equal(page.total, 0);
+});
+
+const CTX = { now: Date.parse("2026-06-15T12:00:00.000Z") };
+const ALL_CONDITION = { type: "and" as const, children: [] };
+
+contract(
+  "adapterのqueryWorks(条件の木)は ids で絞り込み、ページングと組み合わせられる",
+  async (harness) => {
+    const subset = await harness.adapter.queryWorks(
+      {
+        condition: ALL_CONDITION,
+        sort: "id-asc",
+        page: 1,
+        limit: 10,
+        ids: [harness.workId("a"), harness.workId("c")],
+      },
+      CTX,
+    );
+    assert.deepEqual(sortedIds(subset.items), idsOf(harness, ["a", "c"]));
+    assert.equal(subset.total, 2);
+
+    const paged = await harness.adapter.queryWorks(
+      {
+        condition: ALL_CONDITION,
+        sort: "id-asc",
+        page: 1,
+        limit: 1,
+        ids: ["a", "b", "c"].map((key) => harness.workId(key)),
+      },
+      CTX,
+    );
+    assert.deepEqual(
+      paged.items.map((item) => item.id),
+      [idsOf(harness, ["a", "b", "c"])[0]],
+    );
+    assert.equal(paged.total, 3);
+  },
+);
+
+contract(
+  "adapterのqueryWorks(条件の木)は数万件のidsを渡しても束縛数の上限に当たらない",
+  async (harness) => {
+    const unknown = Array.from({ length: 40000 }, (_, index) => `unknown-${index}`);
+    const page = await harness.adapter.queryWorks(
+      {
+        condition: ALL_CONDITION,
+        sort: "id-asc",
+        page: 1,
+        limit: 10,
+        ids: [...unknown, harness.workId("b")],
+      },
+      CTX,
+    );
+    assert.deepEqual(sortedIds(page.items), idsOf(harness, ["b"]));
+    assert.equal(page.total, 1);
+  },
+);
+
+contract("adapterのqueryWorks(条件の木)は空のidsを空集合として扱う", async (harness) => {
+  const page = await harness.adapter.queryWorks(
+    { condition: ALL_CONDITION, sort: "id-asc", page: 1, limit: 10, ids: [] },
+    CTX,
+  );
   assert.equal(page.total, 0);
 });
 

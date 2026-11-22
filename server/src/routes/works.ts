@@ -60,7 +60,7 @@ export function worksRoute(adapter: DataAdapter, scanRecord: ScanRecordStore): H
     }
     // page/limit 未指定でもサーバー側デフォルトでページングする。
     // limit だけの指定は page=1 として扱う
-    const page = await adapter.queryWorks({
+    const page = await adapter.queryWorksLegacy({
       ...query,
       ...(recordKind ? { ids: scanRecord.workIds(recordKind, scanChange) } : {}),
       page: parsed.data.page ?? 1,

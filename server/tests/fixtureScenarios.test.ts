@@ -124,7 +124,7 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
   // 承認分を表示するため、ここで見えなければタブにも出ない。
   const registeredWorkId = registration.registered[0]?.workId;
   assert.ok(registeredWorkId);
-  const registeredWorksPage = await adapter.queryWorks({
+  const registeredWorksPage = await adapter.queryWorksLegacy({
     q: "",
     tags: { tags: [], yearValue: null },
     tagOp: "AND",
