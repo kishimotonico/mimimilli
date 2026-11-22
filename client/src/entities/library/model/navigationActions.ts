@@ -1,7 +1,12 @@
-import { appRouteAction, appRouteCorrection } from "../../navigation/model/appRouteStore";
+import {
+  appRouteAction,
+  appRouteCorrection,
+  appRouteStore,
+} from "../../navigation/model/appRouteStore";
 import {
   addLibraryTag,
   clearLibrarySort,
+  enterLibraryFolderFrom,
   clearLibraryTags,
   deselectLibraryWork,
   backToLibraryValueList,
@@ -9,7 +14,6 @@ import {
   openLibraryGroupValue,
   normalizeLibraryFolder,
   openLibraryTag,
-  reenterLibraryFolder,
   removeLibraryTag,
   replaceLibraryFolder,
   reshuffleLibrarySeed,
@@ -22,7 +26,8 @@ import {
 } from "./libraryRouteTransitions";
 
 export const openLibraryFolderAtom = appRouteAction(openLibraryFolder);
-export const reenterLibraryFolderAtom = appRouteAction(reenterLibraryFolder);
+/** 画面と層を引き戻さないよう、遷移の規則（層を落とす）は通さない */
+export const enterLibraryFolderFromAtom = appRouteStore.action(enterLibraryFolderFrom);
 export const openLibraryGroupValueAtom = appRouteAction(openLibraryGroupValue);
 export const selectLibraryGroupValueAtom = appRouteAction(selectLibraryGroupValue);
 export const openLibraryTagAtom = appRouteAction(openLibraryTag);

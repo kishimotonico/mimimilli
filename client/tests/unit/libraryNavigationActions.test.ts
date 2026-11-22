@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createStore } from "jotai";
 import { libraryRouteAtom } from "../../src/entities/library/model/navigationAtoms";
+import { openNowPlayingLayerAtom } from "../../src/entities/navigation/model/appRouteStore";
+import { libraryPlaceOf } from "../../src/entities/library/model/libraryRouteTransitions";
 import { nt, nts } from "../helpers/tag";
 import { clearPendingOps, pendingWrites, seedAppMode, seedLibraryRoute } from "../helpers/route";
 import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
@@ -12,7 +14,7 @@ import {
   backToLibraryValueListAtom,
   normalizeLibraryFolderAtom,
   openLibraryFolderAtom,
-  reenterLibraryFolderAtom,
+  enterLibraryFolderFromAtom,
   openLibraryGroupValueAtom,
   openLibraryTagAtom,
   removeLibraryTagAtom,
@@ -383,10 +385,37 @@ describe("履歴の積み方", () => {
     const store = setup({ folderId: "sf-own", sort: "title-asc" });
     clearPendingOps(store);
 
-    store.set(reenterLibraryFolderAtom, "sf-own");
+    store.set(enterLibraryFolderFromAtom, libraryPlaceOf(store.get(appRouteAtom)), "sf-own");
 
     expect(ops(store)).toEqual([["push", true]]);
     expect(lib(store)).toMatchObject({ folderId: "sf-own", sort: null });
+  });
+
+  it("await の間に層を開いた・別の画面へ移ったときは、画面と層を引き戻さない", () => {
+    const layered = setup({ folderId: "sf-own", sort: "title-asc" });
+    const place = libraryPlaceOf(layered.get(appRouteAtom));
+    layered.set(openNowPlayingLayerAtom);
+    clearPendingOps(layered);
+
+    layered.set(enterLibraryFolderFromAtom, place, "sf-own");
+
+    expect(layered.get(appRouteAtom)).toMatchObject({
+      mode: "library",
+      layer: { kind: "nowPlaying" },
+    });
+    expect(lib(layered)).toMatchObject({ folderId: "sf-own", sort: null });
+    expect(pendingWrites(layered)).toEqual(["replace"]);
+
+    const away = setup({ folderId: "sf-own" });
+    const awayPlace = libraryPlaceOf(away.get(appRouteAtom));
+    seedAppMode(away, "files");
+    clearPendingOps(away);
+
+    away.set(enterLibraryFolderFromAtom, awayPlace, "sf-new");
+
+    expect(away.get(appRouteAtom)).toMatchObject({ mode: "files" });
+    expect(lib(away).folderId).toBe("sf-own");
+    expect(pendingWrites(away)).toEqual([]);
   });
 
   it("通常の並び変更は積む指定なしの replace", () => {

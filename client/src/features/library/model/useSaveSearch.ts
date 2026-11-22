@@ -1,8 +1,10 @@
 // 今の絞り込みの保存の操作（検索を保存・上書き）。チップ列と＋メニューが使う。
 
 import { useCallback, useRef } from "react";
-import { useSetAtom } from "jotai";
-import { reenterLibraryFolderAtom } from "../../../entities/library/model/navigationActions";
+import { useSetAtom, useStore } from "jotai";
+import { enterLibraryFolderFromAtom } from "../../../entities/library/model/navigationActions";
+import { libraryPlaceOf } from "../../../entities/library/model/libraryRouteTransitions";
+import { appRouteAtom } from "../../../entities/navigation/model/appRouteStore";
 import { useToast } from "../../../shared/ui/useToast";
 import { smartFolderDialogAtom } from "./atoms";
 import {
@@ -35,7 +37,8 @@ export function useOpenSaveDialog(view: ResolvedLibraryView | null): () => void 
 
 export function useSaveSearch(nav: LibraryViewState & LibraryViewActions): SaveSearchActions {
   const view = nav.foldersStatus === "ready" ? nav.view : null;
-  const reenterFolder = useSetAtom(reenterLibraryFolderAtom);
+  const store = useStore();
+  const enterFolderFrom = useSetAtom(enterLibraryFolderFromAtom);
   const editor = useSmartFolderEditor();
   const toast = useToast();
   const openSaveDialog = useOpenSaveDialog(view);
@@ -46,11 +49,12 @@ export function useSaveSearch(nav: LibraryViewState & LibraryViewActions): SaveS
     if (overwriting.current) return;
     overwriting.current = true;
     const { folder } = view;
+    const place = libraryPlaceOf(store.get(appRouteAtom));
     const before = toWrite(draftOf(folder));
     const saved = await editor.update(folder.id, overwriteWrite(view));
     overwriting.current = false;
     if (!saved) return;
-    reenterFolder(folder.id);
+    enterFolderFrom(place, folder.id);
     let undone = false;
     toast.show({
       message: `「${folder.name}」を上書きしました`,
@@ -65,7 +69,7 @@ export function useSaveSearch(nav: LibraryViewState & LibraryViewActions): SaveS
       priority: "action",
       dismissOnUnmount: false,
     });
-  }, [view, editor, reenterFolder, toast]);
+  }, [view, store, editor, enterFolderFrom, toast]);
 
   return { offer: view ? saveOffer(view) : null, openSaveDialog, overwrite };
 }

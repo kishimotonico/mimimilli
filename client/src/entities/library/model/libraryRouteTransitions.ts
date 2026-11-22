@@ -54,9 +54,40 @@ export function openLibraryFolder(route: AppRoute, folderId: string): Transition
   };
 }
 
+/** 操作を始めたときにいた場所。await のあとに同じ場所にいるかを確かめるのに使う */
+export interface LibraryPlace {
+  mode: AppRoute["mode"];
+  layerOpen: boolean;
+  folderId: string;
+}
+
+export function libraryPlaceOf(route: AppRoute): LibraryPlace {
+  return { mode: route.mode, layerOpen: route.layer !== null, folderId: route.library.folderId };
+}
+
+/** await を挟んだ保存・追加のあと、始めたときと同じ場所にいるときだけ folderId のスマートフォルダーへ
+ *  入り直す（履歴を積む）。その間に層を開いた・別の画面やフォルダーへ移っていたら動かさず、
+ *  開いているのがそのフォルダーなら入り直しだけ置き換えで行う */
+export function enterLibraryFolderFrom(
+  route: AppRoute,
+  place: LibraryPlace,
+  folderId: string,
+): Transition | null {
+  const now = libraryPlaceOf(route);
+  if (
+    now.mode === place.mode &&
+    now.layerOpen === place.layerOpen &&
+    now.folderId === place.folderId
+  ) {
+    return reenterLibraryFolder(route, folderId);
+  }
+  const library = replaceLibraryFolder(route, folderId, folderId);
+  return library && { route: { ...route, library }, replace: true };
+}
+
 /** 上書きのあと、同じスマートフォルダーへ入り直す。並びだけの上書きでURLが同じでも履歴を積み、
  *  戻るで上書き前の表示へ戻れるようにする */
-export function reenterLibraryFolder(route: AppRoute, folderId: string): Transition {
+function reenterLibraryFolder(route: AppRoute, folderId: string): Transition {
   return { ...openLibraryFolder(route, folderId), pushSameUrl: true };
 }
 
