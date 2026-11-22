@@ -37,7 +37,7 @@ export type SmartFolderWrite = z.infer<typeof smartFolderWriteSchema>;
 
 /** 一覧の1行。condition・sort・groupBy のどれか1つでも読めない行は壊れた行で、3つとも null で返す。
  *  壊れた行は削除と作り直しだけができる。正常な行の sort の null は「『すべて』と同じ」 */
-export const smartFolderItemSchema = z.object({
+export const smartFolderSchema = z.object({
   id: z.string(),
   name: z.string(),
   condition: conditionTreeSchema.nullable(),
@@ -48,15 +48,15 @@ export const smartFolderItemSchema = z.object({
   /** 件数を出す・0件で隠すかの判定に要るものだけ数える。それ以外は null */
   count: z.number().int().nonnegative().nullable(),
 });
-export type SmartFolderItem = z.infer<typeof smartFolderItemSchema>;
-export type BrokenSmartFolderItem = SmartFolderItem & { condition: null };
-export type ReadableSmartFolderItem = SmartFolderItem & { condition: Condition };
+export type SmartFolder = z.infer<typeof smartFolderSchema>;
+export type BrokenSmartFolder = SmartFolder & { condition: null };
+export type ReadableSmartFolder = SmartFolder & { condition: Condition };
 
-export function isBrokenSmartFolderItem(item: SmartFolderItem): item is BrokenSmartFolderItem {
+export function isBrokenSmartFolder(item: SmartFolder): item is BrokenSmartFolder {
   return item.condition === null;
 }
 
-export const smartFolderItemListSchema = z.array(smartFolderItemSchema);
+export const smartFolderListSchema = z.array(smartFolderSchema);
 
 export const smartFolderOrderSchema = z.strictObject({
   ids: z
@@ -87,7 +87,7 @@ export type SmartFolderRestore = z.infer<typeof smartFolderRestoreSchema>;
 
 // ── 作品一覧・値一覧の要求 ────────────────────────────────────
 
-/** GET /:id/works。チップは常に AND（tagOp は受け付けない）。sort は必須で、random には seed が要る */
+/** GET /:id/works。チップは常に AND（契約にないキーは受け付けない）。sort は必須で、random には seed が要る */
 export const smartFolderWorksRequestSchema = z
   .strictObject({
     q: z.string().default(""),

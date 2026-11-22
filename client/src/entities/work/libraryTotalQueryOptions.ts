@@ -1,8 +1,8 @@
 import { queryOptions } from "@tanstack/react-query";
+import { getAllWorks } from "../smart-folder/api";
 import { WORK_QUERY_KEYS } from "./queryKeys";
-import { searchWorks } from "./api";
 
 export const libraryTotalQueryOptions = queryOptions({
   queryKey: WORK_QUERY_KEYS.total(),
-  queryFn: () => searchWorks({ limit: 1 }),
+  queryFn: () => getAllWorks({ limit: 1 }),
 });

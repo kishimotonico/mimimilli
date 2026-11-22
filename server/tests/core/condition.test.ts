@@ -84,7 +84,7 @@ function adapterWithWorks() {
   });
 }
 
-test("要求の検証: sort=random で seed が無い・tagOp を送る要求は弾く", () => {
+test("要求の検証: sort=random で seed が無い・契約にないキーを送る要求は弾く", () => {
   const status = (fn: () => unknown): number | undefined => {
     try {
       fn();
@@ -98,7 +98,7 @@ test("要求の検証: sort=random で seed が無い・tagOp を送る要求は
     400,
   );
   assert.equal(
-    status(() => parseSmartFolderWorksRequest({ sort: "added-desc", tags: [], tagOp: "OR" })),
+    status(() => parseSmartFolderWorksRequest({ sort: "added-desc", tags: [], tagMode: "OR" })),
     400,
   );
   assert.equal(
@@ -110,7 +110,7 @@ test("要求の検証: sort=random で seed が無い・tagOp を送る要求は
     undefined,
   );
   assert.equal(
-    status(() => parseSmartFolderGroupsRequest({ groupBy: { kind: "tag" }, tagOp: "OR" })),
+    status(() => parseSmartFolderGroupsRequest({ groupBy: { kind: "tag" }, tagMode: "OR" })),
     400,
   );
 });
@@ -130,7 +130,6 @@ test("queryFolderWorks / queryFolderGroups は条件・グループの値・チ�
     page.items.map((item) => item.id),
     ["w1"],
   );
-  assert.equal(page.seed, undefined);
 
   const groups = await queryFolderGroups(
     adapter,

@@ -17,12 +17,10 @@ import type {
   WorkspacePath,
   WorksPage,
   UnregisterMissingWorksResult,
-  WorksQuery,
 } from "@mimimilli/shared";
 import type { ConditionGroupQuery, ConditionWorksQuery, EvalContext } from "./condition.ts";
 
 export interface WorkAdapter {
-  queryWorksLegacy(params: WorksQuery): Promise<WorksPage>;
   /** 条件の木に一致する作品の一覧（ADR-0040）。now は route が1リクエストにつき1回作る */
   queryWorks(query: ConditionWorksQuery, ctx: EvalContext): Promise<WorksPage>;
   /** 条件に一致する作品を、グループ分けの値ごとに集計する */

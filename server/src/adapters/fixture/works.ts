@@ -23,9 +23,7 @@ import type {
   WorkSourceMutationResult,
   WorkSourcePatch,
   WorkspacePath,
-  WorksPage,
   UnregisterMissingWorksResult,
-  WorksQuery,
 } from "@mimimilli/shared";
 import { SourceChangedError } from "../../errors.ts";
 import type { WorkAdapter } from "../../adapter/work.ts";
@@ -38,7 +36,7 @@ import {
   groupWorksByCondition,
   queryWorksByCondition,
 } from "../../core/conditionQuery.ts";
-import { applyWorksQuery, toWorksPage } from "../../core/worksQuery.ts";
+import { toWorksPage } from "../../core/worksQuery.ts";
 import { isPathWithin } from "../../lib/path.ts";
 import { buildFullWorkFromState, checkWorkPlacement } from "./playback.ts";
 import { normalizeFsPath } from "./fsResolve.ts";
@@ -147,10 +145,6 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
   }
 
   return {
-    async queryWorksLegacy(params: WorksQuery): Promise<WorksPage> {
-      return toWorksPage(applyWorksQuery(composeWorks(state), params), requireFixtureRoot(state));
-    },
-
     async queryWorks(query, ctx) {
       return toWorksPage(
         queryWorksByCondition(composeWorks(state), query, ctx),

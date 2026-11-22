@@ -5,7 +5,7 @@
 import { useContext, useMemo, useTransition } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useQuery } from "@tanstack/react-query";
-import { type NormalizedTag, type SmartFolderItem, type SortId } from "@mimimilli/shared";
+import { type NormalizedTag, type SmartFolder, type SortId } from "@mimimilli/shared";
 import { libraryRouteAtom } from "../../../entities/library/model/navigationAtoms";
 import {
   addLibraryTagAtom,
@@ -38,7 +38,7 @@ interface LibraryViewStateBase {
 /** スマートフォルダー一覧が揃っていて、route を突き合わせた view がある */
 export interface ReadyLibraryViewState extends LibraryViewStateBase {
   foldersStatus: "ready";
-  folders: SmartFolderItem[];
+  folders: SmartFolder[];
   view: ResolvedLibraryView;
   /** 効いているチップ。作品一覧以外では空 */
   selectedTags: NormalizedTag[];

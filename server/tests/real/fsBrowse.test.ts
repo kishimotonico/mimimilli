@@ -76,7 +76,9 @@ test("作品ディレクトリには workId、作品配下のファイルには 
   assert.equal(workDir?.workId, existingWorkId);
 
   // 作品配下のサブフォルダー内ファイル（mp3/01_intro.wav）
-  const works = (await (await app.request("/api/works")).json()) as WorksPage;
+  const works = (await (
+    await app.request("/api/smart-folders/all/works?sort=added-desc")
+  ).json()) as WorksPage;
   const generated = works.items.find((w) => w.title.includes("RJ900001"))!;
   const mp3 = await listing(app, "dlsite/RJ900001_テスト作品/mp3");
   const file = mp3.entries.find((e) => e.name === "01_intro.wav");

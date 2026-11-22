@@ -387,73 +387,28 @@ describe("library api", () => {
     mockFetch.mockReset();
   });
 
-  it("searchWorks fetches /api/works and returns the WorksPage envelope", async () => {
-    const mockPage = {
-      items: [makeWorkListItem({ id: "work-1" })],
-      total: 1,
-      stats: { trackCount: 0, durationSec: 0 },
-    };
-    mockFetch.mockResolvedValue(makeResponse(mockPage));
-    const result = await workApi.searchWorks({ q: "test", tags: ["tag,one", "tag2"] });
-    expect(mockFetch).toHaveBeenCalledWith("/api/works?q=test&tags=tag%2Cone&tags=tag2");
-    expect(result).toEqual(mockPage);
-  });
-
-  it("searchWorks supports limit/page for the library total count", async () => {
+  it("getAllWorks は「すべて」の作品一覧を既定の並びで取り、WorksPage を返す", async () => {
     const mockPage = {
       items: [makeWorkListItem({ id: "work-1" })],
       total: 42,
       stats: { trackCount: 0, durationSec: 0 },
     };
     mockFetch.mockResolvedValue(makeResponse(mockPage));
-    const result = await workApi.searchWorks({ limit: 1 });
-    expect(mockFetch).toHaveBeenCalledWith("/api/works?limit=1");
-    expect(result.total).toBe(42);
+    const result = await smartFolderApi.getAllWorks({ limit: 1 });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/smart-folders/all/works?sort=added-desc&page=1&limit=1",
+    );
+    expect(result).toEqual(mockPage);
   });
 
-  it("searchWorks: scanRecord と scanChange をクエリへ載せ、idsは送らない", async () => {
+  it("getAllWorks は scanRecord と scanChange をクエリへ載せ、idsは送らない", async () => {
     mockFetch.mockResolvedValue(
       makeResponse({ items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } }),
     );
-    await workApi.searchWorks({ scanRecord: "updated", scanChange: "moved", limit: 200 });
+    await smartFolderApi.getAllWorks({ scanRecord: "updated", scanChange: "moved", limit: 200 });
     expect(mockFetch).toHaveBeenCalledWith(
-      "/api/works?limit=200&scanRecord=updated&scanChange=moved",
+      "/api/smart-folders/all/works?sort=added-desc&page=1&limit=200&scanRecord=updated&scanChange=moved",
     );
-  });
-
-  it("randomのレスポンスseedを次ページへ送り、ページ間の重複・欠落を防げる", async () => {
-    const seed = 2468;
-    mockFetch
-      .mockResolvedValueOnce(
-        makeResponse({
-          items: [makeWorkListItem({ id: "work-1" }), makeWorkListItem({ id: "work-3" })],
-          total: 4,
-          stats: { trackCount: 0, durationSec: 0 },
-          seed,
-        }),
-      )
-      .mockResolvedValueOnce(
-        makeResponse({
-          items: [makeWorkListItem({ id: "work-4" }), makeWorkListItem({ id: "work-2" })],
-          total: 4,
-          stats: { trackCount: 0, durationSec: 0 },
-          seed,
-        }),
-      );
-
-    const first = await workApi.searchWorks({ sort: "random", page: 1, limit: 2 });
-    const second = await workApi.searchWorks({
-      sort: "random",
-      seed: first.seed,
-      page: 2,
-      limit: 2,
-    });
-
-    expect(mockFetch).toHaveBeenNthCalledWith(1, "/api/works?sort=random&page=1&limit=2");
-    expect(mockFetch).toHaveBeenNthCalledWith(2, "/api/works?sort=random&seed=2468&page=2&limit=2");
-    const ids = [...first.items, ...second.items].map((work) => work.id);
-    expect(new Set(ids).size).toBe(4);
-    expect(ids.toSorted()).toEqual(["work-1", "work-2", "work-3", "work-4"]);
   });
 
   it("listSmartFolders fetches /api/smart-folders", async () => {
@@ -484,7 +439,7 @@ describe("library api", () => {
     expect(result).toEqual(mockPage);
   });
 
-  it("getSmartFolderWorks は tags・q・group を渡し、tagOp は送らない。擬似タグも tags に含まれる", async () => {
+  it("getSmartFolderWorks は tags・q・group を渡し、チップのつなぎ方は送らない。擬似タグも tags に含まれる", async () => {
     mockFetch.mockResolvedValue(
       makeResponse({ items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } }),
     );
@@ -503,7 +458,7 @@ describe("library api", () => {
     expect(url.searchParams.getAll("tags")).toEqual(["cv/藤田茜", "ASMR", "@year/2024"]);
     expect(url.searchParams.get("group")).toBe("霧島レイ");
     expect(url.searchParams.get("sort")).toBe("title-asc");
-    expect(url.searchParams.has("tagOp")).toBe(false);
+    expect(url.searchParams.has("tagMode")).toBe(false);
     expect(url.searchParams.get("page")).toBe("2");
   });
 
@@ -699,7 +654,7 @@ describe("レスポンス検証（getParsed等）", () => {
     );
   });
 
-  it("searchWorks: 契約に適合しないitemsは検証エラーになる", async () => {
+  it("getAllWorks: 契約に適合しないitemsは検証エラーになる", async () => {
     mockFetch.mockResolvedValue(
       makeResponse({
         items: [{ id: "work-1" }],
@@ -707,14 +662,18 @@ describe("レスポンス検証（getParsed等）", () => {
         stats: { trackCount: 0, durationSec: 0 },
       }),
     );
-    await expect(workApi.searchWorks({})).rejects.toThrow(/GET \/works/);
+    await expect(smartFolderApi.getAllWorks({ limit: 1 })).rejects.toThrow(
+      /GET \/smart-folders\/all\/works/,
+    );
   });
 
-  it("searchWorks: statsが欠落したレスポンスは検証エラーになる", async () => {
+  it("getAllWorks: statsが欠落したレスポンスは検証エラーになる", async () => {
     mockFetch.mockResolvedValue(
       makeResponse({ items: [makeWorkListItem({ id: "work-1" })], total: 1 }),
     );
-    await expect(workApi.searchWorks({})).rejects.toThrow(/GET \/works/);
+    await expect(smartFolderApi.getAllWorks({ limit: 1 })).rejects.toThrow(
+      /GET \/smart-folders\/all\/works/,
+    );
   });
 
   it("getSettings: 契約に適合しない設定は検証エラーになる", async () => {

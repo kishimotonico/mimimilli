@@ -276,7 +276,7 @@ realContract("候補にないパスを含む登録・除外は409で拒否し、
     apply: { title: true, cover: true, tags: true, url: true },
   });
   assert.equal(stale.status, 409);
-  assert.equal((await harness.json("/api/works")).body.total, 0);
+  assert.equal((await harness.json("/api/smart-folders/all/works?sort=added-desc")).body.total, 0);
 
   const staleExclude = await harness.send("POST", "/api/scan/candidates/exclude", {
     paths: ["古い候補"],

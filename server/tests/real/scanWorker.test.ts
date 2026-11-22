@@ -63,7 +63,9 @@ test("file scan Workerの同期停止中もworks/Range mediaへ応答し、cance
   );
   const app = library.ownFn(createApp(adapter), (a) => a.shutdown());
 
-  const worksBefore = (await (await app.request("/api/works")).json()) as WorksPage;
+  const worksBefore = (await (
+    await app.request("/api/smart-folders/all/works?sort=added-desc")
+  ).json()) as WorksPage;
   const generated = worksBefore.items.find((work) => work.title.includes("RJ900001"));
   assert.ok(generated);
   // 次のscanがfinalizeへ進めば、この未走査作品はmissingになり、孤児cacheは削除される。
@@ -87,7 +89,10 @@ test("file scan Workerの同期停止中もworks/Range mediaへ応答し、cance
       Promise.resolve(request),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error(message)), 20_000)),
     ]);
-  assert.equal((await withDeadline(app.request("/api/works"))).status, 200);
+  assert.equal(
+    (await withDeadline(app.request("/api/smart-folders/all/works?sort=added-desc"))).status,
+    200,
+  );
   const media = await withDeadline(
     app.request(`/api/media/audio/${generated.id}/mp3/01_intro.wav`, {
       headers: { Range: "bytes=44-143" },
@@ -102,7 +107,9 @@ test("file scan Workerの同期停止中もworks/Range mediaへ応答し、cance
   assert.equal((await waitForTerminal(app, started.job.id)).status, "cancelled");
   assert.deepEqual(await adapter.getSettings(), settingsBeforeCancel);
   assert.equal(existsSync(orphanThumbnail), true);
-  const worksAfterCancel = (await (await app.request("/api/works")).json()) as WorksPage;
+  const worksAfterCancel = (await (
+    await app.request("/api/smart-folders/all/works?sort=added-desc")
+  ).json()) as WorksPage;
   assert.deepEqual(
     worksAfterCancel.items.map((work) => [work.id, work.status]),
     worksBefore.items.map((work) => [work.id, work.status]),

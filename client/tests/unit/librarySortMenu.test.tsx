@@ -5,7 +5,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
-import type { SmartFolderItem } from "@mimimilli/shared";
+import type { SmartFolder } from "@mimimilli/shared";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import LibrarySortMenu from "../../src/features/library/ui/LibrarySortMenu";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
@@ -13,26 +13,20 @@ import { LibraryNavigationContext } from "../../src/features/library/model/libra
 import { libraryRouteAtom } from "../../src/entities/library/model/navigationAtoms";
 import { axisValueSortAtom } from "../../src/features/library/model/atoms";
 import { apiError, mockApi } from "../helpers/api";
-import {
-  buildSmartFolderItem,
-  defaultSmartFolderItems,
-  seedSmartFolders,
-} from "../helpers/smartFolders";
+import { buildSmartFolder, defaultSmartFolders, seedSmartFolders } from "../helpers/smartFolders";
 import { seedLibraryRoute } from "../helpers/route";
 import { buildNav } from "./fixtures/libraryNav";
 
 function renderSortMenu(options?: {
   folderId?: string;
   sort?: string | null;
-  folders?: SmartFolderItem[];
+  folders?: SmartFolder[];
   put?: (id: string) => unknown;
 }) {
   const api = mockApi({
-    "GET /api/smart-folders": options?.folders ?? defaultSmartFolderItems(),
+    "GET /api/smart-folders": options?.folders ?? defaultSmartFolders(),
     "PUT /api/smart-folders/:id": ({ params }) =>
-      options?.put
-        ? options.put(params.id)
-        : buildSmartFolderItem({ id: params.id, name: "保存済み" }),
+      options?.put ? options.put(params.id) : buildSmartFolder({ id: params.id, name: "保存済み" }),
   });
   const store = createStore();
   seedLibraryRoute(store, {
@@ -90,7 +84,7 @@ describe("LibrarySortMenu", () => {
   });
 
   it("「『すべて』と同じ」のスマートフォルダーは「すべて」の既定の並びの変更に従う", () => {
-    const folders = defaultSmartFolderItems().map((folder) =>
+    const folders = defaultSmartFolders().map((folder) =>
       folder.id === "all" ? { ...folder, sort: "title-asc" as const } : folder,
     );
     renderSortMenu({ folderId: "fav", sort: null, folders });
@@ -161,8 +155,8 @@ describe("LibrarySortMenu", () => {
     renderSortMenu({
       folderId: "sf-broken",
       folders: [
-        ...defaultSmartFolderItems(),
-        buildSmartFolderItem({ id: "sf-broken", name: "壊れた行", condition: null }),
+        ...defaultSmartFolders(),
+        buildSmartFolder({ id: "sf-broken", name: "壊れた行", condition: null }),
       ],
     });
     const button = screen.getByRole("button", { name: "並び替え" });
@@ -289,7 +283,7 @@ describe("LibrarySortMenu", () => {
       sort: "title-asc",
       put: async (id) => {
         await gate;
-        return buildSmartFolderItem({ id, name: "保存済み" });
+        return buildSmartFolder({ id, name: "保存済み" });
       },
     });
     fireEvent.click(screen.getByRole("button", { name: "並び替え" }));

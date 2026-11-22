@@ -1,4 +1,4 @@
-// エンドポイント横断の契約: 作品検索クエリ、ページングエンベロープ、部分更新、エラー形式。
+// エンドポイント横断の契約: ページングエンベロープ、タグ絞り込みのクエリ、部分更新、エラー形式。
 import { z } from "zod";
 import { dataIntegrityWarningSchema } from "./dataIntegrity.ts";
 import {
@@ -6,7 +6,6 @@ import {
   dlsiteFetchErrorKindSchema,
   metaDlsiteStateSchema,
 } from "./dlsite.ts";
-import { smartFolderRuleSchema, sortIdSchema, viewIdSchema } from "./library.ts";
 import { normalizedTagArraySchema } from "./tagNormalize.ts";
 import {
   dedupeTags,
@@ -19,11 +18,10 @@ import {
 import { splitSelectedTags, type TagFilters } from "./pseudoTag.ts";
 import { rjCodeFormatSchema } from "./dlsite.ts";
 import { workspacePathSchema } from "./media.ts";
-import { scanRecordKindSchema, workChangeKindSchema } from "./scan.ts";
 
-// ── 作品検索（GET /api/works）────────────────────────────────
+// ── 作品一覧（GET /api/smart-folders/:id/works）───────────────
 
-/** GET /works のページサイズ。limit 未指定時にサーバー側で適用するデフォルト。
+/** 作品一覧のページサイズ。limit 未指定時にサーバー側で適用するデフォルト。
  *  client の追加読み込みも同じサイズでページを要求する */
 export const WORKS_DEFAULT_PAGE_SIZE = 200;
 
@@ -42,33 +40,6 @@ export const tagFiltersQuerySchema = z
     return { tags, yearValue };
   });
 
-/** クエリパラメータ。tags は同名パラメータを繰り返して配列で受ける。組み込み軸（year等）の
- *  フィルタも専用パラメータを持たず、"@year/2024" のような擬似タグとして tags に混ぜて送る
- *  （ADR-0012 §2）。HTTP 境界で tagFiltersQuerySchema が一度だけ解釈し、内側は TagFilters を受け取る。 */
-const worksQueryBaseSchema = z.object({
-  q: z.string().default(""),
-  tags: tagFiltersQuerySchema,
-  tagOp: z.enum(["AND", "OR"]).default("AND"),
-  view: viewIdSchema.optional(),
-  sort: sortIdSchema.default("added-desc"),
-  /** randomソートの安定順序を決める。省略時はアダプタが発行してレスポンスで返す。 */
-  seed: z.coerce.number().int().min(0).max(0x7fffffff).optional(),
-  page: z.coerce.number().int().min(1).optional(),
-  limit: z.coerce.number().int().min(1).max(500).optional(),
-  /** 直近のスキャンの記録に入っている作品だけに絞り込む（new=新規作品、updated=更新済み）。
-   *  ID集合はサーバーが記録から引くので、件数に上限はない */
-  scanRecord: scanRecordKindSchema.optional(),
-  /** scanRecord=updated のとき、指定した変化の種類を持つ作品だけに絞る */
-  scanChange: workChangeKindSchema.optional(),
-});
-export const worksQuerySchema = worksQueryBaseSchema;
-/** HTTP クエリの入力型（.default 付きフィールドは省略可能） */
-export type WorksQueryInput = z.input<typeof worksQuerySchema>;
-/** パース後の正規化済みクエリ（サーバー adapter が受け取る型）。scanRecord・scanChange はルートが記録から引いた ids に置き換えて渡す */
-export type WorksQuery = Omit<z.output<typeof worksQuerySchema>, "scanRecord" | "scanChange"> & {
-  ids?: string[];
-};
-
 /** 検索・フィルター後・ページング前の集合に対する集計。件数は total 側で持つため含まない。
  *  durationSec は totalDurationSec が未知（null）の作品を除いた合計。 */
 export const collectionStatsSchema = z.object({
@@ -83,48 +54,8 @@ export const worksPageSchema = z.object({
   items: z.array(workListItemSchema),
   total: z.number().int().nonnegative(),
   stats: collectionStatsSchema,
-  seed: z.number().int().min(0).max(0x7fffffff).optional(),
 });
 export type WorksPage = z.infer<typeof worksPageSchema>;
-
-/** GET /api/smart-folders/:id/works のクエリパラメータ。
- *  ソートはフォルダー自身が保持するため含まない。tags はフォルダーのルールに対する
- *  追加の AND 条件として、q はフォルダーのルール（OR・除外を含む）全体に対する
- *  追加の AND 条件として適用する（ADR-0012） */
-export const smartFolderWorksQuerySchema = worksQueryBaseSchema.pick({
-  q: true,
-  tags: true,
-  tagOp: true,
-  page: true,
-  limit: true,
-  seed: true,
-});
-export type SmartFolderWorksQuery = z.infer<typeof smartFolderWorksQuerySchema>;
-
-/** adapter evalSmartFolder が受け取る正規化済みクエリ（page/limit は routes がデフォルト適用後） */
-export type SmartFolderEvalQuery = Required<Pick<SmartFolderWorksQuery, "page" | "limit">> &
-  Partial<Pick<SmartFolderWorksQuery, "q" | "tags" | "tagOp" | "seed">>;
-
-/** POST /api/smart-folders/preview のリクエストボディ。保存前のドラフト条件（rules）を受け取り、
- *  チップ絞り込みを適用しない純粋なルール一致件数を返す（条件エディタのライブ件数プレビュー用） */
-export const smartFolderPreviewRequestSchema = z.object({
-  rules: z.array(smartFolderRuleSchema),
-});
-export type SmartFolderPreviewRequest = z.infer<typeof smartFolderPreviewRequestSchema>;
-
-export const smartFolderPreviewResponseSchema = z.object({
-  total: z.number().int().nonnegative(),
-});
-export type SmartFolderPreviewResponse = z.infer<typeof smartFolderPreviewResponseSchema>;
-
-/** GET /api/axes/:axis のクエリパラメータ。値一覧の件数・総時間・代表カバーは、渡された
- *  tags による絞り込み後の集合から集計する（自軸除外カウント）。
- *  自軸由来のフィルタを除外した集合を渡すのは呼び出し側（client）の責務 */
-export const axisFacetsQuerySchema = worksQueryBaseSchema.pick({
-  tags: true,
-  tagOp: true,
-});
-export type AxisFacetsQuery = z.infer<typeof axisFacetsQuerySchema>;
 
 /** GET /api/tags */
 export const tagListSchema = z.array(z.string());

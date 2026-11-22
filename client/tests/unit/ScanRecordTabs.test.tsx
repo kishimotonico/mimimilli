@@ -51,7 +51,7 @@ describe("スキャン記録タブの読み込み失敗", () => {
     mockApi({
       "GET /api/settings": buildSettings(),
       "GET /api/scan/last": buildScanRecord({ finishedAt: "2026-01-01T00:00:00.000Z" }),
-      "GET /api/works": worksFailingOnce(),
+      "GET /api/smart-folders/:id/works": worksFailingOnce(),
     });
     renderTab(<NewWorksTab onOpenFiles={vi.fn()} onOpenWorkDetail={vi.fn()} />);
 
@@ -66,7 +66,7 @@ describe("スキャン記録タブの読み込み失敗", () => {
       "GET /api/scan/last": buildScanRecord({
         updatedWorks: [{ workId: "w1", changes: [{ kind: "meta" }] }],
       }),
-      "GET /api/works": worksFailingOnce(),
+      "GET /api/smart-folders/:id/works": worksFailingOnce(),
     });
     renderTab(<UpdatedWorksTab onOpenFiles={vi.fn()} onOpenWorkDetail={vi.fn()} />);
 
@@ -111,7 +111,7 @@ describe("スキャン記録タブの次ページ取得の失敗", () => {
     mockApi({
       "GET /api/settings": buildSettings(),
       "GET /api/scan/last": buildScanRecord({ finishedAt: "2026-01-01T00:00:00.000Z" }),
-      "GET /api/works": works.handler,
+      "GET /api/smart-folders/:id/works": works.handler,
     });
     renderTab(<NewWorksTab onOpenFiles={vi.fn()} onOpenWorkDetail={vi.fn()} />);
     await scrollListToEnd("新規作品");
@@ -147,7 +147,7 @@ describe("更新済みタブの種類の切り替え", () => {
           { workId: "w2", changes: [{ kind: "meta" }] },
         ],
       }),
-      "GET /api/works": (request) =>
+      "GET /api/smart-folders/:id/works": (request) =>
         request.url.searchParams.get("scanChange") === "moved"
           ? pending.promise
           : buildWorksPage([
@@ -182,7 +182,7 @@ describe("更新済みタブの種類の解除", () => {
     const moved = buildScanRecord({ updatedWorks: record.updatedWorks });
     mockApi({
       "GET /api/scan/last": () => record,
-      "GET /api/works": () =>
+      "GET /api/smart-folders/:id/works": () =>
         buildWorksPage([
           buildWorkListItem({ id: "w1", title: "移動した作品" }),
           buildWorkListItem({ id: "w2", title: "メタだけ作品" }),

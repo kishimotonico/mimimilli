@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ApiError, SmartFolderItem } from "@mimimilli/shared";
+import type { ApiError, SmartFolder } from "@mimimilli/shared";
 import { createApp } from "./helpers/testApp.ts";
 import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
 
@@ -12,7 +12,7 @@ const contract = defineContract({ works: [{ key: "a" }] }, { shared: true });
 const JSON_TYPE = { "Content-Type": "application/json" };
 
 async function folderNames(harness: ContractHarness): Promise<string[]> {
-  const { body } = await harness.json<SmartFolderItem[]>("/api/smart-folders");
+  const { body } = await harness.json<SmartFolder[]>("/api/smart-folders");
   return body.map((folder) => folder.name);
 }
 
@@ -57,7 +57,9 @@ async function assertAccepted(
 contract("外部Hostは拒否し、状態を変えない", async (harness) => {
   for (const host of ["evil.example", "127.0.0.1.evil.example", "localhost.evil.example"]) {
     await assertRejected(harness, `host-${host}`, { Host: host });
-    const get = await harness.app.request("/api/works", { headers: { Host: host } });
+    const get = await harness.app.request("/api/smart-folders/all/works?sort=added-desc", {
+      headers: { Host: host },
+    });
     assert.equal(get.status, 403, host);
   }
   await assertRejected(harness, "host-userinfo", { Host: "localhost@evil.example" });
@@ -79,7 +81,10 @@ contract("loopbackのHostは通す（ポート・大文字小文字を問わな�
 });
 
 contract("Hostヘッダーが無い要求は要求URLがlocalhostでも拒否する", async (harness) => {
-  for (const url of ["http://localhost/api/works", "http://evil.example/api/works"]) {
+  for (const url of [
+    "http://localhost/api/smart-folders/all/works?sort=added-desc",
+    "http://evil.example/api/smart-folders/all/works?sort=added-desc",
+  ]) {
     const res = await harness.app.fetch(new Request(url));
     assert.equal(res.status, 403, url);
   }
@@ -159,7 +164,7 @@ contract("本文なしの外部Origin POSTも拒否する", async (harness) => {
 contract(
   "GETは外部Originでも出所検証の対象外で、OPTIONSにCORSヘッダーを付けない",
   async (harness) => {
-    const get = await harness.app.request("/api/works", {
+    const get = await harness.app.request("/api/smart-folders/all/works?sort=added-desc", {
       headers: { Origin: "http://evil.example", "Sec-Fetch-Site": "cross-site" },
     });
     assert.equal(get.status, 200);

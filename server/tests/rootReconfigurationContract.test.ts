@@ -162,7 +162,7 @@ async function reconfigure(app: App, rootFolder: string): Promise<RootReconfigur
 }
 
 async function listWorkIds(app: App): Promise<string[]> {
-  const res = await app.request("/api/works");
+  const res = await app.request("/api/smart-folders/all/works?sort=added-desc");
   assert.equal(res.status, 200);
   const body = (await res.json()) as { items: Array<{ id: string }> };
   return body.items.map((item) => item.id);
@@ -237,7 +237,9 @@ for (const [kind, createHarness] of harnesses) {
 
       const settings = settingsSchema.parse(await (await h.app.request("/api/settings")).json());
       assert.deepEqual(settings.rootReconfiguration, failed);
-      await assertRootReconfiguring(await h.app.request("/api/works"));
+      await assertRootReconfiguring(
+        await h.app.request("/api/smart-folders/all/works?sort=added-desc"),
+      );
 
       // fixtureには物理FSがないため、存在しないパスの検証はrealだけで確認する。
       const invalidPaths = [
@@ -265,7 +267,7 @@ for (const [kind, createHarness] of harnesses) {
         assert.equal((await h.app.request(path)).status, 200, path);
       }
       const denied: Array<[string, string]> = [
-        ["GET", "/api/works"],
+        ["GET", "/api/smart-folders/all/works?sort=added-desc"],
         ["GET", `/api/works/${h.keptWorkId}`],
         ["GET", "/api/fs"],
         ["GET", `/api/media/cover/${h.keptWorkId}`],
@@ -332,7 +334,9 @@ for (const [kind, createHarness] of harnesses) {
       const failed = await reconfigure(h.app, h.unreadableRoot);
       await h.restart();
       assert.deepEqual(await getState(h.app), failed);
-      await assertRootReconfiguring(await h.app.request("/api/works"));
+      await assertRootReconfiguring(
+        await h.app.request("/api/smart-folders/all/works?sort=added-desc"),
+      );
 
       await h.adapter.beginRootReconfiguration(h.newRoot);
       await h.restart();
@@ -341,10 +345,15 @@ for (const [kind, createHarness] of harnesses) {
         rootFolder: h.newRoot,
         message: ROOT_RECONFIGURATION_INTERRUPTED_MESSAGE,
       });
-      await assertRootReconfiguring(await h.app.request("/api/works"));
+      await assertRootReconfiguring(
+        await h.app.request("/api/smart-folders/all/works?sort=added-desc"),
+      );
 
       assertIdleAfterCompletion(await reconfigure(h.app, h.newRoot));
-      assert.equal((await h.app.request("/api/works")).status, 200);
+      assert.equal(
+        (await h.app.request("/api/smart-folders/all/works?sort=added-desc")).status,
+        200,
+      );
     },
   );
 }
@@ -378,7 +387,7 @@ test("fixture: root-reconfiguration-failed シナリオは失敗状態で起動�
   const state = await getState(app);
   assert.equal(state.status, "failed");
   assert.ok(state.status === "failed" && state.rootFolder === FIXTURE_UNREADABLE_ROOT);
-  await assertRootReconfiguring(await app.request("/api/works"));
+  await assertRootReconfiguring(await app.request("/api/smart-folders/all/works?sort=added-desc"));
 
   assertIdleAfterCompletion(await reconfigure(app, "/library"));
   assert.ok((await listWorkIds(app)).includes("RJ501001"));

@@ -6,13 +6,13 @@ import {
   type Condition,
   type GroupBy,
   type NormalizedTag,
-  type SmartFolderItem,
+  type SmartFolder,
   type SortId,
 } from "@mimimilli/shared";
 import type { LibraryRoute } from "../navigation/model/appRoute";
 
 interface ResolvedBase {
-  folder: SmartFolderItem;
+  folder: SmartFolder;
   /** 解決済みの並び（今の並び → フォルダーの既定 → 「すべて」の既定） */
   sort: SortId;
   /** 今の並びが解決後の既定から外れているか（「この並びを既定にする」を出すか） */
@@ -44,7 +44,7 @@ export type ResolvedViewKind = ResolvedLibraryView["kind"];
 /** 値一覧か作品一覧か。値を選ぶ前のグループ分けが値一覧 */
 export function resolveLibraryView(
   library: LibraryRoute,
-  folders: readonly SmartFolderItem[],
+  folders: readonly SmartFolder[],
 ): ResolvedLibraryView {
   const all = folders.find((folder) => folder.id === ALL_SMART_FOLDER_ID);
   if (!all || all.sort === null) {

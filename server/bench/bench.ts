@@ -77,6 +77,8 @@ function formatMarkdown(report: BenchReport): string {
   return `${lines.join("\n")}\n`;
 }
 
+const ALL_WORKS = "/api/smart-folders/all/works?sort=added-desc";
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const dataDir = resolve(requireArg(args, "data-dir"));
@@ -97,28 +99,28 @@ async function main(): Promise<void> {
   const cases: Array<{ name: string; path: string; run: () => Promise<Response> }> = [
     {
       name: "works-page-1",
-      path: "/api/works",
-      run: async () => request("/api/works"),
+      path: ALL_WORKS,
+      run: async () => request(ALL_WORKS),
     },
     {
       name: "works-deep-page",
-      path: `/api/works?page=${manifest.deepPage}`,
-      run: async () => request(`/api/works?page=${manifest.deepPage}`),
+      path: `${ALL_WORKS}&page=${manifest.deepPage}`,
+      run: async () => request(`${ALL_WORKS}&page=${manifest.deepPage}`),
     },
     {
       name: "works-search-q",
-      path: `/api/works?q=${encodeURIComponent(manifest.sampleSearchQ)}`,
-      run: async () => request(`/api/works?q=${encodeURIComponent(manifest.sampleSearchQ)}`),
+      path: `${ALL_WORKS}&q=${encodeURIComponent(manifest.sampleSearchQ)}`,
+      run: async () => request(`${ALL_WORKS}&q=${encodeURIComponent(manifest.sampleSearchQ)}`),
     },
     {
       name: "works-search-tag",
-      path: `/api/works?tags=${encodeURIComponent(manifest.sampleTag)}`,
-      run: async () => request(`/api/works?tags=${encodeURIComponent(manifest.sampleTag)}`),
+      path: `${ALL_WORKS}&tags=${encodeURIComponent(manifest.sampleTag)}`,
+      run: async () => request(`${ALL_WORKS}&tags=${encodeURIComponent(manifest.sampleTag)}`),
     },
     ...manifest.sorts.map((sort) => {
       const query =
         sort === "random" ? `sort=random&seed=42&limit=${WORKS_DEFAULT_PAGE_SIZE}` : `sort=${sort}`;
-      const path = `/api/works?${query}`;
+      const path = `/api/smart-folders/all/works?${query}`;
       return {
         name: `works-sort-${sort}`,
         path,
@@ -137,10 +139,23 @@ async function main(): Promise<void> {
       run: async () =>
         request(`/api/smart-folders/${manifest.smartFolderWithRulesId}/works?sort=added-desc`),
     },
-    ...["cv", "サークル", "tag", "year"].map((axis) => {
-      const path = `/api/axes/${encodeURIComponent(axis)}`;
-      return { name: `values-${axis}`, path, run: async () => request(path) };
-    }),
+    ...(
+      [
+        ["cv", { kind: "prefix", prefix: "cv" }],
+        ["サークル", { kind: "prefix", prefix: "サークル" }],
+        ["tag", { kind: "tag" }],
+        ["year", { kind: "addedYear" }],
+      ] as const
+    ).map(([name, groupBy]) => ({
+      name: `values-${name}`,
+      path: "/api/smart-folders/all/groups",
+      run: async () =>
+        app.request("/api/smart-folders/all/groups", {
+          method: "POST",
+          headers: { Host: "127.0.0.1:8080", "Content-Type": "application/json" },
+          body: JSON.stringify({ groupBy }),
+        }),
+    })),
     {
       name: "values-cv-in-smart-folder",
       path: `/api/smart-folders/${manifest.smartFolderWithRulesId}/groups`,
@@ -150,18 +165,6 @@ async function main(): Promise<void> {
           headers: { Host: "127.0.0.1:8080", "Content-Type": "application/json" },
           body: JSON.stringify({ groupBy: { kind: "prefix", prefix: "cv" } }),
         }),
-    },
-    {
-      name: "counts-views",
-      path: "/api/works?view=<recent|added|fav|error>&limit=1",
-      run: async () => {
-        let last: Response = new Response(null, { status: 200 });
-        for (const view of ["recent", "added", "fav", "error"]) {
-          last = await request(`/api/works?view=${view}&limit=1`);
-          await last.arrayBuffer();
-        }
-        return last;
-      },
     },
     {
       name: "counts-smart-folders",

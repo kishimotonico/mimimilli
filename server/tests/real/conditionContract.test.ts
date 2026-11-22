@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 import {
   emptyDlsiteState,
   sortIdSchema,
@@ -211,9 +211,18 @@ interface Adapters {
   real: DataAdapter;
 }
 
-async function setup(t: { after: (fn: () => unknown) => void }): Promise<Adapters> {
+/** 全テストが読み取りだけなので、DB の用意（約1秒）はファイルで1回だけ行う */
+let shared: Promise<Adapters> | null = null;
+let cleanupShared: (() => void) | null = null;
+after(() => cleanupShared?.());
+function setup(): Promise<Adapters> {
+  shared ??= createAdapters();
+  return shared;
+}
+
+async function createAdapters(): Promise<Adapters> {
   const directory = makeTestDirectory("condition-contract");
-  t.after(directory.cleanup);
+  cleanupShared = directory.cleanup;
   const catalogPath = join(directory.path, "catalog.db");
   const userPath = join(directory.path, "user.db");
   const root = join(directory.path, "lib");
@@ -243,8 +252,8 @@ function normalizeFacets(items: AxisFacetItem[]) {
   }));
 }
 
-test("条件の木の一覧は fixture と real で作品 ID 列・total・stats が一致する", async (t) => {
-  const { fixture, real } = await setup(t);
+test("条件の木の一覧は fixture と real で作品 ID 列・total・stats が一致する", async () => {
+  const { fixture, real } = await setup();
   for (const condition of trees) {
     const sort = pick(sortIdSchema.options);
     const query = {
@@ -265,13 +274,11 @@ test("条件の木の一覧は fixture と real で作品 ID 列・total・stats
     );
     assert.equal(actual.total, expected.total, `total: ${label}`);
     assert.deepEqual(actual.stats, expected.stats, `stats: ${label}`);
-    assert.equal(actual.seed, undefined, "応答に seed を載せない");
-    assert.equal(expected.seed, undefined, "応答に seed を載せない");
   }
 });
 
-test("条件の木のグループの値一覧は fixture と real で値・件数・時間・カバーが一致する", async (t) => {
-  const { fixture, real } = await setup(t);
+test("条件の木のグループの値一覧は fixture と real で値・件数・時間・カバーが一致する", async () => {
+  const { fixture, real } = await setup();
   for (const condition of trees) {
     for (const groupBy of groupBys) {
       assert.deepEqual(
@@ -283,8 +290,8 @@ test("条件の木のグループの値一覧は fixture と real で値・件�
   }
 });
 
-test("条件の木の件数は fixture と real で一致し、入力順に返る", async (t) => {
-  const { fixture, real } = await setup(t);
+test("条件の木の件数は fixture と real で一致し、入力順に返る", async () => {
+  const { fixture, real } = await setup();
   assert.deepEqual(
     await real.countByConditions(trees, ctx),
     await fixture.countByConditions(trees, ctx),
@@ -340,8 +347,8 @@ const semanticCases: Array<{ name: string; condition: Condition; expected: strin
   },
 ];
 
-test("意味表の境界が独立に書いた期待値と fixture・real の両方で一致する", async (t) => {
-  const adapters = await setup(t);
+test("意味表の境界が独立に書いた期待値と fixture・real の両方で一致する", async () => {
+  const adapters = await setup();
   for (const { name, condition, expected } of semanticCases) {
     assert.ok(expected.length > 0 && expected.length < dataset.length, `${name}: 期待値が自明`);
     const query = { condition, sort: "id-asc" as const, page: 1, limit: 500 };
@@ -359,8 +366,8 @@ test("意味表の境界が独立に書いた期待値と fixture・real の両�
   }
 });
 
-test("sort=random で seed が無いと fixture も real も拒否する", async (t) => {
-  const adapters = await setup(t);
+test("sort=random で seed が無いと fixture も real も拒否する", async () => {
+  const adapters = await setup();
   const query = { condition: and(), sort: "random" as const, page: 1, limit: 5 };
   for (const adapter of [adapters.fixture, adapters.real]) {
     await assert.rejects(adapter.queryWorks(query, ctx), /seed/);

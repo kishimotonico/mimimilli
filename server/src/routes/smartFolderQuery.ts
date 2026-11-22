@@ -52,7 +52,7 @@ function validGroupTag(tag: string): string {
   return normalized;
 }
 
-/** sort=random で seed が無い、tagOp を送るなど、契約に合わない要求は 400 */
+/** sort=random で seed が無い、契約にないキーを送るなど、契約に合わない要求は 400 */
 export function parseSmartFolderWorksRequest(raw: unknown): SmartFolderWorksRequest {
   const parsed = smartFolderWorksRequestSchema.safeParse(raw);
   if (!parsed.success) {

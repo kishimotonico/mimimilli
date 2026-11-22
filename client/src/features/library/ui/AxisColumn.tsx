@@ -3,7 +3,7 @@ import { AnimatePresence } from "motion/react";
 import {
   showsCount,
   type NormalizedTag,
-  type SmartFolderItem,
+  type SmartFolder,
   type TagPrefix,
 } from "@mimimilli/shared";
 import { getAxisLabel, getSmartFolderIcon } from "../../../entities/library/axisDefinitions";
@@ -25,7 +25,7 @@ interface AxisRow {
 }
 
 interface AxisColumnProps {
-  folders: SmartFolderItem[];
+  folders: SmartFolder[];
   /** 開いているスマートフォルダー（解決済み）とグループの値 */
   activeFolderId: string;
   activeGroup: string | null;
@@ -90,7 +90,7 @@ function AxisRowItem({
   );
 }
 
-function toRow(folder: SmartFolderItem): AxisRow {
+function toRow(folder: SmartFolder): AxisRow {
   const { condition } = folder;
   if (condition === null) {
     return { id: folder.id, name: folder.name, icon: "err", hasQuickOverlay: false };

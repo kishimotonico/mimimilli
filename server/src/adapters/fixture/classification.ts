@@ -1,6 +1,4 @@
 import type {
-  AxisFacetItem,
-  AxisFacetsQuery,
   SmartFolderWrite,
   TagPrefix,
   TagPrefixCandidate,
@@ -12,16 +10,11 @@ import type {
   SmartFolderInsert,
   SmartFolderRow,
 } from "../../adapter/classification.ts";
-import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { composeWorks, type FixtureState } from "./state.ts";
 
 export function createClassificationMethods(state: FixtureState): ClassificationAdapter {
   return {
-    async getAxisFacets(axis: string, filter?: Partial<AxisFacetsQuery>): Promise<AxisFacetItem[]> {
-      return buildAxisFacets(axis, composeWorks(state), filter);
-    },
-
     async listTagPrefixes(): Promise<TagPrefix[]> {
       return [...state.tagPrefixes].sort((a, b) => a.order - b.order);
     },

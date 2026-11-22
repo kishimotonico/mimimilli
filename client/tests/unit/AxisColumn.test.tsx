@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 import AxisColumn from "../../src/features/library/ui/AxisColumn";
 import { mockApi } from "../helpers/api";
-import { buildSmartFolderItem, defaultSmartFolderItems } from "../helpers/smartFolders";
+import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
 import { buildAxisFacetItem, buildTagPrefix } from "../helpers/builders";
 
 let sizeMock: { restore: () => void } | null = null;
@@ -35,7 +35,7 @@ function renderAxisColumn(props: Partial<React.ComponentProps<typeof AxisColumn>
     <QueryClientProvider client={queryClient}>
       <div className="mle-app">
         <AxisColumn
-          folders={defaultSmartFolderItems({ recent: 7, added: 0, fav: 4, error: 2 })}
+          folders={defaultSmartFolders({ recent: 7, added: 0, fav: 4, error: 2 })}
           activeFolderId="all"
           activeGroup={null}
           tagPrefixes={PREFIXES}
@@ -85,7 +85,7 @@ describe("AxisColumn", () => {
 
   it("件数を出さないもの（条件が空・グループ分けあり）は件数を持っていても出さない", () => {
     renderAxisColumn({
-      folders: defaultSmartFolderItems({ all: 11, random: 11, "by-cv": 3 }),
+      folders: defaultSmartFolders({ all: 11, random: 11, "by-cv": 3 }),
     });
 
     expect(screen.getByRole("button", { name: "すべて" })).toBeInTheDocument();
@@ -111,8 +111,8 @@ describe("AxisColumn", () => {
   it("読めない行は開けるが件数もクイックオーバーレイも持たない", () => {
     renderAxisColumn({
       folders: [
-        ...defaultSmartFolderItems(),
-        buildSmartFolderItem({ id: "sf-broken", name: "壊れた行", condition: null }),
+        ...defaultSmartFolders(),
+        buildSmartFolder({ id: "sf-broken", name: "壊れた行", condition: null }),
       ],
     });
 

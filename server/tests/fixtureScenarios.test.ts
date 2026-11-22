@@ -11,6 +11,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { workspacePath } from "@mimimilli/shared";
 import { createApp } from "./helpers/testApp.ts";
+import { listWorks } from "./helpers/workList.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { CandidatePoolChangedError } from "../src/errors.ts";
 import {
@@ -32,7 +33,7 @@ function buildApp(scenario?: string) {
 
 test("シナリオ省略時は default として動作する", async () => {
   const app = buildApp();
-  const res = await app.request("/api/works");
+  const res = await app.request("/api/smart-folders/all/works?sort=added-desc");
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.ok(body.items.length > 0);
@@ -124,10 +125,7 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
   // 承認分を表示するため、ここで見えなければタブにも出ない。
   const registeredWorkId = registration.registered[0]?.workId;
   assert.ok(registeredWorkId);
-  const registeredWorksPage = await adapter.queryWorksLegacy({
-    q: "",
-    tags: { tags: [], yearValue: null },
-    tagOp: "AND",
+  const registeredWorksPage = await listWorks(adapter, {
     sort: "id-asc",
     ids: [registeredWorkId],
   });
@@ -299,7 +297,7 @@ test("候補登録APIは、サーバーが持つ実効RJコード（検出値・
 test("empty: 作品が0件で、既定のスマートフォルダーの件数は0", async () => {
   const app = buildApp("empty");
 
-  const worksRes = await app.request("/api/works");
+  const worksRes = await app.request("/api/smart-folders/all/works?sort=added-desc");
   const worksBody = await worksRes.json();
   assert.equal(worksBody.total, 0);
   assert.deepEqual(worksBody.items, []);
@@ -313,7 +311,7 @@ test("empty: 作品が0件で、既定のスマートフォルダーの件数は
 test("errors: エラー・行方不明の作品のみが含まれる", async () => {
   const app = buildApp("errors");
 
-  const res = await app.request("/api/works");
+  const res = await app.request("/api/smart-folders/all/works?sort=added-desc");
   const { items } = await res.json();
   assert.ok(items.length > 0);
   for (const work of items) {
@@ -371,7 +369,9 @@ test("large: 1000件の作品が生成され、IDが一意でスキーマ検証�
 
   const pages = await Promise.all(
     [1, 2].map(async (page) => {
-      const res = await app.request(`/api/works?limit=500&page=${page}`);
+      const res = await app.request(
+        `/api/smart-folders/all/works?sort=added-desc&limit=500&page=${page}`,
+      );
       assert.equal(res.status, 200);
       return res.json();
     }),
@@ -391,7 +391,9 @@ test("large: 生成直後のDLsite取得失敗が未失効で反映される（n
 
   const pages = await Promise.all(
     [1, 2].map(async (page) => {
-      const res = await app.request(`/api/works?limit=500&page=${page}`);
+      const res = await app.request(
+        `/api/smart-folders/all/works?sort=added-desc&limit=500&page=${page}`,
+      );
       assert.equal(res.status, 200);
       return res.json() as Promise<{ items: Array<{ dlsite: { status: string } }> }>;
     }),

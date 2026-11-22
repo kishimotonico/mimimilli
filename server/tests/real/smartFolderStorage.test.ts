@@ -6,7 +6,7 @@ import {
   conditionKey,
   SMART_FOLDER_TEMPLATES,
   findSmartFolderTemplate,
-  type SmartFolderItem,
+  type SmartFolder,
 } from "@mimimilli/shared";
 import { createApp } from "../helpers/testApp.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
@@ -130,7 +130,7 @@ test("読めない行があっても一覧は成功し、壊れた行を null �
 
   const res = await app.request("/api/smart-folders");
   assert.equal(res.status, 200);
-  const folders = (await res.json()) as SmartFolderItem[];
+  const folders = (await res.json()) as SmartFolder[];
   for (const id of ["broken-json", "broken-sort", "broken-group"]) {
     const row = folders.find((f) => f.id === id)!;
     assert.deepEqual(

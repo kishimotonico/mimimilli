@@ -1,4 +1,4 @@
-// GET /works のサーバー側デフォルトページングと、ページ間の重複・欠落なしを fixture / real の両方で検証。
+// GET /smart-folders/:id/works のサーバー側デフォルトページングと、ページ間の重複・欠落なしを fixture / real の両方で検証。
 import assert from "node:assert/strict";
 import { WORKS_DEFAULT_PAGE_SIZE, type WorksPage } from "@mimimilli/shared";
 import { defineContract, numberedWorks, type ContractHarness } from "./helpers/contractHarness.ts";
@@ -6,8 +6,14 @@ import { defineContract, numberedWorks, type ContractHarness } from "./helpers/c
 const TOTAL = WORKS_DEFAULT_PAGE_SIZE + 10;
 const contract = defineContract({ works: numberedWorks(TOTAL) }, { shared: true });
 
-async function getWorks(harness: ContractHarness, query = ""): Promise<WorksPage> {
-  const { status, body } = await harness.json<WorksPage>(`/api/works${query}`);
+async function getWorks(
+  harness: ContractHarness,
+  query = "",
+  sort = "added-desc",
+): Promise<WorksPage> {
+  const { status, body } = await harness.json<WorksPage>(
+    `/api/smart-folders/all/works?sort=${sort}${query}`,
+  );
   assert.equal(status, 200);
   return body;
 }
@@ -22,7 +28,7 @@ contract(
 );
 
 contract("一覧HTTPレスポンスは軽量DTOの許可キーだけを返す", async (harness) => {
-  const body = await getWorks(harness, "?limit=1");
+  const body = await getWorks(harness, "&limit=1");
   const item = body.items[0]!;
   assert.deepEqual(Object.keys(item).sort(), [
     "bookmarked",
@@ -42,36 +48,34 @@ contract("一覧HTTPレスポンスは軽量DTOの許可キーだけを返す", 
   assert.equal("playlists" in item, false);
 });
 
+contract("応答は items・stats・total だけで、seed を返さない", async (harness) => {
+  const body = await getWorks(harness, "&limit=1");
+  assert.deepEqual(Object.keys(body).sort(), ["items", "stats", "total"]);
+  const random = await harness.json<WorksPage>(
+    "/api/smart-folders/random/works?sort=random&seed=7&limit=1",
+  );
+  assert.equal(random.status, 200);
+  assert.deepEqual(Object.keys(random.body).sort(), ["items", "stats", "total"]);
+});
+
 contract("limit のみ指定時は page=1 として動作する", async (harness) => {
-  const body = await getWorks(harness, "?limit=5&sort=id-asc");
+  const body = await getWorks(harness, "&limit=5", "id-asc");
   assert.equal(body.items.length, 5);
   assert.equal(body.total, TOTAL);
   assert.equal(body.items[0]!.id, harness.workId("work-0000"));
 });
 
 contract("全件がページの連結で重複・欠落なく取得できる", async (harness) => {
-  const first = await getWorks(harness, `?limit=${WORKS_DEFAULT_PAGE_SIZE}&page=1`);
-  const second = await getWorks(harness, `?limit=${WORKS_DEFAULT_PAGE_SIZE}&page=2`);
+  const first = await getWorks(harness, `&limit=${WORKS_DEFAULT_PAGE_SIZE}&page=1`);
+  const second = await getWorks(harness, `&limit=${WORKS_DEFAULT_PAGE_SIZE}&page=2`);
   const ids = [...first.items, ...second.items].map((work) => work.id);
   assert.equal(new Set(ids).size, TOTAL, "ページ間で重複があります");
   assert.equal(ids.length, TOTAL, "ページ間で欠落があります");
   assert.equal(second.total, TOTAL);
 });
 
-contract(
-  "randomソートは発行されたseedを次ページへ送ると重複・欠落なく取得できる",
-  async (harness) => {
-    const first = await getWorks(harness, "?sort=random&limit=200&page=1");
-    assert.equal(typeof first.seed, "number");
-    const second = await getWorks(harness, `?sort=random&seed=${first.seed}&limit=200&page=2`);
-    const ids = [...first.items, ...second.items].map((work) => work.id);
-    assert.equal(new Set(ids).size, TOTAL, "random ページ間で重複があります");
-    assert.equal(ids.length, TOTAL, "random ページ間で欠落があります");
-  },
-);
-
 contract("デフォルト limit を超えた分は次ページで取得できる", async (harness) => {
-  const second = await getWorks(harness, "?page=2");
+  const second = await getWorks(harness, "&page=2");
   assert.equal(second.items.length, TOTAL - WORKS_DEFAULT_PAGE_SIZE);
   assert.equal(second.total, TOTAL);
 });
@@ -85,7 +89,7 @@ for (const total of [WORKS_DEFAULT_PAGE_SIZE, WORKS_DEFAULT_PAGE_SIZE + 1]) {
       const first = await getWorks(harness);
       assert.equal(first.items.length, WORKS_DEFAULT_PAGE_SIZE);
       assert.equal(first.total, total);
-      const second = await getWorks(harness, "?page=2");
+      const second = await getWorks(harness, "&page=2");
       assert.equal(second.items.length, total - WORKS_DEFAULT_PAGE_SIZE);
       assert.equal(second.total, total);
     },

@@ -1,18 +1,18 @@
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
-import type { Condition, SmartFolderItem } from "@mimimilli/shared";
+import type { Condition, SmartFolder } from "@mimimilli/shared";
 import { resolveLibraryView } from "../../src/entities/library/resolveLibraryView";
 import { createInitialAppRoute } from "../../src/entities/navigation/model/appRoute";
 import { bookmarkActiveListHandler } from "../../src/features/library/model/workPatchInvalidation";
-import { buildSmartFolderItem, defaultSmartFolderItems } from "../helpers/smartFolders";
+import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
 
 const tag = (value: string): Condition => ({ type: "tag", tag: value });
 const bookmarked: Condition = { type: "bookmarked" };
 
 function handlerFor(condition: Condition) {
-  const folder: SmartFolderItem = buildSmartFolderItem({ id: "sf-x", condition });
+  const folder: SmartFolder = buildSmartFolder({ id: "sf-x", condition });
   const view = resolveLibraryView({ ...createInitialAppRoute().library, folderId: "sf-x" }, [
-    ...defaultSmartFolderItems(),
+    ...defaultSmartFolders(),
     folder,
   ]);
   return bookmarkActiveListHandler(view, "");
@@ -59,9 +59,9 @@ describe("bookmarkActiveListHandler: 条件がお気に入りに依存するか"
   });
 
   it("値一覧・読めない行は一覧を引き受けない", () => {
-    const broken = buildSmartFolderItem({ id: "sf-b", condition: null });
+    const broken = buildSmartFolder({ id: "sf-b", condition: null });
     const view = resolveLibraryView({ ...createInitialAppRoute().library, folderId: "sf-b" }, [
-      ...defaultSmartFolderItems(),
+      ...defaultSmartFolders(),
       broken,
     ]);
     expect(bookmarkActiveListHandler(view, "")).toBeNull();

@@ -58,7 +58,7 @@ const UPDATED_WORK = { workId: "work-u", changes: [{ kind: "meta" as const }] };
 
 const CHANGES_ROUTES = {
   "GET /api/scan/last": () => buildScanRecord(),
-  "GET /api/works": () => buildWorksPage([], { total: 0 }),
+  "GET /api/smart-folders/:id/works": () => buildWorksPage([], { total: 0 }),
 } as const;
 
 const UNSTRUCTURED_FAILURE = () => new Response("開始できませんでした", { status: 500 });
@@ -226,7 +226,7 @@ describe("ScanRuntime", () => {
             finishedAt: "2026-01-01T00:00:01.000Z",
           }),
           "GET /api/scan/last": buildScanRecord({ updatedWorks: [UPDATED_WORK] }),
-          "GET /api/works": () => buildWorksPage([], { total: 3 }),
+          "GET /api/smart-folders/:id/works": () => buildWorksPage([], { total: 3 }),
         },
         { modalOpen: false },
       );

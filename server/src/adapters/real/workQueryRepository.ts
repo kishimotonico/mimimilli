@@ -1,7 +1,6 @@
 import { sep } from "node:path";
 import { asc, eq } from "drizzle-orm";
 import {
-  createRandomSeed,
   relativeToRoot,
   isCoverUnmeasured,
   projectCoverKind,
@@ -13,14 +12,12 @@ import type {
   Condition,
   GroupBy,
   MissingWork,
-  SmartFolderRule,
   Work,
   WorkPlacement,
   WorkspacePath,
   WorksPage,
-  WorksQuery,
+  SortId,
 } from "@mimimilli/shared";
-import type { AxisFacetsQuery } from "@mimimilli/shared";
 import { isPathWithin } from "../../lib/path.ts";
 import type {
   ConditionGroupQuery,
@@ -29,7 +26,6 @@ import type {
 } from "../../adapter/condition.ts";
 import { requireRandomSeed } from "../../core/conditionQuery.ts";
 import { compileCondition } from "./conditionSql.ts";
-import { japaneseSortKey } from "../../core/japaneseSortKey.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips } from "./dataIntegrity.ts";
 import type { Db } from "./db.ts";
@@ -52,11 +48,7 @@ import {
   chunk,
   inClausePlaceholders,
   JOINED_WORKS_SELECT,
-  smartFolderRulePredicates,
   SQLITE_IN_CHUNK_SIZE,
-  tagAxisConditions,
-  textSearchCondition,
-  viewConditions,
   WORKS_QUERY_FROM,
   worksOrderSql,
 } from "./workQuerySql.ts";
@@ -349,49 +341,6 @@ export class WorkQueryRepository {
     }>;
   }
 
-  /** ルールに一致しうる作品のサマリー。ルールなしは全作品（SQLで候補を絞るだけで最終評価は呼び出し側） */
-  listSmartFolderCandidateSummaries(rules: SmartFolderRule[]): ListSummariesResult {
-    if (rules.length === 0) return this.listSummaries();
-    const { predicates, bindings } = smartFolderRulePredicates(rules);
-    const rows = this.db.sqlite
-      .query(`SELECT works.id AS id FROM main.works WHERE ${predicates.join(" OR ")}`)
-      .all(...bindings) as Array<{ id: string }>;
-    return this.listSummaries(rows.map((row) => row.id));
-  }
-
-  queryWorks(params: WorksQuery, root: string): WorksPage {
-    const seed = params.sort === "random" ? (params.seed ?? createRandomSeed()) : undefined;
-    const conditions: string[] = [];
-    const bindings: Array<string | number> = [];
-
-    if (params.ids !== undefined) {
-      conditions.push("works.id IN (SELECT value FROM json_each(?))");
-      bindings.push(JSON.stringify(params.ids));
-    }
-
-    if (params.q) {
-      const text = textSearchCondition(japaneseSortKey(params.q), params.q);
-      conditions.push(...text.conditions);
-      bindings.push(...text.bindings);
-    }
-
-    const { tags: realTags, yearValue } = params.tags;
-    const tagAxis = tagAxisConditions(realTags, params.tagOp, yearValue);
-    conditions.push(...tagAxis.conditions);
-    bindings.push(...tagAxis.bindings);
-
-    const view = viewConditions(params.view);
-    conditions.push(...view.conditions);
-    bindings.push(...view.bindings);
-
-    const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-    const page = this.runWorksQuery(
-      { whereSql, bindings, sort: params.sort, seed, page: params.page, limit: params.limit },
-      root,
-    );
-    return seed === undefined ? page : { ...page, seed };
-  }
-
   /** 条件の木に一致する作品の一覧（ADR-0040）。seed は呼び出し側が渡し、ここでは発行しない */
   queryWorksByCondition(query: ConditionWorksQuery, root: string, ctx: EvalContext): WorksPage {
     const seed = requireRandomSeed(query.sort, query.seed);
@@ -419,7 +368,7 @@ export class WorkQueryRepository {
     run: {
       whereSql: string;
       bindings: Array<string | number>;
-      sort: WorksQuery["sort"];
+      sort: SortId;
       seed: number | undefined;
       page: number | undefined;
       limit: number | undefined;
@@ -567,18 +516,6 @@ export class WorkQueryRepository {
 
   fetchProbeCache(paths: string[]): Map<string, ProbeCacheEntry> {
     return fetchProbeCacheFromDb(this.db, paths);
-  }
-
-  getAxisFacets(axis: string, filter: Partial<AxisFacetsQuery> = {}): AxisFacetItem[] {
-    const { tags: realTags, yearValue } = filter.tags ?? { tags: [], yearValue: null };
-    const tagAxis = tagAxisConditions(realTags, filter.tagOp ?? "AND", yearValue);
-    const groupBy: GroupBy =
-      axis === "year"
-        ? { kind: "addedYear" }
-        : axis === "tag"
-          ? { kind: "tag" }
-          : { kind: "prefix", prefix: axis };
-    return this.facetItems(groupBy, tagAxis.conditions, tagAxis.bindings);
   }
 
   /** 条件の木に一致する作品を、グループ分けの値ごとに集計する（ADR-0040） */

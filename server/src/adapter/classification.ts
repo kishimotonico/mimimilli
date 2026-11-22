@@ -1,8 +1,6 @@
 import type {
-  AxisFacetItem,
-  AxisFacetsQuery,
   Condition,
-  SmartFolderItem,
+  SmartFolder,
   SmartFolderWrite,
   TagPrefix,
   TagPrefixCandidate,
@@ -11,8 +9,6 @@ import type {
 } from "@mimimilli/shared";
 
 export interface ClassificationAdapter {
-  /** axis は "tag" / "year" / 任意の prefix 文字列（正規形・小文字）（ADR-0005） */
-  getAxisFacets(axis: string, filter?: Partial<AxisFacetsQuery>): Promise<AxisFacetItem[]>;
   listTagPrefixes(): Promise<TagPrefix[]>;
   /** 既存の prefix と重複する場合は null（ルートが 409 を返す） */
   createTagPrefix(input: TagPrefixCreate): Promise<TagPrefix | null>;
@@ -38,7 +34,7 @@ export interface ClassificationAdapter {
 }
 
 /** 件数を除いた一覧の1行 */
-export type SmartFolderRow = Omit<SmartFolderItem, "count">;
+export type SmartFolderRow = Omit<SmartFolder, "count">;
 /** 保存する行。読める行だけを書く */
 export type SmartFolderInsert = Omit<SmartFolderRow, "condition" | "position"> & {
   condition: Condition;

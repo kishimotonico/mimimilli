@@ -3,13 +3,16 @@
 
 import { deleteVoid, getParsed, postParsed, putParsed } from "../../shared/api/http";
 import {
+  ALL_SMART_FOLDER_ID,
   axisFacetListSchema,
-  smartFolderItemListSchema,
-  smartFolderItemSchema,
+  smartFolderListSchema,
+  smartFolderSchema,
   worksPageSchema,
   type AxisFacetItem,
   type GroupBy,
-  type SmartFolderItem,
+  type ScanRecordKind,
+  type WorkChangeKind,
+  type SmartFolder,
   type SmartFolderWrite,
   type SortId,
   type WorksPage,
@@ -17,15 +20,12 @@ import {
 
 const folderPath = (id: string) => `/smart-folders/${encodeURIComponent(id)}`;
 
-export async function listSmartFolders(): Promise<SmartFolderItem[]> {
-  return getParsed(smartFolderItemListSchema, "/smart-folders");
+export async function listSmartFolders(): Promise<SmartFolder[]> {
+  return getParsed(smartFolderListSchema, "/smart-folders");
 }
 
-export async function updateSmartFolder(
-  id: string,
-  data: SmartFolderWrite,
-): Promise<SmartFolderItem> {
-  return putParsed(smartFolderItemSchema, folderPath(id), data);
+export async function updateSmartFolder(id: string, data: SmartFolderWrite): Promise<SmartFolder> {
+  return putParsed(smartFolderSchema, folderPath(id), data);
 }
 
 export async function deleteSmartFolder(id: string): Promise<void> {
@@ -40,6 +40,9 @@ export interface SmartFolderWorksParams {
   seed: number | undefined;
   page: number;
   limit: number;
+  /** スキャン記録の作品だけに絞る（スキャン画面） */
+  scanRecord?: ScanRecordKind;
+  scanChange?: WorkChangeKind;
 }
 
 export async function getSmartFolderWorks(
@@ -55,7 +58,34 @@ export async function getSmartFolderWorks(
   if (params.sort === "random" && params.seed !== undefined) p.set("seed", String(params.seed));
   p.set("page", String(params.page));
   p.set("limit", String(params.limit));
+  if (params.scanRecord) p.set("scanRecord", params.scanRecord);
+  if (params.scanChange) p.set("scanChange", params.scanChange);
   return getParsed(worksPageSchema, `${folderPath(id)}/works?${p.toString()}`, options);
+}
+
+/** 「すべて」の作品一覧。ライブラリ全体の件数・統計と、スキャン記録の作品の取得に使う */
+export async function getAllWorks(
+  params: {
+    page?: number;
+    limit: number;
+    scanRecord?: ScanRecordKind;
+    scanChange?: WorkChangeKind;
+  },
+  options?: { signal?: AbortSignal },
+): Promise<WorksPage> {
+  return getSmartFolderWorks(
+    ALL_SMART_FOLDER_ID,
+    {
+      q: "",
+      tags: [],
+      group: null,
+      sort: "added-desc",
+      seed: undefined,
+      page: 1,
+      ...params,
+    },
+    options,
+  );
 }
 
 export interface SmartFolderGroupsParams {

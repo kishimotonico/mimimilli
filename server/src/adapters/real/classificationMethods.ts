@@ -2,13 +2,11 @@ import {
   DEFAULT_TAG_PREFIXES,
   SMART_FOLDER_TEMPLATES,
   type SmartFolderWrite,
-  type AxisFacetItem,
   type TagPrefix,
   type TagPrefixCandidate,
   type TagPrefixCreate,
   type TagPrefixUpdate,
 } from "@mimimilli/shared";
-import type { AxisFacetsQuery } from "@mimimilli/shared";
 import type { SmartFolderInsert, SmartFolderRow } from "../../adapter/classification.ts";
 import { insertFromTemplate } from "../../core/smartFolderPolicy.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
@@ -46,10 +44,6 @@ export function createClassificationMethods(deps: {
 }) {
   const { query, user } = deps;
   return {
-    async getAxisFacets(axis: string, filter?: Partial<AxisFacetsQuery>): Promise<AxisFacetItem[]> {
-      return query.getAxisFacets(axis, filter);
-    },
-
     async listTagPrefixes(): Promise<TagPrefix[]> {
       return user.listTagPrefixes();
     },

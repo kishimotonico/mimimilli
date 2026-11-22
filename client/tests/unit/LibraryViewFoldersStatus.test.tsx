@@ -7,7 +7,7 @@ import LibraryView from "../../src/features/library/ui/LibraryView";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import { apiError, mockApi } from "../helpers/api";
 import { appShellRoutes } from "../helpers/appShellApi";
-import { defaultSmartFolderItems } from "../helpers/smartFolders";
+import { defaultSmartFolders } from "../helpers/smartFolders";
 
 function renderLibrary() {
   render(
@@ -33,7 +33,7 @@ describe("LibraryView: スマートフォルダー一覧の取得状態", () => 
     mockApi(
       appShellRoutes({
         "GET /api/smart-folders": () =>
-          fail ? apiError(500, "internal", "失敗") : defaultSmartFolderItems(),
+          fail ? apiError(500, "internal", "失敗") : defaultSmartFolders(),
       }),
     );
     renderLibrary();

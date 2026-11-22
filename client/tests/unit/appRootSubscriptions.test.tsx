@@ -20,7 +20,7 @@ import { createFakeDlsiteJobStore, createFakeScanJobStore } from "../helpers/fak
 import { mockApi } from "../helpers/api";
 import { buildScanRecord, buildSettings } from "../helpers/builders";
 import { seedLibraryRoute } from "../helpers/route";
-import { defaultSmartFolderItems } from "../helpers/smartFolders";
+import { defaultSmartFolders } from "../helpers/smartFolders";
 
 let appShellCallCount = 0;
 let jotaiProbeRenderCount = 0;
@@ -80,7 +80,7 @@ function seedQueryCache(queryClient: QueryClient) {
   );
   queryClient.setQueryData(SCAN_QUERY_KEYS.last(), buildScanRecord());
   queryClient.setQueryData(WORK_QUERY_KEYS.total(), 0);
-  queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), defaultSmartFolderItems());
+  queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), defaultSmartFolders());
 }
 
 function createTestQueryClient() {

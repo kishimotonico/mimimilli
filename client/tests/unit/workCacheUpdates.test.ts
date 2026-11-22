@@ -84,9 +84,9 @@ const KEYS = {
   detail2: WORK_QUERY_KEYS.detail("w2"),
   source2: WORK_QUERY_KEYS.source("w2"),
   list: WORK_QUERY_KEYS.list({ sort: "added-desc" }),
-  favList: WORK_QUERY_KEYS.list({ sort: "added-desc", view: "fav" }),
+  otherList: WORK_QUERY_KEYS.list({ sort: "title-asc" }),
   total: WORK_QUERY_KEYS.total(),
-  facets: WORK_QUERY_KEYS.facets("circle"),
+  facets: WORK_QUERY_KEYS.scopedFacets("sf-1", "cv"),
   tags: TAG_QUERY_KEYS.all(),
   smartWorks: SMART_FOLDER_QUERY_KEYS.works("sf-1"),
   smartFolders: SMART_FOLDER_QUERY_KEYS.all(),
@@ -107,7 +107,7 @@ function seededClient(): QueryClient {
   queryClient.setQueryData(KEYS.detail2, makeWork({ id: "w2" }));
   queryClient.setQueryData(KEYS.source2, makeSnapshot("w2", "作品2"));
   queryClient.setQueryData(KEYS.list, structuredClone(emptyPages));
-  queryClient.setQueryData(KEYS.favList, structuredClone(emptyPages));
+  queryClient.setQueryData(KEYS.otherList, structuredClone(emptyPages));
   queryClient.setQueryData(KEYS.total, { items: [], total: 0 });
   queryClient.setQueryData(KEYS.facets, []);
   queryClient.setQueryData(KEYS.tags, []);
@@ -134,7 +134,7 @@ function removedKeys(queryClient: QueryClient): KeyName[] {
 
 const LIBRARY_VIEWS: KeyName[] = [
   "list",
-  "favList",
+  "otherList",
   "total",
   "facets",
   "tags",
@@ -194,7 +194,7 @@ describe("bookmark の必須更新", () => {
     await updateCachesAfterBookmark(queryClient, { workId: "w1", bookmarked: true });
 
     expect(sorted(invalidatedKeys(queryClient))).toEqual(
-      sorted(["list", "favList", "smartWorks", "smartFolders"]),
+      sorted(["list", "otherList", "smartWorks", "smartFolders"]),
     );
   });
 
@@ -214,7 +214,7 @@ describe("bookmark の必須更新", () => {
     unsubscribe();
 
     expect(queryClient.getQueryCache().find({ queryKey: KEYS.list })?.isStale()).toBe(false);
-    expect(queryClient.getQueryCache().find({ queryKey: KEYS.favList })?.isStale()).toBe(true);
+    expect(queryClient.getQueryCache().find({ queryKey: KEYS.otherList })?.isStale()).toBe(true);
     expect(queryClient.getQueryCache().find({ queryKey: KEYS.smartWorks })?.isStale()).toBe(true);
     expect(fetchCount).toBe(0);
   });

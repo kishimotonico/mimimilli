@@ -1,18 +1,6 @@
-// 作品検索（GET /api/works）の純粋関数。
-import {
-  tagEquals,
-  toWorkListItem,
-  RECENT_VIEW_WINDOW_DAYS,
-  createRandomSeed,
-} from "@mimimilli/shared";
-import type {
-  CollectionStats,
-  NormalizedTag,
-  SortId,
-  WorksPage,
-  WorksQuery,
-  WorkSummary,
-} from "@mimimilli/shared";
+// 作品一覧の純粋関数（ソート・統計・検索語の一致）。条件の評価は condition.ts。
+import { toWorkListItem } from "@mimimilli/shared";
+import type { CollectionStats, SortId, WorksPage, WorkSummary } from "@mimimilli/shared";
 import {
   compareJapaneseSortKeys,
   compareUtf8Bytes,
@@ -24,10 +12,11 @@ import {
 export type WorkSummaryPage = Omit<WorksPage, "items"> & { items: WorkSummary[] };
 
 export function toWorksPage(page: WorkSummaryPage, root: string): WorksPage {
-  const items = page.items.map((work) => toWorkListItem(work, root));
-  return page.seed === undefined
-    ? { items, total: page.total, stats: page.stats }
-    : { items, total: page.total, stats: page.stats, seed: page.seed };
+  return {
+    items: page.items.map((work) => toWorkListItem(work, root)),
+    total: page.total,
+    stats: page.stats,
+  };
 }
 
 /** フィルター後・ページング前の集合からコレクション統計を求める。
@@ -40,26 +29,6 @@ export function computeCollectionStats(works: WorkSummary[]): CollectionStats {
     if (work.totalDurationSec !== null) durationSec += work.totalDurationSec;
   }
   return { trackCount, durationSec };
-}
-
-/** WorkSummary[] にクエリ（検索・フィルタ・ソート・ページング）を適用する */
-export function applyWorksQuery(works: WorkSummary[], params: WorksQuery): WorkSummaryPage {
-  let results = [...works];
-
-  const { tags, yearValue } = params.tags;
-  results = filterByIds(results, params.ids);
-  results = filterByQuery(results, params.q);
-  results = filterByTags(results, tags, params.tagOp);
-  results = filterByYear(results, yearValue);
-  results = filterByView(results, params.view);
-  const seed = params.sort === "random" ? (params.seed ?? createRandomSeed()) : undefined;
-  results = sortWorkSummaries(results, params.sort, seed);
-
-  const total = results.length;
-  const stats = computeCollectionStats(results);
-  const items = paginate(results, params.page, params.limit);
-
-  return seed === undefined ? { items, total, stats } : { items, total, stats, seed };
 }
 
 /**
@@ -84,12 +53,6 @@ export function normalizeRjCode(value: string): string {
     .replace(/^(RJ|VJ)/, "");
 }
 
-function filterByIds(works: WorkSummary[], ids: string[] | undefined): WorkSummary[] {
-  if (ids === undefined) return works;
-  const idSet = new Set(ids);
-  return works.filter((work) => idSet.has(work.id));
-}
-
 /** 作品検索の部分一致（タイトル・タグ・RJ/VJコード）の判定関数。q ごとの正規化は1回だけ行う。q が空なら全作品が一致 */
 export function textMatcher(q: string): (work: WorkSummary) => boolean {
   if (!q) return () => true;
@@ -102,56 +65,6 @@ export function textMatcher(q: string): (work: WorkSummary) => boolean {
       rjQuery && work.dlsite.rjCode && normalizeRjCode(work.dlsite.rjCode).includes(rjQuery),
     );
   };
-}
-
-export function filterByQuery(works: WorkSummary[], q: string): WorkSummary[] {
-  if (!q) return works;
-  return works.filter(textMatcher(q));
-}
-
-// タグ絞り込みは完全一致（ADR-0005 決定6。prefix は大文字小文字を無視、値は区別）
-export function filterByTags(
-  works: WorkSummary[],
-  tags: NormalizedTag[],
-  tagOp: "AND" | "OR",
-): WorkSummary[] {
-  if (tags.length === 0) return works;
-  if (tagOp === "AND") {
-    return works.filter((work) =>
-      tags.every((tagFilter) => work.tags.some((tag) => tagEquals(tag, tagFilter))),
-    );
-  }
-  return works.filter((work) =>
-    tags.some((tagFilter) => work.tags.some((tag) => tagEquals(tag, tagFilter))),
-  );
-}
-
-/** 組み込み軸 year（addedAt の年）での絞り込み。実タグとの衝突を避けるため擬似タグ経由でのみ渡る */
-export function filterByYear(works: WorkSummary[], yearValue: string | null): WorkSummary[] {
-  if (yearValue === null) return works;
-  return works.filter((work) => work.addedAt.slice(0, 4) === yearValue);
-}
-
-function filterByView(works: WorkSummary[], view: WorksQuery["view"]): WorkSummary[] {
-  switch (view) {
-    case "recent":
-      return works.filter((work) => work.lastPlayedAt != null);
-    case "added": {
-      const cutoff = new Date(Date.now() - RECENT_VIEW_WINDOW_DAYS * 86400000).toISOString();
-      return works.filter((work) => work.addedAt >= cutoff);
-    }
-    case "fav":
-      return works.filter((work) => work.bookmarked);
-    case "error":
-      return works.filter((work) => work.status !== "ok");
-    case "all":
-    case undefined:
-      return works;
-    default: {
-      const unreachable: never = view;
-      throw new Error(`未対応のviewです: ${unreachable}`);
-    }
-  }
 }
 
 export function sortWorkSummaries(
@@ -208,15 +121,4 @@ export function sortWorkSummaries(
 
 function compareStrings(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
-}
-
-/** page/limit が両方指定されているときのみ slice する */
-function paginate(
-  works: WorkSummary[],
-  page: number | undefined,
-  limit: number | undefined,
-): WorkSummary[] {
-  if (page === undefined || limit === undefined) return works;
-  const start = (page - 1) * limit;
-  return works.slice(start, start + limit);
 }

@@ -12,7 +12,7 @@ import AddressBar from "../../src/app/ui/AddressBar";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import { libraryViewModeAtom } from "../../src/features/library/model/atoms";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
-import { defaultSmartFolderItems, seedSmartFolders } from "../helpers/smartFolders";
+import { defaultSmartFolders, seedSmartFolders } from "../helpers/smartFolders";
 import { mockApi } from "../helpers/api";
 import { buildSettings } from "../helpers/builders";
 import { seedAppMode, seedLibraryRoute, seedFilesRoute } from "../helpers/route";
@@ -29,7 +29,7 @@ function renderAddressBar(options?: {
   const settings = buildSettings({ rootFolder: options?.rootFolder ?? "/library" });
   mockApi({
     "GET /api/settings": settings,
-    "GET /api/smart-folders": defaultSmartFolderItems(),
+    "GET /api/smart-folders": defaultSmartFolders(),
     "GET /api/tag-prefixes": [],
   });
   const store = createStore();

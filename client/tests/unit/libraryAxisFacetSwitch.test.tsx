@@ -22,7 +22,7 @@ describe("分類軸切替時の facetItems 系列（R2 機序調査）", () => {
           ? Array.from({ length: 8 }, (_, i) => buildAxisFacetItem({ value: `cv${i}` }))
           : [],
       "GET /api/scan/diagnostics": buildScanDiagnostics(),
-      "GET /api/works": buildWorksPage(),
+      "GET /api/smart-folders/:id/works": buildWorksPage(),
       "GET /api/tag-prefixes": [],
       "GET /api/tags": [],
       "GET /api/smart-folders": [],

@@ -126,7 +126,7 @@ fixture は core の `matchCondition` だけを、real は `compileCondition` �
 
 ADR-0008 の「core↔SQL二重実装の統制」を次のように改める。
 
-- 「作品検索」の例外は、条件の木の評価を含む。`queryWorks`・`groupWorks`・`countByConditions` はすべて `compileCondition` を通し、core 側の対応は `matchCondition` と `applyWorksQuery`
+- 「作品検索」の例外は、条件の木の評価を含む。`queryWorks`・`groupWorks`・`countByConditions` はすべて `compileCondition` を通し、core 側の対応は `matchCondition` と `queryWorksByCondition`
 - 「軸ファセット集計」の例外は、スマートフォルダーの条件をかけたグループの値一覧（`groupWorks`）に置き換わる
 - 「規範形は `evalSmartFolderRules`」の文、「スマートフォルダーは二重実装ではない」の段落、SQL で候補を減らしてから純粋関数で最終評価する2段階評価、ルール無しのスマートフォルダーの別経路の記述は、いずれも成り立たなくなる。2段階評価は使わない
 - 作品検索の内訳のうち `RECENT_VIEW_WINDOW_DAYS` による recent view の期間判定はなくなり、`added`・`played` 述語と評価コンテキストの `now` に置き換わる
@@ -218,6 +218,7 @@ smart_folders(id TEXT PK, name TEXT, condition_json TEXT, sort TEXT NULL,
 
 - 件数: どのスマートフォルダーを数えるかはサーバーが選ぶ。shared の判定関数で「件数を出すもの」「0件で隠すかの判定が要るもの」を決めて数え、スマートフォルダー一覧の応答に載せる
 - 値一覧と「＋絞り込み」の候補: 同じ口で扱う。スマートフォルダー＋グループの値＋チップ＋検索語から組んだ条件と、任意の `groupBy` を受ける。そのスマートフォルダー自身の値一覧と、任意の `groupBy` での候補の2つの用途がある
+- スキャン記録の絞り込み: 作品一覧の口が `scanRecord`（`new`・`updated`）と `scanChange` を受け、サーバーが記録から作品の ID 集合を引いてアダプタの `ids` に渡す。ライブラリ全体の件数・統計、スキャン画面の新規作品・更新済みは、「すべて」（`all`）に対するこの口で取る。作品一覧・値一覧の旧 `/api/works`・`/api/axes/:axis` は持たない
 - 既定から追加: テンプレートの ID を指定し、固定 ID で作る口を持つ。通常の作成（`sf-<uuid>` を採番する POST）とは別にする
 - 削除の取り消し: サーバーは削除をすぐ行う。取り消しは、同じ ID・位置・作成日時の行をそのまま戻す復元の口で行う。履歴に残った `/library/<id>` が、戻したあとも同じ行を指すようにするため
 - 読めない行: `condition` を null にし、壊れていることを示す形で返す。クライアントの `resolveLibraryView`（[ADR-0041](0041-library-sidebar-shell-navigation.md)）はこの行を開けない状態（削除だけできる）として扱い、件数の対象からも外す

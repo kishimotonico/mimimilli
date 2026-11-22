@@ -6,8 +6,8 @@ import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import type { WorksQuery } from "@mimimilli/shared";
-import { EMPTY_TAG_FILTERS, workspacePath } from "@mimimilli/shared";
+import { workspacePath } from "@mimimilli/shared";
+import { listWorks } from "../helpers/workList.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
@@ -347,13 +347,7 @@ test("rescan無しのファイル差し替え後、getWorkはcatalogの総時間
   assert.ok(beforeWork);
   assert.equal(beforeWork.totalDurationSec, 5);
 
-  const baseQuery: WorksQuery = {
-    q: "",
-    tags: EMPTY_TAG_FILTERS,
-    tagOp: "AND",
-    sort: "added-desc",
-  };
-  const beforePage = await adapter.queryWorksLegacy(baseQuery);
+  const beforePage = await listWorks(adapter);
   assert.equal(beforePage.items.find((item) => item.id === id)?.totalDurationSec, 5);
 
   writeWav(join(workDir, "whole.wav"), 8);
@@ -364,7 +358,7 @@ test("rescan無しのファイル差し替え後、getWorkはcatalogの総時間
   assert.equal(track?.durationSec, 5);
   assert.equal(afterWork.totalDurationSec, 5);
 
-  const afterPage = await adapter.queryWorksLegacy(baseQuery);
+  const afterPage = await listWorks(adapter);
   assert.equal(afterPage.items.find((item) => item.id === id)?.totalDurationSec, 5);
 });
 
@@ -414,12 +408,7 @@ test("rescan無しのファイル差し替え後、prepareWorkPlaybackは総時�
   assert.equal(track?.durationSec, 8);
   assert.equal(prepared.totalDurationSec, 8);
 
-  const page = await adapter.queryWorksLegacy({
-    q: "",
-    tags: EMPTY_TAG_FILTERS,
-    tagOp: "AND",
-    sort: "added-desc",
-  });
+  const page = await listWorks(adapter);
   assert.equal(page.items.find((item) => item.id === id)?.totalDurationSec, 8);
 
   const viewed = await adapter.getWork(id);
@@ -452,22 +441,12 @@ test("createWorkの応答取得は登録時の投影総時間を変えない", a
   const createdWork = await adapter.getWork(created.snapshot.id);
   assert.equal(createdWork?.totalDurationSec, 5);
 
-  const page = await adapter.queryWorksLegacy({
-    q: "",
-    tags: EMPTY_TAG_FILTERS,
-    tagOp: "AND",
-    sort: "added-desc",
-  });
+  const page = await listWorks(adapter);
   assert.equal(page.items.find((item) => item.id === created.snapshot.id)?.totalDurationSec, 5);
 
   const viewed = await adapter.getWork(created.snapshot.id);
   assert.equal(viewed?.totalDurationSec, 5);
-  const afterPage = await adapter.queryWorksLegacy({
-    q: "",
-    tags: EMPTY_TAG_FILTERS,
-    tagOp: "AND",
-    sort: "added-desc",
-  });
+  const afterPage = await listWorks(adapter);
   assert.equal(
     afterPage.items.find((item) => item.id === created.snapshot.id)?.totalDurationSec,
     5,

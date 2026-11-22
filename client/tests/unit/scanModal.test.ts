@@ -70,7 +70,7 @@ function toListItem(id: string, title: string, trackCount: number): WorkListItem
 
 function scanRecordQueries() {
   return api
-    .requestsTo("GET /api/works")
+    .requestsTo("GET /api/smart-folders/:id/works")
     .filter((request) => request.url.searchParams.get("scanRecord") === "new");
 }
 
@@ -122,7 +122,7 @@ beforeEach(() => {
   vanishedDuringRegister = [];
   excludedCandidates = [];
   api = mockApi({
-    "GET /api/works": ({ url }) => {
+    "GET /api/smart-folders/:id/works": ({ url }) => {
       if (url.searchParams.get("scanRecord") === "updated") {
         const kind = url.searchParams.get("scanChange");
         const items = updatedFixture
@@ -557,7 +557,7 @@ describe("ScanModal", () => {
         "GET /api/scan/candidates/exclusions": { exclusions: [] },
         "GET /api/scan/last": () => scanRecord,
         "GET /api/scan/diagnostics": buildScanDiagnostics(),
-        "GET /api/works": () => buildWorksPage([], { total: 0 }),
+        "GET /api/smart-folders/:id/works": () => buildWorksPage([], { total: 0 }),
       });
       renderModal({ unseeded: ["candidates"], newCount: 0 });
       openTab("未登録");
@@ -576,7 +576,7 @@ describe("ScanModal", () => {
         "GET /api/scan/candidates/exclusions": { exclusions: [] },
         "GET /api/scan/last": () => scanRecord,
         "GET /api/scan/diagnostics": buildScanDiagnostics(),
-        "GET /api/works": () => buildWorksPage([], { total: 0 }),
+        "GET /api/smart-folders/:id/works": () => buildWorksPage([], { total: 0 }),
       });
       const { queryClient } = renderModal({ unseeded: ["candidates"], newCount: 0 });
       await act(async () => {
@@ -624,7 +624,7 @@ describe("ScanModal", () => {
         "GET /api/scan/candidates/exclusions": { exclusions: [] },
         "GET /api/scan/last": () => new Promise<never>(() => {}),
         "GET /api/scan/diagnostics": buildScanDiagnostics(),
-        "GET /api/works": () => buildWorksPage([], { total: 0 }),
+        "GET /api/smart-folders/:id/works": () => buildWorksPage([], { total: 0 }),
       });
       renderModal({ unseeded: ["record"], candidates: [candidateDetected], newCount: 0 });
       openTab("更新済み");
@@ -736,7 +736,7 @@ describe("ScanModal", () => {
           "GET /api/scan/diagnostics": attention,
           "GET /api/scan/last": scanRecord,
           "GET /api/settings": buildSettings(),
-          "GET /api/works": () => buildWorksPage([], { total: 0 }),
+          "GET /api/smart-folders/:id/works": () => buildWorksPage([], { total: 0 }),
           [route]: () => apiError(500, "internal", "失敗"),
         });
 
@@ -817,7 +817,7 @@ describe("ScanModal", () => {
         "GET /api/scan/diagnostics": () => new Promise<never>(() => {}),
         "GET /api/scan/last": scanRecord,
         "GET /api/settings": buildSettings(),
-        "GET /api/works": () => buildWorksPage([], { total: 0 }),
+        "GET /api/smart-folders/:id/works": () => buildWorksPage([], { total: 0 }),
       });
       const { queryClient, store } = renderModal({
         unseeded: ["diagnostics"],
@@ -1493,7 +1493,7 @@ describe("ScanModal", () => {
         "GET /api/scan/candidates/exclusions": { exclusions: [] },
         "GET /api/scan/last": () => updatedRecord(),
         "GET /api/scan/diagnostics": buildScanDiagnostics(),
-        "GET /api/works": () => new Promise<never>(() => {}),
+        "GET /api/smart-folders/:id/works": () => new Promise<never>(() => {}),
       });
       renderModal({ record: updatedRecord(), newCount: 0 });
       openTab("更新済み");
@@ -1528,7 +1528,7 @@ describe("ScanModal", () => {
       });
       expect(
         api
-          .requestsTo("GET /api/works")
+          .requestsTo("GET /api/smart-folders/:id/works")
           .some((request) => request.url.searchParams.get("scanChange") === "moved"),
       ).toBe(true);
     });

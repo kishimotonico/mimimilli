@@ -27,7 +27,9 @@ async function setup(t: TestContext) {
   const app = createApp(adapter);
   await configureRoot(adapter, lib.root);
   await scanAndRegisterCandidates(adapter);
-  const works = (await (await app.request("/api/works")).json()) as WorksPage;
+  const works = (await (
+    await app.request("/api/smart-folders/all/works?sort=added-desc")
+  ).json()) as WorksPage;
   const workId = works.items.find((entry) => entry.title.includes("RJ900001"))!.id;
   const workDir = join(lib.root, "dlsite", "RJ900001_テスト作品");
   return { lib, adapter, app, workId, workDir, outsideDir: outside.path };

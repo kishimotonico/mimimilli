@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import type { ScanRecord, ScanRecordKind, WorkChangeKind, WorkListItem } from "@mimimilli/shared";
 import { scanRecordQueryOptions } from "../../../../entities/scan/queryOptions";
-import { searchWorks } from "../../../../entities/work/api";
+import { getAllWorks } from "../../../../entities/smart-folder/api";
 import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
 import { deriveScanListStatus, type ScanListStatus } from "../../model/scanListStatus";
 
@@ -41,7 +41,7 @@ export function useScanRecordWorks(kind: ScanRecordKind, change?: WorkChangeKind
   const query = useInfiniteQuery({
     queryKey: [...WORK_QUERY_KEYS.list(params), "scanRecord"],
     queryFn: ({ pageParam }) =>
-      searchWorks({ ...params, page: pageParam, limit: SCAN_RECORD_PAGE_SIZE }),
+      getAllWorks({ ...params, page: pageParam, limit: SCAN_RECORD_PAGE_SIZE }),
     initialPageParam: 1,
     getNextPageParam: (last, pages) => {
       const loaded = pages.reduce((sum, page) => sum + page.items.length, 0);

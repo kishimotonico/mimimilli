@@ -1,5 +1,6 @@
 import { hasRjCode } from "@mimimilli/shared";
 import type { DataAdapter } from "../../src/adapter/index.ts";
+import { listWorks } from "./workList.ts";
 
 export interface WorkFetchCounts {
   fetched: number;
@@ -20,16 +21,7 @@ export async function fetchDlsiteOfWorks(
     ? (await Promise.all(workIds.map((id) => adapter.getWork(id)))).filter(
         (work): work is NonNullable<typeof work> => work !== null && work !== undefined,
       )
-    : (
-        await adapter.queryWorksLegacy({
-          q: "",
-          tags: { tags: [], yearValue: null },
-          tagOp: "AND",
-          sort: "id-asc",
-          page: 1,
-          limit: 1000,
-        })
-      ).items;
+    : (await listWorks(adapter, { sort: "id-asc", limit: 500 })).items;
   const counts: WorkFetchCounts = { fetched: 0, failed: 0, skipped: 0 };
   const outcomes = new Map<string, string>();
   for (const work of works) {

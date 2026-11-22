@@ -122,7 +122,7 @@ test("DELETE /works/:id: メタファイルとDB上の作品データ（履歴�
   const gone = await app.request(`/api/works/${work.id}`);
   assert.equal(gone.status, 404);
 
-  const listRes = await app.request("/api/works");
+  const listRes = await app.request("/api/smart-folders/all/works?sort=added-desc");
   assert.equal(listRes.status, 200);
   const listBody = await listRes.json();
   assert.ok(!listBody.items.some((item: { id: string }) => item.id === work.id));

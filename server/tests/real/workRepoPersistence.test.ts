@@ -83,9 +83,10 @@ test("works.status が不正なら queryWorks は当該作品を隔離して続�
   upsertTestWork(catalog, user, bad);
   db.catalog.update(works).set({ status: "unknown" }).where(eq(works.id, bad.id)).run();
 
-  const page = query.queryWorks(
-    { q: "", tags: { tags: [], yearValue: null }, tagOp: "AND", sort: "id-asc" },
+  const page = query.queryWorksByCondition(
+    { condition: { type: "and", children: [] }, sort: "id-asc", page: 1, limit: 200 },
     "/library",
+    { now: Date.now() },
   );
   assert.equal(page.items.length, 1);
   assert.equal(page.items[0]!.id, good.id);

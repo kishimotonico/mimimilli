@@ -13,13 +13,13 @@ import { resolveLibraryView } from "../../src/entities/library/resolveLibraryVie
 import { useSuspenseLibraryWorks } from "../../src/features/library/model/useLibraryQueries";
 import { mockApi, type ApiMock } from "../helpers/api";
 import { buildWorkListItem, buildWorksPage } from "../helpers/builders";
-import { defaultSmartFolderItems } from "../helpers/smartFolders";
+import { defaultSmartFolders } from "../helpers/smartFolders";
 
 const FOLDER_WORKS_ROUTE = "GET /api/smart-folders/:id/works";
 
 function worksView(patch: Partial<LibraryRoute> = {}) {
   const library: LibraryRoute = { ...createInitialAppRoute().library, seed: 42_195, ...patch };
-  const view = resolveLibraryView(library, defaultSmartFolderItems());
+  const view = resolveLibraryView(library, defaultSmartFolders());
   if (view.kind !== "works") throw new Error("作品一覧のビューが必要です");
   return view;
 }
@@ -181,13 +181,13 @@ describe("作品一覧への条件の渡し方", () => {
     vi.unstubAllGlobals();
   });
 
-  it("選択中のチップを tags として渡し、tagOp は送らない", async () => {
+  it("選択中のチップを tags として渡し、チップのつなぎ方は送らない", async () => {
     const { result } = renderWorks(worksView({ selectedTags: ["cv/藤田茜"] }));
     await waitFor(() => expect(result.current.works.length).toBeGreaterThan(0));
 
     const url = api.urlsTo(FOLDER_WORKS_ROUTE)[0]!;
     expect(url).toContain("tags=cv%2F");
-    expect(url).not.toContain("tagOp");
+    expect(url).not.toContain("tagMode");
   });
 
   it("year 擬似タグも tags として渡す（サーバー側で解釈する）", async () => {

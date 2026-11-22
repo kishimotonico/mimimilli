@@ -3,13 +3,11 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
 import { eq } from "drizzle-orm";
-import { EMPTY_TAG_FILTERS } from "@mimimilli/shared";
 import { createApp } from "../helpers/testApp.ts";
 import { Scanner } from "../../src/adapters/real/scanner.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { tags, works } from "../../src/adapters/real/catalogSchema.ts";
-import { querySmartFolderWorks } from "../../src/adapters/real/smartFolderWorks.ts";
 import { createWorkRepos, makeWork, upsertTestWork } from "../helpers/workTestUtils.ts";
 import { makeTestDirectory, makeTestScope } from "../helpers/sampleLibrary.ts";
 import { nts } from "../helpers/tag.ts";
@@ -70,27 +68,21 @@ test("export は壊れた作品を除外し dataIntegrityWarning を返す", asy
   assert.deepEqual(exported.dataIntegrityWarning?.skippedWorkIds, [badId]);
 });
 
-test("ルールベース smart folder は壊れた候補を除外して WorksPage を返す", (t) => {
+test("条件の木の一覧は壊れた候補を除外して WorksPage を返す", (t) => {
   const scope = makeTestScope();
   t.after(scope.cleanup);
   const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   const { goodId, badId } = seedCorruptedPair(catalog, user, db);
-  const page = querySmartFolderWorks(
-    query,
+  const page = query.queryWorksByCondition(
     {
-      rules: [
-        {
-          conjunction: "WHERE",
-          field: "タグ",
-          operator: "∋",
-          values: nts(["cv/正常"]),
-        },
-      ],
+      condition: { type: "and", children: [{ type: "tag", tag: nts(["cv/正常"])[0]! }] },
       sort: "id-asc",
+      page: 1,
+      limit: 200,
     },
-    { page: 1, limit: 200 },
     "/library",
+    { now: Date.now() },
   );
   assert.deepEqual(
     page.items.map((item) => item.id),
@@ -110,9 +102,10 @@ test("診断のデータ不整合は作品一覧から外れる作品と同じ",
   upsertTestWork(catalog, user, makeWork({ id: "work-good" }));
   upsertTestWork(catalog, user, makeWork({ id: "work-bad" }));
   db.catalog.update(works).set({ status: "unknown" }).where(eq(works.id, "work-bad")).run();
-  const page = query.queryWorks(
-    { q: "", tags: EMPTY_TAG_FILTERS, tagOp: "AND", sort: "id-asc" },
+  const page = query.queryWorksByCondition(
+    { condition: { type: "and", children: [] }, sort: "id-asc", page: 1, limit: 200 },
     "/library",
+    { now: Date.now() },
   );
   assert.deepEqual(
     page.items.map((item) => item.id),
@@ -190,7 +183,7 @@ test("GET /api/works は不正な status の作品を除外し、診断のデー
   user.setUserSetting("root_folder", "/library");
   const adapter = fileAdapter(directory);
   const app = createApp(adapter);
-  const res = await app.request("/api/works");
+  const res = await app.request("/api/smart-folders/all/works?sort=added-desc");
   assert.equal(res.status, 200);
   const body = (await res.json()) as {
     items: Array<{ id: string }>;

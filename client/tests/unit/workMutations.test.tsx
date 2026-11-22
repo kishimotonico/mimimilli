@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 const activeKey = WORK_QUERY_KEYS.list({ sort: "added-desc" });
-const otherKey = WORK_QUERY_KEYS.list({ sort: "added-desc", view: "fav" });
+const otherKey = WORK_QUERY_KEYS.list({ sort: "added-desc", scanRecord: "new" });
 const smartKey = SMART_FOLDER_QUERY_KEYS.works("sf-1");
 const emptyPages = { pages: [{ items: [], total: 0 }], pageParams: [{ page: 1 }] };
 

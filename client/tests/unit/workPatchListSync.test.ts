@@ -65,7 +65,6 @@ function installApi(total = WORKS_DEFAULT_PAGE_SIZE + 50) {
 
   const api = mockApi({
     "GET /api/scan/diagnostics": buildScanDiagnostics(),
-    "GET /api/works": buildWorksPage(),
     [FOLDER_WORKS_ROUTE]: ({ url }) => {
       const page = Number(url.searchParams.get("page") ?? 1);
       const pageSize = WORKS_DEFAULT_PAGE_SIZE;
@@ -119,8 +118,9 @@ function installApi(total = WORKS_DEFAULT_PAGE_SIZE + 50) {
   return { api, worksById, detailsById };
 }
 
+/** 作品一覧の取得。ライブラリ全体の件数を数える limit=1 の呼び出しは含めない */
 function worksCallUrls(api: ApiMock): string[] {
-  return api.urlsTo(FOLDER_WORKS_ROUTE);
+  return api.urlsTo(FOLDER_WORKS_ROUTE).filter((url) => !/[?&]limit=1$/.test(url));
 }
 
 function renderLibraryHooks(nav: LibraryViewState, options?: { queryClient?: QueryClient }) {

@@ -26,7 +26,9 @@ async function setup(t: TestContext): Promise<{ app: App; workId: string }> {
   const app = createApp(adapter);
   await configureRoot(adapter, lib.root);
   await scanAndRegisterCandidates(adapter);
-  const works = (await (await app.request("/api/works")).json()) as WorksPage;
+  const works = (await (
+    await app.request("/api/smart-folders/all/works?sort=added-desc")
+  ).json()) as WorksPage;
   const workId = works.items.find((entry) => entry.title.includes("RJ900001"))!.id;
   return { app, workId };
 }

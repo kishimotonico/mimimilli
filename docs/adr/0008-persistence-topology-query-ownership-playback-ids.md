@@ -76,53 +76,49 @@ catalog DBとuser DBは、どちらも順序付きのforward migrationをin-plac
 
 検索仕様はcoreが所有し、realでの実行はSQLが所有する。
 
-- `WorksQuery`の正規化、各フィルターとソートの意味、nullの順序、同順位の扱いはcoreの契約とする
-- `applyWorksQuery`、ファセット集計、スマートフォルダー評価の純粋関数はfixture実装と参照実装として残す
-- realアダプタは全件を`applyWorksQuery`へ渡さず、ATTACH JOINを使ったSQLで検索、ソート、総件数、ページングを行う
+- 条件の木（[ADR-0040](0040-smart-folder-condition-tree.md)）の各述語とソートの意味、nullの順序、同順位の扱いはcoreの契約とする
+- `matchCondition`・`queryWorksByCondition`・値一覧の集計（`buildGroupFacets`）の純粋関数はfixture実装と参照実装として残す
+- realアダプタは全件をcoreへ渡さず、条件の木を`compileCondition`でSQLにして、ATTACH JOINで検索、ソート、総件数、ページングを行う
 - routeはクエリを検証してアダプタへ渡すだけとし、SQL断片や検索規則を持たない
 
-作品一覧SQLは、catalog作品とuser作品状態をJOINした共通の絞り込み集合を作る。同じ集合から`COUNT(*)`と、`ORDER BY ... LIMIT ... OFFSET ...`を求める。`bookmarked`、`lastPlayedAt`、`addedAt`、resume有無・位置を使う条件も、ページング前に評価する。resume条件ではuserのresume行をcatalogのPlaylist・Track関係へJOINし、IDを解決できる行だけを有効として扱う。タグのAND/ORと軸絞り込みは`tags`、`work_tags`を使う。
+作品一覧SQLは、catalog作品とuser作品状態をJOINした共通の絞り込み集合を作る。同じ集合から`COUNT(*)`と、`ORDER BY ... LIMIT ... OFFSET ...`を求める。`bookmarked`、`lastPlayedAt`、`addedAt`、resume有無・位置を使う条件も、ページング前に評価する。resume条件ではuserのresume行をcatalogのPlaylist・Track関係へJOINし、IDを解決できる行だけを有効として扱う。タグ・prefix・追加年の述語は`tags`、`work_tags`、`work_states.added_at`を使う。
 
-SQLへ直接移せない規則は、catalog DBにcoreと同じ関数で作った検索キー・ソートキーを派生キャッシュとして保持する。それでもSQL化できないスマートフォルダー条件は、SQLで候補を減らしたあと純粋関数で最終評価できる。ルール無し（絞り込みなし・並べ替えのみ）のスマートフォルダーは、条件の最終評価が不要なため `queryWorks` と同じ SQL ソート/ページング経路を使う。ただし、最終評価・ソートを終える前にSQLの`LIMIT/OFFSET`を適用してはならない。正確性を保てない条件を、近似SQLや取得後のページ内フィルターで隠さない。
+SQLへ直接移せない規則は、catalog DBにcoreと同じ関数で作った検索キー・ソートキーを派生キャッシュとして保持する。条件の木はすべてSQLで評価する。SQLで正確に表せない条件を、近似SQLや取得後のページ内フィルターで隠さない。
 
 全ソートは`work_id ASC`を最終タイブレーカーに加え、全順序を定義する。タイトルの検索キーとソートキーには、日本語向けの事前計算キーを使う。coreが所有する1つのキー生成関数で、Unicode NFKC正規化、カタカナからひらがなへの折りたたみ、Unicode既定の`toLowerCase()`を順に適用する。catalogにはその結果を派生キャッシュ列として保存し、SQLはキーのバイト順で並べる。
 
 本アプリは日本語に特化しているため、配布物に外部ICU拡張を加えず、日本語タイトルで実用的な並びを得るこの方式を採る。現行の`localeCompare("ja")`はこの規則へ置き換える。部分一致検索も同じ検索キーを使い、SQLite組み込み`lower()`とJavaScriptの大小変換の差を残さない。キー生成関数はcoreを正本とし、fixtureとSQLの同値性テストに含める。
 
-`random`をページングする場合はseedをクエリ契約に含め、`seed + work_id`から決まる安定順序にする。最初の要求でserverがseedを発行する場合も、レスポンスで返して次ページが同じseedを送れる契約にする。seedなしのランダム順に`LIMIT/OFFSET`を適用する実装は認めない。seed契約を実装するまでの代替は、`random`とページングの組み合わせを明示的な4xxにすることであり、不安定なページを返すことではない。
+`random`をページングする場合はseedをクエリ契約に含め、`seed + work_id`から決まる安定順序にする。seedはクライアントが必ず送り、serverは発行しない。seedの無い`random`は明示的な4xxにする。seedなしのランダム順に`LIMIT/OFFSET`を適用する実装は認めず、不安定なページを返さない。
 
 純粋関数とSQLの同値性は、同じfixtureをメモリと実SQLiteへ投入する契約テストで確認する。固定例だけでなく生成テストを使い、少なくとも次を組み合わせる。
 
 - 空文字、ASCII・日本語・正規化前後の文字、大小文字を含むタイトルとタグ
-- タグAND/OR、prefix軸、年軸、全view
+- 条件の木の全述語と`and`・`or`・`not`の入れ子、`now`の境界
 - `bookmarked`、`lastPlayedAt`、`addedAt`、`status`の全組み合わせとuser孤児行
 - null、同順位、ページ境界、0件、上限件数
 - 全SortId。randomは同じseedを与える
-- ファセットの値と件数、スマートフォルダーの候補抽出と最終結果
+- グループの値と件数・総時間・代表カバー、条件ごとの件数
 
-比較対象は順序付きWork ID列、`total`、ファセット値と件数である。生成テストが反例を出した場合は、SQL結果へ合わせて期待値を緩めず、core契約かSQLのどちらが誤りかを決めて両方を同時に直す。`EXPLAIN QUERY PLAN`と性能計測は同値性を通したクエリに対して行い、その後にindexを決める。
+比較対象は順序付きWork ID列、`total`、`stats`、グループの値と件数、条件ごとの件数である。生成テストが反例を出した場合は、SQL結果へ合わせて期待値を緩めず、core契約かSQLのどちらが誤りかを決めて両方を同時に直す。`EXPLAIN QUERY PLAN`と性能計測は同値性を通したクエリに対して行い、その後にindexを決める。
 
 ### core↔SQL二重実装の統制
 
 [ADR-0004](0004-core-functions-over-sql.md)が定めた「検索・集計・評価はcoreの純粋関数で行う」という規範のうち、coreを仕様正本とする部分は本ADRが引き継いでいる。realの実行経路をSQLへ移した結果として core と SQL に同一仕様が二重に存在するが、これは無制限に許すものではない。統制の規則を次のとおり定める。
 
-新機能の既定はcore-firstとする。規範形は `evalSmartFolderRules` で、core の単一実装を fixture と real の両方が呼ぶ。SQLでの再実装は性能上の例外としてのみ認め、認可済みの例外は次の3件に閉じる。
+新機能の既定はcore-firstとする。core の単一実装を fixture と real の両方が呼ぶ。SQLでの再実装は性能上の例外としてのみ認め、認可済みの例外は次の1件に閉じる。
 
-| 例外             | 経路                                                                                                                                                                 | 性能理由                                                                                                                   | 契約テスト                                                                                                           |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| 作品検索         | `core/worksQuery.ts` の `applyWorksQuery` ↔ `WorkQueryRepository.queryWorks`                                                                                         | user条件を含む絞り込み・ソート・総件数・ページングを1つのSQLスナップショット上で決めるため。全件をメモリへ読む経路を避ける | `server/tests/real/worksQueryContract.test.ts`                                                                       |
-| 軸ファセット集計 | `core/axisFacets.ts` の `buildAxisFacets` ↔ `WorkQueryRepository.getAxisFacets`                                                                                      | 値ごとの件数・総時間・代表カバーを全件取得なしに集計するため                                                               | 同上（ファセット値と件数の同値検証）                                                                                 |
-| DLsite通知の集計 | `core/dlsiteNotifications.ts` の `summarizeDlsiteNotifications` ↔ `WorkQueryRepository.getDlsiteNotificationSummary`・`WorkQueryRepository.queryDlsiteNotifications` | 件数集計をSQLで完結させるため。core関数を呼ぶには作品行を全件展開する必要があり、集計クエリの利点が失われる                | `server/tests/dlsiteNotifications.test.ts`（fixture↔realの同値検証）・`server/tests/real/worksQueryContract.test.ts` |
+| 例外           | 経路                                                                                                                                                                                                                 | 性能理由                                                                                                                                                                                  | 契約テスト                                                                                          |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 条件の木の評価 | `core/condition.ts` の `matchCondition`・`core/conditionQuery.ts` ↔ `adapters/real/conditionSql.ts` の `compileCondition`（作品一覧 `queryWorks`・値一覧 `groupWorks`・件数 `countByConditions` はすべてこれを通る） | user条件を含む絞り込み・ソート・総件数・ページング・値ごとの集計を1つのSQLスナップショット上で決め、全件をメモリへ読む経路を避けるため（[ADR-0040](0040-smart-folder-condition-tree.md)） | `server/tests/real/conditionContract.test.ts`（作品ID列・`total`・`stats`・値一覧・件数の同値検証） |
 
-各例外の内側でSQL固有の表現になっている断片は、独立した例外として数えない。作品検索の内訳は、RJ/VJコード正規化のCASE式、randomソートのローテーション、`RECENT_VIEW_WINDOW_DAYS` による recent view の期間判定、タグとresumeのEXISTS断片である。これらはSQLフラグメント生成を1モジュールへ集約して同期リスクを下げる。DLsite通知の集計では、述語 `isRjCodeMissing`・`isDlsiteFetchFailed` に対応するCASE式がこれにあたる。
-
-スマートフォルダーは二重実装ではない。最終評価の `evalSmartFolderRules`（`core/smartFolder.ts`）は fixture と real の両方が呼ぶ単一実装であり、SQLの候補抽出は本ADRが定めた2段階評価の第1段にあたる。
+各例外の内側でSQL固有の表現になっている断片は、独立した例外として数えない。条件の木の評価の内訳は、RJ/VJコード正規化のCASE式、randomソートのローテーション、`added`・`played`述語と評価コンテキストの`now`による期間判定、タグとresumeのEXISTS断片である。これらはSQLフラグメント生成を1モジュールへ集約して同期リスクを下げる。
 
 例外を増やすには、性能上の必要性を具体的に述べられること、fixture↔realの契約テストがあることの2つを満たしたうえで、本ADRの改訂を必須とする。この2条件を言えないSQL再実装は例外ではなく逸脱として扱い、core化する。
 
 core と SQL で共有する定数・述語は core または shared から export して import する。値やロジックを両側へ書き写さない。SQLの式としてしか表現できないものは、対応するcore関数への参照をコメントで明記し、契約テストで同値を担保する。
 
-タイトルとタグの検索キー・ソートキーに `localeCompare` を使わない規則は、作品検索とファセット集計が返す順序、およびその順序をクライアントが再現・再ソートする経路までを対象とする。ライブラリ外のファイル名一覧（ファイルモードのファイラー表示）は対象外とし、OSのファイラーに近い順序を優先してよい。
+タイトルとタグの検索キー・ソートキーに `localeCompare` を使わない規則は、作品検索と値一覧が返す順序、およびその順序をクライアントが再現・再ソートする経路までを対象とする。ライブラリ外のファイル名一覧（ファイルモードのファイラー表示）は対象外とし、OSのファイラーに近い順序を優先してよい。
 
 ### Work・Playlist・TrackのID
 

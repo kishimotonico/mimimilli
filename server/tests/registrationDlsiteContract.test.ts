@@ -478,7 +478,11 @@ test("fixtureの候補1000件を、上限ごとの分割で全件追加できる
       candidates: unknown[];
     };
     assert.equal(listed.candidates.length, 0);
-    assert.equal((await (await app.request("/api/works?limit=1")).json()).total, 1000);
+    assert.equal(
+      (await (await app.request("/api/smart-folders/all/works?sort=added-desc&limit=1")).json())
+        .total,
+      1000,
+    );
   } finally {
     await app.shutdown();
   }

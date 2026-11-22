@@ -47,8 +47,6 @@ export interface SplitSelectedTagsResult {
 /** HTTP 境界で splitSelectedTags を通した後、core・adapter がそのまま使う構造化済みタグフィルタ */
 export type TagFilters = Pick<SplitSelectedTagsResult, "tags" | "yearValue">;
 
-export const EMPTY_TAG_FILTERS: TagFilters = { tags: [], yearValue: null };
-
 /**
  * 選択中タグ（selectedTagsAtom・URLの tags=・HTTPクエリの tags=）を実タグと組み込み軸の
  * 擬似タグへ分解する共通入口。client（URL復元）・server（HTTPスキーマの境界検証・フィルタ

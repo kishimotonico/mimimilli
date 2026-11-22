@@ -15,7 +15,6 @@ import {
   scanJobSnapshotSchema,
   scanRecordSchema,
   settingsSchema,
-  smartFolderSchema,
   tagPrefixSchema,
   toDlsiteLinkageStatus,
   workEditSnapshotSchema,
@@ -30,7 +29,6 @@ import {
   type ScanDiagnostics,
   type ScanRecord,
   type Settings,
-  type SmartFolder,
   type TagPrefix,
   type ResolvedPlaylist,
   type ScanCandidate,
@@ -151,17 +149,6 @@ export function buildSettings(overrides: Partial<Settings> = {}): Settings {
     rootFolder: "/library",
     lastScanTime: null,
     rootReconfiguration: { status: "idle", completedAt: null },
-    ...overrides,
-  });
-}
-
-export function buildSmartFolder(overrides: Partial<SmartFolder> = {}): SmartFolder {
-  return smartFolderSchema.parse({
-    id: "sf-1",
-    name: "スマートフォルダー",
-    rules: [],
-    sort: "added-desc",
-    createdAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
   });
 }

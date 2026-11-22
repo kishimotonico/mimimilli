@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   SMART_FOLDER_TEMPLATES,
   WORKS_DEFAULT_PAGE_SIZE,
-  type SmartFolderItem,
+  type SmartFolder,
   type WorksPage,
 } from "@mimimilli/shared";
 import { defineContract, numberedWorks, type ContractHarness } from "./helpers/contractHarness.ts";
@@ -30,18 +30,14 @@ const write = (name: string, condition: unknown = EMPTY, extra: object = {}) => 
   ...extra,
 });
 
-async function list(harness: ContractHarness): Promise<SmartFolderItem[]> {
-  const { status, body } = await harness.json<SmartFolderItem[]>("/api/smart-folders");
+async function list(harness: ContractHarness): Promise<SmartFolder[]> {
+  const { status, body } = await harness.json<SmartFolder[]>("/api/smart-folders");
   assert.equal(status, 200);
   return body;
 }
 
 async function create(harness: ContractHarness, name: string, condition?: unknown) {
-  const res = await harness.send<SmartFolderItem>(
-    "POST",
-    "/api/smart-folders",
-    write(name, condition),
-  );
+  const res = await harness.send<SmartFolder>("POST", "/api/smart-folders", write(name, condition));
   assert.equal(res.status, 201);
   return res.body;
 }
@@ -76,7 +72,7 @@ emptyLibrary("空のライブラリでは件数が0になる", async (harness) =
 contract(
   "エラーだけを条件にするグループ分け付きの行も、隠す判定のために数える",
   async (harness) => {
-    const created = await harness.send<SmartFolderItem>(
+    const created = await harness.send<SmartFolder>(
       "POST",
       "/api/smart-folders",
       write(
@@ -115,7 +111,7 @@ contract("作成は sf-<uuid> を採番して末尾に追加し、保存でき�
 
 contract("更新は名前・条件・並び・グループ分けを置き換える", async (harness) => {
   const created = await create(harness, "元");
-  const put = await harness.send<SmartFolderItem>(
+  const put = await harness.send<SmartFolder>(
     "PUT",
     `/api/smart-folders/${created.id}`,
     write(
@@ -137,7 +133,7 @@ contract("更新は名前・条件・並び・グループ分けを置き換え�
 
 contract("既定のものは名前・既定の並びだけ変えられ、条件とグループ分けは弾く", async (harness) => {
   const recent = (await list(harness)).find((f) => f.id === "recent")!;
-  const ok = await harness.send<SmartFolderItem>("PUT", "/api/smart-folders/recent", {
+  const ok = await harness.send<SmartFolder>("PUT", "/api/smart-folders/recent", {
     name: "最近",
     condition: recent.condition,
     sort: "title-asc",
@@ -182,7 +178,7 @@ contract(
       write("すべて", EMPTY, { sort: null }),
     );
     assert.equal(nullSort.status, 400);
-    const sort = await harness.send<SmartFolderItem>(
+    const sort = await harness.send<SmartFolder>(
       "PUT",
       "/api/smart-folders/all",
       write("すべて", EMPTY, { sort: "title-asc" }),
@@ -207,7 +203,7 @@ contract("削除は既定のものも可能で、無い ID は404", async (harne
 contract("並べ替えは全件の順序を置き換え、過不足があれば400", async (harness) => {
   const ids = (await list(harness)).map((f) => f.id);
   const reversed = [...ids].reverse();
-  const put = await harness.send<SmartFolderItem[]>("PUT", "/api/smart-folders/order", {
+  const put = await harness.send<SmartFolder[]>("PUT", "/api/smart-folders/order", {
     ids: reversed,
   });
   assert.equal(put.status, 200);
@@ -231,7 +227,7 @@ contract("テンプレートから固定 ID で追加でき、今ある ID は40
   assert.equal(dup.status, 409);
 
   await harness.request("/api/smart-folders/fav", { method: "DELETE" });
-  const added = await harness.send<SmartFolderItem>("POST", "/api/smart-folders/from-template", {
+  const added = await harness.send<SmartFolder>("POST", "/api/smart-folders/from-template", {
     templateId: "fav",
   });
   assert.equal(added.status, 201);
@@ -239,7 +235,7 @@ contract("テンプレートから固定 ID で追加でき、今ある ID は40
   assert.equal(added.body.name, "お気に入り");
   assert.equal(added.body.position, SEEDED_IDS.length);
 
-  const series = await harness.send<SmartFolderItem>("POST", "/api/smart-folders/from-template", {
+  const series = await harness.send<SmartFolder>("POST", "/api/smart-folders/from-template", {
     templateId: "by-series",
   });
   assert.equal(series.status, 201);
@@ -261,7 +257,7 @@ contract("削除した行を同じ ID・位置・作成日時で戻せる", asyn
   await harness.request(`/api/smart-folders/${created.id}`, { method: "DELETE" });
 
   const { count: _count, ...row } = created;
-  const restored = await harness.send<SmartFolderItem>("POST", "/api/smart-folders/restore", row);
+  const restored = await harness.send<SmartFolder>("POST", "/api/smart-folders/restore", row);
   assert.equal(restored.status, 201);
   assert.deepEqual(restored.body, created);
   assert.deepEqual(
@@ -280,7 +276,7 @@ contract("復元は位置が埋まっていれば後ろへ送り、順序を保�
   const reordered = await create(harness, "新");
   assert.equal(reordered.position, tail.position + 1);
   const { count: _count, ...row } = { ...created, position: tail.position };
-  const restored = await harness.send<SmartFolderItem>("POST", "/api/smart-folders/restore", row);
+  const restored = await harness.send<SmartFolder>("POST", "/api/smart-folders/restore", row);
   assert.equal(restored.status, 201);
   assert.equal(restored.body.position, tail.position);
   const ids = (await list(harness)).map((f) => f.id);
@@ -304,7 +300,7 @@ contract(
       groupBy: { kind: "tag" },
     });
     assert.equal(regrouped.status, 400);
-    const renamed = await harness.send<SmartFolderItem>("POST", "/api/smart-folders/restore", {
+    const renamed = await harness.send<SmartFolder>("POST", "/api/smart-folders/restore", {
       ...row,
       name: "好き",
       sort: "title-asc",
@@ -360,10 +356,10 @@ contract("作品一覧は条件・チップ・検索語・グループの値を 
 });
 
 contract(
-  "作品一覧の要求が契約に合わなければ400（tagOp・seed なしの random・不正な @ タグ）",
+  "作品一覧の要求が契約に合わなければ400（契約にないキー・seed なしの random・不正な @ タグ）",
   async (harness) => {
     for (const query of [
-      "sort=added-desc&tags=cv%2Fx&tagOp=OR",
+      "sort=added-desc&tags=cv%2Fx&tagMode=OR",
       "sort=random",
       "sort=added-desc&tags=%40year%2F",
       "sort=added-desc&page=0",

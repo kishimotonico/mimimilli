@@ -69,7 +69,9 @@ async function diagnosticsOf(app: App) {
 /** 要対応の行方不明が、ライブラリのエラー表示と同じ作品であること */
 async function assertMatchesLibrary(app: App): Promise<void> {
   const diagnostics = await diagnosticsOf(app);
-  const errorView = (await getJson(app, "/api/works?view=error&page=1&limit=500")).body;
+  const errorView = (
+    await getJson(app, "/api/smart-folders/error/works?sort=added-desc&page=1&limit=500")
+  ).body;
   assert.deepEqual(
     diagnostics.missingWorks.map((work) => work.workId).sort(),
     errorView.items
@@ -290,7 +292,9 @@ test("real: 読めない作品は、要対応のデータ不整合とライブ�
       ],
     );
 
-    const list = (await getJson(app, "/api/works?page=1&limit=500")).body;
+    const list = (
+      await getJson(app, "/api/smart-folders/all/works?sort=added-desc&page=1&limit=500")
+    ).body;
     assert.deepEqual(
       list.items.map((item: { id: string }) => item.id),
       ["work-good"],

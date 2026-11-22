@@ -4,14 +4,14 @@ import {
   createInitialAppRoute,
   type LibraryRoute,
 } from "../../src/entities/navigation/model/appRoute";
-import { buildSmartFolderItem, defaultSmartFolderItems } from "../helpers/smartFolders";
+import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
 import { nts } from "../helpers/tag";
 
 function route(patch: Partial<LibraryRoute> = {}): LibraryRoute {
   return { ...createInitialAppRoute().library, seed: 42, ...patch };
 }
 
-const folders = defaultSmartFolderItems();
+const folders = defaultSmartFolders();
 
 describe("resolveLibraryView: 存在しない ID・グループ", () => {
   it("存在しないスマートフォルダー ID は「すべて」の作品一覧になる", () => {
@@ -88,7 +88,7 @@ describe("resolveLibraryView: 値一覧と作品一覧", () => {
 });
 
 describe("resolveLibraryView: 条件が読めない行", () => {
-  const broken = buildSmartFolderItem({ id: "sf-broken", name: "壊れた", condition: null });
+  const broken = buildSmartFolder({ id: "sf-broken", name: "壊れた", condition: null });
 
   it("開けない状態（broken）を返し、並びは「すべて」の既定で解決する", () => {
     const view = resolveLibraryView(route({ folderId: "sf-broken" }), [...folders, broken]);

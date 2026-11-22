@@ -6,7 +6,7 @@
 //   POST   /smart-folders/restore          削除した行を同じ ID・位置・作成日時で戻す
 //   PUT    /smart-folders/:id              更新
 //   DELETE /smart-folders/:id              削除
-//   GET    /smart-folders/:id/works        作品一覧
+//   GET    /smart-folders/:id/works        作品一覧（scanRecord でスキャン記録の作品に絞れる）
 //   POST   /smart-folders/:id/groups       値一覧・「＋絞り込み」候補
 import { Hono } from "hono";
 import { z } from "zod";
@@ -17,7 +17,7 @@ import {
   smartFolderOrderSchema,
   smartFolderRestoreSchema,
   smartFolderWriteSchema,
-  type SmartFolderItem,
+  type SmartFolder,
   type SmartFolderWrite,
 } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter/index.ts";
@@ -30,6 +30,7 @@ import {
 } from "../core/smartFolderPolicy.ts";
 import { conflict, invalidRequest, notFound } from "../lib/httpError.ts";
 import { readJsonBody } from "../lib/jsonBody.ts";
+import type { ScanRecordStore } from "../scanRecord.ts";
 import {
   parseSmartFolderGroupsRequest,
   parseSmartFolderWorksRequest,
@@ -38,10 +39,7 @@ import {
 } from "./smartFolderQuery.ts";
 
 /** 件数を数えるものを shared の判定関数で選び、1往復で数えて載せる。読めない行は対象外 */
-async function withCounts(
-  adapter: DataAdapter,
-  rows: SmartFolderRow[],
-): Promise<SmartFolderItem[]> {
+async function withCounts(adapter: DataAdapter, rows: SmartFolderRow[]): Promise<SmartFolder[]> {
   const targets = rows.flatMap((row, index) =>
     row.condition !== null && needsCount({ condition: row.condition, groupBy: row.groupBy })
       ? [{ index, condition: row.condition }]
@@ -58,10 +56,7 @@ async function withCounts(
   return rows.map((row, index) => ({ ...row, count: countByIndex.get(index) ?? null }));
 }
 
-async function singleWithCount(
-  adapter: DataAdapter,
-  row: SmartFolderRow,
-): Promise<SmartFolderItem> {
+async function singleWithCount(adapter: DataAdapter, row: SmartFolderRow): Promise<SmartFolder> {
   const [item] = await withCounts(adapter, [row]);
   return item!;
 }
@@ -78,7 +73,7 @@ async function requireQueryable(adapter: DataAdapter, id: string) {
   return { condition: row.condition, groupBy: row.groupBy };
 }
 
-export function smartFoldersRoute(adapter: DataAdapter): Hono {
+export function smartFoldersRoute(adapter: DataAdapter, scanRecord: ScanRecordStore): Hono {
   const app = new Hono();
 
   app.get("/smart-folders", async (c) => {
@@ -163,12 +158,17 @@ export function smartFoldersRoute(adapter: DataAdapter): Hono {
 
   app.get("/smart-folders/:id/works", async (c) => {
     const folder = await requireQueryable(adapter, c.req.param("id"));
-    // tagOp など契約にないキーも検証に渡し、黙って AND にせず 400 にする
+    // 契約にないキーも検証に渡し、黙って無視せず 400 にする
     const request = parseSmartFolderWorksRequest({
       ...c.req.query(),
       tags: c.req.queries("tags"),
     });
-    return c.json(await queryFolderWorks(adapter, folder, request));
+    const { scanRecord: recordKind, scanChange } = request;
+    if (scanChange !== undefined && recordKind !== "updated") {
+      invalidRequest("scanChange は scanRecord=updated のときだけ指定できます");
+    }
+    const ids = recordKind ? scanRecord.workIds(recordKind, scanChange) : undefined;
+    return c.json(await queryFolderWorks(adapter, folder, request, ids));
   });
 
   app.post("/smart-folders/:id/groups", async (c) => {

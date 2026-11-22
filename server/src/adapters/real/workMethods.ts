@@ -19,9 +19,7 @@ import type {
   WorkSourceMutationResult,
   WorkSourcePatch,
   WorkspacePath,
-  WorksPage,
   UnregisterMissingWorksResult,
-  WorksQuery,
 } from "@mimimilli/shared";
 import type {
   ConditionGroupQuery,
@@ -138,10 +136,6 @@ export function createWorkMethods(deps: {
   }
 
   return {
-    async queryWorksLegacy(params: WorksQuery): Promise<WorksPage> {
-      return query.queryWorks(params, requireRoot());
-    },
-
     async queryWorks(conditionQuery: ConditionWorksQuery, ctx: EvalContext) {
       return query.queryWorksByCondition(conditionQuery, requireRoot(), ctx);
     },

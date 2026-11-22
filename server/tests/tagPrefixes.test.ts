@@ -1,5 +1,5 @@
 // タグ正規化・prefix 定義（ADR-0005）のテスト。
-// 純粋関数（normalizeTag / buildAxisFacets / buildTagPrefixCandidates）と
+// 純粋関数（normalizeTag / buildGroupFacets / buildTagPrefixCandidates）と
 // fixture / real 両 adapter の HTTP CRUD を確認する。
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -15,13 +15,10 @@ import {
   tagEquals,
   tagPrefixCreateSchema,
   tagPrefixNameSchema,
-  SMART_FOLDER_AXIS_PREFIX,
-  VIEW_IDS,
 } from "@mimimilli/shared";
 import type { WorkSummary } from "@mimimilli/shared";
-import { buildAxisFacets } from "../src/core/axisFacets.ts";
+import { buildGroupFacets } from "../src/core/axisFacets.ts";
 import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
-import { tf } from "./helpers/tag.ts";
 import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../src/adapters/real/dlsiteConfig.ts";
 import { htmlResponse, mockDlsiteTransport, sampleWorkHtml } from "./helpers/dlsiteTransport.ts";
 import { buildTagPrefixCandidates } from "../src/core/tagPrefixCandidates.ts";
@@ -98,15 +95,13 @@ test("tagEquals: 正規化済み同士の同値判定。値は大文字小文字
 
 // ── prefix 名スキーマ ─────────────────────────────────────────
 
-test("tagPrefixNameSchema: 全ビューID・tag・year・smart- 接頭辞・スラッシュを拒否する", () => {
-  for (const id of [...VIEW_IDS, "tag", "year"]) {
+test("tagPrefixNameSchema: tag・year・スラッシュを拒否する", () => {
+  for (const id of ["tag", "year"]) {
     assert.ok(!tagPrefixNameSchema.safeParse(id).success, id);
   }
-  assert.ok(!tagPrefixNameSchema.safeParse("YEAR").success); // 小文字化後に予約IDと衝突
+  assert.ok(!tagPrefixNameSchema.safeParse("YEAR").success); // 小文字化後に予約名と衝突
   assert.ok(!tagPrefixNameSchema.safeParse("a/b").success);
-  assert.ok(!tagPrefixNameSchema.safeParse(SMART_FOLDER_AXIS_PREFIX).success);
-  assert.ok(!tagPrefixNameSchema.safeParse(`${SMART_FOLDER_AXIS_PREFIX}x`).success);
-  assert.ok(tagPrefixNameSchema.safeParse("smartx").success);
+  assert.ok(tagPrefixNameSchema.safeParse("recent").success);
   assert.equal(tagPrefixNameSchema.parse(" 気分 "), "気分");
 });
 
@@ -147,49 +142,52 @@ test("resolveTagPrefix: 未登録 prefix は prefix 文字列をラベルにし�
 
 // ── ファセット集計（動的 prefix 軸）──────────────────────────
 
-test("buildAxisFacets: 任意の prefix 軸を集計できる（別 prefix は混入しない）", () => {
+test("buildGroupFacets: prefix のグループを集計できる（別 prefix は混入しない）", () => {
   const works = [
     summaryWith("W1", ["気分/睡眠用", "ASMR"]),
     summaryWith("W2", ["気分/睡眠用", "気分/作業用"]),
     summaryWith("W3", ["kibun/x", "気分/作業用"]),
   ];
-  const items = buildAxisFacets("気分", works);
+  const items = buildGroupFacets({ kind: "prefix", prefix: "気分" }, works);
   assert.deepEqual(items, [
     { value: "作業用", count: 2, durationSec: 0, covers: [] },
     { value: "睡眠用", count: 2, durationSec: 0, covers: [] },
   ]);
 });
 
-test("buildAxisFacets: tag 軸は flat・annotated 双方を集計し、year 軸は addedAt 由来", () => {
+test("buildGroupFacets: tag は flat・annotated 双方を集計し、addedYear は addedAt 由来", () => {
   const works = [
     summaryWith("W1", ["cv/x", "ASMR"], "2025-06-01T00:00:00.000Z"),
     summaryWith("W2", ["ASMR"], "2026-01-01T00:00:00.000Z"),
   ];
-  assert.deepEqual(buildAxisFacets("tag", works), [
+  assert.deepEqual(buildGroupFacets({ kind: "tag" }, works), [
     { value: "ASMR", count: 2, durationSec: 0, covers: [] },
     { value: "cv/x", count: 1, durationSec: 0, covers: [] },
   ]);
   assert.deepEqual(
-    buildAxisFacets("year", works)
+    buildGroupFacets({ kind: "addedYear" }, works)
       .map((i) => i.value)
       .sort(),
     ["2025", "2026"],
   );
 });
 
-test("buildAxisFacets: durationSecは同じ値に属する作品の合計、durationSec未知(null)は合算から除く", () => {
+test("buildGroupFacets: durationSecは同じ値に属する作品の合計、durationSec未知(null)は合算から除く", () => {
   const works = [
     { ...summaryWith("W1", ["気分/睡眠用"]), totalDurationSec: 600 },
     { ...summaryWith("W2", ["気分/睡眠用"]), totalDurationSec: 1200 },
     { ...summaryWith("W3", ["気分/睡眠用"]), totalDurationSec: null },
   ];
   assert.deepEqual(
-    buildAxisFacets("気分", works).map(({ value, durationSec }) => ({ value, durationSec })),
+    buildGroupFacets({ kind: "prefix", prefix: "気分" }, works).map(({ value, durationSec }) => ({
+      value,
+      durationSec,
+    })),
     [{ value: "睡眠用", durationSec: 1800 }],
   );
 });
 
-test("buildAxisFacets: coversは追加日時の新しい順で最大4件、cover未設定の作品は含まない", () => {
+test("buildGroupFacets: coversは追加日時の新しい順で最大4件、cover未設定の作品は含まない", () => {
   const cover = (n: number) => ({
     image: `cover-${n}.jpg`,
     dimensions: { width: n, height: n },
@@ -203,46 +201,11 @@ test("buildAxisFacets: coversは追加日時の新しい順で最大4件、cover
     { ...summaryWith("W5", ["気分/睡眠用"], "2026-01-04T00:00:00.000Z"), cover: cover(5) },
     { ...summaryWith("W6", ["気分/睡眠用"], "2026-01-06T00:00:00.000Z"), cover: cover(6) },
   ];
-  const [item] = buildAxisFacets("気分", works);
+  const [item] = buildGroupFacets({ kind: "prefix", prefix: "気分" }, works);
   assert.deepEqual(
     item?.covers.map((c) => c.image),
     ["cover-6.jpg", "cover-4.jpg", "cover-5.jpg", "cover-2.jpg"],
   );
-});
-
-test("buildAxisFacets: filter を渡すと AND 条件として絞り込んだ集合から集計する", () => {
-  const works = [
-    summaryWith("W1", ["cv/藤田茜", "ASMR"]),
-    summaryWith("W2", ["cv/霧島レイ", "ASMR"]),
-    summaryWith("W3", ["cv/霧島レイ", "催眠"]),
-  ];
-  // ASMR タグで絞り込むと霧島レイの1件（W3）は集計対象から外れる
-  assert.deepEqual(buildAxisFacets("cv", works, { tags: tf("ASMR"), tagOp: "AND" }), [
-    { value: "藤田茜", count: 1, durationSec: 0, covers: [] },
-    { value: "霧島レイ", count: 1, durationSec: 0, covers: [] },
-  ]);
-});
-
-test("buildAxisFacets: filter の @year/... 擬似タグも追加のAND条件として適用する", () => {
-  const works = [
-    summaryWith("W1", ["cv/藤田茜"], "2024-06-01T00:00:00.000Z"),
-    summaryWith("W2", ["cv/藤田茜"], "2025-06-01T00:00:00.000Z"),
-    summaryWith("W3", ["cv/霧島レイ"], "2025-06-01T00:00:00.000Z"),
-  ];
-  assert.deepEqual(buildAxisFacets("cv", works, { tags: tf("@year/2025") }), [
-    { value: "藤田茜", count: 1, durationSec: 0, covers: [] },
-    { value: "霧島レイ", count: 1, durationSec: 0, covers: [] },
-  ]);
-});
-
-test("buildAxisFacets: filterで0件になった値は一覧から除外される", () => {
-  const works = [summaryWith("W1", ["cv/藤田茜", "催眠"])];
-  assert.deepEqual(buildAxisFacets("cv", works, { tags: tf("ASMR"), tagOp: "AND" }), []);
-});
-
-test("buildAxisFacets: filterが無ければ無絞り込みで集計する", () => {
-  const works = [summaryWith("W1", ["cv/藤田茜"]), summaryWith("W2", ["cv/霧島レイ"])];
-  assert.deepEqual(buildAxisFacets("cv", works), buildAxisFacets("cv", works, {}));
 });
 
 // ── 候補サジェスト ────────────────────────────────────────────
@@ -259,8 +222,8 @@ test("buildTagPrefixCandidates: 未登録 prefix のみを件数降順で返す"
   ]);
 });
 
-test("buildTagPrefixCandidates: 登録できない予約 prefix と禁止形を候補から除く", () => {
-  const works = [summaryWith("W1", ["tag/foo", "year/2025", "smart-x/value", "気分/睡眠用"])];
+test("buildTagPrefixCandidates: 登録できない予約 prefix を候補から除く", () => {
+  const works = [summaryWith("W1", ["tag/foo", "year/2025", "気分/睡眠用"])];
 
   assert.deepEqual(buildTagPrefixCandidates(works, []), [{ prefix: "気分", count: 1 }]);
 });

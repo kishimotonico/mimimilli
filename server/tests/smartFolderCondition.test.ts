@@ -7,9 +7,9 @@ import {
   isHasErrorOnly,
   needsCount,
   showsCount,
-  isBrokenSmartFolderItem,
+  isBrokenSmartFolder,
   smartFolderGroupsRequestSchema,
-  smartFolderItemSchema,
+  smartFolderSchema,
   smartFolderRestoreSchema,
   smartFolderWorksRequestSchema,
   smartFolderWriteSchema,
@@ -130,7 +130,7 @@ test("既定テンプレート: 13本・初回11本・固定IDで、条件は保
   assert.deepEqual([all.id, all.sort, all.groupBy], ["all", "added-desc", null]);
 });
 
-test("作品一覧の要求: sort 必須、random は seed 必須、tagOp は受け付けない", () => {
+test("作品一覧の要求: sort 必須、random は seed 必須、契約にないキーは受け付けない", () => {
   const ok = smartFolderWorksRequestSchema.safeParse({ sort: "title-asc", tags: [] });
   assert.ok(ok.success);
   assert.equal(smartFolderWorksRequestSchema.safeParse({ tags: [] }).success, false);
@@ -141,15 +141,18 @@ test("作品一覧の要求: sort 必須、random は seed 必須、tagOp は受
   assert.ok(
     smartFolderWorksRequestSchema.safeParse({ sort: "random", seed: "1", tags: [] }).success,
   );
-  for (const tagOp of ["OR", "AND"]) {
+  for (const tagMode of ["OR", "AND"]) {
     assert.equal(
-      smartFolderWorksRequestSchema.safeParse({ sort: "added-desc", tags: [], tagOp }).success,
+      smartFolderWorksRequestSchema.safeParse({ sort: "added-desc", tags: [], tagMode }).success,
       false,
     );
   }
   assert.equal(
-    smartFolderGroupsRequestSchema.safeParse({ groupBy: { kind: "tag" }, tags: [], tagOp: "OR" })
-      .success,
+    smartFolderGroupsRequestSchema.safeParse({
+      groupBy: { kind: "tag" },
+      tags: [],
+      tagMode: "OR",
+    }).success,
     false,
   );
 });
@@ -202,9 +205,9 @@ test("壊れた行は condition が null の行", () => {
     createdAt: "t",
     count: null,
   };
-  const item = smartFolderItemSchema.parse(row);
-  assert.ok(isBrokenSmartFolderItem(item));
-  assert.ok(!isBrokenSmartFolderItem({ ...item, condition: and() }));
+  const item = smartFolderSchema.parse(row);
+  assert.ok(isBrokenSmartFolder(item));
+  assert.ok(!isBrokenSmartFolder({ ...item, condition: and() }));
 });
 
 test("読み出し用は空白だけの text.q も通す", () => {
