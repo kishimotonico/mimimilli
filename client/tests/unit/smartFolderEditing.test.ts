@@ -48,6 +48,13 @@ describe("条件の行", () => {
     ]);
   });
 
+  it("長さの否定は以上・以下を保ち、末尾で一度だけ否定する", () => {
+    const text = (op: "gte" | "lte") =>
+      conditionRowText({ type: "not", child: { type: "duration", op, sec: 3600 } });
+    expect(text("gte")).toBe("60分以上ではない");
+    expect(text("lte")).toBe("60分以下ではない");
+  });
+
   it("まとまりはまとまりごと外れる", () => {
     const condition: Condition = { type: "and", children };
     expect(withoutRootChild(condition, 2)).toEqual({

@@ -58,10 +58,8 @@ function predicateText(predicate: Predicate, negated: boolean): string {
     case "hasPrefix":
       return `${predicate.prefix}/ のタグが${negated ? "ない" : "ある"}`;
     case "duration": {
-      const atLeast = (predicate.op === "gte") !== negated;
-      const text = durationText(predicate.sec);
-      if (!negated) return `${text}${atLeast ? "以上" : "以下"}`;
-      return `${text}${atLeast ? "以上" : "以下"}ではない`;
+      const bound = `${durationText(predicate.sec)}${predicate.op === "gte" ? "以上" : "以下"}`;
+      return negated ? `${bound}ではない` : bound;
     }
     case "bookmarked":
       return negated ? "お気に入りでない" : "お気に入り";
