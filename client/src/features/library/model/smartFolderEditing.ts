@@ -4,16 +4,19 @@
 import {
   EMPTY_CONDITION,
   SMART_FOLDER_TEMPLATES,
+  isPredicate,
   rootChildren,
   type Condition,
   type GroupBy,
   type Predicate,
+  type ReadableSmartFolder,
   type SmartFolder,
   type SmartFolderTemplate,
   type SmartFolderWrite,
   type SortId,
   type TagPrefix,
 } from "@mimimilli/shared";
+import type { GroupByKey } from "../../../entities/smart-folder/groupByKey";
 
 // ── 並べ替え ─────────────────────────────────────────────────
 
@@ -49,12 +52,10 @@ function durationText(sec: number): string {
   return sec % 60 === 0 ? `${sec / 60}分` : `${sec}秒`;
 }
 
-const tagLabel = (tag: string) => (tag.includes("/") ? tag : `#${tag}`);
-
 function predicateText(predicate: Predicate, negated: boolean): string {
   switch (predicate.type) {
     case "tag":
-      return `${tagLabel(predicate.tag)} を${negated ? "含まない" : "含む"}`;
+      return `${predicate.tag} を${negated ? "含まない" : "含む"}`;
     case "hasPrefix":
       return `${predicate.prefix}/ のタグが${negated ? "ない" : "ある"}`;
     case "duration": {
@@ -79,26 +80,22 @@ function predicateText(predicate: Predicate, negated: boolean): string {
   }
 }
 
-function isPredicateNode(condition: Condition): condition is Predicate {
-  return condition.type !== "and" && condition.type !== "or" && condition.type !== "not";
-}
-
 function orText(children: readonly Condition[]): string {
   return children
-    .map((child) => (isPredicateNode(child) ? predicateText(child, false) : "…"))
+    .map((child) => (isPredicate(child) ? predicateText(child, false) : "…"))
     .join(" または ");
 }
 
 /** ルート直下の子1つを人が読める1行にする。まとまり（or・not(or)）はまとまり単位 */
 export function conditionRowText(child: Condition): string {
-  if (isPredicateNode(child)) return predicateText(child, false);
+  if (isPredicate(child)) return predicateText(child, false);
   if (child.type === "or") return orText(child.children);
   if (child.type === "not") {
     const inner = child.child;
-    if (isPredicateNode(inner)) return predicateText(inner, true);
+    if (isPredicate(inner)) return predicateText(inner, true);
     if (inner.type === "or") {
       return `どれでもない: ${inner.children
-        .map((c) => (isPredicateNode(c) ? predicateText(c, false) : "…"))
+        .map((c) => (isPredicate(c) ? predicateText(c, false) : "…"))
         .join("、")}`;
     }
   }
@@ -111,20 +108,6 @@ export function withoutRootChild(condition: Condition, index: number): Condition
 }
 
 // ── グループ分け ─────────────────────────────────────────────
-
-export type GroupByKey = string;
-
-export function groupByKey(groupBy: GroupBy | null): GroupByKey {
-  if (groupBy === null) return "";
-  return groupBy.kind === "prefix" ? `prefix:${groupBy.prefix}` : groupBy.kind;
-}
-
-export function groupByFromKey(key: GroupByKey): GroupBy | null {
-  if (key === "") return null;
-  if (key === "tag") return { kind: "tag" };
-  if (key === "addedYear") return { kind: "addedYear" };
-  return { kind: "prefix", prefix: key.slice("prefix:".length) };
-}
 
 export interface GroupByOption {
   key: GroupByKey;
@@ -162,7 +145,7 @@ export interface SmartFolderDraft {
   groupBy: GroupBy | null;
 }
 
-export function draftOf(folder: SmartFolder & { condition: Condition }): SmartFolderDraft {
+export function draftOf(folder: ReadableSmartFolder): SmartFolderDraft {
   return {
     name: folder.name,
     condition: folder.condition,
@@ -172,7 +155,7 @@ export function draftOf(folder: SmartFolder & { condition: Condition }): SmartFo
 }
 
 /** 絞り込みの無い複製の下書き。元の定義と既定の並び（継承ならそのまま継承）を写す */
-export function duplicateDraft(folder: SmartFolder & { condition: Condition }): SmartFolderDraft {
+export function duplicateDraft(folder: ReadableSmartFolder): SmartFolderDraft {
   return { ...draftOf(folder), name: `${folder.name}（コピー）` };
 }
 
@@ -182,8 +165,8 @@ export function groupDraft(groupBy: GroupBy): SmartFolderDraft {
 }
 
 export type SmartFolderDialogTarget =
-  | { kind: "edit"; folder: SmartFolder & { condition: Condition } }
-  | { kind: "duplicate"; folder: SmartFolder & { condition: Condition } }
+  | { kind: "edit"; folder: ReadableSmartFolder }
+  | { kind: "duplicate"; folder: ReadableSmartFolder }
   | { kind: "save"; draft: SmartFolderDraft }
   | { kind: "group" };
 

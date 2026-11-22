@@ -9,7 +9,7 @@ import {
   useAnchoredPopover,
   type AnchoredPopoverFloatingRefCallback,
 } from "../../../shared/ui/useAnchoredPopover";
-import { groupByKey } from "../model/smartFolderEditing";
+import { groupByKey } from "../../../entities/smart-folder/groupByKey";
 import GroupValuePopoverPanel from "./GroupValuePopoverPanel";
 import type { GroupValueScope } from "../model/useGroupValuesQuery";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";

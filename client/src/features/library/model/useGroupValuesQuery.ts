@@ -6,7 +6,7 @@ import type { GroupBy, NormalizedTag } from "@mimimilli/shared";
 import { getSmartFolderGroups } from "../../../entities/smart-folder/api";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { assertGroupValueItems } from "./libraryPresentation";
-import { groupByKey } from "./smartFolderEditing";
+import { groupByKey } from "../../../entities/smart-folder/groupByKey";
 
 /** 候補を数える母集団。サイドバーの値一覧は絞り込み無し、「＋絞り込み」は開いている一覧の状態 */
 export interface GroupValueScope {

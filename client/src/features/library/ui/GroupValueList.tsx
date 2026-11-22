@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import type { GroupBy, GroupValueItem, TagPrefix } from "@mimimilli/shared";
 import { getGroupByIcon, getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
-import { groupByKey } from "../model/smartFolderEditing";
+import { groupByKey } from "../../../entities/smart-folder/groupByKey";
 import { buildGroupValueDisplayRows } from "../model/groupValueDisplayRows";
 import { groupValueSortAtom, libraryTileSizeAtom, libraryViewModeAtom } from "../model/atoms";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";

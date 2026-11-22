@@ -8,7 +8,7 @@ import {
   type GroupValueSortState,
 } from "../model/groupValueSort";
 import { groupValueSortAtom } from "../model/atoms";
-import { groupByKey } from "../model/smartFolderEditing";
+import { groupByKey } from "../../../entities/smart-folder/groupByKey";
 import { buildGroupValueDisplayRows } from "../model/groupValueDisplayRows";
 import { isGroupValueRowArrowKey } from "../model/groupValueRowNav";
 import { I } from "../../../shared/ui/Icon";

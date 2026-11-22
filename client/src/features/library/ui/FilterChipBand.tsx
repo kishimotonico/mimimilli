@@ -1,4 +1,4 @@
-import { resolveTagPrefix, type NormalizedTag, type TagPrefix } from "@mimimilli/shared";
+import { parseTag, resolveTagPrefix, type NormalizedTag, type TagPrefix } from "@mimimilli/shared";
 import { tagPrefixColorToCss } from "../../../entities/work/tagPrefixColor";
 import { formatFilterChipLabel } from "../model/libraryPresentation";
 import type { GroupValueScope } from "../model/useGroupValuesQuery";
@@ -40,18 +40,21 @@ function FilterChip({
   onRemove: () => void;
 }) {
   const label = formatFilterChipLabel(tag);
-  const slash = label === tag ? tag.indexOf("/") : -1;
-  const prefixColor =
-    slash > 0
-      ? tagPrefixColorToCss(resolveTagPrefix(tag.slice(0, slash), tagPrefixes).color)
-      : undefined;
+  const parsed = label === tag ? parseTag(tag) : null;
+  const annotated = parsed?.kind === "annotated" ? parsed : null;
   return (
     <span className="mll-tagband__chip relative">
       <span className="lbl">
-        {slash > 0 ? (
+        {annotated ? (
           <>
-            <b style={{ color: prefixColor }}>{label.slice(0, slash + 1)}</b>
-            {label.slice(slash + 1)}
+            <b
+              style={{
+                color: tagPrefixColorToCss(resolveTagPrefix(annotated.prefix, tagPrefixes).color),
+              }}
+            >
+              {tag.slice(0, annotated.prefix.length + 1)}
+            </b>
+            {annotated.value}
           </>
         ) : (
           label

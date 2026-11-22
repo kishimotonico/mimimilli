@@ -1,8 +1,7 @@
 import { useAtom, useStore } from "jotai";
-import { ALL_SMART_FOLDER_ID } from "@mimimilli/shared";
+import { ALL_SMART_FOLDER_ID, type SmartFolderWrite } from "@mimimilli/shared";
 import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
 import { closeSmartFolderDialogIfOpen, smartFolderDialogAtom } from "../model/atoms";
-import type { toWrite } from "../model/smartFolderEditing";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
 import SmartFolderDialog from "./SmartFolderDialog";
@@ -14,13 +13,10 @@ export default function SmartFolderDialogHost() {
   const nav = useLibraryNavigation();
   const editor = useSmartFolderEditor();
   const { tagPrefixes } = useTagPrefixes();
-  const allSort =
-    nav.foldersStatus === "ready"
-      ? (nav.folders.find((folder) => folder.id === ALL_SMART_FOLDER_ID)?.sort ?? null)
-      : null;
-  if (!dialog) return null;
+  if (!dialog || nav.foldersStatus !== "ready") return null;
+  const allSort = nav.folders.find((folder) => folder.id === ALL_SMART_FOLDER_ID)?.sort ?? null;
 
-  const save = async (data: ReturnType<typeof toWrite>) => {
+  const save = async (data: SmartFolderWrite) => {
     if (dialog.kind === "edit") {
       const saved = await editor.update(dialog.folder.id, data);
       if (saved) closeSmartFolderDialogIfOpen(store, dialog);

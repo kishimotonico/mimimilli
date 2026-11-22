@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { GroupValueItem } from "@mimimilli/shared";
+import type { GroupValueItem, NormalizedTag } from "@mimimilli/shared";
 import { ApiRequestError } from "../../src/shared/api/http";
 import { nt } from "../helpers/tag";
 import {
@@ -147,5 +147,9 @@ describe("formatFilterChipLabel（チップの内部表現を隠す）", () => {
   it("実タグはフルパスのまま変更しない", () => {
     expect(formatFilterChipLabel(nt("cv/藤田茜"))).toBe("cv/藤田茜");
     expect(formatFilterChipLabel(nt("ASMR"))).toBe("ASMR");
+  });
+
+  it("組み込みのキーでない擬似タグは変換しない", () => {
+    expect(formatFilterChipLabel("@other/2024" as NormalizedTag)).toBe("@other/2024");
   });
 });

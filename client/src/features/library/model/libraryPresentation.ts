@@ -5,6 +5,7 @@
 import { hasChipOrSearchRefinement } from "../../../entities/library/refinement";
 import {
   groupChipTag,
+  isBuiltinPseudoTagKey,
   normalizeGroupValue,
   parseBuiltinPseudoTag,
   TagNormalizationError,
@@ -15,7 +16,7 @@ import {
 } from "@mimimilli/shared";
 import { ApiRequestError } from "../../../shared/api/http";
 import { getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
-import { groupByKey } from "./smartFolderEditing";
+import { groupByKey } from "../../../entities/smart-folder/groupByKey";
 
 // 組み込みの擬似タグ（year 等、ADR-0012 §2）の構築・解析・検証は shared/pseudoTag.ts に
 // 集約している（client・server の両方が同じ実装を使うため）。isBuiltinPseudoTagKey /
@@ -49,7 +50,7 @@ export function assertGroupValueItems<T extends GroupValueItem>(groupBy: GroupBy
  *  「追加日/2023」）に変換する。実タグはそのまま tag を返す。 */
 export function formatFilterChipLabel(tag: NormalizedTag): string {
   const builtin = parseBuiltinPseudoTag(tag);
-  if (!builtin) return tag;
+  if (!builtin || !isBuiltinPseudoTagKey(builtin.key)) return tag;
   return `${getGroupByLabel({ kind: "addedYear" })}/${builtin.value}`;
 }
 

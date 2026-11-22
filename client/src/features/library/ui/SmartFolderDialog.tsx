@@ -5,10 +5,12 @@ import {
   rootChildren,
   smartFolderPermissions,
   type SmartFolderPermissions,
+  type SmartFolderWrite,
   type SortId,
   type TagPrefix,
 } from "@mimimilli/shared";
 import { SORT_OPTIONS } from "../../../entities/library/types";
+import { groupByFromKey, groupByKey } from "../../../entities/smart-folder/groupByKey";
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
@@ -18,8 +20,6 @@ import {
   conditionRowText,
   draftOf,
   duplicateDraft,
-  groupByFromKey,
-  groupByKey,
   groupByOptions,
   groupDraft,
   toWrite,
@@ -30,12 +30,11 @@ import {
 
 interface SmartFolderDialogProps {
   target: SmartFolderDialogTarget;
-  /** 「『すべて』と同じ」の表示に使う「すべて」の既定の並び */
   /** 「すべて」の並び。読めないときは null（「すべて」と同じを選べない） */
   allSort: SortId | null;
   tagPrefixes: readonly TagPrefix[];
   /** 保存できたら true。失敗はダイアログを開いたままにする */
-  onSave: (draft: ReturnType<typeof toWrite>) => Promise<boolean>;
+  onSave: (draft: SmartFolderWrite) => Promise<boolean>;
   onClose: () => void;
 }
 
