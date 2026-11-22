@@ -11,7 +11,7 @@ import {
   splitSelectedTags,
   type ReadableSmartFolder,
   type SmartFolder,
-  type SmartFolderWrite,
+  type SmartFolderConditionWrite,
 } from "@mimimilli/shared";
 import { hasChipOrSearchRefinement } from "../../../entities/library/refinement";
 import type { ResolvedLibraryView, WorksView } from "../../../entities/library/resolveLibraryView";
@@ -83,15 +83,21 @@ export function saveSearchDraft(view: WorksView): SmartFolderDraft {
   };
 }
 
-/** 「上書き」の中身。条件に今の絞り込みを足し、並びを変えていればそれを既定の並びにする */
-export function overwriteWrite(view: OverwritableView): SmartFolderWrite {
+/** 「上書き」で更新する項目。条件に今の絞り込みを足し、並びを変えていればそれを既定の並びにする。
+ *  名前・グループ分け・値の並びと、変えない既定の並びは送らない */
+export function overwriteChange(view: OverwritableView): SmartFolderConditionWrite {
+  return {
+    condition: effectiveCondition(view),
+    ...(view.sortDeviates ? { sort: view.sort } : {}),
+  };
+}
+
+/** 「元に戻す」で戻す項目。上書きが更新した項目だけを上書き前の値にする */
+export function overwriteUndoChange(view: OverwritableView): SmartFolderConditionWrite {
   const { folder } = view;
   return {
-    name: folder.name,
-    condition: effectiveCondition(view),
-    sort: view.sortDeviates ? view.sort : folder.sort,
-    groupBy: folder.groupBy,
-    groupSort: folder.groupSort,
+    condition: folder.condition,
+    ...(view.sortDeviates ? { sort: folder.sort } : {}),
   };
 }
 

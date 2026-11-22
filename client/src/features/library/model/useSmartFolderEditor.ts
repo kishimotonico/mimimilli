@@ -11,6 +11,7 @@ import {
   isReadableSmartFolder,
   type SmartFolder,
   type GroupSortId,
+  type SmartFolderConditionWrite,
   type SmartFolderWrite,
   type SortId,
 } from "@mimimilli/shared";
@@ -22,6 +23,7 @@ import {
   reorderSmartFolders,
   restoreSmartFolder,
   updateSmartFolder,
+  updateSmartFolderCondition,
   updateSmartFolderGroupSort,
   updateSmartFolderSort,
 } from "../../../entities/smart-folder/api";
@@ -39,6 +41,12 @@ export interface SmartFolderEditor {
   addFromTemplate: (templateId: string) => Promise<SmartFolder | null>;
   /** 定義（名前・条件・グループ分け・既定の並び）を保存する。保存できたら true */
   update: (id: string, data: SmartFolderWrite, failureMessage?: string) => Promise<boolean>;
+  /** 条件（と、指定したときだけ既定の並び）だけを変える。検索の上書きとその取り消し。保存できたら true */
+  overwriteCondition: (
+    id: string,
+    change: SmartFolderConditionWrite,
+    failureMessage?: string,
+  ) => Promise<boolean>;
   /** 既定の並びだけを変える。定義の結果は変わらないので、作品・値の一覧は取り直さない */
   saveDefaultSort: (id: string, sort: SortId) => Promise<boolean>;
   /** 値一覧の既定の並びだけを変える。作品・値の一覧は取り直さない（並びは要求に含まれる） */
@@ -78,6 +86,15 @@ export function useSmartFolderEditor(): SmartFolderEditor {
         ]);
       }
     };
+
+    /** 作成・追加の成功応答の行を、一覧の再取得を待たず ID 単位で反映する。件数・順序は続く再取得で取り直す */
+    const upsertFolder = (row: SmartFolder) =>
+      queryClient.setQueryData<SmartFolder[]>(SMART_FOLDER_QUERY_KEYS.all(), (prev) => {
+        if (prev === undefined) return prev;
+        return prev.some((folder) => folder.id === row.id)
+          ? prev.map((folder) => (folder.id === row.id ? row : folder))
+          : [...prev, row];
+      });
 
     /** 変更の唯一の実行路。成功なら onSuccess のあとに refresh、失敗ならトーストと一覧の取り直し */
     const commit = async <T>(
@@ -168,10 +185,18 @@ export function useSmartFolderEditor(): SmartFolderEditor {
         }
       },
       create: (data) =>
-        commit("スマートフォルダーを作れませんでした", "folders", () => createSmartFolder(data)),
+        commit(
+          "スマートフォルダーを作れませんでした",
+          "folders",
+          () => createSmartFolder(data),
+          upsertFolder,
+        ),
       addFromTemplate: (templateId) =>
-        commit("既定のスマートフォルダーを追加できませんでした", "folders", () =>
-          createSmartFolderFromTemplate(templateId),
+        commit(
+          "既定のスマートフォルダーを追加できませんでした",
+          "folders",
+          () => createSmartFolderFromTemplate(templateId),
+          upsertFolder,
         ),
       update: async (id, data, failureMessage = "スマートフォルダーを保存できませんでした") => {
         const before = queryClient
@@ -190,6 +215,14 @@ export function useSmartFolderEditor(): SmartFolderEditor {
         }
         return saved !== null;
       },
+      overwriteCondition: async (
+        id,
+        change,
+        failureMessage = "スマートフォルダーを上書きできませんでした",
+      ) =>
+        (await commit(failureMessage, { definitionOf: id }, () =>
+          updateSmartFolderCondition(id, change),
+        )) !== null,
       saveDefaultSort: async (id, sort) =>
         (await commit("並びを既定にできませんでした", "folders", () =>
           updateSmartFolderSort(id, sort),

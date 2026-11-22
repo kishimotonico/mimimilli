@@ -6,7 +6,7 @@ import { createStore, Provider } from "jotai";
 import { smartFolderDialogAtom } from "../../src/features/library/model/atoms";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import SmartFolderDialogHost from "../../src/features/library/ui/SmartFolderDialogHost";
-import { mockApi } from "../helpers/api";
+import { apiError, mockApi } from "../helpers/api";
 import { buildTagPrefix } from "../helpers/builders";
 import { libraryRouteAtom } from "../../src/entities/library/model/navigationAtoms";
 import {
@@ -126,6 +126,27 @@ describe("作成の保存中に移った画面", () => {
     await user.click(await screen.findByRole("button", { name: "保存" }));
 
     await waitFor(() => expect(store.get(libraryRouteAtom).folderId).toBe(folderA.id));
+  });
+});
+
+describe("作成のあとの一覧の再取得が失敗したとき", () => {
+  it("新しいフォルダーを開いたまま「すべて」へ戻さない", async () => {
+    mockApi({
+      "GET /api/tag-prefixes": [],
+      "GET /api/smart-folders": () => apiError(500, "internal", "失敗"),
+      "POST /api/smart-folders": () => ({ ...folderA }),
+    });
+    const store = renderHost(defaultSmartFolders());
+    const user = userEvent.setup();
+
+    act(() => store.set(smartFolderDialogAtom, { kind: "save", draft }));
+    await user.click(await screen.findByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(store.get(smartFolderDialogAtom)).toBeNull());
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(store.get(libraryRouteAtom).folderId).toBe(folderA.id);
   });
 });
 

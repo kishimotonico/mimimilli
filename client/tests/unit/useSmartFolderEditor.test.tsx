@@ -56,6 +56,25 @@ describe("作成・既定から追加", () => {
     expect(toasts()).toEqual([]);
   });
 
+  it("作れたら応答の行を一覧のキャッシュへすぐ反映する（再取得を待たない・ID 単位）", async () => {
+    mockApi({ "POST /api/smart-folders": () => ({ ...userFolder }) });
+    const editor = setup();
+    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), defaultSmartFolders());
+    vi.spyOn(queryClient, "invalidateQueries").mockImplementation(async () => {
+      expect(
+        queryClient.getQueryData<{ id: string }[]>(SMART_FOLDER_QUERY_KEYS.all())?.at(-1)?.id,
+      ).toBe(USER_ID);
+    });
+
+    await editor.create(write);
+
+    expect(
+      queryClient
+        .getQueryData<{ id: string }[]>(SMART_FOLDER_QUERY_KEYS.all())
+        ?.filter((folder) => folder.id === USER_ID),
+    ).toHaveLength(1);
+  });
+
   it("失敗はサーバーの文言でトーストに出し、一覧を取り直す", async () => {
     mockApi({
       "POST /api/smart-folders/from-template": () =>
@@ -155,6 +174,35 @@ describe("既定の並びの保存", () => {
     expect(await editor.saveDefaultSort(USER_ID, "random")).toBe(false);
 
     expect(toasts()[0]).toMatchObject({ message: "競合しました", variant: "error" });
+    expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
+  });
+});
+
+describe("条件だけの更新（検索の上書き）", () => {
+  it("条件と指定した項目だけを condition へ送り、そのフォルダーの作品・値の一覧を取り直す", async () => {
+    const api = mockApi({ "PUT /api/smart-folders/:id/condition": () => ({ ...userFolder }) });
+    const editor = setup();
+    const change = { condition: write.condition, sort: "title-desc" as const };
+
+    expect(await editor.overwriteCondition(USER_ID, change)).toBe(true);
+
+    expect(api.requestsTo("PUT /api/smart-folders/:id/condition")[0]!.body).toEqual(change);
+    expect(invalidated).toEqual([
+      SMART_FOLDER_QUERY_KEYS.all(),
+      SMART_FOLDER_QUERY_KEYS.folderWorks(USER_ID),
+      SMART_FOLDER_QUERY_KEYS.folderGroups(USER_ID),
+    ]);
+  });
+
+  it("失敗はトーストに出して一覧を取り直す", async () => {
+    mockApi({
+      "PUT /api/smart-folders/:id/condition": () => apiError(404, "not_found", "見つかりません"),
+    });
+    const editor = setup();
+
+    expect(await editor.overwriteCondition(USER_ID, { condition: write.condition })).toBe(false);
+
+    expect(toasts()[0]).toMatchObject({ message: "見つかりません", variant: "error" });
     expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
   });
 });

@@ -6,12 +6,12 @@ import { useToast } from "../../../shared/ui/useToast";
 import { smartFolderDialogAtom } from "./atoms";
 import {
   isOverwritable,
-  overwriteWrite,
+  overwriteChange,
+  overwriteUndoChange,
   saveOffer,
   saveDialogTarget,
   type SaveOffer,
 } from "./saveSearch";
-import { draftOf, toWrite } from "./smartFolderEditing";
 import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
 import type { LibraryViewActions, LibraryViewState } from "./useLibraryNavigation";
 import { useBeginSettleLibraryFolder } from "./useSettleLibraryFolder";
@@ -47,8 +47,8 @@ export function useSaveSearch(nav: LibraryViewState & LibraryViewActions): SaveS
     overwriting.current = true;
     const { folder } = view;
     const settle = beginSettle();
-    const before = toWrite(draftOf(folder));
-    const saved = await editor.update(folder.id, overwriteWrite(view));
+    const undoChange = overwriteUndoChange(view);
+    const saved = await editor.overwriteCondition(folder.id, overwriteChange(view));
     overwriting.current = false;
     if (!saved) return;
     settle(folder.id);
@@ -61,7 +61,7 @@ export function useSaveSearch(nav: LibraryViewState & LibraryViewActions): SaveS
         if (undone) return;
         undone = true;
         toast.dismiss();
-        void editor.update(folder.id, before, "元に戻せませんでした");
+        void editor.overwriteCondition(folder.id, undoChange, "元に戻せませんでした");
       },
       priority: "action",
       dismissOnUnmount: false,

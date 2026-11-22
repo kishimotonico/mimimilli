@@ -14,6 +14,7 @@ import {
   type ScanRecordKind,
   type WorkChangeKind,
   type SmartFolder,
+  type SmartFolderConditionWrite,
   type SmartFolderRestore,
   type SmartFolderWrite,
   type SortId,
@@ -52,6 +53,14 @@ export async function updateSmartFolder(id: string, data: SmartFolderWrite): Pro
 /** 既定の並びだけを更新する。ほかの列は触らない */
 export async function updateSmartFolderSort(id: string, sort: SortId | null): Promise<SmartFolder> {
   return putParsed(smartFolderSchema, `${folderPath(id)}/sort`, { sort });
+}
+
+/** 条件（と、指定したときだけ既定の並び）だけを更新する。検索の上書きと、その取り消し */
+export async function updateSmartFolderCondition(
+  id: string,
+  change: SmartFolderConditionWrite,
+): Promise<SmartFolder> {
+  return putParsed(smartFolderSchema, `${folderPath(id)}/condition`, change);
 }
 
 /** 値一覧の既定の並びだけを更新する。ほかの列は触らない */

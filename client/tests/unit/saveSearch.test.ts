@@ -7,7 +7,8 @@ import {
 } from "../../src/entities/navigation/model/appRoute";
 import {
   isOverwritable,
-  overwriteWrite,
+  overwriteChange,
+  overwriteUndoChange,
   saveOffer,
   saveSearchDraft,
   type OverwritableFolder,
@@ -136,8 +137,8 @@ describe("saveSearchDraft", () => {
   });
 });
 
-describe("overwriteWrite", () => {
-  it("条件にチップと検索語を足し、並びを変えていればそれを既定の並びにする", () => {
+describe("overwriteChange", () => {
+  it("条件にチップと検索語を足し、並びを変えていればそれを既定の並びにする。名前などは送らない", () => {
     const v = works({
       folderId: "sf-own",
       selectedTags: nts(["cv/藤田"]),
@@ -145,9 +146,8 @@ describe("overwriteWrite", () => {
       sort: "added-desc",
     });
     expect(isOverwritable(v)).toBe(true);
-    const write = overwriteWrite({ ...v, folder: v.folder as OverwritableFolder });
-    expect(write).toEqual({
-      name: "自作",
+    const change = overwriteChange({ ...v, folder: v.folder as OverwritableFolder });
+    expect(change).toEqual({
       condition: {
         type: "and",
         children: [
@@ -157,14 +157,28 @@ describe("overwriteWrite", () => {
         ],
       },
       sort: "added-desc",
-      groupBy: null,
-      groupSort: null,
     });
   });
 
-  it("並びを変えていなければ既定の並びを保つ", () => {
+  it("並びを変えていなければ既定の並びは送らない", () => {
     const v = works({ folderId: "sf-own", selectedTags: nts(["x"]) });
-    expect(overwriteWrite({ ...v, folder: v.folder as OverwritableFolder }).sort).toBe("title-asc");
+    expect(overwriteChange({ ...v, folder: v.folder as OverwritableFolder })).not.toHaveProperty(
+      "sort",
+    );
+  });
+
+  it("取り消しは、上書きが更新した項目だけを上書き前の値にする", () => {
+    const changed = works({ folderId: "sf-own", selectedTags: nts(["x"]), sort: "added-desc" });
+    const kept = works({ folderId: "sf-own", selectedTags: nts(["x"]) });
+    const folder = changed.folder as OverwritableFolder;
+
+    expect(overwriteUndoChange({ ...changed, folder })).toEqual({
+      condition: folder.condition,
+      sort: "title-asc",
+    });
+    expect(
+      overwriteUndoChange({ ...kept, folder: kept.folder as OverwritableFolder }),
+    ).not.toHaveProperty("sort");
   });
 
   it("既定のもの・グループ分けを持つものは上書きの対象外", () => {
