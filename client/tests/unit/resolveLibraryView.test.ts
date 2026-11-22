@@ -229,6 +229,19 @@ describe("resolveLibraryView: 値の並びの解決（今の並び → フォル
     expect(view.groupSortDeviates).toBe(false);
   });
 
+  it("値を選んだ作品一覧は、兄弟値の一覧に使う値の並び（今の並び → 保存済み）を持つ", () => {
+    const withCurrent = resolveLibraryView(
+      route({ folderId: "by-cv", group: "藤田茜", groupSort: "last-played" }),
+      folders,
+    );
+    const saved = resolveLibraryView(route({ folderId: "by-cv", group: "藤田茜" }), folders);
+    const ungrouped = resolveLibraryView(route({ folderId: "fav" }), folders);
+
+    expect(works(withCurrent).groupSort).toBe("last-played");
+    expect(works(saved).groupSort).toBe("count-desc");
+    expect(works(ungrouped).groupSort).toBeNull();
+  });
+
   it("値を選んだ作品一覧は値の並びに影響されない", () => {
     const view = resolveLibraryView(
       route({ folderId: "by-cv", group: "藤田茜", groupSort: "name-asc" }),

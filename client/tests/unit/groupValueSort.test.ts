@@ -65,32 +65,32 @@ describe("buildGroupValueDisplayRows", () => {
     expect(rows.map((row) => row.label)).toEqual(["う", "あ", "い"]);
   });
 
-  it("平らな値と入れ子の値が混ざっても、サーバーの順（読み順）が保たれ、降順でも親子が崩れない", () => {
-    // 読みのバイト順と localeCompare("ja") で順が変わる値（一・亜）を含む
+  it("平らな値と入れ子の値が混ざっても、サーバーの順（バイト順）が保たれ、降順でも親子が崩れない", () => {
+    // バイト順は cv/a < cv/b < 一 < 亜。localeCompare("ja") では 亜 が 一 より前になる
     const asc = buildGroupValueDisplayRows(
-      [item("一"), item("亜"), item("cv/a"), item("cv/b")],
+      [item("cv/a"), item("cv/b"), item("一"), item("亜")],
       "",
       "name-asc",
     );
     expect(asc.map((row) => `${row.depth}:${row.label}`)).toEqual([
-      "0:一",
-      "0:亜",
       "0:cv",
       "1:a",
       "1:b",
+      "0:一",
+      "0:亜",
     ]);
 
     const desc = buildGroupValueDisplayRows(
-      [item("cv/b"), item("cv/a"), item("亜"), item("一")],
+      [item("亜"), item("一"), item("cv/b"), item("cv/a")],
       "",
       "name-desc",
     );
     expect(desc.map((row) => `${row.depth}:${row.label}`)).toEqual([
+      "0:亜",
+      "0:一",
       "0:cv",
       "1:b",
       "1:a",
-      "0:亜",
-      "0:一",
     ]);
   });
 
