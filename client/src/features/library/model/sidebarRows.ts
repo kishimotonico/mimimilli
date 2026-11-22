@@ -46,7 +46,7 @@ function toRow(folder: SmartFolder): SidebarRow {
   return {
     id: folder.id,
     name: folder.name,
-    icon: getSmartFolderIcon(folder.id),
+    icon: getSmartFolderIcon(folder),
     count: showsCount({ condition, groupBy: folder.groupBy }) ? folder.count : null,
     countTone: isHasErrorOnly(condition) ? "error" : "plain",
     hasQuickOverlay: folder.groupBy !== null,

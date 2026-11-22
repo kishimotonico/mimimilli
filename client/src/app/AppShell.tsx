@@ -42,7 +42,7 @@ export default function AppShell({
 
   return (
     <div className={`mle-app ${dockedBarActive ? "has-docked-bar" : ""}`}>
-      <div className={`mle-frame is-lib ${sidebarVisible ? "has-sidebar" : ""}`}>
+      <div className={`mle-frame ${sidebarVisible ? "has-sidebar" : ""}`}>
         {topBar}
         <div className="contents" inert={layerOpen}>
           {addressBar}

@@ -17,57 +17,52 @@ export function getGroupByLabel(groupBy: GroupBy, tagPrefixes: TagPrefix[] = [])
 
 const PREFIX_ICONS: Record<string, IconName> = {
   cv: "user",
-  サークル: "folder",
-  シリーズ: "bookmark",
-  カテゴリ: "list",
-  genre: "list",
+  サークル: "house",
+  シリーズ: "series",
+  カテゴリ: "steps",
 };
 
+/** グループ分けのアイコン。値一覧・サイドバーの行・「＋絞り込み」で共通 */
 export function getGroupByIcon(groupBy: GroupBy): IconName {
   switch (groupBy.kind) {
     case "tag":
-      return "filter";
+      return "tag";
     case "addedYear":
-      return "refresh";
+      return "calendar";
     case "prefix":
       return PREFIX_ICONS[groupBy.prefix] ?? "folder";
   }
 }
 
-const SMART_FOLDER_ICONS: Record<string, IconName> = {
+const CONDITION_FOLDER_ICONS: Record<string, IconName> = {
   all: "grid",
   random: "shuffle",
   recent: "clock",
   added: "add",
   fav: "star",
   error: "err",
-  "by-cv": "user",
-  "by-circle": "house",
-  "by-series": "series",
-  "by-category": "steps",
-  "by-tag": "tag",
-  "by-year": "calendar",
 };
 
-export function getSmartFolderIcon(id: string): IconName {
-  return SMART_FOLDER_ICONS[id] ?? "funnel";
+/** 既定の条件のフォルダーは ID から、グループ分けのあるフォルダーはそのグループ分けから引く */
+export function getSmartFolderIcon(folder: { id: string; groupBy: GroupBy | null }): IconName {
+  if (folder.groupBy !== null) return getGroupByIcon(folder.groupBy);
+  return CONDITION_FOLDER_ICONS[folder.id] ?? "funnel";
 }
 
 export interface GroupByRow {
   groupBy: GroupBy;
   name: string;
-  icon: IconName;
 }
 
 /** 「＋絞り込み」のグループ分け選択の行 = prefix 定義（定義順）＋ 組み込みの tag / addedYear（ADR-0005） */
 export function buildGroupByRows(tagPrefixes: TagPrefix[]): GroupByRow[] {
   const prefixRows = tagPrefixes.map((p): GroupByRow => {
     const groupBy: GroupBy = { kind: "prefix", prefix: p.prefix };
-    return { groupBy, name: p.label, icon: getGroupByIcon(groupBy) };
+    return { groupBy, name: p.label };
   });
   return [
     ...prefixRows,
-    { groupBy: { kind: "tag" }, name: "タグ", icon: getGroupByIcon({ kind: "tag" }) },
-    { groupBy: { kind: "addedYear" }, name: "追加日", icon: getGroupByIcon({ kind: "addedYear" }) },
+    { groupBy: { kind: "tag" }, name: "タグ" },
+    { groupBy: { kind: "addedYear" }, name: "追加日" },
   ];
 }

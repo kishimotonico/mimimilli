@@ -46,7 +46,7 @@ export default function SidebarAddMenu({
       <div className="mh">既定から追加</div>
       {templates.length > 0 ? (
         templates.map((template) => {
-          const Icon = I[getSmartFolderIcon(template.id)];
+          const Icon = I[getSmartFolderIcon(template)];
           return (
             <button
               key={template.id}

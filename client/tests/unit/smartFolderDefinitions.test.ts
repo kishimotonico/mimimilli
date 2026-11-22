@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { TagPrefix } from "@mimimilli/shared";
+import type { GroupBy, TagPrefix } from "@mimimilli/shared";
 import {
   buildGroupByRows,
+  getGroupByIcon,
   getGroupByLabel,
   getSmartFolderIcon,
 } from "../../src/entities/library/smartFolderDefinitions";
@@ -28,22 +29,27 @@ describe("smartFolderDefinitions", () => {
       { kind: "tag" },
       { kind: "addedYear" },
     ]);
-    expect(rows[0]).toEqual({
-      groupBy: { kind: "prefix", prefix: "cv" },
-      name: "CV",
-      icon: "user",
-    });
-    expect(rows.at(-1)).toEqual({
-      groupBy: { kind: "addedYear" },
-      name: "追加日",
-      icon: "refresh",
-    });
+    expect(rows[0]).toEqual({ groupBy: { kind: "prefix", prefix: "cv" }, name: "CV" });
+    expect(rows.at(-1)).toEqual({ groupBy: { kind: "addedYear" }, name: "追加日" });
   });
 
-  it("getSmartFolderIcon は既定のスマートフォルダー ID から引き、未知の ID は既定のアイコン", () => {
-    expect(getSmartFolderIcon("fav")).toBe("star");
-    expect(getSmartFolderIcon("error")).toBe("err");
-    expect(getSmartFolderIcon("random")).toBe("shuffle");
-    expect(getSmartFolderIcon("sf-unknown")).toBe("funnel");
+  it("getSmartFolderIcon は条件のフォルダーを ID から、グループ分けのフォルダーをグループ分けから引き、未知の ID は既定のアイコン", () => {
+    const folder = (id: string, groupBy: GroupBy | null = null) => ({ id, groupBy });
+    expect(getSmartFolderIcon(folder("fav"))).toBe("star");
+    expect(getSmartFolderIcon(folder("error"))).toBe("err");
+    expect(getSmartFolderIcon(folder("random"))).toBe("shuffle");
+    expect(getSmartFolderIcon(folder("sf-unknown"))).toBe("funnel");
+    expect(getSmartFolderIcon(folder("by-circle", { kind: "prefix", prefix: "サークル" }))).toBe(
+      "house",
+    );
+    expect(getSmartFolderIcon(folder("sf-user", { kind: "prefix", prefix: "気分" }))).toBe(
+      "folder",
+    );
+    expect(getSmartFolderIcon(folder("by-year", { kind: "addedYear" }))).toBe("calendar");
+  });
+
+  it("値一覧の既定アイコンはサイドバーの行と同じ表から引く", () => {
+    expect(getGroupByIcon({ kind: "prefix", prefix: "カテゴリ" })).toBe("steps");
+    expect(getGroupByIcon({ kind: "tag" })).toBe("tag");
   });
 });

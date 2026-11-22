@@ -24,7 +24,7 @@ export default function AddressBar() {
   const showGrid = libraryViewMode === "grid";
 
   return (
-    <div className="mle-addr is-lib">
+    <div className="mle-addr">
       {mode === "files" ? (
         <ToolButton icon={I.chevL} compact onClick={() => setAppMode("library")}>
           ライブラリへ戻る

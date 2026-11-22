@@ -9,7 +9,7 @@
   background: var(--paper-1);
   border-bottom: 1px solid var(--line-soft);
 }
-.mle-addr.is-lib .mle-crumbs {
+.mle-addr .mle-crumbs {
   background: transparent;
   padding-left: 4px;
 }
