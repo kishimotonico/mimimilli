@@ -440,6 +440,21 @@ describe("検索欄の入力（setLibrarySearchQueryAtom）", () => {
     expect(store.get(libraryRouteAtom).q).toBe("藤田");
   });
 
+  it("作品詳細・ファイルからの最初の入力は履歴を積み、そのあとのライブラリの中の入力は置き換える", () => {
+    for (const mode of [{ workDetail: "work-1" }, "files"] as const) {
+      const store = setup({ folderId: "fav" });
+      seedAppMode(store, mode);
+      clearPendingOps(store);
+
+      store.set(setLibrarySearchQueryAtom, "藤", folders);
+      expect(store.get(appRouteAtom)).toMatchObject({ mode: "library" });
+      expect(pendingWrites(store)).toEqual(["push"]);
+
+      store.set(setLibrarySearchQueryAtom, "藤田", folders);
+      expect(pendingWrites(store)).toEqual(["push", "replace"]);
+    }
+  });
+
   it("同じ検索語なら何もしない", () => {
     const store = setup({ q: "藤田" });
     clearPendingOps(store);

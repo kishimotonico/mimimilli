@@ -236,7 +236,8 @@ export function reshuffleLibrarySeed(route: AppRoute): Transition {
   return { route: withLibrary(route, { seed: createRandomSeed() }), replace: true };
 }
 
-/** 検索欄の入力。作品一覧ならその一覧で検索し、値一覧・読めない行なら「すべて」の検索結果へ移る */
+/** 検索欄の入力。作品一覧ならその一覧で検索し（ライブラリの中なら履歴を置き換え、作品詳細・ファイルからは積む）、
+ *  値一覧・読めない行なら「すべて」の検索結果へ移る */
 export function setLibrarySearchQuery(
   route: AppRoute,
   q: string,
@@ -245,7 +246,7 @@ export function setLibrarySearchQuery(
   const view = resolveLibraryView(route.library, folders);
   if (view.kind === "works") {
     if (view.q === q) return null;
-    return { route: withLibrary(route, { q }), replace: true };
+    return { route: withLibrary(route, { q }), replace: route.mode === "library" };
   }
   if (normalizeSearchQuery(q) === "") return null;
   return { route: toAll(route, view, [], q, { entering: true }) };
