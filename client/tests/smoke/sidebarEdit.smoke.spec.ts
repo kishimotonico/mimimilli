@@ -116,7 +116,7 @@ test("＋メニュー: 既定から追加・グループ分けの追加・複製
   await rail(page).getByRole("menuitem", { name: "グループ分けを追加" }).click();
   await expect(dialog(page).getByText("グループ分けを追加", { exact: true })).toBeVisible();
   await dialog(page).getByLabel("名前").fill("作曲者別");
-  await dialog(page).getByLabel("グループ分け").selectOption({ label: "全タグ" });
+  await dialog(page).getByLabel("グループ分け").selectOption({ label: "タグ" });
   await dialog(page).getByRole("button", { name: "保存" }).click();
   await expect(page).toHaveURL(/\/library\/sf-[0-9a-f-]+$/);
   await expect(rail(page).getByRole("button", { name: /^作曲者別/ })).toHaveAttribute(
