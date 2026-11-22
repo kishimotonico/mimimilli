@@ -16,7 +16,7 @@ import { FILE_SYSTEM_QUERY_KEYS } from "../../src/entities/file-system/queryKeys
 const AFFECTED_KEYS = [
   WORK_QUERY_KEYS.list({}),
   WORK_QUERY_KEYS.detail("work-1"),
-  WORK_QUERY_KEYS.allGroupValues(),
+  SMART_FOLDER_QUERY_KEYS.allGroups(),
   SMART_FOLDER_QUERY_KEYS.all(),
   SMART_FOLDER_QUERY_KEYS.works("folder-1"),
   TAG_QUERY_KEYS.all(),

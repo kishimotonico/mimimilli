@@ -26,7 +26,6 @@ import {
   updateSmartFolderSort,
 } from "../../../entities/smart-folder/api";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
-import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { useToast } from "../../../shared/ui/useToast";
 import { applyOrder } from "./smartFolderEditing";
@@ -57,8 +56,9 @@ const reorderQueue: { running: boolean; waiting: string[] | null } = {
   waiting: null,
 };
 
-/** 変更が一覧のどこへ効くか。none は応答でキャッシュを直接更新したとき */
-type Refresh = "none" | "folders" | "definition";
+/** 変更が一覧のどこへ効くか。none は応答でキャッシュを直接更新したとき。
+ *  definitionOf は定義が変わったフォルダーで、そのフォルダーの作品・値の一覧も取り直す */
+type Refresh = "none" | "folders" | { definitionOf: string };
 
 export function useSmartFolderEditor(): SmartFolderEditor {
   const queryClient = useQueryClient();
@@ -74,10 +74,11 @@ export function useSmartFolderEditor(): SmartFolderEditor {
     const refresh = async (scope: Refresh) => {
       if (scope === "none") return;
       await refreshFolders();
-      if (scope === "definition") {
+      if (scope !== "folders") {
+        const id = scope.definitionOf;
         await Promise.all([
-          queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() }),
-          queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allGroupValues() }),
+          queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.folderWorks(id) }),
+          queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.folderGroups(id) }),
         ]);
       }
     };
@@ -181,7 +182,7 @@ export function useSmartFolderEditor(): SmartFolderEditor {
           ?.find((folder) => folder.id === id);
         const saved = await commit(
           failureMessage,
-          "definition",
+          { definitionOf: id },
           () => updateSmartFolder(id, data),
           (row) => {
             // 開いている一覧の ?group= は古いグループ分けの値なので、入り直して外す

@@ -11,7 +11,7 @@ import {
   useMissingWorksCountQuery,
 } from "../model/useLibraryQueries";
 import { useSaveSearch } from "../model/useSaveSearch";
-import { buildWorksResetKey } from "../model/libraryPresentation";
+import { folderWorksResetKey } from "../model/folderWorksRequest";
 import { useLibrarySelectionCleanup } from "../model/useLibrarySelectionCleanup";
 import { useLibraryPreviewActions } from "../model/useLibraryPreviewActions";
 import GroupValueList from "./GroupValueList";
@@ -159,14 +159,7 @@ function LibraryViewBody({
               <LibraryResultsPane
                 nav={nav}
                 result={result}
-                worksQueryKey={buildWorksResetKey({
-                  folderId: view.folder.id,
-                  group: view.group,
-                  selectedTags: view.selectedTags,
-                  sort: view.sort,
-                  searchQuery: debouncedSearchQuery,
-                  seed: view.seed,
-                })}
+                worksQueryKey={folderWorksResetKey(view, debouncedSearchQuery)}
                 isPending={isPending}
                 showGrid={showGrid}
                 dockedBarActive={dockedBarActive}

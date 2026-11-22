@@ -4,7 +4,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { GroupBy, NormalizedTag } from "@mimimilli/shared";
 import { getSmartFolderGroups } from "../../../entities/smart-folder/api";
-import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
+import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { assertGroupValueItems } from "./libraryPresentation";
 import { groupByKey } from "./smartFolderEditing";
 
@@ -20,7 +20,7 @@ export function useGroupValuesQuery(groupBy: GroupBy | null, scope: GroupValueSc
   const { folderId, group = null, tags = [], q = "" } = scope;
   const filter = { group, tags, q };
   return useQuery({
-    queryKey: WORK_QUERY_KEYS.scopedGroupValues(
+    queryKey: SMART_FOLDER_QUERY_KEYS.groups(
       folderId,
       groupBy === null ? "" : groupByKey(groupBy),
       filter,

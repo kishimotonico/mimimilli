@@ -299,7 +299,7 @@ export function updateViolation(
 ): PolicyViolation | null {
   const permissions = readablePermissions(existing.id);
   const template = findSmartFolderTemplate(existing.id);
-  if (template && !permissions.editCondition && !sameTemplateDefinition(template, write)) {
+  if (template && !sameTemplateDefinition(template, write)) {
     return forbidden("既定のスマートフォルダーの条件・グループ分けは変更できません");
   }
   if (!permissions.rename && write.name !== existing.name) {

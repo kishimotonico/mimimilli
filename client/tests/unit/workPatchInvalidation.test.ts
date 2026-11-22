@@ -4,9 +4,11 @@ import type { Condition, SmartFolder } from "@mimimilli/shared";
 import { resolveLibraryView } from "../../src/entities/library/resolveLibraryView";
 import { createInitialAppRoute } from "../../src/entities/navigation/model/appRoute";
 import {
-  bookmarkActiveListHandler,
   folderWorksParams,
-} from "../../src/features/library/model/workPatchInvalidation";
+  folderWorksResetKey,
+} from "../../src/features/library/model/folderWorksRequest";
+import { bookmarkActiveListHandler } from "../../src/features/library/model/workPatchInvalidation";
+import { nt } from "../helpers/tag";
 import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
 
 const tag = (value: string): Condition => ({ type: "tag", tag: value });
@@ -81,5 +83,39 @@ describe("folderWorksParams: 検索語", () => {
 
     expect(folderWorksParams(view, " 藤田 ").q).toBe("藤田");
     expect(folderWorksParams(view, "  ").q).toBe("");
+  });
+});
+
+describe("folderWorksResetKey", () => {
+  const grouped = buildSmartFolder({
+    id: "sf-grouped",
+    groupBy: { kind: "prefix", prefix: "cv" },
+  });
+  const worksView = (patch: Partial<ReturnType<typeof createInitialAppRoute>["library"]>) => {
+    const view = resolveLibraryView(
+      { ...createInitialAppRoute().library, folderId: "all", sort: "added-desc", ...patch },
+      [...defaultSmartFolders(), grouped],
+    );
+    if (view.kind !== "works") throw new Error("works ではありません");
+    return view;
+  };
+  const base = worksView({ selectedTags: [nt("ASMR")] });
+
+  it("同じ入力なら同じキー。検索語は正規形で比べる", () => {
+    expect(folderWorksResetKey(base, "x")).toBe(folderWorksResetKey({ ...base }, " x "));
+  });
+
+  it.each([
+    ["フォルダー", worksView({ folderId: "fav" }), ""],
+    [
+      "グループの値",
+      worksView({ folderId: "sf-grouped", selectedTags: [nt("ASMR")], group: "藤田茜" }),
+      "",
+    ],
+    ["チップ", worksView({}), ""],
+    ["解決済みの並び", worksView({ selectedTags: [nt("ASMR")], sort: "title-asc" }), ""],
+    ["検索語", base, "x"],
+  ])("%sが変わるとキーが変わる", (_label, view, q) => {
+    expect(folderWorksResetKey(view, q)).not.toBe(folderWorksResetKey(base, ""));
   });
 });

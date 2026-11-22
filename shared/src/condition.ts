@@ -235,3 +235,18 @@ export function isBookmarkedOnly(condition: Condition): boolean {
 export function isHasErrorOnly(condition: Condition): boolean {
   return isSinglePredicate(condition, "hasError");
 }
+
+/** 条件の木のどこかに bookmarked がある（お気に入りの切り替えで所属が変わりうる） */
+export function usesBookmarked(condition: Condition): boolean {
+  switch (condition.type) {
+    case "bookmarked":
+      return true;
+    case "and":
+    case "or":
+      return condition.children.some(usesBookmarked);
+    case "not":
+      return usesBookmarked(condition.child);
+    default:
+      return false;
+  }
+}

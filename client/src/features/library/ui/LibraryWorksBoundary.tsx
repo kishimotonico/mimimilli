@@ -4,7 +4,8 @@ import type { WorkListItem } from "@mimimilli/shared";
 import type { ReadyLibraryViewState } from "../model/useLibraryNavigation";
 import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
 import { useSuspenseLibraryWorks } from "../model/useLibraryQueries";
-import { buildWorksResetKey, computeIsNoResultsDueToFilter } from "../model/libraryPresentation";
+import { folderWorksResetKey } from "../model/folderWorksRequest";
+import { computeIsNoResultsDueToFilter } from "../model/libraryPresentation";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 
 interface WorksResult {
@@ -118,14 +119,7 @@ function LoadingFallback({ variant, onShow }: { variant: "list" | "grid"; onShow
 export default function LibraryWorksBoundary(props: Props) {
   const variant = props.viewMode === "grid" ? "grid" : "list";
   const { view } = props;
-  const resetKey = buildWorksResetKey({
-    folderId: view.folder.id,
-    group: view.group,
-    selectedTags: view.selectedTags,
-    sort: view.sort,
-    searchQuery: props.searchQuery,
-    seed: view.seed,
-  });
+  const resetKey = folderWorksResetKey(view, props.searchQuery);
   return (
     <QueryErrorResetBoundary>
       {({ reset }) => (

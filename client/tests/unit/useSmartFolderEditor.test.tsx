@@ -6,7 +6,6 @@ import { describe, expect, it, vi } from "vitest";
 import { libraryRouteAtom } from "../../src/entities/library/model/navigationAtoms";
 import { appRouteAtom } from "../../src/entities/navigation/model/appRouteStore";
 import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
-import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { useSmartFolderEditor } from "../../src/features/library/model/useSmartFolderEditor";
 import { toastRequestsAtom } from "../../src/shared/model/toastRequestsAtom";
 import { apiError, apiNoContent, mockApi } from "../helpers/api";
@@ -75,7 +74,7 @@ describe("作成・既定から追加", () => {
 });
 
 describe("更新", () => {
-  it("保存できたら一覧のあと、作品と値の一覧も取り直す", async () => {
+  it("保存できたら一覧のあと、そのフォルダーの作品と値の一覧だけ取り直す", async () => {
     mockApi({ "PUT /api/smart-folders/:id": () => ({ ...userFolder }) });
     const editor = setup();
 
@@ -83,8 +82,8 @@ describe("更新", () => {
 
     expect(invalidated).toEqual([
       SMART_FOLDER_QUERY_KEYS.all(),
-      SMART_FOLDER_QUERY_KEYS.allWorks(),
-      WORK_QUERY_KEYS.allGroupValues(),
+      SMART_FOLDER_QUERY_KEYS.folderWorks(USER_ID),
+      SMART_FOLDER_QUERY_KEYS.folderGroups(USER_ID),
     ]);
   });
 

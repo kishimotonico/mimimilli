@@ -4,7 +4,6 @@ import { ApiRequestError } from "../../src/shared/api/http";
 import { nt } from "../helpers/tag";
 import {
   buildFilterTag,
-  buildWorksResetKey,
   computeCollectionStatsDisplay,
   computeIsNoResultsDueToFilter,
   assertGroupValueItems,
@@ -148,31 +147,5 @@ describe("formatFilterChipLabel（チップの内部表現を隠す）", () => {
   it("実タグはフルパスのまま変更しない", () => {
     expect(formatFilterChipLabel(nt("cv/藤田茜"))).toBe("cv/藤田茜");
     expect(formatFilterChipLabel(nt("ASMR"))).toBe("ASMR");
-  });
-});
-
-describe("buildWorksResetKey", () => {
-  const base = {
-    folderId: "all",
-    group: null,
-    selectedTags: [nt("ASMR")],
-    sort: "added-desc",
-    searchQuery: "",
-    seed: undefined,
-  };
-
-  it("同じ入力なら同じキー", () => {
-    expect(buildWorksResetKey(base)).toBe(buildWorksResetKey({ ...base }));
-  });
-
-  it.each([
-    ["フォルダー", { folderId: "fav" }],
-    ["グループの値", { group: "藤田茜" }],
-    ["チップ", { selectedTags: [] }],
-    ["解決済みの並び", { sort: "title-asc" }],
-    ["検索語", { searchQuery: "x" }],
-    ["seed", { seed: 1 }],
-  ])("%sが変わるとキーが変わる", (_label, patch) => {
-    expect(buildWorksResetKey({ ...base, ...patch })).not.toBe(buildWorksResetKey(base));
   });
 });

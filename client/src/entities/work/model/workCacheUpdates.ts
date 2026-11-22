@@ -23,7 +23,7 @@ import {
 async function invalidateLibraryViews(queryClient: QueryClient): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() }),
-    queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allGroupValues() }),
+    queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allGroups() }),
     queryClient.invalidateQueries({ queryKey: TAG_QUERY_KEYS.all() }),
     queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() }),
     invalidateSmartFolderCounts(queryClient),
@@ -103,7 +103,7 @@ export async function updateCachesAfterPlaybackPrepared(
 }
 
 /** excludedListKey は画面が apply で揃え済みの一覧。その key だけ無効化しない。
- *  お気に入りはグループの値の件数・総時間に効くので値一覧も取り直す（再生は取り直さない。ADR-0040「件数」） */
+ *  お気に入りはグループの値の件数・総時間に効くので値一覧も取り直す（再生は開いている値一覧を動かさないことを優先して取り直さない。ADR-0040「件数」） */
 export async function updateCachesAfterBookmark(
   queryClient: QueryClient,
   change: { workId: string; bookmarked: boolean },
@@ -117,7 +117,7 @@ export async function updateCachesAfterBookmark(
     queryClient.invalidateQueries({
       predicate: (query) => isWorkListQuery(query) && query.queryHash !== excludedHash,
     }),
-    queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allGroupValues() }),
+    queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allGroups() }),
     invalidateSmartFolderCounts(queryClient),
   ]);
 }

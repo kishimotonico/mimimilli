@@ -53,21 +53,6 @@ export function formatFilterChipLabel(tag: NormalizedTag): string {
   return `${getGroupByLabel({ kind: "addedYear" })}/${builtin.value}`;
 }
 
-/** 作品一覧の描画結果（グリッド・リスト・エラー境界）を再マウントすべきタイミングを表す
- *  安定なキー */
-export interface WorksResetKeyInput {
-  folderId: string;
-  group: string | null;
-  selectedTags: NormalizedTag[];
-  sort: string;
-  searchQuery: string;
-  seed: number | undefined;
-}
-
-export function buildWorksResetKey(input: WorksResetKeyInput): string {
-  return JSON.stringify(input);
-}
-
 /**
  * 検索語やタグフィルタが原因で作品一覧が0件になっているかどうか。
  * fav 等が本来的に0件のケースとは区別し、原因表示が必要な場合だけ案内する。

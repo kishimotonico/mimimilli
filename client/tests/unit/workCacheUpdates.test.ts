@@ -86,7 +86,7 @@ const KEYS = {
   list: WORK_QUERY_KEYS.list({ sort: "added-desc" }),
   otherList: WORK_QUERY_KEYS.list({ sort: "title-asc" }),
   total: WORK_QUERY_KEYS.total(),
-  groupValues: WORK_QUERY_KEYS.scopedGroupValues("sf-1", "prefix:cv"),
+  groupValues: SMART_FOLDER_QUERY_KEYS.groups("sf-1", "prefix:cv"),
   tags: TAG_QUERY_KEYS.all(),
   smartWorks: SMART_FOLDER_QUERY_KEYS.works("sf-1"),
   smartFolders: SMART_FOLDER_QUERY_KEYS.all(),
