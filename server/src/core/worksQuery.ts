@@ -63,14 +63,19 @@ export function textMatcher(q: string): (work: WorkSummary) => boolean {
   };
 }
 
-export function sortWorkSummaries(
-  works: WorkSummary[],
-  sort: SortId,
-  seed?: number,
-): WorkSummary[] {
+/** random は seed を伴う。SQL の ORDER BY で表せるのは random 以外 */
+export type WorksOrder = { sort: "random"; seed: number } | { sort: Exclude<SortId, "random"> };
+
+export function worksOrderOf(sort: SortId, seed: number | undefined): WorksOrder {
+  if (sort !== "random") return { sort };
+  if (seed === undefined) throw new Error("randomソートにはseedが必要です");
+  return { sort, seed };
+}
+
+export function sortWorkSummaries(works: WorkSummary[], order: WorksOrder): WorkSummary[] {
   const sorted = [...works];
   const byId = (a: WorkSummary, b: WorkSummary): number => compareUtf8Bytes(a.id, b.id);
-  switch (sort) {
+  switch (order.sort) {
     case "title-asc":
       sorted.sort((a, b) => compareJapaneseSortKeys(a.title, b.title) || byId(a, b));
       break;
@@ -102,8 +107,7 @@ export function sortWorkSummaries(
       sorted.sort(byId);
       break;
     case "random":
-      if (seed === undefined) throw new Error("randomソートにはseedが必要です");
-      return sortByRandomOrder(sorted, seed, (work) => work.id);
+      return sortByRandomOrder(sorted, order.seed, (work) => work.id);
     default:
       break;
   }

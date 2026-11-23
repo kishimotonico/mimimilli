@@ -17,7 +17,6 @@ import type {
   WorkPlacement,
   WorkspacePath,
   WorksPage,
-  SortId,
 } from "@mimimilli/shared";
 import { isPathWithin } from "../../lib/path.ts";
 import type {
@@ -25,7 +24,7 @@ import type {
   ConditionWorksQuery,
   EvalContext,
 } from "../../adapter/condition.ts";
-import { requireRandomSeed } from "../../core/conditionQuery.ts";
+import { worksOrderOf, type WorksOrder } from "../../core/worksQuery.ts";
 import { sortByRandomOrder } from "../../core/randomOrder.ts";
 import { compileCondition } from "./conditionSql.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
@@ -74,9 +73,6 @@ import { statCoverSource } from "./coverDto.ts";
 import { deriveCoverVersion } from "../../adapter/media.ts";
 
 const queryWorksLogger = getCategoryLogger("http");
-
-/** random は seed を伴う。SQL の ORDER BY で表せるのは random 以外 */
-type RowOrder = { sort: "random"; seed: number } | { sort: Exclude<SortId, "random"> };
 
 const WORK_LIST_ROW_SELECT = `
         SELECT
@@ -348,10 +344,6 @@ export class WorkQueryRepository {
 
   /** 条件の木に一致する作品の一覧（ADR-0040）。seed は呼び出し側が渡し、ここでは発行しない */
   queryWorksByCondition(query: ConditionWorksQuery, root: string, ctx: EvalContext): WorksPage {
-    const order: RowOrder =
-      query.sort === "random"
-        ? { sort: "random", seed: requireRandomSeed(query.sort, query.seed) }
-        : { sort: query.sort };
     const compiled = compileCondition(query.condition, ctx);
     const conditions = [compiled.sql];
     const bindings: Array<string | number> = [...compiled.bindings];
@@ -363,7 +355,7 @@ export class WorkQueryRepository {
       {
         whereSql: `WHERE ${conditions.join(" AND ")}`,
         bindings,
-        order,
+        order: worksOrderOf(query.sort, query.seed),
         page: query.page,
         limit: query.limit,
       },
@@ -375,7 +367,7 @@ export class WorkQueryRepository {
     run: {
       whereSql: string;
       bindings: Array<string | number>;
-      order: RowOrder;
+      order: WorksOrder;
       page: number;
       limit: number;
     },
