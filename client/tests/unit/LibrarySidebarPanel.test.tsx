@@ -218,7 +218,7 @@ describe("LibrarySidebarPanel", () => {
 
     // Escape で閉じる（コーディネーターの close() は遅延なし。閉鎖直後もAnimatePresenceが
     // 退出アニメーション完了まで内容を保持するため、この時点ではDOMから消えていない）。
-    fireEvent.keyDown(screen.getByLabelText("CVの値を検索"), { key: "Escape" });
+    fireEvent.keyDown(screen.getByLabelText("CVを検索"), { key: "Escape" });
 
     // クエリが無効化されて空扱いになっていれば「CVがありません」に切り替わる。
     // 退出中も一覧本体が保持されたままであることを確認する。
@@ -232,17 +232,17 @@ describe("LibrarySidebarPanel", () => {
 
     fireEvent.keyDown(screen.getByRole("button", { name: "CV別" }), { key: "ArrowRight" });
     await waitFor(() => {
-      expect(screen.getByLabelText("CVの値を検索")).toBeInTheDocument();
+      expect(screen.getByLabelText("CVを検索")).toBeInTheDocument();
     });
 
     // 退出アニメーション完了を待たず、別のグループ分けへ即座に切り替える（openImmediately）。
     fireEvent.keyDown(screen.getByRole("button", { name: "追加年別" }), { key: "ArrowRight" });
 
     await waitFor(() => {
-      expect(document.activeElement).toBe(screen.getByLabelText("追加年の値を検索"));
+      expect(document.activeElement).toBe(screen.getByLabelText("追加年を検索"));
     });
     // 新パネルが開いたまま維持されている（閉じていない）。
-    expect(screen.getByLabelText("追加年の値を検索")).toBeInTheDocument();
+    expect(screen.getByLabelText("追加年を検索")).toBeInTheDocument();
   });
 
   it("クイックオーバーレイの値は主クリックもCtrl+クリックもその値の作品一覧（onOpenGroupValue）へ進む", async () => {

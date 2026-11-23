@@ -120,7 +120,7 @@ export default function FilterChipBand({
         )}
         {isValueListPane ? (
           <span className="mll-tagband__count">
-            {valueList.label} {valueList.count}件
+            {valueList.label} {valueList.count} 件
           </span>
         ) : (
           worksTotal != null && <span className="mll-tagband__count">{worksTotal} 件</span>

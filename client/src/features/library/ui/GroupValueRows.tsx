@@ -145,7 +145,7 @@ export default function GroupValueRows({
         style={{ padding: 0 }}
         // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 値ボタン集合を名前付き集合として表す。fieldset等の代替タグは適合しない
         role="group"
-        aria-label={`${groupByLabel}の値一覧`}
+        aria-label={`${groupByLabel}の一覧`}
         onFocus={handleListFocus}
       >
         <div style={wrapperStyle}>

@@ -86,7 +86,7 @@ export function smartFolderViolation(row: SmartFolderRowFields): SmartFolderViol
       return { field: "groupBy", message: `${all}にグループ分けは付けられません` };
     }
     if (row.sort === null) {
-      return { field: "sort", message: `${all}の既定の並びは空にできません` };
+      return { field: "sort", message: `${all}の既定のソートは空にできません` };
     }
   }
   return null;

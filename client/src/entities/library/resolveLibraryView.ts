@@ -62,7 +62,7 @@ export function resolveLibraryView(
 ): ResolvedLibraryView {
   const all = folders.find((item) => item.id === ALL_SMART_FOLDER_ID);
   const folder = folders.find((item) => item.id === library.folderId) ?? all;
-  if (!folder) throw new Error("「すべて」のスマートフォルダーがありません");
+  if (!folder) throw new Error("「すべて」の行がありません");
 
   const { condition } = folder;
   const groupBy = folder.groupBy;

@@ -157,6 +157,7 @@ test("要求の検証: 契約に合わない要求は 400 の HTTPException に�
 test("queryFolderWorks / queryFolderGroups は条件・グループの値・チップを木にして評価し、seed を載せない", async () => {
   const adapter = adapterWithWorks();
   const folder = {
+    name: "テスト",
     condition: { type: "and", children: [] } as Condition,
     groupBy: { kind: "prefix", prefix: "cv" } as const,
   };
@@ -186,7 +187,7 @@ test("queryFolderWorks / queryFolderGroups は条件・グループの値・チ�
   await assert.rejects(
     queryFolderWorks(
       adapter,
-      { condition: folder.condition, groupBy: null },
+      { name: folder.name, condition: folder.condition, groupBy: null },
       parseSmartFolderWorksRequest({ sort: "id-asc", group: "a", tags: [] }),
     ),
     HTTPException,
@@ -197,6 +198,7 @@ test("グループの値は正規化し、不正なら 400 にする", async () 
   const adapter = adapterWithWorks();
   const request = parseSmartFolderWorksRequest({ sort: "id-asc", group: "A", tags: [] });
   const cv = {
+    name: "テスト",
     condition: { type: "and", children: [] } as Condition,
     groupBy: { kind: "prefix", prefix: "cv" } as const,
   };
@@ -208,7 +210,7 @@ test("グループの値は正規化し、不正なら 400 にする", async () 
   );
 
   const rejected = async (
-    folder: typeof cv | { condition: Condition; groupBy: GroupBy },
+    folder: typeof cv | { name: string; condition: Condition; groupBy: GroupBy },
     group: string,
   ) => {
     await assert.rejects(
@@ -217,13 +219,19 @@ test("グループの値は正規化し、不正なら 400 にする", async () 
     );
   };
   await rejected(cv, "   ");
-  await rejected({ condition: cv.condition, groupBy: { kind: "tag" } }, "@year/2025");
-  await rejected({ condition: cv.condition, groupBy: { kind: "tag" } }, "");
-  await rejected({ condition: cv.condition, groupBy: { kind: "addedYear" } }, "20x5");
-  await rejected({ condition: cv.condition, groupBy: { kind: "addedYear" } }, "25");
+  await rejected(
+    { name: cv.name, condition: cv.condition, groupBy: { kind: "tag" } },
+    "@year/2025",
+  );
+  await rejected({ name: cv.name, condition: cv.condition, groupBy: { kind: "tag" } }, "");
+  await rejected(
+    { name: cv.name, condition: cv.condition, groupBy: { kind: "addedYear" } },
+    "20x5",
+  );
+  await rejected({ name: cv.name, condition: cv.condition, groupBy: { kind: "addedYear" } }, "25");
   const year = await queryFolderWorks(
     adapter,
-    { condition: cv.condition, groupBy: { kind: "addedYear" } },
+    { name: cv.name, condition: cv.condition, groupBy: { kind: "addedYear" } },
     { ...request, group: "2026" },
   );
   assert.equal(year.total, 2);

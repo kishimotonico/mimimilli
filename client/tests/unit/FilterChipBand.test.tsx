@@ -106,14 +106,14 @@ describe("値一覧ペイン表示中の件数ラベルと＋絞り込みの扱�
       valueList: { label: "CV", count: 12 },
       groupValueScope: undefined,
     });
-    expect(screen.getByText("CV 12件")).toBeInTheDocument();
+    expect(screen.getByText("CV 12 件")).toBeInTheDocument();
     expect(screen.queryByText(/^\d+ 件$/)).toBeNull();
   });
 
   it("valueList指定時は worksTotal が渡っても絞り込み後件数を出さない", () => {
     renderFilterChipBand(120, { valueList: { label: "CV", count: 12 } });
     expect(screen.queryByText("120 件")).toBeNull();
-    expect(screen.getByText("CV 12件")).toBeInTheDocument();
+    expect(screen.getByText("CV 12 件")).toBeInTheDocument();
   });
 
   it("valueList指定時も「＋絞り込み」ボタンを出す（値一覧でもチップを足せる）", () => {

@@ -1,6 +1,6 @@
 // スマートフォルダーの変更の唯一の口（作成・更新・削除と取り消し・並べ替え）。
 // 画面の動きは成功応答を受けた同期区間で、キャッシュへ反映する前に済ませる。
-// 失敗はサーバーの文言のままトーストで見せ、一覧を取り直す（404/409 のような食い違いも含む）。
+// 失敗はトーストで見せ（検証エラーはサーバーの文言、404・409 は行の名前と動詞）、一覧を取り直す（404/409 のような食い違いも含む）。
 // 成功のあとの無効化もここ1か所で決める。
 
 import { useMemo } from "react";
@@ -25,6 +25,7 @@ import {
   updateSmartFolder,
 } from "../../../entities/smart-folder/api";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
+import { ApiRequestError } from "../../../shared/api/http";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { useToast } from "../../../shared/ui/useToast";
 import { groupByKey } from "../../../entities/smart-folder/groupByKey";
@@ -102,7 +103,10 @@ export function useSmartFolderEditor(): SmartFolderEditor {
       try {
         result = await request();
       } catch (error) {
-        toast.error(apiErrorMessage(error, failure));
+        // 404・409 の文言は ID を含み、何を操作したかが伝わらない。検証エラー（400）だけサーバーの文言を出す
+        const conflicted =
+          error instanceof ApiRequestError && (error.status === 404 || error.status === 409);
+        toast.error(conflicted ? failure : apiErrorMessage(error, failure));
         await refreshFolders();
         return null;
       }

@@ -340,7 +340,7 @@ contract("条件の検証エラーはスキーマの文言を返す", async (har
 contract("行の不変条件の違反は、違反の説明を400で返す", async (harness) => {
   const res = await harness.send("PATCH", "/api/smart-folders/all", { sort: null });
   assert.equal(res.status, 400);
-  assert.equal(res.body.error.message, "「すべて」の既定の並びは空にできません");
+  assert.equal(res.body.error.message, "「すべて」の既定のソートは空にできません");
   const pair = await harness.send("PATCH", "/api/smart-folders/fav", { groupSort: "count-desc" });
   assert.equal(pair.body.error.message, "ソートはグループ分けがあるときだけ指定します");
 });
@@ -502,6 +502,8 @@ contract(
       assert.equal(res.status, 400, query);
       assert.equal(res.body.error.code, "invalid_request", query);
     }
+    const ungrouped = await harness.json("/api/smart-folders/all/works?sort=added-desc&group=x");
+    assert.equal(ungrouped.body.error.message, "「すべて」にはグループ分けがありません");
     const missing = await harness.json("/api/smart-folders/sf-nope/works?sort=added-desc");
     assert.equal(missing.status, 404);
   },

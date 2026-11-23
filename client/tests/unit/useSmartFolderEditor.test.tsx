@@ -90,7 +90,7 @@ describe("作成・既定から追加", () => {
     expect(request?.body).not.toHaveProperty("position");
   });
 
-  it("失敗はサーバーの文言でトーストに出し、一覧を取り直す", async () => {
+  it("既定から追加の失敗（409）は、ID の入ったサーバーの文言でなく行の名前と動詞でトーストに出し、一覧を取り直す", async () => {
     mockApi({
       "POST /api/smart-folders": () => apiError(409, "conflict", "すでにあります: fav"),
     });
@@ -99,10 +99,53 @@ describe("作成・既定から追加", () => {
     expect(await editor.addFromTemplate("fav")).toBeNull();
 
     expect(toasts()[0]).toMatchObject({
-      message: "すでにあります: fav",
+      message: "「お気に入り」を追加できませんでした",
       variant: "error",
     });
     expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
+  });
+});
+
+describe("失敗トーストの文言", () => {
+  it("作成は行の名前と動詞で出す。サーバーに届かない失敗でも同じ", async () => {
+    mockApi({ "POST /api/smart-folders": () => Promise.reject(new TypeError("network")) });
+    const editor = setup();
+
+    expect(await editor.create(write)).toBeNull();
+
+    expect(toasts()[0]).toMatchObject({ message: "「自作」を作れませんでした", variant: "error" });
+  });
+
+  it("400 の検証エラーはサーバーの文言をそのまま出す", async () => {
+    mockApi({
+      "POST /api/smart-folders": () => apiError(400, "invalid_request", "名前を入力してください"),
+    });
+    const editor = setup();
+
+    await editor.create(write);
+
+    expect(toasts()[0]).toMatchObject({ message: "名前を入力してください" });
+  });
+
+  it("保存は一覧から引いた行の名前で、引けなければ名前なしで出す", async () => {
+    mockApi({ "PATCH /api/smart-folders/:id": () => apiError(404, "not_found", "見つかりません") });
+    const editor = setup();
+
+    await editor.patch(USER_ID, { sort: "random" });
+    expect(toasts()[0]).toMatchObject({ message: "保存できませんでした" });
+
+    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), [...defaultSmartFolders(), userFolder]);
+    await editor.patch(USER_ID, { sort: "random" });
+    expect(toasts().map((toast) => toast.message)).toContain("「自作」を保存できませんでした");
+  });
+
+  it("削除は行の名前と動詞で出す", async () => {
+    mockApi({ "DELETE /api/smart-folders/:id": () => apiError(409, "conflict", "競合: sf-1") });
+    const editor = setup();
+
+    await editor.remove(userFolder);
+
+    expect(toasts()[0]).toMatchObject({ message: "「自作」を削除できませんでした" });
   });
 });
 
@@ -235,7 +278,7 @@ describe("定義の更新（全項目）", () => {
     );
 
     expect(toasts()[0]).toMatchObject({
-      message: "見つかりません: sf-1",
+      message: "元に戻せませんでした",
       variant: "error",
     });
     expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
@@ -292,7 +335,7 @@ describe("既定の並びの保存", () => {
 
     expect(await editor.patch(USER_ID, { sort: "random" })).toBe(false);
 
-    expect(toasts()[0]).toMatchObject({ message: "競合しました", variant: "error" });
+    expect(toasts()[0]).toMatchObject({ message: "保存できませんでした", variant: "error" });
     expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
   });
 });
@@ -340,7 +383,7 @@ describe("条件だけの更新（検索の上書き・取り消し）", () => {
 
     expect(await editor.patch(USER_ID, { condition: write.condition })).toBe(false);
 
-    expect(toasts()[0]).toMatchObject({ message: "見つかりません", variant: "error" });
+    expect(toasts()[0]).toMatchObject({ message: "保存できませんでした", variant: "error" });
     expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
   });
 });
@@ -504,7 +547,7 @@ describe("削除", () => {
     await editor.remove(userFolder);
 
     expect(toasts()[0]).toMatchObject({
-      message: "見つかりません: sf-1",
+      message: "「自作」を削除できませんでした",
       variant: "error",
     });
     expect(store.get(libraryRouteAtom).folderId).toBe(USER_ID);
@@ -543,7 +586,7 @@ describe("削除", () => {
     toasts()[0]!.onAction!();
     await vi.waitFor(() =>
       expect(toasts()[0]).toMatchObject({
-        message: "すでにあります: sf-1",
+        message: "元に戻せませんでした",
         variant: "error",
       }),
     );

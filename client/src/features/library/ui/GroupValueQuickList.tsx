@@ -198,7 +198,7 @@ export default function GroupValueQuickList({
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleSearchKeyDown}
           placeholder={`${groupByLabel}を検索`}
-          aria-label={`${groupByLabel}の値を検索`}
+          aria-label={`${groupByLabel}を検索`}
         />
         <button
           ref={sortToggleRef}
@@ -239,7 +239,7 @@ export default function GroupValueQuickList({
           className="mll-qlist__body"
           // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 値ボタン集合を名前付き集合として表す。fieldset等の代替タグは適合しない
           role="group"
-          aria-label={`${groupByLabel}の値一覧`}
+          aria-label={`${groupByLabel}の一覧`}
           onFocus={handleListFocus}
         >
           <div style={wrapperStyle}>

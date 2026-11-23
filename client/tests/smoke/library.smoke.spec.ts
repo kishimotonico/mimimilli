@@ -30,7 +30,7 @@ test("スマートフォルダーを選ぶと値一覧が出て、値を選ぶ�
 
   await railRow(page, "CV別").click();
   await expect(page).toHaveURL(/\/library\/by-cv$/);
-  const valueList = page.getByRole("group", { name: "CVの値一覧" });
+  const valueList = page.getByRole("group", { name: "CVの一覧" });
   await expect(valueList.getByRole("button").first()).toBeVisible();
 
   await valueList.getByRole("button", { name: /^霧島レイ(?!を)/ }).click();
@@ -52,7 +52,7 @@ test("パンくずの値から兄弟の値へ移れる", async ({ page }) => {
 
   await railRow(page, "CV別").click();
   await page
-    .getByRole("group", { name: "CVの値一覧" })
+    .getByRole("group", { name: "CVの一覧" })
     .getByRole("button", { name: /^霧島レイ(?!を)/ })
     .click();
   await page.locator(".mle-crumbs").getByRole("button", { name: "霧島レイ" }).click();
@@ -71,7 +71,7 @@ test("グループの値一覧をグリッド表示に切り替えられる", as
   await railRow(page, "CV別").click();
   await page.getByRole("button", { name: "グリッド" }).click();
 
-  const valueList = page.getByRole("group", { name: "CVの値一覧" });
+  const valueList = page.getByRole("group", { name: "CVの一覧" });
   await expect(valueList.getByRole("button").first()).toBeVisible();
 
   assertNoErrors(tracker);
@@ -98,7 +98,7 @@ test("値の作品一覧で「＋絞り込み」からチップを足せる", as
 
   await railRow(page, "CV別").click();
   await page
-    .getByRole("group", { name: "CVの値一覧" })
+    .getByRole("group", { name: "CVの一覧" })
     .getByRole("button", { name: /^霧島レイ(?!を)/ })
     .click();
 
@@ -108,7 +108,7 @@ test("値の作品一覧で「＋絞り込み」からチップを足せる", as
     .getByRole("button", { name: "サークル" })
     .click();
   await page
-    .getByRole("group", { name: "サークルの値一覧" })
+    .getByRole("group", { name: "サークルの一覧" })
     .getByRole("button", { name: /^月白製作所/ })
     .click();
 
@@ -126,7 +126,7 @@ test("サイドバーのクイックオーバーレイ: 値の主クリックで
   await openApp(page);
 
   const overlay = page.locator(".mll-qoverlay");
-  const quickList = overlay.getByRole("group", { name: "CVの値一覧" });
+  const quickList = overlay.getByRole("group", { name: "CVの一覧" });
   await railRow(page, "CV別").hover();
   await quickList.getByRole("button", { name: /^霧島レイ(?!を)/ }).click();
   await expect(page).toHaveURL(/\/library\/by-cv\?group=/);
@@ -150,7 +150,7 @@ test("サイドバーのクイックオーバーレイ: 値の主クリックで
   await expect(page).toHaveURL(/\/library\/by-cv\?/);
   expect(new URL(page.url()).searchParams.has("group")).toBe(false);
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["cv/霧島レイ"]);
-  await expect(page.locator(".mll-tagband__count")).toHaveText(/^\S+ \d+件$/);
+  await expect(page.locator(".mll-tagband__count")).toHaveText(/^\S+ \d+ 件$/);
 
   assertNoErrors(tracker);
 });
@@ -160,13 +160,13 @@ test("値一覧でも検索でき、同じ値一覧のまま値と件数が絞�
   await openApp(page);
 
   await railRow(page, "CV別").click();
-  const valueList = page.getByRole("group", { name: "CVの値一覧" });
+  const valueList = page.getByRole("group", { name: "CVの一覧" });
   await expect(valueList.getByRole("button").first()).toBeVisible();
   const before = await valueList.getByRole("button").count();
 
   await expect(search(page)).toBeEnabled();
   await expect(valueList.getByRole("button", { name: /をAND追加/ })).toHaveCount(0);
-  await expect(page.locator(".mll-tagband__count")).toHaveText(/^\S+ \d+件$/);
+  await expect(page.locator(".mll-tagband__count")).toHaveText(/^\S+ \d+ 件$/);
 
   await search(page).fill("霧島");
   await expect(page).toHaveURL(/\/library\/by-cv\?q=/);
@@ -715,7 +715,7 @@ test("主要画面でヨコ方向スクロールが発生しない", async ({ pa
 
   // グループの値一覧（CV別を開いたときは結果面が値一覧に置き換わる。ADR-0012）
   await page.getByRole("button", { name: "CV" }).click();
-  const valueList = page.getByRole("group", { name: "CVの値一覧" });
+  const valueList = page.getByRole("group", { name: "CVの一覧" });
   await expect(valueList.getByRole("button").first()).toBeVisible();
   await expectNoHorizontalOverflow(page);
 

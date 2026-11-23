@@ -52,7 +52,7 @@ function notFoundFolder(id: string): never {
 async function requireFolder(adapter: DataAdapter, id: string) {
   const row = await adapter.getSmartFolder(id);
   if (!row) notFoundFolder(id);
-  return { condition: row.condition, groupBy: row.groupBy };
+  return { name: row.name, condition: row.condition, groupBy: row.groupBy };
 }
 
 export function smartFoldersRoute(adapter: DataAdapter, scanRecord: ScanRecordStore): Hono {

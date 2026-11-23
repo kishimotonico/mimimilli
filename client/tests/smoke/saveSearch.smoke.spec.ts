@@ -25,7 +25,7 @@ test("CV別で値を選んで検索し、「検索を保存」して開き直す
 
   await railRow(page, "CV別").click();
   await page
-    .getByRole("group", { name: "CVの値一覧" })
+    .getByRole("group", { name: "CVの一覧" })
     .getByRole("button", { name: /^霧島レイ(?!を)/ })
     .click();
   await expect(page).toHaveURL(/\/library\/by-cv\?group=/);
@@ -58,7 +58,7 @@ test("CV別の値一覧で検索して「検索を保存」すると、グルー
   await openApp(page);
 
   await railRow(page, "CV別").click();
-  const valueList = page.getByRole("group", { name: "CVの値一覧" });
+  const valueList = page.getByRole("group", { name: "CVの一覧" });
   await expect(valueList.getByRole("button").first()).toBeVisible();
   const names = async () => valueList.getByRole("button").allTextContents();
   const unfiltered = await names();
@@ -107,7 +107,7 @@ test("自作のスマートフォルダーにチップを足して上書きし�
   await page.getByRole("button", { name: "CV", exact: true }).click();
   await page.getByRole("button", { name: /^霧島レイ/ }).click();
   await expect.poll(async () => (await workTitles(page)).length).toBeLessThan(original.length);
-  await expect(page.getByLabel("CVの値を検索")).toHaveCount(0);
+  await expect(page.getByLabel("CVを検索")).toHaveCount(0);
 
   await page.getByRole("button", { name: "ソート", exact: true }).click();
   await page.getByRole("menuitemradio", { name: /^タイトル（Z→A）/ }).click();
@@ -153,7 +153,7 @@ test("ライブラリ → 層を開く → 閉じる → 戻る で、元の画�
 
   await railRow(page, "CV別").click();
   await page
-    .getByRole("group", { name: "CVの値一覧" })
+    .getByRole("group", { name: "CVの一覧" })
     .getByRole("button", { name: /^霧島レイ(?!を)/ })
     .click();
   const valuePath = path(page);
@@ -166,7 +166,7 @@ test("ライブラリ → 層を開く → 閉じる → 戻る で、元の画�
   await page.goBack();
   await expect(page).toHaveURL(/\/library\/by-cv$/);
   await page
-    .getByRole("group", { name: "CVの値一覧" })
+    .getByRole("group", { name: "CVの一覧" })
     .getByRole("button", { name: /^天音かなで/ })
     .click();
   await expect(page).toHaveURL(/\/library\/by-cv\?group=/);

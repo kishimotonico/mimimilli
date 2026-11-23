@@ -111,7 +111,7 @@ export default function GroupValueGrid({
         className="mll-grid-scroll"
         // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 値ボタン集合を名前付き集合として表す。fieldset等の代替タグは適合しない
         role="group"
-        aria-label={`${groupByLabel}の値一覧`}
+        aria-label={`${groupByLabel}の一覧`}
       >
         <div ref={setGridContainer} className="mll-grid" style={wrapperStyle as CSSProperties}>
           {virtualItems.map((virtualRow) => {

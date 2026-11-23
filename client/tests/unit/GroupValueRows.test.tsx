@@ -183,7 +183,7 @@ describe("GroupValueRows のキーボード移動", () => {
 
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect.mock.calls[0]?.[0]).toMatchObject({ value: "値0001" });
-    expect(screen.getByRole("group", { name: "CVの値一覧" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "CVの一覧" })).toBeInTheDocument();
     sizeMock.restore();
   });
 });
