@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from "react";
 import { NO_AUTOFILL_PROPS } from "../../../shared/ui/noAutofill";
 import {
+  definitionOf,
   rootChildren,
   ALL_SMART_FOLDER_ID,
   type GroupSortId,
@@ -18,15 +19,12 @@ import Modal from "../../../shared/ui/Modal";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import {
   conditionRowText,
-  draftOf,
   duplicateDraft,
   groupByOptions,
   groupDraft,
-  toWrite,
   withGroupBy,
   withoutRootChild,
   type SmartFolderDialogTarget,
-  type SmartFolderDraft,
 } from "../model/smartFolderEditing";
 
 interface SmartFolderDialogProps {
@@ -40,7 +38,7 @@ interface SmartFolderDialogProps {
 }
 
 function initialDraft(target: SmartFolderDialogTarget, tagPrefixes: readonly TagPrefix[]) {
-  if (target.kind === "edit") return draftOf(target.folder);
+  if (target.kind === "edit") return definitionOf(target.folder);
   if (target.kind === "duplicate") return duplicateDraft(target.folder);
   if (target.kind === "save") return target.draft;
   const first = groupByOptions(tagPrefixes, null)[0]!;
@@ -68,7 +66,7 @@ export default function SmartFolderDialog({
   onClose,
 }: SmartFolderDialogProps) {
   const [initial] = useState(() => initialDraft(target, tagPrefixes));
-  const [draft, setDraft] = useState<SmartFolderDraft>(initial);
+  const [draft, setDraft] = useState<SmartFolderWrite>(initial);
   const [saving, setSaving] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
   const sortRef = useRef<HTMLSelectElement>(null);
@@ -93,7 +91,7 @@ export default function SmartFolderDialog({
   const save = async () => {
     if (!canSave) return;
     setSaving(true);
-    const saved = await onSave(toWrite(draft));
+    const saved = await onSave(draft);
     if (!saved) setSaving(false);
   };
 

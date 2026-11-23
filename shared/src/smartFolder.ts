@@ -37,12 +37,8 @@ export type SmartFolderWrite = z.infer<typeof smartFolderDefinitionSchema>;
 
 /** 一覧の1行。保存と同じ検証を通った行だけが載る。sort の null は「『すべて』と同じ」 */
 export const smartFolderSchema = z.object({
+  ...definitionShape,
   id: z.string(),
-  name: z.string(),
-  condition: conditionSchema,
-  sort: sortIdSchema.nullable(),
-  groupBy: groupBySchema.nullable(),
-  groupSort: groupSortIdSchema.nullable(),
   position: z.number().int().nonnegative(),
   createdAt: z.string(),
 });
@@ -54,7 +50,13 @@ export const smartFolderListSchema = z.array(smartFolderSchema);
 export const smartFolderCountsSchema = z.record(z.string(), z.number().int().nonnegative());
 export type SmartFolderCounts = z.infer<typeof smartFolderCountsSchema>;
 
-export type SmartFolderRowFields = SmartFolderWrite & { id: string };
+/** 定義の5列だけを抜く。ID・位置・作成日時などの列は落ちる */
+export function definitionOf(row: SmartFolderWrite): SmartFolderWrite {
+  const { name, condition, sort, groupBy, groupSort } = row;
+  return { name, condition, sort, groupBy, groupSort };
+}
+
+type SmartFolderRowFields = SmartFolderWrite & { id: string };
 
 export interface SmartFolderViolation {
   /** 違反した列 */

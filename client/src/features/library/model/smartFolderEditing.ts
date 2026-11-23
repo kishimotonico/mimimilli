@@ -1,20 +1,19 @@
 // スマートフォルダーの編集の純粋な部分（ADR-0040「既定のスマートフォルダー」「条件の編集」）。
-// 権限・並べ替え・条件の表示・グループ分けの選択肢・複製と追加の下書きを持つ。
+// 並べ替え・条件の表示・グループ分けの選択肢・複製と追加の下書きを持つ。
 
 import {
   EMPTY_CONDITION,
   defaultGroupSort,
+  definitionOf,
   SMART_FOLDER_TEMPLATES,
   isPredicate,
   rootChildren,
   type Condition,
   type GroupBy,
-  type GroupSortId,
   type Predicate,
   type SmartFolder,
   type SmartFolderTemplate,
   type SmartFolderWrite,
-  type SortId,
   type TagPrefix,
 } from "@mimimilli/shared";
 import { buildGroupByRows } from "../../../entities/library/smartFolderDefinitions";
@@ -133,43 +132,25 @@ export function missingTemplates(folders: readonly SmartFolder[]): SmartFolderTe
   return SMART_FOLDER_TEMPLATES.filter((template) => !present.has(template.id));
 }
 
-export interface SmartFolderDraft {
-  name: string;
-  condition: Condition;
-  sort: SortId | null;
-  groupBy: GroupBy | null;
-  groupSort: GroupSortId | null;
-}
-
-export function draftOf(folder: SmartFolder): SmartFolderDraft {
-  return {
-    name: folder.name,
-    condition: folder.condition,
-    sort: folder.sort,
-    groupBy: folder.groupBy,
-    groupSort: folder.groupSort,
-  };
-}
-
 /** グループ分けを変えた下書き。値の並びは、ダイアログを開いたときのグループ分けに戻したなら開いたときの値、
  *  別のグループ分けならそのグループ分けの初期値にする */
 export function withGroupBy(
-  draft: SmartFolderDraft,
+  draft: SmartFolderWrite,
   groupBy: GroupBy | null,
-  initial: Pick<SmartFolderDraft, "groupBy" | "groupSort">,
-): SmartFolderDraft {
+  initial: Pick<SmartFolderWrite, "groupBy" | "groupSort">,
+): SmartFolderWrite {
   if (groupBy === null) return { ...draft, groupBy, groupSort: null };
   const restored = initial.groupBy !== null && groupByKey(initial.groupBy) === groupByKey(groupBy);
   return { ...draft, groupBy, groupSort: restored ? initial.groupSort : defaultGroupSort(groupBy) };
 }
 
 /** 絞り込みの無い複製の下書き。元の定義と既定の並び（継承ならそのまま継承）を写す */
-export function duplicateDraft(folder: SmartFolder): SmartFolderDraft {
-  return { ...draftOf(folder), name: `${folder.name}（コピー）` };
+export function duplicateDraft(folder: SmartFolder): SmartFolderWrite {
+  return { ...definitionOf(folder), name: `${folder.name}（コピー）` };
 }
 
 /** 条件なしのグループ分けのスマートフォルダーの下書き */
-export function groupDraft(groupBy: GroupBy): SmartFolderDraft {
+export function groupDraft(groupBy: GroupBy): SmartFolderWrite {
   return {
     name: "",
     condition: EMPTY_CONDITION,
@@ -182,9 +163,5 @@ export function groupDraft(groupBy: GroupBy): SmartFolderDraft {
 export type SmartFolderDialogTarget =
   | { kind: "edit"; folder: SmartFolder }
   | { kind: "duplicate"; folder: SmartFolder }
-  | { kind: "save"; draft: SmartFolderDraft }
+  | { kind: "save"; draft: SmartFolderWrite }
   | { kind: "group" };
-
-export function toWrite(draft: SmartFolderDraft): SmartFolderWrite {
-  return { ...draft, name: draft.name.trim() };
-}

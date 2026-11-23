@@ -9,10 +9,11 @@ import {
   splitSelectedTags,
   type SmartFolder,
   type SmartFolderPatch,
+  type SmartFolderWrite,
 } from "@mimimilli/shared";
 import { hasChipOrSearchRefinement } from "../../../entities/library/refinement";
 import type { ResolvedLibraryView, WorksView } from "../../../entities/library/resolveLibraryView";
-import { type SmartFolderDialogTarget, type SmartFolderDraft } from "./smartFolderEditing";
+import { type SmartFolderDialogTarget } from "./smartFolderEditing";
 
 export type SaveOffer = "save" | "overwrite";
 
@@ -64,7 +65,7 @@ function savedSortOf(folder: SmartFolder) {
 /** 「検索を保存」「別名で保存」の下書き。作品一覧ではグループ分けの値は必ず選ばれているので、グループ分けは外す。
  *  既定の並びは、並びを変えていなければ元の既定の並びを写し（「すべて」からは継承）、変えていればその並び。
  */
-export function saveSearchDraft(view: WorksView): SmartFolderDraft {
+export function saveSearchDraft(view: WorksView): SmartFolderWrite {
   return {
     name: defaultName(view),
     condition: effectiveCondition(view),

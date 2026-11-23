@@ -5,6 +5,7 @@ import {
   EMPTY_CONDITION,
   normalizeSearchQuery,
   prefixSchema,
+  rootChildren,
   type Condition,
   type Predicate,
 } from "./condition.ts";
@@ -59,7 +60,7 @@ function normalizedRealTag(tag: string): NormalizedTag | null {
   return parsed.success ? normalizeTag(parsed.data) : null;
 }
 
-export type GroupPredicate = Extract<Predicate, { type: "tag" | "addedYear" }>;
+type GroupPredicate = Extract<Predicate, { type: "tag" | "addedYear" }>;
 
 /** 正規化済みのグループの値を条件の述語にする */
 export function groupPredicate(by: GroupBy, value: string): GroupPredicate {
@@ -96,7 +97,7 @@ export interface EffectiveConditionInput {
  *  サーバーの評価と、クライアントの「検索を保存」「上書き」が同じ規則を使う */
 export function buildEffectiveCondition(input: EffectiveConditionInput): Condition {
   const { condition } = input;
-  const children: Condition[] = condition.type === "and" ? [...condition.children] : [condition];
+  const children = [...rootChildren(condition)];
   if (input.group) children.push(groupPredicate(input.group.by, input.group.value));
   for (const tag of input.tags?.tags ?? []) children.push({ type: "tag", tag });
   if (input.tags?.yearValue != null)

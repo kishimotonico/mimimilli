@@ -46,7 +46,7 @@ export const prefixSchema = z
   .refine((s) => !s.includes("/"), { message: "prefix にスラッシュは使えません" });
 
 /** 日数の上限（約100年）。基準時刻からの日付計算が範囲外にならない値 */
-export const MAX_WITHIN_DAYS = 36500;
+const MAX_WITHIN_DAYS = 36500;
 const positiveInt = z.number().int().positive().max(MAX_WITHIN_DAYS);
 
 const writeTreeSchema: z.ZodType<Condition> = z.lazy(() =>
@@ -71,7 +71,7 @@ const writeTreeSchema: z.ZodType<Condition> = z.lazy(() =>
 );
 
 /** 構造の一致判定用キー。オブジェクトのキー順を無視する */
-export function conditionKey(condition: Condition): string {
+function conditionKey(condition: Condition): string {
   return JSON.stringify(sortKeys(condition));
 }
 
@@ -113,7 +113,7 @@ function normalizeRootChild(child: Condition): Condition {
 }
 
 /** 保存できる形の木を正規形にする。ルートの and は畳まない。保存できる形であることが前提 */
-export function normalizeCondition(condition: Condition): Condition {
+function normalizeCondition(condition: Condition): Condition {
   if (condition.type !== "and") return condition;
   return { type: "and", children: dedupe(condition.children.map(normalizeRootChild)) };
 }

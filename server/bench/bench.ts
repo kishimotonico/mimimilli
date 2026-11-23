@@ -129,15 +129,15 @@ async function main(): Promise<void> {
     }),
     {
       name: "smart-folder-no-rules",
-      path: `/api/smart-folders/${manifest.smartFolderNoRulesId}/works?sort=added-desc`,
+      path: `/api/smart-folders/${manifest.smartFolderAllId}/works?sort=added-desc`,
       run: async () =>
-        request(`/api/smart-folders/${manifest.smartFolderNoRulesId}/works?sort=added-desc`),
+        request(`/api/smart-folders/${manifest.smartFolderAllId}/works?sort=added-desc`),
     },
     {
       name: "smart-folder-with-rules",
-      path: `/api/smart-folders/${manifest.smartFolderWithRulesId}/works?sort=added-desc`,
+      path: `/api/smart-folders/${manifest.smartFolderTaggedId}/works?sort=added-desc`,
       run: async () =>
-        request(`/api/smart-folders/${manifest.smartFolderWithRulesId}/works?sort=added-desc`),
+        request(`/api/smart-folders/${manifest.smartFolderTaggedId}/works?sort=added-desc`),
     },
     ...(
       [
@@ -152,10 +152,10 @@ async function main(): Promise<void> {
     }),
     {
       name: "values-cv-in-smart-folder",
-      path: `/api/smart-folders/${manifest.smartFolderWithRulesId}/groups?groupBy=prefix:cv&groupSort=count-desc`,
+      path: `/api/smart-folders/${manifest.smartFolderTaggedId}/groups?groupBy=prefix:cv&groupSort=count-desc`,
       run: async () =>
         request(
-          `/api/smart-folders/${manifest.smartFolderWithRulesId}/groups?groupBy=prefix:cv&groupSort=count-desc`,
+          `/api/smart-folders/${manifest.smartFolderTaggedId}/groups?groupBy=prefix:cv&groupSort=count-desc`,
         ),
     },
     {

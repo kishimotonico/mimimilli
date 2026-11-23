@@ -1,21 +1,18 @@
 // スマートフォルダーの既定テンプレート（ADR-0040）。初期データと「既定から追加」の元
 import type { Condition } from "./condition.ts";
 import { defaultGroupSort, type GroupBy } from "./groupFilter.ts";
-import type { GroupSortId, SortId } from "./library.ts";
-import { ALL_SMART_FOLDER_ID, ALL_SMART_FOLDER_NAME } from "./smartFolder.ts";
+import type { SortId } from "./library.ts";
+import {
+  ALL_SMART_FOLDER_ID,
+  ALL_SMART_FOLDER_NAME,
+  type SmartFolderWrite,
+} from "./smartFolder.ts";
 
-export interface SmartFolderTemplate {
+export type SmartFolderTemplate = SmartFolderWrite & {
   id: string;
-  name: string;
-  condition: Condition;
-  /** null は「『すべて』と同じ」 */
-  sort: SortId | null;
-  groupBy: GroupBy | null;
-  /** グループ分けがあるテンプレートだけ持つ */
-  groupSort: GroupSortId | null;
   /** 初回起動時に投入する */
   seeded: boolean;
-}
+};
 
 const and = (...children: Condition[]): Condition => ({ type: "and", children });
 const grouped = (

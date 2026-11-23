@@ -90,7 +90,7 @@ export interface FixtureState {
   /** 編集用カバー列（表示用 cover と独立。unmeasured を表現する） */
   coverColumns: Map<string, FixtureCoverColumns>;
   tagPrefixes: TagPrefix[];
-  /** 位置の昇順。fixture は migration を通らないので、「すべて」と初回投入分を初期状態に持つ */
+  /** 位置の昇順 */
   smartFolders: SmartFolder[];
   /** 作品ごとのレジューム位置 */
   resumes: Map<string, ResumeBody>;

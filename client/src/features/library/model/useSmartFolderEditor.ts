@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
 import {
   ALL_SMART_FOLDER_ID,
+  definitionOf,
   findSmartFolderTemplate,
   type SmartFolder,
   type GroupSortId,
@@ -81,7 +82,7 @@ export function useSmartFolderEditor(): SmartFolderEditor {
       }
     };
 
-    /** 作成・追加・定義の更新の成功応答の行を、一覧の再取得を待たず ID 単位で反映する。件数・順序は続く再取得で取り直す */
+    /** 作成・追加・定義の更新の成功応答の行を、一覧の再取得を待たず ID 単位で反映する。順序は続く再取得で取り直す */
     const upsertFolder = (row: SmartFolder) =>
       queryClient.setQueryData<SmartFolder[]>(SMART_FOLDER_QUERY_KEYS.all(), (prev) => {
         if (prev === undefined) return prev;
@@ -112,15 +113,7 @@ export function useSmartFolderEditor(): SmartFolderEditor {
 
     const restore = async (folder: SmartFolder) => {
       await commit("元に戻せませんでした", "folders", () =>
-        createSmartFolder({
-          id: folder.id,
-          name: folder.name,
-          condition: folder.condition,
-          sort: folder.sort,
-          groupBy: folder.groupBy,
-          groupSort: folder.groupSort,
-          position: folder.position,
-        }),
+        createSmartFolder({ ...definitionOf(folder), id: folder.id, position: folder.position }),
       );
     };
 
@@ -183,9 +176,8 @@ export function useSmartFolderEditor(): SmartFolderEditor {
           "既定のスマートフォルダーを追加できませんでした",
           "folders",
           () => {
-            const { id, name, condition, sort, groupBy, groupSort } =
-              findSmartFolderTemplate(templateId)!;
-            return createSmartFolder({ id, name, condition, sort, groupBy, groupSort });
+            const template = findSmartFolderTemplate(templateId)!;
+            return createSmartFolder({ ...definitionOf(template), id: template.id });
           },
           upsertFolder,
         ),

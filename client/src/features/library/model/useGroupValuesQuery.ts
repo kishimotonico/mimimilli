@@ -30,11 +30,7 @@ export function useGroupValuesQuery(
   const { folderId, group = null, tags = [], q = "" } = scope;
   const filter = { group, tags, q: normalizeSearchQuery(q), groupSort };
   return useQuery({
-    queryKey: SMART_FOLDER_QUERY_KEYS.groups(
-      folderId,
-      groupBy === null ? "" : groupByKey(groupBy),
-      filter,
-    ),
+    queryKey: SMART_FOLDER_QUERY_KEYS.groups(folderId, groupByKey(groupBy), filter),
     queryFn: async () => {
       const items = await getSmartFolderGroups(folderId, {
         groupBy: groupBy!,

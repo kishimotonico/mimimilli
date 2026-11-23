@@ -1,21 +1,14 @@
 // 起動時に入れるスマートフォルダーの行（ADR-0040「既定のスマートフォルダー」）。real と fixture が同じ関数を通す。
 import {
   ALL_SMART_FOLDER_ID,
+  definitionOf,
   SMART_FOLDER_TEMPLATES,
   type SmartFolderTemplate,
 } from "@mimimilli/shared";
 import type { SmartFolderInsert } from "../adapter/smartFolder.ts";
 
 function insertFromTemplate(template: SmartFolderTemplate, createdAt: string): SmartFolderInsert {
-  return {
-    id: template.id,
-    name: template.name,
-    condition: template.condition,
-    sort: template.sort,
-    groupBy: template.groupBy,
-    groupSort: template.groupSort,
-    createdAt,
-  };
+  return { ...definitionOf(template), id: template.id, createdAt };
 }
 
 /** 「すべて」が無ければ入れる。残りの既定は、まだ入れていないときだけ入れる（全部消しても戻さない）。
