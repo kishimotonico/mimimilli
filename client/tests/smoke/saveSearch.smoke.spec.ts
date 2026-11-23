@@ -171,6 +171,12 @@ test("ライブラリ → 層を開く → 閉じる → 戻る で、元の画�
     .click();
   await expect(page).toHaveURL(/\/library\/by-cv\?group=/);
   expect(new URL(page.url()).searchParams.get("group")).toBe("天音かなで");
+  await expect(
+    page
+      .locator(".mll-results")
+      .getByRole("button", { name: /を選択、Enterで再生$/ })
+      .first(),
+  ).toBeVisible();
 
   assertNoErrors(tracker);
 });

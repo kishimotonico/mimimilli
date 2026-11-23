@@ -78,6 +78,9 @@ test("層を開いたまま再読み込みしても、再生していなけれ�
   await expect(page.locator(".mll-sidebar")).toBeVisible({ timeout: 20_000 });
   await expect(layer(page)).toHaveCount(0);
   await expect.poll(() => path(page)).toBe("/library/by-cv");
+  await expect(
+    page.getByRole("group", { name: "CVの一覧" }).getByRole("button").first(),
+  ).toBeVisible();
 
   assertNoErrors(tracker);
 });

@@ -137,6 +137,12 @@ test("＋メニュー: 既定から追加・グループ分けの追加・複製
     "aria-current",
     "true",
   );
+  await expect(
+    page
+      .locator(".mll-results")
+      .getByRole("button", { name: /を選択、Enterで再生$/ })
+      .first(),
+  ).toBeVisible();
   assertNoErrors(tracker);
 });
 
