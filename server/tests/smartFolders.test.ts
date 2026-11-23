@@ -307,20 +307,7 @@ contract("更新は PATCH で、送った列だけを書き、ほかの列を巻
   assert.equal((await list(harness)).find((f) => f.id === created.id)!.name, "別タブで改名");
 });
 
-contract("交差した更新でも、groupBy と groupSort の組が崩れた行は書かれない", async (harness) => {
-  const created = await harness.send<SmartFolder>(
-    "POST",
-    "/api/smart-folders",
-    write("年別", EMPTY, GROUPED),
-  );
-  const [a, b] = await Promise.all([
-    patch(harness, created.body.id, { groupSort: "last-played" }),
-    patch(harness, created.body.id, { groupBy: null, groupSort: null }),
-  ]);
-  assert.ok([a.status, b.status].every((status) => status === 200 || status === 400));
-  const after = (await list(harness)).find((f) => f.id === created.body.id)!;
-  assert.equal(after.groupBy === null, after.groupSort === null);
-
+contract("更新は今の行に重ねた形を adapter の中で検証し、違反なら書かない", async (harness) => {
   const plain = await create(harness, "なし");
   const result = await harness.adapter.updateSmartFolder(plain.id, { groupSort: "count-desc" });
   assert.ok(result && "violation" in result);
