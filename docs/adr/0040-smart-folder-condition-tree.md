@@ -223,13 +223,10 @@ smart_folders(id TEXT PK, name TEXT, condition_json TEXT, sort TEXT NULL,
 - `group_by_json` と `group_sort` は、どちらも null か、どちらも値を持つかのどちらか
 - 並び順は `position` の整数で持ち、並べ替えは全件の順序を送る PUT にする。スマートフォルダーは多くても数十本
 - 書き込むのは検証済みの API だけなので、読み出しも保存と同じスキーマ1本で厳密に読む。読み出し用の緩いスキーマは持たない。述語や並びの ID を変えるときは、user migration で保存済みの JSON を書き換える（前述）
-- 読めない行は正常な状態として扱わない。読めない行が1つでもあれば、一覧の取得は失敗させ、応答とログに行の ID、読めない理由（どの列がどう読めないか）、直し方を出す。画面は一覧の取得失敗として扱い、読めない行専用の画面や型を持たない。直し方は行を消すコマンドを、サーバーが実際に開いている DB のパスで示す（消した「すべて」は次の起動の初期化で戻る）。次は Linux・Windows の既定のパスでの例
+- 読めない行は正常な状態として扱わない。読めない行が1つでもあれば、一覧の取得は失敗させ、応答とログに行の ID、読めない理由（どの列がどう読めないか）、直し方を出す。画面は一覧の取得失敗として扱い、読めない行専用の画面や型を持たない。直し方は行を消すコマンドを、サーバーが実際に開いている DB のパスを入れた1つの形で示す（消した「すべて」は次の起動の初期化で戻る）。パス自体が実行 OS のものなので、Linux・Windows のどちらのシェルでも同じ書き方で通る。次は Linux の既定のパスでの例
 
 ```sh
-# Linux
-sqlite3 "${XDG_DATA_HOME:-$HOME/.local/share}/mimimilli/db/user.sqlite" "DELETE FROM smart_folders WHERE id = '<id>'"
-# Windows、cmd
-sqlite3 "%LOCALAPPDATA%\mimimilli\db\user.sqlite" "DELETE FROM smart_folders WHERE id = '<id>'"
+sqlite3 "$HOME/.local/share/mimimilli/db/user.sqlite" "DELETE FROM smart_folders WHERE id = '<id>'"
 ```
 
 - サイドバー用の別テーブル（`sidebar_items` のようなもの）は作らない
