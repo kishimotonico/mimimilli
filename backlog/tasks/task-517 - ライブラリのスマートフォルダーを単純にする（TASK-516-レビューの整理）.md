@@ -1,10 +1,10 @@
 ---
 id: TASK-517
 title: ライブラリのスマートフォルダーを単純にする（TASK-516 レビューの整理）
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-23 12:47'
-updated_date: '2026-11-23 14:39'
+updated_date: '2026-11-23 21:30'
 labels:
   - library
   - refactor
@@ -32,9 +32,9 @@ TASK-516（ADR-0040〜0042）のレビュー（2026-11-23、設計: Fable、ナ�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 子タスクがすべて完了している
-- [ ] #2 pnpm test:smoke を含めて pnpm check・pnpm test が通る
-- [ ] #3 ADR-0040・0041・0008・0031、docs/requirements-v4.md、docs/design-system.md、docs/ARCHITECTURE.md、docs/HANDOFF.md が実装に合っている
+- [x] #1 子タスクがすべて完了している
+- [x] #2 pnpm test:smoke を含めて pnpm check・pnpm test が通る
+- [x] #3 ADR-0040・0041・0008・0031、docs/requirements-v4.md、docs/design-system.md、docs/ARCHITECTURE.md、docs/HANDOFF.md が実装に合っている
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -50,4 +50,6 @@ TASK-516（ADR-0040〜0042）のレビュー（2026-11-23、設計: Fable、ナ�
 2026-11-23 Fable のレビュー（ADR とタスク分け）を受けて組み替えた。517.2 を「更新と作成の口」と 517.8（件数と値一覧の口）に、517.6 を「層と履歴同期」と 517.9（保存後の入り直しと補正）に分けた。順序は 517.1 → 517.3 → 517.2 → 517.8 → 517.4 → 517.5 →（ユーザーの操作感の確認）→ 517.6 → 517.9 → 517.7。規約レビューの ClassificationAdapter の分割とテストの独立した期待値は 517.8 に入れた。517.5・517.6・517.9 の実装担当への注意点は Fable のレビュー（統括の scratchpad の review-517-plan.md の4節）を委譲の指示書に写す。
 
 2026-11-23 Fable の中間レビュー（517.4 まで）: API とデータの形は狙いどおり単純になった。important は空になったテスト1件。指摘と、調査担当のテスト重複・ADR 突き合わせの報告を 517.10 にまとめ、517.5 の前に入れる。517.9 の AC5 を編集フックの関数1本に寄せる形に書き換えた。実装担当への注意点の更新版とオーナーの操作感の確認手順は review-517-mid.md の4・5節。
+
+2026-11-24 統括: 子タスク 517.1〜517.13 完了。Fable の中間・最終レビュー、Codex（mimi2）のレビューと再確認2回を通過。TASK-518 を master に入れたあと統合ブランチを rebase し、pnpm check・pnpm test・フル smoke 2回を通して master へ --no-ff マージ（7901635a）。master のあとに回すものは TASK-521（文言の表記）と TASK-522（smoke の重複）。DRAFT-84・85 はブロックなし。
 <!-- SECTION:NOTES:END -->
