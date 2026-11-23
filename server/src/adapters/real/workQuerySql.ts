@@ -16,7 +16,7 @@ export function inClausePlaceholders(count: number): string {
   return Array.from({ length: count }, () => "?").join(", ");
 }
 
-export function worksOrderSql(sort: SortId, seed: number | undefined, bindings: number[]): string {
+export function worksOrderSql(sort: Exclude<SortId, "random">): string {
   const idTieBreaker = "works.id COLLATE BINARY ASC";
   switch (sort) {
     case "title-asc":
@@ -35,16 +35,6 @@ export function worksOrderSql(sort: SortId, seed: number | undefined, bindings: 
       return `work_states.last_played_at IS NULL ASC, work_states.last_played_at DESC, ${idTieBreaker}`;
     case "id-asc":
       return idTieBreaker;
-    case "random": {
-      if (seed === undefined) throw new Error("randomソートにはseedが必要です");
-      bindings.push(seed, seed);
-      const hexId = "hex(works.id)";
-      const rotated =
-        `CASE WHEN length(${hexId}) = 0 THEN '' ELSE ` +
-        `substr(${hexId}, (? % length(${hexId})) + 1) || ` +
-        `substr(${hexId}, 1, ? % length(${hexId})) END`;
-      return `${rotated} COLLATE BINARY ASC, ${idTieBreaker}`;
-    }
   }
 }
 

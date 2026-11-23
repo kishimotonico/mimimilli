@@ -5,7 +5,7 @@ import {
   compareJapaneseSortKeys,
   compareUtf8Bytes,
   japaneseSortKey,
-  stableRandomSortKey,
+  sortByRandomOrder,
 } from "./japaneseSortKey.ts";
 
 /** 検索・フィルター・ソート中だけ使う内部ページ型。公開前にWorkListItemへ投影する。 */
@@ -107,12 +107,7 @@ export function sortWorkSummaries(
       break;
     case "random":
       if (seed === undefined) throw new Error("randomソートにはseedが必要です");
-      sorted.sort(
-        (a, b) =>
-          compareStrings(stableRandomSortKey(seed, a.id), stableRandomSortKey(seed, b.id)) ||
-          byId(a, b),
-      );
-      break;
+      return sortByRandomOrder(sorted, seed, (work) => work.id);
     default:
       break;
   }
