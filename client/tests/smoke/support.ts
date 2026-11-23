@@ -56,6 +56,8 @@ export interface ErrorTracker {
   /** ok応答の `${method} ${url}`。SSEの正常closeやTanStack Queryの再フェッチ中断は
    *  ネットワークレベルではERR_ABORTEDと区別できないため、失敗判定から除外する目的で使う。 */
   okUrls: Set<string>;
+  /** 未完了のリクエストの `${method} ${url}`。取り直しで中断された取得は、同じURLの取り直しが未完了でも正常とみなす */
+  pendingUrls: () => Set<string>;
 }
 
 /** コンソールエラー・4xx/5xxレスポンス・未捕捉例外・ネットワークリクエスト失敗を記録する。
@@ -67,6 +69,8 @@ export function trackErrors(page: Page): ErrorTracker {
     pageErrors: [],
     failedRequests: [],
     okUrls: new Set<string>(),
+    pendingUrls: () =>
+      new Set([...pendingRequests].map((request) => `${request.method()} ${request.url()}`)),
   };
   // 新しいドキュメントへのナビゲーション開始は、旧ドキュメントの未完了リクエストを
   // 中断させる。その中断は不具合ではないため、ナビゲーション開始時点の未完了分を
@@ -108,10 +112,13 @@ export function trackErrors(page: Page): ErrorTracker {
   return tracker;
 }
 
-function isReportableFailedRequest(line: string, okUrls: Set<string>): boolean {
+function isReportableFailedRequest(
+  line: string,
+  settledOrPending: (key: string) => boolean,
+): boolean {
   if (!line.endsWith("net::ERR_ABORTED")) return true;
   const [method, url] = line.split(" ");
-  return method === undefined || url === undefined || !okUrls.has(`${method} ${url}`);
+  return method === undefined || url === undefined || !settledOrPending(`${method} ${url}`);
 }
 
 /** trackErrors で集めた4種の異常がいずれも空であることを確認する。 */
@@ -119,8 +126,11 @@ export function assertNoErrors(tracker: ErrorTracker) {
   expect(tracker.consoleErrors).toEqual([]);
   expect(tracker.failedResponses).toEqual([]);
   expect(tracker.pageErrors).toEqual([]);
+  const pending = tracker.pendingUrls();
   expect(
-    tracker.failedRequests.filter((line) => isReportableFailedRequest(line, tracker.okUrls)),
+    tracker.failedRequests.filter((line) =>
+      isReportableFailedRequest(line, (key) => tracker.okUrls.has(key) || pending.has(key)),
+    ),
   ).toEqual([]);
 }
 
