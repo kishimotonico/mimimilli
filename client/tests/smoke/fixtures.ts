@@ -5,7 +5,8 @@ import { type ChildProcess, execFileSync, spawn } from "node:child_process";
 import { loadavg } from "node:os";
 import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
-import { chromium, test as base } from "@playwright/test";
+import { type Browser, chromium, test as base } from "@playwright/test";
+import { shutdown, withDeadline } from "./processSupport.ts";
 
 // fixture状態リセットのHTTP待ちがADR-0020のWSL blackhole（未使用ポートへの接続が
 // 約2分ハングする既知障害）を踏まないよう、明示的に短いタイムアウトで打ち切る。
@@ -16,9 +17,14 @@ const RESET_FETCH_TIMEOUT_MS = 5_000;
 const BUN_LOG_TIMEOUT_MS = 60_000;
 const VITE_LOG_TIMEOUT_MS = 60_000;
 const WARM_UP_TIMEOUT_MS = 90_000;
+const BROWSER_CLOSE_TIMEOUT_MS = 5_000;
 const FIXTURE_SETUP_MARGIN_MS = 30_000;
 const WORKER_SERVERS_TIMEOUT_MS =
-  BUN_LOG_TIMEOUT_MS + VITE_LOG_TIMEOUT_MS + WARM_UP_TIMEOUT_MS + FIXTURE_SETUP_MARGIN_MS;
+  BUN_LOG_TIMEOUT_MS +
+  VITE_LOG_TIMEOUT_MS +
+  WARM_UP_TIMEOUT_MS +
+  BROWSER_CLOSE_TIMEOUT_MS +
+  FIXTURE_SETUP_MARGIN_MS;
 
 const SUPERVISE_SCRIPT = fileURLToPath(new URL("./superviseProcess.mjs", import.meta.url));
 
@@ -132,29 +138,30 @@ function waitForLog(
 // 実際にブラウザがモジュールグラフを辿って初回リクエストしたときに走る。workerが4並列で
 // 同時にコールドスタートすると、この事前バンドルが各テストのbootTimeout（20s）を圧迫し
 // 落ちうるため、worker起動時に一度だけ実ブラウザでページを開いて済ませておく。
-// 起動・遷移・要素待ちを1つの期限（timeoutMs）で打ち切る。
+// launch・newPage・遷移・要素待ちを1つの期限（timeoutMs）で打ち切る。後始末（close）は別の短い上限で、
+// 期限切れでもブラウザーの終了待ちで診断が遅れないようにする。
 async function warmUp(baseURL: string, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   const remaining = () => Math.max(1, deadline - Date.now());
-  const browser = await chromium.launch({ timeout: remaining() });
+  let browser: Browser | undefined;
   try {
-    const page = await browser.newPage();
-    await page.goto(baseURL, { waitUntil: "domcontentloaded", timeout: remaining() });
-    await page.locator(".mll-sidebar").waitFor({ state: "visible", timeout: remaining() });
+    await withDeadline(
+      async () => {
+        browser = await chromium.launch({ timeout: remaining() });
+        const page = await browser.newPage();
+        await page.goto(baseURL, { waitUntil: "domcontentloaded", timeout: remaining() });
+        await page.locator(".mll-sidebar").waitFor({ state: "visible", timeout: remaining() });
+      },
+      timeoutMs,
+      "warmUp",
+    );
   } finally {
-    await browser.close();
-  }
-}
-
-// spawnしたコマンド（pnpm exec cross-env ... vite ... 等）はラッパー越しの子プロセスを持つため、
-// ラッパーのPIDだけをkillしても実体（vite・bun本体）が残り、次回起動時のポート衝突を招く。
-// detached: true でspawnし、プロセスグループごと（-pid）シグナルを送って確実に止める。
-function killGroup(proc: ChildProcess, signal: NodeJS.Signals): void {
-  if (proc.pid === undefined) return;
-  try {
-    process.kill(-proc.pid, signal);
-  } catch {
-    // グループが既に消えている場合は何もしない
+    const opened = browser;
+    if (opened) {
+      await withDeadline(() => opened.close(), BROWSER_CLOSE_TIMEOUT_MS, "browser.close").catch(
+        () => undefined,
+      );
+    }
   }
 }
 
@@ -168,22 +175,6 @@ function spawnSupervised(
     ...options,
     stdio: ["pipe", "pipe", "pipe"],
     detached: true,
-  });
-}
-
-async function shutdown(proc: ChildProcess, timeoutMs: number): Promise<void> {
-  // シグナルで終了済みのプロセスは exitCode が null のまま signalCode だけが入る。
-  if (proc.exitCode !== null || proc.signalCode !== null) return;
-  killGroup(proc, "SIGTERM");
-  await new Promise<void>((resolvePromise) => {
-    const timer = setTimeout(() => {
-      killGroup(proc, "SIGKILL");
-      // SIGKILLは無視されないため、そのまま "exit" イベントを待ち続ければ確実に発火する。
-    }, timeoutMs);
-    proc.once("exit", () => {
-      clearTimeout(timer);
-      resolvePromise();
-    });
   });
 }
 
