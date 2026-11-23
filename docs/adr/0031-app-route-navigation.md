@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-09-25
-- 関連: [ADR-0012](0012-library-axis-as-value-browse.md)（軸の値選択）、[ADR-0013](0013-tag-click-replaces-all.md)（タグ操作）、[ADR-0026](0026-value-list-as-global-entry.md)（値一覧はq・tagsを持たない）、[ADR-0029](0029-root-reconfiguration-workflow.md)（root再設定の突入時リセット）、[ADR-0041](0041-library-sidebar-shell-navigation.md)（URL形式・AppRouteの形を改訂）、backlog TASK-466
+- 関連: [ADR-0012](0012-library-axis-as-value-browse.md)（軸の値選択）、[ADR-0013](0013-tag-click-replaces-all.md)（タグ操作）、[ADR-0026](0026-value-list-as-global-entry.md)（廃止）、[ADR-0029](0029-root-reconfiguration-workflow.md)（root再設定の突入時リセット）、[ADR-0041](0041-library-sidebar-shell-navigation.md)（URL形式・AppRouteの形を改訂）、backlog TASK-466
 
 ## 文脈
 
@@ -93,7 +93,7 @@ AppRouteには入れず、今のまま別のatomに置く。
 ### 他のADRとの関係
 
 - [ADR-0012](0012-library-axis-as-value-browse.md)・[ADR-0013](0013-tag-click-replaces-all.md): 軸の値選択とタグ操作の規則（置換で作品一覧へ進む、AND追加は現在地に留まる、yearは単一選択、作品選択のpush/replace）は変えない。置き場所がLibraryの遷移を計算する純粋関数になる。
-- [ADR-0026](0026-value-list-as-global-entry.md): 値一覧へ移るときにq・tagsを消す規則は軸切り替えの純粋関数が持ち、URLから値一覧のq・tagsを復元しない規則はparseが持つ。どちらも変えない。
+- [ADR-0026](0026-value-list-as-global-entry.md): 廃止。値一覧へ移るときにq・tagsを消す規則と、URLから値一覧のq・tagsを復元しない規則は [ADR-0041](0041-library-sidebar-shell-navigation.md) でなくなった。
 - [ADR-0029](0029-root-reconfiguration-workflow.md): 突入時の後処理のうち、ナビゲーションの既定化を本ADRの1操作に置き換える。後処理の他の手順と呼び出し元（自前の開始・起動時の検知・drift検知）は変えない。
 
 ## 帰結
