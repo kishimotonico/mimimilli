@@ -47,13 +47,17 @@ describe("saveOffer", () => {
     expect(saveOffer(view({ folderId: "by-cv" }))).toBeNull();
   });
 
-  it("すべて・既定のものは、チップか検索語があれば「検索を保存」で、上書きは出さない", () => {
+  it("すべては、チップか検索語があれば「検索を保存」で、上書きは出さない", () => {
     expect(saveOffer(view({ folderId: "all", selectedTags: nts(["ASMR"]) }))).toBe("save");
     expect(saveOffer(view({ folderId: "all", q: "雨" }))).toBe("save");
     expect(saveOffer(view({ folderId: "all", q: "  " }))).toBeNull();
     expect(saveOffer(view({ folderId: "sf-own", q: " \u3000" }))).toBeNull();
-    expect(saveOffer(view({ folderId: "fav", selectedTags: nts(["ASMR"]) }))).toBe("save");
-    expect(saveOffer(view({ folderId: "fav", sort: "title-asc" }))).toBeNull();
+    expect(saveOffer(view({ folderId: "all", sort: "title-asc" }))).toBeNull();
+  });
+
+  it("既定のスマートフォルダーも自作と同じく、チップを足すか並びを変えると「上書き」", () => {
+    expect(saveOffer(view({ folderId: "fav", selectedTags: nts(["ASMR"]) }))).toBe("overwrite");
+    expect(saveOffer(view({ folderId: "fav", sort: "title-asc" }))).toBe("overwrite");
   });
 
   it("グループ分けを持つ自作は値を選んでいれば「検索を保存」で、上書きは出さない", () => {
@@ -181,8 +185,9 @@ describe("overwriteChange", () => {
     ).not.toHaveProperty("sort");
   });
 
-  it("既定のもの・グループ分けを持つものは上書きの対象外", () => {
-    expect(isOverwritable(works({ folderId: "fav" }))).toBe(false);
+  it("「すべて」・グループ分けを持つものは上書きの対象外", () => {
+    expect(isOverwritable(works({ folderId: "fav" }))).toBe(true);
+    expect(isOverwritable(works({ folderId: "all" }))).toBe(false);
     expect(isOverwritable(works({ folderId: "sf-grouped", group: "x" }))).toBe(false);
   });
 });

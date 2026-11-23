@@ -4,7 +4,6 @@ import {
   conditionSchema,
   isBookmarkedOnly,
   isHasErrorOnly,
-  needsCount,
   showsCount,
   smartFolderGroupsRequestSchema,
   smartFolderSchema,
@@ -92,13 +91,9 @@ test("条件の形の判定", () => {
   assert.ok(!isHasErrorOnly({ type: "hasError" }));
 });
 
-test("件数: 条件が空・グループ分けありは出さず、hasError だけは隠す判定に数える", () => {
-  const byId = (id: string) => SMART_FOLDER_TEMPLATES.find((t) => t.id === id)!;
+test("件数: 条件が空・グループ分けありは出さない", () => {
   const shown = SMART_FOLDER_TEMPLATES.filter(showsCount).map((t) => t.id);
   assert.deepEqual(shown, ["recent", "added", "fav", "error"]);
-  assert.ok(needsCount(byId("error")));
-  assert.ok(!needsCount(byId("all")) && !needsCount(byId("by-cv")));
-  assert.ok(needsCount({ condition: and({ type: "hasError" }), groupBy: { kind: "tag" } }));
   assert.ok(!showsCount({ condition: and({ type: "hasError" }), groupBy: { kind: "tag" } }));
 });
 

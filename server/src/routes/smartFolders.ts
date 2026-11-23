@@ -1,6 +1,6 @@
 // /smart-folders 以下（ADR-0040「HTTP の契約」）。
 //   GET    /smart-folders                  定義の一覧（サーバーの順。件数は含めない）
-//   GET    /smart-folders/counts           件数（Record<id, number>）。数えるものは needsCount で選ぶ
+//   GET    /smart-folders/counts           件数（Record<id, number>）。数えるものは showsCount で選ぶ
 //   POST   /smart-folders                  作成（id を省くと sf-<uuid> を採番。既定から追加・削除の取り消しも id と position を渡してここを通る）
 //   PUT    /smart-folders/order            全件の順序を置き換える
 //   PATCH  /smart-folders/:id              部分更新（送った列だけ）
@@ -11,7 +11,7 @@ import { Hono } from "hono";
 import type { ZodError } from "zod";
 import {
   ALL_SMART_FOLDER_ID,
-  needsCount,
+  showsCount,
   type SmartFolderCounts,
   smartFolderCreateSchema,
   smartFolderOrderSchema,
@@ -31,7 +31,7 @@ import {
 
 /** 件数を出す行だけを1往復で数える。応答のキーは行の ID */
 async function countFolders(adapter: DataAdapter): Promise<SmartFolderCounts> {
-  const targets = (await adapter.listSmartFolders()).filter(needsCount);
+  const targets = (await adapter.listSmartFolders()).filter(showsCount);
   if (targets.length === 0) return {};
   const counts = await adapter.countByConditions(
     targets.map((folder) => folder.condition),

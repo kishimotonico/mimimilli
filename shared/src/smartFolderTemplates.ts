@@ -1,8 +1,8 @@
-// スマートフォルダーの既定テンプレートと、テンプレート由来の編集権限（ADR-0040）。
+// スマートフォルダーの既定テンプレート（ADR-0040）。初期データと「既定から追加」の元
 import type { Condition } from "./condition.ts";
 import { defaultGroupSort, type GroupBy } from "./groupFilter.ts";
 import type { GroupSortId, SortId } from "./library.ts";
-import { ALL_SMART_FOLDER_ID, ALL_SMART_FOLDER_NAME, type SmartFolder } from "./smartFolder.ts";
+import { ALL_SMART_FOLDER_ID, ALL_SMART_FOLDER_NAME } from "./smartFolder.ts";
 
 export interface SmartFolderTemplate {
   id: string;
@@ -104,28 +104,4 @@ export const SMART_FOLDER_TEMPLATES: readonly SmartFolderTemplate[] = [
 
 export function findSmartFolderTemplate(id: string): SmartFolderTemplate | undefined {
   return SMART_FOLDER_TEMPLATES.find((template) => template.id === id);
-}
-
-// ── 編集の権限 ───────────────────────────────────────────────
-
-/** client の UI の出し分け。サーバーが守るのは smartFolderViolation の不変条件だけで、権限では弾かない */
-export interface SmartFolderPermissions {
-  rename: boolean;
-  editCondition: boolean;
-  editGroupBy: boolean;
-  /** 既定の並びを「『すべて』と同じ」（null）にできるか */
-  inheritSort: boolean;
-  remove: boolean;
-}
-
-export function smartFolderPermissions(folder: Pick<SmartFolder, "id">): SmartFolderPermissions {
-  const isAll = folder.id === ALL_SMART_FOLDER_ID;
-  const isTemplate = findSmartFolderTemplate(folder.id) !== undefined;
-  return {
-    rename: !isAll,
-    editCondition: !isTemplate,
-    editGroupBy: !isTemplate,
-    inheritSort: !isAll,
-    remove: !isAll,
-  };
 }

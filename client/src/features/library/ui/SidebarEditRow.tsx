@@ -75,7 +75,6 @@ export default function SidebarEditRow({
   const classes = [
     "mll-sbrow",
     "is-editing",
-    row.dimmed ? "is-dimmed" : "",
     dragging ? "is-dragging" : "",
     drop === "reorder-before" ? "is-drop-before" : "",
     drop === "reorder-after" ? "is-drop-after" : "",

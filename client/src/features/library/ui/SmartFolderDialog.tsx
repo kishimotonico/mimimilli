@@ -2,9 +2,8 @@ import { useId, useRef, useState } from "react";
 import { NO_AUTOFILL_PROPS } from "../../../shared/ui/noAutofill";
 import {
   rootChildren,
-  smartFolderPermissions,
+  ALL_SMART_FOLDER_ID,
   type GroupSortId,
-  type SmartFolderPermissions,
   type SmartFolderWrite,
   type SortId,
   type TagPrefix,
@@ -39,14 +38,6 @@ interface SmartFolderDialogProps {
   onSave: (draft: SmartFolderWrite) => Promise<boolean>;
   onClose: () => void;
 }
-
-const FULL_PERMISSIONS: SmartFolderPermissions = {
-  rename: true,
-  editCondition: true,
-  editGroupBy: true,
-  inheritSort: true,
-  remove: true,
-};
 
 function initialDraft(target: SmartFolderDialogTarget, tagPrefixes: readonly TagPrefix[]) {
   if (target.kind === "edit") return draftOf(target.folder);
@@ -86,14 +77,13 @@ export default function SmartFolderDialog({
   const groupId = useId();
   const sortId = useId();
   const groupSortId = useId();
-  const permissions =
-    target.kind === "edit" ? smartFolderPermissions(target.folder) : FULL_PERMISSIONS;
+  const isAll = target.kind === "edit" && target.folder.id === ALL_SMART_FOLDER_ID;
   const close = () => {
     if (!saving) onClose();
   };
   const dialog = useDialogModal({
     onClose: close,
-    initialFocusRef: permissions.rename ? nameRef : sortRef,
+    initialFocusRef: isAll ? sortRef : nameRef,
   });
 
   const children = rootChildren(draft.condition);
@@ -133,7 +123,7 @@ export default function SmartFolderDialog({
             type="text"
             value={draft.name}
             placeholder="名前"
-            disabled={!permissions.rename || saving}
+            disabled={isAll || saving}
             onChange={(event) => setDraft({ ...draft, name: event.target.value })}
           />
         </div>
@@ -146,7 +136,7 @@ export default function SmartFolderDialog({
               {children.map((child, index) => (
                 <div key={`${index}:${conditionRowText(child)}`} className="mll-condrow">
                   <span>{conditionRowText(child)}</span>
-                  {permissions.editCondition && (
+                  {!isAll && (
                     <IconButton
                       icon={I.x}
                       label="この条件を外す"
@@ -167,7 +157,7 @@ export default function SmartFolderDialog({
           <select
             id={groupId}
             value={groupByKey(draft.groupBy)}
-            disabled={!permissions.editGroupBy || saving}
+            disabled={isAll || saving}
             onChange={(event) =>
               setDraft(withGroupBy(draft, groupByFromKey(event.target.value), initial))
             }
@@ -213,9 +203,7 @@ export default function SmartFolderDialog({
               })
             }
           >
-            {permissions.inheritSort && (
-              <option value="">{`「すべて」と同じ（${sortLabel(allSort)}）`}</option>
-            )}
+            {!isAll && <option value="">{`「すべて」と同じ（${sortLabel(allSort)}）`}</option>}
             {SORT_OPTIONS.map((option) => (
               <option key={option.id} value={option.id}>
                 {option.label}

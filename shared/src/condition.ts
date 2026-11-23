@@ -197,9 +197,15 @@ export function isEmptyCondition(condition: Condition): boolean {
   return condition.type === "and" && condition.children.length === 0;
 }
 
-function isSinglePredicate(condition: Condition, type: PredicateType): boolean {
+/** ルートの子が述語1つだけのとき、その種類。それ以外は null */
+export function singlePredicateType(condition: Condition): PredicateType | null {
   const children = rootChildren(condition);
-  return children.length === 1 && children[0]!.type === type;
+  const only = children.length === 1 ? children[0]! : null;
+  return only !== null && isPredicate(only) ? only.type : null;
+}
+
+function isSinglePredicate(condition: Condition, type: PredicateType): boolean {
+  return singlePredicateType(condition) === type;
 }
 
 /** ルートの子が bookmarked だけ（お気に入りの案内を出す） */
@@ -207,7 +213,7 @@ export function isBookmarkedOnly(condition: Condition): boolean {
   return isSinglePredicate(condition, "bookmarked");
 }
 
-/** ルートの子が hasError だけ（エラーの一括解除バナー・0件で隠す・要対応からの導線） */
+/** ルートの子が hasError だけ（エラーの一括解除バナー・件数の赤い丸・要対応からの導線） */
 export function isHasErrorOnly(condition: Condition): boolean {
   return isSinglePredicate(condition, "hasError");
 }

@@ -87,22 +87,19 @@ emptyLibrary("空のライブラリでは件数が0になる", async (harness) =
   });
 });
 
-contract(
-  "エラーだけを条件にするグループ分け付きの行も、隠す判定のために数える",
-  async (harness) => {
-    const created = await harness.send<SmartFolder>(
-      "POST",
-      "/api/smart-folders",
-      write(
-        "エラー別",
-        { type: "and", children: [{ type: "hasError" }] },
-        { groupBy: { kind: "tag" }, groupSort: "count-desc" },
-      ),
-    );
-    assert.equal(created.status, 201);
-    assert.equal((await counts(harness))[created.body.id], 0);
-  },
-);
+contract("グループ分け付きの行は、条件がエラーだけでも数えない", async (harness) => {
+  const created = await harness.send<SmartFolder>(
+    "POST",
+    "/api/smart-folders",
+    write(
+      "エラー別",
+      { type: "and", children: [{ type: "hasError" }] },
+      { groupBy: { kind: "tag" }, groupSort: "count-desc" },
+    ),
+  );
+  assert.equal(created.status, 201);
+  assert.ok(!(created.body.id in (await counts(harness))));
+});
 
 const patch = (harness: ContractHarness, id: string, body: unknown) =>
   harness.send<SmartFolder>("PATCH", `/api/smart-folders/${id}`, body);

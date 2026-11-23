@@ -4,7 +4,6 @@ import { z } from "zod";
 import {
   conditionSchema,
   isEmptyCondition,
-  isHasErrorOnly,
   savedConditionViolation,
   type Condition,
 } from "./condition.ts";
@@ -95,19 +94,9 @@ export function smartFolderViolation(row: SmartFolderRowFields): SmartFolderViol
 
 type CountSubject = { condition: Condition; groupBy: GroupBy | null };
 
-/** 0件のとき行を隠す候補か（条件が hasError だけ） */
-export function isHiddenWhenEmpty(condition: Condition): boolean {
-  return isHasErrorOnly(condition);
-}
-
 /** 画面に件数を出すか。条件が空のもの・グループ分けありは出さない */
 export function showsCount(folder: CountSubject): boolean {
   return !isEmptyCondition(folder.condition) && folder.groupBy === null;
-}
-
-/** 件数を数える必要があるか。表示するもの、または 0件で隠すかの判定に要るもの */
-export function needsCount(folder: CountSubject): boolean {
-  return showsCount(folder) || isHiddenWhenEmpty(folder.condition);
 }
 
 // ── 「すべて」 ───────────────────────────────────────────────

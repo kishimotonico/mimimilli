@@ -1,41 +1,10 @@
-// スマートフォルダーの不変条件（ADR-0040）。shared の検証関数と、UI が使う権限の規則を縛る。
+// スマートフォルダーの不変条件（ADR-0040）。shared の検証関数を縛る。
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { smartFolderPermissions, smartFolderViolation, type SmartFolder } from "@mimimilli/shared";
+import { smartFolderViolation } from "@mimimilli/shared";
 import { defineContract } from "./helpers/contractHarness.ts";
 
 const EMPTY = { type: "and" as const, children: [] };
-const folder = (id: string): SmartFolder => ({
-  id,
-  name: id,
-  condition: EMPTY,
-  sort: null,
-  groupBy: null,
-  groupSort: null,
-  position: 0,
-  createdAt: "2026-01-01T00:00:00.000Z",
-});
-
-test("自作は何でも変えられる", () => {
-  assert.deepEqual(smartFolderPermissions(folder("sf-00000000-0000-4000-8000-000000000001")), {
-    rename: true,
-    editCondition: true,
-    editGroupBy: true,
-    inheritSort: true,
-    remove: true,
-  });
-});
-
-test("「すべて」は名前・条件・グループ分け・削除ができず、並びを継承にもできない", () => {
-  assert.deepEqual(smartFolderPermissions(folder("all")), {
-    rename: false,
-    editCondition: false,
-    editGroupBy: false,
-    inheritSort: false,
-    remove: false,
-  });
-});
-
 test("行の検証: グループ分けと値の並びは、どちらも持つか、どちらも持たない", () => {
   const row = {
     id: "sf-x",

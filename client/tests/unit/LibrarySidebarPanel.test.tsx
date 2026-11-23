@@ -50,7 +50,6 @@ function renderSidebar(
           folders={{ status: "ready", folders: defaultSmartFolders() }}
           activeFolderId="all"
           activeGroup={null}
-          dataIntegrity={{ status: "ready", count: 0 }}
           tagPrefixes={PREFIXES}
           onOpenFolder={vi.fn()}
           onReplaceFolder={vi.fn()}
@@ -105,7 +104,7 @@ describe("LibrarySidebarPanel", () => {
     expect(screen.getByRole("button", { name: "CV別" })).toBeInTheDocument();
   });
 
-  it("エラー以外の0件の行は隠さない", () => {
+  it("エラー以外の0件の行は件数の0を出す", () => {
     renderSidebar({});
 
     expect(screen.getByRole("button", { name: "最近追加 0" })).toBeInTheDocument();
@@ -120,7 +119,7 @@ describe("LibrarySidebarPanel", () => {
   });
 
   it("エラーの行の件数は赤い丸で出す", () => {
-    renderSidebar({});
+    renderSidebar({ counts: { error: 2, fav: 5 } });
 
     const errorRow = screen.getByRole("button", { name: /^エラー/ });
     expect(errorRow.querySelector(".ct")).toHaveClass("is-error");
@@ -129,29 +128,10 @@ describe("LibrarySidebarPanel", () => {
     ).not.toHaveClass("is-error");
   });
 
-  it("エラーの行は、作品数が0でもデータ不整合が残っていれば出し続ける", () => {
-    renderSidebar({
-      counts: { recent: 7, error: 0 },
-      dataIntegrity: { status: "ready", count: 3 },
-    });
+  it("エラーの行は0件でも出し続け、赤い丸は出さない", () => {
+    renderSidebar({ counts: { error: 0 } });
 
-    expect(screen.getByRole("button", { name: /^エラー/ })).toBeInTheDocument();
-  });
-
-  it("エラーの行は、作品数もデータ不整合も0なら隠す。ただし開いている間は残す", () => {
-    const counts = { error: 0 };
-    const { unmount } = renderSidebar({ counts });
-    expect(screen.queryByRole("button", { name: /^エラー/ })).toBeNull();
-    unmount();
-
-    renderSidebar({ counts, activeFolderId: "error" });
-    expect(screen.getByRole("button", { name: /^エラー/ })).toBeInTheDocument();
-  });
-
-  it("データ不整合の件数が取得中・取得失敗のあいだは、エラーの行を0件として隠さない", () => {
-    renderSidebar({ counts: { error: 0 }, dataIntegrity: { status: "unknown" } });
-
-    expect(screen.getByRole("button", { name: /^エラー/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "エラー" }).querySelector(".ct")).toBeNull();
   });
 
   it("一覧の取得に失敗したときは再試行を出す", async () => {

@@ -6,7 +6,6 @@ import {
   buildEffectiveCondition,
   normalizeSearchQuery,
   parseTag,
-  smartFolderPermissions,
   splitSelectedTags,
   type SmartFolder,
   type SmartFolderPatch,
@@ -17,9 +16,9 @@ import { type SmartFolderDialogTarget, type SmartFolderDraft } from "./smartFold
 
 export type SaveOffer = "save" | "overwrite";
 
-/** 上書きの対象にできる自作のスマートフォルダー（条件を変えられ、グループ分けを持たない） */
+/** 上書きの対象にできるスマートフォルダー（条件を変えられる「すべて」以外で、グループ分けを持たない） */
 export function isOverwritable(view: WorksView): boolean {
-  return view.groupBy === null && smartFolderPermissions(view.folder).editCondition;
+  return view.groupBy === null && view.folder.id !== ALL_SMART_FOLDER_ID;
 }
 
 /** グループの値・チップ・検索語のどれかで絞り込んでいる */

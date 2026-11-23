@@ -134,17 +134,28 @@ describe("追加・複製", () => {
   });
 });
 
-describe("buildSidebarRows の編集の状態", () => {
+describe("buildSidebarRows", () => {
   const folders: SmartFolder[] = defaultSmartFolders();
-  const counts = { error: 0 };
-  const integrity = { status: "ready", count: 0 } as const;
 
-  it("通常は0件のエラーを隠し、編集の状態では薄く見せる", () => {
-    expect(buildSidebarRows(folders, counts, "all", integrity).some((r) => r.id === "error")).toBe(
-      false,
-    );
-    const rows = buildSidebarRows(folders, counts, "all", integrity, true);
-    expect(rows.find((r) => r.id === "error")?.dimmed).toBe(true);
+  it("0件のエラーも行を残し、件数の赤い丸は出さない。ほかの行の0は出す", () => {
+    const rows = buildSidebarRows(folders, { error: 0, fav: 0, recent: 3 });
     expect(rows).toHaveLength(folders.length);
+    const error = rows.find((r) => r.id === "error")!;
+    expect(error.count).toBeNull();
+    expect(error.countTone).toBe("error");
+    expect(rows.find((r) => r.id === "fav")?.count).toBe(0);
+    expect(rows.find((r) => r.id === "recent")?.count).toBe(3);
+  });
+
+  it("エラーが1件以上なら赤い丸で件数を出す", () => {
+    const error = buildSidebarRows(folders, { error: 2 }).find((r) => r.id === "error")!;
+    expect(error.count).toBe(2);
+    expect(error.countTone).toBe("error");
+  });
+
+  it("条件が空・グループ分けありの行は件数を出さない", () => {
+    const rows = buildSidebarRows(folders, { all: 9, "by-cv": 9 });
+    expect(rows.find((r) => r.id === "all")?.count).toBeNull();
+    expect(rows.find((r) => r.id === "by-cv")?.count).toBeNull();
   });
 });

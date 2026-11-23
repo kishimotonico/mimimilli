@@ -178,19 +178,40 @@ test("編集のダイアログ: 自作の条件を × で外すと件数が変�
   assertNoErrors(tracker);
 });
 
-test("既定・「すべて」の編集権限と削除", async ({ page }) => {
+test("既定のスマートフォルダーの条件とグループ分けを変えて保存でき、アイコンが形に合う", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+  await startEditing(page);
+  await folderRow(page, "fav")
+    .getByRole("button", { name: /を編集$/ })
+    .click();
+  await dialog(page).getByRole("button", { name: "この条件を外す" }).click();
+  await dialog(page).getByLabel("グループ分け").selectOption("tag");
+  await dialog(page).getByRole("button", { name: "保存" }).click();
+  await expect(dialog(page)).toHaveCount(0);
+  await rail(page).getByRole("button", { name: "完了" }).click();
+  await expect(rail(page).getByRole("button", { name: /^お気に入り/ })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  assertNoErrors(tracker);
+});
+
+test("「すべて」だけ編集が限られ、既定は自作と同じに編集できる", async ({ page }) => {
   const tracker = trackErrors(page);
   await openApp(page);
   await startEditing(page);
 
-  // 既定のもの: 条件は読み取り専用、グループ分けは変えられない
+  // 既定のもの: 自作と同じく条件もグループ分けも変えられる
   await folderRow(page, "fav")
     .getByRole("button", { name: /を編集$/ })
     .click();
   await expect(dialog(page).locator(".mll-condrow")).toHaveCount(1);
-  await expect(dialog(page).getByRole("button", { name: "この条件を外す" })).toHaveCount(0);
+  await expect(dialog(page).getByRole("button", { name: "この条件を外す" })).toBeEnabled();
   await expect(dialog(page).getByLabel("名前")).toBeEnabled();
-  await expect(dialog(page).getByLabel("グループ分け")).toBeDisabled();
+  await expect(dialog(page).getByLabel("グループ分け")).toBeEnabled();
   await dialog(page).getByRole("button", { name: "キャンセル" }).click();
 
   // 「すべて」: 名前・グループ分けは変えられず、削除もできない。並びは「すべて」と同じを選べない

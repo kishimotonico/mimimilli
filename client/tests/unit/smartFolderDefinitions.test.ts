@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { GroupBy, TagPrefix } from "@mimimilli/shared";
+import type { Condition, GroupBy, SortId, TagPrefix } from "@mimimilli/shared";
 import {
   buildGroupByRows,
   getGroupByIcon,
@@ -33,19 +33,34 @@ describe("smartFolderDefinitions", () => {
     expect(rows.at(-1)).toEqual({ groupBy: { kind: "addedYear" }, name: "追加年" });
   });
 
-  it("getSmartFolderIcon は条件のフォルダーを ID から、グループ分けのフォルダーをグループ分けから引き、未知の ID は既定のアイコン", () => {
-    const folder = (id: string, groupBy: GroupBy | null = null) => ({ id, groupBy });
-    expect(getSmartFolderIcon(folder("fav"))).toBe("star");
-    expect(getSmartFolderIcon(folder("error"))).toBe("err");
-    expect(getSmartFolderIcon(folder("random"))).toBe("shuffle");
-    expect(getSmartFolderIcon(folder("sf-unknown"))).toBe("funnel");
-    expect(getSmartFolderIcon(folder("by-circle", { kind: "prefix", prefix: "サークル" }))).toBe(
-      "house",
+  it("getSmartFolderIcon はグループ分けから、ないものは条件の形から引く。ID は見ない", () => {
+    const and = (...children: Condition[]): Condition => ({ type: "and", children });
+    const folder = (
+      condition: Condition,
+      options: { sort?: SortId | null; groupBy?: GroupBy | null } = {},
+    ) => ({ condition, sort: options.sort ?? null, groupBy: options.groupBy ?? null });
+    expect(getSmartFolderIcon(folder(and({ type: "bookmarked" })))).toBe("star");
+    expect(getSmartFolderIcon(folder(and({ type: "hasError" })))).toBe("err");
+    expect(getSmartFolderIcon(folder(and({ type: "played" })))).toBe("clock");
+    expect(getSmartFolderIcon(folder(and({ type: "added", withinDays: 30 })))).toBe("add");
+    expect(getSmartFolderIcon(folder(and({ type: "bookmarked" }, { type: "hasError" })))).toBe(
+      "funnel",
     );
-    expect(getSmartFolderIcon(folder("sf-user", { kind: "prefix", prefix: "気分" }))).toBe(
-      "folder",
+    expect(getSmartFolderIcon(folder(and()))).toBe("grid");
+    expect(getSmartFolderIcon(folder(and(), { sort: "added-desc" }))).toBe("grid");
+    expect(getSmartFolderIcon(folder(and(), { sort: "random" }))).toBe("shuffle");
+    expect(getSmartFolderIcon(folder(and({ type: "bookmarked" }), { sort: "random" }))).toBe(
+      "star",
     );
-    expect(getSmartFolderIcon(folder("by-year", { kind: "addedYear" }))).toBe("calendar");
+    expect(
+      getSmartFolderIcon(folder(and(), { groupBy: { kind: "prefix", prefix: "サークル" } })),
+    ).toBe("house");
+    expect(
+      getSmartFolderIcon(
+        folder(and({ type: "bookmarked" }), { groupBy: { kind: "prefix", prefix: "気分" } }),
+      ),
+    ).toBe("folder");
+    expect(getSmartFolderIcon(folder(and(), { groupBy: { kind: "addedYear" } }))).toBe("calendar");
   });
 
   it("値一覧の既定アイコンはサイドバーの行と同じ表から引く", () => {

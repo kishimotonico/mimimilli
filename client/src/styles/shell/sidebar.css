@@ -133,9 +133,6 @@
 .mll-sbrow.is-editing:hover {
   background: var(--paper-2);
 }
-.mll-sbrow.is-dimmed {
-  opacity: 0.5;
-}
 .mll-sbrow.is-dragging {
   opacity: 0.35;
 }
