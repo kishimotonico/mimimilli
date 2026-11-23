@@ -4,12 +4,16 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createStore, Provider } from "jotai";
 import { describe, expect, it, vi } from "vitest";
 import { libraryRouteAtom } from "../../src/entities/library/model/navigationAtoms";
-import { appRouteAtom } from "../../src/entities/navigation/model/appRouteStore";
+import {
+  appRouteAtom,
+  openNowPlayingLayerAtom,
+} from "../../src/entities/navigation/model/appRouteStore";
 import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
 import { useSmartFolderEditor } from "../../src/features/library/model/useSmartFolderEditor";
 import { toastRequestsAtom } from "../../src/shared/model/toastRequestsAtom";
 import { apiError, apiNoContent, mockApi } from "../helpers/api";
-import { clearPendingOps, pendingWrites, seedAppMode, seedLibraryRoute } from "../helpers/route";
+import { clearPendingOps, pendingWrites, seedLibraryRoute } from "../helpers/route";
+import { nts } from "../helpers/tag";
 import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
 
 const USER_ID = "sf-00000000-0000-4000-8000-000000000001";
@@ -75,29 +79,236 @@ describe("作成・既定から追加", () => {
     ).toHaveLength(1);
   });
 
-  it("失敗はサーバーの文言でトーストに出し、一覧を取り直す", async () => {
+  it("既定から追加はテンプレートの固定 ID と定義を POST し、位置は送らない", async () => {
+    const api = mockApi({ "POST /api/smart-folders": () => ({ ...userFolder, id: "fav" }) });
+    const editor = setup();
+
+    await editor.addFromTemplate("fav");
+
+    const [request] = api.requestsTo("POST /api/smart-folders");
+    expect(request?.body).toMatchObject({ id: "fav", name: "お気に入り" });
+    expect(request?.body).not.toHaveProperty("position");
+  });
+
+  it("既定から追加の失敗（409）は、ID の入ったサーバーの文言でなく行の名前と動詞でトーストに出し、一覧を取り直す", async () => {
     mockApi({
-      "POST /api/smart-folders/from-template": () =>
-        apiError(409, "conflict", "すでにあるスマートフォルダーです: fav"),
+      "POST /api/smart-folders": () => apiError(409, "conflict", "すでにあります: fav"),
     });
     const editor = setup();
 
     expect(await editor.addFromTemplate("fav")).toBeNull();
 
     expect(toasts()[0]).toMatchObject({
-      message: "すでにあるスマートフォルダーです: fav",
+      message: "「お気に入り」を追加できませんでした",
       variant: "error",
     });
     expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
   });
 });
 
-describe("更新", () => {
-  it("保存できたら一覧のあと、そのフォルダーの作品と値の一覧だけ取り直す", async () => {
-    mockApi({ "PUT /api/smart-folders/:id": () => ({ ...userFolder }) });
+describe("同じ ID の作り直し", () => {
+  const listKeys = [
+    SMART_FOLDER_QUERY_KEYS.works("fav", { sort: "added-desc" }),
+    SMART_FOLDER_QUERY_KEYS.groups("fav", "tag", {}),
+  ];
+  const seed = () => {
+    for (const key of listKeys) queryClient.setQueryData(key, []);
+  };
+  const cached = () => listKeys.map((key) => queryClient.getQueryState(key) !== undefined);
+
+  it("既定から追加すると、同じ ID の作品・値の一覧のキャッシュを捨てる（前の作品を再取得の間も見せない）", async () => {
+    mockApi({ "POST /api/smart-folders": () => ({ ...userFolder, id: "fav" }) });
+    const editor = setup();
+    seed();
+    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.works("sf-other", {}), []);
+
+    await editor.addFromTemplate("fav");
+
+    expect(cached()).toEqual([false, false]);
+    expect(queryClient.getQueryState(SMART_FOLDER_QUERY_KEYS.works("sf-other", {}))).toBeDefined();
+  });
+
+  it("行を開く前にキャッシュを捨てる", async () => {
+    mockApi({ "POST /api/smart-folders": () => ({ ...userFolder, id: "fav" }) });
+    const editor = setup();
+    seed();
+    seedLibraryRoute(store, { folderId: "all" });
+    let cachedWhenOpened: boolean[] = [];
+    store.sub(libraryRouteAtom, () => {
+      if (store.get(libraryRouteAtom).folderId === "fav") cachedWhenOpened = cached();
+    });
+
+    await editor.addFromTemplate("fav");
+
+    expect(cachedWhenOpened).toEqual([false, false]);
+  });
+
+  it("元に戻すと、同じ ID の作品・値の一覧のキャッシュを捨てる", async () => {
+    mockApi({
+      "DELETE /api/smart-folders/:id": apiNoContent(),
+      "POST /api/smart-folders": () => ({ ...userFolder, id: "fav" }),
+    });
+    const editor = setup();
+    await editor.remove({ ...userFolder, id: "fav" });
+    seed();
+
+    toasts()[0]!.onAction!();
+    await vi.waitFor(() => expect(cached()).toEqual([false, false]));
+  });
+});
+
+describe("失敗トーストの文言", () => {
+  it("作成は行の名前と動詞で出す。サーバーに届かない失敗でも同じ", async () => {
+    mockApi({ "POST /api/smart-folders": () => Promise.reject(new TypeError("network")) });
     const editor = setup();
 
-    expect(await editor.update(USER_ID, write)).toBe(true);
+    expect(await editor.create(write)).toBeNull();
+
+    expect(toasts()[0]).toMatchObject({ message: "「自作」を作れませんでした", variant: "error" });
+  });
+
+  it("400 の検証エラーはサーバーの文言をそのまま出す", async () => {
+    mockApi({
+      "POST /api/smart-folders": () => apiError(400, "invalid_request", "名前を入力してください"),
+    });
+    const editor = setup();
+
+    await editor.create(write);
+
+    expect(toasts()[0]).toMatchObject({ message: "名前を入力してください" });
+  });
+
+  it("ルートの再設定中（409 root_reconfiguring）はサーバーの文言をそのまま出す", async () => {
+    mockApi({
+      "DELETE /api/smart-folders/:id": () =>
+        apiError(
+          409,
+          "root_reconfiguring",
+          "ルートフォルダーの再設定中のため、この操作はできません",
+        ),
+    });
+    const editor = setup();
+
+    await editor.remove(userFolder);
+
+    expect(toasts()[0]).toMatchObject({
+      message: "ルートフォルダーの再設定中のため、この操作はできません",
+    });
+  });
+
+  it("保存は一覧から引いた行の名前で、引けなければ名前なしで出す", async () => {
+    mockApi({ "PATCH /api/smart-folders/:id": () => apiError(404, "not_found", "見つかりません") });
+    const editor = setup();
+
+    await editor.patch(USER_ID, { sort: "random" });
+    expect(toasts()[0]).toMatchObject({ message: "保存できませんでした" });
+
+    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), [...defaultSmartFolders(), userFolder]);
+    await editor.patch(USER_ID, { sort: "random" });
+    expect(toasts().map((toast) => toast.message)).toContain("「自作」を保存できませんでした");
+  });
+
+  it("削除は行の名前と動詞で出す", async () => {
+    mockApi({ "DELETE /api/smart-folders/:id": () => apiError(409, "conflict", "競合: sf-1") });
+    const editor = setup();
+
+    await editor.remove(userFolder);
+
+    expect(toasts()[0]).toMatchObject({ message: "「自作」を削除できませんでした" });
+  });
+});
+
+describe("保存のあとの行き先（保存を始めたときの route から動いていなければ移る）", () => {
+  it("作成は新しいスマートフォルダーを絞り込みなしで開き、履歴を積む", async () => {
+    mockApi({ "POST /api/smart-folders": () => ({ ...userFolder }) });
+    const editor = setup();
+    seedLibraryRoute(store, { folderId: "all", selectedTags: nts(["ASMR"]), q: "雨" });
+    clearPendingOps(store);
+
+    await editor.create(write);
+
+    expect(store.get(libraryRouteAtom)).toMatchObject({
+      folderId: USER_ID,
+      selectedTags: [],
+      q: "",
+    });
+    expect(pendingWrites(store)).toEqual(["push"]);
+  });
+
+  it("作成の完了を待つ間に route が動いていたら、移らずユーザーの状態を保つ", async () => {
+    let release!: () => void;
+    mockApi({
+      "POST /api/smart-folders": async () => {
+        await new Promise<void>((resolve) => (release = resolve));
+        return { ...userFolder };
+      },
+    });
+    const editor = setup();
+    seedLibraryRoute(store, { folderId: "all", q: "雨" });
+    const pending = editor.create(write);
+    await vi.waitFor(() => expect(release).toBeTypeOf("function"));
+    seedLibraryRoute(store, { q: "雨宿り" });
+    clearPendingOps(store);
+
+    release();
+    expect(await pending).toEqual(userFolder);
+
+    expect(store.get(libraryRouteAtom)).toMatchObject({ folderId: "all", q: "雨宿り" });
+    expect(pendingWrites(store)).toEqual([]);
+  });
+
+  it("上書き（reenter）は同じスマートフォルダーへ置き換えで入り直し、取り消しは動かさない", async () => {
+    mockApi({ "PATCH /api/smart-folders/:id": () => ({ ...userFolder }) });
+    const editor = setup();
+    seedLibraryRoute(store, { folderId: USER_ID, selectedTags: nts(["ASMR"]), sort: "title-desc" });
+    clearPendingOps(store);
+
+    await editor.patch(USER_ID, { condition: write.condition }, { reenter: true });
+
+    expect(store.get(libraryRouteAtom)).toMatchObject({
+      folderId: USER_ID,
+      selectedTags: [],
+      sort: null,
+    });
+    expect(pendingWrites(store)).toEqual(["replace"]);
+
+    seedLibraryRoute(store, { selectedTags: nts(["ASMR"]) });
+    clearPendingOps(store);
+    await editor.patch(USER_ID, { condition: write.condition });
+    expect(store.get(libraryRouteAtom).selectedTags).toEqual(["ASMR"]);
+    expect(pendingWrites(store)).toEqual([]);
+  });
+
+  it("上書きの完了を待つ間に層を開いていたら、移らず層を保つ", async () => {
+    let release!: () => void;
+    mockApi({
+      "PATCH /api/smart-folders/:id": async () => {
+        await new Promise<void>((resolve) => (release = resolve));
+        return { ...userFolder };
+      },
+    });
+    const editor = setup();
+    seedLibraryRoute(store, { folderId: USER_ID, selectedTags: nts(["ASMR"]) });
+    const pending = editor.patch(USER_ID, { condition: write.condition }, { reenter: true });
+    await vi.waitFor(() => expect(release).toBeTypeOf("function"));
+    store.set(openNowPlayingLayerAtom);
+    clearPendingOps(store);
+
+    release();
+    await pending;
+
+    expect(store.get(appRouteAtom)).toMatchObject({ layer: { kind: "nowPlaying" } });
+    expect(store.get(libraryRouteAtom).selectedTags).toEqual(["ASMR"]);
+    expect(pendingWrites(store)).toEqual([]);
+  });
+});
+
+describe("定義の更新（全項目）", () => {
+  it("保存できたら一覧のあと、そのフォルダーの作品と値の一覧だけ取り直す", async () => {
+    mockApi({ "PATCH /api/smart-folders/:id": () => ({ ...userFolder }) });
+    const editor = setup();
+
+    expect(await editor.patch(USER_ID, write)).toBe(true);
 
     expect(invalidated).toEqual([
       SMART_FOLDER_QUERY_KEYS.all(),
@@ -107,7 +318,7 @@ describe("更新", () => {
   });
 
   it("無効化されるのは保存したフォルダーの作品・値の一覧だけで、ほかのフォルダーの一覧は残る", async () => {
-    mockApi({ "PUT /api/smart-folders/:id": () => ({ ...userFolder }) });
+    mockApi({ "PATCH /api/smart-folders/:id": () => ({ ...userFolder }) });
     const editor = setup();
     const own = [
       SMART_FOLDER_QUERY_KEYS.works(USER_ID, { sort: "added-desc" }),
@@ -119,7 +330,7 @@ describe("更新", () => {
     ];
     for (const key of [...own, ...other]) queryClient.setQueryData(key, []);
 
-    await editor.update(USER_ID, write);
+    await editor.patch(USER_ID, write);
 
     for (const key of own) expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
     for (const key of other) expect(queryClient.getQueryState(key)?.isInvalidated).toBe(false);
@@ -127,39 +338,59 @@ describe("更新", () => {
 
   it("404 でもトーストを出して一覧を取り直す。作品・値の一覧は取り直さない", async () => {
     mockApi({
-      "PUT /api/smart-folders/:id": () =>
-        apiError(404, "not_found", "スマートフォルダーが見つかりません"),
+      "PATCH /api/smart-folders/:id": () => apiError(404, "not_found", "見つかりません: sf-1"),
     });
     const editor = setup();
 
-    expect(await editor.update(USER_ID, write, "元に戻せませんでした")).toBe(false);
+    expect(await editor.patch(USER_ID, write, { failureMessage: "元に戻せませんでした" })).toBe(
+      false,
+    );
 
     expect(toasts()[0]).toMatchObject({
-      message: "スマートフォルダーが見つかりません",
+      message: "元に戻せませんでした",
       variant: "error",
     });
     expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
   });
 });
 
-describe("既定の並びの保存", () => {
+describe("既定のソートの保存", () => {
   it("並びだけを送り、一覧だけを取り直す", async () => {
-    const api = mockApi({ "PUT /api/smart-folders/:id/sort": () => ({ ...userFolder }) });
+    const api = mockApi({ "PATCH /api/smart-folders/:id": () => ({ ...userFolder }) });
     const editor = setup();
 
-    expect(await editor.saveDefaultSort(USER_ID, "random")).toBe(true);
+    expect(await editor.patch(USER_ID, { sort: "random" })).toBe(true);
 
-    expect(api.requestsTo("PUT /api/smart-folders/:id/sort")[0]!.body).toEqual({ sort: "random" });
+    expect(api.requestsTo("PATCH /api/smart-folders/:id")[0]!.body).toEqual({ sort: "random" });
     expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
   });
 
-  it("値の並びの保存は group-sort へ送り、一覧だけを取り直す", async () => {
-    const api = mockApi({ "PUT /api/smart-folders/:id/group-sort": () => ({ ...userFolder }) });
+  it("今の並びは外さず、応答の行を一覧のキャッシュへすぐ反映する（保存した並びと同じになるので「既定にする」は消える）", async () => {
+    mockApi({ "PATCH /api/smart-folders/:id": () => ({ ...userFolder, sort: "random" }) });
+    const editor = setup();
+    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), [...defaultSmartFolders(), userFolder]);
+    seedLibraryRoute(store, { folderId: USER_ID, sort: "random" });
+    clearPendingOps(store);
+    vi.spyOn(queryClient, "invalidateQueries").mockImplementation(async () => {});
+
+    await editor.patch(USER_ID, { sort: "random" });
+
+    expect(
+      queryClient
+        .getQueryData<(typeof userFolder)[]>(SMART_FOLDER_QUERY_KEYS.all())
+        ?.find((folder) => folder.id === USER_ID)?.sort,
+    ).toBe("random");
+    expect(store.get(libraryRouteAtom).sort).toBe("random");
+    expect(pendingWrites(store)).toEqual([]);
+  });
+
+  it("値一覧のソートの保存は groupSort だけを PATCH し、一覧だけを取り直す", async () => {
+    const api = mockApi({ "PATCH /api/smart-folders/:id": () => ({ ...userFolder }) });
     const editor = setup();
 
-    expect(await editor.saveDefaultGroupSort(USER_ID, "last-played")).toBe(true);
+    expect(await editor.patch(USER_ID, { groupSort: "last-played" })).toBe(true);
 
-    expect(api.requestsTo("PUT /api/smart-folders/:id/group-sort")[0]!.body).toEqual({
+    expect(api.requestsTo("PATCH /api/smart-folders/:id")[0]!.body).toEqual({
       groupSort: "last-played",
     });
     expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
@@ -167,26 +398,26 @@ describe("既定の並びの保存", () => {
 
   it("409 でもトーストを出して一覧を取り直す", async () => {
     mockApi({
-      "PUT /api/smart-folders/:id/sort": () => apiError(409, "conflict", "競合しました"),
+      "PATCH /api/smart-folders/:id": () => apiError(409, "conflict", "競合しました"),
     });
     const editor = setup();
 
-    expect(await editor.saveDefaultSort(USER_ID, "random")).toBe(false);
+    expect(await editor.patch(USER_ID, { sort: "random" })).toBe(false);
 
-    expect(toasts()[0]).toMatchObject({ message: "競合しました", variant: "error" });
+    expect(toasts()[0]).toMatchObject({ message: "保存できませんでした", variant: "error" });
     expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
   });
 });
 
-describe("条件だけの更新（検索の上書き）", () => {
+describe("条件だけの更新（検索の上書き・取り消し）", () => {
   it("条件と指定した項目だけを condition へ送り、そのフォルダーの作品・値の一覧を取り直す", async () => {
-    const api = mockApi({ "PUT /api/smart-folders/:id/condition": () => ({ ...userFolder }) });
+    const api = mockApi({ "PATCH /api/smart-folders/:id": () => ({ ...userFolder }) });
     const editor = setup();
     const change = { condition: write.condition, sort: "title-desc" as const };
 
-    expect(await editor.overwriteCondition(USER_ID, change)).toBe(true);
+    expect(await editor.patch(USER_ID, change)).toBe(true);
 
-    expect(api.requestsTo("PUT /api/smart-folders/:id/condition")[0]!.body).toEqual(change);
+    expect(api.requestsTo("PATCH /api/smart-folders/:id")[0]!.body).toEqual(change);
     expect(invalidated).toEqual([
       SMART_FOLDER_QUERY_KEYS.all(),
       SMART_FOLDER_QUERY_KEYS.folderWorks(USER_ID),
@@ -199,12 +430,12 @@ describe("条件だけの更新（検索の上書き）", () => {
       ...userFolder,
       condition: { type: "and" as const, children: [{ type: "bookmarked" as const }] },
     };
-    mockApi({ "PUT /api/smart-folders/:id/condition": () => overwritten });
+    mockApi({ "PATCH /api/smart-folders/:id": () => overwritten });
     const editor = setup();
     queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), [...defaultSmartFolders(), userFolder]);
     vi.spyOn(queryClient, "invalidateQueries").mockImplementation(async () => {});
 
-    await editor.overwriteCondition(USER_ID, { condition: overwritten.condition });
+    await editor.patch(USER_ID, { condition: overwritten.condition });
 
     expect(
       queryClient
@@ -215,13 +446,13 @@ describe("条件だけの更新（検索の上書き）", () => {
 
   it("失敗はトーストに出して一覧を取り直す", async () => {
     mockApi({
-      "PUT /api/smart-folders/:id/condition": () => apiError(404, "not_found", "見つかりません"),
+      "PATCH /api/smart-folders/:id": () => apiError(404, "not_found", "見つかりません"),
     });
     const editor = setup();
 
-    expect(await editor.overwriteCondition(USER_ID, { condition: write.condition })).toBe(false);
+    expect(await editor.patch(USER_ID, { condition: write.condition })).toBe(false);
 
-    expect(toasts()[0]).toMatchObject({ message: "見つかりません", variant: "error" });
+    expect(toasts()[0]).toMatchObject({ message: "保存できませんでした", variant: "error" });
     expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
   });
 });
@@ -230,12 +461,12 @@ describe("更新とグループ分けの変更", () => {
   const grouped = { ...userFolder, groupBy: { kind: "tag" as const } };
 
   async function updateWith(next: typeof grouped | typeof userFolder, route: string | null) {
-    mockApi({ "PUT /api/smart-folders/:id": () => ({ ...next }) });
+    mockApi({ "PATCH /api/smart-folders/:id": () => ({ ...next }) });
     const editor = setup();
     queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), [grouped]);
     if (route) seedLibraryRoute(store, { folderId: route, group: "cv/x" });
     clearPendingOps(store);
-    await editor.update(USER_ID, { ...write, groupBy: next.groupBy });
+    await editor.patch(USER_ID, { ...write, groupBy: next.groupBy });
   }
 
   it("開いている一覧のグループ分けを変えたら、履歴を積まずに入り直して ?group= を外す", async () => {
@@ -243,6 +474,37 @@ describe("更新とグループ分けの変更", () => {
 
     expect(store.get(libraryRouteAtom)).toMatchObject({ folderId: USER_ID, group: null });
     expect(pendingWrites(store)).toEqual(["replace"]);
+  });
+
+  it("group と groupSort だけを外し、チップ・検索語・並びは残す。キャッシュへ反映する前に外す", async () => {
+    mockApi({ "PATCH /api/smart-folders/:id": () => ({ ...userFolder }) });
+    const editor = setup();
+    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), [grouped]);
+    seedLibraryRoute(store, {
+      folderId: USER_ID,
+      group: "cv/x",
+      groupSort: "name-asc",
+      selectedTags: nts(["ASMR"]),
+      q: "雨",
+      sort: "title-asc",
+    });
+    const groupWhenCached: Array<string | null> = [];
+    queryClient.getQueryCache().subscribe((event) => {
+      if (event.type === "updated" && event.action.type === "success") {
+        groupWhenCached.push(store.get(libraryRouteAtom).group);
+      }
+    });
+
+    await editor.patch(USER_ID, { ...write, groupBy: null });
+
+    expect(groupWhenCached[0]).toBeNull();
+    expect(store.get(libraryRouteAtom)).toMatchObject({
+      group: null,
+      groupSort: null,
+      selectedTags: ["ASMR"],
+      q: "雨",
+      sort: "title-asc",
+    });
   });
 
   it("グループ分けが同じなら route は動かさない", async () => {
@@ -276,6 +538,23 @@ describe("並べ替え", () => {
     expect(invalidated).toEqual([]);
   });
 
+  it("並べ替えは取得中の件数を取り消さない", async () => {
+    mockApi({ "PUT /api/smart-folders/order": () => defaultSmartFolders().reverse() });
+    const editor = setup();
+    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), defaultSmartFolders());
+    let resolveCounts!: (counts: Record<string, number>) => void;
+    const fetching = queryClient.prefetchQuery({
+      queryKey: SMART_FOLDER_QUERY_KEYS.counts(),
+      queryFn: () => new Promise<Record<string, number>>((resolve) => (resolveCounts = resolve)),
+    });
+
+    await editor.reorder(reversed);
+    resolveCounts({ recent: 3 });
+    await fetching;
+
+    expect(queryClient.getQueryData(SMART_FOLDER_QUERY_KEYS.counts())).toEqual({ recent: 3 });
+  });
+
   it("失敗したら一覧を取り直して戻し、トーストを出す", async () => {
     mockApi({
       "PUT /api/smart-folders/order": () => apiError(400, "invalid_request", "過不足があります"),
@@ -290,106 +569,29 @@ describe("並べ替え", () => {
   });
 });
 
-describe("並べ替えの直列化", () => {
-  it("連続した並べ替えは1本ずつ送り、待つ間は最新の順だけを送って最新の順が残る", async () => {
-    const base = defaultSmartFolders();
-    const orders = [
-      base.map((f) => f.id).reverse(),
-      base.map((f) => f.id).sort(),
-      base.map((f) => f.id),
-    ];
-    const releases: Array<() => void> = [];
-    const sent: string[][] = [];
-    mockApi({
-      "PUT /api/smart-folders/order": async ({ body }) => {
-        const ids = (body as { ids: string[] }).ids;
-        sent.push(ids);
-        await new Promise<void>((resolve) => releases.push(resolve));
-        const byId = new Map(base.map((f) => [f.id, f]));
-        return ids.map((id, position) => ({ ...byId.get(id)!, position }));
-      },
-    });
-    const editor = setup();
-    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), base);
-
-    const first = editor.reorder(orders[0]!);
-    await vi.waitFor(() => expect(sent).toHaveLength(1));
-    const second = editor.reorder(orders[1]!);
-    const third = editor.reorder(orders[2]!);
-    await Promise.all([second, third]);
-    expect(sent).toHaveLength(1);
-
-    releases[0]!();
-    await vi.waitFor(() => expect(sent).toHaveLength(2));
-    expect(sent[1]).toEqual(orders[2]);
-    releases[1]!();
-    await first;
-
-    const final = queryClient.getQueryData<{ id: string }[]>(SMART_FOLDER_QUERY_KEYS.all());
-    expect(final?.map((f) => f.id)).toEqual(orders[2]);
-  });
-});
-
-describe("並べ替えの直列化: 再マウント", () => {
-  it("フックを作り直しても、送信中の保存があれば待ってから最新の順だけを送る", async () => {
-    const base = defaultSmartFolders();
-    const ids = base.map((f) => f.id);
-    const releases: Array<() => void> = [];
-    const sent: string[][] = [];
-    mockApi({
-      "PUT /api/smart-folders/order": async ({ body }) => {
-        sent.push((body as { ids: string[] }).ids);
-        await new Promise<void>((resolve) => releases.push(resolve));
-        return base;
-      },
-    });
-    const first = setup();
-    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), base);
-    const inFlight = first.reorder([...ids].reverse());
-    await vi.waitFor(() => expect(sent).toHaveLength(1));
-
-    const remounted = setup();
-    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), base);
-    await remounted.reorder(ids);
-    expect(sent).toHaveLength(1);
-
-    releases[0]!();
-    await vi.waitFor(() => expect(sent).toHaveLength(2));
-    expect(sent[1]).toEqual(ids);
-    releases[1]!();
-    await inFlight;
-  });
-});
-
 describe("削除", () => {
-  it("開いているスマートフォルダーを消したら、履歴を積まずに「すべて」へ移り、元に戻すを出す", async () => {
+  it("消したら一覧のキャッシュから外して「元に戻す」を出す。route の退避は補正に任せ、ここでは動かさない", async () => {
     mockApi({ "DELETE /api/smart-folders/:id": apiNoContent() });
     const editor = setup();
+    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), [...defaultSmartFolders(), userFolder]);
     seedLibraryRoute(store, { folderId: USER_ID, q: "x" });
     clearPendingOps(store);
+    vi.spyOn(queryClient, "invalidateQueries").mockImplementation(async () => {});
 
     await editor.remove(userFolder);
 
-    expect(store.get(libraryRouteAtom)).toMatchObject({ folderId: "all", q: "" });
-    expect(pendingWrites(store)).toEqual(["replace"]);
+    expect(
+      queryClient
+        .getQueryData<{ id: string }[]>(SMART_FOLDER_QUERY_KEYS.all())
+        ?.some((folder) => folder.id === USER_ID),
+    ).toBe(false);
+    expect(store.get(libraryRouteAtom)).toMatchObject({ folderId: USER_ID, q: "x" });
+    expect(pendingWrites(store)).toEqual([]);
     expect(toasts()[0]).toMatchObject({
       message: "「自作」を削除しました",
       variant: "success",
       actionLabel: "元に戻す",
     });
-    expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
-  });
-
-  it("作品詳細で保持しているスマートフォルダーを消しても、画面を保ったまま「すべて」へ置き換える", async () => {
-    mockApi({ "DELETE /api/smart-folders/:id": apiNoContent() });
-    const editor = setup();
-    seedLibraryRoute(store, { folderId: USER_ID });
-    seedAppMode(store, { workDetail: "work-1" });
-
-    await editor.remove(userFolder);
-
-    expect(store.get(libraryRouteAtom).folderId).toBe("all");
-    expect(store.get(appRouteAtom)).toMatchObject({ mode: "workDetail", workId: "work-1" });
   });
 
   it("開いていないスマートフォルダーを消しても route は動かさない", async () => {
@@ -404,23 +606,9 @@ describe("削除", () => {
     expect(pendingWrites(store)).toEqual([]);
   });
 
-  it("壊れた行は戻せないので元に戻すを出さず、開いていれば同じく「すべて」へ置き換える", async () => {
-    mockApi({ "DELETE /api/smart-folders/:id": apiNoContent() });
-    const editor = setup();
-    seedLibraryRoute(store, { folderId: USER_ID });
-    clearPendingOps(store);
-
-    await editor.remove({ ...userFolder, condition: null, sort: null });
-
-    expect(toasts()[0]!.actionLabel).toBeUndefined();
-    expect(store.get(libraryRouteAtom).folderId).toBe("all");
-    expect(pendingWrites(store)).toEqual(["replace"]);
-  });
-
   it("失敗（404・409）はトーストを出して一覧を取り直し、route は動かさない", async () => {
     mockApi({
-      "DELETE /api/smart-folders/:id": () =>
-        apiError(404, "not_found", "スマートフォルダーが見つかりません"),
+      "DELETE /api/smart-folders/:id": () => apiError(404, "not_found", "見つかりません: sf-1"),
     });
     const editor = setup();
     seedLibraryRoute(store, { folderId: USER_ID });
@@ -428,7 +616,7 @@ describe("削除", () => {
     await editor.remove(userFolder);
 
     expect(toasts()[0]).toMatchObject({
-      message: "スマートフォルダーが見つかりません",
+      message: "「自作」を削除できませんでした",
       variant: "error",
     });
     expect(store.get(libraryRouteAtom).folderId).toBe(USER_ID);
@@ -438,7 +626,7 @@ describe("削除", () => {
   it("元に戻すは削除した行を同じ定義で復元して一覧を取り直す", async () => {
     const mocked = mockApi({
       "DELETE /api/smart-folders/:id": apiNoContent(),
-      "POST /api/smart-folders/restore": () => ({ ...userFolder }),
+      "POST /api/smart-folders": () => ({ ...userFolder }),
     });
     const editor = setup();
     await editor.remove({ ...userFolder, condition: write.condition });
@@ -447,7 +635,7 @@ describe("削除", () => {
     toasts()[0]!.onAction!();
     await vi.waitFor(() => expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]));
 
-    expect(mocked.requestsTo("POST /api/smart-folders/restore")[0]!.body).toMatchObject({
+    expect(mocked.requestsTo("POST /api/smart-folders")[0]!.body).toMatchObject({
       id: USER_ID,
       name: "自作",
       condition: write.condition,
@@ -458,8 +646,7 @@ describe("削除", () => {
   it("元に戻せなかったときはトーストを出して一覧を取り直す", async () => {
     mockApi({
       "DELETE /api/smart-folders/:id": apiNoContent(),
-      "POST /api/smart-folders/restore": () =>
-        apiError(409, "conflict", "すでにあるスマートフォルダーです"),
+      "POST /api/smart-folders": () => apiError(409, "conflict", "すでにあります: sf-1"),
     });
     const editor = setup();
     await editor.remove({ ...userFolder, condition: write.condition });
@@ -468,7 +655,7 @@ describe("削除", () => {
     toasts()[0]!.onAction!();
     await vi.waitFor(() =>
       expect(toasts()[0]).toMatchObject({
-        message: "すでにあるスマートフォルダーです",
+        message: "元に戻せませんでした",
         variant: "error",
       }),
     );

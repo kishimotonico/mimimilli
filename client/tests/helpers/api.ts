@@ -122,3 +122,15 @@ export function mockApi(routes: ApiRoutes): ApiMock {
     },
   };
 }
+
+/** GET /smart-folders/:id/groups のクエリ。あるキーだけを返し、tags は常に配列 */
+export function groupsQueryOf(request: ApiRequest): Record<string, string | string[]> {
+  const query: Record<string, string | string[]> = {};
+  for (const key of ["groupBy", "groupSort", "group", "q"]) {
+    const value = request.url.searchParams.get(key);
+    if (value !== null) query[key] = value;
+  }
+  const tags = request.url.searchParams.getAll("tags");
+  if (tags.length > 0) query.tags = tags;
+  return query;
+}

@@ -1,7 +1,7 @@
-// 値の候補（POST /smart-folders/:id/groups）の共通フック。サイドバーのクイックオーバーレイと
-// 「＋絞り込み」が同じ query キー・同じ取得ロジックを共有する。
+// 値の候補（GET /smart-folders/:id/groups）の共通フック。値一覧・クイックオーバーレイ・
+// パンくずの値・「＋絞り込み」が同じ取得ロジックを共有し、母集団が同じなら query キーも共有する。
 
-import { useQuery } from "@tanstack/react-query";
+import { partialMatchKey, useQuery } from "@tanstack/react-query";
 import {
   normalizeSearchQuery,
   type GroupBy,
@@ -13,7 +13,7 @@ import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKey
 import { assertGroupValueItems } from "./libraryPresentation";
 import { groupByKey } from "../../../entities/smart-folder/groupByKey";
 
-/** 候補を数える母集団。サイドバーの値一覧は絞り込み無し、「＋絞り込み」は開いている一覧の状態 */
+/** 候補を数える母集団。サイドバーのクイックオーバーレイは絞り込み無し、ほかは開いている一覧のチップと検索語 */
 export interface GroupValueScope {
   folderId: string;
   group?: string | null;
@@ -26,23 +26,31 @@ export function useGroupValuesQuery(
   scope: GroupValueScope,
   /** null なら取得しない */
   groupSort: GroupSortId | null,
+  /** 検索語・チップが変わる間、同じ行の前の結果を出したままにする（入力のたびに一覧が空にならない） */
+  { keepPrevious = false }: { keepPrevious?: boolean } = {},
 ) {
   const { folderId, group = null, tags = [], q = "" } = scope;
   const filter = { group, tags, q: normalizeSearchQuery(q), groupSort };
   return useQuery({
-    queryKey: SMART_FOLDER_QUERY_KEYS.groups(
-      folderId,
-      groupBy === null ? "" : groupByKey(groupBy),
-      filter,
-    ),
-    queryFn: async () => {
-      const items = await getSmartFolderGroups(folderId, {
-        groupBy: groupBy!,
-        ...filter,
-        groupSort: groupSort!,
-      });
+    queryKey: SMART_FOLDER_QUERY_KEYS.groups(folderId, groupByKey(groupBy), filter),
+    queryFn: async ({ signal }) => {
+      const items = await getSmartFolderGroups(
+        folderId,
+        { groupBy: groupBy!, ...filter, groupSort: groupSort! },
+        { signal },
+      );
       return assertGroupValueItems(groupBy!, items);
     },
     enabled: groupBy !== null && groupSort !== null,
+    placeholderData: keepPrevious
+      ? (previous, previousQuery) =>
+          previousQuery &&
+          partialMatchKey(
+            previousQuery.queryKey,
+            SMART_FOLDER_QUERY_KEYS.groupsOf(folderId, groupByKey(groupBy)),
+          )
+            ? previous
+            : undefined
+      : undefined,
   });
 }

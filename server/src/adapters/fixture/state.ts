@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import {
   DEFAULT_TAG_PREFIXES,
-  SMART_FOLDER_TEMPLATES,
   dlsiteFetchStateOfResolution,
   projectDlsiteState,
   toDlsiteLinkageStatus,
 } from "@mimimilli/shared";
 import type {
   DlsiteWorkInfo,
+  SmartFolder,
   DataIntegrityWarning,
   DlsiteCacheResolution,
   DlsiteCacheResolutionHead,
@@ -31,8 +31,7 @@ import {
   type FixtureWorkRecord,
   type SeedPlaylistSpec,
 } from "./data.ts";
-import type { SmartFolderRow } from "../../adapter/classification.ts";
-import { insertFromTemplate } from "../../core/smartFolderTemplateRow.ts";
+import { initialSmartFolders } from "../../core/smartFolderInitialRows.ts";
 import { requireConfiguredRoot } from "../../core/rootFolder.ts";
 import { createFixtureScenario, type FixtureRootReconfiguration } from "./scenarios.ts";
 
@@ -91,8 +90,8 @@ export interface FixtureState {
   /** 編集用カバー列（表示用 cover と独立。unmeasured を表現する） */
   coverColumns: Map<string, FixtureCoverColumns>;
   tagPrefixes: TagPrefix[];
-  /** 位置の昇順。fixture は migration を通らないので、「すべて」と初回投入分を初期状態に持つ */
-  smartFolders: SmartFolderRow[];
+  /** 位置の昇順 */
+  smartFolders: SmartFolder[];
   /** 作品ごとのレジューム位置 */
   resumes: Map<string, ResumeBody>;
   playbackIds: Map<string, PlaybackIds>;
@@ -333,9 +332,10 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     dlsiteCovers: new Map(),
     coverColumns,
     tagPrefixes: DEFAULT_TAG_PREFIXES.map((def) => ({ ...def })),
-    smartFolders: SMART_FOLDER_TEMPLATES.filter((template) => template.seeded).map(
-      (template, position) => ({ ...insertFromTemplate(template, now), position }),
-    ),
+    smartFolders: initialSmartFolders(new Set(), false, now).map((folder, position) => ({
+      ...folder,
+      position,
+    })),
     resumes: new Map(),
     playbackIds: new Map(),
     playlistSpecs: new Map(Object.entries({ ...SEED_PLAYLIST_SPECS, ...options.playlistSpecs })),

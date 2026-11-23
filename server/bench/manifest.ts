@@ -11,8 +11,8 @@ export interface BenchManifest {
   sampleAudioRelPath: string;
   sampleSearchQ: string;
   sampleTag: string;
-  smartFolderNoRulesId: string;
-  smartFolderWithRulesId: string;
+  smartFolderAllId: string;
+  smartFolderTaggedId: string;
   deepPage: number;
   sorts: SortId[];
 }

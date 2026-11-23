@@ -40,27 +40,30 @@ export function appRouteAction<A extends unknown[]>(
 }
 
 /** 補正: 開いている画面の library を事実に合わせ直す（選択解除・消えたフォルダーからの退避など）。
- *  await のあとに走っても画面と層を動かさないよう library だけを差し替え、履歴は常に置き換える */
+ *  await のあとに走っても画面と層を動かさないよう library だけを差し替え、履歴は常に置き換える。
+ *  層が開いている間の補正は層のエントリーだけを書き換え、閉じた先には引き継がない */
 export function appRouteCorrection<A extends unknown[]>(
   compute: (current: AppRoute, ...args: A) => LibraryRoute | null,
 ) {
   return appRouteStore.action((current: AppRoute, ...args: A) => {
     const library = compute(current, ...args);
-    return library && correctLibrary(current, library);
+    return library && { route: { ...current, library }, replace: true };
   });
 }
 
-/** library だけを差し替える（履歴は置き換え）。層が開いていれば、層を閉じたときに下へ引き継げるよう、
- *  層を開いたときの library と補正後の library を層に持たせる */
-export function correctLibrary(
-  current: AppRoute,
-  library: LibraryRoute,
-): RouteTransition<AppRoute> {
-  // 起点は、まだ下へ反映されていない補正の始まり（反映済みの印は層へ進み直したときに外れている）
-  const from = current.layer?.carry?.from ?? current.library;
-  const layer = current.layer && { ...current.layer, carry: { from, to: library } };
-  return { route: { ...current, library, layer }, replace: true };
+/** 補正: 作品詳細の作品が存在しない（登録解除済み・404）とき、保持しているライブラリへ置き換えで戻る。層は変えない */
+export function leaveMissingWorkDetail(
+  route: AppRoute,
+  workId: string,
+): RouteTransition<AppRoute> | null {
+  if (route.mode !== "workDetail" || route.workId !== workId) return null;
+  return {
+    route: { mode: "library", library: route.library, files: route.files, layer: route.layer },
+    replace: true,
+  };
 }
+
+export const leaveMissingWorkDetailAtom = appRouteStore.action(leaveMissingWorkDetail);
 
 export const appModeAtom = atom<AppMode>((get) => get(appRouteAtom).mode);
 
@@ -74,30 +77,27 @@ export function switchAppMode(
 
 export const setAppModeAtom = appRouteAction(switchAppMode);
 
-/** 404・削除など、現在の画面自体が無効になったための強制退避で使う。履歴を積まず
- *  現在のエントリを置き換える（戻るで無効な画面へ戻ってpush→retreatを繰り返すのを防ぐ）。 */
-export const replaceAppModeAtom = appRouteAction((route: AppRoute, mode: SwitchableAppMode) => {
-  const transition = switchAppMode(route, mode);
-  return transition && { ...transition, replace: true };
-});
-
 export const layerAtom = atom((get) => get(appRouteAtom).layer);
 
 /** 再生中の層を今の画面に重ねる。履歴を1件積み、閉じるときに1件戻れるようにする */
-export function openNowPlayingLayer(route: AppRoute): RouteTransition<AppRoute> | null {
+function openNowPlayingLayer(route: AppRoute): RouteTransition<AppRoute> | null {
   if (route.layer !== null) return null;
-  return { route: { ...route, layer: { kind: "nowPlaying", openedBy: "app" } } };
+  return { route: { ...route, layer: { kind: "nowPlaying" } } };
 }
 
 export const openNowPlayingLayerAtom = appRouteStore.action(openNowPlayingLayer);
 
-/** 層を閉じる。アプリの中で開いたなら履歴を1件戻り、それ以外は置き換えで np だけを外す。戻り先が無いときも置き換え */
+/** 戻る操作を始めたときの route。popstate で route が変わるまで、続けて閉じても2件戻らない */
+const closingFromAtom = atom<AppRoute | null>(null);
+
+/** 層を閉じる。戻れるなら履歴を1件戻り、戻り先が無ければ置き換えで層を外す */
 export const closeLayerAtom = atom(null, (get, set) => {
-  const { layer } = get(appRouteAtom);
-  if (layer === null) return;
-  if (layer.openedBy === "app" && get(navigationHistoryAvailabilityAtom).canBack) {
+  const route = get(appRouteAtom);
+  if (route.layer === null || get(closingFromAtom) === route) return;
+  if (get(navigationHistoryAvailabilityAtom).canBack) {
+    set(closingFromAtom, route);
     navigationHistoryBack();
     return;
   }
-  set(navigateAtom, (route) => ({ ...route, layer: null }), { replace: true });
+  set(navigateAtom, (current) => ({ ...current, layer: null }), { replace: true });
 });

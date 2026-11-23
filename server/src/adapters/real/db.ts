@@ -44,6 +44,8 @@ export interface DbOpenOptions {
 export interface Db {
   catalog: CatalogDb;
   user: UserDb;
+  /** 実際に開いている user DB のパス（メモリ DB では file: の URI） */
+  userPath: string;
   /** ATTACH済みのcatalog接続。DB間JOINと診断用に使う。 */
   sqlite: Database;
   /** catalog DB（main）上のトランザクション。ATTACH先のuserは含まない。 */
@@ -217,6 +219,7 @@ export function openDb(location: DbLocation, options?: DbOpenOptions): Db {
   return {
     catalog,
     user,
+    userPath,
     sqlite: catalogOpened.sqlite,
     transaction: (callback) => catalog.transaction(callback),
     userTransaction: (callback) => user.transaction(callback),

@@ -213,14 +213,14 @@ async function main(): Promise<void> {
   mkdirSync(join(sampleWorkDir, "mp3"), { recursive: true });
   writeWav(join(sampleWorkDir, sampleAudioRelPath), 1);
 
-  const smartFolderNoRulesId = "bench-sf-all";
-  const smartFolderWithRulesId = "bench-sf-tagged";
+  const smartFolderAllId = "bench-sf-all";
+  const smartFolderTaggedId = "bench-sf-tagged";
   const createdAt = new Date().toISOString();
   db.user
     .insert(smartFolders)
     .values([
       {
-        id: smartFolderNoRulesId,
+        id: smartFolderAllId,
         name: "全件",
         conditionJson: JSON.stringify({ type: "and", children: [] }),
         sort: "added-desc",
@@ -228,7 +228,7 @@ async function main(): Promise<void> {
         createdAt,
       },
       {
-        id: smartFolderWithRulesId,
+        id: smartFolderTaggedId,
         name: "CV水瀬",
         conditionJson: JSON.stringify({
           type: "and",
@@ -252,8 +252,8 @@ async function main(): Promise<void> {
     sampleAudioRelPath,
     sampleSearchQ: "ベンチ",
     sampleTag: "cv/水瀬なずな",
-    smartFolderNoRulesId,
-    smartFolderWithRulesId,
+    smartFolderAllId,
+    smartFolderTaggedId,
     deepPage: Math.max(1, Math.ceil(count / WORKS_DEFAULT_PAGE_SIZE)),
     sorts: BENCH_SORTS,
   };

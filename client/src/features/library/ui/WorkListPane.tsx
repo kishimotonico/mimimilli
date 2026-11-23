@@ -16,7 +16,7 @@ import { useRovingIndex } from "./useRovingIndex";
 import { useRevealSelectedWork } from "./useRevealSelectedWork";
 
 // 作品一覧のリスト表示（list/grid のうち list）。ADR-0012 §3 によりレイアウトを固定し、
-// 常に結果面全幅で表示する（旧 ContentColumn の300px固定・中間カラム役割は廃止）。
+// 常に結果面全幅で表示する。
 
 /** WorkRow の概算高さ（padding 上下 10px + カバー 32px） */
 const WORK_ROW_ESTIMATE_SIZE = 42;

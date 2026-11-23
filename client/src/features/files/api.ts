@@ -12,9 +12,12 @@ import { getParsed, postParsed } from "../../shared/api/http";
 import { fsListingSchema, type FsListing } from "@mimimilli/shared";
 
 /** 物理ディレクトリを1階層ぶん列挙する。path 省略でルートフォルダー */
-export async function browseFs(path?: string): Promise<FsListing> {
+export async function browseFs(
+  path?: string,
+  options?: { signal?: AbortSignal },
+): Promise<FsListing> {
   const q = path ? `?path=${encodeURIComponent(path)}` : "";
-  return getParsed(fsListingSchema, `/fs${q}`);
+  return getParsed(fsListingSchema, `/fs${q}`, options);
 }
 
 /** 作品登録前のプレビュー（タイトル候補・RJコード・子作品数） */

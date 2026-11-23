@@ -191,8 +191,8 @@ describe("GroupValueList list 表示（ADR-0012 §5）", () => {
     const header = document.querySelector(".mll-vlist-hd")!;
     expect(notice.compareDocumentPosition(header) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-    await user.type(screen.getByPlaceholderText("値を絞り込み"), "zzz");
-    expect(screen.getByText("該当する値がありません")).toBeInTheDocument();
+    await user.type(screen.getByPlaceholderText("cvを絞り込み"), "zzz");
+    expect(screen.getByText("該当するcvがありません")).toBeInTheDocument();
     expect(document.querySelector(".mll-vlist-hd")).toBeNull();
     sizeMock.restore();
   });
@@ -249,7 +249,7 @@ describe("GroupValueList list 表示（ADR-0012 §5）", () => {
     sizeMock.restore();
   });
 
-  it("値一覧の行にはAND追加ボタンが無い（値一覧は独立した全作品入口。ADR-0026）", async () => {
+  it("値一覧の行にはAND追加ボタンが無い（チップは「＋絞り込み」から足す）", async () => {
     const sizeMock = mockElementSize(600, 600);
     renderGroupValueList({ groupBy: CV, groupValueItems: [makeItem({ value: "藤田茜" })] });
     await flushVirtualizer();
@@ -257,6 +257,22 @@ describe("GroupValueList list 表示（ADR-0012 §5）", () => {
     const row = getRow(".mll-vrow", "藤田茜");
     expect(within(row).queryByRole("button", { name: /AND追加/ })).toBeNull();
     sizeMock.restore();
+  });
+
+  it("0件のとき、絞り込みの案内があればその文言と操作を出し、無ければ既定の文言を出す", () => {
+    const { unmount } = renderGroupValueList({ groupValueItems: [] });
+    expect(screen.getByText("cvがありません")).toBeInTheDocument();
+    unmount();
+
+    renderGroupValueList({
+      groupValueItems: [],
+      emptyState: {
+        message: "選択中の絞り込みに一致する作品はありません",
+        action: <button type="button">「すべて」で探す</button>,
+      },
+    });
+    expect(screen.getByText("選択中の絞り込みに一致する作品はありません")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "「すべて」で探す" })).toBeInTheDocument();
   });
 
   it("1000件でも仮想化により描画されるボタンは総数よりずっと少ない", async () => {
@@ -403,7 +419,7 @@ describe("GroupValueList コンテキスト検索（ADR-0012 §6）", () => {
     expect(getRow(".mll-vrow", "藤田茜")).toBeInTheDocument();
     expect(getRow(".mll-vrow", "夜想曲サークル")).toBeInTheDocument();
 
-    const input = screen.getByPlaceholderText("値を絞り込み");
+    const input = screen.getByPlaceholderText("cvを絞り込み");
     await user.type(input, "藤田");
     await flushVirtualizer();
 
@@ -431,7 +447,7 @@ describe("GroupValueList コンテキスト検索（ADR-0012 §6）", () => {
     );
     await flushVirtualizer();
 
-    const input = screen.getByPlaceholderText("値を絞り込み") as HTMLInputElement;
+    const input = screen.getByPlaceholderText("cvを絞り込み") as HTMLInputElement;
     await user.type(input, "藤田");
     expect(input.value).toBe("藤田");
 
@@ -449,7 +465,7 @@ describe("GroupValueList コンテキスト検索（ADR-0012 §6）", () => {
     );
     await flushVirtualizer();
 
-    const inputAfter = screen.getByPlaceholderText("値を絞り込み") as HTMLInputElement;
+    const inputAfter = screen.getByPlaceholderText("circleを絞り込み") as HTMLInputElement;
     expect(inputAfter.value).toBe("");
     sizeMock.restore();
   });

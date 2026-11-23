@@ -12,6 +12,8 @@ export * from "./library.ts";
 export * from "./condition.ts";
 export * from "./groupFilter.ts";
 export * from "./smartFolder.ts";
+export * from "./smartFolderRequests.ts";
+export * from "./smartFolderTemplates.ts";
 export * from "./pseudoTag.ts";
 export * from "./tagPrefix.ts";
 export * from "./fs.ts";

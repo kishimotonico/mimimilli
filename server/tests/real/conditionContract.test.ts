@@ -24,6 +24,7 @@ import { openDb } from "../../src/adapters/real/db.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeSampleCover } from "../helpers/sampleLibrary.ts";
+import { and, not, or, tag } from "../helpers/conditionTree.ts";
 import { nts } from "../helpers/tag.ts";
 import {
   coverFieldsFromCover,
@@ -136,11 +137,6 @@ function fullWork(item: WorkSummary): Work {
 }
 
 const dataset = Array.from({ length: 56 }, (_, index) => summary(index));
-
-const tag = (name: string): Condition => ({ type: "tag", tag: name });
-const not = (child: Condition): Condition => ({ type: "not", child });
-const and = (...children: Condition[]): Condition => ({ type: "and", children });
-const or = (...children: Condition[]): Condition => ({ type: "or", children });
 
 /** 意味表の境界（長さ不明・未再生・基準時刻ちょうど・不明な値）を踏む葉 */
 const leaves: Condition[] = [
@@ -406,6 +402,50 @@ const semanticCases: Array<{ name: string; condition: Condition; expected: strin
     expected: ids((w) => w.tags.some((t) => t.startsWith("cv/"))),
   },
   {
+    name: "bookmarked はお気に入りだけ（作品が無い user 行は数えない）",
+    condition: and({ type: "bookmarked" }),
+    expected: ids((w) => w.bookmarked),
+  },
+  {
+    name: "not(bookmarked) はお気に入りでない作品",
+    condition: and(not({ type: "bookmarked" })),
+    expected: ids((w) => !w.bookmarked),
+  },
+  {
+    name: "addedYear は追加日時の UTC の年で、年の境目の前後で分かれる",
+    condition: and({ type: "addedYear", year: "2025" }),
+    expected: ids((w) => w.addedAt.startsWith("2025-")),
+  },
+  {
+    name: "addedYear 2026 は 2026-01-01T00:00:00.000Z ちょうどを含む",
+    condition: and({ type: "addedYear", year: "2026" }),
+    expected: ids((w) => w.addedAt.startsWith("2026-")),
+  },
+  {
+    name: "not(addedYear) はほかの年の作品",
+    condition: and(not({ type: "addedYear", year: "2026" })),
+    expected: ids((w) => !w.addedAt.startsWith("2026-")),
+  },
+  {
+    name: "text は全角・半角と大文字小文字を区別せず、タイトルとタグに一致する",
+    condition: and({ type: "text", q: "asmr" }),
+    expected: ids(
+      (w) =>
+        w.title.normalize("NFKC").toLowerCase().includes("asmr") ||
+        w.tags.some((t) => t.normalize("NFKC").toLowerCase().includes("asmr")),
+    ),
+  },
+  {
+    name: "text はひらがなとカタカナを区別しない",
+    condition: and({ type: "text", q: "かたかな" }),
+    expected: ids((w) => w.title.includes("カタカナ") || w.title.includes("かたかな")),
+  },
+  {
+    name: "text は RJ コードに一致する",
+    condition: and({ type: "text", q: "RJ01000004" }),
+    expected: ids((w) => w.dlsite.rjCode === "RJ01000004"),
+  },
+  {
     name: "hasError は missing と error の両方",
     condition: and({ type: "hasError" }),
     expected: ids((w) => w.status !== "ok"),
@@ -455,6 +495,23 @@ test("circleName は独立に書いた期待値（サークルタグの値のバ
       kind,
     );
   }
+});
+
+test("real の random は同じ seed なら同じ並びで、ページを連結すると全件が重複・欠落なく並ぶ", async () => {
+  const { real } = await setup();
+  const limit = 10;
+  const pageCount = Math.ceil(dataset.length / limit);
+  const collect = async (seed: number): Promise<string[]> => {
+    const pages = await Promise.all(
+      Array.from({ length: pageCount }, (_, i) =>
+        real.queryWorks({ condition: and(), sort: "random", seed, page: i + 1, limit }, ctx),
+      ),
+    );
+    return pages.flatMap((page) => page.items.map((work) => work.id));
+  };
+  const first = await collect(12345);
+  assert.deepEqual(await collect(12345), first);
+  assert.deepEqual([...first].sort(), dataset.map((work) => work.id).sort());
 });
 
 test("sort=random で seed が無いと fixture も real も拒否する", async () => {

@@ -144,7 +144,7 @@ function renderLibraryHooks(nav: LibraryViewState, options?: { queryClient?: Que
     () => {
       if (nav.view.kind !== "works") throw new Error("作品一覧のビューが必要です");
       const works = useSuspenseLibraryWorks(nav.view, "");
-      const supporting = useLibrarySupportingQueries(nav);
+      const supporting = useLibrarySupportingQueries(nav, "");
       const workPatchMutations = useLibraryWorkPatchMutations(nav.view, "");
       return { ...works, ...supporting, workPatchMutations };
     },

@@ -47,13 +47,17 @@ describe("saveOffer", () => {
     expect(saveOffer(view({ folderId: "by-cv" }))).toBeNull();
   });
 
-  it("すべて・既定のものは、チップか検索語があれば「検索を保存」で、上書きは出さない", () => {
+  it("すべては、チップか検索語があれば「検索を保存」で、上書きは出さない", () => {
     expect(saveOffer(view({ folderId: "all", selectedTags: nts(["ASMR"]) }))).toBe("save");
     expect(saveOffer(view({ folderId: "all", q: "雨" }))).toBe("save");
     expect(saveOffer(view({ folderId: "all", q: "  " }))).toBeNull();
     expect(saveOffer(view({ folderId: "sf-own", q: " \u3000" }))).toBeNull();
-    expect(saveOffer(view({ folderId: "fav", selectedTags: nts(["ASMR"]) }))).toBe("save");
-    expect(saveOffer(view({ folderId: "fav", sort: "title-asc" }))).toBeNull();
+    expect(saveOffer(view({ folderId: "all", sort: "title-asc" }))).toBeNull();
+  });
+
+  it("既定のスマートフォルダーも自作と同じく、チップを足すか並びを変えると「上書き」", () => {
+    expect(saveOffer(view({ folderId: "fav", selectedTags: nts(["ASMR"]) }))).toBe("overwrite");
+    expect(saveOffer(view({ folderId: "fav", sort: "title-asc" }))).toBe("overwrite");
   });
 
   it("グループ分けを持つ自作は値を選んでいれば「検索を保存」で、上書きは出さない", () => {
@@ -61,6 +65,12 @@ describe("saveOffer", () => {
       saveOffer(view({ folderId: "sf-grouped", group: "藤田", selectedTags: nts(["a"]) })),
     ).toBe("save");
     expect(saveOffer(view({ folderId: "by-cv", group: "藤田" }))).toBe("save");
+  });
+
+  it("値一覧は、チップか検索語があれば「検索を保存」で、上書きは出さない", () => {
+    expect(saveOffer(view({ folderId: "by-cv", selectedTags: nts(["ASMR"]) }))).toBe("save");
+    expect(saveOffer(view({ folderId: "sf-grouped", q: "雨" }))).toBe("save");
+    expect(saveOffer(view({ folderId: "sf-grouped", q: "  " }))).toBeNull();
   });
 
   it("自作でグループ分けなしは、チップか並びの変更で上書き、検索語だけなら「検索を保存」", () => {
@@ -109,6 +119,29 @@ describe("saveSearchDraft", () => {
       groupSort: null,
     });
     expect(conditionSchema.safeParse(draft.condition).success).toBe(true);
+  });
+
+  it("値一覧で絞り込んだときは、チップ・検索語を条件に入れ、グループ分けと値の並びを保つ", () => {
+    const draft = saveSearchDraft(
+      view({ folderId: "sf-grouped", selectedTags: nts(["asmr"]), q: "雨" }),
+    );
+    expect(draft).toEqual({
+      name: "asmr",
+      condition: {
+        type: "and",
+        children: [{ type: "bookmarked" }, { type: "tag", tag: "asmr" }, { type: "text", q: "雨" }],
+      },
+      sort: ownGrouped.sort,
+      groupBy: { kind: "prefix", prefix: "cv" },
+      groupSort: ownGrouped.groupSort,
+    });
+    expect(conditionSchema.safeParse(draft.condition).success).toBe(true);
+  });
+
+  it("値一覧で値の並びを変えていれば、その並びで保存する", () => {
+    const draft = saveSearchDraft(view({ folderId: "sf-grouped", q: "雨", groupSort: "name-asc" }));
+    expect(draft.groupBy).toEqual({ kind: "prefix", prefix: "cv" });
+    expect(draft.groupSort).toBe("name-asc");
   });
 
   it("並びを変えていなければ元の既定の並びを写す", () => {
@@ -179,10 +212,5 @@ describe("overwriteChange", () => {
     expect(
       overwriteUndoChange({ ...kept, folder: kept.folder as OverwritableFolder }),
     ).not.toHaveProperty("sort");
-  });
-
-  it("既定のもの・グループ分けを持つものは上書きの対象外", () => {
-    expect(isOverwritable(works({ folderId: "fav" }))).toBe(false);
-    expect(isOverwritable(works({ folderId: "sf-grouped", group: "x" }))).toBe(false);
   });
 });

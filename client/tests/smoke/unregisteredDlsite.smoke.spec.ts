@@ -158,6 +158,9 @@ test("取得結果が該当なし・失敗の行は選択から外れ、追加�
     "aria-selected",
     "true",
   );
+  await expect(
+    dialog.getByRole("tabpanel", { name: /^新規作品/ }).getByRole("row", { name: /朗読劇/ }),
+  ).toBeVisible();
   assertNoErrors(tracker);
 });
 

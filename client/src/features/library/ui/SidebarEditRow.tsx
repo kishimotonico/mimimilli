@@ -16,10 +16,11 @@ export const SMART_FOLDER_DRAG_TYPE = "smart-folder";
 
 interface SidebarEditRowProps {
   row: SidebarRow;
-  canEdit: boolean;
   canRemove: boolean;
   /** モバイル幅ではドラッグを出さない（ADR-0042） */
   draggableEnabled: boolean;
+  /** 並べ替えの保存中。グリップは残し、次のドラッグだけ受け付けない */
+  dragLocked: boolean;
   onEdit: () => void;
   onRemove: () => void;
 }
@@ -27,9 +28,9 @@ interface SidebarEditRowProps {
 /** 編集の状態の行。グリップでなく行全体がドラッグ元で、上半分・下半分で前後を決める */
 export default function SidebarEditRow({
   row,
-  canEdit,
   canRemove,
   draggableEnabled,
+  dragLocked,
   onEdit,
   onRemove,
 }: SidebarEditRowProps) {
@@ -39,7 +40,7 @@ export default function SidebarEditRow({
 
   useEffect(() => {
     const element = ref.current;
-    if (!element || !draggableEnabled) return;
+    if (!element || !draggableEnabled || dragLocked) return;
     const rowId = row.id;
     return combine(
       draggable({
@@ -71,13 +72,12 @@ export default function SidebarEditRow({
         onDrop: () => setDrop(null),
       }),
     );
-  }, [row.id, draggableEnabled]);
+  }, [row.id, draggableEnabled, dragLocked]);
 
   const Icon = I[row.icon];
   const classes = [
     "mll-sbrow",
     "is-editing",
-    row.dimmed ? "is-dimmed" : "",
     dragging ? "is-dragging" : "",
     drop === "reorder-before" ? "is-drop-before" : "",
     drop === "reorder-after" ? "is-drop-after" : "",
@@ -90,19 +90,15 @@ export default function SidebarEditRow({
       {draggableEnabled && <I.grip size={13} className="grip" />}
       <Icon size={15} />
       <span className="nm">{row.name}</span>
-      {canEdit ? (
-        <button
-          type="button"
-          className="act"
-          title="編集"
-          aria-label={`「${row.name}」を編集`}
-          onClick={onEdit}
-        >
-          <I.edit size={13} />
-        </button>
-      ) : (
-        <span className="act is-empty" aria-hidden="true" />
-      )}
+      <button
+        type="button"
+        className="act"
+        title="編集"
+        aria-label={`「${row.name}」を編集`}
+        onClick={onEdit}
+      >
+        <I.edit size={13} />
+      </button>
       {canRemove ? (
         <button
           type="button"

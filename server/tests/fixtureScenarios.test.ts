@@ -9,7 +9,7 @@ import {
 // fixture アダプタのシナリオ機能（ADR-0002 / client/mocks/scenarios.ts からの移植）のテスト。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { workspacePath } from "@mimimilli/shared";
+import { showsCount, SMART_FOLDER_TEMPLATES, workspacePath } from "@mimimilli/shared";
 import { createApp } from "./helpers/testApp.ts";
 import { listWorks } from "./helpers/workList.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
@@ -303,9 +303,13 @@ test("empty: 作品が0件で、既定のスマートフォルダーの件数は
   assert.deepEqual(worksBody.items, []);
 
   const smartFoldersRes = await app.request("/api/smart-folders");
-  const folders = (await smartFoldersRes.json()) as Array<{ id: string; count: number | null }>;
+  const folders = (await smartFoldersRes.json()) as Array<{ id: string }>;
   assert.equal(folders[0]?.id, "all");
-  for (const folder of folders) assert.ok(folder.count === null || folder.count === 0, folder.id);
+
+  const countsRes = await app.request("/api/smart-folders/counts");
+  const counts = (await countsRes.json()) as Record<string, number>;
+  const counted = SMART_FOLDER_TEMPLATES.filter((t) => t.seeded && showsCount(t)).map((t) => t.id);
+  assert.deepEqual(counts, Object.fromEntries(counted.map((id) => [id, 0])));
 });
 
 test("errors: エラー・行方不明の作品のみが含まれる", async () => {

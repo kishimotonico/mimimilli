@@ -30,7 +30,7 @@ test("スマートフォルダーを選ぶと値一覧が出て、値を選ぶ�
 
   await railRow(page, "CV別").click();
   await expect(page).toHaveURL(/\/library\/by-cv$/);
-  const valueList = page.getByRole("group", { name: "CVの値一覧" });
+  const valueList = page.getByRole("group", { name: "CVの一覧" });
   await expect(valueList.getByRole("button").first()).toBeVisible();
 
   await valueList.getByRole("button", { name: /^霧島レイ(?!を)/ }).click();
@@ -52,7 +52,7 @@ test("パンくずの値から兄弟の値へ移れる", async ({ page }) => {
 
   await railRow(page, "CV別").click();
   await page
-    .getByRole("group", { name: "CVの値一覧" })
+    .getByRole("group", { name: "CVの一覧" })
     .getByRole("button", { name: /^霧島レイ(?!を)/ })
     .click();
   await page.locator(".mle-crumbs").getByRole("button", { name: "霧島レイ" }).click();
@@ -71,7 +71,7 @@ test("グループの値一覧をグリッド表示に切り替えられる", as
   await railRow(page, "CV別").click();
   await page.getByRole("button", { name: "グリッド" }).click();
 
-  const valueList = page.getByRole("group", { name: "CVの値一覧" });
+  const valueList = page.getByRole("group", { name: "CVの一覧" });
   await expect(valueList.getByRole("button").first()).toBeVisible();
 
   assertNoErrors(tracker);
@@ -98,7 +98,7 @@ test("値の作品一覧で「＋絞り込み」からチップを足せる", as
 
   await railRow(page, "CV別").click();
   await page
-    .getByRole("group", { name: "CVの値一覧" })
+    .getByRole("group", { name: "CVの一覧" })
     .getByRole("button", { name: /^霧島レイ(?!を)/ })
     .click();
 
@@ -108,7 +108,7 @@ test("値の作品一覧で「＋絞り込み」からチップを足せる", as
     .getByRole("button", { name: "サークル" })
     .click();
   await page
-    .getByRole("group", { name: "サークルの値一覧" })
+    .getByRole("group", { name: "サークルの一覧" })
     .getByRole("button", { name: /^月白製作所/ })
     .click();
 
@@ -126,7 +126,7 @@ test("サイドバーのクイックオーバーレイ: 値の主クリックで
   await openApp(page);
 
   const overlay = page.locator(".mll-qoverlay");
-  const quickList = overlay.getByRole("group", { name: "CVの値一覧" });
+  const quickList = overlay.getByRole("group", { name: "CVの一覧" });
   await railRow(page, "CV別").hover();
   await quickList.getByRole("button", { name: /^霧島レイ(?!を)/ }).click();
   await expect(page).toHaveURL(/\/library\/by-cv\?group=/);
@@ -140,34 +140,61 @@ test("サイドバーのクイックオーバーレイ: 値の主クリックで
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["cv/天音かなで"]);
   expect(new URL(page.url()).searchParams.get("group")).toBe("霧島レイ");
 
-  // 値一覧が開いているとき、追加ボタンは「すべて」＋そのチップへ進む
+  // 値一覧が開いているとき、追加ボタンは値一覧のままチップを足す
   await railRow(page, "CV別").click();
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveCount(0);
   await page.mouse.move(1200, 600);
   await expect(overlay).toHaveCount(0);
   await railRow(page, "CV別").hover();
   await quickList.getByRole("button", { name: "霧島レイをAND追加" }).click();
-  await expect(page).toHaveURL(/\/library\/all/);
+  await expect(page).toHaveURL(/\/library\/by-cv\?/);
+  expect(new URL(page.url()).searchParams.has("group")).toBe(false);
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["cv/霧島レイ"]);
+  await expect(page.locator(".mll-tagband__count")).toHaveText(/^\S+ \d+ 件$/);
 
   assertNoErrors(tracker);
 });
 
-test("値一覧でも検索でき、入力すると「すべて」の検索結果へ移る", async ({ page }) => {
+test("値一覧でも検索でき、同じ値一覧のまま値と件数が絞り込み後になる", async ({ page }) => {
   const tracker = trackErrors(page);
   await openApp(page);
 
   await railRow(page, "CV別").click();
-  const valueList = page.getByRole("group", { name: "CVの値一覧" });
+  const valueList = page.getByRole("group", { name: "CVの一覧" });
   await expect(valueList.getByRole("button").first()).toBeVisible();
+  const before = await valueList.getByRole("button").count();
 
   await expect(search(page)).toBeEnabled();
   await expect(valueList.getByRole("button", { name: /をAND追加/ })).toHaveCount(0);
-  await expect(page.locator(".mll-tagband__count")).toHaveText(/^\d+ 分類$/);
+  await expect(page.locator(".mll-tagband__count")).toHaveText(/^\S+ \d+ 件$/);
 
   await search(page).fill("霧島");
+  await expect(page).toHaveURL(/\/library\/by-cv\?q=/);
+  await expect(railRow(page, "CV別")).toHaveAttribute("aria-current", "true");
+  await expect(valueList.getByRole("button", { name: /^霧島レイ(?!を)/ })).toBeVisible();
+  await expect.poll(() => valueList.getByRole("button").count()).toBeLessThan(before);
+
+  await valueList.getByRole("button", { name: /^霧島レイ(?!を)/ }).click();
+  await expect(page).toHaveURL(/group=/);
+  expect(new URL(page.url()).searchParams.get("q")).toBe("霧島");
+  await expect(search(page)).toHaveValue("霧島");
+
+  assertNoErrors(tracker);
+});
+
+test("値一覧が絞り込みで0件のとき「すべて」で探すと、同じ検索語で「すべて」へ移る", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await railRow(page, "CV別").click();
+  await search(page).fill("存在しない検索語");
+  await expect(page.getByText("「存在しない検索語」に一致する作品はありません")).toBeVisible();
+  await page.getByRole("button", { name: "「すべて」で探す" }).click();
+
   await expect(page).toHaveURL(/\/library\/all\?q=/);
-  await expect(railRow(page, "すべて")).toHaveAttribute("aria-current", "true");
+  expect(new URL(page.url()).searchParams.get("q")).toBe("存在しない検索語");
 
   assertNoErrors(tracker);
 });
@@ -214,7 +241,7 @@ test("並び順メニュー: 今の並びはURLに出ず、戻る・進むで保
   const tracker = trackErrors(page);
   await openApp(page);
 
-  const sortButton = page.getByRole("button", { name: "並び替え", exact: true });
+  const sortButton = page.getByRole("button", { name: "ソート", exact: true });
   await sortButton.click();
   await page.getByRole("menuitemradio", { name: "タイトル（A→Z）" }).click();
   expect(new URL(page.url()).searchParams.has("sort")).toBe(false);
@@ -228,7 +255,7 @@ test("並び順メニュー: 今の並びはURLに出ず、戻る・進むで保
     "aria-checked",
     "true",
   );
-  await page.getByRole("menuitem", { name: "この並びを既定にする" }).click();
+  await page.getByRole("menuitem", { name: "このソートを既定にする" }).click();
 
   // 保存後は今の並びが外れて既定に従い、メニューの保存項目も消える
   await sortButton.click();
@@ -236,7 +263,7 @@ test("並び順メニュー: 今の並びはURLに出ず、戻る・進むで保
     "aria-checked",
     "true",
   );
-  await expect(page.getByRole("menuitem", { name: "この並びを既定にする" })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "このソートを既定にする" })).toHaveCount(0);
 
   // サイドバーから入り直しても、保存した既定の並びになる
   await page.keyboard.press("Escape");
@@ -308,6 +335,11 @@ test("詳細パネルの「その他」メニューから登録解除できる�
   ).toBeHidden();
   await expect(page.getByText("を登録解除しました", { exact: false })).toBeVisible();
 
+  // 解除した作品の詳細の取り直しが404になることが、選択解除の合図
+  expect(tracker.failedResponses).toEqual([expect.stringMatching(/^404 .*\/api\/works\//)]);
+  tracker.failedResponses.length = 0;
+  expect(tracker.consoleErrors).toEqual([expect.stringContaining("status of 404")]);
+  tracker.consoleErrors.length = 0;
   assertNoErrors(tracker);
 });
 
@@ -683,7 +715,7 @@ test("主要画面でヨコ方向スクロールが発生しない", async ({ pa
 
   // グループの値一覧（CV別を開いたときは結果面が値一覧に置き換わる。ADR-0012）
   await page.getByRole("button", { name: "CV" }).click();
-  const valueList = page.getByRole("group", { name: "CVの値一覧" });
+  const valueList = page.getByRole("group", { name: "CVの一覧" });
   await expect(valueList.getByRole("button").first()).toBeVisible();
   await expectNoHorizontalOverflow(page);
 

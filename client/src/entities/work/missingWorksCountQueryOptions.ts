@@ -4,5 +4,5 @@ import { getMissingWorksCount } from "./api";
 
 export const missingWorksCountQueryOptions = queryOptions({
   queryKey: WORK_QUERY_KEYS.missingCount(),
-  queryFn: getMissingWorksCount,
+  queryFn: ({ signal }) => getMissingWorksCount({ signal }),
 });

@@ -23,10 +23,13 @@ import {
   type StartScanRequest,
 } from "@mimimilli/shared";
 
-export async function getScanCandidateExclusions(): Promise<ScanCandidateExclusion[]> {
+export async function getScanCandidateExclusions(options?: {
+  signal?: AbortSignal;
+}): Promise<ScanCandidateExclusion[]> {
   const { exclusions } = await getParsed(
     scanCandidateExclusionsResponseSchema,
     "/scan/candidates/exclusions",
+    options,
   );
   return exclusions;
 }
@@ -39,13 +42,15 @@ export async function restoreScanCandidateExclusions(paths: string[]): Promise<v
 }
 
 /** 直近のスキャンの記録。未スキャン（サーバー再起動後を含む）は finishedAt が null の空の記録。 */
-export async function getScanRecord(): Promise<ScanRecord> {
-  return getParsed(scanRecordSchema, "/scan/last");
+export async function getScanRecord(options?: { signal?: AbortSignal }): Promise<ScanRecord> {
+  return getParsed(scanRecordSchema, "/scan/last", options);
 }
 
 /** 要対応の現在の診断（ID重複・読み込めない作品情報ファイル）。スキャン完了時点のスナップショットではない。 */
-export async function getScanDiagnostics(): Promise<ScanDiagnostics> {
-  return getParsed(scanDiagnosticsSchema, "/scan/diagnostics");
+export async function getScanDiagnostics(options?: {
+  signal?: AbortSignal;
+}): Promise<ScanDiagnostics> {
+  return getParsed(scanDiagnosticsSchema, "/scan/diagnostics", options);
 }
 
 export class ScanAlreadyActiveError extends ApiRequestError {

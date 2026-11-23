@@ -17,7 +17,7 @@ const baseNav = buildNav({ library: { folderId: "by-cv" } });
 describe("グループ分け切替時の groupValueItems 系列（R2 機序調査）", () => {
   beforeEach(() => {
     mockApi({
-      "POST /api/smart-folders/:id/groups": ({ params }) =>
+      "GET /api/smart-folders/:id/groups": ({ params }) =>
         params.id === "by-cv"
           ? Array.from({ length: 8 }, (_, i) => buildGroupValueItem({ value: `cv${i}` }))
           : [],
@@ -38,7 +38,7 @@ describe("グループ分け切替時の groupValueItems 系列（R2 機序調�
     const history: Array<{ folderId: string; groupValueItemsLength: number }> = [];
 
     function Probe({ nav }: { nav: LibraryViewState }) {
-      const { groupValueItems } = useLibrarySupportingQueries(nav);
+      const { groupValueItems } = useLibrarySupportingQueries(nav, "");
       history.push({ folderId: nav.view.folder.id, groupValueItemsLength: groupValueItems.length });
       return null;
     }

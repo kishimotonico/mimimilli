@@ -23,7 +23,7 @@ export default function TopBar() {
   const setAppMode = useSetAtom(setAppModeAtom);
   const nav = useLibraryNavigation();
   const onSearchChange = nav.setSearchQuery;
-  const searchQuery = nav.foldersStatus === "ready" ? nav.searchQuery : "";
+  const searchQuery = nav.foldersStatus === "ready" ? nav.view.q : "";
   // 一覧が来るまでは検索の行き先（その一覧か「すべて」か）が決まらないので入力させない
   const isSearchDisabled = nav.foldersStatus !== "ready" || mode === "files";
   const isPlaying = useAtomValue(playerIsActiveAtom);

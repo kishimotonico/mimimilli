@@ -1,25 +1,26 @@
-import { and, asc, eq, gte, isNotNull, sql } from "drizzle-orm";
+import { asc, eq, gte, sql } from "drizzle-orm";
 import type { z } from "zod";
 import {
-  conditionTreeSchema,
+  conditionSchema,
   groupBySchema,
   groupSortIdSchema,
+  smartFolderNameSchema,
+  smartFolderPositionSchema,
+  smartFolderViolation,
   sortIdSchema,
   tagPrefixSchema,
 } from "@mimimilli/shared";
 import type {
-  Condition,
   ResumeBody,
-  SmartFolderWrite,
-  GroupSortId,
-  SortId,
+  SmartFolder,
+  SmartFolderPatch,
   TagPrefix,
   TagPrefixCreate,
   TagPrefixUpdate,
   Work,
 } from "@mimimilli/shared";
-import type { SmartFolderInsert, SmartFolderRow } from "../../adapter/classification.ts";
-import { getCategoryLogger } from "../../lib/logger.ts";
+import { UnreadableSmartFolderError, type UnreadableSmartFolderRow } from "../../errors.ts";
+import type { SmartFolderInsert, SmartFolderUpdateResult } from "../../adapter/smartFolder.ts";
 import type { Db } from "./db.ts";
 import {
   appSettings,
@@ -29,12 +30,8 @@ import {
   workStates,
 } from "./userSchema.ts";
 
-const smartFolderLogger = getCategoryLogger("db");
-
 export class UserWorkStateRepository {
   private readonly db: Db;
-  /** 警告済みの壊れた行（id → 問題の署名）。一覧を取るたびに同じ警告を重ねない。直った行は忘れる */
-  private readonly reportedBrokenFolders = new Map<string, string>();
 
   constructor(db: Db) {
     this.db = db;
@@ -251,62 +248,83 @@ export class UserWorkStateRepository {
     });
   }
 
-  listSmartFolders(): SmartFolderRow[] {
-    return this.db.user
+  listSmartFolders(): SmartFolder[] {
+    const results = this.db.user
       .select()
       .from(smartFolders)
       .orderBy(asc(smartFolders.position), asc(smartFolders.createdAt), asc(smartFolders.id))
       .all()
-      .map((row) => toSmartFolderRow(row, this.reportedBrokenFolders));
+      .map(readSmartFolderRow);
+    const unreadable = results.flatMap((result) =>
+      "unreadable" in result ? [result.unreadable] : [],
+    );
+    if (unreadable.length > 0) throw new UnreadableSmartFolderError(unreadable, this.db.userPath);
+    return results.flatMap((result) => ("row" in result ? [result.row] : []));
   }
 
-  getSmartFolder(id: string): SmartFolderRow | null {
+  private toSmartFolderRow(r: typeof smartFolders.$inferSelect): SmartFolder {
+    const result = readSmartFolderRow(r);
+    if ("unreadable" in result) {
+      throw new UnreadableSmartFolderError([result.unreadable], this.db.userPath);
+    }
+    return result.row;
+  }
+
+  getSmartFolder(id: string): SmartFolder | null {
     const r = this.db.user.select().from(smartFolders).where(eq(smartFolders.id, id)).get();
-    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
+    return r ? this.toSmartFolderRow(r) : null;
+  }
+
+  smartFolderIds(): string[] {
+    return this.db.user
+      .select({ id: smartFolders.id })
+      .from(smartFolders)
+      .all()
+      .map((r) => r.id);
   }
 
   /** 既にある ID は飛ばして末尾へ追加し、flagKey を立てる */
   seedSmartFolders(folders: SmartFolderInsert[], flagKey: string): void {
     this.db.userTransaction(() => {
-      for (const folder of folders) this.appendSmartFolder(folder);
+      for (const folder of folders) this.insertSmartFolder(folder);
       this.setUserSetting(flagKey, "1");
     });
   }
 
-  /** 末尾へ追加する。ID が既にあれば null */
-  appendSmartFolder(folder: SmartFolderInsert): SmartFolderRow | null {
+  /** ID が既にあれば null。position を渡すとその位置に入れ、埋まっていればその位置以降を1つずつ後ろへ送る。省けば末尾 */
+  insertSmartFolder(folder: SmartFolderInsert, position?: number): SmartFolder | null {
     return this.db.userTransaction(() => {
-      if (this.getSmartFolder(folder.id)) return null;
-      const position = this.db.user
-        .select({ position: smartFolders.position })
+      const exists = this.db.user
+        .select({ id: smartFolders.id })
         .from(smartFolders)
-        .all()
-        .reduce((max, row) => Math.max(max, row.position + 1), 0);
-      return this.insertSmartFolderRow({ ...folder, position });
-    });
-  }
-
-  /** 同じ ID・位置・作成日時で戻す。位置が埋まっていれば、その位置以降を1つずつ後ろへ送る。ID が既にあれば null */
-  restoreSmartFolder(folder: SmartFolderRow & { condition: Condition }): SmartFolderRow | null {
-    return this.db.userTransaction(() => {
-      if (this.getSmartFolder(folder.id)) return null;
+        .where(eq(smartFolders.id, folder.id))
+        .get();
+      if (exists) return null;
+      if (position === undefined) {
+        const end = this.db.user
+          .select({ position: smartFolders.position })
+          .from(smartFolders)
+          .all()
+          .reduce((max, row) => Math.max(max, row.position + 1), 0);
+        return this.insertSmartFolderRow({ ...folder, position: end });
+      }
       const occupied = this.db.user
         .select({ id: smartFolders.id })
         .from(smartFolders)
-        .where(eq(smartFolders.position, folder.position))
+        .where(eq(smartFolders.position, position))
         .get();
       if (occupied) {
         this.db.user
           .update(smartFolders)
           .set({ position: sql`${smartFolders.position} + 1` })
-          .where(gte(smartFolders.position, folder.position))
+          .where(gte(smartFolders.position, position))
           .run();
       }
-      return this.insertSmartFolderRow(folder);
+      return this.insertSmartFolderRow({ ...folder, position });
     });
   }
 
-  private insertSmartFolderRow(folder: SmartFolderRow & { condition: Condition }): SmartFolderRow {
+  private insertSmartFolderRow(folder: SmartFolder): SmartFolder {
     this.db.user
       .insert(smartFolders)
       .values({
@@ -323,61 +341,35 @@ export class UserWorkStateRepository {
     return folder;
   }
 
-  updateSmartFolder(id: string, input: SmartFolderWrite): SmartFolderRow | null {
-    const r = this.db.user
-      .update(smartFolders)
-      .set({
-        name: input.name,
-        conditionJson: JSON.stringify(input.condition),
-        sort: input.sort,
-        groupByJson: input.groupBy === null ? null : JSON.stringify(input.groupBy),
-        groupSort: input.groupSort,
-      })
-      .where(eq(smartFolders.id, id))
-      .returning()
-      .get();
-    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
-  }
-
-  updateSmartFolderSort(id: string, sort: SortId | null): SmartFolderRow | null {
-    const r = this.db.user
-      .update(smartFolders)
-      .set({ sort })
-      .where(eq(smartFolders.id, id))
-      .returning()
-      .get();
-    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
-  }
-
-  updateSmartFolderCondition(
-    id: string,
-    change: { condition: Condition; sort?: SortId | null },
-  ): SmartFolderRow | null {
-    const r = this.db.user
-      .update(smartFolders)
-      .set({
-        conditionJson: JSON.stringify(change.condition),
-        ...(change.sort === undefined ? {} : { sort: change.sort }),
-      })
-      .where(eq(smartFolders.id, id))
-      .returning()
-      .get();
-    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
-  }
-
-  /** グループ分けのある行だけを更新する。グループ分けを外す更新と交差しても、値の並びだけが残る行を作らない */
-  updateSmartFolderGroupSort(id: string, groupSort: GroupSortId): SmartFolderRow | null {
-    const r = this.db.user
-      .update(smartFolders)
-      .set({ groupSort })
-      .where(and(eq(smartFolders.id, id), isNotNull(smartFolders.groupByJson)))
-      .returning()
-      .get();
-    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
+  /** 送った列だけを更新する。今の行に重ねたできあがりを同じトランザクションの中で検証し、違反なら書かない */
+  updateSmartFolder(id: string, patch: SmartFolderPatch): SmartFolderUpdateResult | null {
+    return this.db.userTransaction(() => {
+      const existing = this.getSmartFolder(id);
+      if (!existing) return null;
+      const violation = smartFolderViolation({ ...existing, ...patch });
+      if (violation) return { violation };
+      const r = this.db.user
+        .update(smartFolders)
+        .set({
+          ...(patch.name === undefined ? {} : { name: patch.name }),
+          ...(patch.condition === undefined
+            ? {}
+            : { conditionJson: JSON.stringify(patch.condition) }),
+          ...(patch.sort === undefined ? {} : { sort: patch.sort }),
+          ...(patch.groupBy === undefined
+            ? {}
+            : { groupByJson: patch.groupBy === null ? null : JSON.stringify(patch.groupBy) }),
+          ...(patch.groupSort === undefined ? {} : { groupSort: patch.groupSort }),
+        })
+        .where(eq(smartFolders.id, id))
+        .returning()
+        .get();
+      return r ? { row: this.toSmartFolderRow(r) } : null;
+    });
   }
 
   /** 全件の順序を置き換える。渡された集合が今の集合と一致しなければ null */
-  reorderSmartFolders(ids: string[]): SmartFolderRow[] | null {
+  reorderSmartFolders(ids: string[]): SmartFolder[] | null {
     return this.db.userTransaction(() => {
       const existing = new Set(
         this.db.user
@@ -395,7 +387,6 @@ export class UserWorkStateRepository {
   }
 
   deleteSmartFolder(id: string): boolean {
-    this.reportedBrokenFolders.delete(id);
     return (
       this.db.user
         .delete(smartFolders)
@@ -406,11 +397,32 @@ export class UserWorkStateRepository {
   }
 }
 
-type ColumnProblem = { column: string; reason: unknown };
+const VIOLATION_COLUMNS = {
+  name: "name",
+  condition: "condition_json",
+  sort: "sort",
+  groupBy: "group_by_json",
+  groupSort: "group_sort",
+} as const;
+
+type ColumnProblem = UnreadableSmartFolderRow["problems"][number];
 type ColumnRead<T> = { ok: true; value: T } | { ok: false; problem: ColumnProblem };
 
-function failed(column: string, reason: unknown): { ok: false; problem: ColumnProblem } {
+function describeIssues(error: z.ZodError): string {
+  return error.issues
+    .map((issue) => (issue.path.length > 0 ? `${issue.path.join(".")}: ` : "") + issue.message)
+    .join(", ");
+}
+
+function failed(column: string, reason: string): { ok: false; problem: ColumnProblem } {
   return { ok: false, problem: { column, reason } };
+}
+
+function readColumn<T>(column: string, raw: unknown, schema: z.ZodType<T>): ColumnRead<T> {
+  const parsed = schema.safeParse(raw);
+  return parsed.success
+    ? { ok: true, value: parsed.data }
+    : failed(column, describeIssues(parsed.error));
 }
 
 function readJsonColumn<T>(column: string, raw: string, schema: z.ZodType<T>): ColumnRead<T> {
@@ -420,50 +432,39 @@ function readJsonColumn<T>(column: string, raw: string, schema: z.ZodType<T>): C
   } catch (error) {
     return failed(column, error instanceof Error ? error.message : String(error));
   }
-  const parsed = schema.safeParse(json);
-  return parsed.success ? { ok: true, value: parsed.data } : failed(column, parsed.error.issues);
+  return readColumn(column, json, schema);
 }
 
-/** condition・sort・groupBy・groupSort のどれか1つでも読めない、または groupBy と groupSort の組が合わなければ、4つとも null の壊れた行にする。壊れた行は同じ問題につき1回だけ警告する */
-function toSmartFolderRow(
+/** 保存と同じスキーマで厳密に読む。読めない列があれば問題を返す */
+function readSmartFolderRow(
   r: typeof smartFolders.$inferSelect,
-  reportedBrokenFolders: Map<string, string>,
-): SmartFolderRow {
-  const base = { id: r.id, name: r.name, position: r.position, createdAt: r.createdAt };
-  const condition = readJsonColumn("condition_json", r.conditionJson, conditionTreeSchema);
-  const sort = sortIdSchema.nullable().safeParse(r.sort);
+): { row: SmartFolder } | { unreadable: UnreadableSmartFolderRow } {
+  const name = readColumn("name", r.name, smartFolderNameSchema);
+  const condition = readJsonColumn("condition_json", r.conditionJson, conditionSchema);
+  const sort = readColumn("sort", r.sort, sortIdSchema.nullable());
   const groupBy =
     r.groupByJson === null
       ? ({ ok: true, value: null } as const)
       : readJsonColumn("group_by_json", r.groupByJson, groupBySchema);
-  const groupSort = groupSortIdSchema.nullable().safeParse(r.groupSort);
-  const problems: ColumnProblem[] = [];
-  if (!condition.ok) problems.push(condition.problem);
-  if (!sort.success) problems.push({ column: "sort", reason: sort.error.issues });
-  if (!groupBy.ok) problems.push(groupBy.problem);
-  if (!groupSort.success) problems.push({ column: "group_sort", reason: groupSort.error.issues });
-  const mismatched =
-    groupBy.ok && groupSort.success && (groupBy.value === null) !== (groupSort.data === null);
-  if (mismatched) {
-    problems.push({ column: "group_sort", reason: "group_by_json と group_sort の組が合いません" });
-  }
-  if (!condition.ok || !sort.success || !groupBy.ok || !groupSort.success || mismatched) {
-    const signature = JSON.stringify(problems);
-    if (reportedBrokenFolders.get(r.id) !== signature) {
-      reportedBrokenFolders.set(r.id, signature);
-      smartFolderLogger.warn("壊れたスマートフォルダーの行を読み込めません", {
-        smartFolderId: r.id,
-        problems,
-      });
+  const groupSort = readColumn("group_sort", r.groupSort, groupSortIdSchema.nullable());
+  const position = readColumn("position", r.position, smartFolderPositionSchema);
+  const problems = [name, condition, sort, groupBy, groupSort, position].flatMap((read) =>
+    read.ok ? [] : [read.problem],
+  );
+  if (name.ok && condition.ok && sort.ok && groupBy.ok && groupSort.ok && position.ok) {
+    const fields = {
+      id: r.id,
+      name: name.value,
+      condition: condition.value,
+      sort: sort.value,
+      groupBy: groupBy.value,
+      groupSort: groupSort.value,
+    };
+    const violation = smartFolderViolation(fields);
+    if (violation === null) {
+      return { row: { ...fields, position: position.value, createdAt: r.createdAt } };
     }
-    return { ...base, condition: null, sort: null, groupBy: null, groupSort: null };
+    problems.push({ column: VIOLATION_COLUMNS[violation.field], reason: violation.message });
   }
-  reportedBrokenFolders.delete(r.id);
-  return {
-    ...base,
-    condition: condition.value,
-    sort: sort.data,
-    groupBy: groupBy.value,
-    groupSort: groupSort.data,
-  };
+  return { unreadable: { id: r.id, name: r.name, problems } };
 }

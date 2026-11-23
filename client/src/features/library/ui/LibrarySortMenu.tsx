@@ -4,11 +4,7 @@ import { useSetAtom } from "jotai";
 import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
 import type { GroupSortId, SortId } from "@mimimilli/shared";
 import { SORT_OPTIONS } from "../../../entities/library/types";
-import {
-  clearLibraryGroupSortAtom,
-  clearLibrarySortAtom,
-  reshuffleLibrarySeedAtom,
-} from "../../../entities/library/model/navigationActions";
+import { reshuffleLibrarySeedAtom } from "../../../entities/library/model/navigationActions";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
 import { getGroupSortLabel, groupSortOptions } from "../model/groupValueSort";
@@ -21,7 +17,7 @@ function getSortLabel(sortId: SortId): string | undefined {
 }
 
 // 結果面が値一覧のときは今の値の並び（8種）、作品一覧のときは今の並び（9種）を、どちらも履歴エントリーの
-// 状態（ADR-0041）として変える。今の並びが解決後の既定から外れているときだけ「この並びを既定にする」を出し、
+// 状態（ADR-0041）として変える。今の並びが解決後の既定から外れているときだけ「このソートを既定にする」を出し、
 // スマートフォルダーの既定の並び（値一覧なら値の並び）として保存する。
 export default function LibrarySortMenu() {
   const nav = useLibraryNavigation();
@@ -29,7 +25,7 @@ export default function LibrarySortMenu() {
     // 一覧が無い間は既定の並びが分からないので操作させない
     return (
       <div className="mle-sortmenu">
-        <IconButton size="sm" icon={I.sort} label="並び替え" title="並び替え" disabled />
+        <IconButton size="sm" icon={I.sort} label="ソート" title="ソート" disabled />
       </div>
     );
   }
@@ -50,10 +46,7 @@ function ReadySortMenu({
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
   const reshuffle = useSetAtom(reshuffleLibrarySeedAtom);
-  const clearCurrentSort = useSetAtom(clearLibrarySortAtom);
-  const clearCurrentGroupSort = useSetAtom(clearLibraryGroupSortAtom);
 
-  const disabled = view.kind === "broken";
   const sort = view.kind === "works" ? view.sort : null;
   const currentSortLabel =
     view.kind === "value-list"
@@ -61,38 +54,39 @@ function ReadySortMenu({
       : sort && getSortLabel(sort);
 
   const saveAsDefault = async () => {
-    if (view.kind === "broken") return;
     setSavingDefault(true);
     if (view.kind === "value-list") {
-      const saved = await editor.saveDefaultGroupSort(view.folder.id, view.groupSort);
-      if (saved) clearCurrentGroupSort({ folderId: view.folder.id, groupSort: view.groupSort });
+      await editor.patch(
+        view.folder.id,
+        { groupSort: view.groupSort },
+        { failureMessage: "ソートを既定にできませんでした" },
+      );
     } else {
-      const saved = await editor.saveDefaultSort(view.folder.id, view.sort);
-      if (saved) clearCurrentSort({ folderId: view.folder.id, sort: view.sort });
+      await editor.patch(
+        view.folder.id,
+        { sort: view.sort },
+        { failureMessage: "ソートを既定にできませんでした" },
+      );
     }
     setSavingDefault(false);
   };
 
-  const buttonTitle = currentSortLabel ? `並び替え: ${currentSortLabel}` : "並び替え";
+  const buttonTitle = currentSortLabel ? `ソート: ${currentSortLabel}` : "ソート";
 
   const { close: closeSortMenu } = usePopoverDismissal({
-    isOpen: sortMenuOpen && !disabled,
+    isOpen: sortMenuOpen,
     onClose: () => setSortMenuOpen(false),
     anchorRef: sortRef,
   });
 
-  useEffect(() => {
-    if (disabled && sortMenuOpen) closeSortMenu();
-  }, [disabled, sortMenuOpen, closeSortMenu]);
-
   // role=menu の期待どおり、開いたら現在値（無ければ先頭）へ初期フォーカスする。
   useEffect(() => {
-    if (!sortMenuOpen || disabled) return;
+    if (!sortMenuOpen) return;
     const items = sortRef.current?.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]');
     if (!items || items.length === 0) return;
     const checked = Array.from(items).find((item) => item.getAttribute("aria-checked") === "true");
     (checked ?? items[0])?.focus({ preventScroll: true });
-  }, [sortMenuOpen, disabled]);
+  }, [sortMenuOpen]);
 
   const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
@@ -117,17 +111,14 @@ function ReadySortMenu({
       <IconButton
         size="sm"
         icon={I.sort}
-        label="並び替え"
+        label="ソート"
         title={buttonTitle}
         active={sortMenuOpen}
-        disabled={disabled}
-        aria-haspopup={disabled ? undefined : "menu"}
-        aria-expanded={disabled ? undefined : sortMenuOpen}
+        aria-haspopup="menu"
+        aria-expanded={sortMenuOpen}
         onClick={() => {
-          if (!disabled) {
-            if (sortMenuOpen) closeSortMenu();
-            else setSortMenuOpen(true);
-          }
+          if (sortMenuOpen) closeSortMenu();
+          else setSortMenuOpen(true);
         }}
       />
       {showReshuffle && (
@@ -135,15 +126,15 @@ function ReadySortMenu({
           size="sm"
           icon={I.refresh}
           label="並べ直す"
-          title="別の並びを再抽選"
+          title="別の順に並べ直す"
           onClick={() => reshuffle()}
         />
       )}
-      {sortMenuOpen && !disabled && (
+      {sortMenuOpen && (
         <div
           className="mle-sortmenu__pop"
           role="menu"
-          aria-label="並び替え"
+          aria-label="ソート"
           tabIndex={-1}
           onKeyDown={handleMenuKeyDown}
         >
@@ -194,7 +185,7 @@ function ReadySortMenu({
               }}
             >
               <span className="check" />
-              <span className="label">この並びを既定にする</span>
+              <span className="label">このソートを既定にする</span>
             </button>
           )}
         </div>

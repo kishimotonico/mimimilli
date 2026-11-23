@@ -1,18 +1,12 @@
-import { z } from "zod";
 import {
   createRandomSeed,
   groupSortIdSchema,
   isRandomSeed,
   sortIdSchema,
   type GroupSortId,
-  type NormalizedTag,
 } from "@mimimilli/shared";
 import type { SortId } from "../../library/types";
-import type {
-  ParseContext,
-  RouteCodec,
-  RouteParseResult,
-} from "../../../shared/model/useRouteHistorySync";
+import type { RouteCodec, RouteParseResult } from "../../../shared/model/useRouteHistorySync";
 import {
   DEFAULT_LIBRARY_URL_STATE,
   parseNavigationUrl,
@@ -32,26 +26,8 @@ export type LibraryRoute = LibraryUrlState & {
   seed: number;
 };
 
-/** 層を、アプリの中で開いたか、`np=1` の URL を直接開いたか */
-export type LayerOpenedBy = "app" | "url";
-
-/** 層の間に補正で変わった library。from は層を開いたときの library、to は補正後の library。
- *  層を閉じたとき、戻った先の library が from のままなら to を引き継ぐ */
-export interface LayerCarry {
-  from: LibraryRoute;
-  to: LibraryRoute;
-}
-
-export type RouteLayer = {
-  kind: "nowPlaying";
-  openedBy: LayerOpenedBy;
-  carry?: LayerCarry;
-} | null;
-
-/** library の同一判定。キー順に依らず全項目で比べる */
-export function libraryKey(library: LibraryRoute): string {
-  return JSON.stringify(Object.entries(library).sort(([a], [b]) => (a < b ? -1 : 1)));
-}
+/** 再生中の層。URL には出さず、履歴エントリーの状態にだけ書く */
+export type RouteLayer = { kind: "nowPlaying" } | null;
 
 /** URLは表示中の画面だけを表すが、Library・Filesの状態は他の画面にいる間も保持する */
 export type AppRoute = {
@@ -86,37 +62,27 @@ type AppRouteEntryState = { layer: RouteLayer } & (
 );
 
 export function toNavigationUrlState(route: AppRoute): NavigationUrlState {
-  const np = route.layer !== null;
   switch (route.mode) {
     case "library": {
       const { sort: _sort, groupSort: _groupSort, seed: _seed, ...library } = route.library;
-      return { mode: "library", library, np };
+      return { mode: "library", library };
     }
     case "files":
-      return { mode: "files", files: route.files, np };
+      return { mode: "files", files: route.files };
     case "workDetail":
-      return { mode: "workDetail", workId: route.workId, np };
+      return { mode: "workDetail", workId: route.workId };
   }
 }
 
 /** sort・groupSort・seed は library 画面のエントリーにだけ書く（読む側の applyEntryState と対称） */
-export function toEntryState(route: AppRoute): AppRouteEntryState {
+function toEntryState(route: AppRoute): AppRouteEntryState {
   if (route.mode !== "library") return { layer: route.layer };
   const { sort, groupSort, seed } = route.library;
   return { sort, groupSort, seed, layer: route.layer };
 }
 
-/** 層の開き方は履歴エントリーの状態にだけ書く。URL に np=1 があって開き方が読めなければ、URL を直接開いたものとみなす */
-function applyNavigationUrlState(
-  route: AppRoute,
-  state: NavigationUrlState,
-  openedBy: LayerOpenedBy,
-  carry: LayerCarry | undefined,
-): AppRoute {
+function applyNavigationUrlState(route: AppRoute, state: NavigationUrlState): AppRoute {
   const { library, files } = route;
-  const layer: RouteLayer = state.np
-    ? { kind: "nowPlaying", openedBy, ...(carry ? { carry } : {}) }
-    : null;
   switch (state.mode) {
     case "library":
       return {
@@ -128,12 +94,12 @@ function applyNavigationUrlState(
           seed: library.seed,
         },
         files,
-        layer,
+        layer: null,
       };
     case "files":
-      return { mode: "files", library, files: state.files, layer };
+      return { mode: "files", library, files: state.files, layer: null };
     case "workDetail":
-      return { mode: "workDetail", workId: state.workId, library, files, layer };
+      return { mode: "workDetail", workId: state.workId, library, files, layer: null };
   }
 }
 
@@ -141,121 +107,40 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-/** 書かれていない・読めない項目は現在のrouteの値を保つ。sort・groupSort・seed はURLの library 部分と同じく
- *  library 画面のエントリーからだけ読む */
+function readLayer(entryState: unknown): RouteLayer {
+  return isRecord(entryState) &&
+    isRecord(entryState.layer) &&
+    entryState.layer.kind === "nowPlaying"
+    ? { kind: "nowPlaying" }
+    : null;
+}
+
+/** 層は履歴エントリーの状態から読み、無ければ開かない。sort・groupSort・seed は URL の library 部分と同じく
+ *  library 画面のエントリーからだけ読み、書かれていない・読めない項目は現在のrouteの値を保つ */
 function applyEntryState(route: AppRoute, entryState: unknown): AppRoute {
-  if (!isRecord(entryState) || route.mode !== "library") return route;
+  const layered = { ...route, layer: readLayer(entryState) };
+  if (!isRecord(entryState) || layered.mode !== "library") return layered;
   const sortResult = sortIdSchema.nullable().safeParse(entryState.sort);
   const groupSortResult = groupSortIdSchema.nullable().safeParse(entryState.groupSort);
   const seed = entryState.seed;
   return {
-    ...route,
+    ...layered,
     library: {
-      ...route.library,
-      sort: sortResult.success ? sortResult.data : route.library.sort,
-      groupSort: groupSortResult.success ? groupSortResult.data : route.library.groupSort,
-      seed: isRandomSeed(seed) ? seed : route.library.seed,
+      ...layered.library,
+      sort: sortResult.success ? sortResult.data : layered.library.sort,
+      groupSort: groupSortResult.success ? groupSortResult.data : layered.library.groupSort,
+      seed: isRandomSeed(seed) ? seed : layered.library.seed,
     },
   };
 }
 
-/** LibraryRoute の全項目を検証する。項目を足すと型が合わなくなり、黙って捨てられない */
-const carryLibrarySchema = z.strictObject({
-  folderId: z.string(),
-  group: z.string().nullable(),
-  selectedTags: z.array(z.custom<NormalizedTag>((tag) => typeof tag === "string")),
-  selectedWorkId: z.string().nullable(),
-  q: z.string(),
-  sort: sortIdSchema.nullable(),
-  groupSort: groupSortIdSchema.nullable(),
-  seed: z.number().refine(isRandomSeed),
-}) satisfies z.ZodType<LibraryRoute>;
-
-/** 履歴から読んだ library を、URL から読む library と同じ規則で検証する。URL へ書いて読み戻して
- *  変わらず、警告も出ないものだけを通す */
-function readCarryLibrary(value: unknown): LibraryRoute | null {
-  const parsed = carryLibrarySchema.safeParse(value);
-  if (!parsed.success) return null;
-  const { sort, groupSort, seed, ...urlPart } = parsed.data;
-  const url = serializeNavigationUrl({
-    mode: "library",
-    library: urlPart as LibraryUrlState,
-    np: false,
-  });
-  const read = parseNavigationUrl(url);
-  if (read.warnings.length > 0 || read.state.mode !== "library") return null;
-  const library = { ...read.state.library, sort, groupSort, seed };
-  return libraryKey(library) === libraryKey(parsed.data) ? library : null;
-}
-
-function readLayerCarry(entryState: unknown): LayerCarry | undefined {
-  if (!isRecord(entryState) || !isRecord(entryState.layer)) return undefined;
-  const { carry } = entryState.layer;
-  if (!isRecord(carry)) return undefined;
-  const from = readCarryLibrary(carry.from);
-  const to = readCarryLibrary(carry.to);
-  return from && to ? { from, to } : undefined;
-}
-
-function readLayerOpenedBy(entryState: unknown): LayerOpenedBy {
-  if (!isRecord(entryState) || !isRecord(entryState.layer)) return "url";
-  return entryState.layer.openedBy === "app" ? "app" : "url";
-}
-
-/** アプリの中で開いた層を、すぐ下のエントリーへ戻って閉じるとき。層の間は library をユーザーが変えられず、
- *  変わるのは補正だけ。補正があった（carry を持つ）層は、戻った先の library が層を開いたときのままなら、
- *  補正後の library を引き継ぐ。戻った先をその後に変えていれば引き継がない */
-function closesLayerBelow(
-  current: AppRoute,
-  state: NavigationUrlState,
-  context: ParseContext | undefined,
-): boolean {
-  return (
-    context?.delta === -1 &&
-    current.mode === "library" &&
-    state.mode === "library" &&
-    !state.np &&
-    current.layer?.openedBy === "app"
-  );
-}
-
-/** 閉じた層へ進んで戻ったとき、下がすでに補正後の library なら、その補正は反映済みなので引き継ぎを持ち越さない */
-function revisitedCarry(
-  current: AppRoute,
-  context: ParseContext | undefined,
-  carry: LayerCarry | undefined,
-): LayerCarry | undefined {
-  const reflected =
-    context?.delta === 1 &&
-    current.layer === null &&
-    carry !== undefined &&
-    libraryKey(carry.to) === libraryKey(current.library);
-  return reflected ? undefined : carry;
-}
-
 export const appRouteCodec: RouteCodec<AppRoute> = {
-  parse(href, entryState, context): RouteParseResult<AppRoute> {
+  parse(href, entryState): RouteParseResult<AppRoute> {
     const { state, canonicalUrl, warnings } = parseNavigationUrl(href);
     return {
       canonicalUrl,
       warnings,
-      apply: (current) => {
-        const applied = applyEntryState(
-          applyNavigationUrlState(
-            current,
-            state,
-            readLayerOpenedBy(entryState),
-            revisitedCarry(current, context, readLayerCarry(entryState)),
-          ),
-          entryState,
-        );
-        const carry = current.layer?.carry;
-        return carry &&
-          closesLayerBelow(current, state, context) &&
-          libraryKey(applied.library) === libraryKey(carry.from)
-          ? { ...applied, library: carry.to }
-          : applied;
-      },
+      apply: (current) => applyEntryState(applyNavigationUrlState(current, state), entryState),
     };
   },
   serialize: (route) => ({

@@ -192,7 +192,7 @@ export function useUnregisterWorkMutation(): UnregisterWorkMutation {
   const queryClient = useQueryClient();
   return useMutation<void, Error, string>({
     mutationFn: (workId) => deleteWork(workId),
-    onSuccess: () => updateCachesAfterUnregistration(queryClient),
+    onSuccess: (_, workId) => updateCachesAfterUnregistration(queryClient, workId),
   });
 }
 

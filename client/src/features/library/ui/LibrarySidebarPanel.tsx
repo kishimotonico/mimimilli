@@ -1,15 +1,16 @@
 import { useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
 import { AnimatePresence } from "motion/react";
 import {
-  isReadableSmartFolder,
-  smartFolderPermissions,
+  ALL_SMART_FOLDER_ID,
   type NormalizedTag,
   type SmartFolder,
   type TagPrefix,
 } from "@mimimilli/shared";
 import { folderGrouping } from "../../../entities/library/resolveLibraryView";
 import { getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
+import { smartFolderCountsQueryOptions } from "../../../entities/smart-folder/queryOptions";
 import { useHoverGroupCoordinator } from "../../../shared/lib/useHoverGroupCoordinator";
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
@@ -19,10 +20,9 @@ import { usePopoverDismissal } from "../../../shared/ui/usePopoverDismissal";
 import { formatDuration } from "../../../shared/lib/format";
 import { smartFolderDialogAtom } from "../model/atoms";
 import { buildFilterTag, type CollectionStatsDisplay } from "../model/libraryPresentation";
-import { buildSidebarRows, type DataIntegrityCount } from "../model/sidebarRows";
+import { buildSidebarRows } from "../model/sidebarRows";
 import { missingTemplates } from "../model/smartFolderEditing";
 import { useSidebarReorder } from "./useSidebarReorder";
-import { useBeginSettleLibraryFolder } from "../model/useSettleLibraryFolder";
 import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
 import GroupValuePopover from "./GroupValuePopover";
 import SidebarAddMenu from "./SidebarAddMenu";
@@ -39,7 +39,6 @@ interface LibrarySidebarPanelProps {
   /** 開いているスマートフォルダー。作品詳細でも元のスマートフォルダーを指す */
   activeFolderId: string | null;
   activeGroup: string | null;
-  dataIntegrity: DataIntegrityCount;
   tagPrefixes: TagPrefix[];
   stats: CollectionStatsDisplay;
   /** 値・チップ・検索語のどれかで絞り込んでいるか。絞り込みがあれば「今の検索を保存」、無ければ「複製」を出す */
@@ -59,7 +58,6 @@ export default function LibrarySidebarPanel({
   folders,
   activeFolderId,
   activeGroup,
-  dataIntegrity,
   tagPrefixes,
   stats,
   filtered,
@@ -73,7 +71,6 @@ export default function LibrarySidebarPanel({
   const [editing, setEditing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const setDialog = useSetAtom(smartFolderDialogAtom);
-  const beginSettle = useBeginSettleLibraryFolder();
   const headerRef = useRef<HTMLDivElement>(null);
   const {
     openKey: overlayFolderId,
@@ -86,7 +83,8 @@ export default function LibrarySidebarPanel({
     close: closeOverlay,
   } = useHoverGroupCoordinator();
   const readyFolders = folders.status === "ready" ? folders.folders : [];
-  const rows = buildSidebarRows(readyFolders, activeFolderId ?? "", dataIntegrity, editing);
+  const { data: counts } = useQuery(smartFolderCountsQueryOptions);
+  const rows = buildSidebarRows(readyFolders, counts);
   const overlayFolder = readyFolders.find((folder) => folder.id === overlayFolderId) ?? null;
   const overlayGrouping = overlayFolder ? folderGrouping(overlayFolder) : null;
 
@@ -96,7 +94,7 @@ export default function LibrarySidebarPanel({
     anchorRef: headerRef,
   });
 
-  useSidebarReorder({
+  const { saving: reordering } = useSidebarReorder({
     enabled: editing,
     orderedIds: readyFolders.map((folder) => folder.id),
     reorder: editor.reorder,
@@ -104,8 +102,7 @@ export default function LibrarySidebarPanel({
   });
 
   const activeFolder = readyFolders.find((folder) => folder.id === activeFolderId) ?? null;
-  const duplicateSource =
-    activeFolder && isReadableSmartFolder(activeFolder) && !filtered ? activeFolder : null;
+  const duplicateSource = activeFolder && !filtered ? activeFolder : null;
 
   const startEditing = () => {
     closeOverlay();
@@ -115,9 +112,7 @@ export default function LibrarySidebarPanel({
 
   const addFromTemplate = async (templateId: string) => {
     setMenuOpen(false);
-    const settle = beginSettle();
-    const created = await editor.addFromTemplate(templateId);
-    if (created) settle(created.id);
+    await editor.addFromTemplate(templateId);
   };
 
   return (
@@ -191,16 +186,15 @@ export default function LibrarySidebarPanel({
             );
           }
           const folder = readyFolders.find((item) => item.id === row.id)!;
-          const permissions = smartFolderPermissions(folder);
           return (
             <SidebarEditRow
               key={row.id}
               row={row}
-              canEdit={permissions.edit}
-              canRemove={permissions.remove}
+              canRemove={folder.id !== ALL_SMART_FOLDER_ID}
               draggableEnabled={!isMobile}
+              dragLocked={reordering}
               onEdit={() => {
-                if (isReadableSmartFolder(folder)) setDialog({ kind: "edit", folder });
+                setDialog({ kind: "edit", folder });
               }}
               onRemove={() => void editor.remove(folder)}
             />
@@ -232,7 +226,8 @@ export default function LibrarySidebarPanel({
           <GroupValuePopover
             key={overlayFolder.id}
             placement="right"
-            folderId={overlayFolder.id}
+            // そこから入るとチップと検索語は消えるので、絞り込み無しで数える
+            scope={{ folderId: overlayFolder.id }}
             groupBy={overlayGrouping.groupBy}
             groupSort={overlayGrouping.groupSort}
             groupByLabel={getGroupByLabel(overlayGrouping.groupBy, tagPrefixes)}

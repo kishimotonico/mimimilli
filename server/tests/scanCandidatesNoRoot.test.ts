@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DataAdapter } from "../src/adapter/index.ts";
-import { createClassificationMethods } from "../src/adapters/fixture/classification.ts";
+import { createTagPrefixMethods } from "../src/adapters/fixture/tagPrefix.ts";
+import { createSmartFolderMethods } from "../src/adapters/fixture/smartFolder.ts";
 import { createCoverMediaMethods } from "../src/adapters/fixture/coverMedia.ts";
 import { createDlsiteMethods } from "../src/adapters/fixture/dlsiteMethods.ts";
 import { createFsMethods } from "../src/adapters/fixture/fsMethods.ts";
@@ -17,7 +18,8 @@ function fixtureWithoutRoot(): DataAdapter {
   return {
     ...createSettingsScanMethods(state),
     ...createWorkMethods(state),
-    ...createClassificationMethods(state),
+    ...createTagPrefixMethods(state),
+    ...createSmartFolderMethods(state),
     ...createFsMethods(state),
     ...createCoverMediaMethods(state),
     ...createDlsiteMethods(state),

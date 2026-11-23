@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { Condition, SmartFolder } from "@mimimilli/shared";
+import { definitionOf, type Condition, type SmartFolder } from "@mimimilli/shared";
 import { buildSidebarRows } from "../../src/features/library/model/sidebarRows";
 import {
+  changedColumns,
   conditionRowText,
   duplicateDraft,
   withGroupBy,
@@ -10,7 +11,7 @@ import {
   reorderIds,
   withoutRootChild,
 } from "../../src/features/library/model/smartFolderEditing";
-import { defaultSmartFolders } from "../helpers/smartFolders";
+import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
 
 describe("reorderIds", () => {
   const ids = ["a", "b", "c", "d"];
@@ -134,14 +135,41 @@ describe("追加・複製", () => {
   });
 });
 
-describe("buildSidebarRows の編集の状態", () => {
-  const folders: SmartFolder[] = defaultSmartFolders({ error: 0 });
-  const integrity = { status: "ready", count: 0 } as const;
+describe("buildSidebarRows", () => {
+  const folders: SmartFolder[] = defaultSmartFolders();
 
-  it("通常は0件のエラーを隠し、編集の状態では薄く見せる", () => {
-    expect(buildSidebarRows(folders, "all", integrity).some((r) => r.id === "error")).toBe(false);
-    const rows = buildSidebarRows(folders, "all", integrity, true);
-    expect(rows.find((r) => r.id === "error")?.dimmed).toBe(true);
+  it("0件のエラーも行を残し、件数の赤い丸は出さない。ほかの行の0は出す", () => {
+    const rows = buildSidebarRows(folders, { error: 0, fav: 0, recent: 3 });
     expect(rows).toHaveLength(folders.length);
+    const error = rows.find((r) => r.id === "error")!;
+    expect(error.count).toBeNull();
+    expect(error.countTone).toBe("error");
+    expect(rows.find((r) => r.id === "fav")?.count).toBe(0);
+    expect(rows.find((r) => r.id === "recent")?.count).toBe(3);
+  });
+
+  it("エラーが1件以上なら赤い丸で件数を出す", () => {
+    const error = buildSidebarRows(folders, { error: 2 }).find((r) => r.id === "error")!;
+    expect(error.count).toBe(2);
+    expect(error.countTone).toBe("error");
+  });
+
+  it("条件が空・グループ分けありの行は件数を出さない", () => {
+    const rows = buildSidebarRows(folders, { all: 9, "by-cv": 9 });
+    expect(rows.find((r) => r.id === "all")?.count).toBeNull();
+    expect(rows.find((r) => r.id === "by-cv")?.count).toBeNull();
+  });
+});
+
+describe("changedColumns", () => {
+  const folder = buildSmartFolder({ name: "自作", sort: "title-asc" });
+  const write = definitionOf(folder);
+
+  it("変わった列だけを返し、変更が無ければ空", () => {
+    expect(changedColumns(folder, write)).toEqual({});
+    expect(changedColumns(folder, { ...write, name: "改名" })).toEqual({ name: "改名" });
+    expect(
+      changedColumns(folder, { ...write, groupBy: { kind: "addedYear" }, groupSort: "name-asc" }),
+    ).toEqual({ groupBy: { kind: "addedYear" }, groupSort: "name-asc" });
   });
 });

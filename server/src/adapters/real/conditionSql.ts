@@ -1,4 +1,4 @@
-// 条件の木の SQL コンパイル（ADR-0040）。core の matchCondition と同じ意味表に従う。
+// 条件の木の SQL コンパイル（ADR-0040）。core の createMatcher と同じ意味表に従う。
 // 各葉は CASE WHEN … THEN 1 ELSE 0 END で必ず 0 か 1 を返し、その上に NOT・AND・OR を組む。
 import type { Condition } from "@mimimilli/shared";
 import { japaneseSortKey } from "../../core/japaneseSortKey.ts";

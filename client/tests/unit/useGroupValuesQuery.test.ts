@@ -1,4 +1,4 @@
-// 値の候補取得（POST /smart-folders/:id/groups）が渡されたスコープ（フォルダー・値・チップ・検索語）を
+// 値の候補取得（GET /smart-folders/:id/groups）が渡されたスコープ（フォルダー・値・チップ・検索語）を
 // そのまま母集団として送ることを検証する。件数基準（何を渡すか）は呼び出し側の責務で、
 // このフック自体は素通しするだけ。
 
@@ -11,9 +11,10 @@ import {
   useGroupValuesQuery,
   type GroupValueScope,
 } from "../../src/features/library/model/useGroupValuesQuery";
-import { mockApi, type ApiMock } from "../helpers/api";
+import { groupsQueryOf, mockApi, type ApiMock } from "../helpers/api";
+import { buildGroupValueItem } from "../helpers/builders";
 
-const KEY = "POST /api/smart-folders/:id/groups";
+const KEY = "GET /api/smart-folders/:id/groups";
 
 function wrapperFor(queryClient: QueryClient) {
   return ({ children }: { children: ReactNode }) =>
@@ -65,8 +66,8 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
     const [request] = api.requestsTo(KEY);
     expect(api.requestsTo(KEY)).toHaveLength(1);
     expect(request?.params.id).toBe("by-circle");
-    expect(request?.body).toEqual({
-      groupBy: { kind: "prefix", prefix: "cv" },
+    expect(request && groupsQueryOf(request)).toEqual({
+      groupBy: "prefix:cv",
       groupSort: "count-desc",
       group: "月白製作所",
       tags: ["cv/藤田茜", "サークル/月白製作所"],
@@ -79,8 +80,8 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(api.requestsTo(KEY)[0]?.body).toEqual({
-      groupBy: { kind: "prefix", prefix: "cv" },
+    expect(groupsQueryOf(api.requestsTo(KEY)[0]!)).toEqual({
+      groupBy: "prefix:cv",
       groupSort: "count-desc",
     });
   });
@@ -91,9 +92,9 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
     const year = renderGroupValues({ kind: "addedYear" }, { folderId: "all" });
     await waitFor(() => expect(year.result.current.isSuccess).toBe(true));
 
-    expect(api.requestsTo(KEY).map((request) => request.body)).toEqual([
-      { groupBy: { kind: "tag" }, groupSort: "count-desc" },
-      { groupBy: { kind: "addedYear" }, groupSort: "count-desc" },
+    expect(api.requestsTo(KEY).map(groupsQueryOf)).toEqual([
+      { groupBy: "tag", groupSort: "count-desc" },
+      { groupBy: "addedYear", groupSort: "count-desc" },
     ]);
   });
 
@@ -104,7 +105,7 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
       "name-asc",
     );
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(api.requestsTo(KEY)[0]?.body).toMatchObject({ groupSort: "name-asc" });
+    expect(groupsQueryOf(api.requestsTo(KEY)[0]!)).toMatchObject({ groupSort: "name-asc" });
 
     rerender({
       groupBy: { kind: "prefix", prefix: "cv" },
@@ -113,7 +114,70 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
     });
 
     await waitFor(() => expect(api.requestsTo(KEY)).toHaveLength(2));
-    expect(api.requestsTo(KEY)[1]?.body).toMatchObject({ groupSort: "last-played" });
+    expect(groupsQueryOf(api.requestsTo(KEY)[1]!)).toMatchObject({ groupSort: "last-played" });
+  });
+
+  it("keepPrevious なら、検索語が変わって取り直す間も同じ行の前の結果を出したままにする", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    api = mockApi({
+      [KEY]: async (request) => {
+        if (groupsQueryOf(request).q === "雨") await gate;
+        return [buildGroupValueItem({ value: "藤田茜" })];
+      },
+    });
+    const { result, rerender } = renderHook(
+      ({ q }: { q: string }) =>
+        useGroupValuesQuery(
+          { kind: "prefix", prefix: "cv" },
+          { folderId: "by-cv", q },
+          "count-desc",
+          { keepPrevious: true },
+        ),
+      { wrapper: wrapperFor(queryClient), initialProps: { q: "" } },
+    );
+    await waitFor(() => expect(result.current.data).toHaveLength(1));
+
+    rerender({ q: "雨" });
+
+    expect(result.current.isPlaceholderData).toBe(true);
+    expect(result.current.data).toHaveLength(1);
+    release();
+    await waitFor(() => expect(result.current.isPlaceholderData).toBe(false));
+  });
+
+  it("keepPrevious でも、別フォルダー・別グループ分けには前の結果を出さない", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    api = mockApi({
+      [KEY]: async (request) => {
+        if (request.params.id === "by-circle" || request.url.searchParams.get("groupBy") === "tag")
+          await gate;
+        return [buildGroupValueItem({ value: "藤田茜" })];
+      },
+    });
+    const { result, rerender } = renderHook(
+      ({ folderId, groupBy }: { folderId: string; groupBy: GroupBy }) =>
+        useGroupValuesQuery(groupBy, { folderId }, "count-desc", { keepPrevious: true }),
+      {
+        wrapper: wrapperFor(queryClient),
+        initialProps: { folderId: "by-cv", groupBy: { kind: "prefix", prefix: "cv" } as GroupBy },
+      },
+    );
+    await waitFor(() => expect(result.current.data).toHaveLength(1));
+
+    rerender({ folderId: "by-circle", groupBy: { kind: "prefix", prefix: "cv" } });
+    expect(result.current.data).toBeUndefined();
+
+    rerender({ folderId: "by-cv", groupBy: { kind: "tag" } });
+    expect(result.current.data).toBeUndefined();
+    release();
   });
 
   it("値の並びが null のときは取得しない", () => {
@@ -146,10 +210,28 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
     rerender({ scope: { folderId: "all", tags: ["サークル/月白製作所"] } });
 
     await waitFor(() => expect(api.requestsTo(KEY)).toHaveLength(1));
-    expect(api.requestsTo(KEY)[0]?.body).toEqual({
-      groupBy: { kind: "prefix", prefix: "cv" },
+    expect(groupsQueryOf(api.requestsTo(KEY)[0]!)).toEqual({
+      groupBy: "prefix:cv",
       groupSort: "count-desc",
       tags: ["サークル/月白製作所"],
     });
+  });
+});
+
+describe("購読が外れたとき", () => {
+  it("進行中の取得を中断する", async () => {
+    let signal: AbortSignal | undefined;
+    mockApi({
+      [KEY]: (request) => {
+        signal = request.init?.signal ?? undefined;
+        return new Promise(() => {});
+      },
+    });
+    const { unmount } = renderGroupValues({ kind: "tag" }, { folderId: "all" });
+    await vi.waitFor(() => expect(signal).toBeDefined());
+
+    unmount();
+
+    expect(signal?.aborted).toBe(true);
   });
 });

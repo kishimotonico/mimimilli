@@ -216,8 +216,8 @@ describe("TopBar の検索入力", () => {
   });
 });
 
-describe("効いていない検索語は検索欄に出さない", () => {
-  it("値一覧を直接開いたとき、URL の q は検索欄に出ない", () => {
+describe("値一覧の検索語", () => {
+  it("値一覧を直接開いたとき、URL の q は検索欄に出る", () => {
     const store = createStore();
     seedAppMode(store, "library");
     seedLibraryRoute(store, { folderId: "by-cv", group: null, q: "foo" });
@@ -241,7 +241,7 @@ describe("効いていない検索語は検索欄に出さない", () => {
       ),
     );
 
-    expect(screen.getByPlaceholderText(PLACEHOLDER)).toHaveValue("");
+    expect(screen.getByPlaceholderText(PLACEHOLDER)).toHaveValue("foo");
   });
 });
 
@@ -273,7 +273,7 @@ describe("スマートフォルダー一覧を取れるまで", () => {
   });
 });
 
-describe("値一覧・読めない行からの検索は「すべて」の検索結果へ移る（ADR-0041）", () => {
+describe("値一覧からの検索は同じ値一覧に効く（ADR-0041）", () => {
   it("値一覧でも検索欄は有効", () => {
     const store = renderTopBar("");
     act(() => seedLibraryRoute(store, { folderId: "by-cv" }));
@@ -282,7 +282,7 @@ describe("値一覧・読めない行からの検索は「すべて」の検索�
     expect(input).not.toBeDisabled();
   });
 
-  it("値一覧で入力すると「すべて」の検索結果へ移り、チップは持ち込まない", () => {
+  it("値一覧で入力すると同じ値一覧のまま検索語が効き、チップも保たれる", () => {
     const store = renderTopBar("");
     act(() => seedLibraryRoute(store, { folderId: "by-cv", selectedTags: ["cv/藤田茜"] }));
     const input = screen.getByPlaceholderText(PLACEHOLDER);
@@ -290,10 +290,10 @@ describe("値一覧・読めない行からの検索は「すべて」の検索�
     fireEvent.change(input, { target: { value: "雨" } });
     const { folderId, group, q, selectedTags } = store.get(libraryRouteAtom);
     expect({ folderId, group, q, selectedTags }).toEqual({
-      folderId: "all",
+      folderId: "by-cv",
       group: null,
       q: "雨",
-      selectedTags: [],
+      selectedTags: ["cv/藤田茜"],
     });
   });
 

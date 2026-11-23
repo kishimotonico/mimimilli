@@ -9,9 +9,10 @@ import {
   normalizeGroupValue,
   type Condition,
   type GroupBy,
+  type WorkSummary,
 } from "@mimimilli/shared";
 import { createFixtureAdapter } from "../../src/adapters/fixture/index.ts";
-import { matchCondition } from "../../src/core/condition.ts";
+import { createMatcher } from "../../src/core/condition.ts";
 import {
   parseSmartFolderGroupsRequest,
   parseSmartFolderWorksRequest,
@@ -95,8 +96,9 @@ test("グループの値の検証・述語・チップは1か所の規則で決�
   assert.equal(groupChipTag({ kind: "addedYear" }, "2025"), "@year/2025");
 });
 
-test("matchCondition は長さ不明・未再生・基準時刻ちょうどを意味表どおりに扱う", () => {
+test("createMatcher は長さ不明・未再生・基準時刻ちょうどを意味表どおりに扱う", () => {
   const ctx = { now: NOW };
+  const matches = (condition: Condition, work: WorkSummary) => createMatcher(condition, ctx)(work);
   const unknown = makeWorkSummary({ totalDurationSec: null, lastPlayedAt: null });
   const edge = makeWorkSummary({
     totalDurationSec: 3600,
@@ -104,16 +106,16 @@ test("matchCondition は長さ不明・未再生・基準時刻ちょうどを�
     addedAt: new Date(NOW - 30 * 86_400_000).toISOString(),
   });
   const lte: Condition = { type: "duration", op: "lte", sec: 3600 };
-  assert.equal(matchCondition(lte, unknown, ctx), false);
-  assert.equal(matchCondition({ type: "not", child: lte }, unknown, ctx), true);
-  assert.equal(matchCondition(lte, edge, ctx), true);
-  assert.equal(matchCondition({ type: "played" }, unknown, ctx), false);
-  assert.equal(matchCondition({ type: "played", withinDays: 7 }, edge, ctx), true);
-  assert.equal(matchCondition({ type: "played", withinDays: 7 }, unknown, ctx), false);
-  assert.equal(matchCondition({ type: "added", withinDays: 30 }, edge, ctx), true);
-  assert.equal(matchCondition({ type: "added", withinDays: 29 }, edge, ctx), false);
-  assert.equal(matchCondition({ type: "or", children: [] }, edge, ctx), false);
-  assert.equal(matchCondition({ type: "and", children: [] }, edge, ctx), true);
+  assert.equal(matches(lte, unknown), false);
+  assert.equal(matches({ type: "not", child: lte }, unknown), true);
+  assert.equal(matches(lte, edge), true);
+  assert.equal(matches({ type: "played" }, unknown), false);
+  assert.equal(matches({ type: "played", withinDays: 7 }, edge), true);
+  assert.equal(matches({ type: "played", withinDays: 7 }, unknown), false);
+  assert.equal(matches({ type: "added", withinDays: 30 }, edge), true);
+  assert.equal(matches({ type: "added", withinDays: 29 }, edge), false);
+  assert.equal(matches({ type: "or", children: [] }, edge), false);
+  assert.equal(matches({ type: "and", children: [] }, edge), true);
 });
 
 function adapterWithWorks() {
@@ -127,7 +129,7 @@ function adapterWithWorks() {
   });
 }
 
-test("要求の検証: sort=random で seed が無い・契約にないキーを送る要求は弾く", () => {
+test("要求の検証: 契約に合わない要求は 400 の HTTPException になる", () => {
   const status = (fn: () => unknown): number | undefined => {
     try {
       fn();
@@ -141,19 +143,13 @@ test("要求の検証: sort=random で seed が無い・契約にないキーを
     400,
   );
   assert.equal(
-    status(() => parseSmartFolderWorksRequest({ sort: "added-desc", tags: [], tagMode: "OR" })),
-    400,
-  );
-  assert.equal(
-    status(() => parseSmartFolderWorksRequest({ tags: [] })),
-    400,
-  );
-  assert.equal(
     status(() => parseSmartFolderWorksRequest({ sort: "random", seed: "7", tags: [] })),
     undefined,
   );
   assert.equal(
-    status(() => parseSmartFolderGroupsRequest({ groupBy: { kind: "tag" }, tagMode: "OR" })),
+    status(() =>
+      parseSmartFolderGroupsRequest({ groupBy: "tag", groupSort: "count-desc", tagMode: "OR" }),
+    ),
     400,
   );
 });
@@ -161,6 +157,7 @@ test("要求の検証: sort=random で seed が無い・契約にないキーを
 test("queryFolderWorks / queryFolderGroups は条件・グループの値・チップを木にして評価し、seed を載せない", async () => {
   const adapter = adapterWithWorks();
   const folder = {
+    name: "テスト",
     condition: { type: "and", children: [] } as Condition,
     groupBy: { kind: "prefix", prefix: "cv" } as const,
   };
@@ -178,7 +175,7 @@ test("queryFolderWorks / queryFolderGroups は条件・グループの値・チ�
     adapter,
     folder,
     parseSmartFolderGroupsRequest({
-      groupBy: { kind: "prefix", prefix: "cv" },
+      groupBy: "prefix:cv",
       groupSort: "count-desc",
     }),
   );
@@ -190,7 +187,7 @@ test("queryFolderWorks / queryFolderGroups は条件・グループの値・チ�
   await assert.rejects(
     queryFolderWorks(
       adapter,
-      { condition: folder.condition, groupBy: null },
+      { name: folder.name, condition: folder.condition, groupBy: null },
       parseSmartFolderWorksRequest({ sort: "id-asc", group: "a", tags: [] }),
     ),
     HTTPException,
@@ -201,6 +198,7 @@ test("グループの値は正規化し、不正なら 400 にする", async () 
   const adapter = adapterWithWorks();
   const request = parseSmartFolderWorksRequest({ sort: "id-asc", group: "A", tags: [] });
   const cv = {
+    name: "テスト",
     condition: { type: "and", children: [] } as Condition,
     groupBy: { kind: "prefix", prefix: "cv" } as const,
   };
@@ -212,7 +210,7 @@ test("グループの値は正規化し、不正なら 400 にする", async () 
   );
 
   const rejected = async (
-    folder: typeof cv | { condition: Condition; groupBy: GroupBy },
+    folder: typeof cv | { name: string; condition: Condition; groupBy: GroupBy },
     group: string,
   ) => {
     await assert.rejects(
@@ -221,13 +219,19 @@ test("グループの値は正規化し、不正なら 400 にする", async () 
     );
   };
   await rejected(cv, "   ");
-  await rejected({ condition: cv.condition, groupBy: { kind: "tag" } }, "@year/2025");
-  await rejected({ condition: cv.condition, groupBy: { kind: "tag" } }, "");
-  await rejected({ condition: cv.condition, groupBy: { kind: "addedYear" } }, "20x5");
-  await rejected({ condition: cv.condition, groupBy: { kind: "addedYear" } }, "25");
+  await rejected(
+    { name: cv.name, condition: cv.condition, groupBy: { kind: "tag" } },
+    "@year/2025",
+  );
+  await rejected({ name: cv.name, condition: cv.condition, groupBy: { kind: "tag" } }, "");
+  await rejected(
+    { name: cv.name, condition: cv.condition, groupBy: { kind: "addedYear" } },
+    "20x5",
+  );
+  await rejected({ name: cv.name, condition: cv.condition, groupBy: { kind: "addedYear" } }, "25");
   const year = await queryFolderWorks(
     adapter,
-    { condition: cv.condition, groupBy: { kind: "addedYear" } },
+    { name: cv.name, condition: cv.condition, groupBy: { kind: "addedYear" } },
     { ...request, group: "2026" },
   );
   assert.equal(year.total, 2);

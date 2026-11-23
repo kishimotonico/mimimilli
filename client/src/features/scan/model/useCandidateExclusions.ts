@@ -28,7 +28,7 @@ export function useCandidateExclusions({ onExcludeError }: UseCandidateExclusion
 
   const exclusionsQuery = useQuery({
     queryKey: SCAN_QUERY_KEYS.candidateExclusions(),
-    queryFn: getScanCandidateExclusions,
+    queryFn: ({ signal }) => getScanCandidateExclusions({ signal }),
   });
 
   const refresh = useCallback(

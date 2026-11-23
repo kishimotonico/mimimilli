@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createClassificationMethods } from "../../src/adapters/real/classificationMethods.ts";
+import { createTagPrefixMethods } from "../../src/adapters/real/tagPrefixMethods.ts";
 import type { UserWorkStateRepository } from "../../src/adapters/real/userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "../../src/adapters/real/workQueryRepository.ts";
 
-test("分類メソッドは real adapter を起動せず直接生成できる", async () => {
+test("タグ prefix のメソッドは real adapter を起動せず直接生成できる", async () => {
   const user = {
     listTagPrefixes: () => [{ prefix: "genre:", label: "ジャンル", color: null, protected: false }],
   } as unknown as UserWorkStateRepository;
 
-  const methods = createClassificationMethods({
+  const methods = createTagPrefixMethods({
     query: {} as unknown as WorkQueryRepository,
     user,
   });

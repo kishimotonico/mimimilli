@@ -41,7 +41,7 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
     }),
   );
   assert.ok(
-    await adapter.appendSmartFolder({
+    await adapter.insertSmartFolder({
       id: "sf-00000000-0000-4000-8000-000000000001",
       name: "保持フォルダー",
       condition: { type: "and", children: [] },

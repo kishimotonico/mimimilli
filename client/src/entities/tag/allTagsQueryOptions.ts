@@ -4,5 +4,5 @@ import { TAG_QUERY_KEYS } from "./queryKeys";
 
 export const allTagsQueryOptions = queryOptions({
   queryKey: TAG_QUERY_KEYS.all(),
-  queryFn: getAllTags,
+  queryFn: ({ signal }) => getAllTags({ signal }),
 });

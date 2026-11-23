@@ -41,18 +41,10 @@ test("PATCH /api/tag-prefixes/:prefix は空オブジェクトを400で拒否す
   );
 });
 
-test("PUT /api/smart-folders/:id は空オブジェクトを400で拒否する", async () => {
-  const app = buildApp();
-  const createRes = await app.request("/api/smart-folders", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: "空拒否テスト", rules: [], sort: "added-desc" }),
-  });
-  const folder = await createRes.json();
-
+test("PATCH /api/smart-folders/:id は空オブジェクトを400で拒否する", async () => {
   await assertEmptyPayloadRejected((app) =>
-    app.request(`/api/smart-folders/${folder.id}`, {
-      method: "PUT",
+    app.request("/api/smart-folders/fav", {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
     }),

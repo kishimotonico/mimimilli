@@ -121,11 +121,9 @@ test("real: カバー実体欠損作品を含む一覧は成功し cover は nul
 test("real: カバー実体欠損作品は値一覧の covers から除外される", async (t) => {
   const { app, work, presentWork } = await setupMissingCoverListQuery(t);
 
-  const res = await app.request("/api/smart-folders/all/groups", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ groupBy: { kind: "addedYear" }, groupSort: "count-desc" }),
-  });
+  const res = await app.request(
+    "/api/smart-folders/all/groups?groupBy=addedYear&groupSort=count-desc",
+  );
   assert.equal(res.status, 200);
   const items = groupValueListSchema.parse(await res.json());
   const year = items.find((item) => item.value === "2026");

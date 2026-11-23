@@ -1,7 +1,15 @@
 // グループ分け（GroupBy）のラベル・アイコン、スマートフォルダーのアイコン。
 // ラベルは tag_prefixes の定義から引く（ADR-0005）。
 
-import { resolveTagPrefix, type GroupBy, type TagPrefix } from "@mimimilli/shared";
+import {
+  isEmptyCondition,
+  resolveTagPrefix,
+  singlePredicateType,
+  type GroupBy,
+  type PredicateType,
+  type SmartFolder,
+  type TagPrefix,
+} from "@mimimilli/shared";
 import type { IconName } from "../../shared/ui/Icon";
 
 export function getGroupByLabel(groupBy: GroupBy, tagPrefixes: readonly TagPrefix[] = []): string {
@@ -34,22 +42,24 @@ export function getGroupByIcon(groupBy: GroupBy): IconName {
   }
 }
 
-const CONDITION_FOLDER_ICONS: Record<string, IconName> = {
-  all: "grid",
-  random: "shuffle",
-  recent: "clock",
+const PREDICATE_FOLDER_ICONS: Partial<Record<PredicateType, IconName>> = {
+  bookmarked: "star",
+  hasError: "err",
+  played: "clock",
   added: "add",
-  fav: "star",
-  error: "err",
 };
 
-/** 既定の条件のフォルダーは ID から、グループ分けのあるフォルダーはそのグループ分けから引く */
-export function getSmartFolderIcon(folder: { id: string; groupBy: GroupBy | null }): IconName {
+type IconSubject = Pick<SmartFolder, "condition" | "sort" | "groupBy">;
+
+/** グループ分けのあるフォルダーはそのグループ分けから、ないものは条件の形から引く。条件が空なら「すべて」と同じで、並びがランダムのときだけランダム */
+export function getSmartFolderIcon(folder: IconSubject): IconName {
   if (folder.groupBy !== null) return getGroupByIcon(folder.groupBy);
-  return CONDITION_FOLDER_ICONS[folder.id] ?? "funnel";
+  if (isEmptyCondition(folder.condition)) return folder.sort === "random" ? "shuffle" : "grid";
+  const type = singlePredicateType(folder.condition);
+  return (type && PREDICATE_FOLDER_ICONS[type]) ?? "funnel";
 }
 
-export interface GroupByRow {
+interface GroupByRow {
   groupBy: GroupBy;
   name: string;
 }

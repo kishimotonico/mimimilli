@@ -22,6 +22,11 @@ test("設定からroot変更すると再設定画面(running)を経て通常画�
 
   await expect(page.getByText("ライブラリを再構築しています")).toBeHidden({ timeout: 20_000 });
   await expect(page.getByRole("button", { name: "設定", exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole("navigation", { name: "ライブラリ" })
+      .getByRole("button", { name: /^お気に入り 0/ }),
+  ).toBeVisible();
 
   assertNoErrors(tracker);
 });
@@ -45,6 +50,12 @@ test("失敗（予約パス）→エラー表示→有効なパスで再試行�
   await expect(page.getByText("ライブラリを再構築しています")).toBeVisible();
   await expect(page.getByText("ライブラリを再構築しています")).toBeHidden({ timeout: 20_000 });
   await expect(page.getByRole("button", { name: "設定", exact: true })).toBeVisible();
+  await expect(
+    page
+      .locator(".mll-results")
+      .getByRole("button", { name: /を選択、Enterで再生$/ })
+      .first(),
+  ).toBeVisible();
 
   assertNoErrors(tracker);
 });

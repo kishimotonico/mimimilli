@@ -118,7 +118,6 @@ function renderDetail(props: Partial<React.ComponentProps<typeof WorkDetail>> = 
       tagSuggestions={[]}
       workPatchMutations={makeWorkPatchMutationsStub()}
       deleteMutation={makeDeleteMutationStub()}
-      onUnregistered={vi.fn()}
       onTagClick={vi.fn()}
       {...props}
     />,
@@ -193,31 +192,29 @@ describe("WorkDetail: 登録解除", () => {
     expect(screen.queryByRole("alertdialog")).toBeNull();
   });
 
-  it("解除に成功するとuseToast経由でsuccessトーストの表示要求を出し、onUnregisteredを呼ぶ", async () => {
+  it("解除に成功するとuseToast経由でsuccessトーストの表示要求を出す", async () => {
     const mutateAsync = vi.fn(async () => {});
-    const onUnregistered = vi.fn();
     const store = getDefaultStore();
     renderDetail({
       work: makeWork({ title: "作品X" }),
       deleteMutation: makeDeleteMutationStub({ mutateAsync }),
-      onUnregistered,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "その他" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
     fireEvent.click(screen.getByRole("button", { name: "解除する" }));
 
-    await waitFor(() => expect(onUnregistered).toHaveBeenCalledTimes(1));
-    const requests = [...store.get(toastRequestsAtom).values()];
-    expect(requests).toContainEqual(
-      expect.objectContaining({
-        message: "「作品X」を登録解除しました",
-        variant: "success",
-      }),
+    await waitFor(() =>
+      expect([...store.get(toastRequestsAtom).values()]).toContainEqual(
+        expect.objectContaining({
+          message: "「作品X」を登録解除しました",
+          variant: "success",
+        }),
+      ),
     );
   });
 
-  it("解除に成功すれば、WorkDetailがアンマウント済みでもトーストとonUnregisteredが届く", async () => {
+  it("解除に成功すれば、WorkDetailがアンマウント済みでもトーストが届く", async () => {
     let resolveDelete!: () => void;
     const mutateAsync = vi.fn(
       () =>
@@ -225,12 +222,10 @@ describe("WorkDetail: 登録解除", () => {
           resolveDelete = resolve;
         }),
     );
-    const onUnregistered = vi.fn();
     const store = getDefaultStore();
     const view = renderDetail({
       work: makeWork({ title: "作品Y" }),
       deleteMutation: makeDeleteMutationStub({ mutateAsync }),
-      onUnregistered,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "その他" }));
@@ -239,9 +234,10 @@ describe("WorkDetail: 登録解除", () => {
     view.unmount();
     resolveDelete();
 
-    await waitFor(() => expect(onUnregistered).toHaveBeenCalledTimes(1));
-    expect([...store.get(toastRequestsAtom).values()]).toContainEqual(
-      expect.objectContaining({ message: "「作品Y」を登録解除しました" }),
+    await waitFor(() =>
+      expect([...store.get(toastRequestsAtom).values()]).toContainEqual(
+        expect.objectContaining({ message: "「作品Y」を登録解除しました" }),
+      ),
     );
   });
 });

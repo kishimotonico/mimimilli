@@ -18,14 +18,9 @@ export interface RouteParseResult<R> {
   apply: (current: R) => R;
 }
 
-/** 履歴の移動の様子。delta は移動先の履歴の位置から今の位置を引いた値（初回ロードは 0） */
-export interface ParseContext {
-  delta: number;
-}
-
 export interface RouteCodec<R> {
   /** entryState は履歴エントリーに書かれていた値。無ければ undefined */
-  parse: (href: string, entryState: unknown, context?: ParseContext) => RouteParseResult<R>;
+  parse: (href: string, entryState: unknown) => RouteParseResult<R>;
   serialize: (route: R) => SerializedRoute;
 }
 
@@ -102,9 +97,8 @@ export function useRouteHistorySync<R>(routeStore: RouteStore<R>, codec: RouteCo
       alwaysMark: boolean,
       direction: NavigationDirection,
       state: unknown,
-      delta: number,
     ) => {
-      const parsed = codec.parse(window.location.href, readHistoryEntryState(state), { delta });
+      const parsed = codec.parse(window.location.href, readHistoryEntryState(state));
       for (const warning of parsed.warnings) console.warn(`[navigation] ${warning}`);
       if (alwaysMark || parsed.canonicalUrl !== currentUrl()) {
         history.replaceState(stateWithMarker(index), "", parsed.canonicalUrl);
@@ -125,28 +119,27 @@ export function useRouteHistorySync<R>(routeStore: RouteStore<R>, codec: RouteCo
       const index = readMarkerIndex(history.state);
       const current = index ?? 0;
       moveTo(current, index === null ? current : readMaxIndex(current));
-      applyLocation(current, true, "forward", history.state, 0);
+      applyLocation(current, true, "forward", history.state);
     }
 
     const handlePopState = (event: PopStateEvent) => {
       const index = readMarkerIndex(event.state);
       const next = index ?? 0;
       const direction = next < indexRef.current ? "back" : "forward";
-      const delta = next - indexRef.current;
       moveTo(next, Math.max(maxIndexRef.current, readMaxIndex(next)));
-      applyLocation(next, index === null, direction, event.state, delta);
+      applyLocation(next, index === null, direction, event.state);
     };
 
     // navigate ごとの履歴操作を、描画を待たずに呼ばれた順で1つずつ反映する。描画後の effect で
     // まとめて書くと、直前の replace の内容が、続く push の前のエントリーに残らない
     const writePending = () => {
-      for (const { route, write, pushSameUrl } of store.set(sync.takePendingOpsAtom)) {
+      for (const { route, write } of store.set(sync.takePendingOpsAtom)) {
         const { url: nextUrl, entryState } = codec.serialize(route);
         const urlChanged = nextUrl !== currentUrl();
         const stateChanged = !sameEntryState(readHistoryEntryState(history.state), entryState);
         if (!urlChanged && !stateChanged) continue;
 
-        if (write === "push" && (urlChanged || pushSameUrl)) {
+        if (write === "push") {
           const nextIndex = indexRef.current + 1;
           moveTo(nextIndex, nextIndex);
           history.pushState(stateWithMarker(nextIndex, entryState), "", nextUrl);

@@ -131,12 +131,18 @@ test("＋メニュー: 既定から追加・グループ分けの追加・複製
   await rail(page).getByRole("button", { name: "追加", exact: true }).click();
   await rail(page).getByRole("menuitem", { name: "「ランダム」を複製" }).click();
   await expect(dialog(page).getByLabel("名前")).toHaveValue("ランダム（コピー）");
-  await expect(dialog(page).getByLabel("既定の並び")).toHaveValue("random");
+  await expect(dialog(page).getByLabel("既定のソート")).toHaveValue("random");
   await dialog(page).getByRole("button", { name: "保存" }).click();
   await expect(rail(page).getByRole("button", { name: /^ランダム（コピー）/ })).toHaveAttribute(
     "aria-current",
     "true",
   );
+  await expect(
+    page
+      .locator(".mll-results")
+      .getByRole("button", { name: /を選択、Enterで再生$/ })
+      .first(),
+  ).toBeVisible();
   assertNoErrors(tracker);
 });
 
@@ -178,19 +184,40 @@ test("編集のダイアログ: 自作の条件を × で外すと件数が変�
   assertNoErrors(tracker);
 });
 
-test("既定・「すべて」の編集権限と削除", async ({ page }) => {
+test("既定のスマートフォルダーの条件とグループ分けを変えて保存でき、グループ分けの行として開ける", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+  await startEditing(page);
+  await folderRow(page, "fav")
+    .getByRole("button", { name: /を編集$/ })
+    .click();
+  await dialog(page).getByRole("button", { name: "この条件を外す" }).click();
+  await dialog(page).getByLabel("グループ分け").selectOption("tag");
+  await dialog(page).getByRole("button", { name: "保存" }).click();
+  await expect(dialog(page)).toHaveCount(0);
+  await rail(page).getByRole("button", { name: "完了" }).click();
+  await expect(rail(page).getByRole("button", { name: /^お気に入り/ })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  assertNoErrors(tracker);
+});
+
+test("「すべて」だけ編集が限られ、既定は自作と同じに編集できる", async ({ page }) => {
   const tracker = trackErrors(page);
   await openApp(page);
   await startEditing(page);
 
-  // 既定のもの: 条件は読み取り専用、グループ分けは変えられない
+  // 既定のもの: 自作と同じく条件もグループ分けも変えられる
   await folderRow(page, "fav")
     .getByRole("button", { name: /を編集$/ })
     .click();
   await expect(dialog(page).locator(".mll-condrow")).toHaveCount(1);
-  await expect(dialog(page).getByRole("button", { name: "この条件を外す" })).toHaveCount(0);
+  await expect(dialog(page).getByRole("button", { name: "この条件を外す" })).toBeEnabled();
   await expect(dialog(page).getByLabel("名前")).toBeEnabled();
-  await expect(dialog(page).getByLabel("グループ分け")).toBeDisabled();
+  await expect(dialog(page).getByLabel("グループ分け")).toBeEnabled();
   await dialog(page).getByRole("button", { name: "キャンセル" }).click();
 
   // 「すべて」: 名前・グループ分けは変えられず、削除もできない。並びは「すべて」と同じを選べない
@@ -199,7 +226,7 @@ test("既定・「すべて」の編集権限と削除", async ({ page }) => {
     .click();
   await expect(dialog(page).getByLabel("名前")).toBeDisabled();
   await expect(dialog(page).getByLabel("グループ分け")).toBeDisabled();
-  await expect(dialog(page).getByLabel("既定の並び").locator("option[value='']")).toHaveCount(0);
+  await expect(dialog(page).getByLabel("既定のソート").locator("option[value='']")).toHaveCount(0);
   await dialog(page).getByRole("button", { name: "キャンセル" }).click();
   await expect(folderRow(page, "all").getByRole("button", { name: "削除" })).toHaveCount(0);
   assertNoErrors(tracker);

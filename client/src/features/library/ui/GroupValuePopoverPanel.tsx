@@ -33,7 +33,7 @@ interface GroupValuePopoverPanelProps {
   floatingStyles: CSSProperties;
   panelHandlers?: HoverGroupPanelHandlers;
   isSelected: (value: string) => boolean;
-  onSelect: (item: GroupValueItem, event: { ctrlKey: boolean; metaKey: boolean }) => void;
+  onSelect: (item: GroupValueItem) => void;
   /** 行の＋ボタン。渡したときだけ出る */
   onAdd?: (item: GroupValueItem) => void;
   close: () => void;

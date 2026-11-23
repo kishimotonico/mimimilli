@@ -1,8 +1,8 @@
 # ADR-0026: 分類値の一覧を全作品への独立した入口とする
 
-- ステータス: 承認
+- ステータス: 廃止（[ADR-0040](0040-smart-folder-condition-tree.md)・[ADR-0041](0041-library-sidebar-shell-navigation.md)により置換）
 - 日付: 2026-09-21
-- 関連: [ADR-0012](0012-library-axis-as-value-browse.md)（決定1を本ADRで限定）、[ADR-0013](0013-tag-click-replaces-all.md)、[ADR-0016](0016-view-axis-consolidation.md)、[ADR-0040](0040-smart-folder-condition-tree.md)（任意の検索式を扱う汎用の AST を導入しない等の3文を撤回し、値一覧の件数の意味を改訂）、[ADR-0041](0041-library-sidebar-shell-navigation.md)（値一覧の Ctrl+クリックを改訂）、backlog TASK-457
+- 関連: [ADR-0012](0012-library-axis-as-value-browse.md)（決定1を本ADRで限定）、[ADR-0013](0013-tag-click-replaces-all.md)、[ADR-0016](0016-view-axis-consolidation.md)、[ADR-0040](0040-smart-folder-condition-tree.md)（任意の検索式を扱う汎用の AST を導入しない等の3文を撤回し、値一覧の件数の意味を改訂）、[ADR-0041](0041-library-sidebar-shell-navigation.md)（値一覧でもチップと検索語を効かせ、本ADRの独立した入口の決定を廃止。値一覧の Ctrl+クリックも改訂）、backlog TASK-457
 
 ## 文脈
 

@@ -1,0 +1,104 @@
+// スマートフォルダーの既定テンプレート（ADR-0040）。初期データと「既定から追加」の元
+import type { Condition } from "./condition.ts";
+import { defaultGroupSort, type GroupBy } from "./groupFilter.ts";
+import type { SortId } from "./library.ts";
+import {
+  ALL_SMART_FOLDER_ID,
+  ALL_SMART_FOLDER_NAME,
+  type SmartFolderWrite,
+} from "./smartFolder.ts";
+
+export type SmartFolderTemplate = SmartFolderWrite & {
+  id: string;
+  /** 初回起動時に投入する */
+  seeded: boolean;
+};
+
+const and = (...children: Condition[]): Condition => ({ type: "and", children });
+const grouped = (
+  id: string,
+  name: string,
+  groupBy: GroupBy,
+  options: { seeded?: boolean; sort?: SortId } = {},
+): SmartFolderTemplate => ({
+  id,
+  name,
+  condition: and(),
+  sort: options.sort ?? null,
+  groupBy,
+  groupSort: defaultGroupSort(groupBy),
+  seeded: options.seeded ?? true,
+});
+
+export const SMART_FOLDER_TEMPLATES: readonly SmartFolderTemplate[] = [
+  {
+    id: ALL_SMART_FOLDER_ID,
+    name: ALL_SMART_FOLDER_NAME,
+    condition: and(),
+    sort: "added-desc",
+    groupBy: null,
+    groupSort: null,
+    seeded: true,
+  },
+  {
+    id: "random",
+    name: "ランダム",
+    condition: and(),
+    sort: "random",
+    groupBy: null,
+    groupSort: null,
+    seeded: true,
+  },
+  {
+    id: "recent",
+    name: "最近再生",
+    condition: and({ type: "played" }),
+    sort: "last-played",
+    groupBy: null,
+    groupSort: null,
+    seeded: true,
+  },
+  {
+    id: "added",
+    name: "最近追加",
+    condition: and({ type: "added", withinDays: 30 }),
+    sort: "added-desc",
+    groupBy: null,
+    groupSort: null,
+    seeded: true,
+  },
+  {
+    id: "fav",
+    name: "お気に入り",
+    condition: and({ type: "bookmarked" }),
+    sort: null,
+    groupBy: null,
+    groupSort: null,
+    seeded: true,
+  },
+  {
+    id: "error",
+    name: "エラー",
+    condition: and({ type: "hasError" }),
+    sort: null,
+    groupBy: null,
+    groupSort: null,
+    seeded: true,
+  },
+  grouped("by-cv", "CV別", { kind: "prefix", prefix: "cv" }),
+  grouped("by-circle", "サークル別", { kind: "prefix", prefix: "サークル" }),
+  grouped("by-category", "カテゴリ別", { kind: "prefix", prefix: "カテゴリ" }),
+  grouped("by-tag", "タグ別", { kind: "tag" }),
+  grouped("by-year", "追加年別", { kind: "addedYear" }),
+  grouped(
+    "by-series",
+    "シリーズ別",
+    { kind: "prefix", prefix: "シリーズ" },
+    { seeded: false, sort: "title-asc" },
+  ),
+  grouped("by-rating", "レーティング別", { kind: "prefix", prefix: "rating" }, { seeded: false }),
+];
+
+export function findSmartFolderTemplate(id: string): SmartFolderTemplate | undefined {
+  return SMART_FOLDER_TEMPLATES.find((template) => template.id === id);
+}

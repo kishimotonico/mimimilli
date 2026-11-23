@@ -9,7 +9,7 @@ import WorkListPane from "./WorkListPane";
 import PreviewPaneSlide from "./PreviewPaneSlide";
 import type { WorkResultsProps } from "./workResultsProps";
 import { DataIntegrityWarningBanner } from "./DataIntegrityWarningBanner";
-import { ErrorViewBulkUnregisterBanner } from "./ErrorViewBulkUnregisterBanner";
+import { HasErrorBulkUnregisterBanner } from "./HasErrorBulkUnregisterBanner";
 import type LibraryWorksBoundary from "./LibraryWorksBoundary";
 
 type WorksResult = Parameters<ComponentProps<typeof LibraryWorksBoundary>["children"]>[0];
@@ -21,7 +21,7 @@ interface LibraryResultsPaneProps {
   isPending: boolean;
   showGrid: boolean;
   dockedBarActive: boolean;
-  isErrorView: boolean;
+  isErrorRow: boolean;
   missingWorksCount: number | undefined;
   tagSuggestions: string[];
   searchQuery: string;
@@ -40,7 +40,7 @@ export default function LibraryResultsPane({
   isPending,
   showGrid,
   dockedBarActive,
-  isErrorView,
+  isErrorRow,
   missingWorksCount,
   tagSuggestions,
   searchQuery,
@@ -50,15 +50,10 @@ export default function LibraryResultsPane({
   previewActions,
   onTagClick,
 }: LibraryResultsPaneProps) {
-  const resultsBanner = isErrorView ? (
+  const resultsBanner = isErrorRow ? (
     <div className="flex flex-col gap-2">
       <DataIntegrityWarningBanner />
-      <ErrorViewBulkUnregisterBanner
-        missingCount={missingWorksCount}
-        onUnregistered={() => {
-          if (selectedWork?.status === "missing") nav.selectWork(null);
-        }}
-      />
+      <HasErrorBulkUnregisterBanner missingCount={missingWorksCount} />
     </div>
   ) : undefined;
 

@@ -21,13 +21,10 @@ export interface FilesUrlState {
   selectedRelPath: string[] | null;
 }
 
-export type NavigationScreenUrlState =
+export type NavigationUrlState =
   | { mode: "library"; library: LibraryUrlState }
   | { mode: "files"; files: FilesUrlState }
   | { mode: "workDetail"; workId: string };
-
-/** 画面の URL に、再生中の層を表す `np=1` を足すかどうかを持つ */
-export type NavigationUrlState = NavigationScreenUrlState & { np: boolean };
 
 export interface NavigationParseResult {
   state: NavigationUrlState;
@@ -47,7 +44,6 @@ function defaultResult(warnings: string[]): NavigationParseResult {
   const state: NavigationUrlState = {
     mode: "library",
     library: { ...DEFAULT_LIBRARY_URL_STATE },
-    np: false,
   };
   return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
 }
@@ -105,7 +101,6 @@ function parseSelectedRelPath(value: string, warnings: string[]): string[] | nul
 export function parseNavigationUrl(input: string | URL): NavigationParseResult {
   const url = input instanceof URL ? input : new URL(input, "http://mimimilli.local");
   const warnings: string[] = [];
-  const np = url.searchParams.get("np") === "1";
 
   if (url.hash) warnings.push(`未対応の URL hash を削除しました: ${url.hash}`);
 
@@ -136,7 +131,6 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
         selectedWorkId: url.searchParams.get("work") || null,
         q: url.searchParams.get("q") ?? "",
       },
-      np,
     };
     return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
   }
@@ -147,7 +141,7 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
       warnings.push(`作品詳細の階層として不正な URL を拒否しました: ${url.pathname}`);
       return defaultResult(warnings);
     }
-    const state: NavigationUrlState = { mode: "workDetail", workId, np };
+    const state: NavigationUrlState = { mode: "workDetail", workId };
     return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
   }
 
@@ -160,7 +154,6 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
     const state: NavigationUrlState = {
       mode: "files",
       files: { relPath: segments.slice(1), selectedRelPath },
-      np,
     };
     return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
   }
@@ -194,7 +187,6 @@ export function serializeNavigationUrl(state: NavigationUrlState): string {
     }
   }
 
-  if (state.np) params.set("np", "1");
   const search = params.toString();
   return search ? `${pathname}?${search}` : pathname;
 }

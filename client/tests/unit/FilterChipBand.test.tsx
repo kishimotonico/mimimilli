@@ -3,12 +3,12 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import FilterChipBand from "../../src/features/library/ui/FilterChipBand";
-import { mockApi, type ApiMock } from "../helpers/api";
+import { groupsQueryOf, mockApi, type ApiMock } from "../helpers/api";
 
 let api: ApiMock;
 
 beforeEach(() => {
-  api = mockApi({ "POST /api/smart-folders/:id/groups": [] });
+  api = mockApi({ "GET /api/smart-folders/:id/groups": [] });
 });
 
 afterEach(cleanup);
@@ -40,7 +40,7 @@ describe("FilterChipBand のチップ", () => {
     expect(screen.queryByRole("button", { name: "cv/藤田茜" })).toBeNull();
     await userEvent.click(screen.getByText("藤田茜"));
 
-    expect(api.requestsTo("POST /api/smart-folders/:id/groups")).toHaveLength(0);
+    expect(api.requestsTo("GET /api/smart-folders/:id/groups")).toHaveLength(0);
   });
 
   it("×で個別解除でき、AND ラベルと「すべてクリア」は無い", async () => {
@@ -54,19 +54,19 @@ describe("FilterChipBand のチップ", () => {
     expect(screen.queryByText("AND")).toBeNull();
   });
 
-  it("「＋絞り込み」の候補は開いている一覧の条件・チップ・検索語を母集団にして POST /:id/groups で取る", async () => {
+  it("「＋絞り込み」の候補は開いている一覧の条件・チップ・検索語を母集団にして GET /:id/groups で取る", async () => {
     renderFilterChipBand();
 
     await userEvent.click(screen.getByRole("button", { name: /絞り込み$/ }));
     await userEvent.click(screen.getByRole("button", { name: "タグ" }));
 
     await waitFor(() =>
-      expect(api.requestsTo("POST /api/smart-folders/:id/groups")).toHaveLength(1),
+      expect(api.requestsTo("GET /api/smart-folders/:id/groups")).toHaveLength(1),
     );
-    const [request] = api.requestsTo("POST /api/smart-folders/:id/groups");
+    const [request] = api.requestsTo("GET /api/smart-folders/:id/groups");
     expect(request?.params.id).toBe("fav");
-    expect(request?.body).toEqual({
-      groupBy: { kind: "tag" },
+    expect(request && groupsQueryOf(request)).toEqual({
+      groupBy: "tag",
       groupSort: "count-desc",
       tags: ["cv/藤田茜"],
       q: "雨",
@@ -100,25 +100,28 @@ describe("FilterChipBand の件数表示", () => {
   });
 });
 
-describe("値一覧ペイン表示中の件数ラベルと＋絞り込みの扱い（ADR-0026）", () => {
-  it("valueListItemCount指定時は絞り込み後件数の代わりに分類数を出す", () => {
-    renderFilterChipBand(undefined, { valueListItemCount: 12, groupValueScope: undefined });
-    expect(screen.getByText("12 分類")).toBeInTheDocument();
+describe("値一覧ペイン表示中の件数ラベルと＋絞り込みの扱い（ADR-0041）", () => {
+  it("valueList指定時は絞り込み後件数の代わりにグループ分けの名前と件数を出す", () => {
+    renderFilterChipBand(undefined, {
+      valueList: { label: "CV", count: 12 },
+      groupValueScope: undefined,
+    });
+    expect(screen.getByText("CV 12 件")).toBeInTheDocument();
     expect(screen.queryByText(/^\d+ 件$/)).toBeNull();
   });
 
-  it("valueListItemCount指定時は worksTotal が渡っても絞り込み後件数を出さない", () => {
-    renderFilterChipBand(120, { valueListItemCount: 12 });
+  it("valueList指定時は worksTotal が渡っても絞り込み後件数を出さない", () => {
+    renderFilterChipBand(120, { valueList: { label: "CV", count: 12 } });
     expect(screen.queryByText("120 件")).toBeNull();
-    expect(screen.getByText("12 分類")).toBeInTheDocument();
+    expect(screen.getByText("CV 12 件")).toBeInTheDocument();
   });
 
-  it("valueListItemCount指定時は「＋絞り込み」ボタンを出さない（値一覧はAND追加を提供しない）", () => {
-    renderFilterChipBand(undefined, { valueListItemCount: 12 });
-    expect(screen.queryByRole("button", { name: /絞り込み$/ })).toBeNull();
+  it("valueList指定時も「＋絞り込み」ボタンを出す（値一覧でもチップを足せる）", () => {
+    renderFilterChipBand(undefined, { valueList: { label: "CV", count: 12 } });
+    expect(screen.getByRole("button", { name: /絞り込み$/ })).toBeInTheDocument();
   });
 
-  it("valueListItemCount未指定時は「＋絞り込み」ボタンを出す（回帰確認）", () => {
+  it("valueList未指定時は「＋絞り込み」ボタンを出す（回帰確認）", () => {
     renderFilterChipBand();
     expect(screen.getByRole("button", { name: /絞り込み$/ })).toBeInTheDocument();
   });

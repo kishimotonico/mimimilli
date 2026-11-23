@@ -15,7 +15,7 @@ export default function LibraryGridControls() {
   const [gridLayoutMode, setGridLayoutMode] = useAtom(libraryGridLayoutModeAtom);
   const [tileSize, setTileSize] = useAtom(libraryTileSizeAtom);
   // 作品グリッド・値グリッドのどちらかが実際に描画されているか。list/grid の決定は
-  // libraryViewModeAtom のみに依存する（ADR-0012 §3・§5。強制グリッドの上書きは廃止済み）。
+  // libraryViewModeAtom のみに依存する（ADR-0012 §3・§5）。
   // タイルサイズは両方が共有するが、敷き詰め形式（1:1/縦横比）は作品グリッド専用
   // （値グリッドのコラージュは常に正方形で、この設定を読まない）。
   const showGrid = viewMode === "grid";

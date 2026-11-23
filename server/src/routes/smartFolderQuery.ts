@@ -18,6 +18,7 @@ import type { DataAdapter } from "../adapter/index.ts";
 import { invalidRequest } from "../lib/httpError.ts";
 
 export interface QueriedSmartFolder {
+  name: string;
   condition: Condition;
   groupBy: GroupBy | null;
 }
@@ -29,11 +30,13 @@ function selectedGroup(
 ): { by: GroupBy; value: string } | undefined {
   if (value === undefined) return undefined;
   const by = folder.groupBy;
-  if (by === null) invalidRequest("グループ分けのないスマートフォルダーです");
+  if (by === null) invalidRequest(`「${folder.name}」にはグループ分けがありません`);
   const normalized = normalizeGroupValue(by, value);
   if (normalized === null) {
     invalidRequest(
-      by.kind === "addedYear" ? "追加年は4桁の年で指定してください" : "グループの値が不正です",
+      by.kind === "addedYear"
+        ? "追加年は4桁の年で指定してください"
+        : `「${folder.name}」のグループの指定が不正です`,
     );
   }
   return { by, value: normalized };
@@ -43,7 +46,7 @@ function selectedGroup(
 export function parseSmartFolderWorksRequest(raw: unknown): SmartFolderWorksRequest {
   const parsed = smartFolderWorksRequestSchema.safeParse(raw);
   if (!parsed.success) {
-    invalidRequest(parsed.error.issues[0]?.message ?? "スマートフォルダーの要求が不正です");
+    invalidRequest(parsed.error.issues[0]?.message ?? "作品一覧の要求が不正です");
   }
   return parsed.data;
 }
@@ -51,7 +54,7 @@ export function parseSmartFolderWorksRequest(raw: unknown): SmartFolderWorksRequ
 export function parseSmartFolderGroupsRequest(raw: unknown): SmartFolderGroupsRequest {
   const parsed = smartFolderGroupsRequestSchema.safeParse(raw);
   if (!parsed.success) {
-    invalidRequest(parsed.error.issues[0]?.message ?? "値一覧の要求が不正です");
+    invalidRequest(parsed.error.issues[0]?.message ?? "グループ分けの要求が不正です");
   }
   return parsed.data;
 }

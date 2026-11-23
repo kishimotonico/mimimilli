@@ -1,5 +1,5 @@
 // 値一覧の並び（GroupSortId）の語彙と、列見出しの切り替え規則（ADR-0040・ADR-0041）。
-// 並べるのはサーバー（POST /smart-folders/:id/groups）で、client は選んだ ID を送るだけ。
+// 並べるのはサーバー（GET /smart-folders/:id/groups）で、client は選んだ ID を送るだけ。
 
 import type { GroupBy, GroupSortId } from "@mimimilli/shared";
 

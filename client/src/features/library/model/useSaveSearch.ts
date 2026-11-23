@@ -14,7 +14,6 @@ import {
 } from "./saveSearch";
 import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
 import type { LibraryViewActions, LibraryViewState } from "./useLibraryNavigation";
-import { useBeginSettleLibraryFolder } from "./useSettleLibraryFolder";
 import { useSmartFolderEditor } from "./useSmartFolderEditor";
 
 export interface SaveSearchActions {
@@ -25,17 +24,16 @@ export interface SaveSearchActions {
   overwrite: () => Promise<void>;
 }
 
-/** 「検索を保存」「別名で保存」。名前を入れるダイアログを開く。作品一覧のときだけ開く */
+/** 「検索を保存」「別名で保存」。名前を入れるダイアログを開く */
 export function useOpenSaveDialog(view: ResolvedLibraryView | null): () => void {
   const setDialog = useSetAtom(smartFolderDialogAtom);
   return useCallback(() => {
-    if (view?.kind === "works") setDialog(saveDialogTarget(view));
+    if (view) setDialog(saveDialogTarget(view));
   }, [view, setDialog]);
 }
 
 export function useSaveSearch(nav: LibraryViewState & LibraryViewActions): SaveSearchActions {
   const view = nav.foldersStatus === "ready" ? nav.view : null;
-  const beginSettle = useBeginSettleLibraryFolder();
   const editor = useSmartFolderEditor();
   const toast = useToast();
   const openSaveDialog = useOpenSaveDialog(view);
@@ -46,12 +44,13 @@ export function useSaveSearch(nav: LibraryViewState & LibraryViewActions): SaveS
     if (overwriting.current) return;
     overwriting.current = true;
     const { folder } = view;
-    const settle = beginSettle();
     const undoChange = overwriteUndoChange(view);
-    const saved = await editor.overwriteCondition(folder.id, overwriteChange(view));
+    const saved = await editor.patch(folder.id, overwriteChange(view), {
+      failureMessage: `「${folder.name}」を上書きできませんでした`,
+      reenter: true,
+    });
     overwriting.current = false;
     if (!saved) return;
-    settle(folder.id);
     let undone = false;
     toast.show({
       message: `「${folder.name}」を上書きしました`,
@@ -61,12 +60,12 @@ export function useSaveSearch(nav: LibraryViewState & LibraryViewActions): SaveS
         if (undone) return;
         undone = true;
         toast.dismiss();
-        void editor.overwriteCondition(folder.id, undoChange, "元に戻せませんでした");
+        void editor.patch(folder.id, undoChange, { failureMessage: "元に戻せませんでした" });
       },
       priority: "action",
       dismissOnUnmount: false,
     });
-  }, [view, beginSettle, editor, toast]);
+  }, [view, editor, toast]);
 
   return { offer: view ? saveOffer(view) : null, openSaveDialog, overwrite };
 }

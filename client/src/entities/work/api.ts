@@ -46,16 +46,19 @@ import {
 } from "@mimimilli/shared";
 
 /** GET /works/:id は存在しない場合404を返す契約。呼び出し側はnull分岐でなくエラー（TanStack QueryのisError等）で扱う */
-export async function getWork(id: string): Promise<Work> {
-  return getParsed(workSchema, `/works/${encodeURIComponent(id)}`);
+export async function getWork(id: string, options?: { signal?: AbortSignal }): Promise<Work> {
+  return getParsed(workSchema, `/works/${encodeURIComponent(id)}`, options);
 }
 
 export async function prepareWorkPlayback(id: string): Promise<Work> {
   return postParsed(workSchema, `/works/${encodeURIComponent(id)}/playback-preparation`);
 }
 
-export async function getWorkEditSnapshot(id: string): Promise<WorkEditSnapshot> {
-  return getParsed(workEditSnapshotSchema, `/works/${encodeURIComponent(id)}/source`);
+export async function getWorkEditSnapshot(
+  id: string,
+  options?: { signal?: AbortSignal },
+): Promise<WorkEditSnapshot> {
+  return getParsed(workEditSnapshotSchema, `/works/${encodeURIComponent(id)}/source`, options);
 }
 
 export async function projectWorkSource(path: WorkspacePath): Promise<WorkSourceMutationResult> {
@@ -160,8 +163,8 @@ export async function deleteWork(workId: string): Promise<void> {
 }
 
 /** status === "missing" の作品数（一括登録解除の確認ダイアログ用） */
-export async function getMissingWorksCount(): Promise<number> {
-  const { count } = await getParsed(missingWorksCountSchema, "/works/missing-count");
+export async function getMissingWorksCount(options?: { signal?: AbortSignal }): Promise<number> {
+  const { count } = await getParsed(missingWorksCountSchema, "/works/missing-count", options);
   return count;
 }
 

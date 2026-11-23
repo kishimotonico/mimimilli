@@ -63,11 +63,11 @@ describe("bookmarkActiveListHandler: 条件がお気に入りに依存するか"
     expect(await applyBookmark(condition)).toBe(0);
   });
 
-  it("値一覧・読めない行は一覧を引き受けない", () => {
-    const broken = buildSmartFolder({ id: "sf-b", condition: null });
-    const view = resolveLibraryView({ ...createInitialAppRoute().library, folderId: "sf-b" }, [
+  it("値一覧は一覧を引き受けない", () => {
+    const grouped = buildSmartFolder({ id: "sf-g", groupBy: { kind: "tag" } });
+    const view = resolveLibraryView({ ...createInitialAppRoute().library, folderId: "sf-g" }, [
       ...defaultSmartFolders(),
-      broken,
+      grouped,
     ]);
     expect(bookmarkActiveListHandler(view, "")).toBeNull();
   });

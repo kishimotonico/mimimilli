@@ -25,6 +25,12 @@ export function folderWorksKey(view: WorksView, searchQuery: string): QueryKey {
   return SMART_FOLDER_QUERY_KEYS.works(view.folder.id, folderWorksParams(view, searchQuery));
 }
 
+/** グループの値を指定した作品一覧の query key か。グループ分けが変わると、その値は意味を失う */
+export function isGroupedWorksKey(queryKey: QueryKey): boolean {
+  const params = queryKey[2] as Pick<SmartFolderWorksParams, "group"> | undefined;
+  return params?.group != null;
+}
+
 /** 作品一覧の描画結果（グリッド・リスト・エラー境界）を再マウントすべきタイミングを表すキー。
  *  取得するクエリが変わるときだけ変わる */
 export function folderWorksResetKey(view: WorksView, searchQuery: string): string {

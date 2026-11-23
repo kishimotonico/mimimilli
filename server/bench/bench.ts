@@ -129,47 +129,39 @@ async function main(): Promise<void> {
     }),
     {
       name: "smart-folder-no-rules",
-      path: `/api/smart-folders/${manifest.smartFolderNoRulesId}/works?sort=added-desc`,
+      path: `/api/smart-folders/${manifest.smartFolderAllId}/works?sort=added-desc`,
       run: async () =>
-        request(`/api/smart-folders/${manifest.smartFolderNoRulesId}/works?sort=added-desc`),
+        request(`/api/smart-folders/${manifest.smartFolderAllId}/works?sort=added-desc`),
     },
     {
       name: "smart-folder-with-rules",
-      path: `/api/smart-folders/${manifest.smartFolderWithRulesId}/works?sort=added-desc`,
+      path: `/api/smart-folders/${manifest.smartFolderTaggedId}/works?sort=added-desc`,
       run: async () =>
-        request(`/api/smart-folders/${manifest.smartFolderWithRulesId}/works?sort=added-desc`),
+        request(`/api/smart-folders/${manifest.smartFolderTaggedId}/works?sort=added-desc`),
     },
     ...(
       [
-        ["cv", { kind: "prefix", prefix: "cv" }],
-        ["サークル", { kind: "prefix", prefix: "サークル" }],
-        ["tag", { kind: "tag" }],
-        ["year", { kind: "addedYear" }],
+        ["cv", "prefix:cv"],
+        ["サークル", "prefix:サークル"],
+        ["tag", "tag"],
+        ["year", "addedYear"],
       ] as const
-    ).map(([name, groupBy]) => ({
-      name: `values-${name}`,
-      path: "/api/smart-folders/all/groups",
-      run: async () =>
-        app.request("/api/smart-folders/all/groups", {
-          method: "POST",
-          headers: { Host: "127.0.0.1:8080", "Content-Type": "application/json" },
-          body: JSON.stringify({ groupBy }),
-        }),
-    })),
+    ).map(([name, groupBy]) => {
+      const path = `/api/smart-folders/all/groups?groupBy=${encodeURIComponent(groupBy)}&groupSort=count-desc`;
+      return { name: `values-${name}`, path, run: async () => request(path) };
+    }),
     {
       name: "values-cv-in-smart-folder",
-      path: `/api/smart-folders/${manifest.smartFolderWithRulesId}/groups`,
+      path: `/api/smart-folders/${manifest.smartFolderTaggedId}/groups?groupBy=prefix:cv&groupSort=count-desc`,
       run: async () =>
-        app.request(`/api/smart-folders/${manifest.smartFolderWithRulesId}/groups`, {
-          method: "POST",
-          headers: { Host: "127.0.0.1:8080", "Content-Type": "application/json" },
-          body: JSON.stringify({ groupBy: { kind: "prefix", prefix: "cv" } }),
-        }),
+        request(
+          `/api/smart-folders/${manifest.smartFolderTaggedId}/groups?groupBy=prefix:cv&groupSort=count-desc`,
+        ),
     },
     {
       name: "counts-smart-folders",
-      path: "/api/smart-folders",
-      run: async () => request("/api/smart-folders"),
+      path: "/api/smart-folders/counts",
+      run: async () => request("/api/smart-folders/counts"),
     },
     {
       name: "fs-root",

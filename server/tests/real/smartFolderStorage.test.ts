@@ -2,19 +2,15 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
-import {
-  conditionKey,
-  SMART_FOLDER_TEMPLATES,
-  findSmartFolderTemplate,
-  type SmartFolder,
-} from "@mimimilli/shared";
+import { eq } from "drizzle-orm";
+import { SMART_FOLDER_TEMPLATES, findSmartFolderTemplate } from "@mimimilli/shared";
+import { UnreadableSmartFolderError } from "../../src/errors.ts";
 import { createApp } from "../helpers/testApp.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { smartFolders } from "../../src/adapters/real/userSchema.ts";
-import { createWorkRepos } from "../helpers/workTestUtils.ts";
 import { captureLogs, categoryRecords } from "../helpers/logCapture.ts";
-import { makeTestDirectory, makeTestScope } from "../helpers/sampleLibrary.ts";
+import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
 
 function openAdapter(directory: ReturnType<typeof makeTestDirectory>) {
   return directory.own(
@@ -29,28 +25,6 @@ function openAdapter(directory: ReturnType<typeof makeTestDirectory>) {
     }),
   );
 }
-
-test("migration が入れる「すべて」は shared のテンプレートと一致する", (t) => {
-  const scope = makeTestScope();
-  t.after(scope.cleanup);
-  const db = scope.own(openDb({ kind: "memory" }));
-  const { user } = createWorkRepos(db);
-
-  const rows = user.listSmartFolders();
-  assert.deepEqual(
-    rows.map((row) => row.id),
-    ["all"],
-  );
-  const row = rows[0]!;
-  const template = findSmartFolderTemplate("all")!;
-  assert.equal(row.name, template.name);
-  assert.equal(row.sort, template.sort);
-  assert.equal(row.groupBy, template.groupBy);
-  assert.equal(row.groupSort, template.groupSort);
-  assert.equal(row.position, 0);
-  assert.ok(row.condition && conditionKey(row.condition) === conditionKey(template.condition));
-  assert.ok(Number.isFinite(Date.parse(row.createdAt)));
-});
 
 test("既定は初回だけ投入され、全部消しても再起動で戻らない", async (t) => {
   const directory = makeTestDirectory("sf-seed");
@@ -70,7 +44,7 @@ test("既定は初回だけ投入され、全部消しても再起動で戻ら�
     (await second.listSmartFolders()).map((row) => row.id),
     ["all"],
   );
-  const added = await second.appendSmartFolder({
+  const added = await second.insertSmartFolder({
     id: "fav",
     name: "お気に入り",
     condition: findSmartFolderTemplate("fav")!.condition,
@@ -83,132 +57,37 @@ test("既定は初回だけ投入され、全部消しても再起動で戻ら�
   await second.close?.();
 });
 
-test("読めない行があっても一覧は成功し、壊れた行を null で返して件数の対象から外す", async (t) => {
-  const directory = makeTestDirectory("sf-broken");
+test("「すべて」の行を消して起動し直すと戻り、ほかの既定は戻らない", async (t) => {
+  const directory = makeTestDirectory("sf-all-recover");
   t.after(directory.cleanup);
-  const adapter = openAdapter(directory);
-  const app = createApp(adapter);
-  const db = directory.own(
-    openDb({
-      kind: "files",
-      catalogPath: join(directory.path, "catalog.sqlite"),
-      userPath: join(directory.path, "user.sqlite"),
-    }),
+
+  const first = openAdapter(directory);
+  const before = await first.getSmartFolder("all");
+  assert.ok(before);
+  await first.deleteSmartFolder("all");
+  await first.deleteSmartFolder("fav");
+  await first.close?.();
+
+  const second = openAdapter(directory);
+  const rows = await second.listSmartFolders();
+  const seededIds = SMART_FOLDER_TEMPLATES.filter((template) => template.seeded).map(
+    (template) => template.id,
   );
-  const createdAt = "2026-07-19T00:00:00.000Z";
-  const healthy = {
-    conditionJson: '{"type":"and","children":[{"type":"hasError"}]}',
-    sort: "added-desc",
-  };
-  db.user
-    .insert(smartFolders)
-    .values([
-      {
-        id: "broken-json",
-        name: "壊れJSON",
-        ...healthy,
-        conditionJson: "{",
-        position: 100,
-        createdAt,
-      },
-      {
-        id: "broken-sort",
-        name: "壊れsort",
-        ...healthy,
-        sort: "unknown",
-        position: 101,
-        createdAt,
-      },
-      {
-        id: "broken-group",
-        name: "壊れgroup",
-        ...healthy,
-        groupByJson: '{"kind":"x"}',
-        position: 102,
-        createdAt,
-      },
-      {
-        id: "broken-group-sort",
-        name: "壊れgroupSort",
-        ...healthy,
-        groupSort: "unknown",
-        position: 104,
-        createdAt,
-      },
-      {
-        id: "orphan-group-sort",
-        name: "グループ分けなしに値の並び",
-        ...healthy,
-        groupSort: "count-desc",
-        position: 105,
-        createdAt,
-      },
-      {
-        id: "missing-group-sort",
-        name: "グループ分けありで値の並びなし",
-        ...healthy,
-        groupByJson: '{"kind":"tag"}',
-        position: 106,
-        createdAt,
-      },
-      { id: "ok-error", name: "エラー確認", ...healthy, position: 103, createdAt },
-    ])
-    .run();
-
-  const res = await app.request("/api/smart-folders");
-  assert.equal(res.status, 200);
-  const folders = (await res.json()) as SmartFolder[];
-  for (const id of [
-    "broken-json",
-    "broken-sort",
-    "broken-group",
-    "broken-group-sort",
-    "orphan-group-sort",
-    "missing-group-sort",
-  ]) {
-    const row = folders.find((f) => f.id === id)!;
-    assert.deepEqual(
-      [row.condition, row.sort, row.groupBy, row.groupSort, row.count],
-      [null, null, null, null, null],
-      id,
-    );
-  }
-  assert.equal(folders.find((f) => f.id === "ok-error")!.count, 0);
-
-  const works = await app.request("/api/smart-folders/broken-json/works?sort=added-desc");
-  assert.equal(works.status, 409);
-  const del = await app.request("/api/smart-folders/broken-json", { method: "DELETE" });
-  assert.equal(del.status, 204);
-  const fix = await app.request("/api/smart-folders/broken-sort", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: "直した",
-      condition: { type: "and", children: [] },
-      sort: "added-desc",
-      groupBy: null,
-      groupSort: null,
-    }),
-  });
-  assert.equal(fix.status, 200);
-  assert.deepEqual(await fix.json(), {
-    id: "broken-sort",
-    name: "直した",
-    condition: { type: "and", children: [] },
-    sort: "added-desc",
-    groupBy: null,
-    groupSort: null,
-    position: 101,
-    createdAt: "2026-07-19T00:00:00.000Z",
-    count: null,
-  });
+  assert.deepEqual(rows.map((row) => row.id).sort(), seededIds.filter((id) => id !== "fav").sort());
+  const all = await second.getSmartFolder("all");
+  const template = findSmartFolderTemplate("all")!;
+  assert.equal(all?.name, template.name);
+  assert.equal(all?.sort, template.sort);
+  assert.deepEqual(all?.condition, template.condition);
+  assert.equal(all?.groupBy, null);
+  assert.equal(all?.groupSort, null);
+  await second.close?.();
 });
 
-test("読めないスマートフォルダーの行は、行ごとに id・列・原因を警告に出す", async (t) => {
-  const directory = makeTestDirectory("sf-broken-log");
-  t.after(directory.cleanup);
-  const adapter = openAdapter(directory);
-  const app = createApp(adapter);
+function insertRows(
+  directory: ReturnType<typeof makeTestDirectory>,
+  rows: Array<Record<string, unknown>>,
+) {
   const db = directory.own(
     openDb({
       kind: "files",
@@ -223,42 +102,142 @@ test("読めないスマートフォルダーの行は、行ごとに id・列�
   };
   db.user
     .insert(smartFolders)
-    .values([
-      { id: "broken-json", name: "壊れJSON", ...healthy, conditionJson: "{", position: 100 },
-      { id: "broken-sort", name: "壊れsort", ...healthy, sort: "unknown", position: 101 },
-      { id: "ok-error", name: "エラー確認", ...healthy, position: 102 },
-    ])
+    .values(rows.map((row) => ({ ...healthy, ...row })) as (typeof smartFolders.$inferInsert)[])
     .run();
+}
 
-  await captureLogs(
-    async (records) => {
-      const res = await app.request("/api/smart-folders");
-      assert.equal(res.status, 200);
-      const warns = categoryRecords(records, "db").filter((r) => r.level === "warning");
-      const byId = new Map(
-        warns.map((r) => [
-          r.properties.smartFolderId as string,
-          r.properties.problems as Array<{ column: string }>,
-        ]),
-      );
-      assert.deepEqual([...byId.keys()].sort(), ["broken-json", "broken-sort"]);
-      assert.deepEqual(
-        byId.get("broken-json")!.map((p) => p.column),
-        ["condition_json"],
-      );
-      assert.deepEqual(
-        byId.get("broken-sort")!.map((p) => p.column),
-        ["sort"],
-      );
+const UNREADABLE_ROWS: Array<{ id: string; column: string; row: Record<string, unknown> }> = [
+  { id: "broken-json", column: "condition_json", row: { conditionJson: "{" } },
+  {
+    id: "broken-shape",
+    column: "condition_json",
+    row: { conditionJson: '{"type":"or","children":[]}' },
+  },
+  { id: "empty-name", column: "name", row: { name: "" } },
+  { id: "broken-sort", column: "sort", row: { sort: "unknown" } },
+  { id: "broken-group", column: "group_by_json", row: { groupByJson: '{"kind":"x"}' } },
+  { id: "broken-group-sort", column: "group_sort", row: { groupSort: "unknown" } },
+  { id: "orphan-group-sort", column: "group_sort", row: { groupSort: "count-desc" } },
+  { id: "negative-position", column: "position", row: { position: -1 } },
+  { id: "fractional-position", column: "position", row: { position: 1.5 } },
+  { id: "missing-group-sort", column: "group_sort", row: { groupByJson: '{"kind":"tag"}' } },
+];
 
-      const warned = warns.length;
-      const again = await app.request("/api/smart-folders");
-      assert.equal(again.status, 200);
-      assert.equal(
-        categoryRecords(records, "db").filter((r) => r.level === "warning").length,
-        warned,
-      );
-    },
-    { categories: ["db"] },
+for (const { id, column, row } of UNREADABLE_ROWS) {
+  test(`読めない行(${id})があると、一覧とその行を引く口が 500 で、行の ID・理由・DB のパス・DELETE のコマンドを返す`, async (t) => {
+    const directory = makeTestDirectory("sf-broken");
+    t.after(directory.cleanup);
+    const adapter = openAdapter(directory);
+    const app = createApp(adapter);
+    insertRows(directory, [{ id, name: "壊れた行", position: 100, ...row }]);
+    const userPath = join(directory.path, "user.sqlite");
+
+    await captureLogs(
+      async (records) => {
+        for (const path of [
+          "/api/smart-folders",
+          `/api/smart-folders/${id}/works?sort=added-desc`,
+        ]) {
+          const res = await app.request(path);
+          assert.equal(res.status, 500, path);
+          const message = ((await res.json()) as { error: { message: string } }).error.message;
+          assert.ok(message.includes(`ID: ${id}`), message);
+          assert.ok(message.includes(column), message);
+          assert.ok(
+            message.includes(
+              `sqlite3 "${userPath}" "DELETE FROM smart_folders WHERE id = '${id}'"`,
+            ),
+            message,
+          );
+          assert.ok(!message.includes("スマートフォルダー"), message);
+        }
+        const errors = categoryRecords(records, "http").filter((r) => r.level === "error");
+        assert.ok(errors.length >= 2);
+        assert.equal(errors[0]!.properties.dbPath, userPath);
+        assert.ok(
+          String(errors[0]!.properties.message).includes(
+            `sqlite3 "${userPath}" "DELETE FROM smart_folders WHERE id = '${id}'"`,
+          ),
+        );
+        assert.deepEqual(
+          (errors[0]!.properties.rows as Array<{ id: string }>).map((r) => r.id),
+          [id],
+        );
+      },
+      { categories: ["http"] },
+    );
+  });
+}
+
+test("「すべて」の行を手で書き換えて形を壊すと、読めない行として 500 で案内する", async (t) => {
+  const directory = makeTestDirectory("sf-broken-all");
+  t.after(directory.cleanup);
+  const adapter = openAdapter(directory);
+  const app = createApp(adapter);
+  const db = directory.own(
+    openDb({
+      kind: "files",
+      catalogPath: join(directory.path, "catalog.sqlite"),
+      userPath: join(directory.path, "user.sqlite"),
+    }),
+  );
+  db.user.update(smartFolders).set({ sort: null }).where(eq(smartFolders.id, "all")).run();
+  const userPath = join(directory.path, "user.sqlite");
+
+  for (const path of ["/api/smart-folders", "/api/smart-folders/all/works?sort=added-desc"]) {
+    const res = await app.request(path);
+    assert.equal(res.status, 500, path);
+    const message = ((await res.json()) as { error: { message: string } }).error.message;
+    assert.ok(message.includes("ID: all") && message.includes("sort"), message);
+    assert.ok(
+      message.includes(`sqlite3 "${userPath}" "DELETE FROM smart_folders WHERE id = 'all'"`),
+      message,
+    );
+  }
+  await adapter.deleteSmartFolder("all");
+  await adapter.close?.();
+  const reopened = openAdapter(directory);
+  assert.equal((await reopened.getSmartFolder("all"))?.sort, "added-desc");
+  await reopened.close?.();
+});
+
+test("読めない行が複数あれば、すべての行を1つの応答にまとめる。行を消すと一覧は読める", async (t) => {
+  const directory = makeTestDirectory("sf-broken-many");
+  t.after(directory.cleanup);
+  const adapter = openAdapter(directory);
+  const app = createApp(adapter);
+  insertRows(directory, [
+    { id: "broken-a", name: "A", position: 100, conditionJson: "{" },
+    { id: "broken-b", name: "B", position: 101, sort: "unknown" },
+    { id: "ok-error", name: "エラー確認", position: 102 },
+  ]);
+
+  const res = await app.request("/api/smart-folders");
+  assert.equal(res.status, 500);
+  const message = ((await res.json()) as { error: { message: string } }).error.message;
+  assert.ok(message.includes("ID: broken-a") && message.includes("ID: broken-b"), message);
+  assert.ok(!message.includes("ok-error"), message);
+
+  assert.equal((await adapter.getSmartFolder("ok-error"))?.id, "ok-error");
+
+  await adapter.deleteSmartFolder("broken-a");
+  await adapter.deleteSmartFolder("broken-b");
+  const list = await app.request("/api/smart-folders");
+  assert.equal(list.status, 200);
+  assert.ok(((await list.json()) as Array<{ id: string }>).some((f) => f.id === "ok-error"));
+});
+
+test("ID にシェルや SQL の特殊文字があっても、DELETE のコマンドは16進のリテラルで指す", () => {
+  const id = `a"b$c\`d'e`;
+  const error = new UnreadableSmartFolderError(
+    [{ id, name: "手書き", problems: [{ column: "sort", reason: "x" }] }],
+    "/data/user.sqlite",
+  );
+  const hex = Buffer.from(id, "utf8").toString("hex");
+  assert.ok(
+    error.message.includes(
+      `sqlite3 "/data/user.sqlite" "DELETE FROM smart_folders WHERE id = CAST(x'${hex}' AS TEXT)"`,
+    ),
+    error.message,
   );
 });

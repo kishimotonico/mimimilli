@@ -6,8 +6,8 @@ import {
   type Settings,
 } from "@mimimilli/shared";
 
-export async function getSettings(): Promise<Settings> {
-  return getParsed(settingsSchema, "/settings");
+export async function getSettings(options?: { signal?: AbortSignal }): Promise<Settings> {
+  return getParsed(settingsSchema, "/settings", options);
 }
 
 export async function getRootReconfiguration(): Promise<RootReconfigurationState> {

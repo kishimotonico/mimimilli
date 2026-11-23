@@ -1,22 +1,21 @@
 import { atom } from "jotai";
-import { appRouteAction, appRouteCorrection } from "../../navigation/model/appRouteStore";
-import { libraryPlaceAtom } from "./navigationAtoms";
+import type { AppRoute } from "../../navigation/model/appRoute";
+import {
+  appRouteAction,
+  appRouteAtom,
+  appRouteCorrection,
+} from "../../navigation/model/appRouteStore";
 import {
   addLibraryTag,
-  clearLibraryGroupSort,
-  clearLibrarySort,
-  isSameScreen,
-  reenterLibraryFolder,
-  type LibraryPlace,
   clearLibraryTags,
   deselectLibraryWork,
+  dropLibraryGroup,
   backToLibraryValueList,
   openLibraryFolder,
   openLibraryGroupValue,
   normalizeLibraryFolder,
   openLibraryTag,
   removeLibraryTag,
-  replaceLibraryFolder,
   reshuffleLibrarySeed,
   searchLibraryInAll,
   selectLibraryGroupValue,
@@ -24,11 +23,11 @@ import {
   setLibraryGroupSort,
   setLibrarySearchQuery,
   setLibrarySort,
+  settleLibraryFolder,
   showLibraryWork,
 } from "./libraryRouteTransitions";
 
 export const openLibraryFolderAtom = appRouteAction(openLibraryFolder);
-export const reenterLibraryFolderAtom = appRouteAction(reenterLibraryFolder);
 export const openLibraryGroupValueAtom = appRouteAction(openLibraryGroupValue);
 export const selectLibraryGroupValueAtom = appRouteAction(selectLibraryGroupValue);
 export const openLibraryTagAtom = appRouteAction(openLibraryTag);
@@ -44,22 +43,18 @@ export const searchLibraryInAllAtom = appRouteAction(searchLibraryInAll);
 export const backToLibraryValueListAtom = appRouteAction(backToLibraryValueList);
 export const showLibraryWorkAtom = appRouteAction(showLibraryWork);
 
-export const replaceLibraryFolderAtom = appRouteCorrection(replaceLibraryFolder);
+const settleTransitionAtom = appRouteAction(settleLibraryFolder);
 
-/** await を挟む保存・追加のあとの入り直し。library が始めたときのままなら、同じ画面（層なし）では
- *  folderId へ入り直す（遷移）。画面や層が変わっていたら、画面と層は動かさず保持中の library だけを
- *  入り直した状態にする（補正）。library をユーザーが変えていたら、その状態を残して何もしない */
+/** await をはさむ保存・作成のあと、folderId へ移る。始めたときの route（不変のオブジェクト）から動いていなければ
+ *  移り、動いていれば何もしない。新規は履歴を積み、上書き（overwrite）は置き換える */
 export const settleLibraryFolderAtom = atom(
   null,
-  (get, set, started: LibraryPlace, folderId: string) => {
-    const now = get(libraryPlaceAtom);
-    if (now.library !== started.library) return;
-    if (isSameScreen(now, started)) set(reenterLibraryFolderAtom, folderId);
-    else set(replaceLibraryFolderAtom, folderId, folderId);
+  (get, set, started: AppRoute, folderId: string, overwrite?: boolean) => {
+    if (get(appRouteAtom) !== started) return;
+    set(settleTransitionAtom, folderId, overwrite ?? false);
   },
 );
 export const normalizeLibraryFolderAtom = appRouteCorrection(normalizeLibraryFolder);
-export const clearLibrarySortAtom = appRouteCorrection(clearLibrarySort);
-export const clearLibraryGroupSortAtom = appRouteCorrection(clearLibraryGroupSort);
+export const dropLibraryGroupAtom = appRouteCorrection(dropLibraryGroup);
 /** 選択中の作品が絞り込みから外れた・存在しないときの選択解除 */
 export const deselectLibraryWorkAtom = appRouteCorrection(deselectLibraryWork);

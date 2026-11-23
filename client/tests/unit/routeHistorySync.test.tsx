@@ -320,20 +320,18 @@ describe("useRouteHistorySync の履歴エントリーの状態", () => {
     expect(pushState).not.toHaveBeenCalled();
   });
 
-  it("URLが同じで状態だけ変わる push は、既定では置き換え、pushSameUrl なら積む", () => {
+  it("URLが同じで状態だけ変わる push は履歴を積み、replace 指定なら置き換える", () => {
     const { routeStore, store } = setupNote("/home");
     pushState.mockClear();
 
     act(() => store.set(routeStore.navigateAtom, (r) => ({ ...r, note: "A" })));
     expect(entryNote()).toBe("A");
-    expect(pushState).not.toHaveBeenCalled();
-
-    act(() =>
-      store.set(routeStore.navigateAtom, (r) => ({ ...r, note: "B" }), { pushSameUrl: true }),
-    );
-    expect(entryNote()).toBe("B");
     expect(pushState).toHaveBeenCalledTimes(1);
     expect(store.get(routeStore.historyAvailabilityAtom).canBack).toBe(true);
+
+    act(() => store.set(routeStore.navigateAtom, (r) => ({ ...r, note: "B" }), { replace: true }));
+    expect(entryNote()).toBe("B");
+    expect(pushState).toHaveBeenCalledTimes(1);
   });
 
   it("push で新しいエントリーへ状態を書き、戻る・進むで元の値を読み戻す", () => {
@@ -358,15 +356,15 @@ describe("useRouteHistorySync の履歴エントリーの状態", () => {
     expect(store.get(routeStore.routeAtom)).toMatchObject({ page: "a", note: "A" });
   });
 
-  it("URLが同じで状態だけ変わったときは、pushせず置き換えで状態を書く", () => {
+  it("URLも状態も変わらない push は何も書かない", () => {
     const { routeStore, store } = setupNote("/home");
     pushState.mockClear();
+    replaceState.mockClear();
 
-    act(() => store.set(routeStore.navigateAtom, (r) => ({ ...r, note: "B" })));
+    act(() => store.set(routeStore.navigateAtom, (r) => ({ ...r })));
 
     expect(pushState).not.toHaveBeenCalled();
-    expect(entryNote()).toBe("B");
-    expect(currentUrl()).toBe("/home");
+    expect(replaceState).not.toHaveBeenCalled();
   });
 });
 

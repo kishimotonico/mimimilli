@@ -48,6 +48,9 @@ export interface SplitSelectedTagsResult {
   warnings: string[];
 }
 
+/** 1回の絞り込みで送れるチップの数。条件の子の上限（MAX_CONDITION_CHILDREN）と同じ理由で束ねる */
+export const MAX_SELECTED_TAGS = 100;
+
 /** HTTP 境界で splitSelectedTags を通した後、core・adapter がそのまま使う構造化済みタグフィルタ */
 export type TagFilters = Pick<SplitSelectedTagsResult, "tags" | "yearValue">;
 

@@ -44,7 +44,7 @@ pnpm workspace のモノレポで、`client/` / `server/` / `shared/` の3パッ
 - `features` 間の sibling import 禁止。複数 feature で共有する state・操作は `shared/model/` か `entities/` へ引き上げる
 - `features` → `app` の import 禁止（`app` → `feature` の composition は許可）
 - `entities`・`shared` への依存は許可。`shared` と `entities` は上位レイヤー（`features` / `app`）へ依存しない
-- ナビゲーション状態は `entities/navigation` の AppRoute 1つを正本にし、書き込みは `navigate` とブラウザー履歴からの適用に限る。URL同期は `shared/model/useRouteHistorySync.ts` の項目を知らない汎用コードが行う（[ADR-0031](adr/0031-app-route-navigation.md)）。Libraryの今の並び・seed・層の開き方は URL ではなく履歴エントリーの状態に書き、URL と定義の突き合わせは `entities/library/resolveLibraryView.ts` の `resolveLibraryView` が1か所で行う（[ADR-0041](adr/0041-library-sidebar-shell-navigation.md)）
+- ナビゲーション状態は `entities/navigation` の AppRoute 1つを正本にし、書き込みは `navigate` とブラウザー履歴からの適用に限る。URL同期は `shared/model/useRouteHistorySync.ts` の項目を知らない汎用コードが行う（[ADR-0031](adr/0031-app-route-navigation.md)）。Libraryの今の並び・seed・層は URL ではなく履歴エントリーの状態に書き、URL と定義の突き合わせは `entities/library/resolveLibraryView.ts` の `resolveLibraryView` が1か所で行う（[ADR-0041](adr/0041-library-sidebar-shell-navigation.md)）
 - 作品を変更する操作は `entities/work/model/workMutations.ts` の hook（React 外は `workCacheUpdates.ts` の関数）を経由し、成功後の必須キャッシュ更新はそこが持つ。画面は選択解除・遷移・表示最適化だけを受け持つ（[ADR-0028](adr/0028-work-management-mutation-ownership.md)）
 
 **server**:
@@ -62,7 +62,7 @@ oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメン
 
 - `routes/`（`server/src/routes/`）: HTTP とバリデーションだけを担う薄い層。ドメインロジックは持たない
 - `core/`（`server/src/core/`）: 純粋関数によるドメイン処理（条件の木の評価・値一覧の集計・検証規則・登録ガードなど）。構成物はディレクトリを正とする。fixture アダプタはインメモリ配列をこれらの関数に渡して検索・集計し、検証規則・登録ガード系は real/fixture 両アダプタが共有する。fixture 固有の判定・real 固有のSQL判定という分岐を作らない
-- real アダプタの作品一覧・値一覧・件数は、スマートフォルダーの条件の木（[ADR-0040](adr/0040-smart-folder-condition-tree.md)）を `compileCondition`（`conditionSql.ts`）で SQL にして評価する。`WorkQueryRepository` の `queryWorksByCondition()` が catalog に user を ATTACH した JOIN で件数とページを同じ絞り込み集合から求め（ADR-0008）、`groupWorksByCondition()` が値ごとの件数・総時間・代表カバーを、`countByConditions()` が条件ごとの件数を数える。SQL フラグメントは `workQuerySql.ts` に集約する。日本語ソートキー（`japaneseSortKey`）は書き込み時に列へ事前計算する。fixture は同じ条件の木を core の `matchCondition`（`core/condition.ts`）で評価する。両者の結果が一致することは `server/tests/real/conditionContract.test.ts` の同値性契約テストで担保する。route は今のスマートフォルダー・グループの値・チップ・検索語から条件の木を組み（shared の `buildEffectiveCondition`）、基準時刻を1リクエストにつき1回作ってアダプタへ渡すだけで、検索規則を持たない。random の seed はクライアントが送り、サーバーは発行しない。戻り値は `WorksPage`（ページングエンベロープ）である
+- real アダプタの作品一覧・値一覧・件数は、スマートフォルダーの条件の木（[ADR-0040](adr/0040-smart-folder-condition-tree.md)）を `compileCondition`（`conditionSql.ts`）で SQL にして評価する。`WorkQueryRepository` の `queryWorksByCondition()` が catalog に user を ATTACH した JOIN で件数とページを同じ絞り込み集合から求め（ADR-0008）、`groupWorksByCondition()` が値ごとの件数・総時間・代表カバーを、`countByConditions()` が条件ごとの件数を数える。SQL フラグメントは `workQuerySql.ts` に集約する。日本語ソートキー（`japaneseSortKey`）は書き込み時に列へ事前計算する。fixture は同じ条件の木を core の `createMatcher`（`core/condition.ts`）で評価する。両者の結果が一致することは `server/tests/real/conditionContract.test.ts` の同値性契約テストで担保する。route は今のスマートフォルダー・グループの値・チップ・検索語から条件の木を組み（shared の `buildEffectiveCondition`）、基準時刻を1リクエストにつき1回作ってアダプタへ渡すだけで、検索規則を持たない。random の seed はクライアントが送り、サーバーは発行しない。戻り値は `WorksPage`（ページングエンベロープ）である
 - `adapters/`（`server/src/adapters/`）: `DataAdapter` インターフェース（`server/src/adapter/index.ts`）でデータの出どころ（real | fixture）だけを差し替える。ルーターとドメインロジックは1系統のみ
 - プロセス内状態を持つアプリケーションサービス（`ScanJobManager` / `DlsiteJobManager` / `RootReconfigurationWorkflow`）は `server/src/` 直下に置き、`app.ts` が生成してルートと配線する。状態遷移や順序はサービスが持ち、I/Oは `DataAdapter` 経由で real/fixture 共通に行う
 
@@ -110,7 +110,6 @@ oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメン
 - [ADR-0007: Windows配布ランタイムにBunを使う](adr/0007-bun-distribution-runtime.md)
 - [ADR-0008: 永続化トポロジー・検索所有権・再生IDを分離する](adr/0008-persistence-topology-query-ownership-playback-ids.md)
 - [ADR-0025: 正本の変更・投影・閲覧を責務として分離する](adr/0025-source-mutation-projection-read-separation.md)
-- [ADR-0026: 分類値の一覧を全作品への独立した入口とする](adr/0026-value-list-as-global-entry.md)
 - [ADR-0028: 作品を変更する操作とキャッシュ更新方針を entities/work/model に集約する](adr/0028-work-management-mutation-ownership.md)
 - [ADR-0029: root変更を再設定ワークフローとして扱う](adr/0029-root-reconfiguration-workflow.md)
 - [ADR-0031: ナビゲーション状態を型付きAppRouteに一本化する](adr/0031-app-route-navigation.md)

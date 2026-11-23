@@ -2,25 +2,20 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   conditionSchema,
-  conditionTreeSchema,
+  definitionOf,
   isBookmarkedOnly,
   isHasErrorOnly,
-  needsCount,
   showsCount,
-  isBrokenSmartFolder,
   smartFolderGroupsRequestSchema,
   smartFolderSchema,
-  smartFolderRestoreSchema,
   smartFolderWorksRequestSchema,
-  smartFolderWriteSchema,
+  smartFolderCreateSchema,
+  smartFolderPatchSchema,
+  smartFolderViolation,
   SMART_FOLDER_TEMPLATES,
   type Condition,
 } from "@mimimilli/shared";
-
-const tag = (t: string): Condition => ({ type: "tag", tag: t });
-const and = (...children: Condition[]): Condition => ({ type: "and", children });
-const or = (...children: Condition[]): Condition => ({ type: "or", children });
-const not = (child: Condition): Condition => ({ type: "not", child });
+import { and, not, or, tag } from "./helpers/conditionTree.ts";
 
 function accepted(input: unknown): Condition {
   const parsed = conditionSchema.safeParse(input);
@@ -56,6 +51,14 @@ test("保存できる形でないものを弾く", () => {
   }
 });
 
+test("子は100個まで", () => {
+  const tags = Array.from({ length: 101 }, (_, i) => tag(`t/${i}`));
+  assert.ok(conditionSchema.safeParse(and(...tags.slice(0, 100))).success);
+  for (const bad of [and(...tags), and(or(...tags)), and(not(or(...tags)))]) {
+    assert.equal(conditionSchema.safeParse(bad).success, false, JSON.stringify(bad).slice(0, 80));
+  }
+});
+
 test("正規化: ルートの and は畳まず、子1つの or を畳む", () => {
   assert.deepEqual(accepted(and(tag("a"))), and(tag("a")));
   assert.deepEqual(accepted(and(or(tag("a")))), and(tag("a")));
@@ -84,11 +87,6 @@ test("正規化: タグは prefix を小文字化し trim する。hasPrefix も
   assert.equal(conditionSchema.safeParse(and(tag("@year/2025"))).success, false);
 });
 
-test("読み出し用は木として読めれば形を問わない", () => {
-  assert.ok(conditionTreeSchema.safeParse(or(and(and(tag("A"))))).success);
-  assert.equal(conditionTreeSchema.safeParse({ type: "xor", children: [] }).success, false);
-});
-
 test("条件の形の判定", () => {
   assert.ok(isBookmarkedOnly(and({ type: "bookmarked" })));
   assert.ok(!isBookmarkedOnly(and({ type: "bookmarked" }, tag("a"))));
@@ -98,13 +96,9 @@ test("条件の形の判定", () => {
   assert.ok(!isHasErrorOnly({ type: "hasError" }));
 });
 
-test("件数: 条件が空・グループ分けありは出さず、hasError だけは隠す判定に数える", () => {
-  const byId = (id: string) => SMART_FOLDER_TEMPLATES.find((t) => t.id === id)!;
+test("件数: 条件が空・グループ分けありは出さない", () => {
   const shown = SMART_FOLDER_TEMPLATES.filter(showsCount).map((t) => t.id);
   assert.deepEqual(shown, ["recent", "added", "fav", "error"]);
-  assert.ok(needsCount(byId("error")));
-  assert.ok(!needsCount(byId("all")) && !needsCount(byId("by-cv")));
-  assert.ok(needsCount({ condition: and({ type: "hasError" }), groupBy: { kind: "tag" } }));
   assert.ok(!showsCount({ condition: and({ type: "hasError" }), groupBy: { kind: "tag" } }));
 });
 
@@ -117,15 +111,10 @@ test("既定テンプレート: 13本・初回11本・固定IDで、条件は保
     ["by-series", "by-rating"],
   );
   for (const t of SMART_FOLDER_TEMPLATES) {
-    const parsed = smartFolderWriteSchema.safeParse({
-      name: t.name,
-      condition: t.condition,
-      sort: t.sort,
-      groupBy: t.groupBy,
-      groupSort: t.groupSort,
-    });
+    const parsed = smartFolderCreateSchema.safeParse({ ...definitionOf(t), id: t.id });
     assert.ok(parsed.success, t.id);
     assert.deepEqual(parsed.data.condition, t.condition);
+    assert.equal(smartFolderViolation({ ...parsed.data, id: t.id }), null, t.id);
   }
   const all = SMART_FOLDER_TEMPLATES[0]!;
   assert.deepEqual([all.id, all.sort, all.groupBy], ["all", "added-desc", null]);
@@ -168,7 +157,7 @@ test("作品一覧の要求: sort 必須、random は seed 必須、契約にな
   );
 });
 
-test("書き込み用は知らないキーを弾き、読み出し用は許す", () => {
+test("知らないキーを弾く", () => {
   const unknownKeys = [
     and({ type: "played", withinDay: 7 } as unknown as Condition),
     and({ type: "tag", tag: "a", negate: true } as unknown as Condition),
@@ -177,7 +166,6 @@ test("書き込み用は知らないキーを弾き、読み出し用は許す",
   for (const bad of unknownKeys) {
     assert.equal(conditionSchema.safeParse(bad).success, false, JSON.stringify(bad));
   }
-  assert.ok(conditionTreeSchema.safeParse(unknownKeys[0]).success);
 });
 
 test("text は trim し、空は弾き、trim 後で重複を落とす", () => {
@@ -188,26 +176,53 @@ test("text は trim し、空は弾き、trim 後で重複を落とす", () => {
   );
 });
 
-test("復元できる ID は sf-<uuid> と all 以外のテンプレート ID", () => {
-  const base = {
-    name: "x",
-    condition: and(),
-    sort: null,
-    groupBy: null,
-    groupSort: null,
-    position: 0,
-    createdAt: "2026-01-01T00:00:00.000Z",
-  };
-  const ok = (id: string) => smartFolderRestoreSchema.safeParse({ ...base, id }).success;
+test("作成の id は小文字・数字・ハイフンの64文字までで、省ける", () => {
+  const base = { name: "x", condition: and(), sort: null, groupBy: null, groupSort: null };
+  const ok = (id: string) => smartFolderCreateSchema.safeParse({ ...base, id }).success;
+  assert.ok(smartFolderCreateSchema.safeParse(base).success);
   assert.ok(ok("sf-123e4567-e89b-42d3-a456-426614174000"));
   assert.ok(ok("by-cv"));
-  assert.ok(!ok("all"));
-  assert.ok(!ok("sf-1"));
-  assert.ok(!ok("whatever"));
-  assert.ok(!smartFolderRestoreSchema.safeParse({ ...base, id: "by-cv", createdAt: "t" }).success);
+  assert.ok(ok("a".repeat(64)));
+  assert.ok(!ok("a".repeat(65)));
+  assert.ok(!ok(""));
+  for (const bad of ["Upper", "a/b", "全角", "sf_underscore"]) assert.ok(!ok(bad), bad);
 });
 
-test("壊れた行は condition が null の行", () => {
+test("作成は5列がそろい、値が不正なら受け付けない", () => {
+  const base = { name: "x", condition: and(), sort: null, groupBy: null, groupSort: null };
+  const ok = (patch: object) => smartFolderCreateSchema.safeParse({ ...base, ...patch }).success;
+  assert.ok(ok({}));
+  assert.ok(ok({ position: 0 }));
+  assert.ok(!ok({ position: -1 }));
+  assert.ok(!ok({ name: " " }));
+  assert.ok(!ok({ sort: "x" }));
+  assert.ok(!ok({ groupBy: { kind: "tag" }, groupSort: "nope" }));
+  assert.ok(!ok({ groupBy: { kind: "tag" }, groupSort: "random" }));
+  assert.ok(!ok({ condition: null }));
+  assert.ok(!ok({ condition: { type: "nope" } }));
+  for (const key of Object.keys(base)) {
+    const { [key]: _omitted, ...rest } = base as Record<string, unknown>;
+    assert.ok(!smartFolderCreateSchema.safeParse(rest).success, key);
+  }
+});
+
+test("作成・更新のどちらも name の前後の空白を落とす", () => {
+  const base = { name: " a ", condition: and(), sort: null, groupBy: null, groupSort: null };
+  const created = smartFolderCreateSchema.parse(base);
+  assert.equal(created.name, "a");
+  assert.equal(smartFolderPatchSchema.parse({ name: " a " }).name, "a");
+});
+
+test("更新は1列以上を持ち、未知のキーを受け付けない", () => {
+  assert.ok(!smartFolderPatchSchema.safeParse({}).success);
+  assert.ok(smartFolderPatchSchema.safeParse({ sort: null }).success);
+  for (const bad of [{ sort: null, position: 1 }, { id: "other" }, { sort: "x" }, { name: " " }]) {
+    assert.ok(!smartFolderPatchSchema.safeParse(bad).success, JSON.stringify(bad));
+  }
+  assert.ok(!smartFolderPatchSchema.safeParse({ condition: { type: "nope" } }).success);
+});
+
+test("一覧の1行は condition が null だと読めない", () => {
   const row = {
     id: "sf-x",
     name: "n",
@@ -217,22 +232,15 @@ test("壊れた行は condition が null の行", () => {
     groupSort: null,
     position: 0,
     createdAt: "t",
-    count: null,
   };
-  const item = smartFolderSchema.parse(row);
-  assert.ok(isBrokenSmartFolder(item));
-  assert.ok(!isBrokenSmartFolder({ ...item, condition: and() }));
+  assert.equal(smartFolderSchema.safeParse(row).success, false);
+  assert.ok(smartFolderSchema.safeParse({ ...row, condition: and() }).success);
 });
 
-test("読み出し用は空白だけの text.q も通す", () => {
-  assert.ok(conditionTreeSchema.safeParse(and({ type: "text", q: "  " })).success);
-});
-
-test("withinDays は 36500 日までで、書き込み・読み出しの両方で上限を超えると弾く", () => {
+test("withinDays は 36500 日まで", () => {
   for (const type of ["added", "played"] as const) {
     assert.ok(conditionSchema.safeParse(and({ type, withinDays: 36500 })).success);
     assert.ok(!conditionSchema.safeParse(and({ type, withinDays: 36501 })).success);
     assert.ok(!conditionSchema.safeParse(and({ type, withinDays: 1e9 })).success);
-    assert.ok(!conditionTreeSchema.safeParse(and({ type, withinDays: 1e9 })).success);
   }
 });

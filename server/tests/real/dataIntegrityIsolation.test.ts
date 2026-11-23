@@ -141,7 +141,7 @@ test("HTTP smart folder は壊れた作品を除外する", async (t) => {
   const { catalog, user } = createWorkRepos(db);
   const { goodId } = seedCorruptedPair(catalog, user, db);
   user.setUserSetting("root_folder", "/library");
-  const folder = user.appendSmartFolder({
+  const folder = user.insertSmartFolder({
     id: "sf-00000000-0000-4000-8000-000000000001",
     name: "タグ一致",
     condition: { type: "and", children: [{ type: "tag", tag: "cv/正常" }] },

@@ -1,4 +1,4 @@
-// 並び順メニュー: 今の並び（履歴エントリーの状態）の変更、既定の並びとして保存、値一覧のソート、並べ直す。
+// ソートメニュー: 今のソート（履歴エントリーの状態）の変更、既定のソートとして保存、値一覧のソート、並べ直す。
 
 import { createElement } from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -23,12 +23,19 @@ function renderSortMenu(options?: {
   folders?: SmartFolder[];
   put?: (id: string) => unknown;
 }) {
+  let folders = options?.folders ?? defaultSmartFolders();
   const api = mockApi({
-    "GET /api/smart-folders": options?.folders ?? defaultSmartFolders(),
-    "PUT /api/smart-folders/:id/group-sort": ({ params }) =>
-      buildSmartFolder({ id: params.id, name: "保存済み" }),
-    "PUT /api/smart-folders/:id/sort": ({ params }) =>
-      options?.put ? options.put(params.id) : buildSmartFolder({ id: params.id, name: "保存済み" }),
+    "GET /api/smart-folders": () => folders,
+    "PATCH /api/smart-folders/:id": ({ params, body }) => {
+      if (options?.put) return options.put(params.id);
+      const saved = {
+        ...(folders.find((folder) => folder.id === params.id) ??
+          buildSmartFolder({ id: params.id, name: "保存済み" })),
+        ...(body as object),
+      };
+      folders = folders.map((folder) => (folder.id === saved.id ? saved : folder));
+      return saved;
+    },
   });
   const store = createStore();
   seedLibraryRoute(store, {
@@ -62,54 +69,64 @@ function renderSortMenu(options?: {
 
 const currentSort = (store: ReturnType<typeof createStore>) => store.get(libraryRouteAtom).sort;
 
+/** 保存した並びが既定になり、メニューを開いても「このソートを既定にする」が出ない */
+async function waitForNoSaveAsDefault() {
+  await waitFor(() => expect(screen.queryByRole("menu", { name: "ソート" })).toBeNull());
+  fireEvent.click(screen.getByRole("button", { name: "ソート" }));
+  expect(screen.getByRole("menu", { name: "ソート" })).toBeInTheDocument();
+  await waitFor(() =>
+    expect(screen.queryByRole("menuitem", { name: "このソートを既定にする" })).toBeNull(),
+  );
+}
+
 describe("LibrarySortMenu", () => {
   it("作品一覧ではソートメニューを開いて今の並びを変更できる", () => {
     const { store } = renderSortMenu({ folderId: "all", sort: null });
-    const button = screen.getByRole("button", { name: "並び替え" });
+    const button = screen.getByRole("button", { name: "ソート" });
 
     expect(button).toBeEnabled();
-    expect(button).toHaveAttribute("title", "並び替え: 追加日（新しい順）");
+    expect(button).toHaveAttribute("title", "ソート: 追加日（新しい順）");
 
     fireEvent.click(button);
-    expect(screen.getByRole("menu", { name: "並び替え" })).toBeInTheDocument();
+    expect(screen.getByRole("menu", { name: "ソート" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("menuitemradio", { name: /タイトル（A→Z）/ }));
     expect(currentSort(store)).toBe("title-asc");
-    expect(screen.queryByRole("menu", { name: "並び替え" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: "ソート" })).not.toBeInTheDocument();
   });
 
-  it("今の並びが無いときはスマートフォルダーの既定の並びを表示する", () => {
+  it("今のソートが無いときはスマートフォルダーの既定のソートを表示する", () => {
     renderSortMenu({ folderId: "recent", sort: null });
-    expect(screen.getByRole("button", { name: "並び替え" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "ソート" })).toHaveAttribute(
       "title",
-      "並び替え: 最近再生した順",
+      "ソート: 最近再生した順",
     );
   });
 
-  it("「『すべて』と同じ」のスマートフォルダーは「すべて」の既定の並びの変更に従う", () => {
+  it("「『すべて』と同じ」のスマートフォルダーは「すべて」の既定のソートの変更に従う", () => {
     const folders = defaultSmartFolders().map((folder) =>
       folder.id === "all" ? { ...folder, sort: "title-asc" as const } : folder,
     );
     renderSortMenu({ folderId: "fav", sort: null, folders });
 
-    expect(screen.getByRole("button", { name: "並び替え" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "ソート" })).toHaveAttribute(
       "title",
-      "並び替え: タイトル（A→Z）",
+      "ソート: タイトル（A→Z）",
     );
   });
 
   it("開くと現在の並び順の項目に初期フォーカスする", () => {
     renderSortMenu({ sort: "title-asc" });
-    fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
+    fireEvent.click(screen.getByRole("button", { name: "ソート" }));
 
     expect(screen.getByRole("menuitemradio", { name: /タイトル（A→Z）/ })).toHaveFocus();
   });
 
   it("ArrowDown/ArrowUpで項目間をフォーカス移動できる", () => {
     renderSortMenu({ sort: "added-desc" });
-    fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
+    fireEvent.click(screen.getByRole("button", { name: "ソート" }));
 
-    const menu = screen.getByRole("menu", { name: "並び替え" });
+    const menu = screen.getByRole("menu", { name: "ソート" });
     const items = screen.getAllByRole("menuitemradio");
     expect(items[0]).toHaveFocus();
 
@@ -127,11 +144,11 @@ describe("LibrarySortMenu", () => {
   it("初期フォーカス・ArrowキーによるフォーカスはpreventScroll:trueで祖先を自動スクロールしない", () => {
     const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
     renderSortMenu({ sort: "title-asc" });
-    fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
+    fireEvent.click(screen.getByRole("button", { name: "ソート" }));
 
     expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
 
-    const menu = screen.getByRole("menu", { name: "並び替え" });
+    const menu = screen.getByRole("menu", { name: "ソート" });
     focusSpy.mockClear();
     fireEvent.keyDown(menu, { key: "ArrowDown" });
     expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
@@ -141,43 +158,28 @@ describe("LibrarySortMenu", () => {
 
   it("項目選択後、Escapeで閉じた後の両方でトリガーへフォーカスが戻る", () => {
     renderSortMenu({ sort: "added-desc" });
-    const button = screen.getByRole("button", { name: "並び替え" });
+    const button = screen.getByRole("button", { name: "ソート" });
 
     fireEvent.click(button);
     fireEvent.click(screen.getByRole("menuitemradio", { name: /タイトル（A→Z）/ }));
-    expect(screen.queryByRole("menu", { name: "並び替え" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: "ソート" })).not.toBeInTheDocument();
     expect(button).toHaveFocus();
 
     fireEvent.click(button);
     fireEvent.keyDown(document, { key: "Escape" });
-    expect(screen.queryByRole("menu", { name: "並び替え" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menu", { name: "ソート" })).not.toBeInTheDocument();
     expect(button).toHaveFocus();
   });
 
-  it("読めないスマートフォルダーではソートメニューを無効化する", () => {
-    renderSortMenu({
-      folderId: "sf-broken",
-      folders: [
-        ...defaultSmartFolders(),
-        buildSmartFolder({ id: "sf-broken", name: "壊れた行", condition: null }),
-      ],
-    });
-    const button = screen.getByRole("button", { name: "並び替え" });
-
-    expect(button).toBeDisabled();
-    fireEvent.click(button);
-    expect(screen.queryByRole("menu", { name: "並び替え" })).not.toBeInTheDocument();
-  });
-
-  it("値一覧では8種の並びを出し、今の値の並びを route へ書く（作品の並びには影響しない）", () => {
+  it("値一覧では8種のソートを出し、今の値一覧のソートを route へ書く（作品のソートには影響しない）", () => {
     const { store } = renderSortMenu({ folderId: "by-cv", sort: "duration-desc" });
-    const button = screen.getByRole("button", { name: "並び替え" });
+    const button = screen.getByRole("button", { name: "ソート" });
 
     expect(button).toBeEnabled();
-    expect(button).toHaveAttribute("title", "並び替え: 件数（多い順）");
+    expect(button).toHaveAttribute("title", "ソート: 件数（多い順）");
 
     fireEvent.click(button);
-    const menu = screen.getByRole("menu", { name: "並び替え" });
+    const menu = screen.getByRole("menu", { name: "ソート" });
     expect(
       within(menu)
         .getAllByRole("menuitemradio")
@@ -206,11 +208,11 @@ describe("LibrarySortMenu", () => {
 
   it("追加年の値一覧は、名前順を年の古い順・新しい順と呼ぶ", () => {
     renderSortMenu({ folderId: "by-year" });
-    const button = screen.getByRole("button", { name: "並び替え" });
-    expect(button).toHaveAttribute("title", "並び替え: 年（新しい順）");
+    const button = screen.getByRole("button", { name: "ソート" });
+    expect(button).toHaveAttribute("title", "ソート: 年（新しい順）");
 
     fireEvent.click(button);
-    const menu = screen.getByRole("menu", { name: "並び替え" });
+    const menu = screen.getByRole("menu", { name: "ソート" });
     expect(within(menu).getByRole("menuitemradio", { name: "年（古い順）" })).toBeInTheDocument();
     expect(within(menu).getByRole("menuitemradio", { name: "年（新しい順）" })).toBeInTheDocument();
     expect(within(menu).queryByRole("menuitemradio", { name: "名前（あ→ん）" })).toBeNull();
@@ -222,7 +224,7 @@ describe("LibrarySortMenu", () => {
     act(() => {
       seedLibraryRoute(store, { folderId: "by-cv" });
     });
-    fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
+    fireEvent.click(screen.getByRole("button", { name: "ソート" }));
     fireEvent.click(screen.getByRole("menuitemradio", { name: "総時間（長い順）" }));
     expect(store.get(libraryRouteAtom).groupSort).toBe("duration-desc");
     expect(currentSort(store)).toBe("duration-desc");
@@ -230,22 +232,23 @@ describe("LibrarySortMenu", () => {
     act(() => {
       seedLibraryRoute(store, { folderId: "all" });
     });
-    expect(screen.getByRole("button", { name: "並び替え" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "ソート" })).toHaveAttribute(
       "title",
-      "並び替え: 再生時間（長い順）",
+      "ソート: 再生時間（長い順）",
     );
   });
 
-  it("値の並びが既定から外れているときだけ「この並びを既定にする」を出し、保存すると今の並びが外れる", async () => {
+  it("値一覧のソートが既定から外れているときだけ「このソートを既定にする」を出し、保存すると今の並びは残ったまま既定と同じになって項目が消える", async () => {
     const { store, api } = renderSortMenu({ folderId: "by-cv", groupSort: "name-asc" });
-    fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "この並びを既定にする" }));
+    fireEvent.click(screen.getByRole("button", { name: "ソート" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "このソートを既定にする" }));
 
-    await waitFor(() => expect(store.get(libraryRouteAtom).groupSort).toBeNull());
-    const [request] = api.requestsTo("PUT /api/smart-folders/:id/group-sort");
+    await waitFor(() => expect(api.requestsTo("PATCH /api/smart-folders/:id")).toHaveLength(1));
+    const [request] = api.requestsTo("PATCH /api/smart-folders/:id");
     expect(request?.params.id).toBe("by-cv");
     expect(request?.body).toEqual({ groupSort: "name-asc" });
-    expect(api.requestsTo("PUT /api/smart-folders/:id/sort")).toHaveLength(0);
+    await waitForNoSaveAsDefault();
+    expect(store.get(libraryRouteAtom).groupSort).toBe("name-asc");
   });
 
   it("解決後の並びがランダムのときだけ「並べ直す」を表示し、押すとseedが変わる", () => {
@@ -268,30 +271,31 @@ describe("LibrarySortMenu", () => {
     expect(screen.queryByRole("button", { name: "並べ直す" })).not.toBeInTheDocument();
   });
 
-  it("フォルダーの既定の並びがランダムなら今の並びが無くても「並べ直す」を表示する", () => {
+  it("フォルダーの既定のソートがランダムなら今のソートが無くても「並べ直す」を表示する", () => {
     renderSortMenu({ folderId: "random", sort: null });
     expect(screen.getByRole("button", { name: "並べ直す" })).toBeInTheDocument();
   });
 
-  it("今の並びが既定と同じ・無いときは「この並びを既定にする」を出さない", () => {
+  it("今の並びが既定と同じ・無いときは「このソートを既定にする」を出さない", () => {
     renderSortMenu({ folderId: "all", sort: "added-desc" });
-    fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
-    expect(screen.queryByRole("menuitem", { name: "この並びを既定にする" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "ソート" }));
+    expect(screen.queryByRole("menuitem", { name: "このソートを既定にする" })).toBeNull();
   });
 
-  it("今の並びが既定から外れているときだけ「この並びを既定にする」を出す", () => {
+  it("今の並びが既定から外れているときだけ「このソートを既定にする」を出す", () => {
     renderSortMenu({ folderId: "all", sort: "title-asc" });
-    fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
-    expect(screen.getByRole("menuitem", { name: "この並びを既定にする" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "ソート" }));
+    expect(screen.getByRole("menuitem", { name: "このソートを既定にする" })).toBeInTheDocument();
   });
 
-  it("押すとそのスマートフォルダーの既定として解決済みの並びを PUT し、今の並びを null に戻す", async () => {
+  it("押すとそのスマートフォルダーの既定として解決済みの並びを PATCH する。今の並びは外さない", async () => {
     const { store, api } = renderSortMenu({ folderId: "fav", sort: "title-asc" });
-    fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "この並びを既定にする" }));
+    fireEvent.click(screen.getByRole("button", { name: "ソート" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "このソートを既定にする" }));
 
-    await waitFor(() => expect(currentSort(store)).toBeNull());
-    const [request] = api.requestsTo("PUT /api/smart-folders/:id/sort");
+    await waitForNoSaveAsDefault();
+    expect(currentSort(store)).toBe("title-asc");
+    const [request] = api.requestsTo("PATCH /api/smart-folders/:id");
     expect(request?.params.id).toBe("fav");
     expect(request?.body).toEqual({ sort: "title-asc" });
   });
@@ -302,8 +306,8 @@ describe("LibrarySortMenu", () => {
       sort: "title-asc",
       put: () => apiError(400, "invalid_request", "保存できません"),
     });
-    fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "この並びを既定にする" }));
+    fireEvent.click(screen.getByRole("button", { name: "ソート" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "このソートを既定にする" }));
 
     expect(await screen.findByText("保存できません")).toBeInTheDocument();
     expect(currentSort(store)).toBe("title-asc");
@@ -322,13 +326,13 @@ describe("LibrarySortMenu", () => {
         return buildSmartFolder({ id, name: "保存済み" });
       },
     });
-    fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "この並びを既定にする" }));
+    fireEvent.click(screen.getByRole("button", { name: "ソート" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "このソートを既定にする" }));
 
     seedLibraryRoute(store, { folderId: "recent", sort: "title-asc" });
     release(null);
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "並び替え" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "ソート" })).toBeEnabled());
     await act(async () => {
       await gate;
     });
@@ -336,18 +340,19 @@ describe("LibrarySortMenu", () => {
     expect(store.get(libraryRouteAtom).folderId).toBe("recent");
   });
 
-  it("「すべて」で押すと「すべて」の並びを PUT する", async () => {
+  it("「すべて」で押すと「すべて」の並びを PATCH する", async () => {
     const { store, api } = renderSortMenu({ folderId: "all", sort: "title-asc" });
-    fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "この並びを既定にする" }));
+    fireEvent.click(screen.getByRole("button", { name: "ソート" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "このソートを既定にする" }));
 
-    await waitFor(() => expect(currentSort(store)).toBeNull());
-    const [request] = api.requestsTo("PUT /api/smart-folders/:id/sort");
+    await waitForNoSaveAsDefault();
+    expect(currentSort(store)).toBe("title-asc");
+    const [request] = api.requestsTo("PATCH /api/smart-folders/:id");
     expect(request?.params.id).toBe("all");
     expect(request?.body).toEqual({ sort: "title-asc" });
   });
 
-  it("並び替えはLibraryNavigationProviderが持つ単一のstartTransition（nav.setSort）を経由する", () => {
+  it("ソートはLibraryNavigationProviderが持つ単一のstartTransition（nav.setSort）を経由する", () => {
     // ソートメニューだけの独立した遷移を持つと、他コンポーネントの遷移中表示
     // （WorkListPaneのis-pending暗転）にこの操作が反映されなくなる。
     const nav = buildNav();
@@ -365,19 +370,20 @@ describe("LibrarySortMenu", () => {
       ),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
+    fireEvent.click(screen.getByRole("button", { name: "ソート" }));
     fireEvent.click(screen.getByRole("menuitemradio", { name: /タイトル（A→Z）/ }));
 
     expect(nav.setSort).toHaveBeenCalledWith("title-asc");
   });
 
-  it("存在しない ID の URL は「すべて」に解決され、その既定を保存すると今の並びが外れる", async () => {
+  it("存在しない ID の URL は「すべて」に解決され、その既定を保存しても今の並びは残る", async () => {
     const { store, api } = renderSortMenu({ folderId: "sf-gone", sort: "title-asc" });
-    fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "この並びを既定にする" }));
+    fireEvent.click(screen.getByRole("button", { name: "ソート" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "このソートを既定にする" }));
 
-    await waitFor(() => expect(currentSort(store)).toBeNull());
-    expect(api.requestsTo("PUT /api/smart-folders/:id/sort")[0]?.params.id).toBe("all");
+    await waitForNoSaveAsDefault();
+    expect(currentSort(store)).toBe("title-asc");
+    expect(api.requestsTo("PATCH /api/smart-folders/:id")[0]?.params.id).toBe("all");
     expect(store.get(libraryRouteAtom).folderId).toBe("all");
   });
 });
@@ -402,16 +408,16 @@ describe("LibrarySortMenu: スマートフォルダー一覧が無い間", () =>
     return api;
   }
 
-  it("取得中は並び替えを操作できず、PUT も飛ばない", () => {
+  it("取得中はソートを操作できず、PATCH も飛ばない", () => {
     const api = renderUnavailable(() => new Promise<Response>(() => {}));
-    expect(screen.getByRole("button", { name: "並び替え" })).toBeDisabled();
-    expect(api.requestsTo("PUT /api/smart-folders/:id/sort")).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "ソート" })).toBeDisabled();
+    expect(api.requestsTo("PATCH /api/smart-folders/:id")).toHaveLength(0);
   });
 
-  it("取得に失敗したときも並び替えを操作できず、PUT も飛ばない", async () => {
+  it("取得に失敗したときもソートを操作できず、PATCH も飛ばない", async () => {
     const api = renderUnavailable(() => apiError(500, "internal", "失敗"));
     await waitFor(() => expect(api.requestsTo("GET /api/smart-folders").length).toBeGreaterThan(0));
-    expect(screen.getByRole("button", { name: "並び替え" })).toBeDisabled();
-    expect(api.requestsTo("PUT /api/smart-folders/:id/sort")).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "ソート" })).toBeDisabled();
+    expect(api.requestsTo("PATCH /api/smart-folders/:id")).toHaveLength(0);
   });
 });

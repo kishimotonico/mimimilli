@@ -38,7 +38,7 @@ export function useFilesBrowse(root: string): FilesBrowse {
 
   const cwdQuery = useQuery({
     queryKey: FILE_SYSTEM_QUERY_KEYS.directory(nav.cwd),
-    queryFn: () => browseFs(nav.cwd),
+    queryFn: ({ signal }) => browseFs(nav.cwd, { signal }),
   });
   const entries = cwdQuery.data?.entries ?? [];
   const cwdNotFound = cwdQuery.error instanceof ApiRequestError && cwdQuery.error.status === 404;
@@ -90,7 +90,7 @@ export function useFilesBrowse(root: string): FilesBrowse {
     previewEntry?.isDir && previewEntry.path !== nav.cwd ? previewEntry.path : null;
   const previewDirQuery = useQuery({
     queryKey: FILE_SYSTEM_QUERY_KEYS.directory(previewDirPath ?? nav.cwd),
-    queryFn: () => browseFs(previewDirPath ?? nav.cwd),
+    queryFn: ({ signal }) => browseFs(previewDirPath ?? nav.cwd, { signal }),
     enabled: previewDirPath !== null,
   });
   const folderEntries = !previewEntry?.isDir

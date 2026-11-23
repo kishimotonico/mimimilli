@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiError, mockApi } from "../helpers/api";
 import { buildScanCandidate, buildScanDiagnostics } from "../helpers/builders";
 import { SCAN_CANDIDATES_QUERY_KEY } from "../../src/entities/scan/scanCandidatesCache";
@@ -9,6 +9,9 @@ import {
   type WorkEditSnapshot,
   type WorkSourceMutationResult,
 } from "@mimimilli/shared";
+import { smartFolderCountsQueryOptions } from "../../src/entities/smart-folder/queryOptions";
+import { libraryTotalQueryOptions } from "../../src/entities/work/libraryTotalQueryOptions";
+import { invalidateFresh } from "../../src/shared/api/invalidateFresh";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../src/entities/tag/queryKeys";
@@ -90,6 +93,7 @@ const KEYS = {
   tags: TAG_QUERY_KEYS.all(),
   smartWorks: SMART_FOLDER_QUERY_KEYS.works("sf-1"),
   smartFolders: SMART_FOLDER_QUERY_KEYS.all(),
+  smartFolderCounts: SMART_FOLDER_QUERY_KEYS.counts(),
   fs: FILE_SYSTEM_QUERY_KEYS.directory("dlsite"),
   diagnostics: SCAN_QUERY_KEYS.diagnostics(),
   scanRecord: SCAN_QUERY_KEYS.last(),
@@ -113,6 +117,7 @@ function seededClient(): QueryClient {
   queryClient.setQueryData(KEYS.tags, []);
   queryClient.setQueryData(KEYS.smartWorks, structuredClone(emptyPages));
   queryClient.setQueryData(KEYS.smartFolders, []);
+  queryClient.setQueryData(KEYS.smartFolderCounts, {});
   queryClient.setQueryData(KEYS.fs, { entries: [] });
   queryClient.setQueryData(KEYS.diagnostics, buildScanDiagnostics());
   queryClient.setQueryData(KEYS.scanRecord, { finishedAt: null });
@@ -139,7 +144,7 @@ const LIBRARY_VIEWS: KeyName[] = [
   "groupValues",
   "tags",
   "smartWorks",
-  "smartFolders",
+  "smartFolderCounts",
 ];
 const REGISTRATION_VIEWS: KeyName[] = [...LIBRARY_VIEWS, "fs", "diagnostics", "scanRecord"];
 
@@ -168,8 +173,8 @@ describe("再生開始時の投影反映", () => {
     await updateCachesAfterPlaybackPrepared(queryClient, prepared);
 
     expect(queryClient.getQueryData(KEYS.detail1)).toEqual(prepared);
-    // 件数（スマートフォルダー一覧）だけを取り直し、開いている一覧の並びは動かさない（ADR-0040）
-    expect(invalidatedKeys(queryClient)).toEqual(["smartFolders"]);
+    // 件数だけを取り直し、定義の一覧と開いている一覧の並びは動かさない（ADR-0040）
+    expect(invalidatedKeys(queryClient)).toEqual(["smartFolderCounts"]);
   });
 });
 
@@ -194,7 +199,7 @@ describe("bookmark の必須更新", () => {
     await updateCachesAfterBookmark(queryClient, { workId: "w1", bookmarked: true });
 
     expect(sorted(invalidatedKeys(queryClient))).toEqual(
-      sorted(["list", "otherList", "smartWorks", "groupValues", "smartFolders"]),
+      sorted(["list", "otherList", "smartWorks", "groupValues", "smartFolderCounts"]),
     );
   });
 
@@ -220,6 +225,105 @@ describe("bookmark の必須更新", () => {
   });
 });
 
+describe("初回の取得の途中で作品が変わったとき", () => {
+  it("件数は進行中の古い応答でなく、変更後の値で取り直される", async () => {
+    const queryClient = new QueryClient();
+    let served = 0;
+    const resolvers: Array<(counts: Record<string, number>) => void> = [];
+    const observer = new QueryObserver(queryClient, {
+      queryKey: SMART_FOLDER_QUERY_KEYS.counts(),
+      queryFn: () =>
+        new Promise<Record<string, number>>((resolve) => {
+          served += 1;
+          resolvers.push(resolve);
+        }),
+    });
+    const unsubscribe = observer.subscribe(() => {});
+    await vi.waitFor(() => expect(resolvers).toHaveLength(1));
+
+    const updating = updateCachesAfterBookmark(queryClient, { workId: "w1", bookmarked: true });
+    resolvers[0]!({ fav: 0 });
+    await vi.waitFor(() => expect(resolvers).toHaveLength(2));
+    resolvers[1]!({ fav: 1 });
+    await updating;
+    unsubscribe();
+
+    expect(served).toBe(2);
+    expect(queryClient.getQueryData(SMART_FOLDER_QUERY_KEYS.counts())).toEqual({ fav: 1 });
+  });
+});
+
+describe("件数の取得", () => {
+  it("最後の購読が外れたら進行中の取得を中断する（古い応答が件数に残らない）", async () => {
+    let signal: AbortSignal | undefined;
+    mockApi({
+      "GET /api/smart-folders/counts": (request) => {
+        signal = request.init?.signal ?? undefined;
+        return new Promise(() => {});
+      },
+    });
+    const queryClient = new QueryClient();
+    const observer = new QueryObserver(queryClient, smartFolderCountsQueryOptions);
+    const unsubscribe = observer.subscribe(() => {});
+    await vi.waitFor(() => expect(signal).toBeDefined());
+
+    unsubscribe();
+
+    expect(signal?.aborted).toBe(true);
+  });
+});
+
+describe("購読が外れたときの取得の中断", () => {
+  async function abortedAfterUnsubscribe(
+    routes: Record<string, unknown>,
+    options: ConstructorParameters<typeof QueryObserver>[1],
+  ) {
+    let signal: AbortSignal | undefined;
+    mockApi(
+      Object.fromEntries(
+        Object.keys(routes).map((key) => [
+          key,
+          (request: { init?: RequestInit }) => {
+            signal = request.init?.signal ?? undefined;
+            return new Promise(() => {});
+          },
+        ]),
+      ),
+    );
+    const observer = new QueryObserver(new QueryClient(), options);
+    const unsubscribe = observer.subscribe(() => {});
+    await vi.waitFor(() => expect(signal).toBeDefined());
+    unsubscribe();
+    return signal?.aborted;
+  }
+
+  it("作品の総件数", async () => {
+    expect(
+      await abortedAfterUnsubscribe(
+        { "GET /api/smart-folders/all/works": null },
+        libraryTotalQueryOptions,
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("invalidateFresh", () => {
+  it("observer の無い取得（fetchQuery）は取り消さない", async () => {
+    const queryClient = new QueryClient();
+    let resolve!: (value: string) => void;
+    const fetching = queryClient.fetchQuery({
+      queryKey: ["scan", "last"],
+      queryFn: () => new Promise<string>((r) => (resolve = r)),
+    });
+
+    const invalidating = invalidateFresh(queryClient, { queryKey: ["scan"] });
+    resolve("done");
+    await invalidating;
+
+    await expect(fetching).resolves.toBe("done");
+  });
+});
+
 describe("登録・スキャン完了の必須更新", () => {
   it("登録は登録の集合に加えて全詳細を無効化する（再登録で古い詳細・sourceRevision を残さない）", async () => {
     const queryClient = seededClient();
@@ -238,7 +342,7 @@ describe("登録・スキャン完了の必須更新", () => {
     });
     const queryClient = seededClient();
 
-    await updateCachesAfterUnregistration(queryClient);
+    await updateCachesAfterUnregistration(queryClient, "w1");
     expect(queryClient.getQueryData(KEYS.candidates)).toEqual({
       scanCompleted: true,
       candidates: [found],
@@ -271,22 +375,26 @@ describe("登録・スキャン完了の必須更新", () => {
 });
 
 describe("登録解除の必須更新", () => {
-  it("単体は登録の集合を無効化するだけで、作品のキャッシュは消さない", async () => {
+  it("単体は登録の集合と解除した作品の詳細だけを無効化し、キャッシュは消さない（開いている詳細が404になり、補正が走る）", async () => {
     const queryClient = seededClient();
 
-    await updateCachesAfterUnregistration(queryClient);
+    await updateCachesAfterUnregistration(queryClient, "w1");
 
     expect(removedKeys(queryClient)).toEqual([]);
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(REGISTRATION_VIEWS));
+    expect(sorted(invalidatedKeys(queryClient))).toEqual(
+      sorted([...REGISTRATION_VIEWS, "detail1"]),
+    );
   });
 
-  it("missing 一括は登録の集合だけを無効化し、詳細は触らない", async () => {
+  it("missing 一括は登録の集合と全詳細を無効化する（どの作品が消えたか応答に無い）", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterMissingUnregistration(queryClient);
 
     expect(removedKeys(queryClient)).toEqual([]);
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(REGISTRATION_VIEWS));
+    expect(sorted(invalidatedKeys(queryClient))).toEqual(
+      sorted([...REGISTRATION_VIEWS, "detail1", "source1", "detail2", "source2"]),
+    );
   });
 });
 

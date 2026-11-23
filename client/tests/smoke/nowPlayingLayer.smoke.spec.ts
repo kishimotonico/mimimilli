@@ -29,7 +29,8 @@ test("お気に入り → CV別 → 層を開く → Esc → 戻る でお気に
   await expect(page).toHaveURL(/\/library\/by-cv$/);
 
   await openNowPlayingFromBar(page);
-  expect(new URL(page.url()).searchParams.get("np")).toBe("1");
+  await expect(layer(page)).toBeVisible();
+  expect(path(page)).toBe("/library/by-cv");
   await expect(page.locator(".mle-bar1")).toHaveCount(0);
 
   await page.keyboard.press("Escape");
@@ -63,27 +64,7 @@ test("閉じるボタンとブラウザの戻るで層が閉じ、層の下の�
   assertNoErrors(tracker);
 });
 
-test("np=1 の URL を直接開いても再生していなければ層は開かず、アプリの外へ出ない", async ({
-  page,
-}) => {
-  const tracker = trackErrors(page);
-  await openApp(page);
-  const origin = new URL(page.url()).origin;
-
-  await page.goto(`${origin}/library/by-cv?np=1`, { waitUntil: "domcontentloaded" });
-  await expect(page.locator(".mll-sidebar")).toBeVisible({ timeout: 20_000 });
-  await expect(layer(page)).toHaveCount(0);
-  await expect.poll(() => path(page)).toBe("/library/by-cv");
-  expect(new URL(page.url()).origin).toBe(origin);
-
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await expect(page.locator(".mll-sidebar")).toBeVisible({ timeout: 20_000 });
-  await expect(layer(page)).toHaveCount(0);
-
-  assertNoErrors(tracker);
-});
-
-test("アプリで開いた層を再読み込みしても、再生していなければ履歴を1件戻って層を外す", async ({
+test("層を開いたまま再読み込みしても、再生していなければ履歴を1件戻って層を外す", async ({
   page,
 }) => {
   const tracker = trackErrors(page);
@@ -97,6 +78,9 @@ test("アプリで開いた層を再読み込みしても、再生していな�
   await expect(page.locator(".mll-sidebar")).toBeVisible({ timeout: 20_000 });
   await expect(layer(page)).toHaveCount(0);
   await expect.poll(() => path(page)).toBe("/library/by-cv");
+  await expect(
+    page.getByRole("group", { name: "CVの一覧" }).getByRole("button").first(),
+  ).toBeVisible();
 
   assertNoErrors(tracker);
 });
@@ -114,7 +98,8 @@ test("ファイルの上で開いた層から作品詳細へ進み、戻ると�
   const filesPath = path(page);
 
   await openNowPlayingFromBar(page);
-  expect(path(page)).toBe(`${filesPath.includes("?") ? `${filesPath}&` : `${filesPath}?`}np=1`);
+  await expect(layer(page)).toBeVisible();
+  expect(path(page)).toBe(filesPath);
 
   await layer(page).getByRole("button", { name: "この作品の詳細を見る" }).click();
   await expect(page).toHaveURL(/\/work\/[^?]+$/);
@@ -157,7 +142,6 @@ test("層のタグから「すべて」＋そのタグへ進み、戻ると層�
     .click();
   await expect(layer(page)).toHaveCount(0);
   await expect(page).toHaveURL(/\/library\/all\?tags=/);
-  expect(new URL(page.url()).searchParams.has("np")).toBe(false);
 
   await page.goBack();
   await expect.poll(() => path(page)).toBe("/library/by-cv");

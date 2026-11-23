@@ -4,7 +4,6 @@ import { appModeAtom, setAppModeAtom } from "../../../entities/navigation/model/
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
 import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
 import { computeCollectionStatsDisplay } from "../model/libraryPresentation";
-import { useDataIntegrityCount } from "../model/useDataIntegrityCount";
 import { isRefined } from "../model/saveSearch";
 import { useOpenSaveDialog } from "../model/useSaveSearch";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
@@ -16,7 +15,6 @@ export default function LibrarySidebar() {
   const openSaveDialog = useOpenSaveDialog(nav.foldersStatus === "ready" ? nav.view : null);
   const mode = useAtomValue(appModeAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
-  const dataIntegrity = useDataIntegrityCount();
   const { tagPrefixes } = useTagPrefixes();
   const totalQuery = useQuery(libraryTotalQueryOptions);
   const stats = computeCollectionStatsDisplay(
@@ -40,10 +38,9 @@ export default function LibrarySidebar() {
       folders={folders}
       activeFolderId={activeFolderId}
       activeGroup={ready?.view.kind === "works" ? ready.view.group : null}
-      dataIntegrity={dataIntegrity}
       tagPrefixes={tagPrefixes}
       stats={stats}
-      filtered={ready?.view.kind === "works" && isRefined(ready.view)}
+      filtered={ready !== null && isRefined(ready.view)}
       onSaveSearch={openSaveDialog}
       onOpenFolder={(folderId) => {
         // 作品詳細・再生中から元のスマートフォルダーの行を押したときは、保持している状態のまま戻る

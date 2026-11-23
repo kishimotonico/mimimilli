@@ -23,6 +23,41 @@ export class CoverSaveError extends Error {
   }
 }
 
+export interface UnreadableSmartFolderRow {
+  id: string;
+  name: string;
+  problems: Array<{ column: string; reason: string }>;
+}
+
+/** 保存済みのスマートフォルダーの行が、保存と同じ検証を通らない。HTTP は 500 internal で、本文に行の ID・理由・直し方を出す。
+ *  ユーザー向けの文言には総称を出さず、行を名前と ID で呼ぶ */
+export class UnreadableSmartFolderError extends Error {
+  readonly rows: UnreadableSmartFolderRow[];
+  readonly dbPath: string;
+
+  constructor(rows: UnreadableSmartFolderRow[], dbPath: string) {
+    super(unreadableSmartFolderMessage(rows, dbPath));
+    this.name = "UnreadableSmartFolderError";
+    this.rows = rows;
+    this.dbPath = dbPath;
+  }
+}
+
+/** シェルでも SQL でも壊れない形で ID を指す。安全な文字だけの ID はそのまま、それ以外は16進のリテラルにする */
+function idCondition(id: string): string {
+  if (/^[A-Za-z0-9_-]+$/.test(id)) return `id = '${id}'`;
+  return `id = CAST(x'${Buffer.from(id, "utf8").toString("hex")}' AS TEXT)`;
+}
+
+function unreadableSmartFolderMessage(rows: UnreadableSmartFolderRow[], dbPath: string): string {
+  const lines = rows.map((row) => {
+    const reasons = row.problems.map((p) => `${p.column}: ${p.reason}`).join(" / ");
+    const sql = `DELETE FROM smart_folders WHERE ${idCondition(row.id)}`;
+    return `「${row.name}」（ID: ${row.id}）を読めません。${reasons}\n  sqlite3 "${dbPath}" "${sql}"`;
+  });
+  return `保存済みの行を読めないため、ライブラリを開けません。次のコマンドで削除してください（「すべて」は削除しても次の起動で作り直されます）。\n${lines.join("\n")}`;
+}
+
 export class SourceChangedError extends Error {
   constructor() {
     super("作品データが外部で変更されました。再読み込みしてからやり直してください");

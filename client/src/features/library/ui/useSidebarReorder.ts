@@ -1,6 +1,7 @@
 // 編集中のサイドバーの行の並べ替え。ドロップ先の指示から全件の ID 列を作り、編集の口へ渡す。
+// 保存中は true を返し、呼び出し側は次のドラッグを出さない。
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { monitorForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { extractInstruction } from "@atlaskit/pragmatic-drag-and-drop-hitbox/list-item";
 import { SMART_FOLDER_DRAG_TYPE } from "./SidebarEditRow";
@@ -18,7 +19,8 @@ export function useSidebarReorder({
   orderedIds,
   reorder,
   onDragStart,
-}: SidebarReorderOptions): void {
+}: SidebarReorderOptions): { saving: boolean } {
+  const [saving, setSaving] = useState(false);
   const latest = useRef({ orderedIds, reorder, onDragStart });
   latest.current = { orderedIds, reorder, onDragStart };
 
@@ -38,8 +40,12 @@ export function useSidebarReorder({
           String(target.data.id),
           operation,
         );
-        if (next) void latest.current.reorder(next);
+        if (!next) return;
+        setSaving(true);
+        void latest.current.reorder(next).finally(() => setSaving(false));
       },
     });
   }, [enabled]);
+
+  return { saving };
 }
