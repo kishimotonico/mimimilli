@@ -8,8 +8,6 @@ export type NavigationDirection = "forward" | "back";
 
 export interface NavigateOptions {
   replace?: boolean;
-  /** push のとき、URLが同じで履歴エントリーの状態だけが変わる場合も履歴を積む。既定は置き換え */
-  pushSameUrl?: boolean;
   direction?: NavigationDirection;
 }
 
@@ -28,7 +26,6 @@ export interface HistoryAvailability {
 export interface PendingHistoryOp<R> {
   route: R;
   write: HistoryWrite;
-  pushSameUrl: boolean;
 }
 
 export interface RouteStore<R> {
@@ -69,10 +66,7 @@ export function createRouteStore<R>(readInitial: () => R): RouteStore<R> {
       const route = typeof next === "function" ? (next as (current: R) => R)(current) : next;
       if (route === current) return;
       const write: HistoryWrite = options.replace ? "replace" : "push";
-      set(pendingOpsAtom, [
-        ...get(pendingOpsAtom),
-        { route, write, pushSameUrl: options.pushSameUrl === true },
-      ]);
+      set(pendingOpsAtom, [...get(pendingOpsAtom), { route, write }]);
       set(directionAtom, options.direction ?? "forward");
       set(baseRouteAtom, route);
     },

@@ -121,7 +121,7 @@ smokeテストの注意:
 - **Jotai atom**: API由来でない UI 操作状態。ナビゲーション（後述の AppRoute）、library 表示設定（`features/library/model/atoms.ts`: libraryViewMode/libraryTileSize/libraryGridLayoutMode/groupValueSort）、player（後述）
 - **TanStack Query**: サーバー状態。キーは `client/src/entities/<ドメイン>/queryKeys.ts` のファクトリで一元管理する（`WORK_QUERY_KEYS` / `TAG_QUERY_KEYS` / `SMART_FOLDER_QUERY_KEYS` / `SETTINGS_QUERY_KEYS` / `FILE_SYSTEM_QUERY_KEYS`）。広域 invalidate 用のプレフィックスキーも各ファクトリが持つ
 - **ナビゲーションとURL同期**: 画面mode・Libraryのスマートフォルダー/グループの値/チップ/選択作品/検索語・Filesの場所/選択・作品詳細ID・再生中の層（`layer`）は `entities/navigation/model/appRouteStore.ts` の AppRoute 1つが正本で、各entityの `navigationAtoms.ts` はそこからの読み取り専用の派生。書き込みは各操作の write atom（次のrouteとpush/replaceを計算する純粋関数＋`navigate`）と履歴からの適用だけ。URLとの同期は `Providers` 直下の `NavigationHistorySync`（汎用の `shared/model/useRouteHistorySync.ts` に codec を渡す）が常時マウントで受け持つ（[ADR-0031](adr/0031-app-route-navigation.md)）。AddressBar の戻る/進む・パンくずも本物
-- **Libraryの今の並びと seed、層の開き方**: 今の並び（`sort`。null は既定の並び）・ランダムの `seed`・層の開き方（`openedBy`）は URL に出さず、履歴エントリーの状態（`history.state`）に書く。URL と同じ codec が読み書きし、戻る/進むでも保たれる。seed はクライアントだけが発行し、サイドバーから入り直すたび・並べ直すたびに新しくする。URL と定義の突き合わせは `entities/library/resolveLibraryView.ts` の `resolveLibraryView` が1か所で行い（値一覧・作品一覧のどちらかと、解決済みの並び・既定から外れているかを返す）、画面・クエリ・パンくず・遷移はその結果だけを読む。作品一覧の query key は解決済みの値だけで決まるので、並びや seed の違いは別のキャッシュになる（[ADR-0041](adr/0041-library-sidebar-shell-navigation.md)）
+- **Libraryの今の並びと seed、層**: 今の並び（`sort`。null は既定の並び）・ランダムの `seed`・再生中の層は URL に出さず、履歴エントリーの状態（`history.state`）に書く。URL と同じ codec が読み書きし、戻る/進むでも保たれる。seed はクライアントだけが発行し、サイドバーから入り直すたび・並べ直すたびに新しくする。URL と定義の突き合わせは `entities/library/resolveLibraryView.ts` の `resolveLibraryView` が1か所で行い（値一覧・作品一覧のどちらかと、解決済みの並び・既定から外れているかを返す）、画面・クエリ・パンくず・遷移はその結果だけを読む。作品一覧の query key は解決済みの値だけで決まるので、並びや seed の違いは別のキャッシュになる（[ADR-0041](adr/0041-library-sidebar-shell-navigation.md)）
 - **サイドバー**: ライブラリの行はすべてスマートフォルダー（[ADR-0040](adr/0040-smart-folder-condition-tree.md)）。編集の状態での並べ替えは pragmatic-drag-and-drop を使う（[ADR-0042](adr/0042-pragmatic-drag-and-drop.md)）
 - **scanのジョブ追跡**: スナップショット・SSE接続・世代管理・終端検知は React 外の純 TS ストア（`entities/scan/model/scanJobStore.ts`）が持つ。`getState`/`subscribe`（状態）と `subscribeEvents`（終端などの一回きりの通知）、`start`/`cancel`/`attach`（サーバー上の実行中ジョブへの後乗り）/`reset`（ローカルの追跡だけを捨てる。サーバー側のジョブには触れない）を持つ。ストアは Jotai store ごとに1つ（`scanJobStoreAtom`）で、操作は Runtime のマウントに依存しない。React からは `useScanJob` の `useStoreSelector` 経由の hook で読む。`ScanRuntime` はイベントをトースト・キャッシュ更新へつなぐだけ
 - **DLsite取得ジョブの追跡**: scanと同じ形の純 TS ストア（`entities/dlsite/model/dlsiteJobStore.ts`、`useDlsiteJob`）がSSE接続と現在のジョブ状態を持つ。`DlsiteJobRuntime` がコードの終端を候補一覧・作品キャッシュの更新とエラートーストへつなぐ。未登録タブの行の状態と上のバーの輪は、このストアから読む。候補一覧（`GET /scan/candidates`）はキャッシュ由来の状態（未取得・取得済み・該当なし・失敗）だけを返し、取得中の表示はジョブの状態からだけ出す。サーバー状態は revision が進むものだけ取り込み、行の表示は候補の値とジョブで見た終端の結果のうち revision が大きい方を出す（ジョブの終端で候補一覧は取り直さない）。作品の詳細と一覧の無効化は、終端に達したコードを集め、ジョブの終わりにまとめて行う。終わりを見ないままミラーのジョブが替わったコードは結果不明として、無効化に加えて候補一覧を1回取り直す（[ADR-0038](adr/0038-dlsite-job-state-revision.md)）
@@ -130,7 +130,7 @@ smokeテストの注意:
 
 ## プレイヤーのアーキテクチャ
 
-プレイヤーの UI と audio ランタイムは `client/src/features/player/`、再生状態機械とコマンド層は他 feature からも使うため `client/src/entities/player/model/` に置く。UIは「画面下バー + 右下ポップアップ」（`PlayerDock.tsx` が AnimatePresence で切替）と、バーとポップアップの ⤢ などから開く「再生中の層」（`NowPlayingLayer.tsx`。中身は `NowPlayingView.tsx` で通常モード⇄没入モード）の構成。層の開閉は `AppRoute.layer`（URL は下の画面に `np=1`）が正で、層が開いている間は `PlayerDock` を描画しない（下部バー/ポップアップと層は同時に出さない）。
+プレイヤーの UI と audio ランタイムは `client/src/features/player/`、再生状態機械とコマンド層は他 feature からも使うため `client/src/entities/player/model/` に置く。UIは「画面下バー + 右下ポップアップ」（`PlayerDock.tsx` が AnimatePresence で切替）と、バーとポップアップの ⤢ などから開く「再生中の層」（`NowPlayingLayer.tsx`。中身は `NowPlayingView.tsx` で通常モード⇄没入モード）の構成。層の開閉は `AppRoute.layer`（履歴エントリーの状態にだけ持ち、URL は下の画面のまま）が正で、層が開いている間は `PlayerDock` を描画しない（下部バー/ポップアップと層は同時に出さない）。
 
 状態遷移は `PlayerController` 状態機械に集約している。model 層の分担（特記のないものは `features/player/model/`）:
 
@@ -155,7 +155,7 @@ smokeテストの注意:
 - `ui/PlayerDock.tsx`: バー⇄ポップアップの外枠・層切替。層が開いている間は描画しない
 - `ui/BarContent.tsx`（画面下バー）: カバー / トラック名 / 再生切替 + バー下辺に貼り付くシークバー（時間表示なし）。バークリックでポップアップへ
 - `ui/PopupContent.tsx`（右下ポップアップ）: 大カバー / シーク / 前・次・ループ / ±10秒 / 倍速 / 音量 / 再生中の作品へジャンプ / 再生中の層を開く
-- `ui/NowPlayingLayer.tsx`: 再生中の層。層の開閉（`layerAtom`）・Esc・再生していないのに開いていたときの外し方（アプリで開いたなら履歴を1件戻り、それ以外は置き換えで `np` を外す）を持つ。
+- `ui/NowPlayingLayer.tsx`: 再生中の層。層の開閉（`layerAtom`）・Esc・再生していないのに開いていたときの外し方（閉じるときと同じく履歴を1件戻り、戻り先が無ければ置き換えで層を外す）を持つ。
 - `ui/NowPlayingView.tsx`: 層の中身。通常モード（左カバー / 右トラックリストの横長2カラム + 下部固定バー）と没入モード（`NowPlayingImmersive.tsx`。ビューポート全面カバー）を切り替える
 - `ui/useSeekDrag.ts`: シーク操作の共通フック（バー・ポップアップ・再生中の層で共用）
 

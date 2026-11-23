@@ -30,16 +30,16 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function openedStore(mode: Parameters<typeof seedAppMode>[1], openedBy: "app" | "url" = "app") {
+function openedStore(mode: Parameters<typeof seedAppMode>[1]) {
   const store = createStore();
   seedAppMode(store, mode);
   store.set(appRouteStore.sync.historyAvailabilityAtom, { canBack: true, canForward: false });
-  seedRoute(store, (route) => ({ ...route, layer: { kind: "nowPlaying", openedBy } }));
+  seedRoute(store, (route) => ({ ...route, layer: { kind: "nowPlaying" } }));
   return store;
 }
 
 describe("再生中の層の遷移", () => {
-  it("開くと履歴を1件積み、URL は下の画面に np=1 を足す", () => {
+  it("開くと履歴を1件積み、URL は下の画面のまま", () => {
     const store = createStore();
     seedAppMode(store, "files");
     store.set(openNowPlayingLayerAtom);
@@ -47,8 +47,8 @@ describe("再生中の層の遷移", () => {
     expect(pendingWrites(store)).toEqual(["push"]);
     const route = store.get(appRouteAtom);
     expect(route.mode).toBe("files");
-    expect(route.layer).toEqual({ kind: "nowPlaying", openedBy: "app" });
-    expect(appRouteCodec.serialize(route).url).toMatch(/^\/files.*np=1$/);
+    expect(route.layer).toEqual({ kind: "nowPlaying" });
+    expect(appRouteCodec.serialize(route).url).toBe("/files");
   });
 
   it("開いている層をもう一度開こうとしても何もしない", () => {
@@ -57,23 +57,25 @@ describe("再生中の層の遷移", () => {
     expect(pendingWrites(store)).toEqual([]);
   });
 
-  it("アプリの中で開いた層は、閉じると履歴を1件戻る", () => {
+  it("閉じると履歴を1件戻り、戻るが終わるまで続けて閉じても2件戻らない", () => {
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
-    const store = openedStore("library", "app");
+    const store = openedStore("library");
+    store.set(closeLayerAtom);
     store.set(closeLayerAtom);
 
     expect(back).toHaveBeenCalledOnce();
     expect(pendingWrites(store)).toEqual([]);
   });
 
-  it("URL を直接開いた層は、閉じると置き換えで np だけを外す", () => {
+  it("戻るが終わって route が変われば、次に開いた層は同じように閉じられる", () => {
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
-    const store = openedStore("library", "url");
+    const store = openedStore("library");
+    store.set(closeLayerAtom);
+    seedRoute(store, (route) => ({ ...route, layer: null }));
+    seedRoute(store, (route) => ({ ...route, layer: { kind: "nowPlaying" } }));
     store.set(closeLayerAtom);
 
-    expect(back).not.toHaveBeenCalled();
-    expect(pendingWrites(store)).toEqual(["replace"]);
-    expect(store.get(appRouteAtom).layer).toBeNull();
+    expect(back).toHaveBeenCalledTimes(2);
   });
 
   it("層から作品詳細へ進むと、層のエントリーを置き換え、ファイルを抜ける", () => {
@@ -157,9 +159,9 @@ describe("再生中の層の遷移", () => {
     expect(store.get(appRouteAtom).layer).toBeNull();
   });
 
-  it("戻り先が無いときは、アプリで開いた層も置き換えで np を外す", () => {
+  it("戻り先が無いときは、置き換えで層を外す", () => {
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
-    const store = openedStore("library", "app");
+    const store = openedStore("library");
     store.set(appRouteStore.sync.historyAvailabilityAtom, { canBack: false, canForward: false });
     store.set(closeLayerAtom);
 

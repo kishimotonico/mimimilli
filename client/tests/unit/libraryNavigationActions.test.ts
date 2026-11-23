@@ -23,6 +23,7 @@ import {
   replaceLibraryFolderAtom,
   reshuffleLibrarySeedAtom,
   searchLibraryInAllAtom,
+  showLibraryWorkAtom,
   selectLibraryGroupValueAtom,
   selectLibraryWorkAtom,
   setLibrarySearchQueryAtom,
@@ -391,15 +392,15 @@ describe("補正は画面を動かさない", () => {
 
 describe("履歴の積み方", () => {
   const ops = (store: ReturnType<typeof createStore>) =>
-    store.get(appRouteStore.sync.pendingOpsAtom).map((op) => [op.write, op.pushSameUrl]);
+    store.get(appRouteStore.sync.pendingOpsAtom).map((op) => op.write);
 
-  it("上書きのあとの入り直しは、URLが同じでも積む指定で push する", () => {
+  it("上書きのあとの入り直しは、URLが同じでも置き換える", () => {
     const store = setup({ folderId: "sf-own", sort: "title-asc" });
     clearPendingOps(store);
 
     store.set(settleLibraryFolderAtom, store.get(libraryPlaceAtom), "sf-own");
 
-    expect(ops(store)).toEqual([["push", true]]);
+    expect(ops(store)).toEqual(["replace"]);
     expect(lib(store)).toMatchObject({ folderId: "sf-own", sort: null });
   });
 
@@ -475,13 +476,85 @@ describe("履歴の積み方", () => {
     expect(pendingWrites(store)).toEqual([]);
   });
 
-  it("通常の並び変更は積む指定なしの replace", () => {
+  it("通常の並び変更は replace", () => {
     const store = setup({ folderId: "sf-own" });
     clearPendingOps(store);
 
     store.set(setLibrarySortAtom, "title-asc");
 
-    expect(ops(store)).toEqual([["replace", false]]);
+    expect(ops(store)).toEqual(["replace"]);
+  });
+});
+
+describe("同じ場所への入り直しは履歴を積まない", () => {
+  const ops = (store: ReturnType<typeof createStore>) =>
+    store.get(appRouteStore.sync.pendingOpsAtom).map((op) => op.write);
+  const reentered = (store: ReturnType<typeof createStore>, seed: number) => {
+    expect(lib(store).seed).not.toBe(seed);
+    expect(lib(store).sort).toBeNull();
+  };
+
+  it("開いている行を押し直すと置き換える。別の行なら積む", () => {
+    const store = setup({ folderId: "fav", sort: "title-asc", seed: 5 });
+    clearPendingOps(store);
+
+    store.set(openLibraryFolderAtom, "fav");
+    expect(ops(store)).toEqual(["replace"]);
+    reentered(store, 5);
+
+    store.set(openLibraryFolderAtom, "by-cv");
+    expect(ops(store)).toEqual(["replace", "push"]);
+  });
+
+  it("チップ・検索語・値を持つ場所からの押し直しは、行き先が違うので積む", () => {
+    for (const patch of [{ q: "x" }, { selectedTags: nts(["ASMR"]) }, { group: "藤田茜" }]) {
+      const store = setup({ folderId: "by-cv", ...patch });
+      clearPendingOps(store);
+      store.set(openLibraryFolderAtom, "by-cv");
+      expect(ops(store)).toEqual(["push"]);
+    }
+  });
+
+  it("開いている値をクイックオーバーレイから押し直すと置き換える", () => {
+    const store = setup({ folderId: "by-cv", group: "藤田茜", seed: 5 });
+    clearPendingOps(store);
+
+    store.set(openLibraryGroupValueAtom, "by-cv", "藤田茜");
+
+    expect(ops(store)).toEqual(["replace"]);
+    reentered(store, 5);
+  });
+
+  it("すでに「すべて」で同じチップと検索語なら、「すべて」で探しても置き換える", () => {
+    const store = setup({ folderId: "all", selectedTags: nts(["ASMR"]), q: "x", seed: 5 });
+    clearPendingOps(store);
+
+    store.set(searchLibraryInAllAtom);
+
+    expect(ops(store)).toEqual(["replace"]);
+    reentered(store, 5);
+  });
+
+  it("開いている作品を再生中から「すべて」で選び直すと置き換える。別の作品なら積む", () => {
+    const store = setup({ folderId: "all", selectedWorkId: "work-1", seed: 5 });
+    clearPendingOps(store);
+
+    store.set(showLibraryWorkAtom, "work-1");
+    expect(ops(store)).toEqual(["replace"]);
+    reentered(store, 5);
+
+    store.set(showLibraryWorkAtom, "work-2");
+    expect(ops(store)).toEqual(["replace", "push"]);
+  });
+
+  it("作品詳細・ファイルからの入り直しは、同じ library の値でも画面が変わるので積む", () => {
+    const store = setup({ folderId: "fav" });
+    seedAppMode(store, "files");
+    clearPendingOps(store);
+
+    store.set(openLibraryFolderAtom, "fav");
+
+    expect(ops(store)).toEqual(["push"]);
   });
 });
 

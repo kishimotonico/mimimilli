@@ -9,7 +9,7 @@ import { useLibrarySelectionCleanup } from "../../src/features/library/model/use
 import { clearPendingOps, pendingWrites, seedLibraryRoute, seedRoute } from "../helpers/route";
 
 function openLayer(store: ReturnType<typeof createStore>) {
-  seedRoute(store, (route) => ({ ...route, layer: { kind: "nowPlaying", openedBy: "app" } }));
+  seedRoute(store, (route) => ({ ...route, layer: { kind: "nowPlaying" } }));
 }
 
 describe("背景の選択解除と再生中の層", () => {

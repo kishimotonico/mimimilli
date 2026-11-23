@@ -1,7 +1,7 @@
 import { expect, test } from "./fixtures";
 import { assertNoErrors, openApp, trackErrors } from "./support";
 
-test("ポップアップの ⤢ から再生中の層が重なり、URL に np=1 が付き、下の画面が残り、表示モードが維持される", async ({
+test("ポップアップの ⤢ から再生中の層が重なり、URL は下の画面のまま、下の画面が残り、表示モードが維持される", async ({
   page,
 }) => {
   const tracker = trackErrors(page);
@@ -21,9 +21,10 @@ test("ポップアップの ⤢ から再生中の層が重なり、URL に np=1
   // バー→ポップアップへ切り替え、⤢ で再生中の層を開く。
   await page.locator(".mle-bar1").getByRole("button", { name: "バーを展開" }).click();
   await expect(page.locator(".mle-popup")).toBeVisible();
+  const urlBefore = page.url();
   await page.locator(".mle-popup").getByRole("button", { name: "再生中を開く" }).click();
   await expect(page.locator(".mle-layer")).toBeVisible();
-  expect(new URL(page.url()).searchParams.get("np")).toBe("1");
+  expect(page.url()).toBe(urlBefore);
 
   // 下の画面（ライブラリ）は層の下に残り、サイドバーは層に隠れる（状態は変わらない）。
   await expect(page.locator(".mll-results")).toBeAttached();

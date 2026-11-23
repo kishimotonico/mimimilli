@@ -34,25 +34,40 @@ function appendTag(tags: NormalizedTag[], tag: NormalizedTag): NormalizedTag[] {
   return orderSelectedTags([...base, tag]);
 }
 
-/** 入り直し。今の並び（作品・値）を捨て、新しい seed にする */
+function sameTags(a: readonly NormalizedTag[], b: readonly NormalizedTag[]): boolean {
+  return a.length === b.length && a.every((tag, index) => tag === b[index]);
+}
+
+/** 入り直し。今の並び（作品・値）を捨て、新しい seed にする。行き先が今のライブラリ画面と同じ場所なら
+ *  履歴を積まず置き換える（サイドバーで開いている行を押し直す、など） */
 function enter(
   route: AppRoute,
   patch: Pick<LibraryRoute, "folderId" | "group" | "selectedTags" | "q">,
-): AppRoute {
-  return withLibrary(route, {
-    ...patch,
-    selectedWorkId: null,
-    sort: null,
-    groupSort: null,
-    seed: createRandomSeed(),
-  });
+  selectedWorkId: string | null = null,
+): Transition {
+  const { library } = route;
+  const sameDestination =
+    route.mode === "library" &&
+    library.folderId === patch.folderId &&
+    library.group === patch.group &&
+    library.q === patch.q &&
+    library.selectedWorkId === selectedWorkId &&
+    sameTags(library.selectedTags, patch.selectedTags);
+  return {
+    route: withLibrary(route, {
+      ...patch,
+      selectedWorkId,
+      sort: null,
+      groupSort: null,
+      seed: createRandomSeed(),
+    }),
+    ...(sameDestination ? { replace: true } : {}),
+  };
 }
 
 /** サイドバーからスマートフォルダーへ入る。チップと検索語は持ち越さない */
 export function openLibraryFolder(route: AppRoute, folderId: string): Transition {
-  return {
-    route: enter(route, { folderId, group: null, selectedTags: [], q: "" }),
-  };
+  return enter(route, { folderId, group: null, selectedTags: [], q: "" });
 }
 
 /** 操作を始めたときにいた場所。await のあとに同じ場所にいるかを確かめるのに使う */
@@ -79,10 +94,9 @@ export function isSameScreen(now: LibraryPlace, started: LibraryPlace): boolean 
   return !now.layerOpen && now.mode === started.mode && now.workId === started.workId;
 }
 
-/** 上書きのあと、同じスマートフォルダーへ入り直す。並びだけの上書きでURLが同じでも履歴を積み、
- *  戻るで上書き前の表示へ戻れるようにする */
+/** 上書きのあと、同じスマートフォルダーへ入り直す。上書き前へ戻すのはトーストの「元に戻す」で、履歴は置き換える */
 export function reenterLibraryFolder(route: AppRoute, folderId: string): Transition {
-  return { ...openLibraryFolder(route, folderId), pushSameUrl: true };
+  return { ...openLibraryFolder(route, folderId), replace: true };
 }
 
 /** 保持しているライブラリが from を指しているときだけ、to へ入り直す（補正）。
@@ -115,7 +129,7 @@ export function openLibraryGroupValue(
   folderId: string,
   group: string,
 ): Transition {
-  return { route: enter(route, { folderId, group, selectedTags: [], q: "" }) };
+  return enter(route, { folderId, group, selectedTags: [], q: "" });
 }
 
 /** 開いているスマートフォルダーの値を選ぶ。値一覧からは作品一覧へ、作品一覧のパンくずからは
@@ -131,9 +145,7 @@ export function openLibraryTag(route: AppRoute, tag: NormalizedTag): Transition 
   if (route.library.folderId === ALL_SMART_FOLDER_ID) {
     return { route: withLibrary(route, { selectedTags: [tag], q: "", selectedWorkId: null }) };
   }
-  return {
-    route: enter(route, { folderId: ALL_SMART_FOLDER_ID, group: null, selectedTags: [tag], q: "" }),
-  };
+  return enter(route, { folderId: ALL_SMART_FOLDER_ID, group: null, selectedTags: [tag], q: "" });
 }
 
 /** タグの Ctrl+クリック・クイックオーバーレイの追加ボタン・「＋絞り込み」。今の一覧にチップを足す */
@@ -223,7 +235,7 @@ export function setLibrarySearchQuery(route: AppRoute, q: string): Transition | 
 /** 0件のとき、同じチップと検索語のまま「すべて」で探す */
 export function searchLibraryInAll(route: AppRoute): Transition {
   const { selectedTags, q } = route.library;
-  return { route: enter(route, { folderId: ALL_SMART_FOLDER_ID, group: null, selectedTags, q }) };
+  return enter(route, { folderId: ALL_SMART_FOLDER_ID, group: null, selectedTags, q });
 }
 
 /** グループの値の作品一覧から、そのスマートフォルダーの値一覧へ戻る。チップ・検索語・並びは保つ */
@@ -234,11 +246,9 @@ export function backToLibraryValueList(route: AppRoute): Transition | null {
 
 /** 再生中の作品などを、「すべて」で選択した状態で表示する */
 export function showLibraryWork(route: AppRoute, workId: string): Transition {
-  const next = enter(route, {
-    folderId: ALL_SMART_FOLDER_ID,
-    group: null,
-    selectedTags: [],
-    q: "",
-  });
-  return { route: { ...next, library: { ...next.library, selectedWorkId: workId } } };
+  return enter(
+    route,
+    { folderId: ALL_SMART_FOLDER_ID, group: null, selectedTags: [], q: "" },
+    workId,
+  );
 }

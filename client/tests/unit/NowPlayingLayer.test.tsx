@@ -40,11 +40,11 @@ function DismissProbe({ onDeselect }: { onDeselect: () => void }) {
 
 function setup({
   playing,
-  openedBy,
+  canBack = true,
   onDeselect,
 }: {
   playing: boolean;
-  openedBy: "app" | "url";
+  canBack?: boolean;
   onDeselect?: () => void;
 }) {
   mockApi({
@@ -53,8 +53,8 @@ function setup({
   });
   const store = createStore();
   seedAppMode(store, "library");
-  store.set(appRouteStore.sync.historyAvailabilityAtom, { canBack: true, canForward: false });
-  seedRoute(store, (route) => ({ ...route, layer: { kind: "nowPlaying", openedBy } }));
+  store.set(appRouteStore.sync.historyAvailabilityAtom, { canBack, canForward: false });
+  seedRoute(store, (route) => ({ ...route, layer: { kind: "nowPlaying" } }));
   if (playing) {
     store.set(playerCoreAtom, {
       ...PLAYER_CORE_INITIAL,
@@ -99,17 +99,17 @@ describe("NowPlayingLayer", () => {
     localStorage.clear();
   });
 
-  it("再生していないのに層が開いていたら、アプリで積んだエントリーは履歴を1件だけ戻る", () => {
+  it("再生していないのに層が開いていたら、履歴を1件だけ戻る", () => {
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
-    setup({ playing: false, openedBy: "app" });
+    setup({ playing: false });
 
     expect(screen.queryByRole("region", { name: "再生中" })).toBeNull();
     expect(back).toHaveBeenCalledOnce();
   });
 
-  it("再生していないのに URL を直接開いた層は、置き換えで np を外し、戻らない", () => {
+  it("再生していないのに層が開いていて戻り先が無ければ、置き換えで層を外す", () => {
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
-    const store = setup({ playing: false, openedBy: "url" });
+    const store = setup({ playing: false, canBack: false });
 
     expect(back).not.toHaveBeenCalled();
     expect(store.get(appRouteAtom).layer).toBeNull();
@@ -117,7 +117,7 @@ describe("NowPlayingLayer", () => {
 
   it("再生中は層を出し、Esc で閉じる（通常表示でも没入でも、没入の設定は変えない）", () => {
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
-    const store = setup({ playing: true, openedBy: "app" });
+    const store = setup({ playing: true });
     expect(screen.getByRole("region", { name: "再生中" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "没入モードにする" }));
@@ -130,7 +130,7 @@ describe("NowPlayingLayer", () => {
 
   it("閉じるボタンで閉じる", () => {
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
-    setup({ playing: true, openedBy: "app" });
+    setup({ playing: true });
 
     fireEvent.click(screen.getByRole("button", { name: "再生中を閉じる" }));
     expect(back).toHaveBeenCalledOnce();
@@ -138,7 +138,7 @@ describe("NowPlayingLayer", () => {
 
   it("モーダルが開いているあいだの Esc は層を閉じない", () => {
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
-    setup({ playing: true, openedBy: "app" });
+    setup({ playing: true });
     const spy = vi
       .spyOn(document, "querySelector")
       .mockImplementation((selector: string) => (selector === ":modal" ? document.body : null));
@@ -150,7 +150,7 @@ describe("NowPlayingLayer", () => {
 
   it("速度メニューを開いたEscはメニューだけを閉じ、2回目のEscで層が閉じる", () => {
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
-    setup({ playing: true, openedBy: "app" });
+    setup({ playing: true });
 
     fireEvent.click(screen.getByTitle("再生速度"));
     expect(screen.getByRole("menu")).toBeInTheDocument();
@@ -166,7 +166,7 @@ describe("NowPlayingLayer", () => {
   it("選択中の作品があるライブラリの上で Esc を押しても、層だけが閉じて選択は残る", () => {
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
     const onDeselect = vi.fn();
-    setup({ playing: true, openedBy: "app", onDeselect });
+    setup({ playing: true, onDeselect });
 
     fireEvent.keyDown(document.body, { key: "Escape" });
     expect(back).toHaveBeenCalledOnce();
@@ -178,7 +178,7 @@ describe("NowPlayingLayer", () => {
     const opener = document.createElement("button");
     document.body.append(opener);
     opener.focus();
-    const store = setup({ playing: true, openedBy: "url" });
+    const store = setup({ playing: true, canBack: false });
     act(() => {
       vi.runAllTimers();
     });
@@ -202,7 +202,7 @@ describe("NowPlayingLayer", () => {
     entry.setAttribute("data-np-open", "");
     document.body.append(entry);
     (document.activeElement as HTMLElement | null)?.blur();
-    const store = setup({ playing: true, openedBy: "url" });
+    const store = setup({ playing: true, canBack: false });
     act(() => {
       vi.runAllTimers();
     });
