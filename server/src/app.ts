@@ -3,7 +3,12 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ApiError } from "@mimimilli/shared";
-import { CoverSaveError, NotConfiguredError, RootReconfiguringError } from "./errors.ts";
+import {
+  CoverSaveError,
+  NotConfiguredError,
+  RootReconfiguringError,
+  UnreadableSmartFolderError,
+} from "./errors.ts";
 import { apiError } from "./lib/httpError.ts";
 import type { DataAdapter } from "./adapter/index.ts";
 import { formatError, getCategoryLogger } from "./lib/logger.ts";
@@ -140,6 +145,15 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
       });
       const body: ApiError = { error: { code: "root_reconfiguring", message: err.message } };
       return c.json(body, 409);
+    }
+    if (err instanceof UnreadableSmartFolderError) {
+      httpLogger.error("保存済みの行を読めません", {
+        requestId,
+        path,
+        rows: err.rows,
+        dbPath: err.dbPath,
+      });
+      return apiError("internal", err.message).getResponse();
     }
     if (err instanceof NotConfiguredError) {
       httpLogger.warn("未設定のためリクエストを拒否しました", { requestId, path, status: 409 });

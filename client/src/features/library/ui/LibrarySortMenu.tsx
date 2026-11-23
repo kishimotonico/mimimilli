@@ -53,7 +53,6 @@ function ReadySortMenu({
   const clearCurrentSort = useSetAtom(clearLibrarySortAtom);
   const clearCurrentGroupSort = useSetAtom(clearLibraryGroupSortAtom);
 
-  const disabled = view.kind === "broken";
   const sort = view.kind === "works" ? view.sort : null;
   const currentSortLabel =
     view.kind === "value-list"
@@ -61,7 +60,6 @@ function ReadySortMenu({
       : sort && getSortLabel(sort);
 
   const saveAsDefault = async () => {
-    if (view.kind === "broken") return;
     setSavingDefault(true);
     if (view.kind === "value-list") {
       const saved = await editor.saveDefaultGroupSort(view.folder.id, view.groupSort);
@@ -76,23 +74,19 @@ function ReadySortMenu({
   const buttonTitle = currentSortLabel ? `並び替え: ${currentSortLabel}` : "並び替え";
 
   const { close: closeSortMenu } = usePopoverDismissal({
-    isOpen: sortMenuOpen && !disabled,
+    isOpen: sortMenuOpen,
     onClose: () => setSortMenuOpen(false),
     anchorRef: sortRef,
   });
 
-  useEffect(() => {
-    if (disabled && sortMenuOpen) closeSortMenu();
-  }, [disabled, sortMenuOpen, closeSortMenu]);
-
   // role=menu の期待どおり、開いたら現在値（無ければ先頭）へ初期フォーカスする。
   useEffect(() => {
-    if (!sortMenuOpen || disabled) return;
+    if (!sortMenuOpen) return;
     const items = sortRef.current?.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]');
     if (!items || items.length === 0) return;
     const checked = Array.from(items).find((item) => item.getAttribute("aria-checked") === "true");
     (checked ?? items[0])?.focus({ preventScroll: true });
-  }, [sortMenuOpen, disabled]);
+  }, [sortMenuOpen]);
 
   const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
@@ -120,14 +114,11 @@ function ReadySortMenu({
         label="並び替え"
         title={buttonTitle}
         active={sortMenuOpen}
-        disabled={disabled}
-        aria-haspopup={disabled ? undefined : "menu"}
-        aria-expanded={disabled ? undefined : sortMenuOpen}
+        aria-haspopup="menu"
+        aria-expanded={sortMenuOpen}
         onClick={() => {
-          if (!disabled) {
-            if (sortMenuOpen) closeSortMenu();
-            else setSortMenuOpen(true);
-          }
+          if (sortMenuOpen) closeSortMenu();
+          else setSortMenuOpen(true);
         }}
       />
       {showReshuffle && (
@@ -139,7 +130,7 @@ function ReadySortMenu({
           onClick={() => reshuffle()}
         />
       )}
-      {sortMenuOpen && !disabled && (
+      {sortMenuOpen && (
         <div
           className="mle-sortmenu__pop"
           role="menu"

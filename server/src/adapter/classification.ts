@@ -20,7 +20,7 @@ export interface ClassificationAdapter {
   reorderTagPrefixes(order: string[]): Promise<TagPrefix[] | null>;
   deleteTagPrefix(prefix: string): Promise<boolean>;
   listTagPrefixCandidates(): Promise<TagPrefixCandidate[]>;
-  /** position の昇順。読めない行は condition・sort・groupBy・groupSort が null の壊れた行で返す */
+  /** position の昇順。読めない行が1つでもあれば UnreadableSmartFolderError を投げる */
   listSmartFolders(): Promise<SmartFolderRow[]>;
   getSmartFolder(id: string): Promise<SmartFolderRow | null>;
   /** 末尾へ追加する。ID が既にあれば null */

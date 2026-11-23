@@ -43,13 +43,11 @@ export type ResolvedLibraryView =
       /** 今の並びが既定から外れているか（「この並びを既定にする」を出すか） */
       groupSortDeviates: boolean;
       breadcrumb: string[];
-    })
-  /** 開けない。folder: 行が読めない／sort: 「すべて」の並びを継承するが、その並びが読めない */
-  | (ResolvedBase & { kind: "broken"; reason: "folder" | "sort"; breadcrumb: string[] });
+    });
 
 export type WorksView = Extract<ResolvedLibraryView, { kind: "works" }>;
 
-/** グループ分けを持つ行の、グループ分けと値の並び（今の並び → 行の既定）。グループ分けの無い行・壊れた行は null */
+/** グループ分けを持つ行の、グループ分けと値の並び（今の並び → 行の既定）。グループ分けの無い行は null */
 export function folderGrouping(
   folder: SmartFolder,
   currentGroupSort: GroupSortId | null = null,
@@ -68,10 +66,6 @@ export function resolveLibraryView(
   if (!folder) throw new Error("「すべて」のスマートフォルダーがありません");
 
   const { condition } = folder;
-  if (condition === null) {
-    return { folder, kind: "broken", reason: "folder", breadcrumb: [folder.name] };
-  }
-
   const groupBy = folder.groupBy;
   const grouping = folderGrouping(folder, library.groupSort);
   if (grouping !== null && library.group === null) {
@@ -88,9 +82,7 @@ export function resolveLibraryView(
 
   const defaultSort = folder.sort ?? all?.sort ?? null;
   const sort = library.sort ?? defaultSort;
-  if (sort === null) {
-    return { folder, kind: "broken", reason: "sort", breadcrumb: [folder.name] };
-  }
+  if (sort === null) throw new Error("「すべて」の既定の並びがありません");
 
   const group = groupBy === null ? null : library.group;
   return {

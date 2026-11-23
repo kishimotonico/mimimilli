@@ -46,7 +46,6 @@ const folders = [
   ...defaultSmartFolders(),
   buildSmartFolder({ id: "by-cv", groupBy: { kind: "prefix", prefix: "cv" } }),
   buildSmartFolder({ id: "sf-own" }),
-  buildSmartFolder({ id: "sf-broken", condition: null }),
 ];
 
 describe("開いているスマートフォルダーを消したときの入り直し（replaceLibraryFolderAtom）", () => {
@@ -290,14 +289,6 @@ describe("タグの行き先（ADR-0041 の表）", () => {
       selectedTags: ["cv/藤田茜"],
       sort: null,
     });
-  });
-
-  it("addLibraryTagAtom: 読めない行を保持しているときも「すべて」＋そのチップ", () => {
-    const store = setup({ folderId: "sf-broken" });
-
-    store.set(addLibraryTagAtom, nt("cv/藤田茜"), folders);
-
-    expect(lib(store)).toMatchObject({ folderId: "all", selectedTags: ["cv/藤田茜"] });
   });
 
   it("addLibraryTagAtom: 作品詳細から押すと mode が library になって保持している一覧に足す", () => {
@@ -558,14 +549,6 @@ describe("検索欄の入力（setLibrarySearchQueryAtom）", () => {
     store.set(setLibrarySearchQueryAtom, "藤田 ", folders);
 
     expect(lib(store).q).toBe("藤田 ");
-  });
-
-  it("読めない行を保持しているときも「すべて」の検索結果へ移る", () => {
-    const store = setup({ folderId: "sf-broken" });
-
-    store.set(setLibrarySearchQueryAtom, "藤田", folders);
-
-    expect(lib(store)).toMatchObject({ folderId: "all", q: "藤田" });
   });
 });
 

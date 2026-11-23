@@ -4,7 +4,7 @@ import {
   createInitialAppRoute,
   type LibraryRoute,
 } from "../../src/entities/navigation/model/appRoute";
-import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
+import { defaultSmartFolders } from "../helpers/smartFolders";
 import { nts } from "../helpers/tag";
 
 function route(patch: Partial<LibraryRoute> = {}): LibraryRoute {
@@ -97,61 +97,6 @@ describe("resolveLibraryView: 値一覧と作品一覧", () => {
     );
 
     expect(view).toMatchObject({ kind: "works", selectedTags: ["ASMR"], q: "x" });
-  });
-});
-
-describe("resolveLibraryView: 条件が読めない行", () => {
-  const broken = buildSmartFolder({ id: "sf-broken", name: "壊れた", condition: null });
-
-  it("開けない状態（broken・reason=folder）を返す", () => {
-    const view = resolveLibraryView(route({ folderId: "sf-broken" }), [...folders, broken]);
-
-    expect(view).toMatchObject({ kind: "broken", reason: "folder", breadcrumb: ["壊れた"] });
-    expect(view.folder.id).toBe("sf-broken");
-  });
-
-  it("group があっても broken", () => {
-    const view = resolveLibraryView(route({ folderId: "sf-broken", group: "x" }), [
-      ...folders,
-      broken,
-    ]);
-
-    expect(view.kind).toBe("broken");
-  });
-});
-
-describe("resolveLibraryView: 「すべて」の行が壊れているとき", () => {
-  const brokenAll = buildSmartFolder({ id: "all", name: "すべて", condition: null, sort: null });
-  const withBrokenAll = folders.map((f) => (f.id === "all" ? brokenAll : f));
-
-  it("固有の並びを持つ正常なスマートフォルダーは開ける", () => {
-    const view = resolveLibraryView(route({ folderId: "recent" }), withBrokenAll);
-
-    expect(view).toMatchObject({ kind: "works", sort: "last-played" });
-  });
-
-  it("今の並びがあれば、継承するスマートフォルダーも開ける", () => {
-    const view = resolveLibraryView(route({ folderId: "fav", sort: "title-asc" }), withBrokenAll);
-
-    expect(view).toMatchObject({ kind: "works", sort: "title-asc" });
-  });
-
-  it("並びを継承する作品一覧は、理由つきで開けない状態になる", () => {
-    const view = resolveLibraryView(route({ folderId: "fav" }), withBrokenAll);
-
-    expect(view).toMatchObject({ kind: "broken", reason: "sort", breadcrumb: ["お気に入り"] });
-  });
-
-  it("値一覧は並びを要さないので開ける", () => {
-    expect(resolveLibraryView(route({ folderId: "by-cv" }), withBrokenAll).kind).toBe("value-list");
-  });
-
-  it("「すべて」自身は読めない行として開けない状態になる。存在しない ID も同じ", () => {
-    expect(resolveLibraryView(route({ folderId: "all" }), withBrokenAll)).toMatchObject({
-      kind: "broken",
-      reason: "folder",
-    });
-    expect(resolveLibraryView(route({ folderId: "sf-gone" }), withBrokenAll).folder.id).toBe("all");
   });
 });
 

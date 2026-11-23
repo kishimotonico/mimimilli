@@ -1,8 +1,6 @@
 import { useId, useRef, useState } from "react";
 import { NO_AUTOFILL_PROPS } from "../../../shared/ui/noAutofill";
 import {
-  ALL_SMART_FOLDER_ID,
-  findSmartFolderTemplate,
   rootChildren,
   smartFolderPermissions,
   type GroupSortId,
@@ -34,7 +32,7 @@ import {
 
 interface SmartFolderDialogProps {
   target: SmartFolderDialogTarget;
-  /** 「すべて」の並び。読めないときは null（「すべて」と同じを選べない） */
+  /** 「すべて」の並び（「すべて」と同じ、の表示に使う） */
   allSort: SortId | null;
   tagPrefixes: readonly TagPrefix[];
   /** 保存できたら true。失敗はダイアログを開いたままにする */
@@ -48,7 +46,6 @@ const FULL_PERMISSIONS: SmartFolderPermissions = {
   editGroupBy: true,
   inheritSort: true,
   remove: true,
-  edit: true,
 };
 
 function initialDraft(target: SmartFolderDialogTarget, tagPrefixes: readonly TagPrefix[]) {
@@ -66,12 +63,6 @@ function titleOf(target: SmartFolderDialogTarget): string {
   return "グループ分けを追加";
 }
 
-/** 「すべて」の並びが読めないときは「すべて」と同じを選べないので、継承の下書きは既定テンプレートの並びで始める */
-function withSelectableSort(draft: SmartFolderDraft, allSort: SortId | null): SmartFolderDraft {
-  if (draft.sort !== null || allSort !== null) return draft;
-  return { ...draft, sort: findSmartFolderTemplate(ALL_SMART_FOLDER_ID)!.sort };
-}
-
 /** 括弧の中に括弧が入らないよう、並び名の（）は「・」に置き換える */
 function sortLabel(sort: SortId): string {
   const label = SORT_OPTIONS.find((option) => option.id === sort)?.label ?? sort;
@@ -85,7 +76,7 @@ export default function SmartFolderDialog({
   onSave,
   onClose,
 }: SmartFolderDialogProps) {
-  const [initial] = useState(() => withSelectableSort(initialDraft(target, tagPrefixes), allSort));
+  const [initial] = useState(() => initialDraft(target, tagPrefixes));
   const [draft, setDraft] = useState<SmartFolderDraft>(initial);
   const [saving, setSaving] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);

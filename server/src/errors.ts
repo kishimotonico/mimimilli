@@ -23,6 +23,35 @@ export class CoverSaveError extends Error {
   }
 }
 
+export interface UnreadableFolderRow {
+  id: string;
+  name: string;
+  problems: Array<{ column: string; reason: string }>;
+}
+
+/** 保存済みのスマートフォルダーの行が、保存と同じ検証を通らない。HTTP は 500 internal で、本文に行の ID・理由・直し方を出す。
+ *  ユーザー向けの文言には総称を出さず、行を名前と ID で呼ぶ */
+export class UnreadableSmartFolderError extends Error {
+  readonly rows: UnreadableFolderRow[];
+  readonly dbPath: string;
+
+  constructor(rows: UnreadableFolderRow[], dbPath: string) {
+    super(unreadableSmartFolderMessage(rows, dbPath));
+    this.name = "UnreadableSmartFolderError";
+    this.rows = rows;
+    this.dbPath = dbPath;
+  }
+}
+
+function unreadableSmartFolderMessage(rows: UnreadableFolderRow[], dbPath: string): string {
+  const lines = rows.map((row) => {
+    const reasons = row.problems.map((p) => `${p.column}: ${p.reason}`).join(" / ");
+    const sql = `DELETE FROM smart_folders WHERE id = '${row.id.replaceAll("'", "''")}'`;
+    return `「${row.name}」（ID: ${row.id}）を読めません。${reasons}\n  sqlite3 "${dbPath}" "${sql}"`;
+  });
+  return `保存済みの行を読めないため、ライブラリを開けません。次のコマンドで行を消してください（消した「すべて」は次の起動で戻ります）。\n${lines.join("\n")}`;
+}
+
 export class SourceChangedError extends Error {
   constructor() {
     super("作品データが外部で変更されました。再読み込みしてからやり直してください");

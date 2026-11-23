@@ -7,7 +7,7 @@ type CollectionStatusKind = "loading" | "error" | "empty";
 interface CollectionStatusProps {
   variant: "list" | "grid";
   kind: CollectionStatusKind;
-  /** kind: "empty" のときの案内文。loading/error は固定文言を使う */
+  /** kind: "empty" のときの案内文。error のときは固定文言の代わりにサーバーの文言を出せる。loading は固定文言 */
   message?: string;
   /** kind: "empty" のときの補足1行（文脈付きの説明・CTA） */
   hint?: string;
@@ -42,7 +42,12 @@ export default function CollectionStatus({
   action,
   onRetry,
 }: CollectionStatusProps) {
-  const text = kind === "empty" ? (message ?? "") : FIXED_MESSAGE[kind];
+  const text =
+    kind === "empty"
+      ? (message ?? "")
+      : kind === "error" && message
+        ? message
+        : FIXED_MESSAGE[kind];
 
   const content =
     kind === "loading" ? (
@@ -52,7 +57,9 @@ export default function CollectionStatus({
       </>
     ) : (
       <>
-        <span>{text}</span>
+        <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-all", userSelect: "text" }}>
+          {text}
+        </span>
         {kind === "empty" && hint && <span className="mll-status-hint">{hint}</span>}
         {kind === "error" && onRetry && (
           <Button variant="ghost" icon={I.refresh} onClick={onRetry}>

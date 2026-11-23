@@ -7,8 +7,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
 import {
   ALL_SMART_FOLDER_ID,
-  isBrokenSmartFolder,
-  isReadableSmartFolder,
   type SmartFolder,
   type GroupSortId,
   type SmartFolderConditionWrite,
@@ -117,7 +115,6 @@ export function useSmartFolderEditor(): SmartFolderEditor {
     };
 
     const restore = async (folder: SmartFolder) => {
-      if (!isReadableSmartFolder(folder)) return;
       await commit("元に戻せませんでした", "folders", () =>
         restoreSmartFolder({
           id: folder.id,
@@ -133,22 +130,17 @@ export function useSmartFolderEditor(): SmartFolderEditor {
     };
 
     const showDeleted = (folder: SmartFolder) => {
-      // 壊れた行は戻せる形（condition）が無いので「元に戻す」を出さない
       let undone = false;
       toast.show({
         message: `「${folder.name}」を削除しました`,
         variant: "success",
-        ...(isBrokenSmartFolder(folder)
-          ? {}
-          : {
-              actionLabel: "元に戻す",
-              onAction: () => {
-                if (undone) return;
-                undone = true;
-                toast.dismiss();
-                void restore(folder);
-              },
-            }),
+        actionLabel: "元に戻す",
+        onAction: () => {
+          if (undone) return;
+          undone = true;
+          toast.dismiss();
+          void restore(folder);
+        },
         priority: "action",
         dismissOnUnmount: false,
       });

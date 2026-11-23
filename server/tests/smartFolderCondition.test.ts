@@ -2,12 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   conditionSchema,
-  conditionTreeSchema,
   isBookmarkedOnly,
   isHasErrorOnly,
   needsCount,
   showsCount,
-  isBrokenSmartFolder,
   smartFolderGroupsRequestSchema,
   smartFolderSchema,
   smartFolderRestoreSchema,
@@ -82,11 +80,6 @@ test("正規化: タグは prefix を小文字化し trim する。hasPrefix も
     and(tag("cv/水瀬"), { type: "hasPrefix", prefix: "cv" }),
   );
   assert.equal(conditionSchema.safeParse(and(tag("@year/2025"))).success, false);
-});
-
-test("読み出し用は木として読めれば形を問わない", () => {
-  assert.ok(conditionTreeSchema.safeParse(or(and(and(tag("A"))))).success);
-  assert.equal(conditionTreeSchema.safeParse({ type: "xor", children: [] }).success, false);
 });
 
 test("条件の形の判定", () => {
@@ -168,7 +161,7 @@ test("作品一覧の要求: sort 必須、random は seed 必須、契約にな
   );
 });
 
-test("書き込み用は知らないキーを弾き、読み出し用は許す", () => {
+test("知らないキーを弾く", () => {
   const unknownKeys = [
     and({ type: "played", withinDay: 7 } as unknown as Condition),
     and({ type: "tag", tag: "a", negate: true } as unknown as Condition),
@@ -177,7 +170,6 @@ test("書き込み用は知らないキーを弾き、読み出し用は許す",
   for (const bad of unknownKeys) {
     assert.equal(conditionSchema.safeParse(bad).success, false, JSON.stringify(bad));
   }
-  assert.ok(conditionTreeSchema.safeParse(unknownKeys[0]).success);
 });
 
 test("text は trim し、空は弾き、trim 後で重複を落とす", () => {
@@ -207,7 +199,7 @@ test("復元できる ID は sf-<uuid> と all 以外のテンプレート ID", 
   assert.ok(!smartFolderRestoreSchema.safeParse({ ...base, id: "by-cv", createdAt: "t" }).success);
 });
 
-test("壊れた行は condition が null の行", () => {
+test("一覧の1行は condition が null だと読めない", () => {
   const row = {
     id: "sf-x",
     name: "n",
@@ -219,20 +211,14 @@ test("壊れた行は condition が null の行", () => {
     createdAt: "t",
     count: null,
   };
-  const item = smartFolderSchema.parse(row);
-  assert.ok(isBrokenSmartFolder(item));
-  assert.ok(!isBrokenSmartFolder({ ...item, condition: and() }));
+  assert.equal(smartFolderSchema.safeParse(row).success, false);
+  assert.ok(smartFolderSchema.safeParse({ ...row, condition: and() }).success);
 });
 
-test("読み出し用は空白だけの text.q も通す", () => {
-  assert.ok(conditionTreeSchema.safeParse(and({ type: "text", q: "  " })).success);
-});
-
-test("withinDays は 36500 日までで、書き込み・読み出しの両方で上限を超えると弾く", () => {
+test("withinDays は 36500 日まで", () => {
   for (const type of ["added", "played"] as const) {
     assert.ok(conditionSchema.safeParse(and({ type, withinDays: 36500 })).success);
     assert.ok(!conditionSchema.safeParse(and({ type, withinDays: 36501 })).success);
     assert.ok(!conditionSchema.safeParse(and({ type, withinDays: 1e9 })).success);
-    assert.ok(!conditionTreeSchema.safeParse(and({ type, withinDays: 1e9 })).success);
   }
 });

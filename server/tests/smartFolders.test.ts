@@ -421,26 +421,6 @@ contract(
   },
 );
 
-contract("壊れた行への既定の並びだけの更新は 403 で、並びは書き換わらない", async (harness) => {
-  const created = await create(harness, "壊れる");
-  const original = harness.adapter.getSmartFolder.bind(harness.adapter);
-  harness.adapter.getSmartFolder = async (id) => {
-    const row = await original(id);
-    return row && id === created.id
-      ? { ...row, condition: null, sort: null, groupBy: null, groupSort: null }
-      : row;
-  };
-  try {
-    const res = await harness.send("PUT", `/api/smart-folders/${created.id}/sort`, {
-      sort: "title-asc",
-    });
-    assert.equal(res.status, 403);
-  } finally {
-    harness.adapter.getSmartFolder = original;
-  }
-  assert.equal((await list(harness)).find((f) => f.id === created.id)!.sort, "added-desc");
-});
-
 contract("既定のものは名前・既定の並びだけ変えられ、条件とグループ分けは弾く", async (harness) => {
   const recent = (await list(harness)).find((f) => f.id === "recent")!;
   const ok = await harness.send<SmartFolder>("PUT", "/api/smart-folders/recent", {

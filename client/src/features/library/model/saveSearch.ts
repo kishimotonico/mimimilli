@@ -6,10 +6,8 @@ import {
   buildEffectiveCondition,
   normalizeSearchQuery,
   parseTag,
-  isReadableSmartFolder,
   smartFolderPermissions,
   splitSelectedTags,
-  type ReadableSmartFolder,
   type SmartFolder,
   type SmartFolderConditionWrite,
 } from "@mimimilli/shared";
@@ -20,14 +18,8 @@ import { type SmartFolderDialogTarget, type SmartFolderDraft } from "./smartFold
 export type SaveOffer = "save" | "overwrite";
 
 /** 上書きの対象にできる自作のスマートフォルダー（条件を変えられ、グループ分けを持たない） */
-export type OverwritableView = WorksView & { folder: ReadableSmartFolder };
-
-export function isOverwritable(view: WorksView): view is OverwritableView {
-  return (
-    isReadableSmartFolder(view.folder) &&
-    view.groupBy === null &&
-    smartFolderPermissions(view.folder).editCondition
-  );
+export function isOverwritable(view: WorksView): boolean {
+  return view.groupBy === null && smartFolderPermissions(view.folder).editCondition;
 }
 
 /** グループの値・チップ・検索語のどれかで絞り込んでいる */
@@ -85,7 +77,7 @@ export function saveSearchDraft(view: WorksView): SmartFolderDraft {
 
 /** 「上書き」で更新する項目。条件に今の絞り込みを足し、並びを変えていればそれを既定の並びにする。
  *  名前・グループ分け・値の並びと、変えない既定の並びは送らない */
-export function overwriteChange(view: OverwritableView): SmartFolderConditionWrite {
+export function overwriteChange(view: WorksView): SmartFolderConditionWrite {
   return {
     condition: effectiveCondition(view),
     ...(view.sortDeviates ? { sort: view.sort } : {}),
@@ -93,7 +85,7 @@ export function overwriteChange(view: OverwritableView): SmartFolderConditionWri
 }
 
 /** 「元に戻す」で戻す項目。上書きが更新した項目だけを上書き前の値にする */
-export function overwriteUndoChange(view: OverwritableView): SmartFolderConditionWrite {
+export function overwriteUndoChange(view: WorksView): SmartFolderConditionWrite {
   const { folder } = view;
   return {
     condition: folder.condition,

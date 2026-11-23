@@ -53,50 +53,25 @@ export const prefixSchema = z
 export const MAX_WITHIN_DAYS = 36500;
 const positiveInt = z.number().int().positive().max(MAX_WITHIN_DAYS);
 
-type ObjectFactory = <T extends z.ZodRawShape>(shape: T) => z.ZodObject<T>;
-
-function treeSchema(
-  object: ObjectFactory,
-  tag: z.ZodType<string>,
-  prefix: z.ZodType<string>,
-  q: z.ZodType<string>,
-): z.ZodType<Condition> {
-  const node: z.ZodType<Condition> = z.lazy(() =>
-    z.union([
-      object({ type: z.literal("and"), children: z.array(node) }),
-      object({ type: z.literal("or"), children: z.array(node) }),
-      object({ type: z.literal("not"), child: node }),
-      object({ type: z.literal("tag"), tag }),
-      object({ type: z.literal("hasPrefix"), prefix }),
-      object({
-        type: z.literal("duration"),
-        op: z.enum(["gte", "lte"]),
-        sec: z.number().int().nonnegative(),
-      }),
-      object({ type: z.literal("bookmarked") }),
-      object({ type: z.literal("played"), withinDays: positiveInt.optional() }),
-      object({ type: z.literal("added"), withinDays: positiveInt }),
-      object({ type: z.literal("addedYear"), year: z.string().regex(YEAR_VALUE_PATTERN) }),
-      object({ type: z.literal("hasError") }),
-      object({ type: z.literal("text"), q }),
-    ]),
-  );
-  return node;
-}
-
-/** DB 読み出し用。木として読めるかだけを見る（保存できる形・正規形は要求しない） */
-export const conditionTreeSchema: z.ZodType<Condition> = treeSchema(
-  z.object,
-  z.string(),
-  z.string(),
-  z.string(),
-);
-
-const writeTreeSchema = treeSchema(
-  z.strictObject,
-  tagSchema,
-  prefixSchema,
-  z.string().trim().min(1),
+const writeTreeSchema: z.ZodType<Condition> = z.lazy(() =>
+  z.union([
+    z.strictObject({ type: z.literal("and"), children: z.array(writeTreeSchema) }),
+    z.strictObject({ type: z.literal("or"), children: z.array(writeTreeSchema) }),
+    z.strictObject({ type: z.literal("not"), child: writeTreeSchema }),
+    z.strictObject({ type: z.literal("tag"), tag: tagSchema }),
+    z.strictObject({ type: z.literal("hasPrefix"), prefix: prefixSchema }),
+    z.strictObject({
+      type: z.literal("duration"),
+      op: z.enum(["gte", "lte"]),
+      sec: z.number().int().nonnegative(),
+    }),
+    z.strictObject({ type: z.literal("bookmarked") }),
+    z.strictObject({ type: z.literal("played"), withinDays: positiveInt.optional() }),
+    z.strictObject({ type: z.literal("added"), withinDays: positiveInt }),
+    z.strictObject({ type: z.literal("addedYear"), year: z.string().regex(YEAR_VALUE_PATTERN) }),
+    z.strictObject({ type: z.literal("hasError") }),
+    z.strictObject({ type: z.literal("text"), q: z.string().trim().min(1) }),
+  ]),
 );
 
 /** 構造の一致判定用キー。オブジェクトのキー順を無視する */
@@ -166,7 +141,7 @@ function rootChildViolation(child: Condition): string | null {
   return isPredicate(inner) ? null : "入れ子は1段までです";
 }
 
-/** 保存用。木として読めて、保存できる形で、正規化済みの条件だけを返す */
+/** 保存と読み出しの両方で使う。木として読めて、保存できる形で、正規化済みの条件だけを返す */
 export const conditionSchema: z.ZodType<Condition, unknown> = writeTreeSchema.transform(
   (tree, ctx) => {
     const violation = savedConditionViolation(tree);

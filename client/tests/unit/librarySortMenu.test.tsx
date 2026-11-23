@@ -154,21 +154,6 @@ describe("LibrarySortMenu", () => {
     expect(button).toHaveFocus();
   });
 
-  it("読めないスマートフォルダーではソートメニューを無効化する", () => {
-    renderSortMenu({
-      folderId: "sf-broken",
-      folders: [
-        ...defaultSmartFolders(),
-        buildSmartFolder({ id: "sf-broken", name: "壊れた行", condition: null }),
-      ],
-    });
-    const button = screen.getByRole("button", { name: "並び替え" });
-
-    expect(button).toBeDisabled();
-    fireEvent.click(button);
-    expect(screen.queryByRole("menu", { name: "並び替え" })).not.toBeInTheDocument();
-  });
-
   it("値一覧では8種の並びを出し、今の値の並びを route へ書く（作品の並びには影響しない）", () => {
     const { store } = renderSortMenu({ folderId: "by-cv", sort: "duration-desc" });
     const button = screen.getByRole("button", { name: "並び替え" });

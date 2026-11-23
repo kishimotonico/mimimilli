@@ -4,7 +4,6 @@ import { tagFiltersQuerySchema } from "./api.ts";
 import {
   conditionKey,
   conditionSchema,
-  conditionTreeSchema,
   isEmptyCondition,
   isHasErrorOnly,
   prefixSchema,
@@ -77,13 +76,11 @@ export type SmartFolderConditionWrite = z.infer<typeof smartFolderConditionWrite
 export const smartFolderGroupSortWriteSchema = z.strictObject({ groupSort: groupSortIdSchema });
 export type SmartFolderGroupSortWrite = z.infer<typeof smartFolderGroupSortWriteSchema>;
 
-/** 一覧の1行。condition・sort・groupBy・groupSort のどれか1つでも読めない行（groupBy と groupSort の組が合わない行を含む）は
- *  壊れた行で、4つとも null で返す。
- *  壊れた行は削除と作り直しだけができる。正常な行の sort の null は「『すべて』と同じ」 */
+/** 一覧の1行。保存と同じ検証を通った行だけが載る。sort の null は「『すべて』と同じ」 */
 export const smartFolderSchema = z.object({
   id: z.string(),
   name: z.string(),
-  condition: conditionTreeSchema.nullable(),
+  condition: conditionSchema,
   sort: sortIdSchema.nullable(),
   groupBy: groupBySchema.nullable(),
   groupSort: groupSortIdSchema.nullable(),
@@ -93,16 +90,6 @@ export const smartFolderSchema = z.object({
   count: z.number().int().nonnegative().nullable(),
 });
 export type SmartFolder = z.infer<typeof smartFolderSchema>;
-export type BrokenSmartFolder = SmartFolder & { condition: null };
-export type ReadableSmartFolder = SmartFolder & { condition: Condition };
-
-export function isBrokenSmartFolder(item: SmartFolder): item is BrokenSmartFolder {
-  return item.condition === null;
-}
-
-export function isReadableSmartFolder(item: SmartFolder): item is ReadableSmartFolder {
-  return item.condition !== null;
-}
 
 export const smartFolderListSchema = z.array(smartFolderSchema);
 
@@ -307,7 +294,7 @@ export function findSmartFolderTemplate(id: string): SmartFolderTemplate | undef
 
 // ── 編集の権限 ───────────────────────────────────────────────
 
-/** 権限を決めるのはテンプレートの固定 ID と、条件を読めるかだけ。条件の意味では決めない。
+/** 権限を決めるのはテンプレートの固定 ID だけ。条件の意味では決めない。
  *  client の UI の出し分けと server の検証が、この規則を共有する */
 export interface SmartFolderPermissions {
   rename: boolean;
@@ -316,39 +303,17 @@ export interface SmartFolderPermissions {
   /** 既定の並びを「『すべて』と同じ」（null）にできるか */
   inheritSort: boolean;
   remove: boolean;
-  /** 編集できるか。壊れた行は削除だけ */
-  edit: boolean;
 }
 
-/** 壊れた行（condition が null）は編集できず、削除だけできる。「すべて」は壊れていても削除できない */
-export function smartFolderPermissions(
-  folder: Pick<SmartFolder, "id" | "condition">,
-): SmartFolderPermissions {
+export function smartFolderPermissions(folder: Pick<SmartFolder, "id">): SmartFolderPermissions {
   const isAll = folder.id === ALL_SMART_FOLDER_ID;
-  if (folder.condition === null) {
-    return {
-      rename: false,
-      editCondition: false,
-      editGroupBy: false,
-      inheritSort: false,
-      remove: !isAll,
-      edit: false,
-    };
-  }
-  return readablePermissions(folder.id);
-}
-
-/** 条件を読めるスマートフォルダーの権限。テンプレートの規則だけで決まる */
-function readablePermissions(id: string): SmartFolderPermissions {
-  const isAll = id === ALL_SMART_FOLDER_ID;
-  const isTemplate = findSmartFolderTemplate(id) !== undefined;
+  const isTemplate = findSmartFolderTemplate(folder.id) !== undefined;
   return {
     rename: !isAll,
     editCondition: !isTemplate,
     editGroupBy: !isTemplate,
     inheritSort: !isAll,
     remove: !isAll,
-    edit: true,
   };
 }
 
@@ -372,12 +337,12 @@ function sameTemplateDefinition(
 }
 
 /** 更新の違反。既定のものは名前・既定の並び・値の並びだけ変えられる。「すべて」は名前も変えられず、並びを null にもできない。
- *  壊れた行への上書きも同じ規則で通す（UI は削除だけを出すが、API は定義が規則に合う作り直しを受ける） */
+ */
 export function updateViolation(
   existing: Pick<SmartFolder, "id" | "name">,
   write: SmartFolderWrite,
 ): PolicyViolation | null {
-  const permissions = readablePermissions(existing.id);
+  const permissions = smartFolderPermissions(existing);
   const template = findSmartFolderTemplate(existing.id);
   if (template && !sameTemplateDefinition(template, write)) {
     return forbidden("既定のスマートフォルダーの条件・グループ分けは変更できません");
@@ -391,48 +356,33 @@ export function updateViolation(
   return null;
 }
 
-/** 既定の並びだけの更新の違反。壊れた行は編集できず、「すべて」は並びを空にできない */
+/** 既定の並びだけの更新の違反。「すべて」は並びを空にできない */
 export function sortViolation(
-  existing: Pick<SmartFolder, "id" | "condition">,
+  existing: Pick<SmartFolder, "id">,
   sort: SortId | null,
 ): PolicyViolation | null {
-  if (!smartFolderPermissions(existing).edit) {
-    return forbidden("壊れたスマートフォルダーは編集できません");
-  }
-  if (!readablePermissions(existing.id).inheritSort && sort === null) {
+  if (!smartFolderPermissions(existing).inheritSort && sort === null) {
     return invalid("「すべて」の既定の並びは空にできません");
   }
   return null;
 }
 
-/** 条件の更新（検索の上書き）の違反。壊れた行と既定のスマートフォルダー（「すべて」を含む）は条件を変えられない */
-export function conditionViolation(
-  existing: Pick<SmartFolder, "id" | "condition">,
-): PolicyViolation | null {
-  const permissions = smartFolderPermissions(existing);
-  if (!permissions.edit) return forbidden("壊れたスマートフォルダーは編集できません");
-  if (!permissions.editCondition) {
-    return forbidden("既定のスマートフォルダーの条件・グループ分けは変更できません");
-  }
-  return null;
+/** 条件の更新（検索の上書き）の違反。既定のスマートフォルダー（「すべて」を含む）は条件を変えられない */
+export function conditionViolation(existing: Pick<SmartFolder, "id">): PolicyViolation | null {
+  return smartFolderPermissions(existing).editCondition
+    ? null
+    : forbidden("既定のスマートフォルダーの条件・グループ分けは変更できません");
 }
 
-/** 値一覧の並びだけの更新の違反。壊れた行は編集できず、グループ分けの無い行には値の並びが無い */
-export function groupSortViolation(
-  existing: Pick<SmartFolder, "id" | "condition" | "groupBy">,
-): PolicyViolation | null {
-  if (!smartFolderPermissions(existing).edit) {
-    return forbidden("壊れたスマートフォルダーは編集できません");
-  }
+/** 値一覧の並びだけの更新の違反。グループ分けの無い行には値の並びが無い */
+export function groupSortViolation(existing: Pick<SmartFolder, "groupBy">): PolicyViolation | null {
   if (existing.groupBy === null) {
     return invalid("グループ分けのないスマートフォルダーに値の並びはありません");
   }
   return null;
 }
 
-export function deleteViolation(
-  existing: Pick<SmartFolder, "id" | "condition">,
-): PolicyViolation | null {
+export function deleteViolation(existing: Pick<SmartFolder, "id">): PolicyViolation | null {
   return smartFolderPermissions(existing).remove ? null : forbidden("「すべて」は削除できません");
 }
 

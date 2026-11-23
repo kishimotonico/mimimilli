@@ -19,6 +19,13 @@ describe("CollectionStatus", () => {
     expect(screen.getByRole("status")).toHaveTextContent("読み込みに失敗しました");
   });
 
+  it("kind=error に message があれば固定メッセージの代わりに出す", () => {
+    render(<CollectionStatus variant="list" kind="error" message="行を読めません。ID: sf-x" />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("行を読めません。ID: sf-x");
+    expect(screen.getByRole("status")).not.toHaveTextContent("読み込みに失敗しました");
+  });
+
   it("kind=error かつ onRetry があれば再試行ボタンを出し、クリックで呼ばれる", async () => {
     const onRetry = vi.fn();
     render(<CollectionStatus variant="list" kind="error" onRetry={onRetry} />);

@@ -46,12 +46,10 @@ import {
   queryFolderWorks,
 } from "./smartFolderQuery.ts";
 
-/** 件数を数えるものを shared の判定関数で選び、1往復で数えて載せる。読めない行は対象外 */
+/** 件数を数えるものを shared の判定関数で選び、1往復で数えて載せる */
 async function withCounts(adapter: DataAdapter, rows: SmartFolderRow[]): Promise<SmartFolder[]> {
   const targets = rows.flatMap((row, index) =>
-    row.condition !== null && needsCount({ condition: row.condition, groupBy: row.groupBy })
-      ? [{ index, condition: row.condition }]
-      : [],
+    needsCount(row) ? [{ index, condition: row.condition }] : [],
   );
   const counts =
     targets.length === 0
@@ -84,11 +82,9 @@ function notFoundFolder(id: string): never {
   notFound(`スマートフォルダーが見つかりません: ${id}`);
 }
 
-async function requireQueryable(adapter: DataAdapter, id: string) {
+async function requireFolder(adapter: DataAdapter, id: string) {
   const row = await adapter.getSmartFolder(id);
   if (!row) notFoundFolder(id);
-  if (row.condition === null)
-    conflict("スマートフォルダーの条件が壊れています。削除して作り直してください");
   return { condition: row.condition, groupBy: row.groupBy };
 }
 
@@ -216,7 +212,7 @@ export function smartFoldersRoute(adapter: DataAdapter, scanRecord: ScanRecordSt
   });
 
   app.get("/smart-folders/:id/works", async (c) => {
-    const folder = await requireQueryable(adapter, c.req.param("id"));
+    const folder = await requireFolder(adapter, c.req.param("id"));
     // 契約にないキーも検証に渡し、黙って無視せず 400 にする
     const request = parseSmartFolderWorksRequest({
       ...c.req.query(),
@@ -231,7 +227,7 @@ export function smartFoldersRoute(adapter: DataAdapter, scanRecord: ScanRecordSt
   });
 
   app.post("/smart-folders/:id/groups", async (c) => {
-    const folder = await requireQueryable(adapter, c.req.param("id"));
+    const folder = await requireFolder(adapter, c.req.param("id"));
     const body = await readJsonBody(c, z.unknown(), "値一覧の要求が不正です");
     return c.json(await queryFolderGroups(adapter, folder, parseSmartFolderGroupsRequest(body)));
   });

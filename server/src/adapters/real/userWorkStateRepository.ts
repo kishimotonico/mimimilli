@@ -1,7 +1,7 @@
 import { and, asc, eq, gte, isNotNull, sql } from "drizzle-orm";
 import type { z } from "zod";
 import {
-  conditionTreeSchema,
+  conditionSchema,
   groupBySchema,
   groupSortIdSchema,
   sortIdSchema,
@@ -18,8 +18,8 @@ import type {
   TagPrefixUpdate,
   Work,
 } from "@mimimilli/shared";
+import { UnreadableSmartFolderError, type UnreadableFolderRow } from "../../errors.ts";
 import type { SmartFolderInsert, SmartFolderRow } from "../../adapter/classification.ts";
-import { getCategoryLogger } from "../../lib/logger.ts";
 import type { Db } from "./db.ts";
 import {
   appSettings,
@@ -29,12 +29,8 @@ import {
   workStates,
 } from "./userSchema.ts";
 
-const smartFolderLogger = getCategoryLogger("db");
-
 export class UserWorkStateRepository {
   private readonly db: Db;
-  /** 警告済みの壊れた行（id → 問題の署名）。一覧を取るたびに同じ警告を重ねない。直った行は忘れる */
-  private readonly reportedBrokenFolders = new Map<string, string>();
 
   constructor(db: Db) {
     this.db = db;
@@ -252,17 +248,30 @@ export class UserWorkStateRepository {
   }
 
   listSmartFolders(): SmartFolderRow[] {
-    return this.db.user
+    const results = this.db.user
       .select()
       .from(smartFolders)
       .orderBy(asc(smartFolders.position), asc(smartFolders.createdAt), asc(smartFolders.id))
       .all()
-      .map((row) => toSmartFolderRow(row, this.reportedBrokenFolders));
+      .map(readSmartFolderRow);
+    const unreadable = results.flatMap((result) =>
+      "unreadable" in result ? [result.unreadable] : [],
+    );
+    if (unreadable.length > 0) throw new UnreadableSmartFolderError(unreadable, this.db.userPath);
+    return results.flatMap((result) => ("row" in result ? [result.row] : []));
+  }
+
+  private toSmartFolderRow(r: typeof smartFolders.$inferSelect): SmartFolderRow {
+    const result = readSmartFolderRow(r);
+    if ("unreadable" in result) {
+      throw new UnreadableSmartFolderError([result.unreadable], this.db.userPath);
+    }
+    return result.row;
   }
 
   getSmartFolder(id: string): SmartFolderRow | null {
     const r = this.db.user.select().from(smartFolders).where(eq(smartFolders.id, id)).get();
-    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
+    return r ? this.toSmartFolderRow(r) : null;
   }
 
   /** 既にある ID は飛ばして末尾へ追加し、flagKey を立てる */
@@ -336,7 +345,7 @@ export class UserWorkStateRepository {
       .where(eq(smartFolders.id, id))
       .returning()
       .get();
-    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
+    return r ? this.toSmartFolderRow(r) : null;
   }
 
   updateSmartFolderSort(id: string, sort: SortId | null): SmartFolderRow | null {
@@ -346,7 +355,7 @@ export class UserWorkStateRepository {
       .where(eq(smartFolders.id, id))
       .returning()
       .get();
-    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
+    return r ? this.toSmartFolderRow(r) : null;
   }
 
   updateSmartFolderCondition(
@@ -362,7 +371,7 @@ export class UserWorkStateRepository {
       .where(eq(smartFolders.id, id))
       .returning()
       .get();
-    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
+    return r ? this.toSmartFolderRow(r) : null;
   }
 
   /** グループ分けのある行だけを更新する。グループ分けを外す更新と交差しても、値の並びだけが残る行を作らない */
@@ -373,7 +382,7 @@ export class UserWorkStateRepository {
       .where(and(eq(smartFolders.id, id), isNotNull(smartFolders.groupByJson)))
       .returning()
       .get();
-    return r ? toSmartFolderRow(r, this.reportedBrokenFolders) : null;
+    return r ? this.toSmartFolderRow(r) : null;
   }
 
   /** 全件の順序を置き換える。渡された集合が今の集合と一致しなければ null */
@@ -395,7 +404,6 @@ export class UserWorkStateRepository {
   }
 
   deleteSmartFolder(id: string): boolean {
-    this.reportedBrokenFolders.delete(id);
     return (
       this.db.user
         .delete(smartFolders)
@@ -406,11 +414,24 @@ export class UserWorkStateRepository {
   }
 }
 
-type ColumnProblem = { column: string; reason: unknown };
+type ColumnProblem = UnreadableFolderRow["problems"][number];
 type ColumnRead<T> = { ok: true; value: T } | { ok: false; problem: ColumnProblem };
 
-function failed(column: string, reason: unknown): { ok: false; problem: ColumnProblem } {
+function describeIssues(error: z.ZodError): string {
+  return error.issues
+    .map((issue) => (issue.path.length > 0 ? `${issue.path.join(".")}: ` : "") + issue.message)
+    .join(", ");
+}
+
+function failed(column: string, reason: string): { ok: false; problem: ColumnProblem } {
   return { ok: false, problem: { column, reason } };
+}
+
+function readColumn<T>(column: string, raw: unknown, schema: z.ZodType<T>): ColumnRead<T> {
+  const parsed = schema.safeParse(raw);
+  return parsed.success
+    ? { ok: true, value: parsed.data }
+    : failed(column, describeIssues(parsed.error));
 }
 
 function readJsonColumn<T>(column: string, raw: string, schema: z.ZodType<T>): ColumnRead<T> {
@@ -420,50 +441,43 @@ function readJsonColumn<T>(column: string, raw: string, schema: z.ZodType<T>): C
   } catch (error) {
     return failed(column, error instanceof Error ? error.message : String(error));
   }
-  const parsed = schema.safeParse(json);
-  return parsed.success ? { ok: true, value: parsed.data } : failed(column, parsed.error.issues);
+  return readColumn(column, json, schema);
 }
 
-/** condition・sort・groupBy・groupSort のどれか1つでも読めない、または groupBy と groupSort の組が合わなければ、4つとも null の壊れた行にする。壊れた行は同じ問題につき1回だけ警告する */
-function toSmartFolderRow(
+/** 保存と同じスキーマで厳密に読む。読めない列があれば問題を返す */
+function readSmartFolderRow(
   r: typeof smartFolders.$inferSelect,
-  reportedBrokenFolders: Map<string, string>,
-): SmartFolderRow {
-  const base = { id: r.id, name: r.name, position: r.position, createdAt: r.createdAt };
-  const condition = readJsonColumn("condition_json", r.conditionJson, conditionTreeSchema);
-  const sort = sortIdSchema.nullable().safeParse(r.sort);
+): { row: SmartFolderRow } | { unreadable: UnreadableFolderRow } {
+  const condition = readJsonColumn("condition_json", r.conditionJson, conditionSchema);
+  const sort = readColumn("sort", r.sort, sortIdSchema.nullable());
   const groupBy =
     r.groupByJson === null
       ? ({ ok: true, value: null } as const)
       : readJsonColumn("group_by_json", r.groupByJson, groupBySchema);
-  const groupSort = groupSortIdSchema.nullable().safeParse(r.groupSort);
-  const problems: ColumnProblem[] = [];
-  if (!condition.ok) problems.push(condition.problem);
-  if (!sort.success) problems.push({ column: "sort", reason: sort.error.issues });
-  if (!groupBy.ok) problems.push(groupBy.problem);
-  if (!groupSort.success) problems.push({ column: "group_sort", reason: groupSort.error.issues });
-  const mismatched =
-    groupBy.ok && groupSort.success && (groupBy.value === null) !== (groupSort.data === null);
-  if (mismatched) {
-    problems.push({ column: "group_sort", reason: "group_by_json と group_sort の組が合いません" });
-  }
-  if (!condition.ok || !sort.success || !groupBy.ok || !groupSort.success || mismatched) {
-    const signature = JSON.stringify(problems);
-    if (reportedBrokenFolders.get(r.id) !== signature) {
-      reportedBrokenFolders.set(r.id, signature);
-      smartFolderLogger.warn("壊れたスマートフォルダーの行を読み込めません", {
-        smartFolderId: r.id,
-        problems,
+  const groupSort = readColumn("group_sort", r.groupSort, groupSortIdSchema.nullable());
+  const problems = [condition, sort, groupBy, groupSort].flatMap((read) =>
+    read.ok ? [] : [read.problem],
+  );
+  if (condition.ok && sort.ok && groupBy.ok && groupSort.ok) {
+    if ((groupBy.value === null) !== (groupSort.value === null)) {
+      problems.push({
+        column: "group_sort",
+        reason: "group_by_json と group_sort の組が合いません",
       });
+    } else {
+      return {
+        row: {
+          id: r.id,
+          name: r.name,
+          condition: condition.value,
+          sort: sort.value,
+          groupBy: groupBy.value,
+          groupSort: groupSort.value,
+          position: r.position,
+          createdAt: r.createdAt,
+        },
+      };
     }
-    return { ...base, condition: null, sort: null, groupBy: null, groupSort: null };
   }
-  reportedBrokenFolders.delete(r.id);
-  return {
-    ...base,
-    condition: condition.value,
-    sort: sort.data,
-    groupBy: groupBy.value,
-    groupSort: groupSort.data,
-  };
+  return { unreadable: { id: r.id, name: r.name, problems } };
 }

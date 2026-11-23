@@ -32,6 +32,7 @@ import {
   resolveLibraryView,
   type ResolvedLibraryView,
 } from "../../../entities/library/resolveLibraryView";
+import { ApiRequestError } from "../../../shared/api/http";
 import { smartFoldersQueryOptions } from "../../../entities/smart-folder/queryOptions";
 import { LibraryNavigationContext } from "./libraryNavigationContext";
 
@@ -55,6 +56,8 @@ export interface ReadyLibraryViewState extends LibraryViewStateBase {
 /** 一覧を取得中・取得失敗。「まだ分からない」ので view は作らない */
 export interface UnavailableLibraryViewState extends LibraryViewStateBase {
   foldersStatus: "pending" | "error";
+  /** 取得失敗のときのサーバーの文言 */
+  foldersError: string | null;
 }
 
 export type ReadyLibraryNavigation = ReadyLibraryViewState & LibraryViewActions;
@@ -174,7 +177,12 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
       refetchFolders: () => void refetch(),
     };
     if (!folders || !view) {
-      return { ...base, foldersStatus: foldersQuery.isError ? "error" : "pending" };
+      return {
+        ...base,
+        foldersStatus: foldersQuery.isError ? "error" : "pending",
+        foldersError:
+          foldersQuery.error instanceof ApiRequestError ? foldersQuery.error.message : null,
+      };
     }
     return {
       ...base,
@@ -184,7 +192,15 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
       selectedTags: view.kind === "works" ? view.selectedTags : EMPTY_TAGS,
       searchQuery: view.kind === "works" ? view.q : "",
     };
-  }, [folders, view, foldersQuery.isError, refetch, library.selectedWorkId, isPending]);
+  }, [
+    folders,
+    view,
+    foldersQuery.isError,
+    foldersQuery.error,
+    refetch,
+    library.selectedWorkId,
+    isPending,
+  ]);
 
   return useMemo(() => ({ ...navigation, ...actions }), [navigation, actions]);
 }

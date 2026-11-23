@@ -6,6 +6,7 @@ import { openDb } from "../../src/adapters/real/db.ts";
 import { playlists, works, tags } from "../../src/adapters/real/catalogSchema.ts";
 import { smartFolders } from "../../src/adapters/real/userSchema.ts";
 import { PersistentDataError } from "../../src/adapters/real/workRowMapping.ts";
+import { UnreadableSmartFolderError } from "../../src/errors.ts";
 import {
   upsertTestWork,
   makeWork,
@@ -147,7 +148,7 @@ test("tags.name が正規化されていなければ listSummaries は当該作�
   assert.match(result.skipped[0]!.reason, /タグが正規化されていません/);
 });
 
-test("読めない列を持つ smart folder は condition・sort・groupBy が null の壊れた行で返る", (t) => {
+test("読めない列を持つ行があると、一覧は読めない行をすべて挙げて失敗する", (t) => {
   const scope = makeTestScope();
   t.after(scope.cleanup);
   const db = scope.own(openDb({ kind: "memory" }));
@@ -199,11 +200,15 @@ test("読めない列を持つ smart folder は condition・sort・groupBy が n
     ])
     .run();
 
-  const rows = user.listSmartFolders();
-  const byId = new Map(rows.map((row) => [row.id, row]));
-  assert.deepEqual(byId.get("ok")?.condition, { type: "and", children: [] });
-  for (const id of ["bad-sort", "bad-json", "bad-tree", "bad-group"]) {
-    const row = byId.get(id)!;
-    assert.deepEqual([row.condition, row.sort, row.groupBy], [null, null, null], id);
-  }
+  assert.throws(
+    () => user.listSmartFolders(),
+    (error) => {
+      assert.ok(error instanceof UnreadableSmartFolderError);
+      assert.deepEqual(
+        error.rows.map((row) => row.id),
+        ["bad-sort", "bad-json", "bad-tree", "bad-group"],
+      );
+      return true;
+    },
+  );
 });

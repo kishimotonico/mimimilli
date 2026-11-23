@@ -15,7 +15,6 @@ import { folderWorksResetKey } from "../model/folderWorksRequest";
 import { useLibrarySelectionCleanup } from "../model/useLibrarySelectionCleanup";
 import { useLibraryPreviewActions } from "../model/useLibraryPreviewActions";
 import GroupValueList from "./GroupValueList";
-import BrokenFolderPane from "./BrokenFolderPane";
 import FilterChipBand from "./FilterChipBand";
 import LibraryResultsPane from "./LibraryResultsPane";
 import LibraryWorksBoundary from "./LibraryWorksBoundary";
@@ -40,6 +39,7 @@ export default function LibraryView({ dockedBarActive }: LibraryViewProps) {
           <CollectionStatus
             variant="list"
             kind={isError ? "error" : "loading"}
+            message={isError ? (nav.foldersError ?? undefined) : undefined}
             onRetry={isError ? nav.refetchFolders : undefined}
           />
         </div>
@@ -98,7 +98,7 @@ function LibraryViewBody({
   return (
     <>
       <div className="mll-resultspane">
-        {view.kind !== "broken" && (
+        {
           // チップ列は結果面の常設ヘッダーとして .mll-results の外に置く。
           // .mll-results 内側の作品プレビューは絶対配置でスライドインするため、
           // 同じ .mll-results に同居させるとプレビューの下に隠れて操作できなくなる。
@@ -130,10 +130,8 @@ function LibraryViewBody({
                 : undefined
             }
           />
-        )}
-        {view.kind === "broken" ? (
-          <BrokenFolderPane folder={view.folder} reason={view.reason} />
-        ) : view.kind === "value-list" ? (
+        }
+        {view.kind === "value-list" ? (
           <div className="mll-results">
             <div className="mll-results__content">
               <GroupValueList

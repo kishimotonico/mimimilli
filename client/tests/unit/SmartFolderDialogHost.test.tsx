@@ -269,19 +269,3 @@ describe("グループ分けがあるときの並びの欄", () => {
     expect(screen.getByLabelText("既定の並び")).toBeInTheDocument();
   });
 });
-
-describe("「すべて」の並びが読めないとき", () => {
-  it("ダイアログは出て、「すべて」と同じは選べず、継承の下書きは既定テンプレートの並びで始まる", async () => {
-    mockApi({ "GET /api/tag-prefixes": [] });
-    const brokenAll = buildSmartFolder({ id: "all", name: "すべて", condition: null, sort: null });
-    const folders = [brokenAll, ...defaultSmartFolders().filter((f) => f.id !== "all"), folderA];
-    const store = renderHost(folders);
-
-    act(() => store.set(smartFolderDialogAtom, { kind: "edit", folder: folderA }));
-    const select = await screen.findByLabelText("既定の並び");
-
-    expect(screen.queryByRole("option", { name: /「すべて」と同じ/ })).toBeNull();
-    expect(select).toHaveValue("added-desc");
-    expect(screen.getByRole("button", { name: "保存" })).toBeEnabled();
-  });
-});

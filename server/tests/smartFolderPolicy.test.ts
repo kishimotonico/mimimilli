@@ -13,10 +13,10 @@ import {
 import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
 
 const EMPTY = { type: "and" as const, children: [] };
-const folder = (id: string, condition: SmartFolder["condition"] = EMPTY): SmartFolder => ({
+const folder = (id: string): SmartFolder => ({
   id,
   name: id,
-  condition,
+  condition: EMPTY,
   sort: null,
   groupBy: null,
   groupSort: null,
@@ -32,7 +32,6 @@ test("自作は何でも変えられる", () => {
     editGroupBy: true,
     inheritSort: true,
     remove: true,
-    edit: true,
   });
 });
 
@@ -43,7 +42,6 @@ test("既定は名前・並び・削除だけ。条件とグループ分けは�
     editGroupBy: false,
     inheritSort: true,
     remove: true,
-    edit: true,
   });
 });
 
@@ -54,47 +52,23 @@ test("「すべて」は名前・条件・グループ分け・削除ができ�
     editGroupBy: false,
     inheritSort: false,
     remove: false,
-    edit: true,
   });
 });
 
-test("壊れた行は編集のダイアログを開けず、削除だけ。壊れた「すべて」は削除もできない", () => {
-  assert.deepEqual(
-    smartFolderPermissions(folder("sf-00000000-0000-4000-8000-000000000001", null)),
-    {
-      rename: false,
-      editCondition: false,
-      editGroupBy: false,
-      inheritSort: false,
-      remove: true,
-      edit: false,
-    },
-  );
-  assert.equal(smartFolderPermissions(folder("all", null)).remove, false);
-});
-
-test("並びだけの更新の違反: 壊れた行は 403 相当、「すべて」の空は 400 相当", () => {
-  assert.equal(
-    sortViolation(folder("sf-00000000-0000-4000-8000-000000000001", null), "title-asc")?.kind,
-    "forbidden",
-  );
+test("並びだけの更新の違反: 「すべて」の空は 400 相当", () => {
   assert.equal(sortViolation(folder("all"), null)?.kind, "invalid");
   assert.equal(sortViolation(folder("all"), "title-asc"), null);
   assert.equal(sortViolation(folder("fav"), null), null);
 });
 
-test("条件の更新の違反: 壊れた行と既定の行（「すべて」を含む）は 403 相当、自作は通る", () => {
-  assert.equal(
-    conditionViolation(folder("sf-00000000-0000-4000-8000-000000000001", null))?.kind,
-    "forbidden",
-  );
+test("条件の更新の違反: 既定の行（「すべて」を含む）は 403 相当、自作は通る", () => {
   assert.equal(conditionViolation(folder("fav"))?.kind, "forbidden");
   assert.equal(conditionViolation(folder("all"))?.kind, "forbidden");
   const own = folder("sf-00000000-0000-4000-8000-000000000001");
   assert.equal(conditionViolation(own), null);
 });
 
-test("値の並びだけの更新の違反: 壊れた行は 403 相当、グループ分けの無い行は 400 相当", () => {
+test("値の並びだけの更新の違反: グループ分けの無い行は 400 相当", () => {
   const grouped = {
     ...folder("by-cv"),
     groupBy: { kind: "tag" } as const,
@@ -102,10 +76,6 @@ test("値の並びだけの更新の違反: 壊れた行は 403 相当、グル�
   };
   assert.equal(groupSortViolation(grouped), null);
   assert.equal(groupSortViolation(folder("fav"))?.kind, "invalid");
-  assert.equal(
-    groupSortViolation(folder("sf-00000000-0000-4000-8000-000000000001", null))?.kind,
-    "forbidden",
-  );
 });
 
 test("更新の違反は値で返り、種別は 403 相当と 400 相当に分かれる", () => {

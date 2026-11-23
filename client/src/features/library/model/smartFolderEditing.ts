@@ -11,7 +11,6 @@ import {
   type GroupBy,
   type GroupSortId,
   type Predicate,
-  type ReadableSmartFolder,
   type SmartFolder,
   type SmartFolderTemplate,
   type SmartFolderWrite,
@@ -142,7 +141,7 @@ export interface SmartFolderDraft {
   groupSort: GroupSortId | null;
 }
 
-export function draftOf(folder: ReadableSmartFolder): SmartFolderDraft {
+export function draftOf(folder: SmartFolder): SmartFolderDraft {
   return {
     name: folder.name,
     condition: folder.condition,
@@ -165,7 +164,7 @@ export function withGroupBy(
 }
 
 /** 絞り込みの無い複製の下書き。元の定義と既定の並び（継承ならそのまま継承）を写す */
-export function duplicateDraft(folder: ReadableSmartFolder): SmartFolderDraft {
+export function duplicateDraft(folder: SmartFolder): SmartFolderDraft {
   return { ...draftOf(folder), name: `${folder.name}（コピー）` };
 }
 
@@ -181,8 +180,8 @@ export function groupDraft(groupBy: GroupBy): SmartFolderDraft {
 }
 
 export type SmartFolderDialogTarget =
-  | { kind: "edit"; folder: ReadableSmartFolder }
-  | { kind: "duplicate"; folder: ReadableSmartFolder }
+  | { kind: "edit"; folder: SmartFolder }
+  | { kind: "duplicate"; folder: SmartFolder }
   | { kind: "save"; draft: SmartFolderDraft }
   | { kind: "group" };
 

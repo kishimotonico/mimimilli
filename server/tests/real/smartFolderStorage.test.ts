@@ -2,12 +2,7 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
-import {
-  conditionKey,
-  SMART_FOLDER_TEMPLATES,
-  findSmartFolderTemplate,
-  type SmartFolder,
-} from "@mimimilli/shared";
+import { conditionKey, SMART_FOLDER_TEMPLATES, findSmartFolderTemplate } from "@mimimilli/shared";
 import { createApp } from "../helpers/testApp.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
@@ -83,11 +78,10 @@ test("既定は初回だけ投入され、全部消しても再起動で戻ら�
   await second.close?.();
 });
 
-test("読めない行があっても一覧は成功し、壊れた行を null で返して件数の対象から外す", async (t) => {
-  const directory = makeTestDirectory("sf-broken");
-  t.after(directory.cleanup);
-  const adapter = openAdapter(directory);
-  const app = createApp(adapter);
+function insertRows(
+  directory: ReturnType<typeof makeTestDirectory>,
+  rows: Array<Record<string, unknown>>,
+) {
   const db = directory.own(
     openDb({
       kind: "files",
@@ -95,170 +89,94 @@ test("読めない行があっても一覧は成功し、壊れた行を null �
       userPath: join(directory.path, "user.sqlite"),
     }),
   );
-  const createdAt = "2026-07-19T00:00:00.000Z";
   const healthy = {
     conditionJson: '{"type":"and","children":[{"type":"hasError"}]}',
     sort: "added-desc",
+    createdAt: "2026-07-19T00:00:00.000Z",
   };
   db.user
     .insert(smartFolders)
-    .values([
-      {
-        id: "broken-json",
-        name: "壊れJSON",
-        ...healthy,
-        conditionJson: "{",
-        position: 100,
-        createdAt,
-      },
-      {
-        id: "broken-sort",
-        name: "壊れsort",
-        ...healthy,
-        sort: "unknown",
-        position: 101,
-        createdAt,
-      },
-      {
-        id: "broken-group",
-        name: "壊れgroup",
-        ...healthy,
-        groupByJson: '{"kind":"x"}',
-        position: 102,
-        createdAt,
-      },
-      {
-        id: "broken-group-sort",
-        name: "壊れgroupSort",
-        ...healthy,
-        groupSort: "unknown",
-        position: 104,
-        createdAt,
-      },
-      {
-        id: "orphan-group-sort",
-        name: "グループ分けなしに値の並び",
-        ...healthy,
-        groupSort: "count-desc",
-        position: 105,
-        createdAt,
-      },
-      {
-        id: "missing-group-sort",
-        name: "グループ分けありで値の並びなし",
-        ...healthy,
-        groupByJson: '{"kind":"tag"}',
-        position: 106,
-        createdAt,
-      },
-      { id: "ok-error", name: "エラー確認", ...healthy, position: 103, createdAt },
-    ])
+    .values(rows.map((row) => ({ ...healthy, ...row })) as (typeof smartFolders.$inferInsert)[])
     .run();
+}
+
+const UNREADABLE_ROWS: Array<{ id: string; column: string; row: Record<string, unknown> }> = [
+  { id: "broken-json", column: "condition_json", row: { conditionJson: "{" } },
+  {
+    id: "broken-shape",
+    column: "condition_json",
+    row: { conditionJson: '{"type":"or","children":[]}' },
+  },
+  { id: "broken-sort", column: "sort", row: { sort: "unknown" } },
+  { id: "broken-group", column: "group_by_json", row: { groupByJson: '{"kind":"x"}' } },
+  { id: "broken-group-sort", column: "group_sort", row: { groupSort: "unknown" } },
+  { id: "orphan-group-sort", column: "group_sort", row: { groupSort: "count-desc" } },
+  { id: "missing-group-sort", column: "group_sort", row: { groupByJson: '{"kind":"tag"}' } },
+];
+
+for (const { id, column, row } of UNREADABLE_ROWS) {
+  test(`読めない行(${id})があると、一覧とその行を引く口が 500 で、行の ID・理由・DB のパス・DELETE のコマンドを返す`, async (t) => {
+    const directory = makeTestDirectory("sf-broken");
+    t.after(directory.cleanup);
+    const adapter = openAdapter(directory);
+    const app = createApp(adapter);
+    insertRows(directory, [{ id, name: "壊れた行", position: 100, ...row }]);
+    const userPath = join(directory.path, "user.sqlite");
+
+    await captureLogs(
+      async (records) => {
+        for (const path of [
+          "/api/smart-folders",
+          `/api/smart-folders/${id}/works?sort=added-desc`,
+        ]) {
+          const res = await app.request(path);
+          assert.equal(res.status, 500, path);
+          const message = ((await res.json()) as { error: { message: string } }).error.message;
+          assert.ok(message.includes(`ID: ${id}`), message);
+          assert.ok(message.includes(column), message);
+          assert.ok(
+            message.includes(
+              `sqlite3 "${userPath}" "DELETE FROM smart_folders WHERE id = '${id}'"`,
+            ),
+            message,
+          );
+          assert.ok(!message.includes("スマートフォルダー"), message);
+        }
+        const errors = categoryRecords(records, "http").filter((r) => r.level === "error");
+        assert.ok(errors.length >= 2);
+        assert.equal(errors[0]!.properties.dbPath, userPath);
+        assert.deepEqual(
+          (errors[0]!.properties.rows as Array<{ id: string }>).map((r) => r.id),
+          [id],
+        );
+      },
+      { categories: ["http"] },
+    );
+  });
+}
+
+test("読めない行が複数あれば、すべての行を1つの応答にまとめる。行を消すと一覧は読める", async (t) => {
+  const directory = makeTestDirectory("sf-broken-many");
+  t.after(directory.cleanup);
+  const adapter = openAdapter(directory);
+  const app = createApp(adapter);
+  insertRows(directory, [
+    { id: "broken-a", name: "A", position: 100, conditionJson: "{" },
+    { id: "broken-b", name: "B", position: 101, sort: "unknown" },
+    { id: "ok-error", name: "エラー確認", position: 102 },
+  ]);
 
   const res = await app.request("/api/smart-folders");
-  assert.equal(res.status, 200);
-  const folders = (await res.json()) as SmartFolder[];
-  for (const id of [
-    "broken-json",
-    "broken-sort",
-    "broken-group",
-    "broken-group-sort",
-    "orphan-group-sort",
-    "missing-group-sort",
-  ]) {
-    const row = folders.find((f) => f.id === id)!;
-    assert.deepEqual(
-      [row.condition, row.sort, row.groupBy, row.groupSort, row.count],
-      [null, null, null, null, null],
-      id,
-    );
-  }
-  assert.equal(folders.find((f) => f.id === "ok-error")!.count, 0);
+  assert.equal(res.status, 500);
+  const message = ((await res.json()) as { error: { message: string } }).error.message;
+  assert.ok(message.includes("ID: broken-a") && message.includes("ID: broken-b"), message);
+  assert.ok(!message.includes("ok-error"), message);
 
-  const works = await app.request("/api/smart-folders/broken-json/works?sort=added-desc");
-  assert.equal(works.status, 409);
-  const del = await app.request("/api/smart-folders/broken-json", { method: "DELETE" });
-  assert.equal(del.status, 204);
-  const fix = await app.request("/api/smart-folders/broken-sort", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: "直した",
-      condition: { type: "and", children: [] },
-      sort: "added-desc",
-      groupBy: null,
-      groupSort: null,
-    }),
-  });
-  assert.equal(fix.status, 200);
-  assert.deepEqual(await fix.json(), {
-    id: "broken-sort",
-    name: "直した",
-    condition: { type: "and", children: [] },
-    sort: "added-desc",
-    groupBy: null,
-    groupSort: null,
-    position: 101,
-    createdAt: "2026-07-19T00:00:00.000Z",
-    count: null,
-  });
-});
+  assert.equal((await adapter.getSmartFolder("ok-error"))?.id, "ok-error");
 
-test("読めないスマートフォルダーの行は、行ごとに id・列・原因を警告に出す", async (t) => {
-  const directory = makeTestDirectory("sf-broken-log");
-  t.after(directory.cleanup);
-  const adapter = openAdapter(directory);
-  const app = createApp(adapter);
-  const db = directory.own(
-    openDb({
-      kind: "files",
-      catalogPath: join(directory.path, "catalog.sqlite"),
-      userPath: join(directory.path, "user.sqlite"),
-    }),
-  );
-  const healthy = {
-    conditionJson: '{"type":"and","children":[{"type":"hasError"}]}',
-    sort: "added-desc",
-    createdAt: "2026-07-19T00:00:00.000Z",
-  };
-  db.user
-    .insert(smartFolders)
-    .values([
-      { id: "broken-json", name: "壊れJSON", ...healthy, conditionJson: "{", position: 100 },
-      { id: "broken-sort", name: "壊れsort", ...healthy, sort: "unknown", position: 101 },
-      { id: "ok-error", name: "エラー確認", ...healthy, position: 102 },
-    ])
-    .run();
-
-  await captureLogs(
-    async (records) => {
-      const res = await app.request("/api/smart-folders");
-      assert.equal(res.status, 200);
-      const warns = categoryRecords(records, "db").filter((r) => r.level === "warning");
-      const byId = new Map(
-        warns.map((r) => [
-          r.properties.smartFolderId as string,
-          r.properties.problems as Array<{ column: string }>,
-        ]),
-      );
-      assert.deepEqual([...byId.keys()].sort(), ["broken-json", "broken-sort"]);
-      assert.deepEqual(
-        byId.get("broken-json")!.map((p) => p.column),
-        ["condition_json"],
-      );
-      assert.deepEqual(
-        byId.get("broken-sort")!.map((p) => p.column),
-        ["sort"],
-      );
-
-      const warned = warns.length;
-      const again = await app.request("/api/smart-folders");
-      assert.equal(again.status, 200);
-      assert.equal(
-        categoryRecords(records, "db").filter((r) => r.level === "warning").length,
-        warned,
-      );
-    },
-    { categories: ["db"] },
-  );
+  await adapter.deleteSmartFolder("broken-a");
+  await adapter.deleteSmartFolder("broken-b");
+  const list = await app.request("/api/smart-folders");
+  assert.equal(list.status, 200);
+  assert.ok(((await list.json()) as Array<{ id: string }>).some((f) => f.id === "ok-error"));
 });

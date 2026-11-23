@@ -5,8 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 import LibrarySidebarPanel from "../../src/features/library/ui/LibrarySidebarPanel";
 import { mockApi } from "../helpers/api";
-import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
 import { buildGroupValueItem, buildTagPrefix } from "../helpers/builders";
+import { defaultSmartFolders } from "../helpers/smartFolders";
 
 let sizeMock: { restore: () => void } | null = null;
 
@@ -167,20 +167,6 @@ describe("LibrarySidebarPanel", () => {
     expect(screen.queryByText("分類軸")).toBeNull();
     expect(screen.queryByText(/新規スマートフォルダー/)).toBeNull();
     expect(screen.queryByRole("button", { name: /^タグ$/ })).toBeNull();
-  });
-
-  it("読めない行は開けるが件数もクイックオーバーレイも持たない", () => {
-    renderSidebar({
-      folders: {
-        status: "ready",
-        folders: [
-          ...defaultSmartFolders(),
-          buildSmartFolder({ id: "sf-broken", name: "壊れた行", condition: null }),
-        ],
-      },
-    });
-
-    expect(screen.getByRole("button", { name: "壊れた行" })).not.toHaveAttribute("aria-expanded");
   });
 
   it("開いているスマートフォルダーに aria-current を付与する", () => {

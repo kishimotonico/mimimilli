@@ -404,19 +404,6 @@ describe("削除", () => {
     expect(pendingWrites(store)).toEqual([]);
   });
 
-  it("壊れた行は戻せないので元に戻すを出さず、開いていれば同じく「すべて」へ置き換える", async () => {
-    mockApi({ "DELETE /api/smart-folders/:id": apiNoContent() });
-    const editor = setup();
-    seedLibraryRoute(store, { folderId: USER_ID });
-    clearPendingOps(store);
-
-    await editor.remove({ ...userFolder, condition: null, sort: null });
-
-    expect(toasts()[0]!.actionLabel).toBeUndefined();
-    expect(store.get(libraryRouteAtom).folderId).toBe("all");
-    expect(pendingWrites(store)).toEqual(["replace"]);
-  });
-
   it("失敗（404・409）はトーストを出して一覧を取り直し、route は動かさない", async () => {
     mockApi({
       "DELETE /api/smart-folders/:id": () =>

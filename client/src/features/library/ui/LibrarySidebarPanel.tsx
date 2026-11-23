@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 import { useSetAtom } from "jotai";
 import { AnimatePresence } from "motion/react";
 import {
-  isReadableSmartFolder,
   smartFolderPermissions,
   type NormalizedTag,
   type SmartFolder,
@@ -104,8 +103,7 @@ export default function LibrarySidebarPanel({
   });
 
   const activeFolder = readyFolders.find((folder) => folder.id === activeFolderId) ?? null;
-  const duplicateSource =
-    activeFolder && isReadableSmartFolder(activeFolder) && !filtered ? activeFolder : null;
+  const duplicateSource = activeFolder && !filtered ? activeFolder : null;
 
   const startEditing = () => {
     closeOverlay();
@@ -196,11 +194,10 @@ export default function LibrarySidebarPanel({
             <SidebarEditRow
               key={row.id}
               row={row}
-              canEdit={permissions.edit}
               canRemove={permissions.remove}
               draggableEnabled={!isMobile}
               onEdit={() => {
-                if (isReadableSmartFolder(folder)) setDialog({ kind: "edit", folder });
+                setDialog({ kind: "edit", folder });
               }}
               onRemove={() => void editor.remove(folder)}
             />

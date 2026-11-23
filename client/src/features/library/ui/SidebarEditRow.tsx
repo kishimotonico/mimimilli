@@ -16,7 +16,6 @@ export const SMART_FOLDER_DRAG_TYPE = "smart-folder";
 
 interface SidebarEditRowProps {
   row: SidebarRow;
-  canEdit: boolean;
   canRemove: boolean;
   /** モバイル幅ではドラッグを出さない（ADR-0042） */
   draggableEnabled: boolean;
@@ -27,7 +26,6 @@ interface SidebarEditRowProps {
 /** 編集の状態の行。グリップでなく行全体がドラッグ元で、上半分・下半分で前後を決める */
 export default function SidebarEditRow({
   row,
-  canEdit,
   canRemove,
   draggableEnabled,
   onEdit,
@@ -90,19 +88,15 @@ export default function SidebarEditRow({
       {draggableEnabled && <I.grip size={13} className="grip" />}
       <Icon size={15} />
       <span className="nm">{row.name}</span>
-      {canEdit ? (
-        <button
-          type="button"
-          className="act"
-          title="編集"
-          aria-label={`「${row.name}」を編集`}
-          onClick={onEdit}
-        >
-          <I.edit size={13} />
-        </button>
-      ) : (
-        <span className="act is-empty" aria-hidden="true" />
-      )}
+      <button
+        type="button"
+        className="act"
+        title="編集"
+        aria-label={`「${row.name}」を編集`}
+        onClick={onEdit}
+      >
+        <I.edit size={13} />
+      </button>
       {canRemove ? (
         <button
           type="button"
