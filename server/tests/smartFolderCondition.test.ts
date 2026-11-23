@@ -206,6 +206,13 @@ test("作成は5列がそろい、値が不正なら受け付けない", () => {
   }
 });
 
+test("作成・更新のどちらも name の前後の空白を落とす", () => {
+  const base = { name: " a ", condition: and(), sort: null, groupBy: null, groupSort: null };
+  const created = smartFolderCreateSchema.parse(base);
+  assert.equal(created.name, "a");
+  assert.equal(smartFolderPatchSchema.parse({ name: " a " }).name, "a");
+});
+
 test("更新は1列以上を持ち、未知のキーを受け付けない", () => {
   assert.ok(!smartFolderPatchSchema.safeParse({}).success);
   assert.ok(smartFolderPatchSchema.safeParse({ sort: null }).success);
