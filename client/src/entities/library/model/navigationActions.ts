@@ -48,14 +48,16 @@ export const replaceLibraryFolderAtom = appRouteCorrection(replaceLibraryFolder)
 
 /** await を挟む保存・追加のあとの入り直し。library が始めたときのままなら、同じ画面（層なし）では
  *  folderId へ入り直す（遷移）。画面や層が変わっていたら、画面と層は動かさず保持中の library だけを
- *  入り直した状態にする（補正）。library をユーザーが変えていたら、その状態を残して何もしない */
+ *  入り直した状態にする（補正）。新規は履歴を積み、上書き（overwrite）は置き換える。
+ *  library をユーザーが変えていたら、その状態を残して何もしない */
 export const settleLibraryFolderAtom = atom(
   null,
-  (get, set, started: LibraryPlace, folderId: string) => {
+  (get, set, started: LibraryPlace, folderId: string, overwrite = false) => {
     const now = get(libraryPlaceAtom);
     if (now.library !== started.library) return;
-    if (isSameScreen(now, started)) set(reenterLibraryFolderAtom, folderId);
-    else set(replaceLibraryFolderAtom, folderId, folderId);
+    if (isSameScreen(now, started)) {
+      set(overwrite ? reenterLibraryFolderAtom : openLibraryFolderAtom, folderId);
+    } else set(replaceLibraryFolderAtom, folderId, folderId);
   },
 );
 export const normalizeLibraryFolderAtom = appRouteCorrection(normalizeLibraryFolder);

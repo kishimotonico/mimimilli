@@ -398,10 +398,22 @@ describe("履歴の積み方", () => {
     const store = setup({ folderId: "sf-own", sort: "title-asc" });
     clearPendingOps(store);
 
-    store.set(settleLibraryFolderAtom, store.get(libraryPlaceAtom), "sf-own");
+    store.set(settleLibraryFolderAtom, store.get(libraryPlaceAtom), "sf-own", true);
 
     expect(ops(store)).toEqual(["replace"]);
     expect(lib(store)).toMatchObject({ folderId: "sf-own", sort: null });
+  });
+
+  it("新規保存のあとの入り直しは履歴を積み、保存前の画面へ戻れる。同じ場所なら置き換える", () => {
+    const store = setup({ folderId: "all", selectedTags: nts(["ASMR"]), q: "雨" });
+    clearPendingOps(store);
+
+    store.set(settleLibraryFolderAtom, store.get(libraryPlaceAtom), "sf-new");
+    expect(ops(store)).toEqual(["push"]);
+    expect(lib(store)).toMatchObject({ folderId: "sf-new", selectedTags: [], q: "" });
+
+    store.set(settleLibraryFolderAtom, store.get(libraryPlaceAtom), "sf-new");
+    expect(ops(store)).toEqual(["push", "replace"]);
   });
 
   it("await の間に層を開いた・別の画面へ移ったときは、画面と層を引き戻さない", () => {

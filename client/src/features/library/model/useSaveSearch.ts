@@ -51,7 +51,7 @@ export function useSaveSearch(nav: LibraryViewState & LibraryViewActions): SaveS
     const saved = await editor.overwriteCondition(folder.id, overwriteChange(view));
     overwriting.current = false;
     if (!saved) return;
-    settle(folder.id);
+    settle(folder.id, true);
     let undone = false;
     toast.show({
       message: `「${folder.name}」を上書きしました`,
