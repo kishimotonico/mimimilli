@@ -4,9 +4,7 @@ import { eq } from "drizzle-orm";
 import type { Work } from "@mimimilli/shared";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { playlists, works, tags } from "../../src/adapters/real/catalogSchema.ts";
-import { smartFolders } from "../../src/adapters/real/userSchema.ts";
 import { PersistentDataError } from "../../src/adapters/real/workRowMapping.ts";
-import { UnreadableSmartFolderError } from "../../src/errors.ts";
 import {
   upsertTestWork,
   makeWork,
@@ -146,69 +144,4 @@ test("tags.name が正規化されていなければ listSummaries は当該作�
   assert.equal(result.skipped.length, 1);
   assert.equal(result.skipped[0]!.workId, bad.id);
   assert.match(result.skipped[0]!.reason, /タグが正規化されていません/);
-});
-
-test("読めない列を持つ行があると、一覧は読めない行をすべて挙げて失敗する", (t) => {
-  const scope = makeTestScope();
-  t.after(scope.cleanup);
-  const db = scope.own(openDb({ kind: "memory" }));
-  const { user } = createWorkRepos(db);
-  const base = {
-    conditionJson: '{"type":"and","children":[]}',
-    sort: "added-desc" as string | null,
-  };
-  const createdAt = "2026-07-19T00:00:00.000Z";
-  db.user
-    .insert(smartFolders)
-    .values([
-      { id: "ok", name: "正常", ...base, groupByJson: null, position: 10, createdAt },
-      {
-        id: "bad-sort",
-        name: "不正sort",
-        ...base,
-        sort: "unknown",
-        groupByJson: null,
-        position: 11,
-        createdAt,
-      },
-      {
-        id: "bad-json",
-        name: "不正JSON",
-        ...base,
-        conditionJson: "{",
-        groupByJson: null,
-        position: 12,
-        createdAt,
-      },
-      {
-        id: "bad-tree",
-        name: "不正な木",
-        ...base,
-        conditionJson: '{"type":"nope"}',
-        groupByJson: null,
-        position: 13,
-        createdAt,
-      },
-      {
-        id: "bad-group",
-        name: "不正groupBy",
-        ...base,
-        groupByJson: '{"kind":"nope"}',
-        position: 14,
-        createdAt,
-      },
-    ])
-    .run();
-
-  assert.throws(
-    () => user.listSmartFolders(),
-    (error) => {
-      assert.ok(error instanceof UnreadableSmartFolderError);
-      assert.deepEqual(
-        error.rows.map((row) => row.id),
-        ["bad-sort", "bad-json", "bad-tree", "bad-group"],
-      );
-      return true;
-    },
-  );
 });

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   conditionSchema,
+  definitionOf,
   isBookmarkedOnly,
   isHasErrorOnly,
   showsCount,
@@ -14,11 +15,7 @@ import {
   SMART_FOLDER_TEMPLATES,
   type Condition,
 } from "@mimimilli/shared";
-
-const tag = (t: string): Condition => ({ type: "tag", tag: t });
-const and = (...children: Condition[]): Condition => ({ type: "and", children });
-const or = (...children: Condition[]): Condition => ({ type: "or", children });
-const not = (child: Condition): Condition => ({ type: "not", child });
+import { and, not, or, tag } from "./helpers/conditionTree.ts";
 
 function accepted(input: unknown): Condition {
   const parsed = conditionSchema.safeParse(input);
@@ -51,6 +48,14 @@ test("保存できる形でないものを弾く", () => {
     and({ type: "addedYear", year: "25" }),
   ]) {
     assert.equal(conditionSchema.safeParse(bad).success, false, JSON.stringify(bad));
+  }
+});
+
+test("子は100個まで", () => {
+  const tags = Array.from({ length: 101 }, (_, i) => tag(`t/${i}`));
+  assert.ok(conditionSchema.safeParse(and(...tags.slice(0, 100))).success);
+  for (const bad of [and(...tags), and(or(...tags)), and(not(or(...tags)))]) {
+    assert.equal(conditionSchema.safeParse(bad).success, false, JSON.stringify(bad).slice(0, 80));
   }
 });
 
@@ -106,14 +111,7 @@ test("既定テンプレート: 13本・初回11本・固定IDで、条件は保
     ["by-series", "by-rating"],
   );
   for (const t of SMART_FOLDER_TEMPLATES) {
-    const parsed = smartFolderCreateSchema.safeParse({
-      id: t.id,
-      name: t.name,
-      condition: t.condition,
-      sort: t.sort,
-      groupBy: t.groupBy,
-      groupSort: t.groupSort,
-    });
+    const parsed = smartFolderCreateSchema.safeParse({ ...definitionOf(t), id: t.id });
     assert.ok(parsed.success, t.id);
     assert.deepEqual(parsed.data.condition, t.condition);
     assert.equal(smartFolderViolation({ ...parsed.data, id: t.id }), null, t.id);
@@ -187,14 +185,34 @@ test("作成の id は小文字・数字・ハイフンの64文字までで、�
   assert.ok(ok("a".repeat(64)));
   assert.ok(!ok("a".repeat(65)));
   assert.ok(!ok(""));
-  assert.ok(!ok("Upper"));
-  assert.ok(!ok("a/b"));
+  for (const bad of ["Upper", "a/b", "全角", "sf_underscore"]) assert.ok(!ok(bad), bad);
+});
+
+test("作成は5列がそろい、値が不正なら受け付けない", () => {
+  const base = { name: "x", condition: and(), sort: null, groupBy: null, groupSort: null };
+  const ok = (patch: object) => smartFolderCreateSchema.safeParse({ ...base, ...patch }).success;
+  assert.ok(ok({}));
+  assert.ok(ok({ position: 0 }));
+  assert.ok(!ok({ position: -1 }));
+  assert.ok(!ok({ name: " " }));
+  assert.ok(!ok({ sort: "x" }));
+  assert.ok(!ok({ groupBy: { kind: "tag" }, groupSort: "nope" }));
+  assert.ok(!ok({ groupBy: { kind: "tag" }, groupSort: "random" }));
+  assert.ok(!ok({ condition: null }));
+  assert.ok(!ok({ condition: { type: "nope" } }));
+  for (const key of Object.keys(base)) {
+    const { [key]: _omitted, ...rest } = base as Record<string, unknown>;
+    assert.ok(!smartFolderCreateSchema.safeParse(rest).success, key);
+  }
 });
 
 test("更新は1列以上を持ち、未知のキーを受け付けない", () => {
   assert.ok(!smartFolderPatchSchema.safeParse({}).success);
   assert.ok(smartFolderPatchSchema.safeParse({ sort: null }).success);
-  assert.ok(!smartFolderPatchSchema.safeParse({ sort: null, position: 1 }).success);
+  for (const bad of [{ sort: null, position: 1 }, { id: "other" }, { sort: "x" }, { name: " " }]) {
+    assert.ok(!smartFolderPatchSchema.safeParse(bad).success, JSON.stringify(bad));
+  }
+  assert.ok(!smartFolderPatchSchema.safeParse({ condition: { type: "nope" } }).success);
 });
 
 test("一覧の1行は condition が null だと読めない", () => {

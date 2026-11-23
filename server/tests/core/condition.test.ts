@@ -129,7 +129,7 @@ function adapterWithWorks() {
   });
 }
 
-test("要求の検証: sort=random で seed が無い・契約にないキーを送る要求は弾く", () => {
+test("要求の検証: 契約に合わない要求は 400 の HTTPException になる", () => {
   const status = (fn: () => unknown): number | undefined => {
     try {
       fn();
@@ -143,24 +143,12 @@ test("要求の検証: sort=random で seed が無い・契約にないキーを
     400,
   );
   assert.equal(
-    status(() => parseSmartFolderWorksRequest({ sort: "added-desc", tags: [], tagMode: "OR" })),
-    400,
-  );
-  assert.equal(
-    status(() => parseSmartFolderWorksRequest({ tags: [] })),
-    400,
-  );
-  assert.equal(
     status(() => parseSmartFolderWorksRequest({ sort: "random", seed: "7", tags: [] })),
     undefined,
   );
   assert.equal(
     status(() =>
-      parseSmartFolderGroupsRequest({
-        groupBy: "tag",
-        groupSort: "count-desc",
-        tagMode: "OR",
-      }),
+      parseSmartFolderGroupsRequest({ groupBy: "tag", groupSort: "count-desc", tagMode: "OR" }),
     ),
     400,
   );

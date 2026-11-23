@@ -9,7 +9,7 @@ import {
 // fixture アダプタのシナリオ機能（ADR-0002 / client/mocks/scenarios.ts からの移植）のテスト。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { workspacePath } from "@mimimilli/shared";
+import { showsCount, SMART_FOLDER_TEMPLATES, workspacePath } from "@mimimilli/shared";
 import { createApp } from "./helpers/testApp.ts";
 import { listWorks } from "./helpers/workList.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
@@ -308,8 +308,8 @@ test("empty: 作品が0件で、既定のスマートフォルダーの件数は
 
   const countsRes = await app.request("/api/smart-folders/counts");
   const counts = (await countsRes.json()) as Record<string, number>;
-  assert.ok(Object.keys(counts).length > 0);
-  for (const [id, count] of Object.entries(counts)) assert.equal(count, 0, id);
+  const counted = SMART_FOLDER_TEMPLATES.filter((t) => t.seeded && showsCount(t)).map((t) => t.id);
+  assert.deepEqual(counts, Object.fromEntries(counted.map((id) => [id, 0])));
 });
 
 test("errors: エラー・行方不明の作品のみが含まれる", async () => {

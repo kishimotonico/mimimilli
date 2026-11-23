@@ -24,6 +24,7 @@ import { openDb } from "../../src/adapters/real/db.ts";
 import { configureRoot } from "../helpers/rootFolder.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeSampleCover } from "../helpers/sampleLibrary.ts";
+import { and, not, or, tag } from "../helpers/conditionTree.ts";
 import { nts } from "../helpers/tag.ts";
 import {
   coverFieldsFromCover,
@@ -136,11 +137,6 @@ function fullWork(item: WorkSummary): Work {
 }
 
 const dataset = Array.from({ length: 56 }, (_, index) => summary(index));
-
-const tag = (name: string): Condition => ({ type: "tag", tag: name });
-const not = (child: Condition): Condition => ({ type: "not", child });
-const and = (...children: Condition[]): Condition => ({ type: "and", children });
-const or = (...children: Condition[]): Condition => ({ type: "or", children });
 
 /** 意味表の境界（長さ不明・未再生・基準時刻ちょうど・不明な値）を踏む葉 */
 const leaves: Condition[] = [

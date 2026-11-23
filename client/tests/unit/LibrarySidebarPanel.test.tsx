@@ -207,7 +207,7 @@ describe("LibrarySidebarPanel", () => {
     expect(groupsQueryOf(api.requestsTo("GET /api/smart-folders/:id/groups")[1]!)).toMatchObject({
       groupSort: "count-desc",
     });
-    expect(api.requestsTo("PUT /api/smart-folders/:id/group-sort")).toHaveLength(0);
+    expect(api.requestsTo("PATCH /api/smart-folders/:id")).toHaveLength(0);
   });
 
   it("オーバーレイ閉鎖（退出）中も値一覧が空にならない", async () => {
