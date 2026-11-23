@@ -4,7 +4,9 @@
 import { deleteVoid, getParsed, patchParsed, postParsed, putParsed } from "../../shared/api/http";
 import {
   ALL_SMART_FOLDER_ID,
+  groupByKey,
   groupValueListSchema,
+  smartFolderCountsSchema,
   smartFolderListSchema,
   smartFolderSchema,
   worksPageSchema,
@@ -14,6 +16,7 @@ import {
   type ScanRecordKind,
   type WorkChangeKind,
   type SmartFolder,
+  type SmartFolderCounts,
   type SmartFolderCreate,
   type SmartFolderOrder,
   type SmartFolderPatch,
@@ -27,12 +30,16 @@ export async function listSmartFolders(): Promise<SmartFolder[]> {
   return getParsed(smartFolderListSchema, "/smart-folders");
 }
 
+export async function getSmartFolderCounts(): Promise<SmartFolderCounts> {
+  return getParsed(smartFolderCountsSchema, "/smart-folders/counts");
+}
+
 /** 通常の作成・既定から追加・削除の取り消しのすべてがこの口を通る。id と position を送ると、その行をその位置に作る */
 export async function createSmartFolder(data: SmartFolderCreate): Promise<SmartFolder> {
   return postParsed(smartFolderSchema, "/smart-folders", data);
 }
 
-/** 全件の順序を置き換える。応答は並べ替え後の一覧（件数入り） */
+/** 全件の順序を置き換える。応答は並べ替え後の一覧 */
 export async function reorderSmartFolders(ids: string[]): Promise<SmartFolder[]> {
   return putParsed(smartFolderListSchema, "/smart-folders/order", {
     ids,
@@ -117,12 +124,12 @@ export async function getSmartFolderGroups(
   id: string,
   params: SmartFolderGroupsParams,
 ): Promise<GroupValueItem[]> {
-  const body: Record<string, unknown> = {
-    groupBy: params.groupBy,
+  const query = new URLSearchParams({
+    groupBy: groupByKey(params.groupBy),
     groupSort: params.groupSort,
-  };
-  if (params.group) body.group = params.group;
-  if (params.tags && params.tags.length > 0) body.tags = params.tags;
-  if (params.q) body.q = params.q;
-  return postParsed(groupValueListSchema, `${folderPath(id)}/groups`, body);
+  });
+  if (params.group) query.set("group", params.group);
+  for (const tag of params.tags ?? []) query.append("tags", tag);
+  if (params.q) query.set("q", params.q);
+  return getParsed(groupValueListSchema, `${folderPath(id)}/groups?${query.toString()}`);
 }

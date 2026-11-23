@@ -30,9 +30,9 @@ async function invalidateLibraryViews(queryClient: QueryClient): Promise<void> {
   ]);
 }
 
-/** スマートフォルダー一覧（件数入り）だけを取り直す。開いている一覧の並びは動かさない */
+/** 件数だけを取り直す。定義の一覧と、開いている一覧の並びは動かさない */
 function invalidateSmartFolderCounts(queryClient: QueryClient): Promise<void> {
-  return queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.all() });
+  return queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.counts() });
 }
 
 async function invalidateRegistrationViews(

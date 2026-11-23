@@ -1,4 +1,4 @@
-// 値の候補取得（POST /smart-folders/:id/groups）が渡されたスコープ（フォルダー・値・チップ・検索語）を
+// 値の候補取得（GET /smart-folders/:id/groups）が渡されたスコープ（フォルダー・値・チップ・検索語）を
 // そのまま母集団として送ることを検証する。件数基準（何を渡すか）は呼び出し側の責務で、
 // このフック自体は素通しするだけ。
 
@@ -11,9 +11,9 @@ import {
   useGroupValuesQuery,
   type GroupValueScope,
 } from "../../src/features/library/model/useGroupValuesQuery";
-import { mockApi, type ApiMock } from "../helpers/api";
+import { groupsQueryOf, mockApi, type ApiMock } from "../helpers/api";
 
-const KEY = "POST /api/smart-folders/:id/groups";
+const KEY = "GET /api/smart-folders/:id/groups";
 
 function wrapperFor(queryClient: QueryClient) {
   return ({ children }: { children: ReactNode }) =>
@@ -65,8 +65,8 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
     const [request] = api.requestsTo(KEY);
     expect(api.requestsTo(KEY)).toHaveLength(1);
     expect(request?.params.id).toBe("by-circle");
-    expect(request?.body).toEqual({
-      groupBy: { kind: "prefix", prefix: "cv" },
+    expect(request && groupsQueryOf(request)).toEqual({
+      groupBy: "prefix:cv",
       groupSort: "count-desc",
       group: "月白製作所",
       tags: ["cv/藤田茜", "サークル/月白製作所"],
@@ -79,8 +79,8 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(api.requestsTo(KEY)[0]?.body).toEqual({
-      groupBy: { kind: "prefix", prefix: "cv" },
+    expect(groupsQueryOf(api.requestsTo(KEY)[0]!)).toEqual({
+      groupBy: "prefix:cv",
       groupSort: "count-desc",
     });
   });
@@ -91,9 +91,9 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
     const year = renderGroupValues({ kind: "addedYear" }, { folderId: "all" });
     await waitFor(() => expect(year.result.current.isSuccess).toBe(true));
 
-    expect(api.requestsTo(KEY).map((request) => request.body)).toEqual([
-      { groupBy: { kind: "tag" }, groupSort: "count-desc" },
-      { groupBy: { kind: "addedYear" }, groupSort: "count-desc" },
+    expect(api.requestsTo(KEY).map(groupsQueryOf)).toEqual([
+      { groupBy: "tag", groupSort: "count-desc" },
+      { groupBy: "addedYear", groupSort: "count-desc" },
     ]);
   });
 
@@ -104,7 +104,7 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
       "name-asc",
     );
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(api.requestsTo(KEY)[0]?.body).toMatchObject({ groupSort: "name-asc" });
+    expect(groupsQueryOf(api.requestsTo(KEY)[0]!)).toMatchObject({ groupSort: "name-asc" });
 
     rerender({
       groupBy: { kind: "prefix", prefix: "cv" },
@@ -113,7 +113,7 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
     });
 
     await waitFor(() => expect(api.requestsTo(KEY)).toHaveLength(2));
-    expect(api.requestsTo(KEY)[1]?.body).toMatchObject({ groupSort: "last-played" });
+    expect(groupsQueryOf(api.requestsTo(KEY)[1]!)).toMatchObject({ groupSort: "last-played" });
   });
 
   it("値の並びが null のときは取得しない", () => {
@@ -146,8 +146,8 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
     rerender({ scope: { folderId: "all", tags: ["サークル/月白製作所"] } });
 
     await waitFor(() => expect(api.requestsTo(KEY)).toHaveLength(1));
-    expect(api.requestsTo(KEY)[0]?.body).toEqual({
-      groupBy: { kind: "prefix", prefix: "cv" },
+    expect(groupsQueryOf(api.requestsTo(KEY)[0]!)).toEqual({
+      groupBy: "prefix:cv",
       groupSort: "count-desc",
       tags: ["サークル/月白製作所"],
     });

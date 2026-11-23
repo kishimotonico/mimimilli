@@ -135,12 +135,15 @@ describe("追加・複製", () => {
 });
 
 describe("buildSidebarRows の編集の状態", () => {
-  const folders: SmartFolder[] = defaultSmartFolders({ error: 0 });
+  const folders: SmartFolder[] = defaultSmartFolders();
+  const counts = { error: 0 };
   const integrity = { status: "ready", count: 0 } as const;
 
   it("通常は0件のエラーを隠し、編集の状態では薄く見せる", () => {
-    expect(buildSidebarRows(folders, "all", integrity).some((r) => r.id === "error")).toBe(false);
-    const rows = buildSidebarRows(folders, "all", integrity, true);
+    expect(buildSidebarRows(folders, counts, "all", integrity).some((r) => r.id === "error")).toBe(
+      false,
+    );
+    const rows = buildSidebarRows(folders, counts, "all", integrity, true);
     expect(rows.find((r) => r.id === "error")?.dimmed).toBe(true);
     expect(rows).toHaveLength(folders.length);
   });

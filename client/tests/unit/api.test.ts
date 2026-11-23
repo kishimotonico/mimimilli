@@ -473,32 +473,41 @@ describe("library api", () => {
     );
   });
 
-  it("getSmartFolderGroups は groupBy だけを body に POST する（自身の値一覧）", async () => {
+  it("getSmartFolderGroups は groupBy と groupSort だけをクエリに GET する（自身の値一覧）", async () => {
     mockFetch.mockResolvedValue(makeResponse([]));
     await smartFolderApi.getSmartFolderGroups("by-cv", {
       groupBy: { kind: "prefix", prefix: "cv" },
+      groupSort: "count-desc",
     });
-    const [url, init] = mockFetch.mock.calls.at(-1)!;
-    expect(url).toBe("/api/smart-folders/by-cv/groups");
-    expect(init?.method).toBe("POST");
-    expect(JSON.parse(String(init?.body))).toEqual({ groupBy: { kind: "prefix", prefix: "cv" } });
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      "/api/smart-folders/by-cv/groups?groupBy=prefix%3Acv&groupSort=count-desc",
+    );
   });
 
-  it("getSmartFolderGroups は候補用に group・tags・q も body へ渡す", async () => {
+  it("getSmartFolderGroups は候補用に group・tags・q もクエリへ渡す", async () => {
     mockFetch.mockResolvedValue(makeResponse([]));
     await smartFolderApi.getSmartFolderGroups("all", {
       groupBy: { kind: "tag" },
+      groupSort: "name-asc",
       group: "x",
-      tags: ["ASMR"],
+      tags: ["ASMR", "cv/藤田茜"],
       q: "雨",
     });
-    const [, init] = mockFetch.mock.calls.at(-1)!;
-    expect(JSON.parse(String(init?.body))).toEqual({
-      groupBy: { kind: "tag" },
+    const [url] = mockFetch.mock.calls.at(-1)!;
+    const params = new URL(String(url), "http://localhost").searchParams;
+    expect(Object.fromEntries(params)).toMatchObject({
+      groupBy: "tag",
+      groupSort: "name-asc",
       group: "x",
-      tags: ["ASMR"],
       q: "雨",
     });
+    expect(params.getAll("tags")).toEqual(["ASMR", "cv/藤田茜"]);
+  });
+
+  it("getSmartFolderCounts は GET /api/smart-folders/counts を読む", async () => {
+    mockFetch.mockResolvedValue(makeResponse({ recent: 3 }));
+    expect(await smartFolderApi.getSmartFolderCounts()).toEqual({ recent: 3 });
+    expect(mockFetch).toHaveBeenLastCalledWith("/api/smart-folders/counts");
   });
 
   it("updateSmartFolder は PATCH /api/smart-folders/:id へ保存内容を送る", async () => {
@@ -511,7 +520,6 @@ describe("library api", () => {
       groupSort: null,
       position: 0,
       createdAt: "2026-01-01T00:00:00.000Z",
-      count: null,
     };
     mockFetch.mockResolvedValue(makeResponse(item));
     const write = {
@@ -540,7 +548,6 @@ describe("library api", () => {
         groupSort: null,
         position: 0,
         createdAt: "2026-01-01T00:00:00.000Z",
-        count: null,
       }),
     );
     await smartFolderApi.updateSmartFolder("sf-1", { sort: null });

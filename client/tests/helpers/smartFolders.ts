@@ -13,13 +13,12 @@ export function buildSmartFolder(overrides: Partial<SmartFolder> = {}): SmartFol
     groupSort: overrides.groupBy ? defaultGroupSort(overrides.groupBy) : null,
     position: 0,
     createdAt: "2026-01-01T00:00:00.000Z",
-    count: null,
     ...overrides,
   };
 }
 
-/** 初回起動時に入るテンプレート（サーバーの順）。件数は applyCounts で上書きする */
-export function defaultSmartFolders(counts: Record<string, number> = {}): SmartFolder[] {
+/** 初回起動時に入るテンプレート（サーバーの順） */
+export function defaultSmartFolders(): SmartFolder[] {
   return SMART_FOLDER_TEMPLATES.filter((template) => template.seeded).map((template, position) =>
     buildSmartFolder({
       id: template.id,
@@ -29,7 +28,6 @@ export function defaultSmartFolders(counts: Record<string, number> = {}): SmartF
       groupBy: template.groupBy,
       groupSort: template.groupSort,
       position,
-      count: counts[template.id] ?? null,
     }),
   );
 }

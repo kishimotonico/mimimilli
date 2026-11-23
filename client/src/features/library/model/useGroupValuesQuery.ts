@@ -1,4 +1,4 @@
-// 値の候補（POST /smart-folders/:id/groups）の共通フック。サイドバーのクイックオーバーレイと
+// 値の候補（GET /smart-folders/:id/groups）の共通フック。サイドバーのクイックオーバーレイと
 // 「＋絞り込み」が同じ query キー・同じ取得ロジックを共有する。
 
 import { useQuery } from "@tanstack/react-query";

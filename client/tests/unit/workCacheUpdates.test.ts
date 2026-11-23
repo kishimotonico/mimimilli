@@ -90,6 +90,7 @@ const KEYS = {
   tags: TAG_QUERY_KEYS.all(),
   smartWorks: SMART_FOLDER_QUERY_KEYS.works("sf-1"),
   smartFolders: SMART_FOLDER_QUERY_KEYS.all(),
+  smartFolderCounts: SMART_FOLDER_QUERY_KEYS.counts(),
   fs: FILE_SYSTEM_QUERY_KEYS.directory("dlsite"),
   diagnostics: SCAN_QUERY_KEYS.diagnostics(),
   scanRecord: SCAN_QUERY_KEYS.last(),
@@ -113,6 +114,7 @@ function seededClient(): QueryClient {
   queryClient.setQueryData(KEYS.tags, []);
   queryClient.setQueryData(KEYS.smartWorks, structuredClone(emptyPages));
   queryClient.setQueryData(KEYS.smartFolders, []);
+  queryClient.setQueryData(KEYS.smartFolderCounts, {});
   queryClient.setQueryData(KEYS.fs, { entries: [] });
   queryClient.setQueryData(KEYS.diagnostics, buildScanDiagnostics());
   queryClient.setQueryData(KEYS.scanRecord, { finishedAt: null });
@@ -139,7 +141,7 @@ const LIBRARY_VIEWS: KeyName[] = [
   "groupValues",
   "tags",
   "smartWorks",
-  "smartFolders",
+  "smartFolderCounts",
 ];
 const REGISTRATION_VIEWS: KeyName[] = [...LIBRARY_VIEWS, "fs", "diagnostics", "scanRecord"];
 
@@ -168,8 +170,8 @@ describe("再生開始時の投影反映", () => {
     await updateCachesAfterPlaybackPrepared(queryClient, prepared);
 
     expect(queryClient.getQueryData(KEYS.detail1)).toEqual(prepared);
-    // 件数（スマートフォルダー一覧）だけを取り直し、開いている一覧の並びは動かさない（ADR-0040）
-    expect(invalidatedKeys(queryClient)).toEqual(["smartFolders"]);
+    // 件数だけを取り直し、定義の一覧と開いている一覧の並びは動かさない（ADR-0040）
+    expect(invalidatedKeys(queryClient)).toEqual(["smartFolderCounts"]);
   });
 });
 
@@ -194,7 +196,7 @@ describe("bookmark の必須更新", () => {
     await updateCachesAfterBookmark(queryClient, { workId: "w1", bookmarked: true });
 
     expect(sorted(invalidatedKeys(queryClient))).toEqual(
-      sorted(["list", "otherList", "smartWorks", "groupValues", "smartFolders"]),
+      sorted(["list", "otherList", "smartWorks", "groupValues", "smartFolderCounts"]),
     );
   });
 

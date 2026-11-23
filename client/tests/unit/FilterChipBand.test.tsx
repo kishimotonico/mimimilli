@@ -3,12 +3,12 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import FilterChipBand from "../../src/features/library/ui/FilterChipBand";
-import { mockApi, type ApiMock } from "../helpers/api";
+import { groupsQueryOf, mockApi, type ApiMock } from "../helpers/api";
 
 let api: ApiMock;
 
 beforeEach(() => {
-  api = mockApi({ "POST /api/smart-folders/:id/groups": [] });
+  api = mockApi({ "GET /api/smart-folders/:id/groups": [] });
 });
 
 afterEach(cleanup);
@@ -40,7 +40,7 @@ describe("FilterChipBand のチップ", () => {
     expect(screen.queryByRole("button", { name: "cv/藤田茜" })).toBeNull();
     await userEvent.click(screen.getByText("藤田茜"));
 
-    expect(api.requestsTo("POST /api/smart-folders/:id/groups")).toHaveLength(0);
+    expect(api.requestsTo("GET /api/smart-folders/:id/groups")).toHaveLength(0);
   });
 
   it("×で個別解除でき、AND ラベルと「すべてクリア」は無い", async () => {
@@ -54,19 +54,19 @@ describe("FilterChipBand のチップ", () => {
     expect(screen.queryByText("AND")).toBeNull();
   });
 
-  it("「＋絞り込み」の候補は開いている一覧の条件・チップ・検索語を母集団にして POST /:id/groups で取る", async () => {
+  it("「＋絞り込み」の候補は開いている一覧の条件・チップ・検索語を母集団にして GET /:id/groups で取る", async () => {
     renderFilterChipBand();
 
     await userEvent.click(screen.getByRole("button", { name: /絞り込み$/ }));
     await userEvent.click(screen.getByRole("button", { name: "タグ" }));
 
     await waitFor(() =>
-      expect(api.requestsTo("POST /api/smart-folders/:id/groups")).toHaveLength(1),
+      expect(api.requestsTo("GET /api/smart-folders/:id/groups")).toHaveLength(1),
     );
-    const [request] = api.requestsTo("POST /api/smart-folders/:id/groups");
+    const [request] = api.requestsTo("GET /api/smart-folders/:id/groups");
     expect(request?.params.id).toBe("fav");
-    expect(request?.body).toEqual({
-      groupBy: { kind: "tag" },
+    expect(request && groupsQueryOf(request)).toEqual({
+      groupBy: "tag",
       groupSort: "count-desc",
       tags: ["cv/藤田茜"],
       q: "雨",

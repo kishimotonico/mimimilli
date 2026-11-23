@@ -16,6 +16,7 @@ export function appShellRoutes(overrides: ApiRoutes = {}): ApiRoutes {
     "GET /api/tag-prefixes": [],
     "GET /api/tag-prefixes/candidates": [],
     "GET /api/smart-folders": defaultSmartFolders(),
+    "GET /api/smart-folders/counts": {},
     ...overrides,
   };
 }

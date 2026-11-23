@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
 import { AnimatePresence } from "motion/react";
 import {
@@ -9,6 +10,7 @@ import {
 } from "@mimimilli/shared";
 import { folderGrouping } from "../../../entities/library/resolveLibraryView";
 import { getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
+import { smartFolderCountsQueryOptions } from "../../../entities/smart-folder/queryOptions";
 import { useHoverGroupCoordinator } from "../../../shared/lib/useHoverGroupCoordinator";
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
@@ -85,7 +87,8 @@ export default function LibrarySidebarPanel({
     close: closeOverlay,
   } = useHoverGroupCoordinator();
   const readyFolders = folders.status === "ready" ? folders.folders : [];
-  const rows = buildSidebarRows(readyFolders, activeFolderId ?? "", dataIntegrity, editing);
+  const { data: counts } = useQuery(smartFolderCountsQueryOptions);
+  const rows = buildSidebarRows(readyFolders, counts, activeFolderId ?? "", dataIntegrity, editing);
   const overlayFolder = readyFolders.find((folder) => folder.id === overlayFolderId) ?? null;
   const overlayGrouping = overlayFolder ? folderGrouping(overlayFolder) : null;
 

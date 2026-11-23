@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import LibraryBreadcrumbs from "../../src/features/library/ui/LibraryBreadcrumbs";
 import { LibraryNavigationContext } from "../../src/features/library/model/libraryNavigationContext";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
-import { mockApi } from "../helpers/api";
+import { groupsQueryOf, mockApi } from "../helpers/api";
 import { buildGroupValueItem } from "../helpers/builders";
 import { buildNav } from "./fixtures/libraryNav";
 import type {
@@ -83,7 +83,7 @@ describe("LibraryBreadcrumbs", () => {
   it("値をクリックすると兄弟の値のドロップダウンが開き、選ぶと selectGroupValue を呼ぶ", async () => {
     const api = mockApi({
       "GET /api/tag-prefixes": [],
-      "POST /api/smart-folders/:id/groups": [
+      "GET /api/smart-folders/:id/groups": [
         buildGroupValueItem({ value: "藤田茜", count: 4 }),
         buildGroupValueItem({ value: "天音かなで", count: 3 }),
       ],
@@ -97,10 +97,10 @@ describe("LibraryBreadcrumbs", () => {
       expect(document.querySelector('.mll-qlist__body[role="group"]')).toBeInTheDocument();
     });
     await waitFor(() =>
-      expect(api.requestsTo("POST /api/smart-folders/:id/groups")).toHaveLength(1),
+      expect(api.requestsTo("GET /api/smart-folders/:id/groups")).toHaveLength(1),
     );
-    expect(api.requestsTo("POST /api/smart-folders/:id/groups")[0]?.body).toEqual({
-      groupBy: { kind: "prefix", prefix: "cv" },
+    expect(groupsQueryOf(api.requestsTo("GET /api/smart-folders/:id/groups")[0]!)).toEqual({
+      groupBy: "prefix:cv",
       groupSort: "count-desc",
     });
     await act(async () => {

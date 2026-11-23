@@ -95,6 +95,7 @@ smokeテストの注意:
 契約上の要点:
 
 - `GET /smart-folders/:id/works` は常にページングエンベロープ `{ items, total, stats }` を返す（page/limit 省略時は page=1, limit=200）。`sort` は必須で、`random` には `seed` が要る（サーバーは seed を発行しない）。作品の全件取得・件数・スキャン記録の絞り込みも、この口を「すべて」（`all`）に対して使う
+- スマートフォルダーの定義（`GET /smart-folders`）に件数は含めない。件数は `GET /smart-folders/counts`（`Record<id, number>`）で別に取り、作品の状態が変わったときはこちらだけを取り直す。値一覧と「＋絞り込み」の候補は `GET /smart-folders/:id/groups`（`groupBy` は `prefix:cv`・`tag`・`addedYear` の1文字列、`groupSort` は必須）
 - 作品の変更系（`PATCH /works/:id`、タグの追加・削除など）は応答に `{ snapshot, projection }` を返す。`PATCH` は `sourceRevision` を要求する
 - `POST /scan` は 202 で `{ job }` を即返し（`Location: /api/scan/:id`）、実行中の二重 POST は 409（`active` 付き）。`GET /scan/active` は該当なしのとき 204。進捗は `GET /scan/:id/events` の SSE（[ADR-0030](adr/0030-job-progress-sse-current-state.md)）。`GET /scan/last` は常に200で直近のスキャンの記録（完了時刻・更新済み。未スキャンは完了時刻が null の空）を返し、新規作品・更新済みの作品本体は `GET /smart-folders/all/works?scanRecord=new|updated`（更新済みは `scanChange` で変化の種類を絞れる）から取る。要対応は `GET /scan/diagnostics` の `{ identityConflicts, invalidMetaFiles, unreadablePaths, dataIntegrityWorks, missingWorks }` を保存済みのデータから返す（ID重複は `registeredTitle`・`registeredPath`、データ不整合は `{ workId, title: string | null }`）。未登録候補は `GET /scan/candidates` の `{ scanCompleted, candidates }`（`scanCompleted` が false は起動後まだ候補のスキャンが完了していない状態で、候補は空）から取る
 - `POST /works/:id/resume` は高頻度のため `PATCH /works/:id` と分離している

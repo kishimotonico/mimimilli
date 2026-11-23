@@ -1,4 +1,10 @@
-import { isHasErrorOnly, isHiddenWhenEmpty, showsCount, type SmartFolder } from "@mimimilli/shared";
+import {
+  isHasErrorOnly,
+  isHiddenWhenEmpty,
+  showsCount,
+  type SmartFolder,
+  type SmartFolderCounts,
+} from "@mimimilli/shared";
 import { getSmartFolderIcon } from "../../../entities/library/smartFolderDefinitions";
 import type { IconName } from "../../../shared/ui/Icon";
 
@@ -21,21 +27,24 @@ export interface SidebarRow {
 /** 0件で隠す行か。作品数とデータ不整合の両方が0と分かったときだけ隠し、開いている行は残す */
 function isHidden(
   folder: SmartFolder,
+  counts: SmartFolderCounts | undefined,
   activeFolderId: string,
   integrity: DataIntegrityCount,
 ): boolean {
   if (!isHiddenWhenEmpty(folder.condition)) return false;
   if (folder.id === activeFolderId) return false;
-  return folder.count === 0 && integrity.status === "ready" && integrity.count === 0;
+  return counts?.[folder.id] === 0 && integrity.status === "ready" && integrity.count === 0;
 }
 
-function toRow(folder: SmartFolder): SidebarRow {
+function toRow(folder: SmartFolder, counts: SmartFolderCounts | undefined): SidebarRow {
   const { condition } = folder;
   return {
     id: folder.id,
     name: folder.name,
     icon: getSmartFolderIcon(folder),
-    count: showsCount({ condition, groupBy: folder.groupBy }) ? folder.count : null,
+    count: showsCount({ condition, groupBy: folder.groupBy })
+      ? (counts?.[folder.id] ?? null)
+      : null,
     countTone: isHasErrorOnly(condition) ? "error" : "plain",
     hasQuickOverlay: folder.groupBy !== null,
     dimmed: false,
@@ -45,13 +54,14 @@ function toRow(folder: SmartFolder): SidebarRow {
 /** 編集の状態（editing）では、0件で隠れる行も見せる */
 export function buildSidebarRows(
   folders: SmartFolder[],
+  counts: SmartFolderCounts | undefined,
   activeFolderId: string,
   integrity: DataIntegrityCount,
   editing = false,
 ): SidebarRow[] {
   return folders.flatMap((folder) => {
-    const hidden = isHidden(folder, activeFolderId, integrity);
+    const hidden = isHidden(folder, counts, activeFolderId, integrity);
     if (hidden && !editing) return [];
-    return [{ ...toRow(folder), dimmed: hidden }];
+    return [{ ...toRow(folder, counts), dimmed: hidden }];
   });
 }

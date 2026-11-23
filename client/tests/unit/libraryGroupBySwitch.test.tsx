@@ -17,7 +17,7 @@ const baseNav = buildNav({ library: { folderId: "by-cv" } });
 describe("グループ分け切替時の groupValueItems 系列（R2 機序調査）", () => {
   beforeEach(() => {
     mockApi({
-      "POST /api/smart-folders/:id/groups": ({ params }) =>
+      "GET /api/smart-folders/:id/groups": ({ params }) =>
         params.id === "by-cv"
           ? Array.from({ length: 8 }, (_, i) => buildGroupValueItem({ value: `cv${i}` }))
           : [],

@@ -2,10 +2,12 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { SmartFolderCounts } from "@mimimilli/shared";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 import LibrarySidebarPanel from "../../src/features/library/ui/LibrarySidebarPanel";
-import { mockApi } from "../helpers/api";
+import { groupsQueryOf, mockApi } from "../helpers/api";
 import { buildGroupValueItem, buildTagPrefix } from "../helpers/builders";
+import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
 import { defaultSmartFolders } from "../helpers/smartFolders";
 
 let sizeMock: { restore: () => void } | null = null;
@@ -29,16 +31,23 @@ async function flushVirtualizer() {
 
 const PREFIXES = [buildTagPrefix({ prefix: "cv", label: "CV", color: "cv", protected: true })];
 
-function renderSidebar(props: Partial<React.ComponentProps<typeof LibrarySidebarPanel>>) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+const DEFAULT_COUNTS = { recent: 7, added: 0, fav: 4, error: 2 };
+
+function renderSidebar(
+  props: Partial<React.ComponentProps<typeof LibrarySidebarPanel>> & {
+    counts?: SmartFolderCounts;
+  },
+) {
+  const { counts = DEFAULT_COUNTS, ...panelProps } = props;
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
+  queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.counts(), counts);
   return render(
     <QueryClientProvider client={queryClient}>
       <div className="mle-app">
         <LibrarySidebarPanel
-          folders={{
-            status: "ready",
-            folders: defaultSmartFolders({ recent: 7, added: 0, fav: 4, error: 2 }),
-          }}
+          folders={{ status: "ready", folders: defaultSmartFolders() }}
           activeFolderId="all"
           activeGroup={null}
           dataIntegrity={{ status: "ready", count: 0 }}
@@ -48,7 +57,7 @@ function renderSidebar(props: Partial<React.ComponentProps<typeof LibrarySidebar
           onOpenGroupValue={vi.fn()}
           onAddTag={vi.fn()}
           stats={{ status: "loading" }}
-          {...props}
+          {...panelProps}
         />
       </div>
     </QueryClientProvider>,
@@ -89,12 +98,7 @@ describe("LibrarySidebarPanel", () => {
   });
 
   it("件数を出さないもの（条件が空・グループ分けあり）は件数を持っていても出さない", () => {
-    renderSidebar({
-      folders: {
-        status: "ready",
-        folders: defaultSmartFolders({ all: 11, random: 11, "by-cv": 3 }),
-      },
-    });
+    renderSidebar({ counts: { all: 11, random: 11, "by-cv": 3 } });
 
     expect(screen.getByRole("button", { name: "すべて" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "ランダム" })).toBeInTheDocument();
@@ -126,28 +130,26 @@ describe("LibrarySidebarPanel", () => {
   });
 
   it("エラーの行は、作品数が0でもデータ不整合が残っていれば出し続ける", () => {
-    const folders = {
-      status: "ready" as const,
-      folders: defaultSmartFolders({ recent: 7, error: 0 }),
-    };
-    renderSidebar({ folders, dataIntegrity: { status: "ready", count: 3 } });
+    renderSidebar({
+      counts: { recent: 7, error: 0 },
+      dataIntegrity: { status: "ready", count: 3 },
+    });
 
     expect(screen.getByRole("button", { name: /^エラー/ })).toBeInTheDocument();
   });
 
   it("エラーの行は、作品数もデータ不整合も0なら隠す。ただし開いている間は残す", () => {
-    const folders = { status: "ready" as const, folders: defaultSmartFolders({ error: 0 }) };
-    const { unmount } = renderSidebar({ folders });
+    const counts = { error: 0 };
+    const { unmount } = renderSidebar({ counts });
     expect(screen.queryByRole("button", { name: /^エラー/ })).toBeNull();
     unmount();
 
-    renderSidebar({ folders, activeFolderId: "error" });
+    renderSidebar({ counts, activeFolderId: "error" });
     expect(screen.getByRole("button", { name: /^エラー/ })).toBeInTheDocument();
   });
 
   it("データ不整合の件数が取得中・取得失敗のあいだは、エラーの行を0件として隠さない", () => {
-    const folders = { status: "ready" as const, folders: defaultSmartFolders({ error: 0 }) };
-    renderSidebar({ folders, dataIntegrity: { status: "unknown" } });
+    renderSidebar({ counts: { error: 0 }, dataIntegrity: { status: "unknown" } });
 
     expect(screen.getByRole("button", { name: /^エラー/ })).toBeInTheDocument();
   });
@@ -188,7 +190,7 @@ describe("LibrarySidebarPanel", () => {
   });
 
   it("初回レンダー直後（再レンダーを挟まない）の最初のホバーでもクイックオーバーレイが開く", async () => {
-    mockApi({ "POST /api/smart-folders/:id/groups": [] });
+    mockApi({ "GET /api/smart-folders/:id/groups": [] });
     renderSidebar({});
 
     // マウント直後、再レンダーを一切挟まずに最初のpointerEnterを発火する。実ブラウザでは
@@ -204,15 +206,15 @@ describe("LibrarySidebarPanel", () => {
 
   it("クイックオーバーレイはそのフォルダーの保存済みの値の並びで開き、列見出しでの変更は開いている間だけの一時状態", async () => {
     const api = mockApi({
-      "POST /api/smart-folders/:id/groups": [buildGroupValueItem({ value: "2025", count: 3 })],
+      "GET /api/smart-folders/:id/groups": [buildGroupValueItem({ value: "2025", count: 3 })],
     });
     renderSidebar({});
 
     fireEvent.keyDown(screen.getByRole("button", { name: "追加年別" }), { key: "ArrowRight" });
     await waitFor(() =>
-      expect(api.requestsTo("POST /api/smart-folders/:id/groups")).toHaveLength(1),
+      expect(api.requestsTo("GET /api/smart-folders/:id/groups")).toHaveLength(1),
     );
-    expect(api.requestsTo("POST /api/smart-folders/:id/groups")[0]?.body).toMatchObject({
+    expect(groupsQueryOf(api.requestsTo("GET /api/smart-folders/:id/groups")[0]!)).toMatchObject({
       groupSort: "name-desc",
     });
 
@@ -220,9 +222,9 @@ describe("LibrarySidebarPanel", () => {
     await userEvent.click(screen.getByRole("button", { name: "件数" }));
 
     await waitFor(() =>
-      expect(api.requestsTo("POST /api/smart-folders/:id/groups")).toHaveLength(2),
+      expect(api.requestsTo("GET /api/smart-folders/:id/groups")).toHaveLength(2),
     );
-    expect(api.requestsTo("POST /api/smart-folders/:id/groups")[1]?.body).toMatchObject({
+    expect(groupsQueryOf(api.requestsTo("GET /api/smart-folders/:id/groups")[1]!)).toMatchObject({
       groupSort: "count-desc",
     });
     expect(api.requestsTo("PUT /api/smart-folders/:id/group-sort")).toHaveLength(0);
@@ -230,7 +232,7 @@ describe("LibrarySidebarPanel", () => {
 
   it("オーバーレイ閉鎖（退出）中も値一覧が空にならない", async () => {
     mockApi({
-      "POST /api/smart-folders/:id/groups": [buildGroupValueItem({ value: "藤田茜", count: 3 })],
+      "GET /api/smart-folders/:id/groups": [buildGroupValueItem({ value: "藤田茜", count: 3 })],
     });
     renderSidebar({});
 
@@ -254,7 +256,7 @@ describe("LibrarySidebarPanel", () => {
   });
 
   it("グループ分けA→B高速切替で新パネルが閉じず、検索欄フォーカスが奪われない", async () => {
-    mockApi({ "POST /api/smart-folders/:id/groups": [] });
+    mockApi({ "GET /api/smart-folders/:id/groups": [] });
     renderSidebar({});
 
     fireEvent.keyDown(screen.getByRole("button", { name: "CV別" }), { key: "ArrowRight" });
@@ -274,7 +276,7 @@ describe("LibrarySidebarPanel", () => {
 
   it("クイックオーバーレイの値は主クリックもCtrl+クリックもその値の作品一覧（onOpenGroupValue）へ進む", async () => {
     mockApi({
-      "POST /api/smart-folders/:id/groups": [buildGroupValueItem({ value: "藤田茜", count: 3 })],
+      "GET /api/smart-folders/:id/groups": [buildGroupValueItem({ value: "藤田茜", count: 3 })],
     });
     sizeMock = mockElementSize(260, 260);
     const onOpenGroupValue = vi.fn();
@@ -293,7 +295,7 @@ describe("LibrarySidebarPanel", () => {
 
   it("クイックオーバーレイの追加ボタンは値をチップの候補として onAddTag へ渡す", async () => {
     mockApi({
-      "POST /api/smart-folders/:id/groups": [buildGroupValueItem({ value: "藤田茜", count: 3 })],
+      "GET /api/smart-folders/:id/groups": [buildGroupValueItem({ value: "藤田茜", count: 3 })],
     });
     sizeMock = mockElementSize(260, 260);
     const onAddTag = vi.fn();
