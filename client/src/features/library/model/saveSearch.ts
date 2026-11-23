@@ -9,7 +9,7 @@ import {
   smartFolderPermissions,
   splitSelectedTags,
   type SmartFolder,
-  type SmartFolderConditionWrite,
+  type SmartFolderPatch,
 } from "@mimimilli/shared";
 import { hasChipOrSearchRefinement } from "../../../entities/library/refinement";
 import type { ResolvedLibraryView, WorksView } from "../../../entities/library/resolveLibraryView";
@@ -77,7 +77,7 @@ export function saveSearchDraft(view: WorksView): SmartFolderDraft {
 
 /** 「上書き」で更新する項目。条件に今の絞り込みを足し、並びを変えていればそれを既定の並びにする。
  *  名前・グループ分け・値の並びと、変えない既定の並びは送らない */
-export function overwriteChange(view: WorksView): SmartFolderConditionWrite {
+export function overwriteChange(view: WorksView): SmartFolderPatch {
   return {
     condition: effectiveCondition(view),
     ...(view.sortDeviates ? { sort: view.sort } : {}),
@@ -85,7 +85,7 @@ export function overwriteChange(view: WorksView): SmartFolderConditionWrite {
 }
 
 /** 「元に戻す」で戻す項目。上書きが更新した項目だけを上書き前の値にする */
-export function overwriteUndoChange(view: WorksView): SmartFolderConditionWrite {
+export function overwriteUndoChange(view: WorksView): SmartFolderPatch {
   const { folder } = view;
   return {
     condition: folder.condition,

@@ -1,7 +1,7 @@
 // smart-folder entity の API（ADR-0040「HTTP の契約」）。
 // 依存方向: shared/api/http のみを参照する。
 
-import { deleteVoid, getParsed, postParsed, putParsed } from "../../shared/api/http";
+import { deleteVoid, getParsed, patchParsed, postParsed, putParsed } from "../../shared/api/http";
 import {
   ALL_SMART_FOLDER_ID,
   groupValueListSchema,
@@ -14,9 +14,9 @@ import {
   type ScanRecordKind,
   type WorkChangeKind,
   type SmartFolder,
-  type SmartFolderConditionWrite,
-  type SmartFolderRestore,
-  type SmartFolderWrite,
+  type SmartFolderCreate,
+  type SmartFolderOrder,
+  type SmartFolderPatch,
   type SortId,
   type WorksPage,
 } from "@mimimilli/shared";
@@ -27,48 +27,21 @@ export async function listSmartFolders(): Promise<SmartFolder[]> {
   return getParsed(smartFolderListSchema, "/smart-folders");
 }
 
-export async function createSmartFolder(data: SmartFolderWrite): Promise<SmartFolder> {
+/** 通常の作成・既定から追加・削除の取り消しのすべてがこの口を通る。id と position を送ると、その行をその位置に作る */
+export async function createSmartFolder(data: SmartFolderCreate): Promise<SmartFolder> {
   return postParsed(smartFolderSchema, "/smart-folders", data);
 }
 
 /** 全件の順序を置き換える。応答は並べ替え後の一覧（件数入り） */
 export async function reorderSmartFolders(ids: string[]): Promise<SmartFolder[]> {
-  return putParsed(smartFolderListSchema, "/smart-folders/order", { ids });
+  return putParsed(smartFolderListSchema, "/smart-folders/order", {
+    ids,
+  } satisfies SmartFolderOrder);
 }
 
-/** テンプレートの固定 ID で追加する */
-export async function createSmartFolderFromTemplate(templateId: string): Promise<SmartFolder> {
-  return postParsed(smartFolderSchema, "/smart-folders/from-template", { templateId });
-}
-
-/** 削除した行を同じ ID・位置・作成日時で戻す */
-export async function restoreSmartFolder(data: SmartFolderRestore): Promise<SmartFolder> {
-  return postParsed(smartFolderSchema, "/smart-folders/restore", data);
-}
-
-export async function updateSmartFolder(id: string, data: SmartFolderWrite): Promise<SmartFolder> {
-  return putParsed(smartFolderSchema, folderPath(id), data);
-}
-
-/** 既定の並びだけを更新する。ほかの列は触らない */
-export async function updateSmartFolderSort(id: string, sort: SortId | null): Promise<SmartFolder> {
-  return putParsed(smartFolderSchema, `${folderPath(id)}/sort`, { sort });
-}
-
-/** 条件（と、指定したときだけ既定の並び）だけを更新する。検索の上書きと、その取り消し */
-export async function updateSmartFolderCondition(
-  id: string,
-  change: SmartFolderConditionWrite,
-): Promise<SmartFolder> {
-  return putParsed(smartFolderSchema, `${folderPath(id)}/condition`, change);
-}
-
-/** 値一覧の既定の並びだけを更新する。ほかの列は触らない */
-export async function updateSmartFolderGroupSort(
-  id: string,
-  groupSort: GroupSortId,
-): Promise<SmartFolder> {
-  return putParsed(smartFolderSchema, `${folderPath(id)}/group-sort`, { groupSort });
+/** 送った列だけを更新する。ほかの列は触らない */
+export async function updateSmartFolder(id: string, patch: SmartFolderPatch): Promise<SmartFolder> {
+  return patchParsed(smartFolderSchema, folderPath(id), patch);
 }
 
 export async function deleteSmartFolder(id: string): Promise<void> {

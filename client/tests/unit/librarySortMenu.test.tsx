@@ -25,9 +25,7 @@ function renderSortMenu(options?: {
 }) {
   const api = mockApi({
     "GET /api/smart-folders": options?.folders ?? defaultSmartFolders(),
-    "PUT /api/smart-folders/:id/group-sort": ({ params }) =>
-      buildSmartFolder({ id: params.id, name: "保存済み" }),
-    "PUT /api/smart-folders/:id/sort": ({ params }) =>
+    "PATCH /api/smart-folders/:id": ({ params }) =>
       options?.put ? options.put(params.id) : buildSmartFolder({ id: params.id, name: "保存済み" }),
   });
   const store = createStore();
@@ -227,10 +225,10 @@ describe("LibrarySortMenu", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "この並びを既定にする" }));
 
     await waitFor(() => expect(store.get(libraryRouteAtom).groupSort).toBeNull());
-    const [request] = api.requestsTo("PUT /api/smart-folders/:id/group-sort");
-    expect(request?.params.id).toBe("by-cv");
-    expect(request?.body).toEqual({ groupSort: "name-asc" });
-    expect(api.requestsTo("PUT /api/smart-folders/:id/sort")).toHaveLength(0);
+    const requests = api.requestsTo("PATCH /api/smart-folders/:id");
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.params.id).toBe("by-cv");
+    expect(requests[0]?.body).toEqual({ groupSort: "name-asc" });
   });
 
   it("解決後の並びがランダムのときだけ「並べ直す」を表示し、押すとseedが変わる", () => {
@@ -270,13 +268,13 @@ describe("LibrarySortMenu", () => {
     expect(screen.getByRole("menuitem", { name: "この並びを既定にする" })).toBeInTheDocument();
   });
 
-  it("押すとそのスマートフォルダーの既定として解決済みの並びを PUT し、今の並びを null に戻す", async () => {
+  it("押すとそのスマートフォルダーの既定として解決済みの並びを PATCH し、今の並びを null に戻す", async () => {
     const { store, api } = renderSortMenu({ folderId: "fav", sort: "title-asc" });
     fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "この並びを既定にする" }));
 
     await waitFor(() => expect(currentSort(store)).toBeNull());
-    const [request] = api.requestsTo("PUT /api/smart-folders/:id/sort");
+    const [request] = api.requestsTo("PATCH /api/smart-folders/:id");
     expect(request?.params.id).toBe("fav");
     expect(request?.body).toEqual({ sort: "title-asc" });
   });
@@ -321,13 +319,13 @@ describe("LibrarySortMenu", () => {
     expect(store.get(libraryRouteAtom).folderId).toBe("recent");
   });
 
-  it("「すべて」で押すと「すべて」の並びを PUT する", async () => {
+  it("「すべて」で押すと「すべて」の並びを PATCH する", async () => {
     const { store, api } = renderSortMenu({ folderId: "all", sort: "title-asc" });
     fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "この並びを既定にする" }));
 
     await waitFor(() => expect(currentSort(store)).toBeNull());
-    const [request] = api.requestsTo("PUT /api/smart-folders/:id/sort");
+    const [request] = api.requestsTo("PATCH /api/smart-folders/:id");
     expect(request?.params.id).toBe("all");
     expect(request?.body).toEqual({ sort: "title-asc" });
   });
@@ -362,7 +360,7 @@ describe("LibrarySortMenu", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "この並びを既定にする" }));
 
     await waitFor(() => expect(currentSort(store)).toBeNull());
-    expect(api.requestsTo("PUT /api/smart-folders/:id/sort")[0]?.params.id).toBe("all");
+    expect(api.requestsTo("PATCH /api/smart-folders/:id")[0]?.params.id).toBe("all");
     expect(store.get(libraryRouteAtom).folderId).toBe("all");
   });
 });
@@ -387,16 +385,16 @@ describe("LibrarySortMenu: スマートフォルダー一覧が無い間", () =>
     return api;
   }
 
-  it("取得中は並び替えを操作できず、PUT も飛ばない", () => {
+  it("取得中は並び替えを操作できず、PATCH も飛ばない", () => {
     const api = renderUnavailable(() => new Promise<Response>(() => {}));
     expect(screen.getByRole("button", { name: "並び替え" })).toBeDisabled();
-    expect(api.requestsTo("PUT /api/smart-folders/:id/sort")).toHaveLength(0);
+    expect(api.requestsTo("PATCH /api/smart-folders/:id")).toHaveLength(0);
   });
 
-  it("取得に失敗したときも並び替えを操作できず、PUT も飛ばない", async () => {
+  it("取得に失敗したときも並び替えを操作できず、PATCH も飛ばない", async () => {
     const api = renderUnavailable(() => apiError(500, "internal", "失敗"));
     await waitFor(() => expect(api.requestsTo("GET /api/smart-folders").length).toBeGreaterThan(0));
     expect(screen.getByRole("button", { name: "並び替え" })).toBeDisabled();
-    expect(api.requestsTo("PUT /api/smart-folders/:id/sort")).toHaveLength(0);
+    expect(api.requestsTo("PATCH /api/smart-folders/:id")).toHaveLength(0);
   });
 });

@@ -156,7 +156,7 @@ describe("保存中のダイアログ", () => {
     mockApi({
       "GET /api/tag-prefixes": [],
       "GET /api/smart-folders": [...defaultSmartFolders(), folderA],
-      "PUT /api/smart-folders/:id": async () => {
+      "PATCH /api/smart-folders/:id": async () => {
         await held.promise;
         return { ...folderA };
       },
@@ -194,7 +194,7 @@ describe("保存中の入力欄", () => {
     mockApi({
       "GET /api/tag-prefixes": [],
       "GET /api/smart-folders": [...defaultSmartFolders(), grouped],
-      "PUT /api/smart-folders/:id": async () => {
+      "PATCH /api/smart-folders/:id": async () => {
         await held.promise;
         return apiError(409, "conflict", "競合しました");
       },

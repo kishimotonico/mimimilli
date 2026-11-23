@@ -501,7 +501,7 @@ describe("library api", () => {
     });
   });
 
-  it("updateSmartFolder は PUT /api/smart-folders/:id へ保存内容を送る", async () => {
+  it("updateSmartFolder は PATCH /api/smart-folders/:id へ保存内容を送る", async () => {
     const item = {
       id: "sf-1",
       name: "お気に入り",
@@ -524,12 +524,12 @@ describe("library api", () => {
     const result = await smartFolderApi.updateSmartFolder("sf-1", write);
     const [url, init] = mockFetch.mock.calls.at(-1)!;
     expect(url).toBe("/api/smart-folders/sf-1");
-    expect(init?.method).toBe("PUT");
+    expect(init?.method).toBe("PATCH");
     expect(JSON.parse(String(init?.body))).toEqual(write);
     expect(result.sort).toBe("title-asc");
   });
 
-  it("updateSmartFolderSort は PUT /api/smart-folders/:id/sort へ並びだけを送る", async () => {
+  it("updateSmartFolder は送った列だけを PATCH する", async () => {
     mockFetch.mockResolvedValue(
       makeResponse({
         id: "sf-1",
@@ -543,10 +543,10 @@ describe("library api", () => {
         count: null,
       }),
     );
-    await smartFolderApi.updateSmartFolderSort("sf-1", null);
+    await smartFolderApi.updateSmartFolder("sf-1", { sort: null });
     const [url, init] = mockFetch.mock.calls.at(-1)!;
-    expect(url).toBe("/api/smart-folders/sf-1/sort");
-    expect(init?.method).toBe("PUT");
+    expect(url).toBe("/api/smart-folders/sf-1");
+    expect(init?.method).toBe("PATCH");
     expect(JSON.parse(String(init?.body))).toEqual({ sort: null });
   });
 
