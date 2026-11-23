@@ -208,7 +208,7 @@ focus中はタイマーを止め、離れると残り時間から再開する。
 - 幅は 208px 固定。幅の変更はない。背景は `--paper-1`、右辺に `--line`。上から見出し、行、最下部の統計
 - 見出しは「ライブラリ」1つ。Geist 10px・600・字間 0.08em・`--ink-2`。総称（スマートフォルダー・項目）は画面に出さない。右端に ＋（追加メニュー）と ✎（編集の状態へ入る）を `IconButton`（xs・20px）で置く
 - 行（`.mll-sbrow`）は高さ 29px・左右 8px・角丸 6px、アイコン 15px、名前は 12px の `--ink-1`。hover は `--paper-2`。選択中は `--paper-4`・`--ink-0`・太字で、アイコンと `chev` は `--acc`。グループ分けを持つ行は右端に 12px の `chev`（通常は `--ink-3`）を置く
-- 件数（`.ct`）は JetBrains Mono 10.5px・`--ink-2`・tabular-nums。出す行は shared の `showsCount` で決め、条件が空のもの（すべて・ランダム）とグループ分けを持つものには出さない。条件が `hasError` だけの行は赤い丸（`.ct.is-error`、`--state-danger` 地に `--paper-1` の文字、padding 0 6px）で出す。アイコンは ID でなく、グループ分け、無ければ条件の形（お気に入りだけ・エラーだけ・最近再生・最近追加）から引き、条件が空のものは「すべて」と同じで、既定の並びがランダムのときだけランダムにする
+- 件数（`.ct`）は JetBrains Mono 10.5px・`--ink-2`・tabular-nums。出す行は shared の `showsCount` で決め、条件が空のもの（すべて・ランダム）とグループ分けを持つものには出さない。条件が `hasError` だけの行は赤い丸（`.ct.is-error`、`--state-danger` 地に `--paper-1` の文字、padding 0 6px）で出す。アイコンの引き方は ADR-0040
 - 0件のときも行は隠さない（「エラー」も常に出す）。条件が `hasError` だけの行は、0件のとき赤い丸を出さない。ほかの行の0件は件数を出す
 - 最下部の統計（`.mll-sidebar__foot`）は「{N}作品 · {N}トラック · {合計時間}」。JetBrains Mono 10.5px・`--ink-2`・上辺に `--line-soft`。取得に失敗したときは「統計の取得に失敗しました」
 - 開閉の状態は端末の `localStorage`（`mimimilli:librarySidebarOpen`）に保存し、画面幅では自動で切り替えない。作品詳細でも同じ状態を使う。切り替えはアドレスバー左端のボタン（`SidebarToggleButton`）と Ctrl+B（Mac は ⌘B）。入力欄・テキストエリア・セレクト・contenteditable にフォーカスがあるときは Ctrl+B を奪わない

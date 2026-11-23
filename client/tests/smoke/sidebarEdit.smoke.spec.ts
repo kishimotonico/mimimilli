@@ -178,7 +178,7 @@ test("編集のダイアログ: 自作の条件を × で外すと件数が変�
   assertNoErrors(tracker);
 });
 
-test("既定のスマートフォルダーの条件とグループ分けを変えて保存でき、アイコンが形に合う", async ({
+test("既定のスマートフォルダーの条件とグループ分けを変えて保存でき、グループ分けの行として開ける", async ({
   page,
 }) => {
   const tracker = trackErrors(page);
