@@ -8,14 +8,16 @@ import { getParsed } from "../../shared/api/http";
 
 export const SCAN_CANDIDATES_QUERY_KEY = ["scan", "candidates"] as const;
 
-export async function fetchScanCandidates(): Promise<ScanCandidatesResponse> {
-  return getParsed(scanCandidatesResponseSchema, "/scan/candidates");
+export async function fetchScanCandidates(options?: {
+  signal?: AbortSignal;
+}): Promise<ScanCandidatesResponse> {
+  return getParsed(scanCandidatesResponseSchema, "/scan/candidates", options);
 }
 
 /** 購読者がいなくても一覧が消えないよう gcTime を無限にする（モーダルを閉じて開き直しても残す） */
 export const scanCandidatesQueryOptions = {
   queryKey: SCAN_CANDIDATES_QUERY_KEY,
-  queryFn: fetchScanCandidates,
+  queryFn: ({ signal }: { signal: AbortSignal }) => fetchScanCandidates({ signal }),
   staleTime: 0,
   gcTime: Number.POSITIVE_INFINITY,
 } as const;

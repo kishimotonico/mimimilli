@@ -13,12 +13,12 @@ import {
   type TagPrefixUpdate,
 } from "@mimimilli/shared";
 
-export async function getAllTags(): Promise<string[]> {
-  return getParsed(tagListSchema, "/tags");
+export async function getAllTags(options?: { signal?: AbortSignal }): Promise<string[]> {
+  return getParsed(tagListSchema, "/tags", options);
 }
 
-export async function listTagPrefixes(): Promise<TagPrefix[]> {
-  return getParsed(tagPrefixListSchema, "/tag-prefixes");
+export async function listTagPrefixes(options?: { signal?: AbortSignal }): Promise<TagPrefix[]> {
+  return getParsed(tagPrefixListSchema, "/tag-prefixes", options);
 }
 
 export async function createTagPrefix(data: TagPrefixCreate): Promise<TagPrefix> {
@@ -38,6 +38,8 @@ export async function reorderTagPrefixes(prefixes: string[]): Promise<TagPrefix[
   return putParsed(tagPrefixListSchema, "/tag-prefixes/order", { prefixes });
 }
 
-export async function listTagPrefixCandidates(): Promise<TagPrefixCandidate[]> {
-  return getParsed(tagPrefixCandidateListSchema, "/tag-prefixes/candidates");
+export async function listTagPrefixCandidates(options?: {
+  signal?: AbortSignal;
+}): Promise<TagPrefixCandidate[]> {
+  return getParsed(tagPrefixCandidateListSchema, "/tag-prefixes/candidates", options);
 }

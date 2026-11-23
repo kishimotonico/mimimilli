@@ -4,5 +4,5 @@ import { WORK_QUERY_KEYS } from "./queryKeys";
 
 export const libraryTotalQueryOptions = queryOptions({
   queryKey: WORK_QUERY_KEYS.total(),
-  queryFn: () => getAllWorks({ limit: 1 }),
+  queryFn: ({ signal }) => getAllWorks({ limit: 1 }, { signal }),
 });

@@ -4,10 +4,10 @@ import { SCAN_QUERY_KEYS } from "./queryKeys";
 
 export const scanRecordQueryOptions = queryOptions({
   queryKey: SCAN_QUERY_KEYS.last(),
-  queryFn: () => getScanRecord(),
+  queryFn: ({ signal }) => getScanRecord({ signal }),
 });
 
 export const scanDiagnosticsQueryOptions = queryOptions({
   queryKey: SCAN_QUERY_KEYS.diagnostics(),
-  queryFn: () => getScanDiagnostics(),
+  queryFn: ({ signal }) => getScanDiagnostics({ signal }),
 });

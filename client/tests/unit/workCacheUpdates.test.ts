@@ -10,6 +10,7 @@ import {
   type WorkSourceMutationResult,
 } from "@mimimilli/shared";
 import { smartFolderCountsQueryOptions } from "../../src/entities/smart-folder/queryOptions";
+import { libraryTotalQueryOptions } from "../../src/entities/work/libraryTotalQueryOptions";
 import { invalidateFresh } from "../../src/shared/api/invalidateFresh";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
@@ -269,6 +270,40 @@ describe("件数の取得", () => {
     unsubscribe();
 
     expect(signal?.aborted).toBe(true);
+  });
+});
+
+describe("購読が外れたときの取得の中断", () => {
+  async function abortedAfterUnsubscribe(
+    routes: Record<string, unknown>,
+    options: ConstructorParameters<typeof QueryObserver>[1],
+  ) {
+    let signal: AbortSignal | undefined;
+    mockApi(
+      Object.fromEntries(
+        Object.keys(routes).map((key) => [
+          key,
+          (request: { init?: RequestInit }) => {
+            signal = request.init?.signal ?? undefined;
+            return new Promise(() => {});
+          },
+        ]),
+      ),
+    );
+    const observer = new QueryObserver(new QueryClient(), options);
+    const unsubscribe = observer.subscribe(() => {});
+    await vi.waitFor(() => expect(signal).toBeDefined());
+    unsubscribe();
+    return signal?.aborted;
+  }
+
+  it("作品の総件数", async () => {
+    expect(
+      await abortedAfterUnsubscribe(
+        { "GET /api/smart-folders/all/works": null },
+        libraryTotalQueryOptions,
+      ),
+    ).toBe(true);
   });
 });
 

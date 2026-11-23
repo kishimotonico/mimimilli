@@ -41,11 +41,11 @@ export default function TagPrefixSettings() {
 
   const prefixesQuery = useQuery({
     queryKey: TAG_QUERY_KEYS.prefixes(),
-    queryFn: listTagPrefixes,
+    queryFn: ({ signal }) => listTagPrefixes({ signal }),
   });
   const candidatesQuery = useQuery({
     queryKey: TAG_QUERY_KEYS.prefixCandidates(),
-    queryFn: listTagPrefixCandidates,
+    queryFn: ({ signal }) => listTagPrefixCandidates({ signal }),
   });
 
   const invalidate = async () => {

@@ -40,8 +40,8 @@ export function useScanRecordWorks(kind: ScanRecordKind, change?: WorkChangeKind
   );
   const query = useInfiniteQuery({
     queryKey: [...WORK_QUERY_KEYS.list(params), "scanRecord"],
-    queryFn: ({ pageParam }) =>
-      getAllWorks({ ...params, page: pageParam, limit: SCAN_RECORD_PAGE_SIZE }),
+    queryFn: ({ pageParam, signal }) =>
+      getAllWorks({ ...params, page: pageParam, limit: SCAN_RECORD_PAGE_SIZE }, { signal }),
     initialPageParam: 1,
     getNextPageParam: (last, pages) => {
       const loaded = pages.reduce((sum, page) => sum + page.items.length, 0);

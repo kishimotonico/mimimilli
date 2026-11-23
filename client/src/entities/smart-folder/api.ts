@@ -26,8 +26,8 @@ import {
 
 const folderPath = (id: string) => `/smart-folders/${encodeURIComponent(id)}`;
 
-export async function listSmartFolders(): Promise<SmartFolder[]> {
-  return getParsed(smartFolderListSchema, "/smart-folders");
+export async function listSmartFolders(options?: { signal?: AbortSignal }): Promise<SmartFolder[]> {
+  return getParsed(smartFolderListSchema, "/smart-folders", options);
 }
 
 export async function getSmartFolderCounts(options?: {
@@ -125,6 +125,7 @@ interface SmartFolderGroupsParams {
 export async function getSmartFolderGroups(
   id: string,
   params: SmartFolderGroupsParams,
+  options?: { signal?: AbortSignal },
 ): Promise<GroupValueItem[]> {
   const query = new URLSearchParams({
     groupBy: groupByKey(params.groupBy),
@@ -133,5 +134,5 @@ export async function getSmartFolderGroups(
   if (params.group) query.set("group", params.group);
   for (const tag of params.tags ?? []) query.append("tags", tag);
   if (params.q) query.set("q", params.q);
-  return getParsed(groupValueListSchema, `${folderPath(id)}/groups?${query.toString()}`);
+  return getParsed(groupValueListSchema, `${folderPath(id)}/groups?${query.toString()}`, options);
 }

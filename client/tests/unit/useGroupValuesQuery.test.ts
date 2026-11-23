@@ -217,3 +217,21 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
     });
   });
 });
+
+describe("購読が外れたとき", () => {
+  it("進行中の取得を中断する", async () => {
+    let signal: AbortSignal | undefined;
+    mockApi({
+      [KEY]: (request) => {
+        signal = request.init?.signal ?? undefined;
+        return new Promise(() => {});
+      },
+    });
+    const { unmount } = renderGroupValues({ kind: "tag" }, { folderId: "all" });
+    await vi.waitFor(() => expect(signal).toBeDefined());
+
+    unmount();
+
+    expect(signal?.aborted).toBe(true);
+  });
+});

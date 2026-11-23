@@ -44,7 +44,7 @@ export function useWorkEditDraft({
   const queryClient = useQueryClient();
   const sourceQuery = useQuery({
     queryKey: WORK_QUERY_KEYS.source(work.id),
-    queryFn: () => getWorkEditSnapshot(work.id),
+    queryFn: ({ signal }) => getWorkEditSnapshot(work.id, { signal }),
   });
   const [state, dispatch] = useReducer(workEditDraftReducer, work, createWorkEditDraftState);
   const [isUnsavedPromptOpen, setIsUnsavedPromptOpen] = useState(false);

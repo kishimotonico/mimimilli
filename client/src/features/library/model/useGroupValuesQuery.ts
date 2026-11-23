@@ -33,12 +33,12 @@ export function useGroupValuesQuery(
   const filter = { group, tags, q: normalizeSearchQuery(q), groupSort };
   return useQuery({
     queryKey: SMART_FOLDER_QUERY_KEYS.groups(folderId, groupByKey(groupBy), filter),
-    queryFn: async () => {
-      const items = await getSmartFolderGroups(folderId, {
-        groupBy: groupBy!,
-        ...filter,
-        groupSort: groupSort!,
-      });
+    queryFn: async ({ signal }) => {
+      const items = await getSmartFolderGroups(
+        folderId,
+        { groupBy: groupBy!, ...filter, groupSort: groupSort! },
+        { signal },
+      );
       return assertGroupValueItems(groupBy!, items);
     },
     enabled: groupBy !== null && groupSort !== null,
