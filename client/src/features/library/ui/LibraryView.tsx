@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
-import { isHasErrorOnly } from "@mimimilli/shared";
+import { isHasErrorOnly, normalizeSearchQuery } from "@mimimilli/shared";
+import { hasChipOrSearchRefinement } from "../../../entities/library/refinement";
 import { libraryViewModeAtom } from "../model/atoms";
 import { openNowPlayingLayerAtom } from "../../../entities/navigation/model/appRouteStore";
 import { openWorkDetailAtom } from "../../../entities/work/model/navigationActions";
+import { buildEmptyWorksMessage } from "../model/emptyWorks";
 import { useLibraryNavigation, type ReadyLibraryNavigation } from "../model/useLibraryNavigation";
 import {
   useLibraryDebouncedSearchQuery,
@@ -16,6 +18,7 @@ import { useLibrarySelectionCleanup } from "../model/useLibrarySelectionCleanup"
 import { useLibraryPreviewActions } from "../model/useLibraryPreviewActions";
 import GroupValueList from "./GroupValueList";
 import FilterChipBand from "./FilterChipBand";
+import RefinementActions from "./RefinementActions";
 import LibraryResultsPane from "./LibraryResultsPane";
 import LibraryWorksBoundary from "./LibraryWorksBoundary";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
@@ -52,7 +55,8 @@ function LibraryViewBody({
   nav,
   dockedBarActive,
 }: LibraryViewProps & { nav: ReadyLibraryNavigation }) {
-  const { view, searchQuery } = nav;
+  const { view } = nav;
+  const searchQuery = view.q;
   const debouncedSearchQuery = useLibraryDebouncedSearchQuery(searchQuery);
   const openNowPlaying = useSetAtom(openNowPlayingLayerAtom);
   const openWorkDetail = useSetAtom(openWorkDetailAtom);
@@ -69,7 +73,7 @@ function LibraryViewBody({
     isTagPrefixesError,
     refetchTagPrefixes,
     refetchGroupValues,
-  } = useLibrarySupportingQueries(nav);
+  } = useLibrarySupportingQueries(nav, debouncedSearchQuery);
   const [noResultsKey, setNoResultsKey] = useState<string | null>(null);
   // 0件と報告された一覧が、route の今の一覧と同じときだけ「絞り込みで0件」とする。デバウンス中や
   // 戻る・進むの直後に、前の一覧の結果を引きずらない
@@ -79,6 +83,9 @@ function LibraryViewBody({
 
   const isErrorView = view.kind === "works" && isHasErrorOnly(view.condition);
   const missingWorksCountQuery = useMissingWorksCountQuery(isErrorView);
+
+  const valueListEmptyState =
+    view.kind === "value-list" ? buildValueListEmptyState(nav) : undefined;
 
   const showGrid = viewMode === "grid";
   const saveSearch = useSaveSearch(nav);
@@ -104,17 +111,13 @@ function LibraryViewBody({
           // 同じ .mll-results に同居させるとプレビューの下に隠れて操作できなくなる。
           <FilterChipBand
             tagPrefixes={tagPrefixes}
-            selectedTags={nav.selectedTags}
-            groupValueScope={
-              view.kind === "works"
-                ? {
-                    folderId: view.folder.id,
-                    group: view.group,
-                    tags: view.selectedTags,
-                    q: debouncedSearchQuery,
-                  }
-                : undefined
-            }
+            selectedTags={view.selectedTags}
+            groupValueScope={{
+              folderId: view.folder.id,
+              group: view.kind === "works" ? view.group : null,
+              tags: view.selectedTags,
+              q: debouncedSearchQuery,
+            }}
             onAddTag={nav.addTag}
             onRemoveTag={nav.removeTag}
             worksTotal={view.kind === "works" ? worksTotal : undefined}
@@ -146,6 +149,7 @@ function LibraryViewBody({
                 onSelectValue={nav.selectGroupValue}
                 onRetryGroupValues={refetchGroupValues}
                 onRetryTagPrefixes={refetchTagPrefixes}
+                emptyState={valueListEmptyState}
               />
             </div>
           </div>
@@ -182,4 +186,24 @@ function LibraryViewBody({
       </div>
     </>
   );
+}
+
+/** 値一覧が0件のとき、絞り込みが原因なら「すべて」で探す操作などを添える */
+function buildValueListEmptyState(nav: ReadyLibraryNavigation) {
+  const { view } = nav;
+  if (!hasChipOrSearchRefinement(view)) return undefined;
+  const query = normalizeSearchQuery(view.q);
+  return {
+    message: buildEmptyWorksMessage(query, view.selectedTags.length > 0),
+    action: (
+      <RefinementActions
+        folderId={view.folder.id}
+        hasQuery={query !== ""}
+        hasSelectedTags={view.selectedTags.length > 0}
+        onSearchInAll={nav.searchInAll}
+        onClearSearch={() => nav.setSearchQuery("")}
+        onClearTags={nav.clearTags}
+      />
+    ),
+  };
 }

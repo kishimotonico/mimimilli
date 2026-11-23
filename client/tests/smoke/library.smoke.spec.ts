@@ -140,34 +140,60 @@ test("サイドバーのクイックオーバーレイ: 値の主クリックで
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["cv/天音かなで"]);
   expect(new URL(page.url()).searchParams.get("group")).toBe("霧島レイ");
 
-  // 値一覧が開いているとき、追加ボタンは「すべて」＋そのチップへ進む
+  // 値一覧が開いているとき、追加ボタンは値一覧のままチップを足す
   await railRow(page, "CV別").click();
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveCount(0);
   await page.mouse.move(1200, 600);
   await expect(overlay).toHaveCount(0);
   await railRow(page, "CV別").hover();
   await quickList.getByRole("button", { name: "霧島レイをAND追加" }).click();
-  await expect(page).toHaveURL(/\/library\/all/);
+  await expect(page).toHaveURL(/\/library\/by-cv\?/);
+  expect(new URL(page.url()).searchParams.has("group")).toBe(false);
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["cv/霧島レイ"]);
+  await expect(page.locator(".mll-tagband__count")).toHaveText(/^\d+ 分類$/);
 
   assertNoErrors(tracker);
 });
 
-test("値一覧でも検索でき、入力すると「すべて」の検索結果へ移る", async ({ page }) => {
+test("値一覧でも検索でき、同じ値一覧のまま値と件数が絞り込み後になる", async ({ page }) => {
   const tracker = trackErrors(page);
   await openApp(page);
 
   await railRow(page, "CV別").click();
   const valueList = page.getByRole("group", { name: "CVの値一覧" });
   await expect(valueList.getByRole("button").first()).toBeVisible();
+  const before = await valueList.getByRole("button").count();
 
   await expect(search(page)).toBeEnabled();
   await expect(valueList.getByRole("button", { name: /をAND追加/ })).toHaveCount(0);
   await expect(page.locator(".mll-tagband__count")).toHaveText(/^\d+ 分類$/);
 
   await search(page).fill("霧島");
+  await expect(page).toHaveURL(/\/library\/by-cv\?q=/);
+  await expect(railRow(page, "CV別")).toHaveAttribute("aria-current", "true");
+  await expect(valueList.getByRole("button", { name: /^霧島レイ(?!を)/ })).toBeVisible();
+  await expect.poll(() => valueList.getByRole("button").count()).toBeLessThan(before);
+
+  await valueList.getByRole("button", { name: /^霧島レイ(?!を)/ }).click();
+  expect(new URL(page.url()).searchParams.get("q")).toBe("霧島");
+  await expect(search(page)).toHaveValue("霧島");
+
+  assertNoErrors(tracker);
+});
+
+test("値一覧が絞り込みで0件のとき「すべて」で探すと、同じ検索語で「すべて」へ移る", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await railRow(page, "CV別").click();
+  await search(page).fill("存在しない検索語");
+  await expect(page.getByText("「存在しない検索語」に一致する作品はありません")).toBeVisible();
+  await page.getByRole("button", { name: "「すべて」で探す" }).click();
+
   await expect(page).toHaveURL(/\/library\/all\?q=/);
-  await expect(railRow(page, "すべて")).toHaveAttribute("aria-current", "true");
+  expect(new URL(page.url()).searchParams.get("q")).toBe("存在しない検索語");
 
   assertNoErrors(tracker);
 });

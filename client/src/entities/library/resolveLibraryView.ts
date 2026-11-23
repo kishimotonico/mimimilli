@@ -14,18 +14,18 @@ import type { LibraryRoute } from "../navigation/model/appRoute";
 
 interface ResolvedBase {
   folder: SmartFolder;
+  condition: Condition;
+  selectedTags: NormalizedTag[];
+  q: string;
 }
 
 export type ResolvedLibraryView =
   | (ResolvedBase & {
       kind: "works";
-      condition: Condition;
       group: string | null;
       groupBy: GroupBy | null;
       /** グループ分けのある行の解決済みの値の並び。値を選んだあとの兄弟値の一覧が使う */
       groupSort: GroupSortId | null;
-      selectedTags: NormalizedTag[];
-      q: string;
       /** 解決済みの並び（今の並び → フォルダーの既定 → 「すべて」の既定） */
       sort: SortId;
       /** 今の並びが解決後の既定から外れているか（「この並びを既定にする」を出すか） */
@@ -36,7 +36,6 @@ export type ResolvedLibraryView =
     })
   | (ResolvedBase & {
       kind: "value-list";
-      condition: Condition;
       groupBy: GroupBy;
       /** 解決済みの値の並び（今の並び → フォルダーの既定） */
       groupSort: GroupSortId;
@@ -73,6 +72,8 @@ export function resolveLibraryView(
       folder,
       kind: "value-list",
       condition,
+      selectedTags: library.selectedTags,
+      q: library.q,
       groupBy: grouping.groupBy,
       groupSort: grouping.groupSort,
       groupSortDeviates: library.groupSort !== null && library.groupSort !== folder.groupSort,
@@ -89,11 +90,11 @@ export function resolveLibraryView(
     folder,
     kind: "works",
     condition,
+    selectedTags: library.selectedTags,
+    q: library.q,
     group,
     groupBy,
     groupSort: grouping?.groupSort ?? null,
-    selectedTags: library.selectedTags,
-    q: library.q,
     sort,
     sortDeviates: library.sort !== null && library.sort !== defaultSort,
     seed: sort === "random" ? library.seed : undefined,

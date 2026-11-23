@@ -12,6 +12,7 @@ import {
   type GroupValueScope,
 } from "../../src/features/library/model/useGroupValuesQuery";
 import { groupsQueryOf, mockApi, type ApiMock } from "../helpers/api";
+import { buildGroupValueItem } from "../helpers/builders";
 
 const KEY = "GET /api/smart-folders/:id/groups";
 
@@ -114,6 +115,38 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
 
     await waitFor(() => expect(api.requestsTo(KEY)).toHaveLength(2));
     expect(groupsQueryOf(api.requestsTo(KEY)[1]!)).toMatchObject({ groupSort: "last-played" });
+  });
+
+  it("keepPrevious なら、検索語が変わって取り直す間も同じ行の前の結果を出したままにする", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    api = mockApi({
+      [KEY]: async (request) => {
+        if (groupsQueryOf(request).q === "雨") await gate;
+        return [buildGroupValueItem({ value: "藤田茜" })];
+      },
+    });
+    const { result, rerender } = renderHook(
+      ({ q }: { q: string }) =>
+        useGroupValuesQuery(
+          { kind: "prefix", prefix: "cv" },
+          { folderId: "by-cv", q },
+          "count-desc",
+          { keepPrevious: true },
+        ),
+      { wrapper: wrapperFor(queryClient), initialProps: { q: "" } },
+    );
+    await waitFor(() => expect(result.current.data).toHaveLength(1));
+
+    rerender({ q: "雨" });
+
+    expect(result.current.isPlaceholderData).toBe(true);
+    expect(result.current.data).toHaveLength(1);
+    release();
+    await waitFor(() => expect(result.current.isPlaceholderData).toBe(false));
   });
 
   it("値の並びが null のときは取得しない", () => {

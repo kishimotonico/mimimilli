@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { NO_AUTOFILL_PROPS } from "../../../shared/ui/noAutofill";
 import { useAtomValue } from "jotai";
 import type { GroupBy, GroupSortId, GroupValueItem, TagPrefix } from "@mimimilli/shared";
@@ -31,6 +31,8 @@ interface GroupValueListProps {
   onSelectValue: (value: string) => void;
   onRetryGroupValues?: () => void;
   onRetryTagPrefixes?: () => void;
+  /** 絞り込み（チップ・検索語）で0件になったときの案内。絞り込みが無ければ undefined */
+  emptyState?: { message: string; action: ReactNode };
 }
 
 export default function GroupValueList({
@@ -45,6 +47,7 @@ export default function GroupValueList({
   onSelectValue,
   onRetryGroupValues,
   onRetryTagPrefixes,
+  emptyState,
 }: GroupValueListProps) {
   const viewMode = useAtomValue(libraryViewModeAtom);
   const tileSize = useAtomValue(libraryTileSizeAtom);
@@ -136,7 +139,8 @@ export default function GroupValueList({
               <CollectionStatus
                 variant={viewMode === "grid" ? "grid" : "list"}
                 kind="empty"
-                message="項目がありません"
+                message={emptyState?.message ?? "項目がありません"}
+                action={emptyState?.action}
               />
             ) : showSearchMiss ? (
               <CollectionStatus

@@ -249,7 +249,7 @@ describe("GroupValueList list 表示（ADR-0012 §5）", () => {
     sizeMock.restore();
   });
 
-  it("値一覧の行にはAND追加ボタンが無い（値一覧は独立した全作品入口。ADR-0026）", async () => {
+  it("値一覧の行にはAND追加ボタンが無い（チップは「＋絞り込み」から足す）", async () => {
     const sizeMock = mockElementSize(600, 600);
     renderGroupValueList({ groupBy: CV, groupValueItems: [makeItem({ value: "藤田茜" })] });
     await flushVirtualizer();
@@ -257,6 +257,22 @@ describe("GroupValueList list 表示（ADR-0012 §5）", () => {
     const row = getRow(".mll-vrow", "藤田茜");
     expect(within(row).queryByRole("button", { name: /AND追加/ })).toBeNull();
     sizeMock.restore();
+  });
+
+  it("0件のとき、絞り込みの案内があればその文言と操作を出し、無ければ既定の文言を出す", () => {
+    const { unmount } = renderGroupValueList({ groupValueItems: [] });
+    expect(screen.getByText("項目がありません")).toBeInTheDocument();
+    unmount();
+
+    renderGroupValueList({
+      groupValueItems: [],
+      emptyState: {
+        message: "選択中のフィルタに一致する作品はありません",
+        action: <button type="button">「すべて」で探す</button>,
+      },
+    });
+    expect(screen.getByText("選択中のフィルタに一致する作品はありません")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "「すべて」で探す" })).toBeInTheDocument();
   });
 
   it("1000件でも仮想化により描画されるボタンは総数よりずっと少ない", async () => {

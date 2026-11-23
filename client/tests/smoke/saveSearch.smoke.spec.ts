@@ -51,6 +51,36 @@ test("CV別で値を選んで検索し、「検索を保存」して開き直す
   assertNoErrors(tracker);
 });
 
+test("CV別の値一覧で検索して「検索を保存」すると、グループ分けを保ったまま保存され、開くと同じ値一覧が見える", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await railRow(page, "CV別").click();
+  const valueList = page.getByRole("group", { name: "CVの値一覧" });
+  await expect(valueList.getByRole("button").first()).toBeVisible();
+  const names = async () => valueList.getByRole("button").allTextContents();
+  const unfiltered = await names();
+  await search(page).fill("ボイス");
+  await expect(page).toHaveURL(/\/library\/by-cv\?q=/);
+  await expect.poll(names).not.toEqual(unfiltered);
+  const before = await names();
+
+  await page.getByRole("button", { name: "検索を保存", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "検索を保存" });
+  await expect(dialog.getByLabel("名前")).toHaveValue("ボイス");
+  await dialog.getByRole("button", { name: "保存", exact: true }).click();
+
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(/\/library\/sf-[0-9a-f-]+$/);
+  await expect(railRow(page, /^ボイス/)).toHaveAttribute("aria-current", "true");
+  await expect.poll(names).toEqual(before);
+  await expect(page.getByRole("button", { name: "検索を保存", exact: true })).toHaveCount(0);
+
+  assertNoErrors(tracker);
+});
+
 test("自作のスマートフォルダーにチップを足して上書きし、トーストの「元に戻す」で条件が戻る", async ({
   page,
 }) => {

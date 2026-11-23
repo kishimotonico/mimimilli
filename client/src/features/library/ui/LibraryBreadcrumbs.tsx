@@ -35,7 +35,7 @@ export default function LibraryBreadcrumbs() {
           <GroupValuePopover
             key={`siblings:${view.folder.id}:${groupSort}`}
             placement="below"
-            folderId={view.folder.id}
+            scope={{ folderId: view.folder.id, tags: view.selectedTags, q: view.q }}
             groupBy={groupBy}
             groupSort={groupSort}
             groupByLabel={getGroupByLabel(groupBy, tagPrefixes)}

@@ -22,34 +22,43 @@ export function isOverwritable(view: WorksView): boolean {
   return view.groupBy === null && view.folder.id !== ALL_SMART_FOLDER_ID;
 }
 
+function groupOf(view: ResolvedLibraryView): string | null {
+  return view.kind === "works" ? view.group : null;
+}
+
 /** グループの値・チップ・検索語のどれかで絞り込んでいる */
-export function isRefined(view: WorksView): boolean {
-  return view.group !== null || hasChipOrSearchRefinement(view);
+export function isRefined(view: ResolvedLibraryView): boolean {
+  return groupOf(view) !== null || hasChipOrSearchRefinement(view);
 }
 
 /** チップ列の右端に出す保存の操作。無ければ null */
 export function saveOffer(view: ResolvedLibraryView): SaveOffer | null {
-  if (view.kind !== "works") return null;
-  if (isOverwritable(view) && (view.selectedTags.length > 0 || view.sortDeviates)) {
+  if (
+    view.kind === "works" &&
+    isOverwritable(view) &&
+    (view.selectedTags.length > 0 || view.sortDeviates)
+  ) {
     return "overwrite";
   }
   return isRefined(view) ? "save" : null;
 }
 
-function effectiveCondition(view: WorksView) {
+function effectiveCondition(view: ResolvedLibraryView) {
   const { tags, yearValue } = splitSelectedTags(view.selectedTags);
+  const group = groupOf(view);
   return buildEffectiveCondition({
     condition: view.condition,
-    ...(view.group !== null && view.groupBy !== null
-      ? { group: { by: view.groupBy, value: view.group } }
+    ...(group !== null && view.groupBy !== null
+      ? { group: { by: view.groupBy, value: group } }
       : {}),
     tags: { tags, yearValue },
     q: view.q,
   });
 }
 
-function defaultName(view: WorksView): string {
-  if (view.group !== null) return view.group;
+function defaultName(view: ResolvedLibraryView): string {
+  const group = groupOf(view);
+  if (group !== null) return group;
   if (view.selectedTags.length > 0) {
     return view.selectedTags.map((tag) => parseTag(tag).value).join("・");
   }
@@ -62,16 +71,21 @@ function savedSortOf(folder: SmartFolder) {
   return folder.id === ALL_SMART_FOLDER_ID ? null : folder.sort;
 }
 
-/** 「検索を保存」「別名で保存」の下書き。作品一覧ではグループ分けの値は必ず選ばれているので、グループ分けは外す。
- *  既定の並びは、並びを変えていなければ元の既定の並びを写し（「すべて」からは継承）、変えていればその並び。
+/** 「検索を保存」「別名で保存」の下書き。グループの値を選んでいれば条件に入るのでグループ分けは外し、
+ *  選んでいなければ（値一覧で絞り込んだとき）グループ分けと値の並びを保つ。値の並びは、今の並びを
+ *  変えていればその並び、変えていなければ元の値の並び。既定の並びは、変えていなければ元の既定の並びを写し
+ *  （「すべて」からは継承）、変えていればその並び。
  */
-export function saveSearchDraft(view: WorksView): SmartFolderWrite {
+export function saveSearchDraft(view: ResolvedLibraryView): SmartFolderWrite {
+  const { folder } = view;
+  const keepsGrouping = groupOf(view) === null;
+  const groupSortDeviates = view.kind === "value-list" && view.groupSortDeviates;
   return {
     name: defaultName(view),
     condition: effectiveCondition(view),
-    sort: view.sortDeviates ? view.sort : savedSortOf(view.folder),
-    groupBy: null,
-    groupSort: null,
+    sort: view.kind === "works" && view.sortDeviates ? view.sort : savedSortOf(folder),
+    groupBy: keepsGrouping ? folder.groupBy : null,
+    groupSort: keepsGrouping ? (groupSortDeviates ? view.groupSort : folder.groupSort) : null,
   };
 }
 
@@ -93,6 +107,6 @@ export function overwriteUndoChange(view: WorksView): SmartFolderPatch {
   };
 }
 
-export function saveDialogTarget(view: WorksView): SmartFolderDialogTarget {
+export function saveDialogTarget(view: ResolvedLibraryView): SmartFolderDialogTarget {
   return { kind: "save", draft: saveSearchDraft(view) };
 }

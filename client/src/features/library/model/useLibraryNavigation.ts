@@ -2,7 +2,7 @@
 // route とスマートフォルダー一覧を resolveLibraryView で突き合わせた結果と、
 // write-only action atom を束ねた高レベル操作を提供する（ADR-0041）。
 
-import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useTransition } from "react";
+import { useContext, useEffect, useMemo, useTransition } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -47,10 +47,6 @@ export interface ReadyLibraryViewState extends LibraryViewStateBase {
   foldersStatus: "ready";
   folders: SmartFolder[];
   view: ResolvedLibraryView;
-  /** 効いているチップ。作品一覧以外では空 */
-  selectedTags: NormalizedTag[];
-  /** 効いている検索語。値一覧では空（効かない q を見せない） */
-  searchQuery: string;
 }
 
 /** 一覧を取得中・取得失敗。「まだ分からない」ので view は作らない */
@@ -71,13 +67,13 @@ export interface LibraryViewActions {
   /** 値一覧の値・パンくずの兄弟値。開いているスマートフォルダーの中で値を選ぶ */
   selectGroupValue: (group: string) => void;
   removeTag: (tag: NormalizedTag) => void;
-  /** 追加ボタン・Ctrl+クリック用。作品一覧ならチップを足し、値一覧なら「すべて」＋そのチップ */
+  /** 追加ボタン・Ctrl+クリック用。今の一覧にチップを足す */
   addTag: (tag: NormalizedTag) => void;
   /** プレビュー・作品詳細のタグ。主クリックは「すべて」＋そのタグ、Ctrl/Cmd+クリックは addTag */
   clickTag: (tag: NormalizedTag, modifiers: TagClickModifiers) => void;
   clearTags: () => void;
   searchInAll: () => void;
-  /** 検索欄の入力。作品一覧ならその一覧で検索し、値一覧なら「すべて」の検索結果へ移る */
+  /** 検索欄の入力。今の一覧で検索する */
   setSearchQuery: (q: string) => void;
   selectWork: (id: string | null) => void;
   setSort: (sort: SortId) => void;
@@ -118,12 +114,6 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
     () => (folders ? resolveLibraryView(library, folders) : null),
     [library, folders],
   );
-  // 操作は呼ばれた時点の最新の一覧を渡す（解決は遷移の中で反映先の route に対して行う）。参照は変えない
-  const foldersRef = useRef(folders);
-  useLayoutEffect(() => {
-    foldersRef.current = folders;
-  }, [folders]);
-
   useEffect(() => {
     if (folders) normalizeFolder(folders);
   }, [folders, library.folderId, library.group, normalizeFolder]);
@@ -133,26 +123,21 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
       startTransition(() => {
         action();
       });
-    // 一覧が無い間は保持しているライブラリが決まらないので、それに依存する操作は行わない
-    const withFolders = (action: (folders: SmartFolder[]) => void) => {
-      const current = foldersRef.current;
-      if (current) run(() => action(current));
-    };
     return {
       openFolder: (folderId) => run(() => openFolder(folderId)),
       openGroupValue: (folderId, group) => run(() => openGroupValue(folderId, group)),
-      selectGroupValue: (group) => withFolders((f) => selectGroupValue(group, f)),
+      selectGroupValue: (group) => run(() => selectGroupValue(group)),
       removeTag: (tag) => run(() => removeTag(tag)),
-      addTag: (tag) => withFolders((f) => addTag(tag, f)),
+      addTag: (tag) => run(() => addTag(tag)),
       clickTag: (tag, { ctrlKey, metaKey }) =>
-        withFolders((f) => (ctrlKey || metaKey ? addTag(tag, f) : openTag(tag, f))),
+        run(() => (ctrlKey || metaKey ? addTag(tag) : openTag(tag))),
       clearTags: () => run(() => clearTags()),
-      searchInAll: () => withFolders((f) => searchInAll(f)),
-      setSearchQuery: (q) => withFolders((f) => setSearchQuery(q, f)),
+      searchInAll: () => run(() => searchInAll()),
+      setSearchQuery: (q) => run(() => setSearchQuery(q)),
       selectWork,
       setSort: (sort) => run(() => setSort(sort)),
       setGroupSort: (groupSort) => run(() => setGroupSort(groupSort)),
-      backToValueList: () => withFolders((f) => backToValueList(f)),
+      backToValueList: () => run(() => backToValueList()),
     };
   }, [
     openFolder,
@@ -189,8 +174,6 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
       foldersStatus: "ready",
       folders,
       view,
-      selectedTags: view.kind === "works" ? view.selectedTags : EMPTY_TAGS,
-      searchQuery: view.kind === "works" ? view.q : "",
     };
   }, [
     folders,
@@ -204,8 +187,6 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
 
   return useMemo(() => ({ ...navigation, ...actions }), [navigation, actions]);
 }
-
-const EMPTY_TAGS: NormalizedTag[] = [];
 
 export function useLibraryNavigation(): LibraryViewState & LibraryViewActions {
   const navigation = useContext(LibraryNavigationContext);

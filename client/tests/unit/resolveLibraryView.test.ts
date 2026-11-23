@@ -63,15 +63,13 @@ describe("resolveLibraryView: 値一覧と作品一覧", () => {
     });
   });
 
-  it("値一覧では q・tags を効かせない（parse では落とさず、ここで無視する）", () => {
+  it("値一覧でもチップ・検索語を持つ", () => {
     const view = resolveLibraryView(
       route({ folderId: "by-cv", selectedTags: nts(["ASMR"]), q: "藤田" }),
       folders,
     );
 
-    expect(view.kind).toBe("value-list");
-    expect(view).not.toHaveProperty("selectedTags");
-    expect(view).not.toHaveProperty("q");
+    expect(view).toMatchObject({ kind: "value-list", selectedTags: ["ASMR"], q: "藤田" });
   });
 
   it("グループの値を選ぶと作品一覧になり、チップ・検索語・値・パンくずを返す", () => {

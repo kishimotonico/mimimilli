@@ -40,7 +40,7 @@ export default function LibrarySidebar() {
       activeGroup={ready?.view.kind === "works" ? ready.view.group : null}
       tagPrefixes={tagPrefixes}
       stats={stats}
-      filtered={ready?.view.kind === "works" && isRefined(ready.view)}
+      filtered={ready !== null && isRefined(ready.view)}
       onSaveSearch={openSaveDialog}
       onOpenFolder={(folderId) => {
         // 作品詳細・再生中から元のスマートフォルダーの行を押したときは、保持している状態のまま戻る

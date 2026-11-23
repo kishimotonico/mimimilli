@@ -73,14 +73,15 @@ export function useLibraryDebouncedSearchQuery(searchQuery: string) {
   return useDebouncedValue(searchQuery, SEARCH_DEBOUNCE_MS, searchQuery === "");
 }
 
-/** 開いているスマートフォルダー自身の値一覧（グループ分け）。サイドバーのクイックオーバーレイ・
- *  パンくずの兄弟値と同じ母集団（絞り込み無し）なので、同じ query を共有する */
-export function useFolderGroupValuesQuery(view: ResolvedLibraryView) {
+/** 開いているスマートフォルダー自身の値一覧（グループ分け）。値一覧のときだけ取得し、今のチップと検索語をかける。
+ *  検索語は作品一覧と同じく間引いた値を使う */
+function useFolderGroupValuesQuery(view: ResolvedLibraryView, debouncedSearchQuery: string) {
   const valueList = view.kind === "value-list" ? view : null;
   return useGroupValuesQuery(
     valueList?.groupBy ?? null,
-    { folderId: view.folder.id },
+    { folderId: view.folder.id, tags: view.selectedTags, q: debouncedSearchQuery },
     valueList?.groupSort ?? null,
+    { keepPrevious: true },
   );
 }
 
@@ -88,8 +89,11 @@ export function useFolderGroupValuesQuery(view: ResolvedLibraryView) {
  * 作品一覧以外の LibraryView 用クエリ。作品クエリは Suspense 境界の子へ下ろすため、
  * このフックは一覧を取得しない。
  */
-export function useLibrarySupportingQueries(nav: ReadyLibraryViewState) {
-  const groupValuesQuery = useFolderGroupValuesQuery(nav.view);
+export function useLibrarySupportingQueries(
+  nav: ReadyLibraryViewState,
+  debouncedSearchQuery: string,
+) {
+  const groupValuesQuery = useFolderGroupValuesQuery(nav.view, debouncedSearchQuery);
   const workDetailQuery = useQuery(workDetailQueryOptions(nav.selectedWorkId));
   const tagsQuery = useQuery(allTagsQueryOptions);
   const {

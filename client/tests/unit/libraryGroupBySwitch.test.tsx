@@ -38,7 +38,7 @@ describe("グループ分け切替時の groupValueItems 系列（R2 機序調�
     const history: Array<{ folderId: string; groupValueItemsLength: number }> = [];
 
     function Probe({ nav }: { nav: LibraryViewState }) {
-      const { groupValueItems } = useLibrarySupportingQueries(nav);
+      const { groupValueItems } = useLibrarySupportingQueries(nav, "");
       history.push({ folderId: nav.view.folder.id, groupValueItemsLength: groupValueItems.length });
       return null;
     }

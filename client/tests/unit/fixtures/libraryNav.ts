@@ -26,8 +26,6 @@ export function buildNav(
     refetchFolders: vi.fn(),
     folders,
     view,
-    searchQuery: view.kind === "works" ? view.q : "",
-    selectedTags: view.kind === "works" ? view.selectedTags : [],
     selectedWorkId: library.selectedWorkId,
     isPending: false,
     openFolder: vi.fn(),

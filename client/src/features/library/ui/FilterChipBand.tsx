@@ -13,13 +13,13 @@ import { I } from "../../../shared/ui/Icon";
 interface FilterChipBandProps {
   tagPrefixes: TagPrefix[];
   selectedTags: NormalizedTag[];
-  /** 「＋絞り込み」の候補を数える母集団。値一覧では絞り込みを持たないので undefined */
+  /** 「＋絞り込み」の候補を数える母集団（開いている一覧のチップ・検索語・値） */
   groupValueScope?: GroupValueScope;
   onAddTag: (tag: NormalizedTag) => void;
   onRemoveTag: (tag: NormalizedTag) => void;
   /** 絞り込み後の作品件数。作品一覧を出さない結果面では undefined */
   worksTotal?: number;
-  /** 値一覧ペインの分類数。指定時は作品件数の代わりに分類数を出し、「＋絞り込み」ボタンも隠す */
+  /** 値一覧ペインの分類数。指定時は作品件数の代わりに分類数を出す */
   valueListItemCount?: number;
   /** 保存の操作。出すものは状態で決まる（ADR-0041） */
   save?: {
@@ -93,7 +93,7 @@ export default function FilterChipBand({
           onRemove={() => onRemoveTag(tag)}
         />
       ))}
-      {!isValueListPane && groupValueScope && (
+      {groupValueScope && (
         <FilterChipAddButton
           tagPrefixes={tagPrefixes}
           selectedTags={selectedTags}

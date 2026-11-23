@@ -114,7 +114,7 @@ export async function getAllWorks(
 export interface SmartFolderGroupsParams {
   groupBy: GroupBy;
   groupSort: GroupSortId;
-  /** 「＋絞り込み」の候補でだけ使う。自身の値一覧では送らない */
+  /** 値を選んだあとの作品一覧の母集団で候補を数えるときの値 */
   group?: string | null;
   tags?: string[];
   q?: string;

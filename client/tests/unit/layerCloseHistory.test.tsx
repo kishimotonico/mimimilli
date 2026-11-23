@@ -5,7 +5,6 @@ import { Provider, createStore } from "jotai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appRouteCodec, createInitialAppRoute } from "../../src/entities/navigation/model/appRoute";
 import { addLibraryTag } from "../../src/entities/library/model/libraryRouteTransitions";
-import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
 import { nt } from "../helpers/tag";
 import { correctLibrary } from "../../src/entities/navigation/model/appRouteStore";
 import { createRouteStore } from "../../src/shared/model/routeStore";
@@ -265,14 +264,11 @@ describe("層を閉じて下のエントリーへ戻る", () => {
 
   it("追加年→実タグの順に足したチップでも、層の補正を下へ引き継げる（メモリ上の並びが URL と同じ正準順）", () => {
     const { routeStore, store } = setup();
-    const folders = [...defaultSmartFolders(), buildSmartFolder({ id: "sf-own" })];
     for (const tag of [nt("@year/2024"), nt("cv/藤田茜")]) {
       act(() =>
-        store.set(
-          routeStore.navigateAtom,
-          (route) => addLibraryTag(route, tag, folders)?.route ?? route,
-          { replace: true },
-        ),
+        store.set(routeStore.navigateAtom, (route) => addLibraryTag(route, tag)?.route ?? route, {
+          replace: true,
+        }),
       );
     }
     const library = store.get(routeStore.routeAtom).library;

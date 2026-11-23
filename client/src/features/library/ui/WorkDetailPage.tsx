@@ -31,7 +31,7 @@ export default function WorkDetailPage() {
   const nav = useLibraryNavigation();
   const { clickTag } = nav;
   const view = nav.foldersStatus === "ready" ? nav.view : null;
-  const searchQuery = nav.foldersStatus === "ready" ? nav.searchQuery : "";
+  const searchQuery = nav.foldersStatus === "ready" ? nav.view.q : "";
 
   const workQuery = useQuery(workDetailQueryOptions(workId));
   const tagsQuery = useQuery(allTagsQueryOptions);

@@ -3,6 +3,7 @@ import { useIsPresent } from "motion/react";
 import type { GroupBy, GroupSortId, GroupValueItem } from "@mimimilli/shared";
 import { useAnchoredPopover } from "../../../shared/ui/useAnchoredPopover";
 import type { HoverGroupPanelHandlers } from "../../../shared/lib/useHoverGroupCoordinator";
+import type { GroupValueScope } from "../model/useGroupValuesQuery";
 import GroupValuePopoverPanel, { GROUP_VALUE_PLACEMENTS } from "./GroupValuePopoverPanel";
 
 // アンカーの横または下にグループの値の一覧を出す。サイドバーの列は overflow でクリップされるため、
@@ -17,7 +18,8 @@ import GroupValuePopoverPanel, { GROUP_VALUE_PLACEMENTS } from "./GroupValuePopo
 
 interface GroupValuePopoverProps {
   placement: keyof typeof GROUP_VALUE_PLACEMENTS;
-  folderId: string;
+  /** 値と件数を数える母集団 */
+  scope: GroupValueScope;
   groupBy: GroupBy;
   groupByLabel: string;
   /** そのフォルダーの保存済みの値の並び。開いている間だけ列見出しで変えられる */
@@ -37,7 +39,7 @@ interface GroupValuePopoverProps {
 
 export default function GroupValuePopover({
   placement,
-  folderId,
+  scope,
   groupBy,
   groupByLabel,
   groupSort,
@@ -75,8 +77,7 @@ export default function GroupValuePopover({
     <GroupValuePopoverPanel
       groupBy={groupBy}
       groupByLabel={groupByLabel}
-      // 件数は主クリック（その値の作品一覧）の結果と一致させるため、絞り込み無しで数える
-      scope={{ folderId }}
+      scope={scope}
       initialGroupSort={groupSort}
       placement={placement}
       setFloating={setPanelEl}

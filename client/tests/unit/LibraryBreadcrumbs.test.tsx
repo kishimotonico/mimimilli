@@ -7,6 +7,7 @@ import { LibraryNavigationContext } from "../../src/features/library/model/libra
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 import { groupsQueryOf, mockApi } from "../helpers/api";
 import { buildGroupValueItem } from "../helpers/builders";
+import { nts } from "../helpers/tag";
 import { buildNav } from "./fixtures/libraryNav";
 import type {
   LibraryViewActions,
@@ -15,7 +16,7 @@ import type {
 
 /** 一覧が無い状態の nav には、操作だけを buildNav から借りる */
 function buildNavActions(): LibraryViewActions {
-  const { view: _view, folders: _folders, selectedTags: _t, searchQuery: _q, ...rest } = buildNav();
+  const { view: _view, folders: _folders, ...rest } = buildNav();
   const {
     foldersStatus: _s,
     refetchFolders: _r,
@@ -110,6 +111,30 @@ describe("LibraryBreadcrumbs", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /^天音かなで ?3/ }));
     expect(nav.selectGroupValue).toHaveBeenCalledWith("天音かなで");
+    sizeMock.restore();
+  });
+
+  it("兄弟の値のドロップダウンは、今のチップと検索語をかけた値と件数を取る", async () => {
+    const api = mockApi({
+      "GET /api/tag-prefixes": [],
+      "GET /api/smart-folders/:id/groups": [buildGroupValueItem({ value: "天音かなで", count: 1 })],
+    });
+    const sizeMock = mockElementSize(260, 260);
+    const nav = buildNav({
+      library: { folderId: "by-cv", group: "藤田茜", selectedTags: nts(["ASMR"]), q: "雨" },
+    });
+    renderBreadcrumbs(nav);
+
+    fireEvent.click(screen.getByRole("button", { name: "藤田茜" }));
+    await waitFor(() =>
+      expect(api.requestsTo("GET /api/smart-folders/:id/groups")).toHaveLength(1),
+    );
+    expect(groupsQueryOf(api.requestsTo("GET /api/smart-folders/:id/groups")[0]!)).toEqual({
+      groupBy: "prefix:cv",
+      groupSort: "count-desc",
+      tags: ["ASMR"],
+      q: "雨",
+    });
     sizeMock.restore();
   });
 

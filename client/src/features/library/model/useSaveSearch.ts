@@ -25,11 +25,11 @@ export interface SaveSearchActions {
   overwrite: () => Promise<void>;
 }
 
-/** 「検索を保存」「別名で保存」。名前を入れるダイアログを開く。作品一覧のときだけ開く */
+/** 「検索を保存」「別名で保存」。名前を入れるダイアログを開く */
 export function useOpenSaveDialog(view: ResolvedLibraryView | null): () => void {
   const setDialog = useSetAtom(smartFolderDialogAtom);
   return useCallback(() => {
-    if (view?.kind === "works") setDialog(saveDialogTarget(view));
+    if (view) setDialog(saveDialogTarget(view));
   }, [view, setDialog]);
 }
 

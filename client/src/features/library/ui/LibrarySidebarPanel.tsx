@@ -229,7 +229,8 @@ export default function LibrarySidebarPanel({
           <GroupValuePopover
             key={overlayFolder.id}
             placement="right"
-            folderId={overlayFolder.id}
+            // そこから入るとチップと検索語は消えるので、絞り込み無しで数える
+            scope={{ folderId: overlayFolder.id }}
             groupBy={overlayGrouping.groupBy}
             groupSort={overlayGrouping.groupSort}
             groupByLabel={getGroupByLabel(overlayGrouping.groupBy, tagPrefixes)}
