@@ -11,6 +11,7 @@ import {
 } from "@mimimilli/shared";
 import { groupSortOptions } from "../model/groupValueSort";
 import { SORT_OPTIONS } from "../../../entities/library/types";
+import { getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
 import { groupByFromKey, groupByKey } from "../../../entities/smart-folder/groupByKey";
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
@@ -86,8 +87,7 @@ export default function SmartFolderDialog({
 
   const children = rootChildren(draft.condition);
   const options = groupByOptions(tagPrefixes, draft.groupBy);
-  const groupByLabel =
-    options.find((option) => option.key === groupByKey(draft.groupBy))?.label ?? "";
+  const groupByLabel = draft.groupBy === null ? "" : getGroupByLabel(draft.groupBy, tagPrefixes);
   const canSave = !saving && draft.name.trim() !== "";
 
   const save = async () => {

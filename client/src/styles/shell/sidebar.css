@@ -242,14 +242,15 @@
 }
 .mll-dlg-b {
   display: grid;
-  gap: 12px;
+  grid-template-columns: max-content 1fr;
+  gap: 12px 10px;
   padding: 4px 16px 14px;
   overflow-y: auto;
 }
 .mll-fld {
   display: grid;
-  grid-template-columns: 72px 1fr;
-  gap: 10px;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
 }
 .mll-fld.is-top {
