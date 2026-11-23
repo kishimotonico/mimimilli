@@ -1,3 +1,4 @@
+import { smartFolderViolation } from "@mimimilli/shared";
 import type {
   SmartFolderPatch,
   TagPrefix,
@@ -9,6 +10,7 @@ import type {
   ClassificationAdapter,
   SmartFolderInsert,
   SmartFolderRow,
+  SmartFolderUpdateResult,
 } from "../../adapter/classification.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { composeWorks, type FixtureState } from "./state.ts";
@@ -81,11 +83,16 @@ export function createClassificationMethods(state: FixtureState): Classification
       return created;
     },
 
-    async updateSmartFolder(id: string, patch: SmartFolderPatch): Promise<SmartFolderRow | null> {
+    async updateSmartFolder(
+      id: string,
+      patch: SmartFolderPatch,
+    ): Promise<SmartFolderUpdateResult | null> {
       const folder = state.smartFolders.find((f) => f.id === id);
       if (!folder) return null;
+      const violation = smartFolderViolation({ ...folder, ...patch });
+      if (violation) return { violation };
       Object.assign(folder, patch);
-      return folder;
+      return { row: folder };
     },
 
     async reorderSmartFolders(ids: string[]): Promise<SmartFolderRow[] | null> {

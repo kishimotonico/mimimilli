@@ -18,7 +18,11 @@ import type {
   Work,
 } from "@mimimilli/shared";
 import { UnreadableSmartFolderError, type UnreadableFolderRow } from "../../errors.ts";
-import type { SmartFolderInsert, SmartFolderRow } from "../../adapter/classification.ts";
+import type {
+  SmartFolderInsert,
+  SmartFolderRow,
+  SmartFolderUpdateResult,
+} from "../../adapter/classification.ts";
 import type { Db } from "./db.ts";
 import {
   appSettings,
@@ -339,25 +343,31 @@ export class UserWorkStateRepository {
     return folder;
   }
 
-  /** 送った列だけを更新する */
-  updateSmartFolder(id: string, patch: SmartFolderPatch): SmartFolderRow | null {
-    const r = this.db.user
-      .update(smartFolders)
-      .set({
-        ...(patch.name === undefined ? {} : { name: patch.name }),
-        ...(patch.condition === undefined
-          ? {}
-          : { conditionJson: JSON.stringify(patch.condition) }),
-        ...(patch.sort === undefined ? {} : { sort: patch.sort }),
-        ...(patch.groupBy === undefined
-          ? {}
-          : { groupByJson: patch.groupBy === null ? null : JSON.stringify(patch.groupBy) }),
-        ...(patch.groupSort === undefined ? {} : { groupSort: patch.groupSort }),
-      })
-      .where(eq(smartFolders.id, id))
-      .returning()
-      .get();
-    return r ? this.toSmartFolderRow(r) : null;
+  /** 送った列だけを更新する。今の行に重ねたできあがりを同じトランザクションの中で検証し、違反なら書かない */
+  updateSmartFolder(id: string, patch: SmartFolderPatch): SmartFolderUpdateResult | null {
+    return this.db.userTransaction(() => {
+      const existing = this.getSmartFolder(id);
+      if (!existing) return null;
+      const violation = smartFolderViolation({ ...existing, ...patch });
+      if (violation) return { violation };
+      const r = this.db.user
+        .update(smartFolders)
+        .set({
+          ...(patch.name === undefined ? {} : { name: patch.name }),
+          ...(patch.condition === undefined
+            ? {}
+            : { conditionJson: JSON.stringify(patch.condition) }),
+          ...(patch.sort === undefined ? {} : { sort: patch.sort }),
+          ...(patch.groupBy === undefined
+            ? {}
+            : { groupByJson: patch.groupBy === null ? null : JSON.stringify(patch.groupBy) }),
+          ...(patch.groupSort === undefined ? {} : { groupSort: patch.groupSort }),
+        })
+        .where(eq(smartFolders.id, id))
+        .returning()
+        .get();
+      return r ? { row: this.toSmartFolderRow(r) } : null;
+    });
   }
 
   /** 全件の順序を置き換える。渡された集合が今の集合と一致しなければ null */

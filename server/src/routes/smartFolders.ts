@@ -102,13 +102,10 @@ export function smartFoldersRoute(adapter: DataAdapter, scanRecord: ScanRecordSt
       smartFolderPatchSchema,
       writeInvalidMessage("更新内容が不正です"),
     );
-    const existing = await adapter.getSmartFolder(id);
-    if (!existing) notFoundFolder(id);
-    const violation = smartFolderViolation({ ...existing, ...patch });
-    if (violation) invalidRequest(violation.message);
-    const row = await adapter.updateSmartFolder(id, patch);
-    if (!row) notFoundFolder(id);
-    return c.json(await singleWithCount(adapter, row));
+    const result = await adapter.updateSmartFolder(id, patch);
+    if (!result) notFoundFolder(id);
+    if ("violation" in result) invalidRequest(result.violation.message);
+    return c.json(await singleWithCount(adapter, result.row));
   });
 
   app.delete("/smart-folders/:id", async (c) => {

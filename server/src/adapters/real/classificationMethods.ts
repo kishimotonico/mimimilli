@@ -6,7 +6,11 @@ import {
   type TagPrefixCreate,
   type TagPrefixUpdate,
 } from "@mimimilli/shared";
-import type { SmartFolderInsert, SmartFolderRow } from "../../adapter/classification.ts";
+import type {
+  SmartFolderInsert,
+  SmartFolderRow,
+  SmartFolderUpdateResult,
+} from "../../adapter/classification.ts";
 import { initialSmartFolders } from "../../core/smartFolderInitialRows.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
@@ -26,14 +30,14 @@ export function initializeTagPrefixes(user: UserWorkStateRepository): void {
 }
 
 export function initializeSmartFolders(user: UserWorkStateRepository): void {
-  user.seedSmartFolders(
-    initialSmartFolders(
-      new Set(user.smartFolderIds()),
-      user.getUserSetting(KEY_SMART_FOLDERS_SEEDED) !== null,
-      new Date().toISOString(),
-    ),
-    KEY_SMART_FOLDERS_SEEDED,
+  const seeded = user.getUserSetting(KEY_SMART_FOLDERS_SEEDED) !== null;
+  const rows = initialSmartFolders(
+    new Set(user.smartFolderIds()),
+    seeded,
+    new Date().toISOString(),
   );
+  if (rows.length === 0 && seeded) return;
+  user.seedSmartFolders(rows, KEY_SMART_FOLDERS_SEEDED);
 }
 
 export function createClassificationMethods(deps: {
@@ -78,7 +82,10 @@ export function createClassificationMethods(deps: {
     ): Promise<SmartFolderRow | null> {
       return user.insertSmartFolder(folder, position);
     },
-    async updateSmartFolder(id: string, patch: SmartFolderPatch): Promise<SmartFolderRow | null> {
+    async updateSmartFolder(
+      id: string,
+      patch: SmartFolderPatch,
+    ): Promise<SmartFolderUpdateResult | null> {
       return user.updateSmartFolder(id, patch);
     },
     async reorderSmartFolders(ids: string[]): Promise<SmartFolderRow[] | null> {
