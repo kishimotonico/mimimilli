@@ -80,13 +80,16 @@ export interface FadeOptions {
   exitAbsolute?: boolean;
 }
 
+// exit の pointerEvents: "none" は、退出が途中で打ち切られて animate に戻ると残り続ける。
+// exit で none にする variant は、animate で "auto" へ戻すこと。
+
 /** opacity のみのフェード。既定で退出中は absolute 配置になり、兄弟のレイアウト膨張を防ぐ。 */
 export function fadeVariant(reduced: boolean, opts: FadeOptions = {}): MotionVariant {
   const { exitAbsolute = true } = opts;
   const t = timing(reduced, DUR.fade, EASE_STANDARD);
   return {
     initial: { opacity: 0 },
-    animate: { opacity: 1, transition: { opacity: t } },
+    animate: { opacity: 1, pointerEvents: "auto", transition: { opacity: t } },
     exit: {
       opacity: 0,
       pointerEvents: "none",
@@ -102,7 +105,7 @@ export function fadeSlideUpVariant(reduced: boolean): MotionVariant {
   const yT = timing(reduced, DUR.fadeSlideUp, EASE_STANDARD);
   return {
     initial: { opacity: 0, y: -8 },
-    animate: { opacity: 1, y: 0, transition: { opacity: opacityT, y: yT } },
+    animate: { opacity: 1, y: 0, pointerEvents: "auto", transition: { opacity: opacityT, y: yT } },
     exit: { opacity: 0, y: -8, pointerEvents: "none", transition: { opacity: opacityT, y: yT } },
   };
 }
@@ -112,7 +115,12 @@ export function collapseVariant(reduced: boolean): MotionVariant {
   const t = timing(reduced, DUR.collapse, EASE_STANDARD);
   return {
     initial: { height: 0, opacity: 0 },
-    animate: { height: "auto", opacity: 1, transition: { height: t, opacity: t } },
+    animate: {
+      height: "auto",
+      opacity: 1,
+      pointerEvents: "auto",
+      transition: { height: t, opacity: t },
+    },
     exit: { height: 0, opacity: 0, pointerEvents: "none", transition: { height: t, opacity: t } },
   };
 }
@@ -134,7 +142,7 @@ export function dockBarSlideVariant(reduced: boolean): MotionVariant {
   const opacityT = timing(reduced, DUR.dockBarOpacity, EASE_STANDARD);
   return {
     initial: { y: "100%", opacity: 0 },
-    animate: { y: 0, opacity: 1, transition: { y: yT, opacity: opacityT } },
+    animate: { y: 0, opacity: 1, pointerEvents: "auto", transition: { y: yT, opacity: opacityT } },
     exit: {
       y: "100%",
       opacity: 0,
@@ -156,7 +164,12 @@ export function dockBarSwitchVariant(reduced: boolean, opts: WaitEnterOptions = 
   const exitT = timing(reduced, DUR.dockSwitch, EASE_OUT);
   return {
     initial: { y: "100%", opacity: 0 },
-    animate: { y: 0, opacity: 1, transition: { y: enterT, opacity: enterT } },
+    animate: {
+      y: 0,
+      opacity: 1,
+      pointerEvents: "auto",
+      transition: { y: enterT, opacity: enterT },
+    },
     exit: {
       y: "100%",
       opacity: 0,
@@ -181,6 +194,7 @@ export function dockPopupScaleVariant(
       opacity: 1,
       scale: 1,
       transformOrigin,
+      pointerEvents: "auto",
       transition: { opacity: enterT, scale: enterT },
     },
     exit: {
@@ -208,6 +222,7 @@ export function popoverScaleVariant(reduced: boolean, opts: PopoverScaleOptions)
       opacity: 1,
       scale: 1,
       transformOrigin: origin,
+      pointerEvents: "auto",
       transition: { opacity: t, scale: t },
     },
     exit: {
@@ -233,7 +248,12 @@ export function colstackWidthVariant(
   const t = timing(reduced, DUR.colstackWidth, EASE_DECEL);
   return {
     initial: { width: 0, opacity: 0 },
-    animate: { width: widthPx, opacity: 1, transition: { width: t, opacity: t } },
+    animate: {
+      width: widthPx,
+      opacity: 1,
+      pointerEvents: "auto",
+      transition: { width: t, opacity: t },
+    },
     exit: { width: 0, opacity: 0, pointerEvents: "none", transition: { width: t, opacity: t } },
   };
 }
@@ -243,7 +263,7 @@ export function previewSlideVariant(reduced: boolean): MotionVariant {
   const t = timing(reduced, DUR.previewSlide, EASE_DECEL);
   return {
     initial: { x: "100%" },
-    animate: { x: 0, transition: { x: t } },
+    animate: { x: 0, pointerEvents: "auto", transition: { x: t } },
     exit: { x: "100%", pointerEvents: "none", transition: { x: t } },
   };
 }

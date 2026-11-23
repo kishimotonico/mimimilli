@@ -1,7 +1,8 @@
 // smoke用のworker単位サーバー起動とテスト間状態リセット。
 // fixtureアダプタはBunサーバー1インスタンスにつき可変状態を1つ持つため、workerごとに
 // 独立したBun+Viteのペアを立て、各テスト開始前にサーバー側の状態をリセットして分離する。
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, execFileSync, spawn } from "node:child_process";
+import { loadavg } from "node:os";
 import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { chromium, test as base } from "@playwright/test";
@@ -31,6 +32,47 @@ function acquireFreePort(): Promise<number> {
       probe.close(() => resolvePromise(address.port));
     });
   });
+}
+
+// 起動待ちで落ちたときの原因切り分け用。各フェーズの経過時間と、その時点のリッスン中ポート・
+// 負荷をエラーメッセージに添える（待っていたもの・待った時間・ポート衝突・負荷の区別がつくように）。
+class StartupTrace {
+  private readonly startedAt = Date.now();
+  private readonly phases: string[] = [];
+  private phase = "開始前";
+  private phaseStartedAt = Date.now();
+
+  begin(phase: string): void {
+    this.end();
+    this.phase = phase;
+    this.phaseStartedAt = Date.now();
+  }
+
+  end(): void {
+    if (this.phase !== "開始前") {
+      this.phases.push(`${this.phase}: ${Date.now() - this.phaseStartedAt}ms`);
+    }
+    this.phase = "完了";
+  }
+
+  report(extra: Record<string, string | number>): string {
+    const waitedMs = Date.now() - this.phaseStartedAt;
+    let listening: string;
+    try {
+      listening = execFileSync("ss", ["-ltnpH"], { encoding: "utf8", timeout: 3_000 }).trim();
+    } catch (error) {
+      listening = `ss の実行に失敗: ${String(error)}`;
+    }
+    return [
+      `[smoke起動診断] 待機中フェーズ: ${this.phase}（${waitedMs}ms 待機、開始から ${Date.now() - this.startedAt}ms）`,
+      `完了済み: ${this.phases.join(", ") || "なし"}`,
+      `ポート: ${JSON.stringify(extra)}`,
+      `loadavg: ${loadavg()
+        .map((v) => v.toFixed(1))
+        .join(" ")}`,
+      `ss -ltnp:\n${listening}`,
+    ].join("\n");
+  }
 }
 
 function waitForLog(
@@ -148,8 +190,11 @@ export const test = base.extend<
     async ({ fixtureScenario, dlsiteFetchDelayMs }, use) => {
       let bunProc: ChildProcess | undefined;
       let viteProc: ChildProcess | undefined;
+      const trace = new StartupTrace();
+      const ports: Record<string, string | number> = {};
 
       try {
+        trace.begin("bunサーバー起動ログ待ち");
         bunProc = spawnSupervised("bun", ["src/index.ts"], {
           cwd: "../server",
           env: {
@@ -166,8 +211,11 @@ export const test = base.extend<
           120_000,
         );
         const bunPort = Number(bunPortText);
+        ports.bun = bunPort;
 
+        trace.begin("vite起動ログ待ち");
         const startPort = await acquireFreePort();
+        ports.viteStart = startPort;
         // ポート番号を色付きのエスケープ無しで読めるよう、色を切って起動する
         const { FORCE_COLOR: _forceColor, ...baseEnv } = process.env;
         viteProc = spawnSupervised(
@@ -191,18 +239,27 @@ export const test = base.extend<
           120_000,
         );
         const vitePort = Number(vitePortText);
+        ports.vite = vitePort;
+
+        trace.begin("warmUp（実ブラウザの初回表示）");
         await warmUp(`http://127.0.0.1:${vitePort}`, 60_000);
+        trace.end();
 
         await use({
           baseURL: `http://127.0.0.1:${vitePort}`,
           bunBaseURL: `http://127.0.0.1:${bunPort}`,
         });
+      } catch (error) {
+        if (error instanceof Error) error.message += `\n${trace.report(ports)}`;
+        throw error;
       } finally {
         if (viteProc) await shutdown(viteProc, 500);
         if (bunProc) await shutdown(bunProc, 5_000);
       }
     },
-    { scope: "worker" },
+    // 既定ではテストのタイムアウト（30s）が起動にも掛かり、4worker同時のコールドスタートで
+    // 打ち切られるため、各フェーズ自身のタイムアウト（診断付きで落ちる）より長く取る。
+    { scope: "worker", timeout: 200_000 },
   ],
 
   baseURL: async ({ workerServers }, use) => {
