@@ -4,7 +4,7 @@ import {
   SMART_FOLDER_TEMPLATES,
   type SmartFolderTemplate,
 } from "@mimimilli/shared";
-import type { SmartFolderInsert } from "../adapter/classification.ts";
+import type { SmartFolderInsert } from "../adapter/smartFolder.ts";
 
 function insertFromTemplate(template: SmartFolderTemplate, createdAt: string): SmartFolderInsert {
   return {

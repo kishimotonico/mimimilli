@@ -9,9 +9,10 @@ import {
   normalizeGroupValue,
   type Condition,
   type GroupBy,
+  type WorkSummary,
 } from "@mimimilli/shared";
 import { createFixtureAdapter } from "../../src/adapters/fixture/index.ts";
-import { matchCondition } from "../../src/core/condition.ts";
+import { createMatcher } from "../../src/core/condition.ts";
 import {
   parseSmartFolderGroupsRequest,
   parseSmartFolderWorksRequest,
@@ -95,8 +96,9 @@ test("グループの値の検証・述語・チップは1か所の規則で決�
   assert.equal(groupChipTag({ kind: "addedYear" }, "2025"), "@year/2025");
 });
 
-test("matchCondition は長さ不明・未再生・基準時刻ちょうどを意味表どおりに扱う", () => {
+test("createMatcher は長さ不明・未再生・基準時刻ちょうどを意味表どおりに扱う", () => {
   const ctx = { now: NOW };
+  const matches = (condition: Condition, work: WorkSummary) => createMatcher(condition, ctx)(work);
   const unknown = makeWorkSummary({ totalDurationSec: null, lastPlayedAt: null });
   const edge = makeWorkSummary({
     totalDurationSec: 3600,
@@ -104,16 +106,16 @@ test("matchCondition は長さ不明・未再生・基準時刻ちょうどを�
     addedAt: new Date(NOW - 30 * 86_400_000).toISOString(),
   });
   const lte: Condition = { type: "duration", op: "lte", sec: 3600 };
-  assert.equal(matchCondition(lte, unknown, ctx), false);
-  assert.equal(matchCondition({ type: "not", child: lte }, unknown, ctx), true);
-  assert.equal(matchCondition(lte, edge, ctx), true);
-  assert.equal(matchCondition({ type: "played" }, unknown, ctx), false);
-  assert.equal(matchCondition({ type: "played", withinDays: 7 }, edge, ctx), true);
-  assert.equal(matchCondition({ type: "played", withinDays: 7 }, unknown, ctx), false);
-  assert.equal(matchCondition({ type: "added", withinDays: 30 }, edge, ctx), true);
-  assert.equal(matchCondition({ type: "added", withinDays: 29 }, edge, ctx), false);
-  assert.equal(matchCondition({ type: "or", children: [] }, edge, ctx), false);
-  assert.equal(matchCondition({ type: "and", children: [] }, edge, ctx), true);
+  assert.equal(matches(lte, unknown), false);
+  assert.equal(matches({ type: "not", child: lte }, unknown), true);
+  assert.equal(matches(lte, edge), true);
+  assert.equal(matches({ type: "played" }, unknown), false);
+  assert.equal(matches({ type: "played", withinDays: 7 }, edge), true);
+  assert.equal(matches({ type: "played", withinDays: 7 }, unknown), false);
+  assert.equal(matches({ type: "added", withinDays: 30 }, edge), true);
+  assert.equal(matches({ type: "added", withinDays: 29 }, edge), false);
+  assert.equal(matches({ type: "or", children: [] }, edge), false);
+  assert.equal(matches({ type: "and", children: [] }, edge), true);
 });
 
 function adapterWithWorks() {
@@ -153,7 +155,13 @@ test("要求の検証: sort=random で seed が無い・契約にないキーを
     undefined,
   );
   assert.equal(
-    status(() => parseSmartFolderGroupsRequest({ groupBy: { kind: "tag" }, tagMode: "OR" })),
+    status(() =>
+      parseSmartFolderGroupsRequest({
+        groupBy: "tag",
+        groupSort: "count-desc",
+        tagMode: "OR",
+      }),
+    ),
     400,
   );
 });
@@ -178,7 +186,7 @@ test("queryFolderWorks / queryFolderGroups は条件・グループの値・チ�
     adapter,
     folder,
     parseSmartFolderGroupsRequest({
-      groupBy: { kind: "prefix", prefix: "cv" },
+      groupBy: "prefix:cv",
       groupSort: "count-desc",
     }),
   );

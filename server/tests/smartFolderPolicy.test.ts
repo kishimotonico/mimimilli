@@ -14,7 +14,6 @@ const folder = (id: string): SmartFolder => ({
   groupSort: null,
   position: 0,
   createdAt: "2026-01-01T00:00:00.000Z",
-  count: null,
 });
 
 test("自作は何でも変えられる", () => {

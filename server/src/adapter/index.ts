@@ -16,7 +16,8 @@ export type {
   RootReconfigurationRecord,
 } from "./rootReconfiguration.ts";
 export type { WorkAdapter } from "./work.ts";
-export type { ClassificationAdapter } from "./classification.ts";
+export type { TagPrefixAdapter } from "./tagPrefix.ts";
+export type { SmartFolderAdapter } from "./smartFolder.ts";
 export type { FsAdapter } from "./fs.ts";
 export {
   createCoverValidators,
@@ -28,18 +29,20 @@ export {
 } from "./media.ts";
 export type { DlsiteAdapter } from "./dlsite.ts";
 
-import type { ClassificationAdapter } from "./classification.ts";
 import type { DlsiteAdapter } from "./dlsite.ts";
 import type { FsAdapter } from "./fs.ts";
 import type { MediaAdapter } from "./media.ts";
 import type { RootReconfigurationAdapter } from "./rootReconfiguration.ts";
 import type { SettingsAdapter } from "./settings.ts";
+import type { SmartFolderAdapter } from "./smartFolder.ts";
+import type { TagPrefixAdapter } from "./tagPrefix.ts";
 import type { WorkAdapter } from "./work.ts";
 
 export type DataAdapter = SettingsAdapter &
   RootReconfigurationAdapter &
   WorkAdapter &
-  ClassificationAdapter &
+  TagPrefixAdapter &
+  SmartFolderAdapter &
   FsAdapter &
   MediaAdapter &
   DlsiteAdapter & {

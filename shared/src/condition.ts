@@ -1,11 +1,7 @@
 // スマートフォルダーの条件の木（ADR-0040）。保存できる形の検証・正規化・形の判定を持つ。
-// 評価（matchCondition / compileCondition）は server 側の責務でここには置かない。
-// 絞り込みを重ねた1本の木の組み立て（buildEffectiveCondition）は、サーバーの評価と
-// クライアントの保存が同じ規則を使うためここに置く。
+// 評価（createMatcher / compileCondition）は server 側の責務でここには置かない。
 import { z } from "zod";
-import { groupPredicate } from "./groupFilter.ts";
-import { YEAR_VALUE_PATTERN, type TagFilters } from "./pseudoTag.ts";
-import type { GroupBy } from "./smartFolder.ts";
+import { YEAR_VALUE_PATTERN } from "./pseudoTag.ts";
 import { normalizeTag, tagSchema } from "./tagNormalize.ts";
 
 export type Condition =
@@ -185,34 +181,9 @@ export const conditionSchema: z.ZodType<Condition, unknown> = z
 
 export const EMPTY_CONDITION: Condition = { type: "and", children: [] };
 
-export interface EffectiveConditionInput {
-  /** スマートフォルダーの条件 */
-  condition: Condition;
-  /** 選択中のグループの値 */
-  group?: { by: GroupBy; value: string };
-  /** チップ。擬似タグ @year/… は分解済みの yearValue で届く */
-  tags?: TagFilters;
-  /** 前後の空白は落とす（保存スキーマの text と同じ正規形）。空なら text を足さない */
-  q?: string;
-}
-
 /** 検索語の正規形（前後の空白を落とす）。空なら絞り込みに効かない。保存スキーマの text と同じ規則 */
 export function normalizeSearchQuery(q: string | undefined): string {
   return q?.trim() ?? "";
-}
-
-/** スマートフォルダー・グループの値・チップ・検索語から1本の木を作る。
- *  サーバーの評価と、クライアントの「検索を保存」「上書き」が同じ規則を使う */
-export function buildEffectiveCondition(input: EffectiveConditionInput): Condition {
-  const { condition } = input;
-  const children: Condition[] = condition.type === "and" ? [...condition.children] : [condition];
-  if (input.group) children.push(groupPredicate(input.group.by, input.group.value));
-  for (const tag of input.tags?.tags ?? []) children.push({ type: "tag", tag });
-  if (input.tags?.yearValue != null)
-    children.push({ type: "addedYear", year: input.tags.yearValue });
-  const q = normalizeSearchQuery(input.q);
-  if (q) children.push({ type: "text", q });
-  return children.length === 0 ? EMPTY_CONDITION : { type: "and", children };
 }
 
 // ── 条件の形の判定（正規化済みの木が前提） ─────────────────────

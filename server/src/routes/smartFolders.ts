@@ -1,24 +1,24 @@
 // /smart-folders 以下（ADR-0040「HTTP の契約」）。
-//   GET    /smart-folders                  一覧（サーバーの順、件数入り）
+//   GET    /smart-folders                  定義の一覧（サーバーの順。件数は含めない）
+//   GET    /smart-folders/counts           件数（Record<id, number>）。数えるものは needsCount で選ぶ
 //   POST   /smart-folders                  作成（id を省くと sf-<uuid> を採番。既定から追加・削除の取り消しも id と position を渡してここを通る）
 //   PUT    /smart-folders/order            全件の順序を置き換える
 //   PATCH  /smart-folders/:id              部分更新（送った列だけ）
 //   DELETE /smart-folders/:id              削除
 //   GET    /smart-folders/:id/works        作品一覧（scanRecord でスキャン記録の作品に絞れる）
-//   POST   /smart-folders/:id/groups       値一覧・「＋絞り込み」候補
+//   GET    /smart-folders/:id/groups       値一覧・「＋絞り込み」候補
 import { Hono } from "hono";
-import { z, type ZodError } from "zod";
+import type { ZodError } from "zod";
 import {
   ALL_SMART_FOLDER_ID,
   needsCount,
+  type SmartFolderCounts,
   smartFolderCreateSchema,
   smartFolderOrderSchema,
   smartFolderPatchSchema,
   smartFolderViolation,
-  type SmartFolder,
 } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter/index.ts";
-import type { SmartFolderRow } from "../adapter/classification.ts";
 import { conflict, invalidRequest, notFound } from "../lib/httpError.ts";
 import { readJsonBody } from "../lib/jsonBody.ts";
 import type { ScanRecordStore } from "../scanRecord.ts";
@@ -29,25 +29,15 @@ import {
   queryFolderWorks,
 } from "./smartFolderQuery.ts";
 
-/** 件数を数えるものを shared の判定関数で選び、1往復で数えて載せる */
-async function withCounts(adapter: DataAdapter, rows: SmartFolderRow[]): Promise<SmartFolder[]> {
-  const targets = rows.flatMap((row, index) =>
-    needsCount(row) ? [{ index, condition: row.condition }] : [],
+/** 件数を出す行だけを1往復で数える。応答のキーは行の ID */
+async function countFolders(adapter: DataAdapter): Promise<SmartFolderCounts> {
+  const targets = (await adapter.listSmartFolders()).filter(needsCount);
+  if (targets.length === 0) return {};
+  const counts = await adapter.countByConditions(
+    targets.map((folder) => folder.condition),
+    { now: Date.now() },
   );
-  const counts =
-    targets.length === 0
-      ? []
-      : await adapter.countByConditions(
-          targets.map((target) => target.condition),
-          { now: Date.now() },
-        );
-  const countByIndex = new Map(targets.map((target, i) => [target.index, counts[i]!]));
-  return rows.map((row, index) => ({ ...row, count: countByIndex.get(index) ?? null }));
-}
-
-async function singleWithCount(adapter: DataAdapter, row: SmartFolderRow): Promise<SmartFolder> {
-  const [item] = await withCounts(adapter, [row]);
-  return item!;
+  return Object.fromEntries(targets.map((folder, i) => [folder.id, counts[i]!]));
 }
 
 /** 条件の検証エラーは、スキーマが返す文言（保存できない理由）をそのまま返す。それ以外は固定の文言 */
@@ -69,8 +59,10 @@ export function smartFoldersRoute(adapter: DataAdapter, scanRecord: ScanRecordSt
   const app = new Hono();
 
   app.get("/smart-folders", async (c) => {
-    return c.json(await withCounts(adapter, await adapter.listSmartFolders()));
+    return c.json(await adapter.listSmartFolders());
   });
+
+  app.get("/smart-folders/counts", async (c) => c.json(await countFolders(adapter)));
 
   app.post("/smart-folders", async (c) => {
     const {
@@ -85,14 +77,14 @@ export function smartFoldersRoute(adapter: DataAdapter, scanRecord: ScanRecordSt
       position,
     );
     if (!row) conflict(`すでにあります: ${id}`);
-    return c.json(await singleWithCount(adapter, row), 201);
+    return c.json(row, 201);
   });
 
   app.put("/smart-folders/order", async (c) => {
     const data = await readJsonBody(c, smartFolderOrderSchema, "並び順が不正です");
     const rows = await adapter.reorderSmartFolders(data.ids);
     if (!rows) invalidRequest("今ある行を過不足なく指定してください");
-    return c.json(await withCounts(adapter, rows));
+    return c.json(rows);
   });
 
   app.patch("/smart-folders/:id", async (c) => {
@@ -105,7 +97,7 @@ export function smartFoldersRoute(adapter: DataAdapter, scanRecord: ScanRecordSt
     const result = await adapter.updateSmartFolder(id, patch);
     if (!result) notFoundFolder(id);
     if ("violation" in result) invalidRequest(result.violation.message);
-    return c.json(await singleWithCount(adapter, result.row));
+    return c.json(result.row);
   });
 
   app.delete("/smart-folders/:id", async (c) => {
@@ -130,10 +122,13 @@ export function smartFoldersRoute(adapter: DataAdapter, scanRecord: ScanRecordSt
     return c.json(await queryFolderWorks(adapter, folder, request, ids));
   });
 
-  app.post("/smart-folders/:id/groups", async (c) => {
+  app.get("/smart-folders/:id/groups", async (c) => {
     const folder = await requireFolder(adapter, c.req.param("id"));
-    const body = await readJsonBody(c, z.unknown(), "値一覧の要求が不正です");
-    return c.json(await queryFolderGroups(adapter, folder, parseSmartFolderGroupsRequest(body)));
+    const request = parseSmartFolderGroupsRequest({
+      ...c.req.query(),
+      tags: c.req.queries("tags"),
+    });
+    return c.json(await queryFolderGroups(adapter, folder, request));
   });
 
   return app;

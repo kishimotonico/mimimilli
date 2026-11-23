@@ -7,6 +7,7 @@ import {
 } from "@mimimilli/shared";
 import type {
   DlsiteWorkInfo,
+  SmartFolder,
   DataIntegrityWarning,
   DlsiteCacheResolution,
   DlsiteCacheResolutionHead,
@@ -30,7 +31,6 @@ import {
   type FixtureWorkRecord,
   type SeedPlaylistSpec,
 } from "./data.ts";
-import type { SmartFolderRow } from "../../adapter/classification.ts";
 import { initialSmartFolders } from "../../core/smartFolderInitialRows.ts";
 import { requireConfiguredRoot } from "../../core/rootFolder.ts";
 import { createFixtureScenario, type FixtureRootReconfiguration } from "./scenarios.ts";
@@ -91,7 +91,7 @@ export interface FixtureState {
   coverColumns: Map<string, FixtureCoverColumns>;
   tagPrefixes: TagPrefix[];
   /** 位置の昇順。fixture は migration を通らないので、「すべて」と初回投入分を初期状態に持つ */
-  smartFolders: SmartFolderRow[];
+  smartFolders: SmartFolder[];
   /** 作品ごとのレジューム位置 */
   resumes: Map<string, ResumeBody>;
   playbackIds: Map<string, PlaybackIds>;

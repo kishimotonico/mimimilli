@@ -212,7 +212,6 @@ test("一覧の1行は condition が null だと読めない", () => {
     groupSort: null,
     position: 0,
     createdAt: "t",
-    count: null,
   };
   assert.equal(smartFolderSchema.safeParse(row).success, false);
   assert.ok(smartFolderSchema.safeParse({ ...row, condition: and() }).success);

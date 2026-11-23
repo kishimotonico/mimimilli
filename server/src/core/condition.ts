@@ -61,7 +61,3 @@ export function createMatcher(condition: Condition, ctx: EvalContext): WorkMatch
       return textMatcher(condition.q);
   }
 }
-
-export function matchCondition(condition: Condition, work: WorkSummary, ctx: EvalContext): boolean {
-  return createMatcher(condition, ctx)(work);
-}

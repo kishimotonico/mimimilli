@@ -303,9 +303,13 @@ test("empty: 作品が0件で、既定のスマートフォルダーの件数は
   assert.deepEqual(worksBody.items, []);
 
   const smartFoldersRes = await app.request("/api/smart-folders");
-  const folders = (await smartFoldersRes.json()) as Array<{ id: string; count: number | null }>;
+  const folders = (await smartFoldersRes.json()) as Array<{ id: string }>;
   assert.equal(folders[0]?.id, "all");
-  for (const folder of folders) assert.ok(folder.count === null || folder.count === 0, folder.id);
+
+  const countsRes = await app.request("/api/smart-folders/counts");
+  const counts = (await countsRes.json()) as Record<string, number>;
+  assert.ok(Object.keys(counts).length > 0);
+  for (const [id, count] of Object.entries(counts)) assert.equal(count, 0, id);
 });
 
 test("errors: エラー・行方不明の作品のみが含まれる", async () => {

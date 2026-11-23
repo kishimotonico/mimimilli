@@ -9,8 +9,8 @@ import {
   tagPrefixSchema,
 } from "@mimimilli/shared";
 import type {
-  Condition,
   ResumeBody,
+  SmartFolder,
   SmartFolderPatch,
   TagPrefix,
   TagPrefixCreate,
@@ -18,11 +18,7 @@ import type {
   Work,
 } from "@mimimilli/shared";
 import { UnreadableSmartFolderError, type UnreadableFolderRow } from "../../errors.ts";
-import type {
-  SmartFolderInsert,
-  SmartFolderRow,
-  SmartFolderUpdateResult,
-} from "../../adapter/classification.ts";
+import type { SmartFolderInsert, SmartFolderUpdateResult } from "../../adapter/smartFolder.ts";
 import type { Db } from "./db.ts";
 import {
   appSettings,
@@ -250,7 +246,7 @@ export class UserWorkStateRepository {
     });
   }
 
-  listSmartFolders(): SmartFolderRow[] {
+  listSmartFolders(): SmartFolder[] {
     const results = this.db.user
       .select()
       .from(smartFolders)
@@ -264,7 +260,7 @@ export class UserWorkStateRepository {
     return results.flatMap((result) => ("row" in result ? [result.row] : []));
   }
 
-  private toSmartFolderRow(r: typeof smartFolders.$inferSelect): SmartFolderRow {
+  private toSmartFolderRow(r: typeof smartFolders.$inferSelect): SmartFolder {
     const result = readSmartFolderRow(r);
     if ("unreadable" in result) {
       throw new UnreadableSmartFolderError([result.unreadable], this.db.userPath);
@@ -272,7 +268,7 @@ export class UserWorkStateRepository {
     return result.row;
   }
 
-  getSmartFolder(id: string): SmartFolderRow | null {
+  getSmartFolder(id: string): SmartFolder | null {
     const r = this.db.user.select().from(smartFolders).where(eq(smartFolders.id, id)).get();
     return r ? this.toSmartFolderRow(r) : null;
   }
@@ -294,7 +290,7 @@ export class UserWorkStateRepository {
   }
 
   /** ID が既にあれば null。position を渡すとその位置に入れ、埋まっていればその位置以降を1つずつ後ろへ送る。省けば末尾 */
-  insertSmartFolder(folder: SmartFolderInsert, position?: number): SmartFolderRow | null {
+  insertSmartFolder(folder: SmartFolderInsert, position?: number): SmartFolder | null {
     return this.db.userTransaction(() => {
       const exists = this.db.user
         .select({ id: smartFolders.id })
@@ -326,7 +322,7 @@ export class UserWorkStateRepository {
     });
   }
 
-  private insertSmartFolderRow(folder: SmartFolderRow & { condition: Condition }): SmartFolderRow {
+  private insertSmartFolderRow(folder: SmartFolder): SmartFolder {
     this.db.user
       .insert(smartFolders)
       .values({
@@ -371,7 +367,7 @@ export class UserWorkStateRepository {
   }
 
   /** 全件の順序を置き換える。渡された集合が今の集合と一致しなければ null */
-  reorderSmartFolders(ids: string[]): SmartFolderRow[] | null {
+  reorderSmartFolders(ids: string[]): SmartFolder[] | null {
     return this.db.userTransaction(() => {
       const existing = new Set(
         this.db.user
@@ -440,7 +436,7 @@ function readJsonColumn<T>(column: string, raw: string, schema: z.ZodType<T>): C
 /** 保存と同じスキーマで厳密に読む。読めない列があれば問題を返す */
 function readSmartFolderRow(
   r: typeof smartFolders.$inferSelect,
-): { row: SmartFolderRow } | { unreadable: UnreadableFolderRow } {
+): { row: SmartFolder } | { unreadable: UnreadableFolderRow } {
   const condition = readJsonColumn("condition_json", r.conditionJson, conditionSchema);
   const sort = readColumn("sort", r.sort, sortIdSchema.nullable());
   const groupBy =

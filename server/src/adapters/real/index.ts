@@ -21,11 +21,8 @@ import { createDlsiteMethods } from "./dlsiteMethods.ts";
 import { createCoverMediaMethods } from "./coverMediaMethods.ts";
 import { createSettingsScanMethods } from "./settingsScanMethods.ts";
 import { createWorkMethods } from "./workMethods.ts";
-import {
-  createClassificationMethods,
-  initializeSmartFolders,
-  initializeTagPrefixes,
-} from "./classificationMethods.ts";
+import { createSmartFolderMethods, initializeSmartFolders } from "./smartFolderMethods.ts";
+import { createTagPrefixMethods, initializeTagPrefixes } from "./tagPrefixMethods.ts";
 import { runFileScanInWorker, type FileScanRunner } from "./scanRunner.ts";
 
 export interface RealAdapterOptions {
@@ -128,12 +125,14 @@ export function createRealAdapter(
     dlsiteCache,
     parser,
   });
-  const classificationMethods = createClassificationMethods({ query, user });
+  const tagPrefixMethods = createTagPrefixMethods({ query, user });
+  const smartFolderMethods = createSmartFolderMethods({ user });
 
   return {
     ...settingsScanMethods,
     ...workMethods,
-    ...classificationMethods,
+    ...tagPrefixMethods,
+    ...smartFolderMethods,
     ...coverMediaMethods,
     ...dlsiteMethods,
     async close(): Promise<void> {

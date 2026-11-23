@@ -1,17 +1,11 @@
 import {
   DEFAULT_TAG_PREFIXES,
-  type SmartFolderPatch,
   type TagPrefix,
   type TagPrefixCandidate,
   type TagPrefixCreate,
   type TagPrefixUpdate,
 } from "@mimimilli/shared";
-import type {
-  SmartFolderInsert,
-  SmartFolderRow,
-  SmartFolderUpdateResult,
-} from "../../adapter/classification.ts";
-import { initialSmartFolders } from "../../core/smartFolderInitialRows.ts";
+import type { TagPrefixAdapter } from "../../adapter/tagPrefix.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips } from "./dataIntegrity.ts";
@@ -20,7 +14,6 @@ import type { WorkQueryRepository } from "./workQueryRepository.ts";
 
 const scanLogger = getCategoryLogger("scan");
 const KEY_TAG_PREFIXES_SEEDED = "tag_prefixes_seeded";
-const KEY_SMART_FOLDERS_SEEDED = "smart_folders_seeded";
 
 export function initializeTagPrefixes(user: UserWorkStateRepository): void {
   if (user.getUserSetting(KEY_TAG_PREFIXES_SEEDED) === null) {
@@ -29,21 +22,10 @@ export function initializeTagPrefixes(user: UserWorkStateRepository): void {
   }
 }
 
-export function initializeSmartFolders(user: UserWorkStateRepository): void {
-  const seeded = user.getUserSetting(KEY_SMART_FOLDERS_SEEDED) !== null;
-  const rows = initialSmartFolders(
-    new Set(user.smartFolderIds()),
-    seeded,
-    new Date().toISOString(),
-  );
-  if (rows.length === 0 && seeded) return;
-  user.seedSmartFolders(rows, KEY_SMART_FOLDERS_SEEDED);
-}
-
-export function createClassificationMethods(deps: {
+export function createTagPrefixMethods(deps: {
   query: WorkQueryRepository;
   user: UserWorkStateRepository;
-}) {
+}): TagPrefixAdapter {
   const { query, user } = deps;
   return {
     async listTagPrefixes(): Promise<TagPrefix[]> {
@@ -68,31 +50,6 @@ export function createClassificationMethods(deps: {
         summaries,
         user.listTagPrefixes().map((p) => p.prefix),
       );
-    },
-
-    async listSmartFolders(): Promise<SmartFolderRow[]> {
-      return user.listSmartFolders();
-    },
-    async getSmartFolder(id: string): Promise<SmartFolderRow | null> {
-      return user.getSmartFolder(id);
-    },
-    async insertSmartFolder(
-      folder: SmartFolderInsert,
-      position?: number,
-    ): Promise<SmartFolderRow | null> {
-      return user.insertSmartFolder(folder, position);
-    },
-    async updateSmartFolder(
-      id: string,
-      patch: SmartFolderPatch,
-    ): Promise<SmartFolderUpdateResult | null> {
-      return user.updateSmartFolder(id, patch);
-    },
-    async reorderSmartFolders(ids: string[]): Promise<SmartFolderRow[] | null> {
-      return user.reorderSmartFolders(ids);
-    },
-    async deleteSmartFolder(id: string): Promise<boolean> {
-      return user.deleteSmartFolder(id);
     },
   };
 }
