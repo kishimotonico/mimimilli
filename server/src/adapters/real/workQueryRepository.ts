@@ -26,7 +26,7 @@ import type {
   EvalContext,
 } from "../../adapter/condition.ts";
 import { requireRandomSeed } from "../../core/conditionQuery.ts";
-import { sortByRandomOrder } from "../../core/japaneseSortKey.ts";
+import { sortByRandomOrder } from "../../core/randomOrder.ts";
 import { compileCondition } from "./conditionSql.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips } from "./dataIntegrity.ts";
@@ -74,6 +74,9 @@ import { statCoverSource } from "./coverDto.ts";
 import { deriveCoverVersion } from "../../adapter/media.ts";
 
 const queryWorksLogger = getCategoryLogger("http");
+
+/** random は seed を伴う。SQL の ORDER BY で表せるのは random 以外 */
+type RowOrder = { sort: "random"; seed: number } | { sort: Exclude<SortId, "random"> };
 
 const WORK_LIST_ROW_SELECT = `
         SELECT
@@ -345,7 +348,10 @@ export class WorkQueryRepository {
 
   /** 条件の木に一致する作品の一覧（ADR-0040）。seed は呼び出し側が渡し、ここでは発行しない */
   queryWorksByCondition(query: ConditionWorksQuery, root: string, ctx: EvalContext): WorksPage {
-    const seed = requireRandomSeed(query.sort, query.seed);
+    const order: RowOrder =
+      query.sort === "random"
+        ? { sort: "random", seed: requireRandomSeed(query.sort, query.seed) }
+        : { sort: query.sort };
     const compiled = compileCondition(query.condition, ctx);
     const conditions = [compiled.sql];
     const bindings: Array<string | number> = [...compiled.bindings];
@@ -357,8 +363,7 @@ export class WorkQueryRepository {
       {
         whereSql: `WHERE ${conditions.join(" AND ")}`,
         bindings,
-        sort: query.sort,
-        seed,
+        order,
         page: query.page,
         limit: query.limit,
       },
@@ -370,14 +375,13 @@ export class WorkQueryRepository {
     run: {
       whereSql: string;
       bindings: Array<string | number>;
-      sort: SortId;
-      seed: number | undefined;
+      order: RowOrder;
       page: number;
       limit: number;
     },
     root: string,
   ): WorksPage {
-    const { whereSql, bindings, sort, seed, page, limit } = run;
+    const { whereSql, bindings, order, page, limit } = run;
     return this.db.transaction(() => {
       const statsRow = this.db.sqlite
         .query(`
@@ -391,13 +395,13 @@ export class WorkQueryRepository {
 
       const offset = (page - 1) * limit;
       const rows =
-        sort === "random"
-          ? this.queryRandomOrderedRows(whereSql, bindings, seed, limit, offset)
+        order.sort === "random"
+          ? this.queryRandomOrderedRows(whereSql, bindings, order.seed, limit, offset)
           : (this.db.sqlite
               .query(`
         ${WORK_LIST_ROW_SELECT}
         ${whereSql}
-        ORDER BY ${worksOrderSql(sort)}
+        ORDER BY ${worksOrderSql(order.sort)}
         LIMIT ? OFFSET ?
       `)
               .all(...bindings, limit, offset) as RawWorkListRow[]);
@@ -412,11 +416,10 @@ export class WorkQueryRepository {
   private queryRandomOrderedRows(
     whereSql: string,
     bindings: Array<string | number>,
-    seed: number | undefined,
+    seed: number,
     limit: number,
     offset: number,
   ): RawWorkListRow[] {
-    if (seed === undefined) throw new Error("randomソートにはseedが必要です");
     const ids = sortByRandomOrder(
       (
         this.db.sqlite

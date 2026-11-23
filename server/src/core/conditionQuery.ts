@@ -9,6 +9,8 @@ import type {
 import { createMatcher } from "./condition.ts";
 import { computeCollectionStats, sortWorkSummaries, type WorkSummaryPage } from "./worksQuery.ts";
 
+export function requireRandomSeed(sort: "random", seed: number | undefined): number;
+export function requireRandomSeed(sort: SortId, seed: number | undefined): number | undefined;
 export function requireRandomSeed(sort: SortId, seed: number | undefined): number | undefined {
   if (sort !== "random") return undefined;
   if (seed === undefined) throw new Error("randomソートにはseedが必要です");

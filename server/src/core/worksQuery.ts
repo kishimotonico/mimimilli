@@ -1,12 +1,8 @@
 // 作品一覧の純粋関数（ソート・統計・検索語の一致）。条件の評価は condition.ts。
 import { toWorkListItem } from "@mimimilli/shared";
 import type { CollectionStats, SortId, WorksPage, WorkSummary } from "@mimimilli/shared";
-import {
-  compareJapaneseSortKeys,
-  compareUtf8Bytes,
-  japaneseSortKey,
-  sortByRandomOrder,
-} from "./japaneseSortKey.ts";
+import { compareJapaneseSortKeys, compareUtf8Bytes, japaneseSortKey } from "./japaneseSortKey.ts";
+import { sortByRandomOrder } from "./randomOrder.ts";
 
 /** 検索・フィルター・ソート中だけ使う内部ページ型。公開前にWorkListItemへ投影する。 */
 export type WorkSummaryPage = Omit<WorksPage, "items"> & { items: WorkSummary[] };

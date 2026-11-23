@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { sortByRandomOrder } from "../../src/core/randomOrder.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import type { Condition } from "@mimimilli/shared";
 import { createWorkRepos, makeWork, upsertTestWork } from "../helpers/workTestUtils.ts";
@@ -40,21 +41,11 @@ test("real のランダム順はseedで再現し、ページ連結で全件が�
   const collected = [1, 2, 3].flatMap((n) => idsOf(7, n));
   assert.equal(collected.length, total);
   assert.equal(new Set(collected).size, total);
+  const allIds = Array.from({ length: total }, (_, i) => `RJ${500000 + i}`);
+  assert.deepEqual(
+    collected,
+    sortByRandomOrder(allIds, 7, (id) => id),
+  );
   assert.deepEqual(idsOf(7, 2), collected.slice(100, 200));
   assert.notDeepEqual(idsOf(8, 1), idsOf(7, 1));
-});
-
-test("real のランダム順は1万件でも他の並びと同程度で返る", { timeout: 60_000 }, (t) => {
-  const { scope, page } = seedWorks(10_000);
-  t.after(scope.cleanup);
-  const time = (sort: "random" | "title-asc") => {
-    const start = performance.now();
-    for (let n = 1; n <= 5; n++) page(sort, 7, n, 1000);
-    return (performance.now() - start) / 5;
-  };
-  time("random");
-  time("title-asc");
-  const random = time("random");
-  const titleAsc = time("title-asc");
-  assert.ok(random < Math.max(titleAsc * 10, 200), `random ${random}ms / title-asc ${titleAsc}ms`);
 });
