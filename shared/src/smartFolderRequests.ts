@@ -63,9 +63,9 @@ const groupByQuerySchema = z.string().transform((key, ctx) => {
 });
 
 /** GET /:id/groups。そのフォルダー自身の値一覧と、任意の groupBy での候補の両方に使う。
- *  groupBy を省くとフォルダー自身のグループ分け。値一覧では tags・q・group を送らない */
+ *  値一覧では tags・q・group を送らない */
 export const smartFolderGroupsRequestSchema = z.strictObject({
-  groupBy: groupByQuerySchema.optional(),
+  groupBy: groupByQuerySchema,
   /** 返す値の並び。サーバーは既定を補わない */
   groupSort: groupSortIdSchema,
   group: z.string().min(1).optional(),

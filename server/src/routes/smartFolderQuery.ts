@@ -86,8 +86,6 @@ export async function queryFolderGroups(
   folder: QueriedSmartFolder,
   request: SmartFolderGroupsRequest,
 ): Promise<GroupValueItem[]> {
-  const groupBy = request.groupBy ?? folder.groupBy;
-  if (groupBy === null) invalidRequest("グループ分けのないスマートフォルダーです");
   const now = Date.now();
   return adapter.groupWorks(
     {
@@ -97,7 +95,7 @@ export async function queryFolderGroups(
         tags: request.tags,
         q: request.q,
       }),
-      groupBy,
+      groupBy: request.groupBy,
       groupSort: request.groupSort,
     },
     { now },

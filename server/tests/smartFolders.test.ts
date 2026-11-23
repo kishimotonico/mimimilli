@@ -478,6 +478,10 @@ contract("値一覧は groupSort の並びで返り、groupSort の省略は400"
     (await harness.request("/api/smart-folders/all/groups?groupBy=prefix:cv")).status,
     400,
   );
+  assert.equal(
+    (await harness.request("/api/smart-folders/by-cv/groups?groupSort=count-desc")).status,
+    400,
+  );
   const bad = await harness.request("/api/smart-folders/all/groups?groupBy=tag&groupSort=random");
   assert.equal(bad.status, 400);
 });
@@ -596,18 +600,6 @@ groupsLibrary(
     assert.deepEqual(await groupPairs(harness, "all", { groupBy: "addedYear" }), [
       [String(SEED_YEAR), 3],
     ]);
-  },
-);
-
-groupsLibrary(
-  "groupBy を省くとフォルダー自身のグループ分けで返し、持たないフォルダーなら400",
-  async (harness) => {
-    assert.deepEqual(await groupPairs(harness, "by-cv", {}), [
-      ["y", 2],
-      ["x", 1],
-    ]);
-    const none = await harness.request("/api/smart-folders/all/groups?groupSort=count-desc");
-    assert.equal(none.status, 400);
   },
 );
 
