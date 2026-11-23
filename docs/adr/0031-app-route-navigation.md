@@ -86,7 +86,7 @@ TASK-469.2の3点（URLを直接書き換える `resetLibraryNavigationUrl`、`r
 
 AppRouteには入れず、今のまま別のatomに置く。
 
-- 表示密度（表示モード・タイルサイズ・グリッドレイアウト）、値一覧のsort、モーダル、`<dialog>` スタック、トースト。
+- 表示密度（表示モード・タイルサイズ・グリッドレイアウト）、モーダル、`<dialog>` スタック、トースト。
 - ランダムsortのseed（`randomSeedAtom`）。URLに載らないので、navigationのatomファイルから `features/library/model` へ移す。
 - Filesのカラム遷移の向き。navigationのatomファイルからは外し、汎用の遷移方向atomとして同期が持つ。`navigate` の `direction` と、popstateでの履歴indexの前後から決める。Filesのカラムは表示中のフォルダーが変わったときだけこの向きでアニメーションする。
 

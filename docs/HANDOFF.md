@@ -80,17 +80,17 @@ smokeテストの注意:
 
 すべて `/api` 配下。リクエスト/レスポンスの正典は `shared/src/*.ts` の Zod スキーマ、エンドポイントの一覧は `server/src/routes/` のルートファイル。エラーは `{ error: { code, message } }`（`apiErrorSchema`）。
 
-| ルートファイル           | 担当                                                                                                                                                                        |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `settings.ts`            | 設定の取得                                                                                                                                                                  |
-| `rootReconfiguration.ts` | ルートフォルダーの再設定ワークフロー（[ADR-0029](adr/0029-root-reconfiguration-workflow.md)）                                                                               |
-| `scan.ts`                | スキャンジョブ（開始・取得・キャンセル・SSE）、候補プール・除外・登録、診断                                                                                                 |
-| `works.ts`               | 作品の登録・正本編集・タグ編集・しおり・再生準備・resume・登録解除、`/tags`、`/export`                                                                                      |
-| `dlsite.ts`              | DLsite の取得・適用・取得ジョブ（SSE）（[dlsite.md](dlsite.md)）                                                                                                            |
-| `tagPrefixes.ts`         | prefix 定義の一覧・追加・変更・削除・並び替え・候補                                                                                                                         |
-| `smartFolders.ts`        | スマートフォルダーの作成（既定から追加・削除の取り消しを含む）・部分更新・削除・並び替え、作品一覧、グループの値一覧（[ADR-0040](adr/0040-smart-folder-condition-tree.md)） |
-| `fs.ts`                  | 物理 FS ブラウズ（Files モード）                                                                                                                                            |
-| `media.ts`               | カバー画像・音声・ワークスペースファイルの配信                                                                                                                              |
+| ルートファイル           | 担当                                                                                                                                                                              |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `settings.ts`            | 設定の取得                                                                                                                                                                        |
+| `rootReconfiguration.ts` | ルートフォルダーの再設定ワークフロー（[ADR-0029](adr/0029-root-reconfiguration-workflow.md)）                                                                                     |
+| `scan.ts`                | スキャンジョブ（開始・取得・キャンセル・SSE）、候補プール・除外・登録、診断                                                                                                       |
+| `works.ts`               | 作品の登録・正本編集・タグ編集・しおり・再生準備・resume・登録解除、`/tags`、`/export`                                                                                            |
+| `dlsite.ts`              | DLsite の取得・適用・取得ジョブ（SSE）（[dlsite.md](dlsite.md)）                                                                                                                  |
+| `tagPrefixes.ts`         | prefix 定義の一覧・追加・変更・削除・並び替え・候補                                                                                                                               |
+| `smartFolders.ts`        | スマートフォルダーの作成（既定から追加・削除の取り消しを含む）・部分更新・削除・並び替え、作品一覧、件数、グループの値一覧（[ADR-0040](adr/0040-smart-folder-condition-tree.md)） |
+| `fs.ts`                  | 物理 FS ブラウズ（Files モード）                                                                                                                                                  |
+| `media.ts`               | カバー画像・音声・ワークスペースファイルの配信                                                                                                                                    |
 
 契約上の要点:
 
@@ -121,7 +121,7 @@ smokeテストの注意:
 - **Jotai atom**: API由来でない UI 操作状態。ナビゲーション（後述の AppRoute）、library 表示設定（`features/library/model/atoms.ts`: libraryViewMode/libraryTileSize/libraryGridLayoutMode/groupValueSort）、player（後述）
 - **TanStack Query**: サーバー状態。キーは `client/src/entities/<ドメイン>/queryKeys.ts` のファクトリで一元管理する（`WORK_QUERY_KEYS` / `TAG_QUERY_KEYS` / `SMART_FOLDER_QUERY_KEYS` / `SETTINGS_QUERY_KEYS` / `FILE_SYSTEM_QUERY_KEYS`）。広域 invalidate 用のプレフィックスキーも各ファクトリが持つ
 - **ナビゲーションとURL同期**: 画面mode・Libraryのスマートフォルダー/グループの値/チップ/選択作品/検索語・Filesの場所/選択・作品詳細ID・再生中の層（`layer`）は `entities/navigation/model/appRouteStore.ts` の AppRoute 1つが正本で、各entityの `navigationAtoms.ts` はそこからの読み取り専用の派生。書き込みは各操作の write atom（次のrouteとpush/replaceを計算する純粋関数＋`navigate`）と履歴からの適用だけ。URLとの同期は `Providers` 直下の `NavigationHistorySync`（汎用の `shared/model/useRouteHistorySync.ts` に codec を渡す）が常時マウントで受け持つ（[ADR-0031](adr/0031-app-route-navigation.md)）。AddressBar の戻る/進む・パンくずも本物
-- **Libraryの今の並びと seed、層**: 今の並び（`sort`。null は既定の並び）・ランダムの `seed`・再生中の層は URL に出さず、履歴エントリーの状態（`history.state`）に書く。URL と同じ codec が読み書きし、戻る/進むでも保たれる。seed はクライアントだけが発行し、サイドバーから入り直すたび・並べ直すたびに新しくする。URL と定義の突き合わせは `entities/library/resolveLibraryView.ts` の `resolveLibraryView` が1か所で行い（値一覧・作品一覧のどちらかと、解決済みの並び・既定から外れているかを返す）、画面・クエリ・パンくず・遷移はその結果だけを読む。作品一覧の query key は解決済みの値だけで決まるので、並びや seed の違いは別のキャッシュになる（[ADR-0041](adr/0041-library-sidebar-shell-navigation.md)）
+- **Libraryの今の並びと seed、層**: 今の並び（`sort`・`groupSort`。null は既定の並び）・ランダムの `seed`・再生中の層は URL に出さず、履歴エントリーの状態（`history.state`）に書く。URL と同じ codec が読み書きし、戻る/進むでも保たれる。seed はクライアントだけが発行し、サイドバーから入り直すたび・並べ直すたびに新しくする。URL と定義の突き合わせは `entities/library/resolveLibraryView.ts` の `resolveLibraryView` が1か所で行い（値一覧・作品一覧のどちらかと、解決済みの並び・既定から外れているかを返す）、画面・クエリ・パンくず・遷移はその結果だけを読む。作品一覧の query key は解決済みの値だけで決まるので、並びや seed の違いは別のキャッシュになる（[ADR-0041](adr/0041-library-sidebar-shell-navigation.md)）
 - **サイドバー**: ライブラリの行はすべてスマートフォルダー（[ADR-0040](adr/0040-smart-folder-condition-tree.md)）。編集の状態での並べ替えは pragmatic-drag-and-drop を使う（[ADR-0042](adr/0042-pragmatic-drag-and-drop.md)）
 - **scanのジョブ追跡**: スナップショット・SSE接続・世代管理・終端検知は React 外の純 TS ストア（`entities/scan/model/scanJobStore.ts`）が持つ。`getState`/`subscribe`（状態）と `subscribeEvents`（終端などの一回きりの通知）、`start`/`cancel`/`attach`（サーバー上の実行中ジョブへの後乗り）/`reset`（ローカルの追跡だけを捨てる。サーバー側のジョブには触れない）を持つ。ストアは Jotai store ごとに1つ（`scanJobStoreAtom`）で、操作は Runtime のマウントに依存しない。React からは `useScanJob` の `useStoreSelector` 経由の hook で読む。`ScanRuntime` はイベントをトースト・キャッシュ更新へつなぐだけ
 - **DLsite取得ジョブの追跡**: scanと同じ形の純 TS ストア（`entities/dlsite/model/dlsiteJobStore.ts`、`useDlsiteJob`）がSSE接続と現在のジョブ状態を持つ。`DlsiteJobRuntime` がコードの終端を候補一覧・作品キャッシュの更新とエラートーストへつなぐ。未登録タブの行の状態と上のバーの輪は、このストアから読む。候補一覧（`GET /scan/candidates`）はキャッシュ由来の状態（未取得・取得済み・該当なし・失敗）だけを返し、取得中の表示はジョブの状態からだけ出す。サーバー状態は revision が進むものだけ取り込み、行の表示は候補の値とジョブで見た終端の結果のうち revision が大きい方を出す（ジョブの終端で候補一覧は取り直さない）。作品の詳細と一覧の無効化は、終端に達したコードを集め、ジョブの終わりにまとめて行う。終わりを見ないままミラーのジョブが替わったコードは結果不明として、無効化に加えて候補一覧を1回取り直す（[ADR-0038](adr/0038-dlsite-job-state-revision.md)）
