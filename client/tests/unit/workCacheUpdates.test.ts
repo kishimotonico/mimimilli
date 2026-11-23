@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiError, mockApi } from "../helpers/api";
 import { buildScanCandidate, buildScanDiagnostics } from "../helpers/builders";
 import { SCAN_CANDIDATES_QUERY_KEY } from "../../src/entities/scan/scanCandidatesCache";
@@ -219,6 +219,34 @@ describe("bookmark の必須更新", () => {
     expect(queryClient.getQueryCache().find({ queryKey: KEYS.otherList })?.isStale()).toBe(true);
     expect(queryClient.getQueryCache().find({ queryKey: KEYS.smartWorks })?.isStale()).toBe(true);
     expect(fetchCount).toBe(0);
+  });
+});
+
+describe("初回の取得の途中で作品が変わったとき", () => {
+  it("件数は進行中の古い応答でなく、変更後の値で取り直される", async () => {
+    const queryClient = new QueryClient();
+    let served = 0;
+    const resolvers: Array<(counts: Record<string, number>) => void> = [];
+    const observer = new QueryObserver(queryClient, {
+      queryKey: SMART_FOLDER_QUERY_KEYS.counts(),
+      queryFn: () =>
+        new Promise<Record<string, number>>((resolve) => {
+          served += 1;
+          resolvers.push(resolve);
+        }),
+    });
+    const unsubscribe = observer.subscribe(() => {});
+    await vi.waitFor(() => expect(resolvers).toHaveLength(1));
+
+    const updating = updateCachesAfterBookmark(queryClient, { workId: "w1", bookmarked: true });
+    resolvers[0]!({ fav: 0 });
+    await vi.waitFor(() => expect(resolvers).toHaveLength(2));
+    resolvers[1]!({ fav: 1 });
+    await updating;
+    unsubscribe();
+
+    expect(served).toBe(2);
+    expect(queryClient.getQueryData(SMART_FOLDER_QUERY_KEYS.counts())).toEqual({ fav: 1 });
   });
 });
 

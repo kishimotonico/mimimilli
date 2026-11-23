@@ -9,6 +9,7 @@ import {
   type WorkEditSnapshot,
   type WorkSourceMutationResult,
 } from "@mimimilli/shared";
+import { invalidateFresh } from "../../../shared/api/invalidateFresh";
 import { WORK_QUERY_KEYS } from "../queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../tag/queryKeys";
@@ -22,17 +23,17 @@ import {
 
 async function invalidateLibraryViews(queryClient: QueryClient): Promise<void> {
   await Promise.all([
-    queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() }),
-    queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allGroups() }),
-    queryClient.invalidateQueries({ queryKey: TAG_QUERY_KEYS.all() }),
-    queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() }),
+    invalidateFresh(queryClient, { queryKey: WORK_QUERY_KEYS.all() }),
+    invalidateFresh(queryClient, { queryKey: SMART_FOLDER_QUERY_KEYS.allGroups() }),
+    invalidateFresh(queryClient, { queryKey: TAG_QUERY_KEYS.all() }),
+    invalidateFresh(queryClient, { queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() }),
     invalidateSmartFolderCounts(queryClient),
   ]);
 }
 
 /** 件数だけを取り直す。定義の一覧と、開いている一覧の並びは動かさない */
 function invalidateSmartFolderCounts(queryClient: QueryClient): Promise<void> {
-  return queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.counts() });
+  return invalidateFresh(queryClient, { queryKey: SMART_FOLDER_QUERY_KEYS.counts() });
 }
 
 async function invalidateRegistrationViews(
@@ -40,20 +41,20 @@ async function invalidateRegistrationViews(
 ): Promise<ScanCandidatesResponse | null> {
   const [, , , , candidates] = await Promise.all([
     invalidateLibraryViews(queryClient),
-    queryClient.invalidateQueries({ queryKey: FILE_SYSTEM_QUERY_KEYS.all() }),
-    queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.diagnostics() }),
-    queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.last() }),
+    invalidateFresh(queryClient, { queryKey: FILE_SYSTEM_QUERY_KEYS.all() }),
+    invalidateFresh(queryClient, { queryKey: SCAN_QUERY_KEYS.diagnostics() }),
+    invalidateFresh(queryClient, { queryKey: SCAN_QUERY_KEYS.last() }),
     refreshScanCandidatesQuietly(queryClient),
   ]);
   return candidates;
 }
 
 function invalidateWorkDetail(queryClient: QueryClient, workId: string): Promise<void> {
-  return queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(workId), exact: true });
+  return invalidateFresh(queryClient, { queryKey: WORK_QUERY_KEYS.detail(workId), exact: true });
 }
 
 function invalidateAllWorkDetails(queryClient: QueryClient): Promise<void> {
-  return queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allDetails() });
+  return invalidateFresh(queryClient, { queryKey: WORK_QUERY_KEYS.allDetails() });
 }
 
 function rememberSource(queryClient: QueryClient, snapshot: WorkEditSnapshot): void {
@@ -68,7 +69,7 @@ async function updateCachesAfterSourceMutation(
   await Promise.all([
     invalidateWorkDetail(queryClient, result.snapshot.id),
     invalidateLibraryViews(queryClient),
-    queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.diagnostics() }),
+    invalidateFresh(queryClient, { queryKey: SCAN_QUERY_KEYS.diagnostics() }),
   ]);
 }
 
@@ -114,10 +115,10 @@ export async function updateCachesAfterBookmark(
   );
   const excludedHash = excludedListKey === null ? null : hashKey(excludedListKey);
   await Promise.all([
-    queryClient.invalidateQueries({
+    invalidateFresh(queryClient, {
       predicate: (query) => isWorkListQuery(query) && query.queryHash !== excludedHash,
     }),
-    queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allGroups() }),
+    invalidateFresh(queryClient, { queryKey: SMART_FOLDER_QUERY_KEYS.allGroups() }),
     invalidateSmartFolderCounts(queryClient),
   ]);
 }
@@ -159,7 +160,7 @@ export async function updateCachesAfterWorkReload(
   await Promise.all([
     invalidateRegistrationViews(queryClient),
     invalidateWorkDetail(queryClient, workId),
-    queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.source(workId), exact: true }),
+    invalidateFresh(queryClient, { queryKey: WORK_QUERY_KEYS.source(workId), exact: true }),
   ]);
 }
 
@@ -204,7 +205,7 @@ export async function updateCachesAfterDlsiteFetch(
   if (productCodes.length === 0) return;
   const codes = new Set(productCodes.map(canonicalDlsiteProductCode));
   await Promise.all([
-    queryClient.invalidateQueries({
+    invalidateFresh(queryClient, {
       predicate: (query) => {
         if (!isWorkDetailQuery(query)) return false;
         const rjCode = (query.state.data as Work | undefined)?.dlsite?.rjCode;
@@ -212,7 +213,7 @@ export async function updateCachesAfterDlsiteFetch(
       },
     }),
     invalidateLibraryViews(queryClient),
-    queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.diagnostics() }),
+    invalidateFresh(queryClient, { queryKey: SCAN_QUERY_KEYS.diagnostics() }),
   ]);
 }
 

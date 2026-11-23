@@ -43,6 +43,31 @@ describe("useLibraryView", () => {
     expect(result.current).toMatchObject({ foldersError: "保存済みの行を読めません。ID: sf-x" });
   });
 
+  it("取得に成功したあとの再取得が失敗したら、前の一覧が残っていても error になり、サーバーの文言を持つ", async () => {
+    let fail = false;
+    mockApi({
+      "GET /api/smart-folders": () =>
+        fail
+          ? apiError(500, "internal", "保存済みの行を読めません。ID: sf-x")
+          : defaultSmartFolders(),
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(JotaiProvider, { store: createStore() }, children),
+      );
+    const { result } = renderHook(() => useLibraryView(), { wrapper });
+    await waitFor(() => expect(result.current.foldersStatus).toBe("ready"));
+
+    fail = true;
+    await act(() => queryClient.invalidateQueries({ queryKey: ["smartFolders"], exact: true }));
+
+    await waitFor(() => expect(result.current.foldersStatus).toBe("error"));
+    expect(result.current).toMatchObject({ foldersError: "保存済みの行を読めません。ID: sf-x" });
+  });
+
   it("存在しないスマートフォルダーを指す route は、一覧が揃ったら「すべて」へ正規化する。チップ・検索語・並びは保つ", async () => {
     const { store, result } = setup({
       folderId: "sf-gone",

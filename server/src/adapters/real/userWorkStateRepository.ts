@@ -5,6 +5,7 @@ import {
   groupBySchema,
   groupSortIdSchema,
   smartFolderNameSchema,
+  smartFolderPositionSchema,
   smartFolderViolation,
   sortIdSchema,
   tagPrefixSchema,
@@ -446,10 +447,11 @@ function readSmartFolderRow(
       ? ({ ok: true, value: null } as const)
       : readJsonColumn("group_by_json", r.groupByJson, groupBySchema);
   const groupSort = readColumn("group_sort", r.groupSort, groupSortIdSchema.nullable());
-  const problems = [name, condition, sort, groupBy, groupSort].flatMap((read) =>
+  const position = readColumn("position", r.position, smartFolderPositionSchema);
+  const problems = [name, condition, sort, groupBy, groupSort, position].flatMap((read) =>
     read.ok ? [] : [read.problem],
   );
-  if (name.ok && condition.ok && sort.ok && groupBy.ok && groupSort.ok) {
+  if (name.ok && condition.ok && sort.ok && groupBy.ok && groupSort.ok && position.ok) {
     const fields = {
       id: r.id,
       name: name.value,
@@ -460,7 +462,7 @@ function readSmartFolderRow(
     };
     const violation = smartFolderViolation(fields);
     if (violation === null) {
-      return { row: { ...fields, position: r.position, createdAt: r.createdAt } };
+      return { row: { ...fields, position: position.value, createdAt: r.createdAt } };
     }
     problems.push({ column: VIOLATION_COLUMNS[violation.field], reason: violation.message });
   }

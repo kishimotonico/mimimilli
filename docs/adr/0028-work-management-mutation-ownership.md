@@ -116,6 +116,7 @@ mutation hook は `UseMutationResult` をそのまま返す。
 - 一覧系: `["works"]` 前方一致（一覧、総件数、スキャンの新規件数、missing 件数）
 - 一覧: 一覧系のうち `WORK_QUERY_KEYS.list(params)` の形のもの、および `["smartFolderWorks"]` 前方一致
 - グループの値: `["smartFolderGroups"]` 前方一致（スマートフォルダーの値一覧・「＋絞り込み」の候補）。タグ: `["tags"]`。SF: `["smartFolderWorks"]`、スマートフォルダーの定義の一覧 `["smartFolders"]`、その下の件数 `["smartFolders", "counts"]`。FS: `["fs"]`。診断（要対応）: `["scan", "diagnostics"]`（ID重複・読み取り失敗・アクセス不可・データ不整合・行方不明）。直近のスキャン結果: `["scan", "last"]`
+- 無効化は `invalidateFresh`（`shared/api`）を通す。初回取得中（data なし）の取得は進行中の取得へ合流して変更前の応答が残るので、先に取り消して変更後の値で取り直す
 - 登録の集合: 一覧系・グループの値・タグ・SF・FS・診断・直近のスキャン結果を無効化し、未登録の候補（`["scan", "candidates"]`）を取り直す
 
 | 操作                                                                                                   | 必須更新                                                                                                                                                                                           |

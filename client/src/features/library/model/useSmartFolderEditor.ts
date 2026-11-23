@@ -26,6 +26,7 @@ import {
 } from "../../../entities/smart-folder/api";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { ApiRequestError } from "../../../shared/api/http";
+import { invalidateFresh } from "../../../shared/api/invalidateFresh";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { useToast } from "../../../shared/ui/useToast";
 import { groupByKey } from "../../../entities/smart-folder/groupByKey";
@@ -51,8 +52,9 @@ export interface SmartFolderEditor {
 }
 
 /** 変更が一覧のどこへ効くか。none は応答でキャッシュを直接更新したとき。
- *  definitionOf は定義の結果が変わったフォルダーで、そのフォルダーの作品・値の一覧も取り直す */
-type Refresh = "none" | "folders" | { definitionOf: string };
+ *  definitionOf は定義の結果が変わった（作成・削除・定義の更新）フォルダーで、そのフォルダーの作品・値の一覧も古いものにする。
+ *  削除は開いている一覧を取り直さない（refetchType none） */
+type Refresh = "none" | "folders" | { definitionOf: string; refetchType?: "active" | "none" };
 
 export function useSmartFolderEditor(): SmartFolderEditor {
   const queryClient = useQueryClient();
@@ -63,17 +65,23 @@ export function useSmartFolderEditor(): SmartFolderEditor {
 
   return useMemo<SmartFolderEditor>(() => {
     const refreshFolders = () =>
-      queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.all() });
+      invalidateFresh(queryClient, { queryKey: SMART_FOLDER_QUERY_KEYS.all() });
 
     // 定義が変わったスマートフォルダーの作品・値も取り直す。一覧が更新されてから行う
     const refresh = async (scope: Refresh) => {
       if (scope === "none") return;
       await refreshFolders();
       if (scope !== "folders") {
-        const id = scope.definitionOf;
+        const { definitionOf: id, refetchType } = scope;
         await Promise.all([
-          queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.folderWorks(id) }),
-          queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.folderGroups(id) }),
+          invalidateFresh(queryClient, {
+            queryKey: SMART_FOLDER_QUERY_KEYS.folderWorks(id),
+            refetchType,
+          }),
+          invalidateFresh(queryClient, {
+            queryKey: SMART_FOLDER_QUERY_KEYS.folderGroups(id),
+            refetchType,
+          }),
         ]);
       }
     };
@@ -95,7 +103,7 @@ export function useSmartFolderEditor(): SmartFolderEditor {
     /** 変更の唯一の実行路。成功なら onSuccess のあとに refresh、失敗ならトーストと一覧の取り直し */
     const commit = async <T>(
       failure: string,
-      scope: Refresh,
+      scope: Refresh | ((result: T) => Refresh),
       request: () => Promise<T>,
       onSuccess?: (result: T) => void,
     ): Promise<T | null> => {
@@ -112,13 +120,16 @@ export function useSmartFolderEditor(): SmartFolderEditor {
         return null;
       }
       onSuccess?.(result);
-      await refresh(scope);
+      await refresh(typeof scope === "function" ? scope(result) : scope);
       return result;
     };
 
     const restore = async (folder: SmartFolder) => {
-      await commit("元に戻せませんでした", "folders", () =>
-        createSmartFolder({ ...definitionOf(folder), id: folder.id, position: folder.position }),
+      await commit(
+        "元に戻せませんでした",
+        (row) => ({ definitionOf: row.id }),
+        () =>
+          createSmartFolder({ ...definitionOf(folder), id: folder.id, position: folder.position }),
       );
     };
 
@@ -144,10 +155,15 @@ export function useSmartFolderEditor(): SmartFolderEditor {
       request: () => Promise<SmartFolder>,
     ): Promise<SmartFolder | null> => {
       const started = store.get(appRouteAtom);
-      return commit(failure, "folders", request, (row) => {
-        settle(started, row.id);
-        upsertFolder(row);
-      });
+      return commit(
+        failure,
+        (row) => ({ definitionOf: row.id }),
+        request,
+        (row) => {
+          settle(started, row.id);
+          upsertFolder(row);
+        },
+      );
     };
 
     return {
@@ -202,7 +218,7 @@ export function useSmartFolderEditor(): SmartFolderEditor {
       remove: async (folder) => {
         await commit(
           `「${folder.name}」を削除できませんでした`,
-          "folders",
+          { definitionOf: folder.id, refetchType: "none" },
           () => deleteSmartFolder(folder.id),
           () => {
             dropFolder(folder.id);

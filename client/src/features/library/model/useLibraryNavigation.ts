@@ -161,7 +161,7 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
       isPending,
       refetchFolders: () => void refetch(),
     };
-    if (!folders || !view) {
+    if (foldersQuery.isError || !folders || !view) {
       return {
         ...base,
         foldersStatus: foldersQuery.isError ? "error" : "pending",

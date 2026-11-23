@@ -50,13 +50,17 @@ function setup() {
 const toasts = () => [...store.get(toastRequestsAtom).values()];
 
 describe("作成・既定から追加", () => {
-  it("作れたら一覧だけを取り直し、作ったものを返す", async () => {
+  it("作れたら一覧と、その ID の作品・値の一覧を取り直し、作ったものを返す", async () => {
     mockApi({ "POST /api/smart-folders": () => ({ ...userFolder }) });
     const editor = setup();
 
     expect(await editor.create(write)).toEqual(userFolder);
 
-    expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
+    expect(invalidated).toEqual([
+      SMART_FOLDER_QUERY_KEYS.all(),
+      SMART_FOLDER_QUERY_KEYS.folderWorks(USER_ID),
+      SMART_FOLDER_QUERY_KEYS.folderGroups(USER_ID),
+    ]);
     expect(toasts()).toEqual([]);
   });
 
@@ -103,6 +107,50 @@ describe("作成・既定から追加", () => {
       variant: "error",
     });
     expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
+  });
+});
+
+describe("同じ ID の作り直し", () => {
+  const listKeys = [
+    SMART_FOLDER_QUERY_KEYS.works("fav", { sort: "added-desc" }),
+    SMART_FOLDER_QUERY_KEYS.groups("fav", "tag", {}),
+  ];
+  const seed = () => {
+    for (const key of listKeys) queryClient.setQueryData(key, []);
+  };
+  const stale = () => listKeys.map((key) => queryClient.getQueryState(key)?.isInvalidated);
+
+  it("既定から追加すると、同じ ID の作品・値の一覧を古いものとして扱う", async () => {
+    mockApi({ "POST /api/smart-folders": () => ({ ...userFolder, id: "fav" }) });
+    const editor = setup();
+    seed();
+
+    await editor.addFromTemplate("fav");
+
+    expect(stale()).toEqual([true, true]);
+  });
+
+  it("削除すると、同じ ID の作品・値の一覧を古いものとして扱う", async () => {
+    mockApi({ "DELETE /api/smart-folders/:id": apiNoContent() });
+    const editor = setup();
+    seed();
+
+    await editor.remove({ ...userFolder, id: "fav" });
+
+    expect(stale()).toEqual([true, true]);
+  });
+
+  it("元に戻すと、同じ ID の作品・値の一覧を古いものとして扱う", async () => {
+    mockApi({
+      "DELETE /api/smart-folders/:id": apiNoContent(),
+      "POST /api/smart-folders": () => ({ ...userFolder, id: "fav" }),
+    });
+    const editor = setup();
+    await editor.remove({ ...userFolder, id: "fav" });
+    seed();
+
+    toasts()[0]!.onAction!();
+    await vi.waitFor(() => expect(stale()).toEqual([true, true]));
   });
 });
 
@@ -582,7 +630,13 @@ describe("削除", () => {
     invalidated.length = 0;
 
     toasts()[0]!.onAction!();
-    await vi.waitFor(() => expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]));
+    await vi.waitFor(() =>
+      expect(invalidated).toEqual([
+        SMART_FOLDER_QUERY_KEYS.all(),
+        SMART_FOLDER_QUERY_KEYS.folderWorks(USER_ID),
+        SMART_FOLDER_QUERY_KEYS.folderGroups(USER_ID),
+      ]),
+    );
 
     expect(mocked.requestsTo("POST /api/smart-folders")[0]!.body).toMatchObject({
       id: USER_ID,

@@ -14,6 +14,8 @@ import { groupSortIdSchema, sortIdSchema } from "./library.ts";
 
 export const smartFolderNameSchema = z.string().trim().min(1);
 
+export const smartFolderPositionSchema = z.number().int().nonnegative();
+
 /** URL のパスに入るので、形式だけを検査する */
 export const smartFolderIdSchema = z
   .string()
@@ -39,7 +41,7 @@ export type SmartFolderWrite = z.infer<typeof smartFolderDefinitionSchema>;
 export const smartFolderSchema = z.object({
   ...definitionShape,
   id: z.string(),
-  position: z.number().int().nonnegative(),
+  position: smartFolderPositionSchema,
   createdAt: z.string(),
 });
 export type SmartFolder = z.infer<typeof smartFolderSchema>;

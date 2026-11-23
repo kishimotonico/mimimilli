@@ -118,6 +118,8 @@ const UNREADABLE_ROWS: Array<{ id: string; column: string; row: Record<string, u
   { id: "broken-group", column: "group_by_json", row: { groupByJson: '{"kind":"x"}' } },
   { id: "broken-group-sort", column: "group_sort", row: { groupSort: "unknown" } },
   { id: "orphan-group-sort", column: "group_sort", row: { groupSort: "count-desc" } },
+  { id: "negative-position", column: "position", row: { position: -1 } },
+  { id: "fractional-position", column: "position", row: { position: 1.5 } },
   { id: "missing-group-sort", column: "group_sort", row: { groupByJson: '{"kind":"tag"}' } },
 ];
 

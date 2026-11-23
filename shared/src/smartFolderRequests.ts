@@ -4,14 +4,14 @@ import { tagFiltersQuerySchema } from "./api.ts";
 import { parseGroupByKey } from "./groupFilter.ts";
 import { groupSortIdSchema, MAX_RANDOM_SEED, sortIdSchema } from "./library.ts";
 import { scanRecordKindSchema, workChangeKindSchema } from "./scan.ts";
-import { definitionShape, smartFolderIdSchema } from "./smartFolder.ts";
+import { definitionShape, smartFolderIdSchema, smartFolderPositionSchema } from "./smartFolder.ts";
 
 /** POST /smart-folders のボディ。通常の作成・既定から追加・削除の取り消しのすべてがこの形を通る。
  *  id を省くと採番して末尾に入れ、position を渡すとその位置に入れて後ろをずらす */
 export const smartFolderCreateSchema = z.strictObject({
   ...definitionShape,
   id: smartFolderIdSchema.optional(),
-  position: z.number().int().nonnegative().optional(),
+  position: smartFolderPositionSchema.optional(),
 });
 export type SmartFolderCreate = z.infer<typeof smartFolderCreateSchema>;
 
