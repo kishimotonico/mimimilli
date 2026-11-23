@@ -8,9 +8,7 @@ import { getDefaultStore } from "jotai";
 import type { Work } from "@mimimilli/shared";
 import { emptyDlsiteState } from "@mimimilli/shared";
 import { WorkDetail } from "../../src/features/library/ui/preview/WorkDetail";
-import { appRouteAtom } from "../../src/entities/navigation/model/appRouteStore";
 import { toastRequestsAtom } from "../../src/shared/model/toastRequestsAtom";
-import { seedLibraryRoute } from "../helpers/route";
 
 const { playWork, resumeWork, togglePlay } = vi.hoisted(() => ({
   playWork: vi.fn(),
@@ -214,33 +212,6 @@ describe("WorkDetail: 登録解除", () => {
         }),
       ),
     );
-  });
-
-  it("解除に成功すると、その作品の選択だけを外す（待つ間に選び直した別の作品は外さない）", async () => {
-    const store = getDefaultStore();
-    const done: Array<() => void> = [];
-    const mutateAsync = vi.fn(() => new Promise<void>((resolve) => done.push(resolve)));
-    renderDetail({
-      work: makeWork({ id: "w1" }),
-      deleteMutation: makeDeleteMutationStub({ mutateAsync }),
-    });
-    seedLibraryRoute(store, { selectedWorkId: "w1" });
-
-    fireEvent.click(screen.getByRole("button", { name: "その他" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
-    fireEvent.click(screen.getByRole("button", { name: "解除する" }));
-    seedLibraryRoute(store, { selectedWorkId: "w2" });
-    done[0]!();
-    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(store.get(appRouteAtom).library.selectedWorkId).toBe("w2");
-
-    seedLibraryRoute(store, { selectedWorkId: "w1" });
-    fireEvent.click(screen.getByRole("button", { name: "その他" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
-    fireEvent.click(screen.getByRole("button", { name: "解除する" }));
-    done[1]!();
-    await waitFor(() => expect(store.get(appRouteAtom).library.selectedWorkId).toBeNull());
   });
 
   it("解除に成功すれば、WorkDetailがアンマウント済みでもトーストが届く", async () => {

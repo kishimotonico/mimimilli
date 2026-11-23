@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { Condition, SmartFolder } from "@mimimilli/shared";
+import { definitionOf, type Condition, type SmartFolder } from "@mimimilli/shared";
 import { buildSidebarRows } from "../../src/features/library/model/sidebarRows";
 import {
+  changedColumns,
   conditionRowText,
   duplicateDraft,
   withGroupBy,
@@ -10,7 +11,7 @@ import {
   reorderIds,
   withoutRootChild,
 } from "../../src/features/library/model/smartFolderEditing";
-import { defaultSmartFolders } from "../helpers/smartFolders";
+import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
 
 describe("reorderIds", () => {
   const ids = ["a", "b", "c", "d"];
@@ -157,5 +158,18 @@ describe("buildSidebarRows", () => {
     const rows = buildSidebarRows(folders, { all: 9, "by-cv": 9 });
     expect(rows.find((r) => r.id === "all")?.count).toBeNull();
     expect(rows.find((r) => r.id === "by-cv")?.count).toBeNull();
+  });
+});
+
+describe("changedColumns", () => {
+  const folder = buildSmartFolder({ name: "自作", sort: "title-asc" });
+  const write = definitionOf(folder);
+
+  it("変わった列だけを返し、変更が無ければ空", () => {
+    expect(changedColumns(folder, write)).toEqual({});
+    expect(changedColumns(folder, { ...write, name: "改名" })).toEqual({ name: "改名" });
+    expect(
+      changedColumns(folder, { ...write, groupBy: { kind: "addedYear" }, groupSort: "name-asc" }),
+    ).toEqual({ groupBy: { kind: "addedYear" }, groupSort: "name-asc" });
   });
 });

@@ -3,6 +3,7 @@ import { ALL_SMART_FOLDER_ID, type SmartFolderWrite } from "@mimimilli/shared";
 import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
 import { smartFolderDialogAtom } from "../model/atoms";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
+import { changedColumns } from "../model/smartFolderEditing";
 import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
 import SmartFolderDialog from "./SmartFolderDialog";
 
@@ -18,7 +19,9 @@ export default function SmartFolderDialogHost() {
 
   const save = async (data: SmartFolderWrite) => {
     if (dialog.kind === "edit") {
-      const saved = await editor.patch(dialog.folder.id, data);
+      const change = changedColumns(dialog.folder, data);
+      const saved =
+        Object.keys(change).length === 0 || (await editor.patch(dialog.folder.id, change));
       if (saved) setDialog(null);
       return saved;
     }

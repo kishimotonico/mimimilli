@@ -9,7 +9,6 @@ import {
 import { useToast } from "../../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
-import { dropMissingWorkAtom } from "../../../../entities/navigation/model/appRouteStore";
 import { openPathInFilesAtom } from "../../../../entities/file-system/model/navigationAtoms";
 import { usePlayerActions } from "../../../../entities/player/model/usePlayerActions";
 import { usePlayWork } from "../../../../entities/player/model/usePlayWork";
@@ -91,7 +90,6 @@ export function WorkDetail({
   const statusLabel = getWorkStatusLabel(work.status);
   const toast = useToast();
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
-  const dropMissingWork = useSetAtom(dropMissingWorkAtom);
   const rootFolder = useRootFolder();
   const { togglePlay } = usePlayerActions();
   const { playWork, resumeWork } = usePlayWork();
@@ -118,7 +116,6 @@ export function WorkDetail({
       // 通知は発行元の生存に縛らない
       dismissOnUnmount: false,
     });
-    dropMissingWork(work.id);
   };
 
   return (

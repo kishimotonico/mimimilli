@@ -165,7 +165,8 @@ describe("保存中のダイアログ", () => {
     const user = userEvent.setup();
 
     act(() => store.set(smartFolderDialogAtom, { kind: "edit", folder: folderA }));
-    await user.click(await screen.findByRole("button", { name: "保存" }));
+    await user.type(await screen.findByRole("textbox", { name: "名前" }), "改");
+    await user.click(screen.getByRole("button", { name: "保存" }));
 
     expect(screen.getByRole("button", { name: "キャンセル" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "閉じる" })).toBeDisabled();
@@ -177,6 +178,29 @@ describe("保存中のダイアログ", () => {
       await held.promise;
     });
     await waitFor(() => expect(store.get(smartFolderDialogAtom)).toBeNull());
+  });
+
+  it("名前だけ変えたら名前だけを送り、変更が無ければ何も送らず閉じる", async () => {
+    const api = mockApi({
+      "GET /api/tag-prefixes": [],
+      "GET /api/smart-folders": [...defaultSmartFolders(), folderA],
+      "PATCH /api/smart-folders/:id": () => ({ ...folderA, name: `${folderA.name}改` }),
+    });
+    const store = renderHost();
+    const user = userEvent.setup();
+
+    act(() => store.set(smartFolderDialogAtom, { kind: "edit", folder: folderA }));
+    await user.click(await screen.findByRole("button", { name: "保存" }));
+    await waitFor(() => expect(store.get(smartFolderDialogAtom)).toBeNull());
+    expect(api.requestsTo("PATCH /api/smart-folders/:id")).toHaveLength(0);
+
+    act(() => store.set(smartFolderDialogAtom, { kind: "edit", folder: folderA }));
+    await user.type(await screen.findByRole("textbox", { name: "名前" }), "改");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(store.get(smartFolderDialogAtom)).toBeNull());
+    expect(api.requestsTo("PATCH /api/smart-folders/:id")[0]?.body).toEqual({
+      name: `${folderA.name}改`,
+    });
   });
 });
 

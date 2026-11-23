@@ -12,12 +12,26 @@ import {
   type GroupBy,
   type Predicate,
   type SmartFolder,
+  type SmartFolderPatch,
   type SmartFolderTemplate,
   type SmartFolderWrite,
   type TagPrefix,
 } from "@mimimilli/shared";
 import { buildGroupByRows } from "../../../entities/library/smartFolderDefinitions";
 import { groupByKey, type GroupByKey } from "../../../entities/smart-folder/groupByKey";
+
+// ── 保存 ─────────────────────────────────────────────────────
+
+/** 保存済みの行から変わった列だけ */
+export function changedColumns(folder: SmartFolder, data: SmartFolderWrite): SmartFolderPatch {
+  const change: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (JSON.stringify(value) !== JSON.stringify(folder[key as keyof SmartFolder])) {
+      change[key] = value;
+    }
+  }
+  return change;
+}
 
 // ── 並べ替え ─────────────────────────────────────────────────
 

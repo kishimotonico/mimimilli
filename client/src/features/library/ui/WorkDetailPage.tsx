@@ -7,7 +7,7 @@ import { workDetailIdAtom } from "../../../entities/work/model/navigationAtoms";
 import { workDetailQueryOptions } from "../../../entities/work/workDetailQueryOptions";
 import { allTagsQueryOptions } from "../../../entities/tag/allTagsQueryOptions";
 import {
-  dropMissingWorkAtom,
+  leaveMissingWorkDetailAtom,
   openNowPlayingLayerAtom,
 } from "../../../entities/navigation/model/appRouteStore";
 import {
@@ -27,7 +27,7 @@ export default function WorkDetailPage() {
   const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
   const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
   const openNowPlaying = useSetAtom(openNowPlayingLayerAtom);
-  const dropMissingWork = useSetAtom(dropMissingWorkAtom);
+  const leaveMissingWorkDetail = useSetAtom(leaveMissingWorkDetailAtom);
   const nav = useLibraryNavigation();
   const { clickTag } = nav;
   const view = nav.foldersStatus === "ready" ? nav.view : null;
@@ -46,9 +46,9 @@ export default function WorkDetailPage() {
       workQuery.error instanceof ApiRequestError &&
       workQuery.error.status === 404
     ) {
-      dropMissingWork(workId);
+      leaveMissingWorkDetail(workId);
     }
-  }, [workId, workQuery.error, dropMissingWork]);
+  }, [workId, workQuery.error, leaveMissingWorkDetail]);
 
   const work = workQuery.data ?? null;
   const isCurrentWorkPlaying = work !== null && playingWorkId === work.id;

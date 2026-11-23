@@ -73,6 +73,7 @@ const currentSort = (store: ReturnType<typeof createStore>) => store.get(library
 async function waitForNoSaveAsDefault() {
   await waitFor(() => expect(screen.queryByRole("menu", { name: "並び替え" })).toBeNull());
   fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
+  expect(screen.getByRole("menu", { name: "並び替え" })).toBeInTheDocument();
   await waitFor(() =>
     expect(screen.queryByRole("menuitem", { name: "この並びを既定にする" })).toBeNull(),
   );

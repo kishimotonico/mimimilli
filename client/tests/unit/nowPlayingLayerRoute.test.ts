@@ -5,7 +5,7 @@ import {
   appRouteAtom,
   appRouteStore,
   closeLayerAtom,
-  dropMissingWorkAtom,
+  leaveMissingWorkDetailAtom,
   openNowPlayingLayerAtom,
   setAppModeAtom,
 } from "../../src/entities/navigation/model/appRouteStore";
@@ -155,26 +155,20 @@ describe("再生中の層の遷移", () => {
     expect(pendingWrites(store)).toEqual(["replace", "replace"]);
   });
 
-  it("存在しなくなった作品は、その作品の選択と詳細だけを外す。層とほかの作品は変えない", () => {
+  it("存在しない作品詳細からの退避は、同じ作品のときだけ層を保って置き換える", () => {
     const store = openedStore({ workDetail: "work-a" });
-    seedLibraryRoute(store, { selectedWorkId: "work-b" });
     clearPendingOps(store);
 
-    store.set(dropMissingWorkAtom, "work-c");
+    store.set(leaveMissingWorkDetailAtom, "work-b");
     expect(store.get(appRouteAtom)).toMatchObject({ mode: "workDetail", workId: "work-a" });
-    expect(store.get(appRouteAtom).library.selectedWorkId).toBe("work-b");
     expect(pendingWrites(store)).toEqual([]);
 
-    store.set(dropMissingWorkAtom, "work-b");
-    expect(store.get(appRouteAtom)).toMatchObject({ mode: "workDetail", workId: "work-a" });
-    expect(store.get(appRouteAtom).library.selectedWorkId).toBeNull();
-
-    store.set(dropMissingWorkAtom, "work-a");
+    store.set(leaveMissingWorkDetailAtom, "work-a");
     expect(store.get(appRouteAtom)).toMatchObject({
       mode: "library",
       layer: { kind: "nowPlaying" },
     });
-    expect(pendingWrites(store)).toEqual(["replace", "replace"]);
+    expect(pendingWrites(store)).toEqual(["replace"]);
   });
 
   it("ファイルの選択の解除は、選択が同じパスのときだけ層を保って置き換える", () => {

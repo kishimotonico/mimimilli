@@ -51,20 +51,19 @@ export function appRouteCorrection<A extends unknown[]>(
   });
 }
 
-/** 補正: 作品が存在しなくなったとき（登録解除・404）、その作品の選択を外し、その作品の詳細なら保持している
- *  ライブラリへ置き換えで戻る。ほかの作品の選択・詳細と層は変えない */
-export function dropMissingWork(route: AppRoute, workId: string): RouteTransition<AppRoute> | null {
-  const deselect = route.library.selectedWorkId === workId;
-  const leave = route.mode === "workDetail" && route.workId === workId;
-  if (!deselect && !leave) return null;
-  const library = deselect ? { ...route.library, selectedWorkId: null } : route.library;
-  const next: AppRoute = leave
-    ? { mode: "library", library, files: route.files, layer: route.layer }
-    : { ...route, library };
-  return { route: next, replace: true };
+/** 補正: 作品詳細の作品が存在しない（登録解除済み・404）とき、保持しているライブラリへ置き換えで戻る。層は変えない */
+export function leaveMissingWorkDetail(
+  route: AppRoute,
+  workId: string,
+): RouteTransition<AppRoute> | null {
+  if (route.mode !== "workDetail" || route.workId !== workId) return null;
+  return {
+    route: { mode: "library", library: route.library, files: route.files, layer: route.layer },
+    replace: true,
+  };
 }
 
-export const dropMissingWorkAtom = appRouteStore.action(dropMissingWork);
+export const leaveMissingWorkDetailAtom = appRouteStore.action(leaveMissingWorkDetail);
 
 export const appModeAtom = atom<AppMode>((get) => get(appRouteAtom).mode);
 

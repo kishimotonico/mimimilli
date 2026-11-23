@@ -335,6 +335,10 @@ test("詳細パネルの「その他」メニューから登録解除できる�
   ).toBeHidden();
   await expect(page.getByText("を登録解除しました", { exact: false })).toBeVisible();
 
+  // 解除した作品の詳細の取り直しが404になることが、選択解除の合図
+  expect(tracker.failedResponses).toEqual([expect.stringMatching(/^404 .*\/api\/works\//)]);
+  tracker.failedResponses.length = 0;
+  tracker.consoleErrors = tracker.consoleErrors.filter((text) => !text.includes("404"));
   assertNoErrors(tracker);
 });
 

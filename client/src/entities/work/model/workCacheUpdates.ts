@@ -140,8 +140,15 @@ export async function updateCachesAfterLibraryScan(queryClient: QueryClient): Pr
   ]);
 }
 
-export async function updateCachesAfterUnregistration(queryClient: QueryClient): Promise<void> {
-  await invalidateRegistrationViews(queryClient);
+/** 解除した作品の詳細も無効化し、開いている詳細が404になって補正（選択解除・作品詳細からの退避）が走るようにする */
+export async function updateCachesAfterUnregistration(
+  queryClient: QueryClient,
+  workId: string,
+): Promise<void> {
+  await Promise.all([
+    invalidateRegistrationViews(queryClient),
+    invalidateWorkDetail(queryClient, workId),
+  ]);
 }
 
 /** 作品単位の読み直し（データ不整合の解消）の成功後 */
@@ -159,7 +166,10 @@ export async function updateCachesAfterWorkReload(
 export async function updateCachesAfterMissingUnregistration(
   queryClient: QueryClient,
 ): Promise<void> {
-  await invalidateRegistrationViews(queryClient);
+  await Promise.all([
+    invalidateRegistrationViews(queryClient),
+    invalidateAllWorkDetails(queryClient),
+  ]);
 }
 
 export async function updateCachesAfterIdentityReassign(

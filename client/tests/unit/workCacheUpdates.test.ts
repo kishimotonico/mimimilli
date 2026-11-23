@@ -240,7 +240,7 @@ describe("登録・スキャン完了の必須更新", () => {
     });
     const queryClient = seededClient();
 
-    await updateCachesAfterUnregistration(queryClient);
+    await updateCachesAfterUnregistration(queryClient, "w1");
     expect(queryClient.getQueryData(KEYS.candidates)).toEqual({
       scanCompleted: true,
       candidates: [found],
@@ -273,22 +273,26 @@ describe("登録・スキャン完了の必須更新", () => {
 });
 
 describe("登録解除の必須更新", () => {
-  it("単体は登録の集合を無効化するだけで、作品のキャッシュは消さない", async () => {
+  it("単体は登録の集合と解除した作品の詳細だけを無効化し、キャッシュは消さない（開いている詳細が404になり、補正が走る）", async () => {
     const queryClient = seededClient();
 
-    await updateCachesAfterUnregistration(queryClient);
+    await updateCachesAfterUnregistration(queryClient, "w1");
 
     expect(removedKeys(queryClient)).toEqual([]);
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(REGISTRATION_VIEWS));
+    expect(sorted(invalidatedKeys(queryClient))).toEqual(
+      sorted([...REGISTRATION_VIEWS, "detail1"]),
+    );
   });
 
-  it("missing 一括は登録の集合だけを無効化し、詳細は触らない", async () => {
+  it("missing 一括は登録の集合と全詳細を無効化する（どの作品が消えたか応答に無い）", async () => {
     const queryClient = seededClient();
 
     await updateCachesAfterMissingUnregistration(queryClient);
 
     expect(removedKeys(queryClient)).toEqual([]);
-    expect(sorted(invalidatedKeys(queryClient))).toEqual(sorted(REGISTRATION_VIEWS));
+    expect(sorted(invalidatedKeys(queryClient))).toEqual(
+      sorted([...REGISTRATION_VIEWS, "detail1", "source1", "detail2", "source2"]),
+    );
   });
 });
 
