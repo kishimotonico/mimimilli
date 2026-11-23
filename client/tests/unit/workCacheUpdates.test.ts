@@ -9,6 +9,7 @@ import {
   type WorkEditSnapshot,
   type WorkSourceMutationResult,
 } from "@mimimilli/shared";
+import { invalidateFresh } from "../../src/shared/api/invalidateFresh";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../src/entities/tag/queryKeys";
@@ -247,6 +248,23 @@ describe("初回の取得の途中で作品が変わったとき", () => {
 
     expect(served).toBe(2);
     expect(queryClient.getQueryData(SMART_FOLDER_QUERY_KEYS.counts())).toEqual({ fav: 1 });
+  });
+});
+
+describe("invalidateFresh", () => {
+  it("observer の無い取得（fetchQuery）は取り消さない", async () => {
+    const queryClient = new QueryClient();
+    let resolve!: (value: string) => void;
+    const fetching = queryClient.fetchQuery({
+      queryKey: ["scan", "last"],
+      queryFn: () => new Promise<string>((r) => (resolve = r)),
+    });
+
+    const invalidating = invalidateFresh(queryClient, { queryKey: ["scan"] });
+    resolve("done");
+    await invalidating;
+
+    await expect(fetching).resolves.toBe("done");
   });
 });
 

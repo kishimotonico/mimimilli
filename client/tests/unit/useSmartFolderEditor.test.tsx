@@ -130,16 +130,6 @@ describe("同じ ID の作り直し", () => {
     expect(stale()).toEqual([true, true]);
   });
 
-  it("削除すると、同じ ID の作品・値の一覧を古いものとして扱う", async () => {
-    mockApi({ "DELETE /api/smart-folders/:id": apiNoContent() });
-    const editor = setup();
-    seed();
-
-    await editor.remove({ ...userFolder, id: "fav" });
-
-    expect(stale()).toEqual([true, true]);
-  });
-
   it("元に戻すと、同じ ID の作品・値の一覧を古いものとして扱う", async () => {
     mockApi({
       "DELETE /api/smart-folders/:id": apiNoContent(),
