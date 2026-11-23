@@ -80,17 +80,17 @@ smokeテストの注意:
 
 すべて `/api` 配下。リクエスト/レスポンスの正典は `shared/src/*.ts` の Zod スキーマ、エンドポイントの一覧は `server/src/routes/` のルートファイル。エラーは `{ error: { code, message } }`（`apiErrorSchema`）。
 
-| ルートファイル           | 担当                                                                                                                         |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `settings.ts`            | 設定の取得                                                                                                                   |
-| `rootReconfiguration.ts` | ルートフォルダーの再設定ワークフロー（[ADR-0029](adr/0029-root-reconfiguration-workflow.md)）                                |
-| `scan.ts`                | スキャンジョブ（開始・取得・キャンセル・SSE）、候補プール・除外・登録、診断                                                  |
-| `works.ts`               | 作品の登録・正本編集・タグ編集・しおり・再生準備・resume・登録解除、`/tags`、`/export`                                       |
-| `dlsite.ts`              | DLsite の取得・適用・取得ジョブ（SSE）（[dlsite.md](dlsite.md)）                                                             |
-| `tagPrefixes.ts`         | prefix 定義の一覧・追加・変更・削除・並び替え・候補                                                                          |
-| `smartFolders.ts`        | スマートフォルダーの CRUD・並び替え・復元、作品一覧、グループの値一覧（[ADR-0040](adr/0040-smart-folder-condition-tree.md)） |
-| `fs.ts`                  | 物理 FS ブラウズ（Files モード）                                                                                             |
-| `media.ts`               | カバー画像・音声・ワークスペースファイルの配信                                                                               |
+| ルートファイル           | 担当                                                                                                                                                                        |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `settings.ts`            | 設定の取得                                                                                                                                                                  |
+| `rootReconfiguration.ts` | ルートフォルダーの再設定ワークフロー（[ADR-0029](adr/0029-root-reconfiguration-workflow.md)）                                                                               |
+| `scan.ts`                | スキャンジョブ（開始・取得・キャンセル・SSE）、候補プール・除外・登録、診断                                                                                                 |
+| `works.ts`               | 作品の登録・正本編集・タグ編集・しおり・再生準備・resume・登録解除、`/tags`、`/export`                                                                                      |
+| `dlsite.ts`              | DLsite の取得・適用・取得ジョブ（SSE）（[dlsite.md](dlsite.md)）                                                                                                            |
+| `tagPrefixes.ts`         | prefix 定義の一覧・追加・変更・削除・並び替え・候補                                                                                                                         |
+| `smartFolders.ts`        | スマートフォルダーの作成（既定から追加・削除の取り消しを含む）・部分更新・削除・並び替え、作品一覧、グループの値一覧（[ADR-0040](adr/0040-smart-folder-condition-tree.md)） |
+| `fs.ts`                  | 物理 FS ブラウズ（Files モード）                                                                                                                                            |
+| `media.ts`               | カバー画像・音声・ワークスペースファイルの配信                                                                                                                              |
 
 契約上の要点:
 

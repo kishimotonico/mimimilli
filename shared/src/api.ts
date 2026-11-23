@@ -15,7 +15,7 @@ import {
   urlEntrySchema,
   workListItemSchema,
 } from "./work.ts";
-import { splitSelectedTags, type TagFilters } from "./pseudoTag.ts";
+import { MAX_SELECTED_TAGS, splitSelectedTags, type TagFilters } from "./pseudoTag.ts";
 import { rjCodeFormatSchema } from "./dlsite.ts";
 import { workspacePathSchema } from "./media.ts";
 
@@ -28,6 +28,7 @@ export const WORKS_DEFAULT_PAGE_SIZE = 200;
 /** tags= クエリを実タグと year 値へ一度だけ分解する。警告がある入力は拒否する。 */
 export const tagFiltersQuerySchema = z
   .array(z.string())
+  .max(MAX_SELECTED_TAGS, { message: `絞り込みのタグは${MAX_SELECTED_TAGS}個までです` })
   .default([])
   .superRefine((rawTags, ctx) => {
     const { warnings } = splitSelectedTags(rawTags);

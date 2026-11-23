@@ -1,16 +1,8 @@
-// スマートフォルダーの編集権限（ADR-0040）。UI が使う shared の規則と、サーバーの検証が一致することを縛る。
+// スマートフォルダーの不変条件（ADR-0040）。shared の検証関数と、UI が使う権限の規則を縛る。
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  conditionViolation,
-  groupSortViolation,
-  smartFolderPermissions,
-  sortViolation,
-  updateViolation,
-  type SmartFolder,
-  type SmartFolderWrite,
-} from "@mimimilli/shared";
-import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
+import { smartFolderPermissions, smartFolderViolation, type SmartFolder } from "@mimimilli/shared";
+import { defineContract } from "./helpers/contractHarness.ts";
 
 const EMPTY = { type: "and" as const, children: [] };
 const folder = (id: string): SmartFolder => ({
@@ -35,16 +27,6 @@ test("自作は何でも変えられる", () => {
   });
 });
 
-test("既定は名前・並び・削除だけ。条件とグループ分けは変えられない", () => {
-  assert.deepEqual(smartFolderPermissions(folder("by-cv")), {
-    rename: true,
-    editCondition: false,
-    editGroupBy: false,
-    inheritSort: true,
-    remove: true,
-  });
-});
-
 test("「すべて」は名前・条件・グループ分け・削除ができず、並びを継承にもできない", () => {
   assert.deepEqual(smartFolderPermissions(folder("all")), {
     rename: false,
@@ -55,108 +37,51 @@ test("「すべて」は名前・条件・グループ分け・削除ができ�
   });
 });
 
-test("並びだけの更新の違反: 「すべて」の空は 400 相当", () => {
-  assert.equal(sortViolation(folder("all"), null)?.kind, "invalid");
-  assert.equal(sortViolation(folder("all"), "title-asc"), null);
-  assert.equal(sortViolation(folder("fav"), null), null);
-});
-
-test("条件の更新の違反: 既定の行（「すべて」を含む）は 403 相当、自作は通る", () => {
-  assert.equal(conditionViolation(folder("fav"))?.kind, "forbidden");
-  assert.equal(conditionViolation(folder("all"))?.kind, "forbidden");
-  const own = folder("sf-00000000-0000-4000-8000-000000000001");
-  assert.equal(conditionViolation(own), null);
-});
-
-test("値の並びだけの更新の違反: グループ分けの無い行は 400 相当", () => {
-  const grouped = {
-    ...folder("by-cv"),
-    groupBy: { kind: "tag" } as const,
-    groupSort: "count-desc" as const,
-  };
-  assert.equal(groupSortViolation(grouped), null);
-  assert.equal(groupSortViolation(folder("fav"))?.kind, "invalid");
-});
-
-test("更新の違反は値で返り、種別は 403 相当と 400 相当に分かれる", () => {
-  const write = (patch: Partial<SmartFolderWrite>): SmartFolderWrite => ({
-    name: "all",
+test("行の検証: グループ分けと値の並びは、どちらも持つか、どちらも持たない", () => {
+  const row = {
+    id: "sf-x",
+    name: "x",
     condition: EMPTY,
-    sort: "added-desc",
+    sort: null,
     groupBy: null,
     groupSort: null,
-    ...patch,
-  });
-  const all = { id: "all", name: "all" };
-  assert.equal(updateViolation(all, write({})), null);
-  assert.equal(updateViolation(all, write({ name: "x" }))?.kind, "forbidden");
-  assert.equal(updateViolation(all, write({ sort: null }))?.kind, "invalid");
-  assert.equal(
-    updateViolation(all, write({ condition: { type: "and", children: [{ type: "hasError" }] } }))
-      ?.kind,
-    "forbidden",
+  };
+  assert.equal(smartFolderViolation(row), null);
+  const grouped = { groupBy: { kind: "tag" } as const, groupSort: "count-desc" as const };
+  assert.equal(smartFolderViolation({ ...row, ...grouped }), null);
+  assert.ok(smartFolderViolation({ ...row, groupBy: grouped.groupBy }));
+  assert.ok(smartFolderViolation({ ...row, groupSort: grouped.groupSort }));
+});
+
+test("行の検証: 保存できない条件の形を弾く", () => {
+  const row = { id: "sf-x", name: "x", sort: null, groupBy: null, groupSort: null };
+  const nested = {
+    type: "and" as const,
+    children: [{ type: "or" as const, children: [{ type: "or" as const, children: [] }] }],
+  };
+  assert.ok(smartFolderViolation({ ...row, condition: nested }));
+  assert.ok(smartFolderViolation({ ...row, condition: { type: "bookmarked" } }));
+});
+
+test("行の検証: 「すべて」の形は、名前・空の条件・グループ分けなし・並びあり", () => {
+  const all = {
+    id: "all",
+    name: "すべて",
+    condition: EMPTY,
+    sort: "added-desc" as const,
+    groupBy: null,
+    groupSort: null,
+  };
+  assert.equal(smartFolderViolation(all), null);
+  assert.ok(smartFolderViolation({ ...all, name: "全部" }));
+  assert.ok(smartFolderViolation({ ...all, sort: null }));
+  assert.ok(
+    smartFolderViolation({ ...all, condition: { type: "and", children: [{ type: "hasError" }] } }),
   );
+  assert.ok(smartFolderViolation({ ...all, groupBy: { kind: "tag" }, groupSort: "count-desc" }));
 });
 
 const contract = defineContract({ works: [{ key: "a", tags: ["cv/x"] }] });
-
-async function current(harness: ContractHarness, id: string): Promise<SmartFolder> {
-  const { body } = await harness.json<SmartFolder[]>("/api/smart-folders");
-  return body.find((item) => item.id === id)!;
-}
-
-async function put(harness: ContractHarness, id: string, patch: Partial<SmartFolderWrite>) {
-  const now = await current(harness, id);
-  return harness.send("PUT", `/api/smart-folders/${id}`, {
-    name: now.name,
-    condition: now.condition,
-    sort: now.sort ?? "added-desc",
-    groupBy: now.groupBy,
-    groupSort: now.groupSort,
-    ...patch,
-  });
-}
-
-contract("サーバーの検証は shared の権限と同じ結果になる", async (harness) => {
-  const created = await harness.send<SmartFolder>("POST", "/api/smart-folders", {
-    name: "自作",
-    condition: EMPTY,
-    sort: "added-desc",
-    groupBy: null,
-    groupSort: null,
-  });
-  for (const id of ["all", "fav", "by-cv", created.body.id]) {
-    const permissions = smartFolderPermissions(await current(harness, id));
-    const status = (ok: boolean, rejected: number) => (ok ? 200 : rejected);
-    assert.equal((await put(harness, id, {})).status, 200, `${id}: 同じ定義`);
-    assert.equal(
-      (await put(harness, id, { name: "改名" })).status,
-      status(permissions.rename, 403),
-      `${id}: 名前`,
-    );
-    assert.equal(
-      (await put(harness, id, { condition: { type: "and", children: [{ type: "hasError" }] } }))
-        .status,
-      status(permissions.editCondition, 403),
-      `${id}: 条件`,
-    );
-    assert.equal(
-      (await put(harness, id, { groupBy: { kind: "tag" }, groupSort: "count-desc" })).status,
-      status(permissions.editGroupBy, 403),
-      `${id}: グループ分け`,
-    );
-    assert.equal(
-      (await put(harness, id, { sort: null })).status,
-      status(permissions.inheritSort, 400),
-      `${id}: 並びの継承`,
-    );
-  }
-  for (const id of ["all", "fav", "by-cv", created.body.id]) {
-    const permissions = smartFolderPermissions(await current(harness, id));
-    const res = await harness.send("DELETE", `/api/smart-folders/${id}`);
-    assert.equal(res.status, permissions.remove ? 204 : 403, `${id}: 削除`);
-  }
-});
 
 contract("条件の検証エラーはスキーマの文言を返す", async (harness) => {
   const body = (condition: unknown) => ({
@@ -164,6 +89,7 @@ contract("条件の検証エラーはスキーマの文言を返す", async (har
     condition,
     sort: "added-desc",
     groupBy: null,
+    groupSort: null,
   });
   const empty = await harness.send(
     "POST",
@@ -172,19 +98,23 @@ contract("条件の検証エラーはスキーマの文言を返す", async (har
   );
   assert.equal(empty.status, 400);
   assert.equal(empty.body.error.message, "条件のルートは and にしてください");
-  const nested = await harness.send(
-    "POST",
-    "/api/smart-folders",
-    body({ type: "and", children: [{ type: "or", children: [] }] }),
-  );
-  assert.equal(nested.body.error.message, "子の無い or は保存できません");
-  const put = await harness.send(
-    "PUT",
-    "/api/smart-folders/fav",
-    body({ type: "and", children: [{ type: "or", children: [] }] }),
-  );
-  assert.equal(put.body.error.message, "子の無い or は保存できません");
+  const nested = {
+    type: "and",
+    children: [{ type: "or", children: [] }],
+  };
+  const created = await harness.send("POST", "/api/smart-folders", body(nested));
+  assert.equal(created.body.error.message, "子の無い or は保存できません");
+  const patched = await harness.send("PATCH", "/api/smart-folders/fav", { condition: nested });
+  assert.equal(patched.body.error.message, "子の無い or は保存できません");
   const shape = await harness.send("POST", "/api/smart-folders", body({ type: "nope" }));
   assert.equal(shape.status, 400);
-  assert.equal(shape.body.error.message, "スマートフォルダーの作成内容が不正です");
+  assert.equal(shape.body.error.message, "作成内容が不正です");
+});
+
+contract("行の不変条件の違反は、違反の説明を400で返す", async (harness) => {
+  const res = await harness.send("PATCH", "/api/smart-folders/all", { sort: null });
+  assert.equal(res.status, 400);
+  assert.equal(res.body.error.message, "「すべて」の既定の並びは空にできません");
+  const pair = await harness.send("PATCH", "/api/smart-folders/fav", { groupSort: "count-desc" });
+  assert.equal(pair.body.error.message, "値の並びはグループ分けがあるときだけ指定します");
 });

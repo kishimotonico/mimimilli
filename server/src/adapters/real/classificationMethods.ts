@@ -1,17 +1,13 @@
 import {
   DEFAULT_TAG_PREFIXES,
-  SMART_FOLDER_TEMPLATES,
-  type Condition,
-  type GroupSortId,
-  type SmartFolderWrite,
-  type SortId,
+  type SmartFolderPatch,
   type TagPrefix,
   type TagPrefixCandidate,
   type TagPrefixCreate,
   type TagPrefixUpdate,
 } from "@mimimilli/shared";
 import type { SmartFolderInsert, SmartFolderRow } from "../../adapter/classification.ts";
-import { insertFromTemplate } from "../../core/smartFolderTemplateRow.ts";
+import { initialSmartFolders } from "../../core/smartFolderInitialRows.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips } from "./dataIntegrity.ts";
@@ -29,13 +25,12 @@ export function initializeTagPrefixes(user: UserWorkStateRepository): void {
   }
 }
 
-/** 「すべて」は migration が入れる。残りの既定は初回だけ入れ、全部消しても戻さない */
 export function initializeSmartFolders(user: UserWorkStateRepository): void {
-  if (user.getUserSetting(KEY_SMART_FOLDERS_SEEDED) !== null) return;
-  const createdAt = new Date().toISOString();
   user.seedSmartFolders(
-    SMART_FOLDER_TEMPLATES.filter((template) => template.seeded).map((template) =>
-      insertFromTemplate(template, createdAt),
+    initialSmartFolders(
+      new Set(user.smartFolderIds()),
+      user.getUserSetting(KEY_SMART_FOLDERS_SEEDED) !== null,
+      new Date().toISOString(),
     ),
     KEY_SMART_FOLDERS_SEEDED,
   );
@@ -77,31 +72,14 @@ export function createClassificationMethods(deps: {
     async getSmartFolder(id: string): Promise<SmartFolderRow | null> {
       return user.getSmartFolder(id);
     },
-    async appendSmartFolder(folder: SmartFolderInsert): Promise<SmartFolderRow | null> {
-      return user.appendSmartFolder(folder);
-    },
-    async restoreSmartFolder(
-      folder: SmartFolderInsert & { position: number },
+    async insertSmartFolder(
+      folder: SmartFolderInsert,
+      position?: number,
     ): Promise<SmartFolderRow | null> {
-      return user.restoreSmartFolder(folder);
+      return user.insertSmartFolder(folder, position);
     },
-    async updateSmartFolder(id: string, input: SmartFolderWrite): Promise<SmartFolderRow | null> {
-      return user.updateSmartFolder(id, input);
-    },
-    async updateSmartFolderSort(id: string, sort: SortId | null): Promise<SmartFolderRow | null> {
-      return user.updateSmartFolderSort(id, sort);
-    },
-    async updateSmartFolderCondition(
-      id: string,
-      change: { condition: Condition; sort?: SortId | null },
-    ): Promise<SmartFolderRow | null> {
-      return user.updateSmartFolderCondition(id, change);
-    },
-    async updateSmartFolderGroupSort(
-      id: string,
-      groupSort: GroupSortId,
-    ): Promise<SmartFolderRow | null> {
-      return user.updateSmartFolderGroupSort(id, groupSort);
+    async updateSmartFolder(id: string, patch: SmartFolderPatch): Promise<SmartFolderRow | null> {
+      return user.updateSmartFolder(id, patch);
     },
     async reorderSmartFolders(ids: string[]): Promise<SmartFolderRow[] | null> {
       return user.reorderSmartFolders(ids);

@@ -1,8 +1,5 @@
 import type {
-  Condition,
-  GroupSortId,
-  SmartFolderWrite,
-  SortId,
+  SmartFolderPatch,
   TagPrefix,
   TagPrefixCandidate,
   TagPrefixCreate,
@@ -69,61 +66,25 @@ export function createClassificationMethods(state: FixtureState): Classification
       return state.smartFolders.find((f) => f.id === id) ?? null;
     },
 
-    async appendSmartFolder(folder: SmartFolderInsert): Promise<SmartFolderRow | null> {
+    async insertSmartFolder(
+      folder: SmartFolderInsert,
+      position?: number,
+    ): Promise<SmartFolderRow | null> {
       if (state.smartFolders.some((f) => f.id === folder.id)) return null;
-      const position = state.smartFolders.reduce((max, f) => Math.max(max, f.position + 1), 0);
-      const created = { ...folder, position };
+      const at =
+        position ?? state.smartFolders.reduce((max, f) => Math.max(max, f.position + 1), 0);
+      if (state.smartFolders.some((f) => f.position === at)) {
+        for (const f of state.smartFolders) if (f.position >= at) f.position += 1;
+      }
+      const created = { ...folder, position: at };
       state.smartFolders.push(created);
       return created;
     },
 
-    async restoreSmartFolder(
-      folder: SmartFolderInsert & { position: number },
-    ): Promise<SmartFolderRow | null> {
-      if (state.smartFolders.some((f) => f.id === folder.id)) return null;
-      if (state.smartFolders.some((f) => f.position === folder.position)) {
-        for (const f of state.smartFolders) if (f.position >= folder.position) f.position += 1;
-      }
-      state.smartFolders.push({ ...folder });
-      return { ...folder };
-    },
-
-    async updateSmartFolder(id: string, input: SmartFolderWrite): Promise<SmartFolderRow | null> {
+    async updateSmartFolder(id: string, patch: SmartFolderPatch): Promise<SmartFolderRow | null> {
       const folder = state.smartFolders.find((f) => f.id === id);
       if (!folder) return null;
-      folder.name = input.name;
-      folder.condition = input.condition;
-      folder.sort = input.sort;
-      folder.groupBy = input.groupBy;
-      folder.groupSort = input.groupSort;
-      return folder;
-    },
-
-    async updateSmartFolderCondition(
-      id: string,
-      change: { condition: Condition; sort?: SortId | null },
-    ): Promise<SmartFolderRow | null> {
-      const folder = state.smartFolders.find((f) => f.id === id);
-      if (!folder) return null;
-      folder.condition = change.condition;
-      if (change.sort !== undefined) folder.sort = change.sort;
-      return folder;
-    },
-
-    async updateSmartFolderGroupSort(
-      id: string,
-      groupSort: GroupSortId,
-    ): Promise<SmartFolderRow | null> {
-      const folder = state.smartFolders.find((f) => f.id === id);
-      if (!folder || folder.groupBy === null) return null;
-      folder.groupSort = groupSort;
-      return folder;
-    },
-
-    async updateSmartFolderSort(id: string, sort: SortId | null): Promise<SmartFolderRow | null> {
-      const folder = state.smartFolders.find((f) => f.id === id);
-      if (!folder) return null;
-      folder.sort = sort;
+      Object.assign(folder, patch);
       return folder;
     },
 

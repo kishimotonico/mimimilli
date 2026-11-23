@@ -94,6 +94,10 @@ contract(
   },
 );
 
+const patch = (harness: ContractHarness, id: string, body: unknown) =>
+  harness.send<SmartFolder>("PATCH", `/api/smart-folders/${id}`, body);
+const GROUPED = { groupBy: { kind: "addedYear" }, groupSort: "name-desc" };
+
 contract("作成は sf-<uuid> を採番して末尾に追加し、保存できない条件は400", async (harness) => {
   const created = await create(harness, "cv/x だけ", {
     type: "and",
@@ -117,193 +121,213 @@ contract("作成は sf-<uuid> を採番して末尾に追加し、保存でき�
   assert.equal(noSort.status, 400);
 });
 
-contract("更新は名前・条件・並び・グループ分けを置き換える", async (harness) => {
-  const created = await create(harness, "元");
-  const put = await harness.send<SmartFolder>(
-    "PUT",
-    `/api/smart-folders/${created.id}`,
-    write(
-      "先",
-      { type: "and", children: [{ type: "bookmarked" }] },
-      { sort: null, groupBy: { kind: "addedYear" }, groupSort: "name-desc" },
-    ),
+contract("作成は任意の id と position を受け、既存の id は409、形式違反は400", async (harness) => {
+  const before = await list(harness);
+  const custom = await harness.send<SmartFolder>(
+    "POST",
+    "/api/smart-folders",
+    write("自分で ID", EMPTY, { id: "my-folder-1", position: 1 }),
   );
-  assert.equal(put.status, 200);
-  assert.equal(put.body.name, "先");
-  assert.equal(put.body.sort, null);
-  assert.deepEqual(put.body.groupBy, { kind: "addedYear" });
-  assert.equal(put.body.createdAt, created.createdAt);
-  assert.equal(put.body.position, created.position);
+  assert.equal(custom.status, 201);
+  assert.equal(custom.body.id, "my-folder-1");
+  assert.equal(custom.body.position, 1);
+  const after = await list(harness);
+  assert.deepEqual(
+    after.map((f) => f.id),
+    [before[0]!.id, "my-folder-1", ...before.slice(1).map((f) => f.id)],
+  );
 
-  const missing = await harness.send("PUT", "/api/smart-folders/sf-nope", write("x"));
-  assert.equal(missing.status, 404);
+  const dup = await harness.send("POST", "/api/smart-folders", write("重複", EMPTY, { id: "fav" }));
+  assert.equal(dup.status, 409);
+  for (const id of ["Upper", "a/b", "", "a".repeat(65), "全角", "sf_underscore"]) {
+    const res = await harness.send("POST", "/api/smart-folders", write("不正", EMPTY, { id }));
+    assert.equal(res.status, 400, JSON.stringify(id));
+  }
+  const badPosition = await harness.send(
+    "POST",
+    "/api/smart-folders",
+    write("x", EMPTY, { position: -1 }),
+  );
+  assert.equal(badPosition.status, 400);
 });
 
-contract(
-  "既定の並びだけの更新は、ほかの列を触らず、「すべて」の並びは空にできない",
-  async (harness) => {
-    const created = await create(harness, "自作", {
-      type: "and",
-      children: [{ type: "bookmarked" }],
-    });
-    const renamed = await harness.send<SmartFolder>("PUT", `/api/smart-folders/${created.id}`, {
-      name: "別タブで改名",
-      condition: { type: "and", children: [{ type: "played" }] },
-      sort: "added-desc",
-      groupBy: { kind: "addedYear" },
-      groupSort: "name-desc",
-    });
-    assert.equal(renamed.status, 200);
+contract("削除した行は同じ ID・位置・作成日時を送って POST で戻せる", async (harness) => {
+  const created = await create(harness, "戻す", {
+    type: "and",
+    children: [{ type: "tag", tag: "cv/x" }],
+  });
+  await create(harness, "後ろ");
+  const before = await list(harness);
+  await harness.request(`/api/smart-folders/${created.id}`, { method: "DELETE" });
 
-    const res = await harness.send<SmartFolder>("PUT", `/api/smart-folders/${created.id}/sort`, {
-      sort: "title-asc",
-    });
-    assert.equal(res.status, 200);
-    assert.equal(res.body.sort, "title-asc");
-    assert.equal(res.body.name, "別タブで改名");
-    assert.deepEqual(res.body.condition, { type: "and", children: [{ type: "played" }] });
-    assert.deepEqual(res.body.groupBy, { kind: "addedYear" });
+  const { count: _count, createdAt: _createdAt, ...row } = created;
+  const restored = await harness.send<SmartFolder>("POST", "/api/smart-folders", row);
+  assert.equal(restored.status, 201);
+  assert.equal(restored.body.id, created.id);
+  assert.equal(restored.body.position, created.position);
+  assert.deepEqual(
+    (await list(harness)).map((f) => [f.id, f.position]),
+    before.map((f) => [f.id, f.position]),
+  );
+  assert.equal((await harness.send("POST", "/api/smart-folders", row)).status, 409);
+});
 
-    const inherit = await harness.send<SmartFolder>(
-      "PUT",
-      `/api/smart-folders/${created.id}/sort`,
-      {
-        sort: null,
-      },
-    );
-    assert.equal(inherit.status, 200);
-    assert.equal(inherit.body.sort, null);
+contract("位置が埋まっていれば、その位置以降を後ろへ送って順序を保つ", async (harness) => {
+  const created = await create(harness, "中");
+  const tail = await create(harness, "末");
+  await harness.request(`/api/smart-folders/${created.id}`, { method: "DELETE" });
+  const added = await create(harness, "新");
+  assert.equal(added.position, tail.position + 1);
+  const { count: _count, createdAt: _createdAt, ...row } = { ...created, position: tail.position };
+  const restored = await harness.send<SmartFolder>("POST", "/api/smart-folders", row);
+  assert.equal(restored.body.position, tail.position);
+  const ids = (await list(harness)).map((f) => f.id);
+  assert.deepEqual(ids.slice(-3), [created.id, tail.id, added.id]);
+});
 
-    const all = await harness.send("PUT", "/api/smart-folders/all/sort", { sort: null });
-    assert.equal(all.status, 400);
-    const allOk = await harness.send<SmartFolder>("PUT", "/api/smart-folders/all/sort", {
-      sort: "title-asc",
-    });
-    assert.equal(allOk.status, 200);
-    assert.equal(allOk.body.sort, "title-asc");
-    assert.equal(
-      (await harness.send("PUT", "/api/smart-folders/sf-nope/sort", { sort: null })).status,
-      404,
-    );
-    assert.equal(
-      (await harness.send("PUT", `/api/smart-folders/${created.id}/sort`, { sort: "x" })).status,
-      400,
-    );
-  },
-);
+contract("既定から追加は、テンプレートの定義と固定 ID を送って POST で作る", async (harness) => {
+  const template = SMART_FOLDER_TEMPLATES.find((t) => t.id === "by-series")!;
+  const { id, name, condition, sort, groupBy, groupSort } = template;
+  const added = await harness.send<SmartFolder>("POST", "/api/smart-folders", {
+    id,
+    name,
+    condition,
+    sort,
+    groupBy,
+    groupSort,
+  });
+  assert.equal(added.status, 201);
+  assert.equal(added.body.id, "by-series");
+  assert.deepEqual(added.body.groupBy, { kind: "prefix", prefix: "シリーズ" });
+  assert.equal(added.body.groupSort, "count-desc");
+  assert.equal(added.body.sort, "title-asc");
+  assert.equal(added.body.position, SEEDED_IDS.length);
+});
 
-contract(
-  "値一覧の並びだけの更新は、ほかの列を触らず、グループ分けの無い行・不正な値を弾く",
-  async (harness) => {
-    const created = await harness.send<SmartFolder>(
-      "POST",
-      "/api/smart-folders",
-      write("年別", EMPTY, { groupBy: { kind: "addedYear" }, groupSort: "name-desc" }),
-    );
-    assert.equal(created.status, 201);
-    assert.equal(created.body.groupSort, "name-desc");
-    const path = `/api/smart-folders/${created.body.id}/group-sort`;
-
-    const res = await harness.send<SmartFolder>("PUT", path, { groupSort: "last-played" });
-    assert.equal(res.status, 200);
-    assert.equal(res.body.groupSort, "last-played");
-    assert.equal(res.body.name, "年別");
-    assert.equal(res.body.sort, "added-desc");
-    assert.deepEqual(res.body.groupBy, { kind: "addedYear" });
-
-    assert.equal((await harness.send("PUT", path, { groupSort: null })).status, 400);
-    assert.equal((await harness.send("PUT", path, { groupSort: "random" })).status, 400);
-    assert.equal((await harness.send("PUT", path, { groupSort: "count-asc", x: 1 })).status, 400);
-    assert.equal(
-      (
-        await harness.send("PUT", "/api/smart-folders/sf-nope/group-sort", {
-          groupSort: "count-asc",
-        })
-      ).status,
-      404,
-    );
-    const plain = await create(harness, "グループ分けなし");
-    assert.equal(
-      (
-        await harness.send("PUT", `/api/smart-folders/${plain.id}/group-sort`, {
-          groupSort: "count-asc",
-        })
-      ).status,
-      400,
-    );
-    assert.equal(
-      (await list(harness)).find((f) => f.id === created.body.id)!.groupSort,
-      "last-played",
-    );
-  },
-);
-
-contract(
-  "条件の更新は、条件と指定した既定の並びだけを書き、名前・グループ分け・値の並びを触らない",
-  async (harness) => {
-    const tag = { type: "and", children: [{ type: "tag", tag: "ASMR" }] };
-    const created = await harness.send<SmartFolder>(
-      "POST",
-      "/api/smart-folders",
-      write("雨", EMPTY, { sort: "title-asc" }),
-    );
-    const path = `/api/smart-folders/${created.body.id}/condition`;
-    // 別の保存で名前と既定の並びが変わっても、条件の更新は巻き戻さない
-    await harness.send(
-      "PUT",
-      `/api/smart-folders/${created.body.id}`,
-      write("晴れ", EMPTY, { sort: "random" }),
-    );
-
-    const res = await harness.send<SmartFolder>("PUT", path, { condition: tag });
-    assert.equal(res.status, 200);
-    assert.deepEqual(res.body.condition, tag);
-    assert.equal(res.body.name, "晴れ");
-    assert.equal(res.body.sort, "random");
-
-    const withSort = await harness.send<SmartFolder>("PUT", path, {
-      condition: EMPTY,
-      sort: "title-desc",
-    });
-    assert.equal(withSort.body.sort, "title-desc");
-    assert.deepEqual(withSort.body.condition, EMPTY);
-    const inherit = await harness.send<SmartFolder>("PUT", path, { condition: tag, sort: null });
-    assert.equal(inherit.body.sort, null);
-    assert.equal(inherit.body.name, "晴れ");
-  },
-);
-
-contract("条件の更新は、不正な条件・未知のキー・存在しない行・既定の行を弾く", async (harness) => {
-  const created = await create(harness, "雨");
-  const path = `/api/smart-folders/${created.id}/condition`;
-
-  assert.equal((await harness.send("PUT", path, { condition: { type: "nope" } })).status, 400);
-  assert.equal((await harness.send("PUT", path, { condition: EMPTY, name: "x" })).status, 400);
-  assert.equal((await harness.send("PUT", path, { condition: EMPTY, sort: "x" })).status, 400);
+contract("条件の木の子は100個まで、入れ子は1段までで、超えたら400", async (harness) => {
+  const tags = (n: number) => Array.from({ length: n }, (_, i) => ({ type: "tag", tag: `t/${i}` }));
+  const rejected = async (condition: unknown) => {
+    const res = await harness.send("POST", "/api/smart-folders", write("x", condition));
+    assert.equal(res.status, 400, JSON.stringify(condition).slice(0, 80));
+  };
   assert.equal(
-    (await harness.send("PUT", "/api/smart-folders/sf-nope/condition", { condition: EMPTY }))
-      .status,
+    (
+      await harness.send(
+        "POST",
+        "/api/smart-folders",
+        write("100", { type: "and", children: tags(100) }),
+      )
+    ).status,
+    201,
+  );
+  await rejected({ type: "and", children: tags(101) });
+  await rejected({ type: "and", children: [{ type: "or", children: tags(101) }] });
+  await rejected({
+    type: "and",
+    children: [{ type: "not", child: { type: "or", children: tags(101) } }],
+  });
+  await rejected({
+    type: "and",
+    children: [{ type: "or", children: [{ type: "or", children: tags(2) }] }],
+  });
+  await rejected({
+    type: "and",
+    children: [{ type: "not", child: { type: "not", child: { type: "tag", tag: "a" } } }],
+  });
+
+  const deep = '{"type":"not","child":'.repeat(20000) + '{"type":"bookmarked"}' + "}".repeat(20000);
+  for (const [method, path] of [
+    ["POST", "/api/smart-folders"],
+    ["PATCH", "/api/smart-folders/fav"],
+  ] as const) {
+    const body =
+      method === "POST"
+        ? `{"name":"x","sort":null,"groupBy":null,"groupSort":null,"condition":{"type":"and","children":[${deep}]}}`
+        : `{"condition":{"type":"and","children":[${deep}]}}`;
+    const res = await harness.request(path, {
+      method,
+      headers: { "content-type": "application/json" },
+      body,
+    });
+    assert.equal(res.status, 400, `${method} ${path}`);
+  }
+});
+
+contract("チップは100個まで。超えたら作品一覧も値一覧も400", async (harness) => {
+  const tags = (n: number) => Array.from({ length: n }, (_, i) => `t/${i}`);
+  const query = (n: number) =>
+    tags(n)
+      .map((tag) => `tags=${encodeURIComponent(tag)}`)
+      .join("&");
+  const works = (n: number) =>
+    harness.request(`/api/smart-folders/all/works?sort=added-desc&${query(n)}`);
+  assert.equal((await works(100)).status, 200);
+  assert.equal((await works(101)).status, 400);
+  const groups = (n: number) =>
+    harness.send("POST", "/api/smart-folders/all/groups", {
+      groupBy: { kind: "tag" },
+      groupSort: "count-desc",
+      tags: tags(n),
+    });
+  assert.equal((await groups(100)).status, 200);
+  assert.equal((await groups(101)).status, 400);
+});
+
+contract("更新は PATCH で、送った列だけを書き、ほかの列を巻き戻さない", async (harness) => {
+  const created = await create(harness, "元", { type: "and", children: [{ type: "bookmarked" }] });
+  // 別の画面での更新が先に入っていても、送らなかった列は巻き戻さない
+  await patch(harness, created.id, { name: "別タブで改名", sort: "title-asc" });
+
+  const tag = { type: "and", children: [{ type: "tag", tag: "ASMR" }] };
+  const res = await patch(harness, created.id, { condition: tag });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.condition, tag);
+  assert.equal(res.body.name, "別タブで改名");
+  assert.equal(res.body.sort, "title-asc");
+  assert.equal(res.body.createdAt, created.createdAt);
+  assert.equal(res.body.position, created.position);
+
+  const inherit = await patch(harness, created.id, { sort: null });
+  assert.equal(inherit.body.sort, null);
+  assert.deepEqual(inherit.body.condition, tag);
+
+  const grouped = await patch(harness, created.id, GROUPED);
+  assert.equal(grouped.status, 200);
+  assert.deepEqual(grouped.body.groupBy, { kind: "addedYear" });
+  assert.equal(grouped.body.groupSort, "name-desc");
+  assert.equal(grouped.body.name, "別タブで改名");
+
+  const resorted = await patch(harness, created.id, { groupSort: "last-played" });
+  assert.equal(resorted.body.groupSort, "last-played");
+  assert.deepEqual(resorted.body.groupBy, { kind: "addedYear" });
+
+  const ungrouped = await patch(harness, created.id, { groupBy: null, groupSort: null });
+  assert.equal(ungrouped.body.groupBy, null);
+  assert.equal(ungrouped.body.groupSort, null);
+  assert.equal((await list(harness)).find((f) => f.id === created.id)!.name, "別タブで改名");
+});
+
+contract("PATCH は不正な本文・無い行を弾く", async (harness) => {
+  const created = await create(harness, "雨");
+  assert.equal((await patch(harness, created.id, {})).status, 400);
+  assert.equal((await patch(harness, created.id, { condition: { type: "nope" } })).status, 400);
+  assert.equal((await patch(harness, created.id, { sort: "x" })).status, 400);
+  assert.equal((await patch(harness, created.id, { name: " " })).status, 400);
+  assert.equal((await patch(harness, created.id, { position: 3 })).status, 400);
+  assert.equal((await patch(harness, created.id, { id: "other" })).status, 400);
+  assert.equal((await patch(harness, "sf-nope", { name: "x" })).status, 404);
+  assert.equal(
+    (await harness.send("PUT", `/api/smart-folders/${created.id}`, write("x"))).status,
     404,
   );
   assert.equal(
-    (await harness.send("PUT", "/api/smart-folders/fav/condition", { condition: EMPTY })).status,
-    403,
+    (await harness.send("PUT", `/api/smart-folders/${created.id}/sort`, { sort: null })).status,
+    404,
   );
 });
 
-contract("既定のグループ分けでも値の並びは変えられ、既定の並びは固定でない", async (harness) => {
-  const byCv = (await list(harness)).find((f) => f.id === "by-cv")!;
-  assert.equal(byCv.groupSort, "count-desc");
-  const res = await harness.send<SmartFolder>("PUT", "/api/smart-folders/by-cv/group-sort", {
-    groupSort: "name-asc",
-  });
-  assert.equal(res.status, 200);
-  assert.equal(res.body.groupSort, "name-asc");
-  assert.equal((await list(harness)).find((f) => f.id === "by-year")!.groupSort, "name-desc");
-});
-
 contract(
-  "値の並びは、グループ分けの有無と整合しない作成・更新・復元を400で弾く",
+  "グループ分けと値の並びの組が合わない作成・更新は400で、行は変わらない",
   async (harness) => {
     const grouped = { groupBy: { kind: "tag" } };
     for (const body of [
@@ -313,177 +337,83 @@ contract(
     ]) {
       assert.equal((await harness.send("POST", "/api/smart-folders", body)).status, 400);
     }
-    const created = await create(harness, "元");
-    assert.equal(
-      (
-        await harness.send(
-          "PUT",
-          `/api/smart-folders/${created.id}`,
-          write("元", EMPTY, { groupSort: "count-desc" }),
-        )
-      ).status,
-      400,
-    );
-    const fav = (await list(harness)).find((f) => f.id === "fav")!;
-    await harness.request("/api/smart-folders/fav", { method: "DELETE" });
-    const { count: _count, ...row } = fav;
-    assert.equal(
-      (
-        await harness.send("POST", "/api/smart-folders/restore", {
-          ...row,
-          groupSort: "count-desc",
-        })
-      ).status,
-      400,
-    );
-    const restored = await harness.send<SmartFolder>("POST", "/api/smart-folders/restore", row);
-    assert.equal(restored.status, 201);
-    assert.equal(restored.body.groupSort, null);
-  },
-);
+    const plain = await create(harness, "なし");
+    assert.equal((await patch(harness, plain.id, { groupSort: "count-desc" })).status, 400);
+    assert.equal((await patch(harness, plain.id, grouped)).status, 400);
 
-contract(
-  "複製・テンプレート追加・復元で値の並びが保たれ、シリーズ別の作品はタイトル順",
-  async (harness) => {
-    const byCv = (await list(harness)).find((f) => f.id === "by-cv")!;
-    const copy = await harness.send<SmartFolder>(
+    const withGroup = await harness.send<SmartFolder>(
       "POST",
       "/api/smart-folders",
-      write("CV別のコピー", byCv.condition, {
-        sort: byCv.sort,
-        groupBy: byCv.groupBy,
-        groupSort: "duration-desc",
-      }),
+      write("年別", EMPTY, GROUPED),
     );
-    assert.equal(copy.body.groupSort, "duration-desc");
-    await harness.request(`/api/smart-folders/${copy.body.id}`, { method: "DELETE" });
-    const { count: _count, ...row } = copy.body;
-    const restored = await harness.send<SmartFolder>("POST", "/api/smart-folders/restore", row);
-    assert.equal(restored.body.groupSort, "duration-desc");
-
-    const series = await harness.send<SmartFolder>("POST", "/api/smart-folders/from-template", {
-      templateId: "by-series",
-    });
-    assert.equal(series.body.groupSort, "count-desc");
-    assert.equal(series.body.sort, "title-asc");
+    assert.equal(withGroup.status, 201);
+    assert.equal((await patch(harness, withGroup.body.id, { groupBy: null })).status, 400);
+    assert.equal((await patch(harness, withGroup.body.id, { groupSort: null })).status, 400);
+    assert.equal((await patch(harness, withGroup.body.id, { groupSort: "random" })).status, 400);
+    const after = (await list(harness)).find((f) => f.id === withGroup.body.id)!;
+    assert.deepEqual(after.groupBy, { kind: "addedYear" });
+    assert.equal(after.groupSort, "name-desc");
   },
 );
 
-contract("値一覧は groupSort の並びで返り、groupSort の省略は400", async (harness) => {
-  const names = async (groupSort: string) => {
-    const res = await harness.send<Array<{ value: string; sortKey: string }>>(
-      "POST",
-      "/api/smart-folders/all/groups",
-      { groupBy: { kind: "prefix", prefix: "cv" }, groupSort },
-    );
-    assert.equal(res.status, 200);
-    return res.body.map((item) => item.value);
-  };
-  assert.deepEqual(await names("name-asc"), ["x", "y"]);
-  assert.deepEqual(await names("name-desc"), ["y", "x"]);
-  assert.equal(
-    (
-      await harness.send("POST", "/api/smart-folders/all/groups", {
-        groupBy: { kind: "prefix", prefix: "cv" },
-      })
-    ).status,
-    400,
-  );
-  const bad = await harness.send("POST", "/api/smart-folders/all/groups", {
-    groupBy: { kind: "tag" },
-    groupSort: "random",
-  });
-  assert.equal(bad.status, 400);
-});
-
-contract(
-  "値の並びの条件付き更新が行を更新できなかったら、行があれば409で値の並びは変わらない",
-  async (harness) => {
-    const created = await harness.send<SmartFolder>(
-      "POST",
-      "/api/smart-folders",
-      write("年別", EMPTY, { groupBy: { kind: "addedYear" }, groupSort: "name-desc" }),
-    );
-    const original = harness.adapter.updateSmartFolderGroupSort.bind(harness.adapter);
-    harness.adapter.updateSmartFolderGroupSort = async () => null;
-    try {
-      const res = await harness.send("PUT", `/api/smart-folders/${created.body.id}/group-sort`, {
-        groupSort: "count-asc",
-      });
-      assert.equal(res.status, 409);
-    } finally {
-      harness.adapter.updateSmartFolderGroupSort = original;
-    }
-    assert.equal(
-      (await list(harness)).find((f) => f.id === created.body.id)!.groupSort,
-      "name-desc",
-    );
-  },
-);
-
-contract("既定のものは名前・既定の並びだけ変えられ、条件とグループ分けは弾く", async (harness) => {
-  const recent = (await list(harness)).find((f) => f.id === "recent")!;
-  const ok = await harness.send<SmartFolder>("PUT", "/api/smart-folders/recent", {
+contract("既定の行は自作と同じに変えられる", async (harness) => {
+  const renamed = await patch(harness, "recent", {
     name: "最近",
-    condition: recent.condition,
+    condition: { type: "and", children: [{ type: "bookmarked" }] },
     sort: "title-asc",
-    groupBy: null,
-    groupSort: null,
+    ...GROUPED,
   });
-  assert.equal(ok.status, 200);
-  assert.equal(ok.body.name, "最近");
-  assert.equal(ok.body.sort, "title-asc");
-
-  const condition = await harness.send("PUT", "/api/smart-folders/recent", write("最近"));
-  assert.equal(condition.status, 403);
-  const groupBy = await harness.send("PUT", "/api/smart-folders/recent", {
-    ...write("最近", recent.condition),
-    groupBy: { kind: "tag" },
-    groupSort: "count-desc",
-  });
-  assert.equal(groupBy.status, 403);
-  const byCv = (await list(harness)).find((f) => f.id === "by-cv")!;
-  const regroup = await harness.send("PUT", "/api/smart-folders/by-cv", {
-    ...write("CV別", byCv.condition),
-    groupBy: { kind: "tag" },
-    groupSort: "count-desc",
-  });
-  assert.equal(regroup.status, 403);
+  assert.equal(renamed.status, 200);
+  assert.equal(renamed.body.name, "最近");
+  assert.deepEqual(renamed.body.groupBy, { kind: "addedYear" });
+  assert.equal(
+    (await patch(harness, "by-cv", { groupSort: "name-asc" })).body.groupSort,
+    "name-asc",
+  );
+  assert.equal((await patch(harness, "by-cv", { groupBy: { kind: "tag" } })).status, 200);
+  assert.equal((await list(harness)).find((f) => f.id === "by-year")!.groupSort, "name-desc");
 });
 
 contract(
-  "「すべて」は名前・条件の変更と削除ができず、既定の並びは空にできない",
+  "「すべて」は並びだけ変えられ、名前・条件・グループ分け・空の並びは400",
   async (harness) => {
-    const rename = await harness.send("PUT", "/api/smart-folders/all", write("全部"));
-    assert.equal(rename.status, 403);
-    const condition = await harness.send(
-      "PUT",
-      "/api/smart-folders/all",
-      write("すべて", {
-        type: "and",
-        children: [{ type: "bookmarked" }],
-      }),
-    );
-    assert.equal(condition.status, 403);
-    const nullSort = await harness.send(
-      "PUT",
-      "/api/smart-folders/all",
-      write("すべて", EMPTY, { sort: null }),
-    );
-    assert.equal(nullSort.status, 400);
-    const sort = await harness.send<SmartFolder>(
-      "PUT",
-      "/api/smart-folders/all",
-      write("すべて", EMPTY, { sort: "title-asc" }),
-    );
-    assert.equal(sort.status, 200);
-    assert.equal(sort.body.sort, "title-asc");
+    const bad: unknown[] = [
+      { name: "全部" },
+      { condition: { type: "and", children: [{ type: "bookmarked" }] } },
+      GROUPED,
+      { sort: null },
+    ];
+    for (const body of bad) {
+      assert.equal((await patch(harness, "all", body)).status, 400, JSON.stringify(body));
+    }
+    const sorted = await patch(harness, "all", { sort: "title-asc" });
+    assert.equal(sorted.status, 200);
+    assert.equal(sorted.body.sort, "title-asc");
+    assert.equal(sorted.body.name, "すべて");
 
     const del = await harness.request("/api/smart-folders/all", { method: "DELETE" });
-    assert.equal(del.status, 403);
+    assert.equal(del.status, 400);
     assert.ok((await list(harness)).some((f) => f.id === "all"));
   },
 );
+
+contract("消した「すべて」は、保存できる形のときだけ POST で戻せる", async (harness) => {
+  const all = (await list(harness)).find((f) => f.id === "all")!;
+  const { count: _count, createdAt: _createdAt, ...row } = all;
+  // 一時的に「すべて」が無い状態は、adapter を直接触って作る
+  await harness.adapter.deleteSmartFolder("all");
+  for (const bad of [
+    { ...row, name: "全部" },
+    { ...row, sort: null },
+    { ...row, condition: { type: "and", children: [{ type: "bookmarked" }] } },
+    { ...row, ...GROUPED },
+  ]) {
+    assert.equal((await harness.send("POST", "/api/smart-folders", bad)).status, 400);
+  }
+  const ok = await harness.send<SmartFolder>("POST", "/api/smart-folders", row);
+  assert.equal(ok.status, 201);
+  assert.equal(ok.body.id, "all");
+});
 
 contract("削除は既定のものも可能で、無い ID は404", async (harness) => {
   const del = await harness.request("/api/smart-folders/fav", { method: "DELETE" });
@@ -515,103 +445,32 @@ contract("並べ替えは全件の順序を置き換え、過不足があれば4
   }
 });
 
-contract("テンプレートから固定 ID で追加でき、今ある ID は409", async (harness) => {
-  const dup = await harness.send("POST", "/api/smart-folders/from-template", { templateId: "fav" });
-  assert.equal(dup.status, 409);
-
-  await harness.request("/api/smart-folders/fav", { method: "DELETE" });
-  const added = await harness.send<SmartFolder>("POST", "/api/smart-folders/from-template", {
-    templateId: "fav",
-  });
-  assert.equal(added.status, 201);
-  assert.equal(added.body.id, "fav");
-  assert.equal(added.body.name, "お気に入り");
-  assert.equal(added.body.position, SEEDED_IDS.length);
-
-  const series = await harness.send<SmartFolder>("POST", "/api/smart-folders/from-template", {
-    templateId: "by-series",
-  });
-  assert.equal(series.status, 201);
-  assert.deepEqual(series.body.groupBy, { kind: "prefix", prefix: "シリーズ" });
-
-  const unknown = await harness.send("POST", "/api/smart-folders/from-template", {
-    templateId: "nope",
-  });
-  assert.equal(unknown.status, 400);
-});
-
-contract("削除した行を同じ ID・位置・作成日時で戻せる", async (harness) => {
-  const created = await create(harness, "戻す", {
-    type: "and",
-    children: [{ type: "tag", tag: "cv/x" }],
-  });
-  await create(harness, "後ろ");
-  const before = await list(harness);
-  await harness.request(`/api/smart-folders/${created.id}`, { method: "DELETE" });
-
-  const { count: _count, ...row } = created;
-  const restored = await harness.send<SmartFolder>("POST", "/api/smart-folders/restore", row);
-  assert.equal(restored.status, 201);
-  assert.deepEqual(restored.body, created);
-  assert.deepEqual(
-    (await list(harness)).map((f) => [f.id, f.position, f.createdAt]),
-    before.map((f) => [f.id, f.position, f.createdAt]),
+contract("値一覧は groupSort の並びで返り、groupSort の省略は400", async (harness) => {
+  const names = async (groupSort: string) => {
+    const res = await harness.send<Array<{ value: string; sortKey: string }>>(
+      "POST",
+      "/api/smart-folders/all/groups",
+      { groupBy: { kind: "prefix", prefix: "cv" }, groupSort },
+    );
+    assert.equal(res.status, 200);
+    return res.body.map((item) => item.value);
+  };
+  assert.deepEqual(await names("name-asc"), ["x", "y"]);
+  assert.deepEqual(await names("name-desc"), ["y", "x"]);
+  assert.equal(
+    (
+      await harness.send("POST", "/api/smart-folders/all/groups", {
+        groupBy: { kind: "prefix", prefix: "cv" },
+      })
+    ).status,
+    400,
   );
-
-  const exists = await harness.send("POST", "/api/smart-folders/restore", row);
-  assert.equal(exists.status, 409);
+  const bad = await harness.send("POST", "/api/smart-folders/all/groups", {
+    groupBy: { kind: "tag" },
+    groupSort: "random",
+  });
+  assert.equal(bad.status, 400);
 });
-
-contract("復元は位置が埋まっていれば後ろへ送り、順序を保つ", async (harness) => {
-  const created = await create(harness, "中");
-  const tail = await create(harness, "末");
-  await harness.request(`/api/smart-folders/${created.id}`, { method: "DELETE" });
-  const reordered = await create(harness, "新");
-  assert.equal(reordered.position, tail.position + 1);
-  const { count: _count, ...row } = { ...created, position: tail.position };
-  const restored = await harness.send<SmartFolder>("POST", "/api/smart-folders/restore", row);
-  assert.equal(restored.status, 201);
-  assert.equal(restored.body.position, tail.position);
-  const ids = (await list(harness)).map((f) => f.id);
-  assert.deepEqual(ids.slice(-3), [created.id, tail.id, reordered.id]);
-});
-
-contract(
-  "既定の ID の復元は条件・グループ分けがテンプレートと一致するときだけ通る",
-  async (harness) => {
-    const fav = (await list(harness)).find((f) => f.id === "fav")!;
-    await harness.request("/api/smart-folders/fav", { method: "DELETE" });
-    const { count: _count, ...row } = fav;
-
-    const tampered = await harness.send("POST", "/api/smart-folders/restore", {
-      ...row,
-      condition: EMPTY,
-    });
-    assert.equal(tampered.status, 400);
-    const regrouped = await harness.send("POST", "/api/smart-folders/restore", {
-      ...row,
-      groupBy: { kind: "tag" },
-      groupSort: "count-desc",
-    });
-    assert.equal(regrouped.status, 400);
-    const renamed = await harness.send<SmartFolder>("POST", "/api/smart-folders/restore", {
-      ...row,
-      name: "好き",
-      sort: "title-asc",
-    });
-    assert.equal(renamed.status, 201);
-    assert.equal(renamed.body.id, "fav");
-    assert.equal(renamed.body.position, fav.position);
-
-    const all = await harness.send("POST", "/api/smart-folders/restore", { ...row, id: "all" });
-    assert.equal(all.status, 400);
-    const unknownId = await harness.send("POST", "/api/smart-folders/restore", {
-      ...row,
-      id: "something",
-    });
-    assert.equal(unknownId.status, 400);
-  },
-);
 
 contract("作品一覧は条件・チップ・検索語・グループの値を AND で評価する", async (harness) => {
   const folder = await create(harness, "cv", {

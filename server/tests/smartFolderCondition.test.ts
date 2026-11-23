@@ -8,9 +8,10 @@ import {
   showsCount,
   smartFolderGroupsRequestSchema,
   smartFolderSchema,
-  smartFolderRestoreSchema,
   smartFolderWorksRequestSchema,
-  smartFolderWriteSchema,
+  smartFolderCreateSchema,
+  smartFolderPatchSchema,
+  smartFolderViolation,
   SMART_FOLDER_TEMPLATES,
   type Condition,
 } from "@mimimilli/shared";
@@ -110,7 +111,8 @@ test("既定テンプレート: 13本・初回11本・固定IDで、条件は保
     ["by-series", "by-rating"],
   );
   for (const t of SMART_FOLDER_TEMPLATES) {
-    const parsed = smartFolderWriteSchema.safeParse({
+    const parsed = smartFolderCreateSchema.safeParse({
+      id: t.id,
       name: t.name,
       condition: t.condition,
       sort: t.sort,
@@ -119,6 +121,7 @@ test("既定テンプレート: 13本・初回11本・固定IDで、条件は保
     });
     assert.ok(parsed.success, t.id);
     assert.deepEqual(parsed.data.condition, t.condition);
+    assert.equal(smartFolderViolation({ ...parsed.data, id: t.id }), null, t.id);
   }
   const all = SMART_FOLDER_TEMPLATES[0]!;
   assert.deepEqual([all.id, all.sort, all.groupBy], ["all", "added-desc", null]);
@@ -180,23 +183,23 @@ test("text は trim し、空は弾き、trim 後で重複を落とす", () => {
   );
 });
 
-test("復元できる ID は sf-<uuid> と all 以外のテンプレート ID", () => {
-  const base = {
-    name: "x",
-    condition: and(),
-    sort: null,
-    groupBy: null,
-    groupSort: null,
-    position: 0,
-    createdAt: "2026-01-01T00:00:00.000Z",
-  };
-  const ok = (id: string) => smartFolderRestoreSchema.safeParse({ ...base, id }).success;
+test("作成の id は小文字・数字・ハイフンの64文字までで、省ける", () => {
+  const base = { name: "x", condition: and(), sort: null, groupBy: null, groupSort: null };
+  const ok = (id: string) => smartFolderCreateSchema.safeParse({ ...base, id }).success;
+  assert.ok(smartFolderCreateSchema.safeParse(base).success);
   assert.ok(ok("sf-123e4567-e89b-42d3-a456-426614174000"));
   assert.ok(ok("by-cv"));
-  assert.ok(!ok("all"));
-  assert.ok(!ok("sf-1"));
-  assert.ok(!ok("whatever"));
-  assert.ok(!smartFolderRestoreSchema.safeParse({ ...base, id: "by-cv", createdAt: "t" }).success);
+  assert.ok(ok("a".repeat(64)));
+  assert.ok(!ok("a".repeat(65)));
+  assert.ok(!ok(""));
+  assert.ok(!ok("Upper"));
+  assert.ok(!ok("a/b"));
+});
+
+test("更新は1列以上を持ち、未知のキーを受け付けない", () => {
+  assert.ok(!smartFolderPatchSchema.safeParse({}).success);
+  assert.ok(smartFolderPatchSchema.safeParse({ sort: null }).success);
+  assert.ok(!smartFolderPatchSchema.safeParse({ sort: null, position: 1 }).success);
 });
 
 test("一覧の1行は condition が null だと読めない", () => {

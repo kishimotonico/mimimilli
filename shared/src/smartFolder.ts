@@ -2,11 +2,11 @@
 import { z } from "zod";
 import { tagFiltersQuerySchema } from "./api.ts";
 import {
-  conditionKey,
   conditionSchema,
   isEmptyCondition,
   isHasErrorOnly,
   prefixSchema,
+  savedConditionViolation,
   type Condition,
 } from "./condition.ts";
 import {
@@ -32,49 +32,44 @@ export function defaultGroupSort(groupBy: GroupBy): GroupSortId {
   return groupBy.kind === "addedYear" ? "name-desc" : "count-desc";
 }
 
-/** グループ分けと値の並びは、グループ分けがあるときだけ両方が揃う */
-function hasConsistentGroupSort(folder: {
-  groupBy: GroupBy | null;
-  groupSort: GroupSortId | null;
-}): boolean {
-  return (folder.groupBy === null) === (folder.groupSort === null);
-}
-
-const GROUP_SORT_MISMATCH = { message: "値の並びはグループ分けがあるときだけ指定します" };
-
 // ── 保存形 ───────────────────────────────────────────────────
 
 const smartFolderNameSchema = z.string().trim().min(1);
 
-/** POST・PUT のボディ。条件は保存できる形だけを通し、正規化して返す */
-export const smartFolderWriteSchema = z
-  .strictObject({
-    name: smartFolderNameSchema,
-    condition: conditionSchema,
-    /** 値を選んだ後（グループ分けなしは全体）の作品一覧の並び。null は「『すべて』と同じ」 */
-    sort: sortIdSchema.nullable(),
-    groupBy: groupBySchema.nullable(),
-    /** 値一覧の並び。グループ分けがあるときだけ必須で、「すべて」からの継承は無い */
-    groupSort: groupSortIdSchema.nullable(),
-  })
-  .refine(hasConsistentGroupSort, GROUP_SORT_MISMATCH);
-export type SmartFolderWrite = z.infer<typeof smartFolderWriteSchema>;
+/** URL のパスに入るので、形式だけを検査する */
+const smartFolderIdSchema = z
+  .string()
+  .regex(/^[a-z0-9-]{1,64}$/, { message: "ID は半角小文字・数字・ハイフンの64文字までです" });
 
-/** PUT /:id/sort のボディ。既定の並びだけを更新する */
-export const smartFolderSortWriteSchema = z.strictObject({ sort: sortIdSchema.nullable() });
-export type SmartFolderSortWrite = z.infer<typeof smartFolderSortWriteSchema>;
-
-/** PUT /:id/condition のボディ。検索の上書きと、その取り消し。条件と、変えるときだけ既定の並びを更新し、
- *  名前・グループ分け・値の並びは触らない（sort を省けば既定の並びも触らない） */
-export const smartFolderConditionWriteSchema = z.strictObject({
+const definitionShape = {
+  name: smartFolderNameSchema,
+  /** 保存できる形だけを通し、正規化して返す */
   condition: conditionSchema,
-  sort: sortIdSchema.nullable().optional(),
-});
-export type SmartFolderConditionWrite = z.infer<typeof smartFolderConditionWriteSchema>;
+  /** 値を選んだ後（グループ分けなしは全体）の作品一覧の並び。null は「『すべて』と同じ」 */
+  sort: sortIdSchema.nullable(),
+  groupBy: groupBySchema.nullable(),
+  /** 値一覧の並び。グループ分けがあるときだけ必須で、「すべて」からの継承は無い */
+  groupSort: groupSortIdSchema.nullable(),
+};
 
-/** PUT /:id/group-sort のボディ。値一覧の並びだけを更新する */
-export const smartFolderGroupSortWriteSchema = z.strictObject({ groupSort: groupSortIdSchema });
-export type SmartFolderGroupSortWrite = z.infer<typeof smartFolderGroupSortWriteSchema>;
+/** POST /smart-folders のボディ。通常の作成・既定から追加・削除の取り消しのすべてがこの形を通る。
+ *  id を省くと採番して末尾に入れ、position を渡すとその位置に入れて後ろをずらす */
+export const smartFolderCreateSchema = z.strictObject({
+  ...definitionShape,
+  id: smartFolderIdSchema.optional(),
+  position: z.number().int().nonnegative().optional(),
+});
+export type SmartFolderCreate = z.infer<typeof smartFolderCreateSchema>;
+
+/** 画面で編集する定義（ID と位置を除いた列） */
+export type SmartFolderWrite = Omit<SmartFolderCreate, "id" | "position">;
+
+/** PATCH /smart-folders/:id のボディ。送った列だけを更新する */
+export const smartFolderPatchSchema = z
+  .strictObject(definitionShape)
+  .partial()
+  .refine((patch) => Object.keys(patch).length > 0, { message: "更新する項目がありません" });
+export type SmartFolderPatch = z.infer<typeof smartFolderPatchSchema>;
 
 /** 一覧の1行。保存と同じ検証を通った行だけが載る。sort の null は「『すべて』と同じ」 */
 export const smartFolderSchema = z.object({
@@ -100,28 +95,44 @@ export const smartFolderOrderSchema = z.strictObject({
 });
 export type SmartFolderOrder = z.infer<typeof smartFolderOrderSchema>;
 
-const USER_SMART_FOLDER_ID = /^sf-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export type SmartFolderRowFields = Pick<
+  SmartFolderCreate,
+  "name" | "condition" | "sort" | "groupBy" | "groupSort"
+> & { id: string };
 
-export const smartFolderRestoreSchema = z
-  .strictObject({
-    id: z
-      .string()
-      .refine(
-        (id) =>
-          USER_SMART_FOLDER_ID.test(id) ||
-          (id !== ALL_SMART_FOLDER_ID && SMART_FOLDER_TEMPLATES.some((t) => t.id === id)),
-        { message: "復元できない ID です" },
-      ),
-    name: smartFolderNameSchema,
-    condition: conditionSchema,
-    sort: sortIdSchema.nullable(),
-    groupBy: groupBySchema.nullable(),
-    groupSort: groupSortIdSchema.nullable(),
-    position: z.number().int().nonnegative(),
-    createdAt: z.iso.datetime({ offset: true }),
-  })
-  .refine(hasConsistentGroupSort, GROUP_SORT_MISMATCH);
-export type SmartFolderRestore = z.infer<typeof smartFolderRestoreSchema>;
+export interface SmartFolderViolation {
+  /** 違反した列 */
+  field: "name" | "condition" | "sort" | "groupBy" | "groupSort";
+  message: string;
+}
+
+/** 作成・更新・読み出しのいずれも、できあがる行をこの1関数で検証する。見るのはデータの不変条件だけ */
+export function smartFolderViolation(row: SmartFolderRowFields): SmartFolderViolation | null {
+  const condition = savedConditionViolation(row.condition);
+  if (condition) return { field: "condition", message: condition };
+  if (row.groupBy !== null && row.groupSort === null) {
+    return { field: "groupSort", message: "グループ分けには値の並びが要ります" };
+  }
+  if (row.groupBy === null && row.groupSort !== null) {
+    return { field: "groupSort", message: "値の並びはグループ分けがあるときだけ指定します" };
+  }
+  if (row.id === ALL_SMART_FOLDER_ID) {
+    const all = `「${ALL_SMART_FOLDER_NAME}」`;
+    if (row.name !== ALL_SMART_FOLDER_NAME) {
+      return { field: "name", message: `${all}の名前は変えられません` };
+    }
+    if (!isEmptyCondition(row.condition)) {
+      return { field: "condition", message: `${all}の条件は空のままにしてください` };
+    }
+    if (row.groupBy !== null) {
+      return { field: "groupBy", message: `${all}にグループ分けは付けられません` };
+    }
+    if (row.sort === null) {
+      return { field: "sort", message: `${all}の既定の並びは空にできません` };
+    }
+  }
+  return null;
+}
 
 // ── 作品一覧・値一覧の要求 ────────────────────────────────────
 
@@ -179,6 +190,7 @@ export function needsCount(folder: CountSubject): boolean {
 // ── 既定テンプレート ─────────────────────────────────────────
 
 export const ALL_SMART_FOLDER_ID = "all";
+export const ALL_SMART_FOLDER_NAME = "すべて";
 
 export interface SmartFolderTemplate {
   id: string;
@@ -211,8 +223,8 @@ const grouped = (
 
 export const SMART_FOLDER_TEMPLATES: readonly SmartFolderTemplate[] = [
   {
-    id: "all",
-    name: "すべて",
+    id: ALL_SMART_FOLDER_ID,
+    name: ALL_SMART_FOLDER_NAME,
     condition: and(),
     sort: "added-desc",
     groupBy: null,
@@ -278,24 +290,13 @@ export const SMART_FOLDER_TEMPLATES: readonly SmartFolderTemplate[] = [
   grouped("by-rating", "レーティング別", { kind: "prefix", prefix: "rating" }, { seeded: false }),
 ];
 
-export const smartFolderTemplateIdSchema = z.enum(
-  SMART_FOLDER_TEMPLATES.map((t) => t.id) as [string, ...string[]],
-);
-
-/** POST /from-template */
-export const smartFolderFromTemplateSchema = z.strictObject({
-  templateId: smartFolderTemplateIdSchema,
-});
-export type SmartFolderFromTemplate = z.infer<typeof smartFolderFromTemplateSchema>;
-
 export function findSmartFolderTemplate(id: string): SmartFolderTemplate | undefined {
   return SMART_FOLDER_TEMPLATES.find((template) => template.id === id);
 }
 
 // ── 編集の権限 ───────────────────────────────────────────────
 
-/** 権限を決めるのはテンプレートの固定 ID だけ。条件の意味では決めない。
- *  client の UI の出し分けと server の検証が、この規則を共有する */
+/** client の UI の出し分け。サーバーが守るのは smartFolderViolation の不変条件だけで、権限では弾かない */
 export interface SmartFolderPermissions {
   rename: boolean;
   editCondition: boolean;
@@ -315,84 +316,4 @@ export function smartFolderPermissions(folder: Pick<SmartFolder, "id">): SmartFo
     inheritSort: !isAll,
     remove: !isAll,
   };
-}
-
-/** 権限の違反。forbidden は 403、invalid は 400 に写す */
-export interface PolicyViolation {
-  kind: "forbidden" | "invalid";
-  message: string;
-}
-
-const forbidden = (message: string): PolicyViolation => ({ kind: "forbidden", message });
-const invalid = (message: string): PolicyViolation => ({ kind: "invalid", message });
-
-function sameTemplateDefinition(
-  template: SmartFolderTemplate,
-  folder: { condition: Condition; groupBy: GroupBy | null },
-): boolean {
-  return (
-    conditionKey(folder.condition) === conditionKey(template.condition) &&
-    JSON.stringify(folder.groupBy) === JSON.stringify(template.groupBy)
-  );
-}
-
-/** 更新の違反。既定のものは名前・既定の並び・値の並びだけ変えられる。「すべて」は名前も変えられず、並びを null にもできない。
- */
-export function updateViolation(
-  existing: Pick<SmartFolder, "id" | "name">,
-  write: SmartFolderWrite,
-): PolicyViolation | null {
-  const permissions = smartFolderPermissions(existing);
-  const template = findSmartFolderTemplate(existing.id);
-  if (template && !sameTemplateDefinition(template, write)) {
-    return forbidden("既定のスマートフォルダーの条件・グループ分けは変更できません");
-  }
-  if (!permissions.rename && write.name !== existing.name) {
-    return forbidden("「すべて」の名前は変更できません");
-  }
-  if (!permissions.inheritSort && write.sort === null) {
-    return invalid("「すべて」の既定の並びは空にできません");
-  }
-  return null;
-}
-
-/** 既定の並びだけの更新の違反。「すべて」は並びを空にできない */
-export function sortViolation(
-  existing: Pick<SmartFolder, "id">,
-  sort: SortId | null,
-): PolicyViolation | null {
-  if (!smartFolderPermissions(existing).inheritSort && sort === null) {
-    return invalid("「すべて」の既定の並びは空にできません");
-  }
-  return null;
-}
-
-/** 条件の更新（検索の上書き）の違反。既定のスマートフォルダー（「すべて」を含む）は条件を変えられない */
-export function conditionViolation(existing: Pick<SmartFolder, "id">): PolicyViolation | null {
-  return smartFolderPermissions(existing).editCondition
-    ? null
-    : forbidden("既定のスマートフォルダーの条件・グループ分けは変更できません");
-}
-
-/** 値一覧の並びだけの更新の違反。グループ分けの無い行には値の並びが無い */
-export function groupSortViolation(existing: Pick<SmartFolder, "groupBy">): PolicyViolation | null {
-  if (existing.groupBy === null) {
-    return invalid("グループ分けのないスマートフォルダーに値の並びはありません");
-  }
-  return null;
-}
-
-export function deleteViolation(existing: Pick<SmartFolder, "id">): PolicyViolation | null {
-  return smartFolderPermissions(existing).remove ? null : forbidden("「すべて」は削除できません");
-}
-
-/** テンプレートの固定 ID の行は、条件・グループ分けがテンプレートと一致するときだけ戻せる */
-export function restoreViolation(restore: SmartFolderRestore): PolicyViolation | null {
-  const template = findSmartFolderTemplate(restore.id);
-  if (template && !sameTemplateDefinition(template, restore)) {
-    return invalid(
-      "既定のスマートフォルダーは、条件・グループ分けがテンプレートと同じものだけ戻せます",
-    );
-  }
-  return null;
 }

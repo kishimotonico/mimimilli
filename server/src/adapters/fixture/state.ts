@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import {
   DEFAULT_TAG_PREFIXES,
-  SMART_FOLDER_TEMPLATES,
   dlsiteFetchStateOfResolution,
   projectDlsiteState,
   toDlsiteLinkageStatus,
@@ -32,7 +31,7 @@ import {
   type SeedPlaylistSpec,
 } from "./data.ts";
 import type { SmartFolderRow } from "../../adapter/classification.ts";
-import { insertFromTemplate } from "../../core/smartFolderTemplateRow.ts";
+import { initialSmartFolders } from "../../core/smartFolderInitialRows.ts";
 import { requireConfiguredRoot } from "../../core/rootFolder.ts";
 import { createFixtureScenario, type FixtureRootReconfiguration } from "./scenarios.ts";
 
@@ -333,9 +332,10 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     dlsiteCovers: new Map(),
     coverColumns,
     tagPrefixes: DEFAULT_TAG_PREFIXES.map((def) => ({ ...def })),
-    smartFolders: SMART_FOLDER_TEMPLATES.filter((template) => template.seeded).map(
-      (template, position) => ({ ...insertFromTemplate(template, now), position }),
-    ),
+    smartFolders: initialSmartFolders(new Set(), false, now).map((folder, position) => ({
+      ...folder,
+      position,
+    })),
     resumes: new Map(),
     playbackIds: new Map(),
     playlistSpecs: new Map(Object.entries({ ...SEED_PLAYLIST_SPECS, ...options.playlistSpecs })),

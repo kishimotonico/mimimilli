@@ -1,9 +1,7 @@
 import type {
   Condition,
   SmartFolder,
-  GroupSortId,
-  SmartFolderWrite,
-  SortId,
+  SmartFolderPatch,
   TagPrefix,
   TagPrefixCandidate,
   TagPrefixCreate,
@@ -23,22 +21,10 @@ export interface ClassificationAdapter {
   /** position の昇順。読めない行が1つでもあれば UnreadableSmartFolderError を投げる */
   listSmartFolders(): Promise<SmartFolderRow[]>;
   getSmartFolder(id: string): Promise<SmartFolderRow | null>;
-  /** 末尾へ追加する。ID が既にあれば null */
-  appendSmartFolder(folder: SmartFolderInsert): Promise<SmartFolderRow | null>;
-  /** 同じ ID・位置・作成日時で戻す。位置が埋まっていればその位置以降を後ろへ送る。ID が既にあれば null */
-  restoreSmartFolder(
-    folder: SmartFolderInsert & { position: number },
-  ): Promise<SmartFolderRow | null>;
-  updateSmartFolder(id: string, input: SmartFolderWrite): Promise<SmartFolderRow | null>;
-  /** 既定の並びの列だけを更新する。ほかの列は触らない */
-  updateSmartFolderSort(id: string, sort: SortId | null): Promise<SmartFolderRow | null>;
-  /** 条件の列と、sort があるときだけ既定の並びの列を更新する。ほかの列は触らない */
-  updateSmartFolderCondition(
-    id: string,
-    change: { condition: Condition; sort?: SortId | null },
-  ): Promise<SmartFolderRow | null>;
-  /** 値一覧の並びの列だけを更新する。ほかの列は触らない。行がない、またはグループ分けがなければ null */
-  updateSmartFolderGroupSort(id: string, groupSort: GroupSortId): Promise<SmartFolderRow | null>;
+  /** ID が既にあれば null。position を渡すとその位置に入れ、埋まっていればその位置以降を後ろへ送る。省けば末尾 */
+  insertSmartFolder(folder: SmartFolderInsert, position?: number): Promise<SmartFolderRow | null>;
+  /** 送った列だけを更新する。ほかの列は触らない。行がなければ null */
+  updateSmartFolder(id: string, patch: SmartFolderPatch): Promise<SmartFolderRow | null>;
   /** 全件の順序を置き換える。渡された集合が今の集合と一致しなければ null */
   reorderSmartFolders(ids: string[]): Promise<SmartFolderRow[] | null>;
   deleteSmartFolder(id: string): Promise<boolean>;

@@ -2,15 +2,15 @@
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
-import { conditionKey, SMART_FOLDER_TEMPLATES, findSmartFolderTemplate } from "@mimimilli/shared";
+import { eq } from "drizzle-orm";
+import { SMART_FOLDER_TEMPLATES, findSmartFolderTemplate } from "@mimimilli/shared";
 import { UnreadableSmartFolderError } from "../../src/errors.ts";
 import { createApp } from "../helpers/testApp.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { smartFolders } from "../../src/adapters/real/userSchema.ts";
-import { createWorkRepos } from "../helpers/workTestUtils.ts";
 import { captureLogs, categoryRecords } from "../helpers/logCapture.ts";
-import { makeTestDirectory, makeTestScope } from "../helpers/sampleLibrary.ts";
+import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
 
 function openAdapter(directory: ReturnType<typeof makeTestDirectory>) {
   return directory.own(
@@ -25,28 +25,6 @@ function openAdapter(directory: ReturnType<typeof makeTestDirectory>) {
     }),
   );
 }
-
-test("migration が入れる「すべて」は shared のテンプレートと一致する", (t) => {
-  const scope = makeTestScope();
-  t.after(scope.cleanup);
-  const db = scope.own(openDb({ kind: "memory" }));
-  const { user } = createWorkRepos(db);
-
-  const rows = user.listSmartFolders();
-  assert.deepEqual(
-    rows.map((row) => row.id),
-    ["all"],
-  );
-  const row = rows[0]!;
-  const template = findSmartFolderTemplate("all")!;
-  assert.equal(row.name, template.name);
-  assert.equal(row.sort, template.sort);
-  assert.equal(row.groupBy, template.groupBy);
-  assert.equal(row.groupSort, template.groupSort);
-  assert.equal(row.position, 0);
-  assert.ok(row.condition && conditionKey(row.condition) === conditionKey(template.condition));
-  assert.ok(Number.isFinite(Date.parse(row.createdAt)));
-});
 
 test("既定は初回だけ投入され、全部消しても再起動で戻らない", async (t) => {
   const directory = makeTestDirectory("sf-seed");
@@ -66,7 +44,7 @@ test("既定は初回だけ投入され、全部消しても再起動で戻ら�
     (await second.listSmartFolders()).map((row) => row.id),
     ["all"],
   );
-  const added = await second.appendSmartFolder({
+  const added = await second.insertSmartFolder({
     id: "fav",
     name: "お気に入り",
     condition: findSmartFolderTemplate("fav")!.condition,
@@ -76,6 +54,33 @@ test("既定は初回だけ投入され、全部消しても再起動で戻ら�
     createdAt: new Date().toISOString(),
   });
   assert.equal(added?.position, 1);
+  await second.close?.();
+});
+
+test("「すべて」の行を消して起動し直すと戻り、ほかの既定は戻らない", async (t) => {
+  const directory = makeTestDirectory("sf-all-recover");
+  t.after(directory.cleanup);
+
+  const first = openAdapter(directory);
+  const before = await first.getSmartFolder("all");
+  assert.ok(before);
+  await first.deleteSmartFolder("all");
+  await first.deleteSmartFolder("fav");
+  await first.close?.();
+
+  const second = openAdapter(directory);
+  const rows = await second.listSmartFolders();
+  const seededIds = SMART_FOLDER_TEMPLATES.filter((template) => template.seeded).map(
+    (template) => template.id,
+  );
+  assert.deepEqual(rows.map((row) => row.id).sort(), seededIds.filter((id) => id !== "fav").sort());
+  const all = await second.getSmartFolder("all");
+  const template = findSmartFolderTemplate("all")!;
+  assert.equal(all?.name, template.name);
+  assert.equal(all?.sort, template.sort);
+  assert.deepEqual(all?.condition, template.condition);
+  assert.equal(all?.groupBy, null);
+  assert.equal(all?.groupSort, null);
   await second.close?.();
 });
 
@@ -160,6 +165,38 @@ for (const { id, column, row } of UNREADABLE_ROWS) {
     );
   });
 }
+
+test("「すべて」の行を手で書き換えて形を壊すと、読めない行として 500 で案内する", async (t) => {
+  const directory = makeTestDirectory("sf-broken-all");
+  t.after(directory.cleanup);
+  const adapter = openAdapter(directory);
+  const app = createApp(adapter);
+  const db = directory.own(
+    openDb({
+      kind: "files",
+      catalogPath: join(directory.path, "catalog.sqlite"),
+      userPath: join(directory.path, "user.sqlite"),
+    }),
+  );
+  db.user.update(smartFolders).set({ sort: null }).where(eq(smartFolders.id, "all")).run();
+  const userPath = join(directory.path, "user.sqlite");
+
+  for (const path of ["/api/smart-folders", "/api/smart-folders/all/works?sort=added-desc"]) {
+    const res = await app.request(path);
+    assert.equal(res.status, 500, path);
+    const message = ((await res.json()) as { error: { message: string } }).error.message;
+    assert.ok(message.includes("ID: all") && message.includes("sort"), message);
+    assert.ok(
+      message.includes(`sqlite3 "${userPath}" "DELETE FROM smart_folders WHERE id = 'all'"`),
+      message,
+    );
+  }
+  await adapter.deleteSmartFolder("all");
+  await adapter.close?.();
+  const reopened = openAdapter(directory);
+  assert.equal((await reopened.getSmartFolder("all"))?.sort, "added-desc");
+  await reopened.close?.();
+});
 
 test("読めない行が複数あれば、すべての行を1つの応答にまとめる。行を消すと一覧は読める", async (t) => {
   const directory = makeTestDirectory("sf-broken-many");
