@@ -113,6 +113,7 @@ const UNREADABLE_ROWS: Array<{ id: string; column: string; row: Record<string, u
     column: "condition_json",
     row: { conditionJson: '{"type":"or","children":[]}' },
   },
+  { id: "empty-name", column: "name", row: { name: "" } },
   { id: "broken-sort", column: "sort", row: { sort: "unknown" } },
   { id: "broken-group", column: "group_by_json", row: { groupByJson: '{"kind":"x"}' } },
   { id: "broken-group-sort", column: "group_sort", row: { groupSort: "unknown" } },

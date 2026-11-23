@@ -168,7 +168,7 @@ export function selectLibraryWork(route: AppRoute, id: string | null): Transitio
   };
 }
 
-/** 並び順メニューでの変更。今の並びとして履歴エントリーへ書く */
+/** ソートメニューでの変更。今の並びとして履歴エントリーへ書く */
 export function setLibrarySort(route: AppRoute, sort: SortId): Transition | null {
   if (route.library.sort === sort) return null;
   return { route: withLibrary(route, { sort }), replace: true };
