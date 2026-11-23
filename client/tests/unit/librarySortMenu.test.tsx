@@ -1,4 +1,4 @@
-// 並び順メニュー: 今の並び（履歴エントリーの状態）の変更、既定の並びとして保存、値一覧のソート、並べ直す。
+// ソートメニュー: 今のソート（履歴エントリーの状態）の変更、既定のソートとして保存、値一覧のソート、並べ直す。
 
 import { createElement } from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -95,7 +95,7 @@ describe("LibrarySortMenu", () => {
     expect(screen.queryByRole("menu", { name: "ソート" })).not.toBeInTheDocument();
   });
 
-  it("今の並びが無いときはスマートフォルダーの既定の並びを表示する", () => {
+  it("今のソートが無いときはスマートフォルダーの既定のソートを表示する", () => {
     renderSortMenu({ folderId: "recent", sort: null });
     expect(screen.getByRole("button", { name: "ソート" })).toHaveAttribute(
       "title",
@@ -103,7 +103,7 @@ describe("LibrarySortMenu", () => {
     );
   });
 
-  it("「『すべて』と同じ」のスマートフォルダーは「すべて」の既定の並びの変更に従う", () => {
+  it("「『すべて』と同じ」のスマートフォルダーは「すべて」の既定のソートの変更に従う", () => {
     const folders = defaultSmartFolders().map((folder) =>
       folder.id === "all" ? { ...folder, sort: "title-asc" as const } : folder,
     );
@@ -171,7 +171,7 @@ describe("LibrarySortMenu", () => {
     expect(button).toHaveFocus();
   });
 
-  it("値一覧では8種の並びを出し、今の値の並びを route へ書く（作品の並びには影響しない）", () => {
+  it("値一覧では8種のソートを出し、今の値一覧のソートを route へ書く（作品のソートには影響しない）", () => {
     const { store } = renderSortMenu({ folderId: "by-cv", sort: "duration-desc" });
     const button = screen.getByRole("button", { name: "ソート" });
 
@@ -238,7 +238,7 @@ describe("LibrarySortMenu", () => {
     );
   });
 
-  it("値の並びが既定から外れているときだけ「このソートを既定にする」を出し、保存すると今の並びは残ったまま既定と同じになって項目が消える", async () => {
+  it("値一覧のソートが既定から外れているときだけ「このソートを既定にする」を出し、保存すると今の並びは残ったまま既定と同じになって項目が消える", async () => {
     const { store, api } = renderSortMenu({ folderId: "by-cv", groupSort: "name-asc" });
     fireEvent.click(screen.getByRole("button", { name: "ソート" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "このソートを既定にする" }));
@@ -271,7 +271,7 @@ describe("LibrarySortMenu", () => {
     expect(screen.queryByRole("button", { name: "並べ直す" })).not.toBeInTheDocument();
   });
 
-  it("フォルダーの既定の並びがランダムなら今の並びが無くても「並べ直す」を表示する", () => {
+  it("フォルダーの既定のソートがランダムなら今のソートが無くても「並べ直す」を表示する", () => {
     renderSortMenu({ folderId: "random", sort: null });
     expect(screen.getByRole("button", { name: "並べ直す" })).toBeInTheDocument();
   });

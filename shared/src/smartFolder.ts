@@ -12,7 +12,7 @@ import { groupSortIdSchema, sortIdSchema } from "./library.ts";
 
 // ── 保存形 ───────────────────────────────────────────────────
 
-const smartFolderNameSchema = z.string().trim().min(1);
+export const smartFolderNameSchema = z.string().trim().min(1);
 
 /** URL のパスに入るので、形式だけを検査する */
 export const smartFolderIdSchema = z

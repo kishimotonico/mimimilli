@@ -303,7 +303,7 @@ describe("定義の更新（全項目）", () => {
   });
 });
 
-describe("既定の並びの保存", () => {
+describe("既定のソートの保存", () => {
   it("並びだけを送り、一覧だけを取り直す", async () => {
     const api = mockApi({ "PATCH /api/smart-folders/:id": () => ({ ...userFolder }) });
     const editor = setup();
@@ -333,7 +333,7 @@ describe("既定の並びの保存", () => {
     expect(pendingWrites(store)).toEqual([]);
   });
 
-  it("値の並びの保存は groupSort だけを PATCH し、一覧だけを取り直す", async () => {
+  it("値一覧のソートの保存は groupSort だけを PATCH し、一覧だけを取り直す", async () => {
     const api = mockApi({ "PATCH /api/smart-folders/:id": () => ({ ...userFolder }) });
     const editor = setup();
 

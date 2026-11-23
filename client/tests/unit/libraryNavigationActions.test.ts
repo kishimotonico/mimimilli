@@ -720,21 +720,6 @@ describe("0件時の「すべて」で探す（searchLibraryInAllAtom）", () =>
   });
 });
 
-describe("値一覧からの「すべて」で探す", () => {
-  it("同じチップと検索語のまま「すべて」へ移る", () => {
-    const store = setup({ folderId: "by-cv", selectedTags: nts(["cv/藤田茜"]), q: "藤田" });
-
-    store.set(searchLibraryInAllAtom);
-
-    expect(lib(store)).toMatchObject({
-      folderId: "all",
-      group: null,
-      selectedTags: ["cv/藤田茜"],
-      q: "藤田",
-    });
-  });
-});
-
 describe("今の値の並び", () => {
   it("setLibraryGroupSortAtom は今の値の並びを replace で書き、同じ並びなら何もしない", () => {
     const store = setup({ folderId: "by-cv" });

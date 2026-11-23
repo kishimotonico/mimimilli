@@ -4,6 +4,7 @@ import {
   conditionSchema,
   groupBySchema,
   groupSortIdSchema,
+  smartFolderNameSchema,
   smartFolderViolation,
   sortIdSchema,
   tagPrefixSchema,
@@ -437,6 +438,7 @@ function readJsonColumn<T>(column: string, raw: string, schema: z.ZodType<T>): C
 function readSmartFolderRow(
   r: typeof smartFolders.$inferSelect,
 ): { row: SmartFolder } | { unreadable: UnreadableSmartFolderRow } {
+  const name = readColumn("name", r.name, smartFolderNameSchema);
   const condition = readJsonColumn("condition_json", r.conditionJson, conditionSchema);
   const sort = readColumn("sort", r.sort, sortIdSchema.nullable());
   const groupBy =
@@ -444,13 +446,13 @@ function readSmartFolderRow(
       ? ({ ok: true, value: null } as const)
       : readJsonColumn("group_by_json", r.groupByJson, groupBySchema);
   const groupSort = readColumn("group_sort", r.groupSort, groupSortIdSchema.nullable());
-  const problems = [condition, sort, groupBy, groupSort].flatMap((read) =>
+  const problems = [name, condition, sort, groupBy, groupSort].flatMap((read) =>
     read.ok ? [] : [read.problem],
   );
-  if (condition.ok && sort.ok && groupBy.ok && groupSort.ok) {
+  if (name.ok && condition.ok && sort.ok && groupBy.ok && groupSort.ok) {
     const fields = {
       id: r.id,
-      name: r.name,
+      name: name.value,
       condition: condition.value,
       sort: sort.value,
       groupBy: groupBy.value,
