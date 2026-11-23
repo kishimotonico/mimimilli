@@ -1,6 +1,6 @@
 // スマートフォルダーの変更の唯一の口（作成・更新・削除と取り消し・並べ替え）。
 // 画面の動きは成功応答を受けた同期区間で、キャッシュへ反映する前に済ませる。
-// 失敗はトーストで見せ（検証エラーはサーバーの文言、404・409 は行の名前と動詞）、一覧を取り直す（404/409 のような食い違いも含む）。
+// 失敗はトーストで見せ（検証エラーはサーバーの文言、not_found・conflict は行の名前と動詞）、一覧を取り直す（404/409 のような食い違いも含む）。
 // 成功のあとの無効化もここ1か所で決める。
 
 import { useMemo } from "react";
@@ -103,9 +103,10 @@ export function useSmartFolderEditor(): SmartFolderEditor {
       try {
         result = await request();
       } catch (error) {
-        // 404・409 の文言は ID を含み、何を操作したかが伝わらない。検証エラー（400）だけサーバーの文言を出す
+        // 404・409 の文言は ID を含み、何を操作したかが伝わらない。それ以外（検証エラー・再設定中など）はサーバーの文言を出す
         const conflicted =
-          error instanceof ApiRequestError && (error.status === 404 || error.status === 409);
+          error instanceof ApiRequestError &&
+          (error.code === "not_found" || error.code === "conflict");
         toast.error(conflicted ? failure : apiErrorMessage(error, failure));
         await refreshFolders();
         return null;

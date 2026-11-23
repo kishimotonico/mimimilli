@@ -127,6 +127,24 @@ describe("失敗トーストの文言", () => {
     expect(toasts()[0]).toMatchObject({ message: "名前を入力してください" });
   });
 
+  it("ルートの再設定中（409 root_reconfiguring）はサーバーの文言をそのまま出す", async () => {
+    mockApi({
+      "DELETE /api/smart-folders/:id": () =>
+        apiError(
+          409,
+          "root_reconfiguring",
+          "ルートフォルダーの再設定中のため、この操作はできません",
+        ),
+    });
+    const editor = setup();
+
+    await editor.remove(userFolder);
+
+    expect(toasts()[0]).toMatchObject({
+      message: "ルートフォルダーの再設定中のため、この操作はできません",
+    });
+  });
+
   it("保存は一覧から引いた行の名前で、引けなければ名前なしで出す", async () => {
     mockApi({ "PATCH /api/smart-folders/:id": () => apiError(404, "not_found", "見つかりません") });
     const editor = setup();
