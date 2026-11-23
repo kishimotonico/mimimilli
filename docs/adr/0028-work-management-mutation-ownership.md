@@ -116,7 +116,7 @@ mutation hook は `UseMutationResult` をそのまま返す。
 - 一覧系: `["works"]` 前方一致（一覧、総件数、スキャンの新規件数、missing 件数）
 - 一覧: 一覧系のうち `WORK_QUERY_KEYS.list(params)` の形のもの、および `["smartFolderWorks"]` 前方一致
 - グループの値: `["smartFolderGroups"]` 前方一致（スマートフォルダーの値一覧・「＋絞り込み」の候補）。タグ: `["tags"]`。SF: `["smartFolderWorks"]`、スマートフォルダーの定義の一覧 `["smartFolders"]`、その下の件数 `["smartFolders", "counts"]`。FS: `["fs"]`。診断（要対応）: `["scan", "diagnostics"]`（ID重複・読み取り失敗・アクセス不可・データ不整合・行方不明）。直近のスキャン結果: `["scan", "last"]`
-- `queryFn` は TanStack Query の `signal` を受け取って API 関数（`getParsed` の `signal`）まで渡す。購読が外れたあとも取得が続き、古い応答が無効化の印を戻すのを防ぐ（`tests/unit/queryFnSignal.test.ts` が検査する）
+- `queryFn` は TanStack Query の `signal` を受け取って API 関数（`getParsed` の `signal`）まで渡す。購読が外れたあとも取得が続き、古い応答が無効化の印を戻すのを防ぐ。取得の寿命を手で管理するクエリ（`enabled: false` で明示的に取り直すもの）は除く
 - 無効化は `invalidateFresh`（`shared/api`）を通す。初回取得中（data なし）の取得は進行中の取得へ合流して変更前の応答が残るので、先に取り消して変更後の値で取り直す
 - 登録の集合: 一覧系・グループの値・タグ・SF・FS・診断・直近のスキャン結果を無効化し、未登録の候補（`["scan", "candidates"]`）を取り直す
 
