@@ -110,7 +110,6 @@ oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメン
 - [ADR-0007: Windows配布ランタイムにBunを使う](adr/0007-bun-distribution-runtime.md)
 - [ADR-0008: 永続化トポロジー・検索所有権・再生IDを分離する](adr/0008-persistence-topology-query-ownership-playback-ids.md)
 - [ADR-0025: 正本の変更・投影・閲覧を責務として分離する](adr/0025-source-mutation-projection-read-separation.md)
-- [ADR-0026: 分類値の一覧を全作品への独立した入口とする](adr/0026-value-list-as-global-entry.md)
 - [ADR-0028: 作品を変更する操作とキャッシュ更新方針を entities/work/model に集約する](adr/0028-work-management-mutation-ownership.md)
 - [ADR-0029: root変更を再設定ワークフローとして扱う](adr/0029-root-reconfiguration-workflow.md)
 - [ADR-0031: ナビゲーション状態を型付きAppRouteに一本化する](adr/0031-app-route-navigation.md)
