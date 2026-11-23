@@ -86,6 +86,8 @@ export default function SmartFolderDialog({
 
   const children = rootChildren(draft.condition);
   const options = groupByOptions(tagPrefixes, draft.groupBy);
+  const groupByLabel =
+    options.find((option) => option.key === groupByKey(draft.groupBy))?.label ?? "";
   const canSave = !saving && draft.name.trim() !== "";
 
   const save = async () => {
@@ -170,7 +172,7 @@ export default function SmartFolderDialog({
         </div>
         {draft.groupSort !== null && (
           <div className="mll-fld">
-            <label htmlFor={groupSortId}>値の並び</label>
+            <label htmlFor={groupSortId}>{`${groupByLabel}のソート`}</label>
             <select
               id={groupSortId}
               value={draft.groupSort}
@@ -188,7 +190,7 @@ export default function SmartFolderDialog({
           </div>
         )}
         <div className="mll-fld">
-          <label htmlFor={sortId}>{draft.groupBy === null ? "既定の並び" : "作品の並び"}</label>
+          <label htmlFor={sortId}>{draft.groupBy === null ? "既定のソート" : "作品のソート"}</label>
           <select
             ref={sortRef}
             id={sortId}

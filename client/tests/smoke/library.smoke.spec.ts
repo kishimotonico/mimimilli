@@ -241,7 +241,7 @@ test("並び順メニュー: 今の並びはURLに出ず、戻る・進むで保
   const tracker = trackErrors(page);
   await openApp(page);
 
-  const sortButton = page.getByRole("button", { name: "並び替え", exact: true });
+  const sortButton = page.getByRole("button", { name: "ソート", exact: true });
   await sortButton.click();
   await page.getByRole("menuitemradio", { name: "タイトル（A→Z）" }).click();
   expect(new URL(page.url()).searchParams.has("sort")).toBe(false);
@@ -255,7 +255,7 @@ test("並び順メニュー: 今の並びはURLに出ず、戻る・進むで保
     "aria-checked",
     "true",
   );
-  await page.getByRole("menuitem", { name: "この並びを既定にする" }).click();
+  await page.getByRole("menuitem", { name: "このソートを既定にする" }).click();
 
   // 保存後は今の並びが外れて既定に従い、メニューの保存項目も消える
   await sortButton.click();
@@ -263,7 +263,7 @@ test("並び順メニュー: 今の並びはURLに出ず、戻る・進むで保
     "aria-checked",
     "true",
   );
-  await expect(page.getByRole("menuitem", { name: "この並びを既定にする" })).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "このソートを既定にする" })).toHaveCount(0);
 
   // サイドバーから入り直しても、保存した既定の並びになる
   await page.keyboard.press("Escape");

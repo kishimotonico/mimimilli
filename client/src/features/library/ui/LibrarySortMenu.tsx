@@ -17,7 +17,7 @@ function getSortLabel(sortId: SortId): string | undefined {
 }
 
 // 結果面が値一覧のときは今の値の並び（8種）、作品一覧のときは今の並び（9種）を、どちらも履歴エントリーの
-// 状態（ADR-0041）として変える。今の並びが解決後の既定から外れているときだけ「この並びを既定にする」を出し、
+// 状態（ADR-0041）として変える。今の並びが解決後の既定から外れているときだけ「このソートを既定にする」を出し、
 // スマートフォルダーの既定の並び（値一覧なら値の並び）として保存する。
 export default function LibrarySortMenu() {
   const nav = useLibraryNavigation();
@@ -25,7 +25,7 @@ export default function LibrarySortMenu() {
     // 一覧が無い間は既定の並びが分からないので操作させない
     return (
       <div className="mle-sortmenu">
-        <IconButton size="sm" icon={I.sort} label="並び替え" title="並び替え" disabled />
+        <IconButton size="sm" icon={I.sort} label="ソート" title="ソート" disabled />
       </div>
     );
   }
@@ -59,19 +59,19 @@ function ReadySortMenu({
       await editor.patch(
         view.folder.id,
         { groupSort: view.groupSort },
-        { failureMessage: "値の並びを既定にできませんでした" },
+        { failureMessage: "値のソートを既定にできませんでした" },
       );
     } else {
       await editor.patch(
         view.folder.id,
         { sort: view.sort },
-        { failureMessage: "並びを既定にできませんでした" },
+        { failureMessage: "ソートを既定にできませんでした" },
       );
     }
     setSavingDefault(false);
   };
 
-  const buttonTitle = currentSortLabel ? `並び替え: ${currentSortLabel}` : "並び替え";
+  const buttonTitle = currentSortLabel ? `ソート: ${currentSortLabel}` : "ソート";
 
   const { close: closeSortMenu } = usePopoverDismissal({
     isOpen: sortMenuOpen,
@@ -111,7 +111,7 @@ function ReadySortMenu({
       <IconButton
         size="sm"
         icon={I.sort}
-        label="並び替え"
+        label="ソート"
         title={buttonTitle}
         active={sortMenuOpen}
         aria-haspopup="menu"
@@ -126,7 +126,7 @@ function ReadySortMenu({
           size="sm"
           icon={I.refresh}
           label="並べ直す"
-          title="別の並びを再抽選"
+          title="別の順に並べ直す"
           onClick={() => reshuffle()}
         />
       )}
@@ -134,7 +134,7 @@ function ReadySortMenu({
         <div
           className="mle-sortmenu__pop"
           role="menu"
-          aria-label="並び替え"
+          aria-label="ソート"
           tabIndex={-1}
           onKeyDown={handleMenuKeyDown}
         >
@@ -185,7 +185,7 @@ function ReadySortMenu({
               }}
             >
               <span className="check" />
-              <span className="label">この並びを既定にする</span>
+              <span className="label">このソートを既定にする</span>
             </button>
           )}
         </div>

@@ -131,7 +131,7 @@ test("＋メニュー: 既定から追加・グループ分けの追加・複製
   await rail(page).getByRole("button", { name: "追加", exact: true }).click();
   await rail(page).getByRole("menuitem", { name: "「ランダム」を複製" }).click();
   await expect(dialog(page).getByLabel("名前")).toHaveValue("ランダム（コピー）");
-  await expect(dialog(page).getByLabel("既定の並び")).toHaveValue("random");
+  await expect(dialog(page).getByLabel("既定のソート")).toHaveValue("random");
   await dialog(page).getByRole("button", { name: "保存" }).click();
   await expect(rail(page).getByRole("button", { name: /^ランダム（コピー）/ })).toHaveAttribute(
     "aria-current",
@@ -220,7 +220,7 @@ test("「すべて」だけ編集が限られ、既定は自作と同じに編�
     .click();
   await expect(dialog(page).getByLabel("名前")).toBeDisabled();
   await expect(dialog(page).getByLabel("グループ分け")).toBeDisabled();
-  await expect(dialog(page).getByLabel("既定の並び").locator("option[value='']")).toHaveCount(0);
+  await expect(dialog(page).getByLabel("既定のソート").locator("option[value='']")).toHaveCount(0);
   await dialog(page).getByRole("button", { name: "キャンセル" }).click();
   await expect(folderRow(page, "all").getByRole("button", { name: "削除" })).toHaveCount(0);
   assertNoErrors(tracker);

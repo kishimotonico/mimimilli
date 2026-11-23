@@ -235,13 +235,13 @@ describe("保存中の入力欄", () => {
     expect(screen.getByLabelText("名前")).toBeDisabled();
     expect(screen.getByRole("button", { name: "この条件を外す" })).toBeDisabled();
     expect(screen.getByLabelText("グループ分け")).toBeDisabled();
-    expect(screen.getByLabelText("値の並び")).toBeDisabled();
-    expect(screen.getByLabelText("作品の並び")).toBeDisabled();
+    expect(screen.getByLabelText("追加年のソート")).toBeDisabled();
+    expect(screen.getByLabelText("作品のソート")).toBeDisabled();
 
     held.release();
     await waitFor(() => expect(screen.getByLabelText("名前")).toBeEnabled());
     expect(screen.getByLabelText("名前")).toHaveValue("新しい名前");
-    expect(screen.getByLabelText("値の並び")).toBeEnabled();
+    expect(screen.getByLabelText("追加年のソート")).toBeEnabled();
     expect(store.get(smartFolderDialogAtom)).not.toBeNull();
   });
 });
@@ -255,19 +255,23 @@ describe("グループ分けがあるときの並びの欄", () => {
     sort: "title-asc",
   });
 
-  it("「値の並び」「作品の並び」の2欄を出し、グループ分けなしでは「既定の並び」1欄だけを出す", async () => {
-    mockApi({ "GET /api/tag-prefixes": [] });
+  it("「CVのソート」「作品のソート」の2欄を出し、グループ分けなしでは「既定のソート」1欄だけを出す", async () => {
+    mockApi({
+      "GET /api/tag-prefixes": [
+        buildTagPrefix({ prefix: "cv", label: "CV", color: "cv", protected: true }),
+      ],
+    });
     const store = renderHost([...defaultSmartFolders(), grouped, folderA]);
 
     act(() => store.set(smartFolderDialogAtom, { kind: "edit", folder: grouped }));
-    expect(await screen.findByLabelText("値の並び")).toHaveValue("last-played");
-    expect(screen.getByLabelText("作品の並び")).toHaveValue("title-asc");
-    expect(screen.queryByLabelText("既定の並び")).toBeNull();
+    expect(await screen.findByLabelText("CVのソート")).toHaveValue("last-played");
+    expect(screen.getByLabelText("作品のソート")).toHaveValue("title-asc");
+    expect(screen.queryByLabelText("既定のソート")).toBeNull();
 
     act(() => store.set(smartFolderDialogAtom, null));
     act(() => store.set(smartFolderDialogAtom, { kind: "edit", folder: folderA }));
-    expect(await screen.findByLabelText("既定の並び")).toBeInTheDocument();
-    expect(screen.queryByLabelText("値の並び")).toBeNull();
+    expect(await screen.findByLabelText("既定のソート")).toBeInTheDocument();
+    expect(screen.queryByLabelText("CVのソート")).toBeNull();
   });
 
   it("グループ分けを変えると値の並びはそのグループ分けの初期値になり、開いたときのグループ分けに戻すと保存済みの値に戻る", async () => {
@@ -283,13 +287,13 @@ describe("グループ分けがあるときの並びの欄", () => {
     const groupBySelect = await screen.findByLabelText("グループ分け");
 
     await user.selectOptions(groupBySelect, "addedYear");
-    expect(screen.getByLabelText("値の並び")).toHaveValue("name-desc");
+    expect(screen.getByLabelText("追加年のソート")).toHaveValue("name-desc");
 
     await user.selectOptions(groupBySelect, "prefix:cv");
-    expect(screen.getByLabelText("値の並び")).toHaveValue("last-played");
+    expect(screen.getByLabelText("CVのソート")).toHaveValue("last-played");
 
     await user.selectOptions(groupBySelect, "");
-    expect(screen.queryByLabelText("値の並び")).toBeNull();
-    expect(screen.getByLabelText("既定の並び")).toBeInTheDocument();
+    expect(screen.queryByLabelText("CVのソート")).toBeNull();
+    expect(screen.getByLabelText("既定のソート")).toBeInTheDocument();
   });
 });

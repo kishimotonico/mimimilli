@@ -152,7 +152,7 @@ export function useSmartFolderEditor(): SmartFolderEditor {
         const before = queryClient.getQueryData<SmartFolder[]>(key);
         if (before) queryClient.setQueryData(key, applyOrder(before, ids));
         await commit(
-          "並び順を保存できませんでした",
+          "順番を保存できませんでした",
           "none",
           () => reorderSmartFolders(ids),
           (rows) => queryClient.setQueryData(key, rows),

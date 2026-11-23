@@ -72,7 +72,7 @@ function SortMenu({ sort, onToggle }: SortMenuProps) {
   return (
     <motion.div style={{ overflow: "hidden" }} inert={!isPresent} {...v}>
       {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- ソート切替はボタン列で表現する */}
-      <div className="mll-qlist__sort" role="group" aria-label="並び替え">
+      <div className="mll-qlist__sort" role="group" aria-label="ソート">
         {GROUP_SORT_COLUMNS.map((opt) => {
           const isActive = groupSortColumn(sort) === opt.id;
           const direction = groupSortDirection(sort);
@@ -208,8 +208,8 @@ export default function GroupValueQuickList({
           className={`mll-qlist__sorttoggle ${sortMenuOpen ? "is-open" : ""}`}
           aria-haspopup="true"
           aria-expanded={sortMenuOpen}
-          aria-label={`並び替え: ${currentSortLabel}`}
-          title={`並び替え: ${currentSortLabel}`}
+          aria-label={`ソート: ${currentSortLabel}`}
+          title={`ソート: ${currentSortLabel}`}
           onClick={() => setSortMenuOpen((open) => !open)}
         >
           <I.sort size={12} />

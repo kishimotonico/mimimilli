@@ -159,7 +159,7 @@ describe("GroupValueQuickList のキーボード移動", () => {
 
     // 既定ソートは件数（フラット）。ソートはアイコンボタンからインライン展開し、
     // 名前順に切り替えて階層表示（見出し行あり）にする。
-    await user.click(screen.getByRole("button", { name: /^並び替え/ }));
+    await user.click(screen.getByRole("button", { name: /^ソート/ }));
     await user.click(screen.getByRole("button", { name: "名前" }));
     await flushVirtualizer();
 
@@ -369,25 +369,25 @@ describe("GroupValueQuickList のソート（アイコンボタン＋インラ�
     renderQuickList({ items: makeItems(5) });
     await flushVirtualizer();
 
-    expect(screen.queryByRole("group", { name: "並び替え" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "ソート" })).toBeNull();
 
-    const toggle = screen.getByRole("button", { name: /^並び替え/ });
+    const toggle = screen.getByRole("button", { name: /^ソート/ });
     await user.click(toggle);
-    expect(screen.getByRole("group", { name: "並び替え" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "ソート" })).toBeInTheDocument();
 
     await user.click(toggle);
     // collapse variant の退出アニメーション（150ms）が終わるまでマウントされ続ける
-    await waitFor(() => expect(screen.queryByRole("group", { name: "並び替え" })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("group", { name: "ソート" })).toBeNull());
     sizeMock.restore();
   });
 
-  it("並び替えを選んでもフォーカスは押したソートキーのボタンに残る", async () => {
+  it("ソートを選んでもフォーカスは押したソートキーのボタンに残る", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
     renderQuickList({ items: makeItems(5) });
     await flushVirtualizer();
 
-    await user.click(screen.getByRole("button", { name: /^並び替え/ }));
+    await user.click(screen.getByRole("button", { name: /^ソート/ }));
     await user.click(screen.getByRole("button", { name: "名前" }));
     const nameButton = screen.getByRole("button", { name: "名前（昇順）" });
 
@@ -395,20 +395,20 @@ describe("GroupValueQuickList のソート（アイコンボタン＋インラ�
     sizeMock.restore();
   });
 
-  it("並び替えを選んでもインライン展開は閉じたままにならず、トグルの再クリックで閉じる", async () => {
+  it("ソートを選んでもインライン展開は閉じたままにならず、トグルの再クリックで閉じる", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
     renderQuickList({ items: makeItems(5) });
     await flushVirtualizer();
 
-    const toggle = screen.getByRole("button", { name: /^並び替え/ });
+    const toggle = screen.getByRole("button", { name: /^ソート/ });
     await user.click(toggle);
     await user.click(screen.getByRole("button", { name: "名前" }));
 
-    expect(screen.getByRole("group", { name: "並び替え" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "ソート" })).toBeInTheDocument();
 
     await user.click(toggle);
-    await waitFor(() => expect(screen.queryByRole("group", { name: "並び替え" })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("group", { name: "ソート" })).toBeNull());
     sizeMock.restore();
   });
 
@@ -418,7 +418,7 @@ describe("GroupValueQuickList のソート（アイコンボタン＋インラ�
     renderQuickList({ items: makeItems(5) });
     await flushVirtualizer();
 
-    await user.click(screen.getByRole("button", { name: /^並び替え/ }));
+    await user.click(screen.getByRole("button", { name: /^ソート/ }));
     const nameButton = screen.getByRole("button", { name: "名前" });
     await user.click(nameButton);
     expect(screen.getByRole("button", { name: "名前（昇順）" })).toBeInTheDocument();
@@ -435,7 +435,7 @@ describe("GroupValueQuickList のソート（アイコンボタン＋インラ�
     renderQuickList({ items: makeItems(5), onSortChange });
     await flushVirtualizer();
 
-    await user.click(screen.getByRole("button", { name: /^並び替え/ }));
+    await user.click(screen.getByRole("button", { name: /^ソート/ }));
     await user.click(screen.getByRole("button", { name: "名前" }));
 
     expect(onSortChange).toHaveBeenCalledWith("name-asc");

@@ -198,7 +198,7 @@ describe("LibrarySidebarPanel", () => {
       groupSort: "name-desc",
     });
 
-    await userEvent.click(screen.getByRole("button", { name: /^並び替え/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^ソート/ }));
     await userEvent.click(screen.getByRole("button", { name: "件数" }));
 
     await waitFor(() =>

@@ -28,7 +28,7 @@ export type ResolvedLibraryView =
       groupSort: GroupSortId | null;
       /** 解決済みの並び（今の並び → フォルダーの既定 → 「すべて」の既定） */
       sort: SortId;
-      /** 今の並びが解決後の既定から外れているか（「この並びを既定にする」を出すか） */
+      /** 今の並びが解決後の既定から外れているか（「このソートを既定にする」を出すか） */
       sortDeviates: boolean;
       /** サーバーに渡す seed。random のときだけ持つ */
       seed: number | undefined;
@@ -39,7 +39,7 @@ export type ResolvedLibraryView =
       groupBy: GroupBy;
       /** 解決済みの値の並び（今の並び → フォルダーの既定） */
       groupSort: GroupSortId;
-      /** 今の並びが既定から外れているか（「この並びを既定にする」を出すか） */
+      /** 今の並びが既定から外れているか（「このソートを既定にする」を出すか） */
       groupSortDeviates: boolean;
       breadcrumb: string[];
     });
@@ -83,7 +83,7 @@ export function resolveLibraryView(
 
   const defaultSort = folder.sort ?? all?.sort ?? null;
   const sort = library.sort ?? defaultSort;
-  if (sort === null) throw new Error("「すべて」の既定の並びがありません");
+  if (sort === null) throw new Error("「すべて」の既定のソートがありません");
 
   const group = groupBy === null ? null : library.group;
   return {

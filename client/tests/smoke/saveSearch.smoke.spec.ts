@@ -109,9 +109,9 @@ test("自作のスマートフォルダーにチップを足して上書きし�
   await expect.poll(async () => (await workTitles(page)).length).toBeLessThan(original.length);
   await expect(page.getByLabel("CVの値を検索")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "並び替え", exact: true }).click();
+  await page.getByRole("button", { name: "ソート", exact: true }).click();
   await page.getByRole("menuitemradio", { name: /^タイトル（Z→A）/ }).click();
-  await expect(page.getByTitle("並び替え: タイトル（Z→A）")).toBeVisible();
+  await expect(page.getByTitle("ソート: タイトル（Z→A）")).toBeVisible();
   await expect.poll(async () => (await workTitles(page)).length).toBeGreaterThan(0);
   const sorted = await workTitles(page);
   await page.getByRole("button", { name: "「ボイス」を上書き" }).click();
