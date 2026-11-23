@@ -537,26 +537,6 @@ describe("library api", () => {
     expect(result.sort).toBe("title-asc");
   });
 
-  it("updateSmartFolder は送った列だけを PATCH する", async () => {
-    mockFetch.mockResolvedValue(
-      makeResponse({
-        id: "sf-1",
-        name: "x",
-        condition: { type: "and", children: [] },
-        sort: null,
-        groupBy: null,
-        groupSort: null,
-        position: 0,
-        createdAt: "2026-01-01T00:00:00.000Z",
-      }),
-    );
-    await smartFolderApi.updateSmartFolder("sf-1", { sort: null });
-    const [url, init] = mockFetch.mock.calls.at(-1)!;
-    expect(url).toBe("/api/smart-folders/sf-1");
-    expect(init?.method).toBe("PATCH");
-    expect(JSON.parse(String(init?.body))).toEqual({ sort: null });
-  });
-
   it("exportLibrary POSTs to /api/export and returns parsed response", async () => {
     mockFetch.mockResolvedValue(
       makeResponse({

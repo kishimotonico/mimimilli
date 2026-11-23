@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createStore } from "jotai";
-import {
-  libraryPlaceAtom,
-  libraryRouteAtom,
-} from "../../src/entities/library/model/navigationAtoms";
+import { libraryRouteAtom } from "../../src/entities/library/model/navigationAtoms";
 import { openNowPlayingLayerAtom } from "../../src/entities/navigation/model/appRouteStore";
 import { nt, nts } from "../helpers/tag";
 import { clearPendingOps, pendingWrites, seedAppMode, seedLibraryRoute } from "../helpers/route";
@@ -11,16 +8,15 @@ import { buildSmartFolder, defaultSmartFolders } from "../helpers/smartFolders";
 import { appRouteStore, appRouteAtom } from "../../src/entities/navigation/model/appRouteStore";
 import {
   addLibraryTagAtom,
-  clearLibrarySortAtom,
   clearLibraryTagsAtom,
   backToLibraryValueListAtom,
+  dropLibraryGroupAtom,
   normalizeLibraryFolderAtom,
   openLibraryFolderAtom,
   settleLibraryFolderAtom,
   openLibraryGroupValueAtom,
   openLibraryTagAtom,
   removeLibraryTagAtom,
-  replaceLibraryFolderAtom,
   reshuffleLibrarySeedAtom,
   searchLibraryInAllAtom,
   showLibraryWorkAtom,
@@ -28,7 +24,6 @@ import {
   selectLibraryWorkAtom,
   setLibrarySearchQueryAtom,
   setLibraryGroupSortAtom,
-  clearLibraryGroupSortAtom,
   setLibrarySortAtom,
 } from "../../src/entities/library/model/navigationActions";
 
@@ -49,13 +44,16 @@ const folders = [
   buildSmartFolder({ id: "sf-own" }),
 ];
 
-describe("開いているスマートフォルダーを消したときの入り直し（replaceLibraryFolderAtom）", () => {
-  it("ライブラリでは履歴を積まずに置き換える", () => {
-    const store = setup({ folderId: "added", q: "x" });
+describe("開いているスマートフォルダーが消えたときの退避（normalizeLibraryFolderAtom）", () => {
+  const withoutAdded = folders.filter((folder) => folder.id !== "added");
 
-    store.set(replaceLibraryFolderAtom, "added", "all");
+  it("ライブラリでは履歴を積まずに置き換え、チップ・検索語は残す", () => {
+    const store = setup({ folderId: "added", q: "x", selectedTags: nts(["cv/a"]) });
+    clearPendingOps(store);
 
-    expect(lib(store)).toMatchObject({ folderId: "all", q: "" });
+    store.set(normalizeLibraryFolderAtom, withoutAdded);
+
+    expect(lib(store)).toMatchObject({ folderId: "all", q: "x", selectedTags: ["cv/a"] });
     expect(pendingWrites(store)).toEqual(["replace"]);
   });
 
@@ -65,10 +63,40 @@ describe("開いているスマートフォルダーを消したときの入り�
     seedAppMode(store, { workDetail: "work-1" });
     clearPendingOps(store);
 
-    store.set(replaceLibraryFolderAtom, "added", "all");
+    store.set(normalizeLibraryFolderAtom, withoutAdded);
 
-    expect(lib(store)).toMatchObject({ folderId: "all", q: "", selectedTags: [] });
+    expect(lib(store)).toMatchObject({ folderId: "all", q: "x", selectedTags: ["cv/a"] });
     expect(store.get(appRouteAtom)).toMatchObject({ mode: "workDetail", workId: "work-1" });
+    expect(pendingWrites(store)).toEqual(["replace"]);
+  });
+});
+
+describe("グループ分けを変えた保存の補正（dropLibraryGroupAtom）", () => {
+  it("そのフォルダーを指しているときだけ group と groupSort を外し、チップ・検索語・並び・seed は残す", () => {
+    const store = setup({
+      folderId: "by-cv",
+      group: "藤田茜",
+      groupSort: "name-asc",
+      selectedTags: nts(["ASMR"]),
+      q: "x",
+      sort: "title-asc",
+      seed: 5,
+    });
+    clearPendingOps(store);
+
+    store.set(dropLibraryGroupAtom, "other");
+    expect(lib(store).group).toBe("藤田茜");
+    expect(pendingWrites(store)).toEqual([]);
+
+    store.set(dropLibraryGroupAtom, "by-cv");
+    expect(lib(store)).toMatchObject({
+      group: null,
+      groupSort: null,
+      selectedTags: ["ASMR"],
+      q: "x",
+      sort: "title-asc",
+      seed: 5,
+    });
     expect(pendingWrites(store)).toEqual(["replace"]);
   });
 });
@@ -137,6 +165,22 @@ describe("route の正規化（normalizeLibraryFolderAtom）", () => {
     const ungrouped = setup({ folderId: "fav", group: "x" });
     setNormalized(ungrouped);
     expect(lib(ungrouped)).toMatchObject({ folderId: "fav", group: null });
+  });
+
+  it("今のグループ分けの形に合わない group は落とし、形が合えば残す", () => {
+    const byYear = [
+      ...folders,
+      buildSmartFolder({ id: "by-year", groupBy: { kind: "addedYear" } }),
+    ];
+    const invalid = setup({ folderId: "by-year", group: "藤田茜", q: "a", sort: "title-asc" });
+    invalid.set(normalizeLibraryFolderAtom, byYear);
+    expect(lib(invalid)).toMatchObject({ group: null, q: "a", sort: "title-asc" });
+
+    const valid = setup({ folderId: "by-year", group: "2024" });
+    clearPendingOps(valid);
+    valid.set(normalizeLibraryFolderAtom, byYear);
+    expect(lib(valid).group).toBe("2024");
+    expect(pendingWrites(valid)).toEqual([]);
   });
 
   it("整合している route は動かさない", () => {
@@ -377,15 +421,15 @@ describe("タグの行き先（ADR-0041 の表）", () => {
 });
 
 describe("補正は画面を動かさない", () => {
-  it("作品詳細で保持しているライブラリの並びを外しても、作品詳細のまま置き換える", () => {
-    const store = setup({ folderId: "sf-own", sort: "title-asc" });
+  it("作品詳細で保持しているライブラリの group を外しても、作品詳細のまま置き換える", () => {
+    const store = setup({ folderId: "by-cv", group: "藤田茜", sort: "title-asc" });
     seedAppMode(store, { workDetail: "work-1" });
     clearPendingOps(store);
 
-    store.set(clearLibrarySortAtom, { folderId: "sf-own", sort: "title-asc" });
+    store.set(dropLibraryGroupAtom, "by-cv");
 
     expect(store.get(appRouteAtom)).toMatchObject({ mode: "workDetail", workId: "work-1" });
-    expect(lib(store).sort).toBeNull();
+    expect(lib(store)).toMatchObject({ group: null, sort: "title-asc" });
     expect(pendingWrites(store)).toEqual(["replace"]);
   });
 });
@@ -398,7 +442,7 @@ describe("履歴の積み方", () => {
     const store = setup({ folderId: "sf-own", sort: "title-asc" });
     clearPendingOps(store);
 
-    store.set(settleLibraryFolderAtom, store.get(libraryPlaceAtom), "sf-own", true);
+    store.set(settleLibraryFolderAtom, store.get(appRouteAtom), "sf-own", true);
 
     expect(ops(store)).toEqual(["replace"]);
     expect(lib(store)).toMatchObject({ folderId: "sf-own", sort: null });
@@ -408,26 +452,21 @@ describe("履歴の積み方", () => {
     const store = setup({ folderId: "all", selectedTags: nts(["ASMR"]), q: "雨" });
     clearPendingOps(store);
 
-    store.set(settleLibraryFolderAtom, store.get(libraryPlaceAtom), "sf-new");
+    store.set(settleLibraryFolderAtom, store.get(appRouteAtom), "sf-new");
     expect(ops(store)).toEqual(["push"]);
     expect(lib(store)).toMatchObject({ folderId: "sf-new", selectedTags: [], q: "" });
 
-    store.set(settleLibraryFolderAtom, store.get(libraryPlaceAtom), "sf-new");
+    store.set(settleLibraryFolderAtom, store.get(appRouteAtom), "sf-new");
     expect(ops(store)).toEqual(["push", "replace"]);
   });
 
-  it("await の間に層を開いた・別の画面へ移ったときは、画面と層を引き戻さない", () => {
-    const layered = setup({
-      folderId: "sf-own",
-      sort: "title-asc",
-      selectedTags: nts(["ASMR"]),
-      q: "雨",
-    });
-    const place = layered.get(libraryPlaceAtom);
+  it("await の間に層を開いた・別の画面へ移った・作品詳細の別の作品へ移ったときは、何もせず今の状態を保つ", () => {
+    const layered = setup({ folderId: "sf-own", sort: "title-asc", selectedTags: nts(["ASMR"]) });
+    const started = layered.get(appRouteAtom);
     layered.set(openNowPlayingLayerAtom);
     clearPendingOps(layered);
 
-    layered.set(settleLibraryFolderAtom, place, "sf-own");
+    layered.set(settleLibraryFolderAtom, started, "sf-new");
 
     expect(layered.get(appRouteAtom)).toMatchObject({
       mode: "library",
@@ -435,22 +474,44 @@ describe("履歴の積み方", () => {
     });
     expect(lib(layered)).toMatchObject({
       folderId: "sf-own",
-      sort: null,
-      selectedTags: [],
-      q: "",
+      sort: "title-asc",
+      selectedTags: ["ASMR"],
     });
-    expect(pendingWrites(layered)).toEqual(["replace"]);
+    expect(pendingWrites(layered)).toEqual([]);
 
     const away = setup({ folderId: "sf-own" });
-    const awayPlace = away.get(libraryPlaceAtom);
+    const awayStarted = away.get(appRouteAtom);
     seedAppMode(away, "files");
     clearPendingOps(away);
 
-    away.set(settleLibraryFolderAtom, awayPlace, "sf-new");
+    away.set(settleLibraryFolderAtom, awayStarted, "sf-new");
 
     expect(away.get(appRouteAtom)).toMatchObject({ mode: "files" });
     expect(lib(away).folderId).toBe("sf-own");
     expect(pendingWrites(away)).toEqual([]);
+
+    const detail = setup({ folderId: "sf-own" });
+    seedAppMode(detail, { workDetail: "work-a" });
+    const detailStarted = detail.get(appRouteAtom);
+    seedAppMode(detail, { workDetail: "work-b" });
+    clearPendingOps(detail);
+
+    detail.set(settleLibraryFolderAtom, detailStarted, "sf-new");
+
+    expect(detail.get(appRouteAtom)).toMatchObject({ mode: "workDetail", workId: "work-b" });
+    expect(pendingWrites(detail)).toEqual([]);
+  });
+
+  it("始めたとき作品詳細にいて、そのまま動いていなければ、新しいフォルダーへ入る", () => {
+    const store = setup({ folderId: "sf-own" });
+    seedAppMode(store, { workDetail: "work-a" });
+    clearPendingOps(store);
+
+    store.set(settleLibraryFolderAtom, store.get(appRouteAtom), "sf-new");
+
+    expect(store.get(appRouteAtom)).toMatchObject({ mode: "library" });
+    expect(lib(store).folderId).toBe("sf-new");
+    expect(ops(store)).toEqual(["push"]);
   });
 
   it("待つ間に検索語・チップ・選択・並び・seed を変えていたら、入り直してそれを消さない", () => {
@@ -464,28 +525,15 @@ describe("履歴の積み方", () => {
     ];
     for (const change of changes) {
       const store = setup({ folderId: "sf-own", sort: "title-asc" });
-      const place = store.get(libraryPlaceAtom);
+      const started = store.get(appRouteAtom);
       seedLibraryRoute(store, change);
       clearPendingOps(store);
 
-      store.set(settleLibraryFolderAtom, place, "sf-own");
+      store.set(settleLibraryFolderAtom, started, "sf-own");
 
       expect(lib(store)).toMatchObject(change);
       expect(pendingWrites(store)).toEqual([]);
     }
-  });
-
-  it("作品詳細で始めて別の作品の詳細へ移っていたら、別の場所として引き戻さない", () => {
-    const store = setup({ folderId: "sf-own" });
-    seedAppMode(store, { workDetail: "work-a" });
-    const place = store.get(libraryPlaceAtom);
-    seedAppMode(store, { workDetail: "work-b" });
-    clearPendingOps(store);
-
-    store.set(settleLibraryFolderAtom, place, "sf-new");
-
-    expect(store.get(appRouteAtom)).toMatchObject({ mode: "workDetail", workId: "work-b" });
-    expect(pendingWrites(store)).toEqual([]);
   });
 
   it("通常の並び変更は replace", () => {
@@ -714,18 +762,6 @@ describe("今の値の並び", () => {
     expect(lib(store).groupSort).toBeNull();
     expect(lib(store).sort).toBeNull();
   });
-
-  it("clearLibraryGroupSortAtom は保存を始めたときと同じフォルダー・同じ並びのときだけ今の並びを外す", () => {
-    const store = setup({ folderId: "by-cv", groupSort: "name-asc" });
-
-    store.set(clearLibraryGroupSortAtom, { folderId: "by-circle", groupSort: "name-asc" });
-    expect(lib(store).groupSort).toBe("name-asc");
-    store.set(clearLibraryGroupSortAtom, { folderId: "by-cv", groupSort: "count-asc" });
-    expect(lib(store).groupSort).toBe("name-asc");
-
-    store.set(clearLibraryGroupSortAtom, { folderId: "by-cv", groupSort: "name-asc" });
-    expect(lib(store).groupSort).toBeNull();
-  });
 });
 
 describe("今の並びとランダムの seed", () => {
@@ -745,22 +781,6 @@ describe("今の並びとランダムの seed", () => {
 
     store.set(setLibrarySortAtom, "title-asc");
 
-    expect(pendingWrites(store)).toEqual([]);
-  });
-
-  it("clearLibrarySortAtom は保存を始めたときと同じフォルダー・同じ並びのときだけ今の並びを null に戻す", () => {
-    const store = setup({ sort: "title-asc" });
-
-    store.set(clearLibrarySortAtom, { folderId: "other", sort: "title-asc" });
-    expect(lib(store).sort).toBe("title-asc");
-    store.set(clearLibrarySortAtom, { folderId: "all", sort: "added-asc" });
-    expect(lib(store).sort).toBe("title-asc");
-
-    store.set(clearLibrarySortAtom, { folderId: "all", sort: "title-asc" });
-    expect(lib(store).sort).toBeNull();
-
-    clearPendingOps(store);
-    store.set(clearLibrarySortAtom, { folderId: "all", sort: "title-asc" });
     expect(pendingWrites(store)).toEqual([]);
   });
 

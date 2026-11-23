@@ -23,7 +23,6 @@ import { buildFilterTag, type CollectionStatsDisplay } from "../model/libraryPre
 import { buildSidebarRows } from "../model/sidebarRows";
 import { missingTemplates } from "../model/smartFolderEditing";
 import { useSidebarReorder } from "./useSidebarReorder";
-import { useBeginSettleLibraryFolder } from "../model/useSettleLibraryFolder";
 import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
 import GroupValuePopover from "./GroupValuePopover";
 import SidebarAddMenu from "./SidebarAddMenu";
@@ -72,7 +71,6 @@ export default function LibrarySidebarPanel({
   const [editing, setEditing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const setDialog = useSetAtom(smartFolderDialogAtom);
-  const beginSettle = useBeginSettleLibraryFolder();
   const headerRef = useRef<HTMLDivElement>(null);
   const {
     openKey: overlayFolderId,
@@ -96,7 +94,7 @@ export default function LibrarySidebarPanel({
     anchorRef: headerRef,
   });
 
-  useSidebarReorder({
+  const { saving: reordering } = useSidebarReorder({
     enabled: editing,
     orderedIds: readyFolders.map((folder) => folder.id),
     reorder: editor.reorder,
@@ -114,9 +112,7 @@ export default function LibrarySidebarPanel({
 
   const addFromTemplate = async (templateId: string) => {
     setMenuOpen(false);
-    const settle = beginSettle();
-    const created = await editor.addFromTemplate(templateId);
-    if (created) settle(created.id);
+    await editor.addFromTemplate(templateId);
   };
 
   return (
@@ -196,6 +192,7 @@ export default function LibrarySidebarPanel({
               row={row}
               canRemove={folder.id !== ALL_SMART_FOLDER_ID}
               draggableEnabled={!isMobile}
+              dragLocked={reordering}
               onEdit={() => {
                 setDialog({ kind: "edit", folder });
               }}

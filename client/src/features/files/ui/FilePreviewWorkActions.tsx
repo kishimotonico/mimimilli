@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useSetAtom } from "jotai";
-import { clearFilesSelectionAtom } from "../model/filesNavigationActions";
+import { dropFilesSelectionOfAtom } from "../model/filesNavigationActions";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "../../../shared/ui/useToast";
 import { I } from "../../../shared/ui/Icon";
@@ -84,7 +84,7 @@ export default function FilePreviewWorkActions({
   const isSingleFileWorkEntry = isSingleFileWork(entry);
   const queryClient = useQueryClient();
   const toast = useToast();
-  const clearSelection = useSetAtom(clearFilesSelectionAtom);
+  const dropSelection = useSetAtom(dropFilesSelectionOfAtom);
   const [registerPreview, setRegisterPreview] = useState<WorkRegisterPreview | null>(null);
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
   const [showUnregisterConfirm, setShowUnregisterConfirm] = useState(false);
@@ -119,7 +119,7 @@ export default function FilePreviewWorkActions({
       setPendingProjection(result);
     } else {
       // 再採番したメタファイルは一覧から消えるため、親フォルダーへ移って結果を通知で伝える
-      clearSelection();
+      dropSelection(entry.path);
       const message = projectionNoticeMessage(result.projection);
       if (message) {
         toast.show({

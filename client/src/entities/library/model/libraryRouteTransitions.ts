@@ -3,6 +3,7 @@ import {
   ALL_SMART_FOLDER_ID,
   createRandomSeed,
   isBuiltinPseudoTagKey,
+  normalizeGroupValue,
   orderSelectedTags,
   parseBuiltinPseudoTag,
   type NormalizedTag,
@@ -70,48 +71,28 @@ export function openLibraryFolder(route: AppRoute, folderId: string): Transition
   return enter(route, { folderId, group: null, selectedTags: [], q: "" });
 }
 
-/** 操作を始めたときにいた場所。await のあとに同じ場所にいるかを確かめるのに使う */
-export interface LibraryPlace {
-  mode: AppRoute["mode"];
-  /** 作品詳細のときの作品 ID */
-  workId: string | null;
-  layerOpen: boolean;
-  /** 操作を始めたときの library の全項目（待つ間にユーザーが変えたかを見分ける） */
-  library: string;
-}
-
-export function libraryPlaceOf(route: AppRoute): LibraryPlace {
-  return {
-    mode: route.mode,
-    workId: route.mode === "workDetail" ? route.workId : null,
-    layerOpen: route.layer !== null,
-    library: JSON.stringify(route.library),
-  };
-}
-
-/** 始めた画面と今が同じか。今は層が開いていないことも条件にする */
-export function isSameScreen(now: LibraryPlace, started: LibraryPlace): boolean {
-  return !now.layerOpen && now.mode === started.mode && now.workId === started.workId;
-}
-
-/** 上書きのあと、同じスマートフォルダーへ入り直す。上書き前へ戻すのはトーストの「元に戻す」で、履歴は置き換える */
-export function reenterLibraryFolder(route: AppRoute, folderId: string): Transition {
-  return { ...openLibraryFolder(route, folderId), replace: true };
-}
-
-/** 保持しているライブラリが from を指しているときだけ、to へ入り直す（補正）。
- *  開いているスマートフォルダーが消えた・グループ分けが変わったときに使う */
-export function replaceLibraryFolder(
+/** await をはさんだ保存・作成のあと、そのスマートフォルダーを絞り込みなしで開く。新規は履歴を積み、
+ *  上書き（overwrite）は置き換える */
+export function settleLibraryFolder(
   route: AppRoute,
-  from: string,
-  to: string,
-): LibraryRoute | null {
-  if (route.library.folderId !== from) return null;
-  return openLibraryFolder(route, to).route.library;
+  folderId: string,
+  overwrite: boolean,
+): Transition {
+  const transition = openLibraryFolder(route, folderId);
+  return overwrite ? { ...transition, replace: true } : transition;
+}
+
+/** グループ分けを変えた保存の直後に、そのスマートフォルダーを指している library の group と groupSort を外す（補正）。
+ *  チップ・検索語・並び・seed は残す */
+export function dropLibraryGroup(route: AppRoute, folderId: string): LibraryRoute | null {
+  const { library } = route;
+  if (library.folderId !== folderId) return null;
+  if (library.group === null && library.groupSort === null) return null;
+  return { ...library, group: null, groupSort: null };
 }
 
 /** 保持しているライブラリを、スマートフォルダー一覧に合わせて書き戻す（補正）。存在しないスマートフォルダーは
- *  「すべて」へ、グループ分けの無いスマートフォルダーの group は落とす。チップ・検索語・並びは保つ */
+ *  「すべて」へ、今のグループ分けの形に合わない group は落とす。チップ・検索語・並びは保つ */
 export function normalizeLibraryFolder(
   route: AppRoute,
   folders: readonly SmartFolder[],
@@ -119,7 +100,12 @@ export function normalizeLibraryFolder(
   const { library } = route;
   const folder = folders.find((item) => item.id === library.folderId);
   if (folder === undefined) return { ...library, folderId: ALL_SMART_FOLDER_ID, group: null };
-  if (folder.groupBy === null && library.group !== null) return { ...library, group: null };
+  if (
+    library.group !== null &&
+    (folder.groupBy === null || normalizeGroupValue(folder.groupBy, library.group) === null)
+  ) {
+    return { ...library, group: null };
+  }
   return null;
 }
 
@@ -192,28 +178,6 @@ export function setLibrarySort(route: AppRoute, sort: SortId): Transition | null
 export function setLibraryGroupSort(route: AppRoute, groupSort: GroupSortId): Transition | null {
   if (route.library.groupSort === groupSort) return null;
   return { route: withLibrary(route, { groupSort }), replace: true };
-}
-
-/** 今の値の並びを既定として保存したあと、今の並びを外して既定に従わせる。保存を始めたときと
- *  同じスマートフォルダー・同じ並びにいるときだけ外す */
-export function clearLibraryGroupSort(
-  route: AppRoute,
-  saved: { folderId: string; groupSort: GroupSortId },
-): LibraryRoute | null {
-  const { library } = route;
-  if (library.folderId !== saved.folderId || library.groupSort !== saved.groupSort) return null;
-  return { ...library, groupSort: null };
-}
-
-/** 今の並びを既定として保存したあと、今の並びを外して既定に従わせる。保存を始めたときと
- *  同じスマートフォルダー・同じ並びにいるときだけ外す */
-export function clearLibrarySort(
-  route: AppRoute,
-  saved: { folderId: string; sort: SortId },
-): LibraryRoute | null {
-  const { library } = route;
-  if (library.folderId !== saved.folderId || library.sort !== saved.sort) return null;
-  return { ...library, sort: null };
 }
 
 /** 選択中の作品を外す（補正） */

@@ -23,10 +23,19 @@ function renderSortMenu(options?: {
   folders?: SmartFolder[];
   put?: (id: string) => unknown;
 }) {
+  let folders = options?.folders ?? defaultSmartFolders();
   const api = mockApi({
-    "GET /api/smart-folders": options?.folders ?? defaultSmartFolders(),
-    "PATCH /api/smart-folders/:id": ({ params }) =>
-      options?.put ? options.put(params.id) : buildSmartFolder({ id: params.id, name: "保存済み" }),
+    "GET /api/smart-folders": () => folders,
+    "PATCH /api/smart-folders/:id": ({ params, body }) => {
+      if (options?.put) return options.put(params.id);
+      const saved = {
+        ...(folders.find((folder) => folder.id === params.id) ??
+          buildSmartFolder({ id: params.id, name: "保存済み" })),
+        ...(body as object),
+      };
+      folders = folders.map((folder) => (folder.id === saved.id ? saved : folder));
+      return saved;
+    },
   });
   const store = createStore();
   seedLibraryRoute(store, {
@@ -59,6 +68,15 @@ function renderSortMenu(options?: {
 }
 
 const currentSort = (store: ReturnType<typeof createStore>) => store.get(libraryRouteAtom).sort;
+
+/** 保存した並びが既定になり、メニューを開いても「この並びを既定にする」が出ない */
+async function waitForNoSaveAsDefault() {
+  await waitFor(() => expect(screen.queryByRole("menu", { name: "並び替え" })).toBeNull());
+  fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("menuitem", { name: "この並びを既定にする" })).toBeNull(),
+  );
+}
 
 describe("LibrarySortMenu", () => {
   it("作品一覧ではソートメニューを開いて今の並びを変更できる", () => {
@@ -219,16 +237,17 @@ describe("LibrarySortMenu", () => {
     );
   });
 
-  it("値の並びが既定から外れているときだけ「この並びを既定にする」を出し、保存すると今の並びが外れる", async () => {
+  it("値の並びが既定から外れているときだけ「この並びを既定にする」を出し、保存すると今の並びは残ったまま既定と同じになって項目が消える", async () => {
     const { store, api } = renderSortMenu({ folderId: "by-cv", groupSort: "name-asc" });
     fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "この並びを既定にする" }));
 
-    await waitFor(() => expect(store.get(libraryRouteAtom).groupSort).toBeNull());
-    const requests = api.requestsTo("PATCH /api/smart-folders/:id");
-    expect(requests).toHaveLength(1);
-    expect(requests[0]?.params.id).toBe("by-cv");
-    expect(requests[0]?.body).toEqual({ groupSort: "name-asc" });
+    await waitFor(() => expect(api.requestsTo("PATCH /api/smart-folders/:id")).toHaveLength(1));
+    const [request] = api.requestsTo("PATCH /api/smart-folders/:id");
+    expect(request?.params.id).toBe("by-cv");
+    expect(request?.body).toEqual({ groupSort: "name-asc" });
+    await waitForNoSaveAsDefault();
+    expect(store.get(libraryRouteAtom).groupSort).toBe("name-asc");
   });
 
   it("解決後の並びがランダムのときだけ「並べ直す」を表示し、押すとseedが変わる", () => {
@@ -268,12 +287,13 @@ describe("LibrarySortMenu", () => {
     expect(screen.getByRole("menuitem", { name: "この並びを既定にする" })).toBeInTheDocument();
   });
 
-  it("押すとそのスマートフォルダーの既定として解決済みの並びを PATCH し、今の並びを null に戻す", async () => {
+  it("押すとそのスマートフォルダーの既定として解決済みの並びを PATCH する。今の並びは外さない", async () => {
     const { store, api } = renderSortMenu({ folderId: "fav", sort: "title-asc" });
     fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "この並びを既定にする" }));
 
-    await waitFor(() => expect(currentSort(store)).toBeNull());
+    await waitForNoSaveAsDefault();
+    expect(currentSort(store)).toBe("title-asc");
     const [request] = api.requestsTo("PATCH /api/smart-folders/:id");
     expect(request?.params.id).toBe("fav");
     expect(request?.body).toEqual({ sort: "title-asc" });
@@ -324,7 +344,8 @@ describe("LibrarySortMenu", () => {
     fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "この並びを既定にする" }));
 
-    await waitFor(() => expect(currentSort(store)).toBeNull());
+    await waitForNoSaveAsDefault();
+    expect(currentSort(store)).toBe("title-asc");
     const [request] = api.requestsTo("PATCH /api/smart-folders/:id");
     expect(request?.params.id).toBe("all");
     expect(request?.body).toEqual({ sort: "title-asc" });
@@ -354,12 +375,13 @@ describe("LibrarySortMenu", () => {
     expect(nav.setSort).toHaveBeenCalledWith("title-asc");
   });
 
-  it("存在しない ID の URL は「すべて」に解決され、その既定を保存すると今の並びが外れる", async () => {
+  it("存在しない ID の URL は「すべて」に解決され、その既定を保存しても今の並びは残る", async () => {
     const { store, api } = renderSortMenu({ folderId: "sf-gone", sort: "title-asc" });
     fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "この並びを既定にする" }));
 
-    await waitFor(() => expect(currentSort(store)).toBeNull());
+    await waitForNoSaveAsDefault();
+    expect(currentSort(store)).toBe("title-asc");
     expect(api.requestsTo("PATCH /api/smart-folders/:id")[0]?.params.id).toBe("all");
     expect(store.get(libraryRouteAtom).folderId).toBe("all");
   });

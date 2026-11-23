@@ -51,6 +51,21 @@ export function appRouteCorrection<A extends unknown[]>(
   });
 }
 
+/** 補正: 作品が存在しなくなったとき（登録解除・404）、その作品の選択を外し、その作品の詳細なら保持している
+ *  ライブラリへ置き換えで戻る。ほかの作品の選択・詳細と層は変えない */
+export function dropMissingWork(route: AppRoute, workId: string): RouteTransition<AppRoute> | null {
+  const deselect = route.library.selectedWorkId === workId;
+  const leave = route.mode === "workDetail" && route.workId === workId;
+  if (!deselect && !leave) return null;
+  const library = deselect ? { ...route.library, selectedWorkId: null } : route.library;
+  const next: AppRoute = leave
+    ? { mode: "library", library, files: route.files, layer: route.layer }
+    : { ...route, library };
+  return { route: next, replace: true };
+}
+
+export const dropMissingWorkAtom = appRouteStore.action(dropMissingWork);
+
 export const appModeAtom = atom<AppMode>((get) => get(appRouteAtom).mode);
 
 export function switchAppMode(
@@ -62,13 +77,6 @@ export function switchAppMode(
 }
 
 export const setAppModeAtom = appRouteAction(switchAppMode);
-
-/** 404・削除など、現在の画面自体が無効になったための強制退避で使う。履歴を積まず
- *  現在のエントリを置き換える（戻るで無効な画面へ戻ってpush→retreatを繰り返すのを防ぐ）。 */
-export const replaceAppModeAtom = appRouteAction((route: AppRoute, mode: SwitchableAppMode) => {
-  const transition = switchAppMode(route, mode);
-  return transition && { ...transition, replace: true };
-});
 
 export const layerAtom = atom((get) => get(appRouteAtom).layer);
 

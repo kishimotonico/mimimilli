@@ -1,21 +1,23 @@
-// スマートフォルダーの変更の唯一の口（作成・更新・削除と取り消し・並べ替え・既定の並びの保存）。
+// スマートフォルダーの変更の唯一の口（作成・更新・削除と取り消し・並べ替え）。
+// 画面の動きは成功応答を受けた同期区間で、キャッシュへ反映する前に済ませる。
 // 失敗はサーバーの文言のままトーストで見せ、一覧を取り直す（404/409 のような食い違いも含む）。
 // 成功のあとの無効化もここ1か所で決める。
 
 import { useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSetAtom } from "jotai";
+import { useSetAtom, useStore } from "jotai";
 import {
-  ALL_SMART_FOLDER_ID,
   definitionOf,
   findSmartFolderTemplate,
   type SmartFolder,
-  type GroupSortId,
   type SmartFolderPatch,
   type SmartFolderWrite,
-  type SortId,
 } from "@mimimilli/shared";
-import { replaceLibraryFolderAtom } from "../../../entities/library/model/navigationActions";
+import {
+  dropLibraryGroupAtom,
+  settleLibraryFolderAtom,
+} from "../../../entities/library/model/navigationActions";
+import { appRouteAtom } from "../../../entities/navigation/model/appRouteStore";
 import {
   createSmartFolder,
   deleteSmartFolder,
@@ -26,44 +28,37 @@ import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKey
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { useToast } from "../../../shared/ui/useToast";
 import { groupByKey } from "../../../entities/smart-folder/groupByKey";
+import { isGroupedWorksKey } from "./folderWorksRequest";
 import { applyOrder } from "./smartFolderEditing";
 
 export interface SmartFolderEditor {
-  /** 全件の順序を送る。先に画面へ反映し、失敗したら戻す。保存は1本ずつ直列で、待つ間は最新の順だけを持つ */
+  /** 全件の順序を送る。先に画面へ反映し、失敗したら戻す。呼び出し側が保存中の重なりを防ぐ */
   reorder: (ids: string[]) => Promise<void>;
-  /** 作ったスマートフォルダー。失敗は null */
+  /** 作ったスマートフォルダー。成功したら、保存を始めたときから画面が動いていなければそこへ入る（履歴を積む）。失敗は null */
   create: (data: SmartFolderWrite) => Promise<SmartFolder | null>;
+  /** 既定から追加する。作ったあとの動きは create と同じ */
   addFromTemplate: (templateId: string) => Promise<SmartFolder | null>;
-  /** 定義（名前・条件・グループ分け・既定の並び）を保存する。保存できたら true */
-  update: (id: string, data: SmartFolderWrite, failureMessage?: string) => Promise<boolean>;
-  /** 条件（と、指定したときだけ既定の並び）だけを変える。検索の上書きとその取り消し。保存できたら true */
-  overwriteCondition: (
+  /** 送った列だけを更新する（定義の保存・検索の上書きとその取り消し・既定の並びの保存）。保存できたら true。
+   *  reenter（検索の上書き）は成功したら、保存を始めたときから画面が動いていなければ同じスマートフォルダーへ置き換えで入り直す */
+  patch: (
     id: string,
-    change: Pick<SmartFolderPatch, "condition" | "sort">,
-    failureMessage?: string,
+    change: SmartFolderPatch,
+    options?: { failureMessage?: string; reenter?: boolean },
   ) => Promise<boolean>;
-  /** 既定の並びだけを変える。定義の結果は変わらないので、作品・値の一覧は取り直さない */
-  saveDefaultSort: (id: string, sort: SortId) => Promise<boolean>;
-  /** 値一覧の既定の並びだけを変える。作品・値の一覧は取り直さない（並びは要求に含まれる） */
-  saveDefaultGroupSort: (id: string, groupSort: GroupSortId) => Promise<boolean>;
-  /** 削除して「元に戻す」を出す。開いている（保持しているものも含む）なら「すべて」へ置き換えで移る */
+  /** 削除して「元に戻す」を出す。開いているスマートフォルダーの退避は route の補正が行う */
   remove: (folder: SmartFolder) => Promise<void>;
 }
 
-/** 並べ替えの保存の待ち行列。フックの再マウントをまたいで直列を保つため、モジュールで持つ */
-const reorderQueue: { running: boolean; waiting: string[] | null } = {
-  running: false,
-  waiting: null,
-};
-
 /** 変更が一覧のどこへ効くか。none は応答でキャッシュを直接更新したとき。
- *  definitionOf は定義が変わったフォルダーで、そのフォルダーの作品・値の一覧も取り直す */
+ *  definitionOf は定義の結果が変わったフォルダーで、そのフォルダーの作品・値の一覧も取り直す */
 type Refresh = "none" | "folders" | { definitionOf: string };
 
 export function useSmartFolderEditor(): SmartFolderEditor {
   const queryClient = useQueryClient();
   const toast = useToast();
-  const replaceFolder = useSetAtom(replaceLibraryFolderAtom);
+  const store = useStore();
+  const settle = useSetAtom(settleLibraryFolderAtom);
+  const dropGroup = useSetAtom(dropLibraryGroupAtom);
 
   return useMemo<SmartFolderEditor>(() => {
     const refreshFolders = () =>
@@ -90,6 +85,11 @@ export function useSmartFolderEditor(): SmartFolderEditor {
           ? prev.map((folder) => (folder.id === row.id ? row : folder))
           : [...prev, row];
       });
+
+    const dropFolder = (id: string) =>
+      queryClient.setQueryData<SmartFolder[]>(SMART_FOLDER_QUERY_KEYS.all(), (prev) =>
+        prev?.filter((folder) => folder.id !== id),
+      );
 
     /** 変更の唯一の実行路。成功なら onSuccess のあとに refresh、失敗ならトーストと一覧の取り直し */
     const commit = async <T>(
@@ -134,103 +134,74 @@ export function useSmartFolderEditor(): SmartFolderEditor {
       });
     };
 
+    const createAndEnter = (
+      failure: string,
+      request: () => Promise<SmartFolder>,
+    ): Promise<SmartFolder | null> => {
+      const started = store.get(appRouteAtom);
+      return commit(failure, "folders", request, (row) => {
+        settle(started, row.id);
+        upsertFolder(row);
+      });
+    };
+
     return {
       reorder: async (ids) => {
         const key = SMART_FOLDER_QUERY_KEYS.all();
         await queryClient.cancelQueries({ queryKey: key, exact: true });
         const before = queryClient.getQueryData<SmartFolder[]>(key);
         if (before) queryClient.setQueryData(key, applyOrder(before, ids));
-        if (reorderQueue.running) {
-          reorderQueue.waiting = ids;
-          return;
-        }
-        reorderQueue.running = true;
-        try {
-          let next: string[] | null = ids;
-          while (next) {
-            const sending: string[] = next;
-            reorderQueue.waiting = null;
-            await commit(
-              "並び順を保存できませんでした",
-              "none",
-              () => reorderSmartFolders(sending),
-              (rows) => {
-                if (reorderQueue.waiting === null) queryClient.setQueryData(key, rows);
-              },
-            );
-            next = reorderQueue.waiting;
-          }
-        } finally {
-          reorderQueue.running = false;
-        }
+        await commit(
+          "並び順を保存できませんでした",
+          "none",
+          () => reorderSmartFolders(ids),
+          (rows) => queryClient.setQueryData(key, rows),
+        );
       },
       create: (data) =>
-        commit(
-          "スマートフォルダーを作れませんでした",
-          "folders",
-          () => createSmartFolder(data),
-          upsertFolder,
-        ),
+        createAndEnter("スマートフォルダーを作れませんでした", () => createSmartFolder(data)),
       addFromTemplate: (templateId) =>
-        commit(
-          "既定のスマートフォルダーを追加できませんでした",
-          "folders",
-          () => {
-            const template = findSmartFolderTemplate(templateId)!;
-            return createSmartFolder({ ...definitionOf(template), id: template.id });
-          },
-          upsertFolder,
-        ),
-      update: async (id, data, failureMessage = "スマートフォルダーを保存できませんでした") => {
-        const before = queryClient
-          .getQueryData<SmartFolder[]>(SMART_FOLDER_QUERY_KEYS.all())
-          ?.find((folder) => folder.id === id);
+        createAndEnter("既定のスマートフォルダーを追加できませんでした", () => {
+          const template = findSmartFolderTemplate(templateId)!;
+          return createSmartFolder({ ...definitionOf(template), id: template.id });
+        }),
+      patch: async (id, change, { failureMessage, reenter = false } = {}) => {
+        const started = store.get(appRouteAtom);
+        const scope: Refresh =
+          "condition" in change || "groupBy" in change ? { definitionOf: id } : "folders";
         const saved = await commit(
-          failureMessage,
-          { definitionOf: id },
-          () => updateSmartFolder(id, data),
-          upsertFolder,
+          failureMessage ?? "スマートフォルダーを保存できませんでした",
+          scope,
+          () => updateSmartFolder(id, change),
+          (row) => {
+            const before = queryClient
+              .getQueryData<SmartFolder[]>(SMART_FOLDER_QUERY_KEYS.all())
+              ?.find((folder) => folder.id === id);
+            if (reenter) settle(started, id, true);
+            if (before !== undefined && groupByKey(before.groupBy) !== groupByKey(row.groupBy)) {
+              dropGroup(id);
+              // 古いグループ分けの値を指す作品一覧は、取り直さず捨てる（新しいグループ分けでは 400 になる）
+              queryClient.removeQueries({
+                queryKey: SMART_FOLDER_QUERY_KEYS.folderWorks(id),
+                predicate: (query) => isGroupedWorksKey(query.queryKey),
+              });
+            }
+            upsertFolder(row);
+          },
         );
-        // 開いている一覧の ?group= は古いグループ分けの値なので、一覧が更新されたあとに入り直して外す
-        if (
-          saved &&
-          before !== undefined &&
-          groupByKey(before.groupBy) !== groupByKey(saved.groupBy)
-        ) {
-          replaceFolder(id, id);
-        }
         return saved !== null;
       },
-      overwriteCondition: async (
-        id,
-        change,
-        failureMessage = "スマートフォルダーを上書きできませんでした",
-      ) =>
-        (await commit(
-          failureMessage,
-          { definitionOf: id },
-          () => updateSmartFolder(id, change),
-          upsertFolder,
-        )) !== null,
-      saveDefaultSort: async (id, sort) =>
-        (await commit("並びを既定にできませんでした", "folders", () =>
-          updateSmartFolder(id, { sort }),
-        )) !== null,
-      saveDefaultGroupSort: async (id, groupSort) =>
-        (await commit("値の並びを既定にできませんでした", "folders", () =>
-          updateSmartFolder(id, { groupSort }),
-        )) !== null,
       remove: async (folder) => {
         await commit(
           "スマートフォルダーを削除できませんでした",
           "folders",
           () => deleteSmartFolder(folder.id),
           () => {
-            replaceFolder(folder.id, ALL_SMART_FOLDER_ID);
+            dropFolder(folder.id);
             showDeleted(folder);
           },
         );
       },
     };
-  }, [queryClient, toast, replaceFolder]);
+  }, [queryClient, store, toast, settle, dropGroup]);
 }

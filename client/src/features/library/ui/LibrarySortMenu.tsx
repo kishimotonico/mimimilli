@@ -4,11 +4,7 @@ import { useSetAtom } from "jotai";
 import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
 import type { GroupSortId, SortId } from "@mimimilli/shared";
 import { SORT_OPTIONS } from "../../../entities/library/types";
-import {
-  clearLibraryGroupSortAtom,
-  clearLibrarySortAtom,
-  reshuffleLibrarySeedAtom,
-} from "../../../entities/library/model/navigationActions";
+import { reshuffleLibrarySeedAtom } from "../../../entities/library/model/navigationActions";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
 import { getGroupSortLabel, groupSortOptions } from "../model/groupValueSort";
@@ -50,8 +46,6 @@ function ReadySortMenu({
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
   const reshuffle = useSetAtom(reshuffleLibrarySeedAtom);
-  const clearCurrentSort = useSetAtom(clearLibrarySortAtom);
-  const clearCurrentGroupSort = useSetAtom(clearLibraryGroupSortAtom);
 
   const sort = view.kind === "works" ? view.sort : null;
   const currentSortLabel =
@@ -62,11 +56,17 @@ function ReadySortMenu({
   const saveAsDefault = async () => {
     setSavingDefault(true);
     if (view.kind === "value-list") {
-      const saved = await editor.saveDefaultGroupSort(view.folder.id, view.groupSort);
-      if (saved) clearCurrentGroupSort({ folderId: view.folder.id, groupSort: view.groupSort });
+      await editor.patch(
+        view.folder.id,
+        { groupSort: view.groupSort },
+        { failureMessage: "値の並びを既定にできませんでした" },
+      );
     } else {
-      const saved = await editor.saveDefaultSort(view.folder.id, view.sort);
-      if (saved) clearCurrentSort({ folderId: view.folder.id, sort: view.sort });
+      await editor.patch(
+        view.folder.id,
+        { sort: view.sort },
+        { failureMessage: "並びを既定にできませんでした" },
+      );
     }
     setSavingDefault(false);
   };

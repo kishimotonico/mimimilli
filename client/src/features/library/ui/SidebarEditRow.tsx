@@ -19,6 +19,8 @@ interface SidebarEditRowProps {
   canRemove: boolean;
   /** モバイル幅ではドラッグを出さない（ADR-0042） */
   draggableEnabled: boolean;
+  /** 並べ替えの保存中。グリップは残し、次のドラッグだけ受け付けない */
+  dragLocked: boolean;
   onEdit: () => void;
   onRemove: () => void;
 }
@@ -28,6 +30,7 @@ export default function SidebarEditRow({
   row,
   canRemove,
   draggableEnabled,
+  dragLocked,
   onEdit,
   onRemove,
 }: SidebarEditRowProps) {
@@ -37,7 +40,7 @@ export default function SidebarEditRow({
 
   useEffect(() => {
     const element = ref.current;
-    if (!element || !draggableEnabled) return;
+    if (!element || !draggableEnabled || dragLocked) return;
     const rowId = row.id;
     return combine(
       draggable({
@@ -69,7 +72,7 @@ export default function SidebarEditRow({
         onDrop: () => setDrop(null),
       }),
     );
-  }, [row.id, draggableEnabled]);
+  }, [row.id, draggableEnabled, dragLocked]);
 
   const Icon = I[row.icon];
   const classes = [

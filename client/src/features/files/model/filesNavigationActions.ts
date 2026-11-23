@@ -2,7 +2,7 @@ import type { WorkspacePath } from "@mimimilli/shared";
 import type { RouteTransition } from "../../../shared/model/routeStore";
 import type { AppRoute } from "../../../entities/navigation/model/appRoute";
 import type { FilesUrlState } from "../../../entities/navigation/model/navigationUrl";
-import { appRouteAction } from "../../../entities/navigation/model/appRouteStore";
+import { appRouteAction, appRouteStore } from "../../../entities/navigation/model/appRouteStore";
 import { toSelectedRelPath } from "../../../entities/file-system/model/navigationAtoms";
 
 function withFiles(route: AppRoute, patch: Partial<FilesUrlState>): AppRoute {
@@ -55,5 +55,15 @@ export function goUpFiles(route: AppRoute): RouteTransition<AppRoute> | null {
 export const openFilesDirAtom = appRouteAction(openFilesDir);
 export const selectFilesEntryAtom = appRouteAction(selectFilesEntry);
 export const clearFilesSelectionAtom = appRouteAction(clearFilesSelection);
+/** 補正: 選択が path のままなら解除する。await のあとに走っても層と画面は変えず、別の選択へ移っていれば何もしない */
+export const dropFilesSelectionOfAtom = appRouteStore.action(
+  (route: AppRoute, path: WorkspacePath): RouteTransition<AppRoute> | null => {
+    const selected = route.files.selectedRelPath;
+    if (selected === null || selected.join("/") !== (toSelectedRelPath(path) ?? []).join("/")) {
+      return null;
+    }
+    return { route: withFiles(route, { selectedRelPath: null }), replace: true };
+  },
+);
 export const goToFilesSegmentAtom = appRouteAction(goToFilesSegment);
 export const goUpFilesAtom = appRouteAction(goUpFiles);

@@ -7,8 +7,8 @@ import { workDetailIdAtom } from "../../../entities/work/model/navigationAtoms";
 import { workDetailQueryOptions } from "../../../entities/work/workDetailQueryOptions";
 import { allTagsQueryOptions } from "../../../entities/tag/allTagsQueryOptions";
 import {
+  dropMissingWorkAtom,
   openNowPlayingLayerAtom,
-  replaceAppModeAtom,
 } from "../../../entities/navigation/model/appRouteStore";
 import {
   playerIsPlayingOrLoadingAtom,
@@ -27,7 +27,7 @@ export default function WorkDetailPage() {
   const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
   const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
   const openNowPlaying = useSetAtom(openNowPlayingLayerAtom);
-  const replaceAppMode = useSetAtom(replaceAppModeAtom);
+  const dropMissingWork = useSetAtom(dropMissingWorkAtom);
   const nav = useLibraryNavigation();
   const { clickTag } = nav;
   const view = nav.foldersStatus === "ready" ? nav.view : null;
@@ -38,15 +38,17 @@ export default function WorkDetailPage() {
   const workPatchMutations = useLibraryWorkPatchMutations(view, searchQuery);
   const deleteMutation = useUnregisterWorkMutation();
 
-  // 削除済み作品などをURLで直接開いた場合、404を確認したらライブラリへ戻す（LibraryViewの
-  // 選択解除と同じ考え方。ネットワーク断・5xx等の一時的な失敗では留まりエラー表示・再試行を出す）。
-  // 現在の画面自体が無効なのでreplaceで退避する。pushだと「404→自動でlibraryへpush→
-  // 戻るで404詳細に戻る→また自動push」のループになり、戻る操作で抜けられなくなる。
+  // 作品が存在しない（登録解除済み・URLで直接開いた削除済み作品）と404で確認したら、置き換えでライブラリへ戻る。
+  // ネットワーク断・5xx等の一時的な失敗では留まりエラー表示・再試行を出す。
   useEffect(() => {
-    if (workQuery.error instanceof ApiRequestError && workQuery.error.status === 404) {
-      replaceAppMode("library");
+    if (
+      workId !== null &&
+      workQuery.error instanceof ApiRequestError &&
+      workQuery.error.status === 404
+    ) {
+      dropMissingWork(workId);
     }
-  }, [workQuery.error, replaceAppMode]);
+  }, [workId, workQuery.error, dropMissingWork]);
 
   const work = workQuery.data ?? null;
   const isCurrentWorkPlaying = work !== null && playingWorkId === work.id;
@@ -78,8 +80,6 @@ export default function WorkDetailPage() {
         tagSuggestions={tagsQuery.data ?? []}
         workPatchMutations={workPatchMutations}
         deleteMutation={deleteMutation}
-        // 解除後の退避も、404と同じくreplaceで抜ける（上のuseEffect参照）
-        onUnregistered={() => replaceAppMode("library")}
         onTagClick={handleTagClick}
         onGoToPlayingScreen={isCurrentWorkPlaying ? openNowPlaying : undefined}
       />

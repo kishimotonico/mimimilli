@@ -1,7 +1,9 @@
 import type { ComponentProps } from "react";
 import { AnimatePresence } from "motion/react";
 import type { UseQueryResult } from "@tanstack/react-query";
+import { useSetAtom } from "jotai";
 import type { NormalizedTag, Work } from "@mimimilli/shared";
+import { dropMissingWorkAtom } from "../../../entities/navigation/model/appRouteStore";
 import type { ReadyLibraryNavigation } from "../model/useLibraryNavigation";
 import type { useLibraryPreviewActions } from "../model/useLibraryPreviewActions";
 import WorkGrid from "./WorkGrid";
@@ -50,13 +52,14 @@ export default function LibraryResultsPane({
   previewActions,
   onTagClick,
 }: LibraryResultsPaneProps) {
+  const dropMissingWork = useSetAtom(dropMissingWorkAtom);
   const resultsBanner = isErrorView ? (
     <div className="flex flex-col gap-2">
       <DataIntegrityWarningBanner />
       <ErrorViewBulkUnregisterBanner
         missingCount={missingWorksCount}
         onUnregistered={() => {
-          if (selectedWork?.status === "missing") nav.selectWork(null);
+          if (selectedWork?.status === "missing") dropMissingWork(selectedWork.id);
         }}
       />
     </div>

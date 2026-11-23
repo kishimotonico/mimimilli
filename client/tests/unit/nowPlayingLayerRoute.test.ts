@@ -5,15 +5,19 @@ import {
   appRouteAtom,
   appRouteStore,
   closeLayerAtom,
+  dropMissingWorkAtom,
   openNowPlayingLayerAtom,
   setAppModeAtom,
 } from "../../src/entities/navigation/model/appRouteStore";
-import { openFilesDirAtom } from "../../src/features/files/model/filesNavigationActions";
+import {
+  dropFilesSelectionOfAtom,
+  openFilesDirAtom,
+} from "../../src/features/files/model/filesNavigationActions";
 import { openWorkDetailAtom } from "../../src/entities/work/model/navigationActions";
 import {
   addLibraryTagAtom,
-  clearLibrarySortAtom,
-  replaceLibraryFolderAtom,
+  dropLibraryGroupAtom,
+  normalizeLibraryFolderAtom,
   openLibraryTagAtom,
 } from "../../src/entities/library/model/navigationActions";
 import { appRouteCodec } from "../../src/entities/navigation/model/appRoute";
@@ -136,19 +140,59 @@ describe("再生中の層の遷移", () => {
     expect(route.library.selectedTags).toEqual(nts(["cv/藤田茜"]));
   });
 
-  it("補正（既定の並びの保存後・消えたフォルダーからの退避）は層を保ち、置き換える", () => {
+  it("補正（グループ分けを変えた保存後・消えたフォルダーからの退避）は層を保ち、置き換える", () => {
     const store = openedStore("library");
-    seedLibraryRoute(store, { folderId: "sf-x", sort: "title-asc" });
+    seedLibraryRoute(store, { folderId: "sf-x", group: "藤田茜" });
     clearPendingOps(store);
 
-    store.set(clearLibrarySortAtom, { folderId: "sf-x", sort: "title-asc" });
+    store.set(dropLibraryGroupAtom, "sf-x");
     expect(store.get(appRouteAtom)).toMatchObject({ layer: { kind: "nowPlaying" } });
-    expect(store.get(appRouteAtom).library.sort).toBeNull();
+    expect(store.get(appRouteAtom).library.group).toBeNull();
 
-    store.set(replaceLibraryFolderAtom, "sf-x", "all");
+    store.set(normalizeLibraryFolderAtom, defaultSmartFolders());
     expect(store.get(appRouteAtom)).toMatchObject({ layer: { kind: "nowPlaying" } });
     expect(store.get(appRouteAtom).library.folderId).toBe("all");
     expect(pendingWrites(store)).toEqual(["replace", "replace"]);
+  });
+
+  it("存在しなくなった作品は、その作品の選択と詳細だけを外す。層とほかの作品は変えない", () => {
+    const store = openedStore({ workDetail: "work-a" });
+    seedLibraryRoute(store, { selectedWorkId: "work-b" });
+    clearPendingOps(store);
+
+    store.set(dropMissingWorkAtom, "work-c");
+    expect(store.get(appRouteAtom)).toMatchObject({ mode: "workDetail", workId: "work-a" });
+    expect(store.get(appRouteAtom).library.selectedWorkId).toBe("work-b");
+    expect(pendingWrites(store)).toEqual([]);
+
+    store.set(dropMissingWorkAtom, "work-b");
+    expect(store.get(appRouteAtom)).toMatchObject({ mode: "workDetail", workId: "work-a" });
+    expect(store.get(appRouteAtom).library.selectedWorkId).toBeNull();
+
+    store.set(dropMissingWorkAtom, "work-a");
+    expect(store.get(appRouteAtom)).toMatchObject({
+      mode: "library",
+      layer: { kind: "nowPlaying" },
+    });
+    expect(pendingWrites(store)).toEqual(["replace", "replace"]);
+  });
+
+  it("ファイルの選択の解除は、選択が同じパスのときだけ層を保って置き換える", () => {
+    const store = openedStore("files");
+    seedRoute(store, (route) => ({
+      ...route,
+      files: { ...route.files, relPath: ["dlsite"], selectedRelPath: ["dlsite", "a.json"] },
+    }));
+    clearPendingOps(store);
+
+    store.set(dropFilesSelectionOfAtom, "dlsite/b.json");
+    expect(store.get(appRouteAtom).files.selectedRelPath).toEqual(["dlsite", "a.json"]);
+    expect(pendingWrites(store)).toEqual([]);
+
+    store.set(dropFilesSelectionOfAtom, "dlsite/a.json");
+    expect(store.get(appRouteAtom).files.selectedRelPath).toBeNull();
+    expect(store.get(appRouteAtom).layer).toEqual({ kind: "nowPlaying" });
+    expect(pendingWrites(store)).toEqual(["replace"]);
   });
 
   it("画面へ進む操作は、遷移の中身によらず層を落として置き換える（ファイル内の操作を含む）", () => {

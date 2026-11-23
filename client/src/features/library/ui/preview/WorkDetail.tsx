@@ -9,6 +9,7 @@ import {
 import { useToast } from "../../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
+import { dropMissingWorkAtom } from "../../../../entities/navigation/model/appRouteStore";
 import { openPathInFilesAtom } from "../../../../entities/file-system/model/navigationAtoms";
 import { usePlayerActions } from "../../../../entities/player/model/usePlayerActions";
 import { usePlayWork } from "../../../../entities/player/model/usePlayWork";
@@ -42,8 +43,6 @@ interface WorkDetailProps {
   tagSuggestions: string[];
   workPatchMutations: ReturnType<typeof useLibraryWorkPatchMutations>;
   deleteMutation: UnregisterWorkMutation;
-  /** 登録解除の成功後、必須キャッシュ更新が済んでから呼ばれる（選択解除・遷移） */
-  onUnregistered: () => void;
   /** タグチップクリック時のハンドラ（絞り込み遷移。ADR-0013） */
   onTagClick: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
   /** "pane" = 右ペイン（既定）、"full" = 全画面詳細。カバー・余白のサイズだけを変える */
@@ -61,7 +60,6 @@ export function WorkDetail({
   tagSuggestions,
   workPatchMutations,
   deleteMutation,
-  onUnregistered,
   onTagClick,
   layout = "pane",
   onExpand,
@@ -93,6 +91,7 @@ export function WorkDetail({
   const statusLabel = getWorkStatusLabel(work.status);
   const toast = useToast();
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
+  const dropMissingWork = useSetAtom(dropMissingWorkAtom);
   const rootFolder = useRootFolder();
   const { togglePlay } = usePlayerActions();
   const { playWork, resumeWork } = usePlayWork();
@@ -115,11 +114,11 @@ export function WorkDetail({
       message: `「${title}」を登録解除しました`,
       variant: "success",
       priority: "notice",
-      // 解除成功で画面遷移してWorkDetailが直後にアンマウントされるため、
+      // 解除成功でこの作品の詳細が404になりWorkDetailがアンマウントされるため、
       // 通知は発行元の生存に縛らない
       dismissOnUnmount: false,
     });
-    onUnregistered();
+    dropMissingWork(work.id);
   };
 
   return (
