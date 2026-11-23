@@ -34,13 +34,10 @@ test("randomの並びは1000個のseedでほぼ重複しない", () => {
 });
 
 test("連番IDでもseedを変えると先頭がID順から外れる", () => {
-  let idOrderedHeads = 0;
   for (let seed = 0; seed < 200; seed++) {
     const head = orderFor(seed).slice(0, 5);
-    if (head.join(",") === serialIds.slice(0, 5).join(",")) idOrderedHeads++;
     assert.notEqual(head.join(","), serialIds.slice(0, 5).join(","));
   }
-  assert.equal(idOrderedHeads, 0);
   const firsts = new Set(Array.from({ length: 200 }, (_, seed) => orderFor(seed)[0]));
   assert.ok(firsts.size > 60);
 });

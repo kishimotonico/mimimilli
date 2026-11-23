@@ -25,9 +25,7 @@ export function compareJapaneseSortKeys(a: string, b: string): number {
 
 /** seed と作品 ID から決まる 32bit のランダム順キー（FNV-1a に seed を混ぜ murmur3 の fmix32 で拡散）。 */
 export function randomOrderKey(seed: number, workId: string): number {
-  const seedHigh = Math.floor(seed / 0x100000000);
-  let h =
-    (0x811c9dc5 ^ Math.imul(seed | 0, 0x9e3779b1) ^ Math.imul(seedHigh | 0, 0x85ebca6b)) >>> 0;
+  let h = (0x811c9dc5 ^ Math.imul(seed | 0, 0x9e3779b1)) >>> 0;
   for (const byte of textEncoder.encode(workId)) {
     h = Math.imul(h ^ byte, 0x01000193) >>> 0;
   }
@@ -41,11 +39,10 @@ export function randomOrderKey(seed: number, workId: string): number {
 
 /** randomOrderKey 昇順、同値は ID のバイト順。キーは1件につき1回だけ計算する。 */
 export function sortByRandomOrder<T>(items: T[], seed: number, idOf: (item: T) => string): T[] {
-  const keyed = items.map((item) => ({
-    item,
-    id: idOf(item),
-    key: randomOrderKey(seed, idOf(item)),
-  }));
+  const keyed = items.map((item) => {
+    const id = idOf(item);
+    return { item, id, key: randomOrderKey(seed, id) };
+  });
   keyed.sort((a, b) => a.key - b.key || compareUtf8Bytes(a.id, b.id));
   return keyed.map((entry) => entry.item);
 }

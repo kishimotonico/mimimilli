@@ -428,8 +428,8 @@ export class WorkQueryRepository {
     ).slice(offset, offset + limit);
     if (ids.length === 0) return [];
     const rows = this.db.sqlite
-      .query(`${WORK_LIST_ROW_SELECT} ${whereSql} AND works.id IN (SELECT value FROM json_each(?))`)
-      .all(...bindings, JSON.stringify(ids)) as RawWorkListRow[];
+      .query(`${WORK_LIST_ROW_SELECT} WHERE works.id IN (SELECT value FROM json_each(?))`)
+      .all(JSON.stringify(ids)) as RawWorkListRow[];
     const position = new Map(ids.map((id, index) => [id, index]));
     return rows.sort((a, b) => position.get(a.id)! - position.get(b.id)!);
   }
