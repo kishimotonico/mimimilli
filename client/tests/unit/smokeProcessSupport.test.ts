@@ -1,6 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { createServer } from "node:net";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { isGroupAlive, shutdown, withDeadline } from "../smoke/processSupport";
 
 describe("withDeadline", () => {
@@ -43,11 +43,29 @@ function canBind(port: number): Promise<boolean> {
 }
 
 describe.skipIf(process.platform === "win32")("shutdown（プロセスグループ）", () => {
-  it("先頭だけが SIGKILL で消えても、残った子を止めて待受ポートを解放して戻る", async () => {
+  const leaders: ChildProcess[] = [];
+  // テストが途中で失敗しても detached のグループを残さない
+  afterEach(() => {
+    for (const leader of leaders.splice(0)) {
+      try {
+        process.kill(-leader.pid!, "SIGKILL");
+      } catch {
+        // 既に消えている
+      }
+    }
+  });
+
+  function spawnLeader(): ChildProcess {
     const leader = spawn(process.execPath, ["-e", LEADER_SCRIPT], {
       stdio: ["ignore", "pipe", "inherit"],
       detached: true,
     });
+    leaders.push(leader);
+    return leader;
+  }
+
+  it("先頭だけが SIGKILL で消えても、残った子を止めて待受ポートを解放して戻る", async () => {
+    const leader = spawnLeader();
     const port = await readPort(leader);
     expect(await canBind(port)).toBe(false);
 
@@ -62,10 +80,7 @@ describe.skipIf(process.platform === "win32")("shutdown（プロセスグルー�
   }, 15_000);
 
   it("通常の終了ではグループ全体が消えて戻る", async () => {
-    const leader = spawn(process.execPath, ["-e", LEADER_SCRIPT], {
-      stdio: ["ignore", "pipe", "inherit"],
-      detached: true,
-    });
+    const leader = spawnLeader();
     const port = await readPort(leader);
 
     await shutdown(leader, 300);
