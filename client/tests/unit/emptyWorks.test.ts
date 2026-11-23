@@ -15,12 +15,12 @@ describe("buildEmptyWorksMessage", () => {
   });
 
   it("mentions the selected tag filter alone", () => {
-    expect(buildEmptyWorksMessage("", true)).toBe("選択中のフィルタに一致する作品はありません");
+    expect(buildEmptyWorksMessage("", true)).toBe("選択中の絞り込みに一致する作品はありません");
   });
 
   it("combines search query and selected tag filter when both narrow the result", () => {
     expect(buildEmptyWorksMessage("癒し", true)).toBe(
-      "「癒し」・選択中のフィルタ に一致する作品はありません",
+      "「癒し」と選択中の絞り込みに一致する作品はありません",
     );
   });
 });

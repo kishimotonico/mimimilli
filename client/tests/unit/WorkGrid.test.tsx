@@ -355,7 +355,7 @@ describe("WorkGrid empty states", () => {
       },
     });
 
-    expect(screen.getByText("選択中のフィルタに一致する作品はありません")).toBeInTheDocument();
+    expect(screen.getByText("選択中の絞り込みに一致する作品はありません")).toBeInTheDocument();
     screen.getByRole("button", { name: "絞り込みをすべてクリア" }).click();
     expect(clearTags).toHaveBeenCalled();
   });

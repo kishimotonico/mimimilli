@@ -175,18 +175,16 @@ export function useSmartFolderEditor(): SmartFolderEditor {
         const started = store.get(appRouteAtom);
         const scope: Refresh =
           "condition" in change || "groupBy" in change ? { definitionOf: id } : "folders";
-        const name = queryClient
+        const before = queryClient
           .getQueryData<SmartFolder[]>(SMART_FOLDER_QUERY_KEYS.all())
-          ?.find((folder) => folder.id === id)?.name;
+          ?.find((folder) => folder.id === id);
+        const name = before?.name;
         const saved = await commit(
           failureMessage ??
             (name === undefined ? "保存できませんでした" : `「${name}」を保存できませんでした`),
           scope,
           () => updateSmartFolder(id, change),
           (row) => {
-            const before = queryClient
-              .getQueryData<SmartFolder[]>(SMART_FOLDER_QUERY_KEYS.all())
-              ?.find((folder) => folder.id === id);
             if (reenter) settle(started, id, true);
             if (before !== undefined && groupByKey(before.groupBy) !== groupByKey(row.groupBy)) {
               dropGroup(id);

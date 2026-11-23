@@ -55,7 +55,7 @@ function unreadableSmartFolderMessage(rows: UnreadableSmartFolderRow[], dbPath: 
     const sql = `DELETE FROM smart_folders WHERE ${idCondition(row.id)}`;
     return `「${row.name}」（ID: ${row.id}）を読めません。${reasons}\n  sqlite3 "${dbPath}" "${sql}"`;
   });
-  return `保存済みの行を読めないため、ライブラリを開けません。次のコマンドで行を消してください（消した「すべて」は次の起動で戻ります）。\n${lines.join("\n")}`;
+  return `保存済みの行を読めないため、ライブラリを開けません。次のコマンドで削除してください（「すべて」は削除しても次の起動で作り直されます）。\n${lines.join("\n")}`;
 }
 
 export class SourceChangedError extends Error {

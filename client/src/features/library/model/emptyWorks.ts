@@ -8,13 +8,13 @@ import { isBookmarkedOnly, isHasErrorOnly, type Condition } from "@mimimilli/sha
 // ケースなので原因表示はしない。
 export function buildEmptyWorksMessage(searchQuery: string, hasSelectedTags: boolean): string {
   if (searchQuery && hasSelectedTags) {
-    return `「${searchQuery}」・選択中のフィルタ に一致する作品はありません`;
+    return `「${searchQuery}」と選択中の絞り込みに一致する作品はありません`;
   }
   if (searchQuery) {
     return `「${searchQuery}」に一致する作品はありません`;
   }
   if (hasSelectedTags) {
-    return "選択中のフィルタに一致する作品はありません";
+    return "選択中の絞り込みに一致する作品はありません";
   }
   return "作品が見つかりません";
 }

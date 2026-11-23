@@ -237,7 +237,7 @@ describe("WorkListPane 空状態", () => {
 
   it("選択中フィルタが原因の0件では専用メッセージを出す", () => {
     renderWorkListPane({ nav: { library: { selectedTags: nts(["タグ"]) } }, works: [] });
-    expect(screen.getByText("選択中のフィルタに一致する作品はありません")).toBeInTheDocument();
+    expect(screen.getByText("選択中の絞り込みに一致する作品はありません")).toBeInTheDocument();
   });
 
   it("検索語が原因の0件で検索クリアボタンを出す", async () => {

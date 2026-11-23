@@ -124,7 +124,7 @@ export function WorkEditTagsField({
       {confirmingRemoveTag && (
         <ConfirmDialog
           title="保護タグの削除"
-          message={`「${confirmingRemoveTag}」は保護された分類のタグです。削除しますか？`}
+          message={`「${confirmingRemoveTag}」は保護されたタグです。削除しますか？`}
           confirmLabel="削除する"
           onConfirm={onConfirmRemoveTag}
           onCancel={onCancelRemoveTag}

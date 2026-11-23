@@ -267,11 +267,11 @@ describe("GroupValueList list 表示（ADR-0012 §5）", () => {
     renderGroupValueList({
       groupValueItems: [],
       emptyState: {
-        message: "選択中のフィルタに一致する作品はありません",
+        message: "選択中の絞り込みに一致する作品はありません",
         action: <button type="button">「すべて」で探す</button>,
       },
     });
-    expect(screen.getByText("選択中のフィルタに一致する作品はありません")).toBeInTheDocument();
+    expect(screen.getByText("選択中の絞り込みに一致する作品はありません")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "「すべて」で探す" })).toBeInTheDocument();
   });
 
