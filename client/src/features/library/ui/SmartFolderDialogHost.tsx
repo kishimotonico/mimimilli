@@ -15,7 +15,8 @@ export default function SmartFolderDialogHost() {
   const editor = useSmartFolderEditor();
   const { tagPrefixes } = useTagPrefixes();
   if (!dialog || nav.foldersStatus !== "ready") return null;
-  const allSort = nav.folders.find((folder) => folder.id === ALL_SMART_FOLDER_ID)?.sort ?? null;
+  const allSort = nav.folders.find((folder) => folder.id === ALL_SMART_FOLDER_ID)?.sort;
+  if (!allSort) throw new Error("「すべて」の既定の並びがありません");
 
   const save = async (data: SmartFolderWrite) => {
     if (dialog.kind === "edit") {

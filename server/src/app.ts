@@ -151,6 +151,7 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
         requestId,
         path,
         rows: err.rows,
+        message: err.message,
         dbPath: err.dbPath,
       });
       return apiError("internal", err.message).getResponse();

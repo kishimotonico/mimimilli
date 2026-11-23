@@ -273,7 +273,7 @@ describe("スマートフォルダー一覧を取れるまで", () => {
   });
 });
 
-describe("値一覧・読めない行からの検索は「すべて」の検索結果へ移る（ADR-0041）", () => {
+describe("値一覧からの検索は「すべて」の検索結果へ移る（ADR-0041）", () => {
   it("値一覧でも検索欄は有効", () => {
     const store = renderTopBar("");
     act(() => seedLibraryRoute(store, { folderId: "by-cv" }));

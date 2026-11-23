@@ -43,10 +43,16 @@ export class UnreadableSmartFolderError extends Error {
   }
 }
 
+/** シェルでも SQL でも壊れない形で ID を指す。安全な文字だけの ID はそのまま、それ以外は16進のリテラルにする */
+function idCondition(id: string): string {
+  if (/^[A-Za-z0-9_-]+$/.test(id)) return `id = '${id}'`;
+  return `id = CAST(x'${Buffer.from(id, "utf8").toString("hex")}' AS TEXT)`;
+}
+
 function unreadableSmartFolderMessage(rows: UnreadableFolderRow[], dbPath: string): string {
   const lines = rows.map((row) => {
     const reasons = row.problems.map((p) => `${p.column}: ${p.reason}`).join(" / ");
-    const sql = `DELETE FROM smart_folders WHERE id = '${row.id.replaceAll("'", "''")}'`;
+    const sql = `DELETE FROM smart_folders WHERE ${idCondition(row.id)}`;
     return `「${row.name}」（ID: ${row.id}）を読めません。${reasons}\n  sqlite3 "${dbPath}" "${sql}"`;
   });
   return `保存済みの行を読めないため、ライブラリを開けません。次のコマンドで行を消してください（消した「すべて」は次の起動で戻ります）。\n${lines.join("\n")}`;

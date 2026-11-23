@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
 import { conditionKey, SMART_FOLDER_TEMPLATES, findSmartFolderTemplate } from "@mimimilli/shared";
+import { UnreadableSmartFolderError } from "../../src/errors.ts";
 import { createApp } from "../helpers/testApp.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
@@ -145,6 +146,11 @@ for (const { id, column, row } of UNREADABLE_ROWS) {
         const errors = categoryRecords(records, "http").filter((r) => r.level === "error");
         assert.ok(errors.length >= 2);
         assert.equal(errors[0]!.properties.dbPath, userPath);
+        assert.ok(
+          String(errors[0]!.properties.message).includes(
+            `sqlite3 "${userPath}" "DELETE FROM smart_folders WHERE id = '${id}'"`,
+          ),
+        );
         assert.deepEqual(
           (errors[0]!.properties.rows as Array<{ id: string }>).map((r) => r.id),
           [id],
@@ -179,4 +185,19 @@ test("読めない行が複数あれば、すべての行を1つの応答にま�
   const list = await app.request("/api/smart-folders");
   assert.equal(list.status, 200);
   assert.ok(((await list.json()) as Array<{ id: string }>).some((f) => f.id === "ok-error"));
+});
+
+test("ID にシェルや SQL の特殊文字があっても、DELETE のコマンドは16進のリテラルで指す", () => {
+  const id = `a"b$c\`d'e`;
+  const error = new UnreadableSmartFolderError(
+    [{ id, name: "手書き", problems: [{ column: "sort", reason: "x" }] }],
+    "/data/user.sqlite",
+  );
+  const hex = Buffer.from(id, "utf8").toString("hex");
+  assert.ok(
+    error.message.includes(
+      `sqlite3 "/data/user.sqlite" "DELETE FROM smart_folders WHERE id = CAST(x'${hex}' AS TEXT)"`,
+    ),
+    error.message,
+  );
 });

@@ -49,7 +49,7 @@ export interface ReadyLibraryViewState extends LibraryViewStateBase {
   view: ResolvedLibraryView;
   /** 効いているチップ。作品一覧以外では空 */
   selectedTags: NormalizedTag[];
-  /** 効いている検索語。値一覧・読めない行では空（効かない q を見せない） */
+  /** 効いている検索語。値一覧では空（効かない q を見せない） */
   searchQuery: string;
 }
 

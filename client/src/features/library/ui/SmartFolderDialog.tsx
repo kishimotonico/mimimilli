@@ -33,7 +33,7 @@ import {
 interface SmartFolderDialogProps {
   target: SmartFolderDialogTarget;
   /** 「すべて」の並び（「すべて」と同じ、の表示に使う） */
-  allSort: SortId | null;
+  allSort: SortId;
   tagPrefixes: readonly TagPrefix[];
   /** 保存できたら true。失敗はダイアログを開いたままにする */
   onSave: (draft: SmartFolderWrite) => Promise<boolean>;
@@ -213,7 +213,7 @@ export default function SmartFolderDialog({
               })
             }
           >
-            {permissions.inheritSort && allSort !== null && (
+            {permissions.inheritSort && (
               <option value="">{`「すべて」と同じ（${sortLabel(allSort)}）`}</option>
             )}
             {SORT_OPTIONS.map((option) => (

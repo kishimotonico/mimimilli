@@ -48,6 +48,5 @@ describe("buildEmptyWorksHint（条件の形で決める）", () => {
   it("omits hint for conditions without a specific context", () => {
     expect(buildEmptyWorksHint(and(), false)).toBeUndefined();
     expect(buildEmptyWorksHint(and({ type: "played" }), false)).toBeUndefined();
-    expect(buildEmptyWorksHint(null, false)).toBeUndefined();
   });
 });

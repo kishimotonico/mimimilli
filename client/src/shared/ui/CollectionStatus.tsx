@@ -57,7 +57,7 @@ export default function CollectionStatus({
       </>
     ) : (
       <>
-        <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-all", userSelect: "text" }}>
+        <span className={kind === "error" && message ? "mll-status-detail" : undefined}>
           {text}
         </span>
         {kind === "empty" && hint && <span className="mll-status-hint">{hint}</span>}

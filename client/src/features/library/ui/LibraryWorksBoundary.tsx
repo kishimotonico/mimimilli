@@ -17,7 +17,7 @@ interface WorksResult {
   refetchWorks: () => void;
 }
 
-// LibraryWorksBoundary は作品一覧を表示する結果面でのみ使う。値一覧・読めない行は
+// LibraryWorksBoundary は作品一覧を表示する結果面でのみ使う。値一覧は
 // works query 自体を発行しないため、呼び出し側（LibraryView）でこの境界に入らない。
 
 interface Props {

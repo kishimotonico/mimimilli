@@ -250,7 +250,7 @@ export function reshuffleLibrarySeed(route: AppRoute): Transition {
 }
 
 /** 検索欄の入力。作品一覧ならその一覧で検索し（ライブラリの中なら履歴を置き換え、作品詳細・ファイルからは積む）、
- *  値一覧・読めない行なら「すべて」の検索結果へ移る */
+ *  値一覧なら「すべて」の検索結果へ移る */
 export function setLibrarySearchQuery(
   route: AppRoute,
   q: string,

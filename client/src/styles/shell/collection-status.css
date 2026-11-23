@@ -69,3 +69,10 @@
     opacity: 0.75;
   }
 }
+/* 取得失敗でサーバーの文言を出すとき。改行とコマンドの途中の折り返しを許し、選択してコピーできる */
+.mll-status-detail {
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+  text-align: left;
+}

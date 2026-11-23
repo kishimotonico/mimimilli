@@ -24,25 +24,13 @@ function isHidden(
   activeFolderId: string,
   integrity: DataIntegrityCount,
 ): boolean {
-  const { condition } = folder;
-  if (condition === null || !isHiddenWhenEmpty(condition)) return false;
+  if (!isHiddenWhenEmpty(folder.condition)) return false;
   if (folder.id === activeFolderId) return false;
   return folder.count === 0 && integrity.status === "ready" && integrity.count === 0;
 }
 
 function toRow(folder: SmartFolder): SidebarRow {
   const { condition } = folder;
-  if (condition === null) {
-    return {
-      id: folder.id,
-      name: folder.name,
-      icon: "err",
-      count: null,
-      countTone: "plain",
-      hasQuickOverlay: false,
-      dimmed: false,
-    };
-  }
   return {
     id: folder.id,
     name: folder.name,
