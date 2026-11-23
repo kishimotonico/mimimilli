@@ -17,7 +17,6 @@ import type {
   WorkPlacement,
   WorkspacePath,
   WorksPage,
-  SortId,
 } from "@mimimilli/shared";
 import { isPathWithin } from "../../lib/path.ts";
 import type {
@@ -25,7 +24,8 @@ import type {
   ConditionWorksQuery,
   EvalContext,
 } from "../../adapter/condition.ts";
-import { requireRandomSeed } from "../../core/conditionQuery.ts";
+import { worksOrderOf, type WorksOrder } from "../../core/worksQuery.ts";
+import { sortByRandomOrder } from "../../core/randomOrder.ts";
 import { compileCondition } from "./conditionSql.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips } from "./dataIntegrity.ts";
@@ -344,7 +344,6 @@ export class WorkQueryRepository {
 
   /** 条件の木に一致する作品の一覧（ADR-0040）。seed は呼び出し側が渡し、ここでは発行しない */
   queryWorksByCondition(query: ConditionWorksQuery, root: string, ctx: EvalContext): WorksPage {
-    const seed = requireRandomSeed(query.sort, query.seed);
     const compiled = compileCondition(query.condition, ctx);
     const conditions = [compiled.sql];
     const bindings: Array<string | number> = [...compiled.bindings];
@@ -356,8 +355,7 @@ export class WorkQueryRepository {
       {
         whereSql: `WHERE ${conditions.join(" AND ")}`,
         bindings,
-        sort: query.sort,
-        seed,
+        order: worksOrderOf(query.sort, query.seed),
         page: query.page,
         limit: query.limit,
       },
@@ -369,14 +367,13 @@ export class WorkQueryRepository {
     run: {
       whereSql: string;
       bindings: Array<string | number>;
-      sort: SortId;
-      seed: number | undefined;
+      order: WorksOrder;
       page: number;
       limit: number;
     },
     root: string,
   ): WorksPage {
-    const { whereSql, bindings, sort, seed, page, limit } = run;
+    const { whereSql, bindings, order, page, limit } = run;
     return this.db.transaction(() => {
       const statsRow = this.db.sqlite
         .query(`
@@ -388,21 +385,48 @@ export class WorkQueryRepository {
         `)
         .get(...bindings) as { total: number; trackCount: number; durationSec: number };
 
-      const orderBindings: number[] = [];
-      const orderSql = worksOrderSql(sort, seed, orderBindings);
-      const rows = this.db.sqlite
-        .query(`
+      const offset = (page - 1) * limit;
+      const rows =
+        order.sort === "random"
+          ? this.queryRandomOrderedRows(whereSql, bindings, order.seed, limit, offset)
+          : (this.db.sqlite
+              .query(`
         ${WORK_LIST_ROW_SELECT}
         ${whereSql}
-        ORDER BY ${orderSql}
+        ORDER BY ${worksOrderSql(order.sort)}
         LIMIT ? OFFSET ?
       `)
-        .all(...bindings, ...orderBindings, limit, (page - 1) * limit) as RawWorkListRow[];
+              .all(...bindings, limit, offset) as RawWorkListRow[]);
       const { items, skipped } = this.mapWorkListRows(rows, root);
       logDataIntegritySkips(queryWorksLogger, "query-works", skipped);
       const stats = { trackCount: statsRow.trackCount, durationSec: statsRow.durationSec };
       return { items, total: statsRow.total, stats };
     });
+  }
+
+  /** ランダム順はキーをアプリ側で計算する。絞り込み後の ID だけを並べ替え、そのページ分の行を読む */
+  private queryRandomOrderedRows(
+    whereSql: string,
+    bindings: Array<string | number>,
+    seed: number,
+    limit: number,
+    offset: number,
+  ): RawWorkListRow[] {
+    const ids = sortByRandomOrder(
+      (
+        this.db.sqlite
+          .query(`SELECT works.id AS id ${WORKS_QUERY_FROM} ${whereSql}`)
+          .all(...bindings) as Array<{ id: string }>
+      ).map((row) => row.id),
+      seed,
+      (id) => id,
+    ).slice(offset, offset + limit);
+    if (ids.length === 0) return [];
+    const rows = this.db.sqlite
+      .query(`${WORK_LIST_ROW_SELECT} WHERE works.id IN (SELECT value FROM json_each(?))`)
+      .all(JSON.stringify(ids)) as RawWorkListRow[];
+    const position = new Map(ids.map((id, index) => [id, index]));
+    return rows.sort((a, b) => position.get(a.id)! - position.get(b.id)!);
   }
 
   /** 一覧の行を作品に変換する。保存された値を読めない作品は skipped に分ける。行が読めるかの検証は validateWorkRow を通る */

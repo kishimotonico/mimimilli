@@ -1,5 +1,5 @@
 // 条件の木による作品一覧・グループの値一覧・件数（fixture アダプタの評価。real は SQL で同じ意味を返す）。
-import type { GroupValueItem, Condition, SortId, WorkSummary } from "@mimimilli/shared";
+import type { GroupValueItem, Condition, WorkSummary } from "@mimimilli/shared";
 import { buildGroupValues } from "./groupValues.ts";
 import type {
   ConditionGroupQuery,
@@ -7,24 +7,22 @@ import type {
   EvalContext,
 } from "../adapter/condition.ts";
 import { createMatcher } from "./condition.ts";
-import { computeCollectionStats, sortWorkSummaries, type WorkSummaryPage } from "./worksQuery.ts";
-
-export function requireRandomSeed(sort: SortId, seed: number | undefined): number | undefined {
-  if (sort !== "random") return undefined;
-  if (seed === undefined) throw new Error("randomソートにはseedが必要です");
-  return seed;
-}
+import {
+  computeCollectionStats,
+  sortWorkSummaries,
+  worksOrderOf,
+  type WorkSummaryPage,
+} from "./worksQuery.ts";
 
 export function queryWorksByCondition(
   works: WorkSummary[],
   query: ConditionWorksQuery,
   ctx: EvalContext,
 ): WorkSummaryPage {
-  const seed = requireRandomSeed(query.sort, query.seed);
   const idSet = query.ids === undefined ? null : new Set(query.ids);
   const matches = createMatcher(query.condition, ctx);
   const matched = works.filter((work) => (idSet === null || idSet.has(work.id)) && matches(work));
-  const sorted = sortWorkSummaries(matched, query.sort, seed);
+  const sorted = sortWorkSummaries(matched, worksOrderOf(query.sort, query.seed));
   const start = (query.page - 1) * query.limit;
   return {
     items: sorted.slice(start, start + query.limit),

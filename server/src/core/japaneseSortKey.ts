@@ -16,19 +16,7 @@ export function japaneseSortKey(value: string): string {
 
 export { compareUtf8Bytes };
 
-const textEncoder = new TextEncoder();
-
 /** SQLiteのBINARY照合と同じUTF-8バイト順でキーを比較する。 */
 export function compareJapaneseSortKeys(a: string, b: string): number {
   return compareUtf8Bytes(japaneseSortKey(a), japaneseSortKey(b));
-}
-
-/** SQLiteのhex(work_id)をseed位置で回転した、安定したrandomソートキー。 */
-export function stableRandomSortKey(seed: number, workId: string): string {
-  const hex = [...textEncoder.encode(workId)]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-  if (hex.length === 0) return "";
-  const offset = seed % hex.length;
-  return hex.slice(offset) + hex.slice(0, offset);
 }
