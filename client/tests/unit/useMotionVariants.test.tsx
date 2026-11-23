@@ -37,7 +37,7 @@ describe("motion variant builders: reduced=false は duration>0", () => {
   });
 });
 
-describe("motion variant builders: exit は全variantで pointerEvents:none をbakeする", () => {
+describe("motion variant builders: exit に pointerEvents を置かない（退出中の操作不可は inert={!isPresent} が担う）", () => {
   it.each([
     ["fade", () => fadeVariant(false)],
     ["fadeSlideUp", () => fadeSlideUpVariant(false)],
@@ -50,7 +50,8 @@ describe("motion variant builders: exit は全variantで pointerEvents:none をb
     ["previewSlide", () => previewSlideVariant(false)],
   ])("%s", (_name, build) => {
     const variant = build();
-    expect((variant.exit as { pointerEvents?: string }).pointerEvents).toBe("none");
+    expect(variant.exit).not.toHaveProperty("pointerEvents");
+    expect(variant.animate).not.toHaveProperty("pointerEvents");
   });
 });
 
