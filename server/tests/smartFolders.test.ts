@@ -342,7 +342,7 @@ contract("行の不変条件の違反は、違反の説明を400で返す", asyn
   assert.equal(res.status, 400);
   assert.equal(res.body.error.message, "「すべて」の既定の並びは空にできません");
   const pair = await harness.send("PATCH", "/api/smart-folders/fav", { groupSort: "count-desc" });
-  assert.equal(pair.body.error.message, "値の並びはグループ分けがあるときだけ指定します");
+  assert.equal(pair.body.error.message, "ソートはグループ分けがあるときだけ指定します");
 });
 
 contract("既定の行は自作と同じに変えられる", async (harness) => {

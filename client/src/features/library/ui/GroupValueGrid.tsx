@@ -37,10 +37,8 @@ interface GroupValueGridProps {
   tileSize: number;
   fallbackIcon: IconName;
   resetKey: string;
-  /** クリック（既定=置き換え）・Ctrl/Cmd+クリック（トグル、ADR-0012 §7・ADR-0013の
-   *  作品詳細タグクリックと同型）。値一覧は独立した全作品入口のためAND追加ボタンは
-   *  持たない。 */
-  onSelect: (item: GroupValueItem, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
+  /** 値を選ぶとその値の作品一覧へ進む（ADR-0041）。修飾キーでも動きは同じ */
+  onSelect: (item: GroupValueItem) => void;
 }
 
 export default function GroupValueGrid({
@@ -144,9 +142,7 @@ export default function GroupValueGrid({
                         data-flat-index={flatIndex}
                         tabIndex={flatIndex === rovingIndex ? 0 : -1}
                         title={parentPath ? row.item.value : undefined}
-                        onClick={(e) =>
-                          onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
-                        }
+                        onClick={() => onSelect(row.item)}
                         onKeyDown={(e) => {
                           if (!isGridArrowKey(e.key, GRID_ARROW_KEYS)) return;
                           e.preventDefault();

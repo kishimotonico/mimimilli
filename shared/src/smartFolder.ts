@@ -69,10 +69,10 @@ export function smartFolderViolation(row: SmartFolderRowFields): SmartFolderViol
   const condition = savedConditionViolation(row.condition);
   if (condition) return { field: "condition", message: condition };
   if (row.groupBy !== null && row.groupSort === null) {
-    return { field: "groupSort", message: "グループ分けには値の並びが要ります" };
+    return { field: "groupSort", message: "グループ分けにはソートが要ります" };
   }
   if (row.groupBy === null && row.groupSort !== null) {
-    return { field: "groupSort", message: "値の並びはグループ分けがあるときだけ指定します" };
+    return { field: "groupSort", message: "ソートはグループ分けがあるときだけ指定します" };
   }
   if (row.id === ALL_SMART_FOLDER_ID) {
     const all = `「${ALL_SMART_FOLDER_NAME}」`;

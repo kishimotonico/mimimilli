@@ -150,7 +150,7 @@ test("サイドバーのクイックオーバーレイ: 値の主クリックで
   await expect(page).toHaveURL(/\/library\/by-cv\?/);
   expect(new URL(page.url()).searchParams.has("group")).toBe(false);
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["cv/霧島レイ"]);
-  await expect(page.locator(".mll-tagband__count")).toHaveText(/^\d+ 分類$/);
+  await expect(page.locator(".mll-tagband__count")).toHaveText(/^\S+ \d+件$/);
 
   assertNoErrors(tracker);
 });
@@ -166,7 +166,7 @@ test("値一覧でも検索でき、同じ値一覧のまま値と件数が絞�
 
   await expect(search(page)).toBeEnabled();
   await expect(valueList.getByRole("button", { name: /をAND追加/ })).toHaveCount(0);
-  await expect(page.locator(".mll-tagband__count")).toHaveText(/^\d+ 分類$/);
+  await expect(page.locator(".mll-tagband__count")).toHaveText(/^\S+ \d+件$/);
 
   await search(page).fill("霧島");
   await expect(page).toHaveURL(/\/library\/by-cv\?q=/);

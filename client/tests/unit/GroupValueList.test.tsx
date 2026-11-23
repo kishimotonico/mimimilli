@@ -191,8 +191,8 @@ describe("GroupValueList list 表示（ADR-0012 §5）", () => {
     const header = document.querySelector(".mll-vlist-hd")!;
     expect(notice.compareDocumentPosition(header) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-    await user.type(screen.getByPlaceholderText("値を絞り込み"), "zzz");
-    expect(screen.getByText("該当する値がありません")).toBeInTheDocument();
+    await user.type(screen.getByPlaceholderText("cvを絞り込み"), "zzz");
+    expect(screen.getByText("該当するcvがありません")).toBeInTheDocument();
     expect(document.querySelector(".mll-vlist-hd")).toBeNull();
     sizeMock.restore();
   });
@@ -261,7 +261,7 @@ describe("GroupValueList list 表示（ADR-0012 §5）", () => {
 
   it("0件のとき、絞り込みの案内があればその文言と操作を出し、無ければ既定の文言を出す", () => {
     const { unmount } = renderGroupValueList({ groupValueItems: [] });
-    expect(screen.getByText("項目がありません")).toBeInTheDocument();
+    expect(screen.getByText("cvがありません")).toBeInTheDocument();
     unmount();
 
     renderGroupValueList({
@@ -419,7 +419,7 @@ describe("GroupValueList コンテキスト検索（ADR-0012 §6）", () => {
     expect(getRow(".mll-vrow", "藤田茜")).toBeInTheDocument();
     expect(getRow(".mll-vrow", "夜想曲サークル")).toBeInTheDocument();
 
-    const input = screen.getByPlaceholderText("値を絞り込み");
+    const input = screen.getByPlaceholderText("cvを絞り込み");
     await user.type(input, "藤田");
     await flushVirtualizer();
 
@@ -447,7 +447,7 @@ describe("GroupValueList コンテキスト検索（ADR-0012 §6）", () => {
     );
     await flushVirtualizer();
 
-    const input = screen.getByPlaceholderText("値を絞り込み") as HTMLInputElement;
+    const input = screen.getByPlaceholderText("cvを絞り込み") as HTMLInputElement;
     await user.type(input, "藤田");
     expect(input.value).toBe("藤田");
 
@@ -465,7 +465,7 @@ describe("GroupValueList コンテキスト検索（ADR-0012 §6）", () => {
     );
     await flushVirtualizer();
 
-    const inputAfter = screen.getByPlaceholderText("値を絞り込み") as HTMLInputElement;
+    const inputAfter = screen.getByPlaceholderText("circleを絞り込み") as HTMLInputElement;
     expect(inputAfter.value).toBe("");
     sizeMock.restore();
   });

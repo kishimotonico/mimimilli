@@ -19,8 +19,8 @@ interface FilterChipBandProps {
   onRemoveTag: (tag: NormalizedTag) => void;
   /** 絞り込み後の作品件数。作品一覧を出さない結果面では undefined */
   worksTotal?: number;
-  /** 値一覧ペインの分類数。指定時は作品件数の代わりに分類数を出す */
-  valueListItemCount?: number;
+  /** 値一覧ペインのグループ分けの名前と件数。指定時は作品件数の代わりに出す */
+  valueList?: { label: string; count: number };
   /** 保存の操作。出すものは状態で決まる（ADR-0041） */
   save?: {
     offer: SaveOffer;
@@ -79,10 +79,10 @@ export default function FilterChipBand({
   onAddTag,
   onRemoveTag,
   worksTotal,
-  valueListItemCount,
+  valueList,
   save,
 }: FilterChipBandProps) {
-  const isValueListPane = valueListItemCount !== undefined;
+  const isValueListPane = valueList !== undefined;
   return (
     <div className="mll-tagband">
       {selectedTags.map((tag) => (
@@ -119,7 +119,9 @@ export default function FilterChipBand({
           </button>
         )}
         {isValueListPane ? (
-          <span className="mll-tagband__count">{valueListItemCount} 分類</span>
+          <span className="mll-tagband__count">
+            {valueList.label} {valueList.count}件
+          </span>
         ) : (
           worksTotal != null && <span className="mll-tagband__count">{worksTotal} 件</span>
         )}

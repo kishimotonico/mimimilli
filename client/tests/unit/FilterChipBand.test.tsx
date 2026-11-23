@@ -101,24 +101,27 @@ describe("FilterChipBand の件数表示", () => {
 });
 
 describe("値一覧ペイン表示中の件数ラベルと＋絞り込みの扱い（ADR-0041）", () => {
-  it("valueListItemCount指定時は絞り込み後件数の代わりに分類数を出す", () => {
-    renderFilterChipBand(undefined, { valueListItemCount: 12, groupValueScope: undefined });
-    expect(screen.getByText("12 分類")).toBeInTheDocument();
+  it("valueList指定時は絞り込み後件数の代わりにグループ分けの名前と件数を出す", () => {
+    renderFilterChipBand(undefined, {
+      valueList: { label: "CV", count: 12 },
+      groupValueScope: undefined,
+    });
+    expect(screen.getByText("CV 12件")).toBeInTheDocument();
     expect(screen.queryByText(/^\d+ 件$/)).toBeNull();
   });
 
-  it("valueListItemCount指定時は worksTotal が渡っても絞り込み後件数を出さない", () => {
-    renderFilterChipBand(120, { valueListItemCount: 12 });
+  it("valueList指定時は worksTotal が渡っても絞り込み後件数を出さない", () => {
+    renderFilterChipBand(120, { valueList: { label: "CV", count: 12 } });
     expect(screen.queryByText("120 件")).toBeNull();
-    expect(screen.getByText("12 分類")).toBeInTheDocument();
+    expect(screen.getByText("CV 12件")).toBeInTheDocument();
   });
 
-  it("valueListItemCount指定時も「＋絞り込み」ボタンを出す（値一覧でもチップを足せる）", () => {
-    renderFilterChipBand(undefined, { valueListItemCount: 12 });
+  it("valueList指定時も「＋絞り込み」ボタンを出す（値一覧でもチップを足せる）", () => {
+    renderFilterChipBand(undefined, { valueList: { label: "CV", count: 12 } });
     expect(screen.getByRole("button", { name: /絞り込み$/ })).toBeInTheDocument();
   });
 
-  it("valueListItemCount未指定時は「＋絞り込み」ボタンを出す（回帰確認）", () => {
+  it("valueList未指定時は「＋絞り込み」ボタンを出す（回帰確認）", () => {
     renderFilterChipBand();
     expect(screen.getByRole("button", { name: /絞り込み$/ })).toBeInTheDocument();
   });

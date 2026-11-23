@@ -46,7 +46,7 @@ export function useSaveSearch(nav: LibraryViewState & LibraryViewActions): SaveS
     const { folder } = view;
     const undoChange = overwriteUndoChange(view);
     const saved = await editor.patch(folder.id, overwriteChange(view), {
-      failureMessage: "スマートフォルダーを上書きできませんでした",
+      failureMessage: `「${folder.name}」を上書きできませんでした`,
       reenter: true,
     });
     overwriting.current = false;

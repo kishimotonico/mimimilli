@@ -17,6 +17,7 @@ import { folderWorksResetKey } from "../model/folderWorksRequest";
 import { useLibrarySelectionCleanup } from "../model/useLibrarySelectionCleanup";
 import { useLibraryPreviewActions } from "../model/useLibraryPreviewActions";
 import GroupValueList from "./GroupValueList";
+import { getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
 import FilterChipBand from "./FilterChipBand";
 import RefinementActions from "./RefinementActions";
 import LibraryResultsPane from "./LibraryResultsPane";
@@ -81,8 +82,8 @@ function LibraryViewBody({
     view.kind === "works" && noResultsKey === folderWorksResetKey(view, view.q);
   const [worksTotal, setWorksTotal] = useState<number | undefined>(undefined);
 
-  const isErrorView = view.kind === "works" && isHasErrorOnly(view.condition);
-  const missingWorksCountQuery = useMissingWorksCountQuery(isErrorView);
+  const isErrorRow = view.kind === "works" && isHasErrorOnly(view.condition);
+  const missingWorksCountQuery = useMissingWorksCountQuery(isErrorRow);
 
   const valueListEmptyState =
     view.kind === "value-list" ? buildValueListEmptyState(nav) : undefined;
@@ -121,7 +122,14 @@ function LibraryViewBody({
             onAddTag={nav.addTag}
             onRemoveTag={nav.removeTag}
             worksTotal={view.kind === "works" ? worksTotal : undefined}
-            valueListItemCount={view.kind === "value-list" ? groupValueItems.length : undefined}
+            valueList={
+              view.kind === "value-list"
+                ? {
+                    label: getGroupByLabel(view.groupBy, tagPrefixes),
+                    count: groupValueItems.length,
+                  }
+                : undefined
+            }
             save={
               saveSearch.offer
                 ? {
@@ -170,7 +178,7 @@ function LibraryViewBody({
                 isPending={isPending}
                 showGrid={showGrid}
                 dockedBarActive={dockedBarActive}
-                isErrorView={isErrorView}
+                isErrorRow={isErrorRow}
                 missingWorksCount={missingWorksCountQuery.data}
                 tagSuggestions={tagSuggestions}
                 searchQuery={searchQuery}

@@ -19,7 +19,7 @@ export type SmartFolderCreate = z.infer<typeof smartFolderCreateSchema>;
 export const smartFolderPatchSchema = z
   .strictObject(definitionShape)
   .partial()
-  .refine((patch) => Object.keys(patch).length > 0, { message: "更新する項目がありません" });
+  .refine((patch) => Object.keys(patch).length > 0, { message: "更新する内容がありません" });
 export type SmartFolderPatch = z.infer<typeof smartFolderPatchSchema>;
 
 export const smartFolderOrderSchema = z.strictObject({

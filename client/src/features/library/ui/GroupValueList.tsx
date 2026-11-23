@@ -81,8 +81,8 @@ export default function GroupValueList({
           type="text"
           value={contextQuery}
           onChange={(e) => setContextQuery(e.target.value)}
-          placeholder="値を絞り込み"
-          aria-label={`${getGroupByLabel(groupBy, tagPrefixes)}の値を絞り込み`}
+          placeholder={`${groupByLabel}を絞り込み`}
+          aria-label={`${groupByLabel}を絞り込み`}
         />
         {contextQuery && (
           <Button variant="ghost" icon={I.x} onClick={() => setContextQuery("")}>
@@ -97,7 +97,7 @@ export default function GroupValueList({
             {isGroupValuesError && (
               // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- role="status"で非ブロッキング通知にする
               <div className="mle-col__notice" role="status" aria-live="polite">
-                <span>{getGroupByLabel(groupBy, tagPrefixes)}の取得に失敗しました</span>
+                <span>{groupByLabel}の取得に失敗しました</span>
                 {onRetryGroupValues && (
                   <Button variant="ghost" icon={I.refresh} onClick={onRetryGroupValues}>
                     再試行
@@ -139,14 +139,14 @@ export default function GroupValueList({
               <CollectionStatus
                 variant={viewMode === "grid" ? "grid" : "list"}
                 kind="empty"
-                message={emptyState?.message ?? "項目がありません"}
+                message={emptyState?.message ?? `${groupByLabel}がありません`}
                 action={emptyState?.action}
               />
             ) : showSearchMiss ? (
               <CollectionStatus
                 variant={viewMode === "grid" ? "grid" : "list"}
                 kind="empty"
-                message="該当する値がありません"
+                message={`該当する${groupByLabel}がありません`}
                 action={
                   <Button variant="ghost" icon={I.x} onClick={() => setContextQuery("")}>
                     絞り込みをクリア

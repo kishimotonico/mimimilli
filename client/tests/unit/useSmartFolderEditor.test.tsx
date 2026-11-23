@@ -226,8 +226,7 @@ describe("定義の更新（全項目）", () => {
 
   it("404 でもトーストを出して一覧を取り直す。作品・値の一覧は取り直さない", async () => {
     mockApi({
-      "PATCH /api/smart-folders/:id": () =>
-        apiError(404, "not_found", "スマートフォルダーが見つかりません"),
+      "PATCH /api/smart-folders/:id": () => apiError(404, "not_found", "見つかりません: sf-1"),
     });
     const editor = setup();
 
@@ -236,7 +235,7 @@ describe("定義の更新（全項目）", () => {
     );
 
     expect(toasts()[0]).toMatchObject({
-      message: "スマートフォルダーが見つかりません",
+      message: "見つかりません: sf-1",
       variant: "error",
     });
     expect(invalidated).toEqual([SMART_FOLDER_QUERY_KEYS.all()]);
@@ -497,8 +496,7 @@ describe("削除", () => {
 
   it("失敗（404・409）はトーストを出して一覧を取り直し、route は動かさない", async () => {
     mockApi({
-      "DELETE /api/smart-folders/:id": () =>
-        apiError(404, "not_found", "スマートフォルダーが見つかりません"),
+      "DELETE /api/smart-folders/:id": () => apiError(404, "not_found", "見つかりません: sf-1"),
     });
     const editor = setup();
     seedLibraryRoute(store, { folderId: USER_ID });
@@ -506,7 +504,7 @@ describe("削除", () => {
     await editor.remove(userFolder);
 
     expect(toasts()[0]).toMatchObject({
-      message: "スマートフォルダーが見つかりません",
+      message: "見つかりません: sf-1",
       variant: "error",
     });
     expect(store.get(libraryRouteAtom).folderId).toBe(USER_ID);
@@ -536,8 +534,7 @@ describe("削除", () => {
   it("元に戻せなかったときはトーストを出して一覧を取り直す", async () => {
     mockApi({
       "DELETE /api/smart-folders/:id": apiNoContent(),
-      "POST /api/smart-folders": () =>
-        apiError(409, "conflict", "すでにあるスマートフォルダーです"),
+      "POST /api/smart-folders": () => apiError(409, "conflict", "すでにあります: sf-1"),
     });
     const editor = setup();
     await editor.remove({ ...userFolder, condition: write.condition });
@@ -546,7 +543,7 @@ describe("削除", () => {
     toasts()[0]!.onAction!();
     await vi.waitFor(() =>
       expect(toasts()[0]).toMatchObject({
-        message: "すでにあるスマートフォルダーです",
+        message: "すでにあります: sf-1",
         variant: "error",
       }),
     );

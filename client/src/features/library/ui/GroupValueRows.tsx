@@ -37,10 +37,8 @@ interface GroupValueRowsProps {
   fallbackIcon: IconName;
   /** グループ分け・並び順・検索語が変わったらスクロール位置をリセットするための key */
   resetKey: string;
-  /** クリック（既定=置き換え）・Ctrl/Cmd+クリック（トグル、ADR-0012 §7・ADR-0013の
-   *  作品詳細タグクリックと同型）。値一覧は独立した全作品入口のためAND追加ボタンは
-   *  持たない。 */
-  onSelect: (item: GroupValueItem, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
+  /** 値を選ぶとその値の作品一覧へ進む（ADR-0041）。修飾キーでも動きは同じ */
+  onSelect: (item: GroupValueItem) => void;
 }
 
 function SortHeaderButton({
@@ -175,9 +173,7 @@ export default function GroupValueRows({
                       tabIndex={virtualRow.index === rovingIndex ? 0 : -1}
                       style={{ paddingLeft: 4 + indent }}
                       title={row.depth > 0 ? row.item.value : undefined}
-                      onClick={(e) =>
-                        onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
-                      }
+                      onClick={() => onSelect(row.item)}
                       onKeyDown={(e) => {
                         if (!isGroupValueRowArrowKey(e.key)) return;
                         e.preventDefault();

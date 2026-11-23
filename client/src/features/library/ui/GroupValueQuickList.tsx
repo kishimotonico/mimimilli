@@ -47,14 +47,13 @@ interface GroupValueQuickListProps {
   isLoading?: boolean;
   isError?: boolean;
   isSelected: (tag: string) => boolean;
-  /** 値を選択したときのハンドラ。Ctrl/Cmdキーで既定動作を反転する（呼び出し側が解釈する） */
-  onSelect: (item: GroupValueItem, event: { ctrlKey: boolean; metaKey: boolean }) => void;
+  /** 値を選択したときのハンドラ。修飾キーでも動きは同じ（ADR-0041） */
+  onSelect: (item: GroupValueItem) => void;
   /** ホバー/フォーカス時に出る＋ボタン（冪等なAND追加。選択済み行には出さない）。
    *  省略時はボタンを出さない（ADR-0013） */
   onAdd?: (item: GroupValueItem) => void;
   /** useAnchoredPopover / usePopoverDismissal が返す close をそのまま渡す */
   close: () => void;
-  emptyLabel?: string;
 }
 
 interface SortMenuProps {
@@ -113,7 +112,6 @@ export default function GroupValueQuickList({
   onSelect,
   onAdd,
   close,
-  emptyLabel = "項目がありません",
 }: GroupValueQuickListProps) {
   const groupKey = groupByKey(groupBy);
   const [query, setQuery] = useState("");
@@ -233,7 +231,7 @@ export default function GroupValueQuickList({
       ) : isError ? (
         <div className="mll-qlist__status">取得に失敗しました</div>
       ) : rows.length === 0 ? (
-        <div className="mll-qlist__status">{emptyLabel}</div>
+        <div className="mll-qlist__status">{groupByLabel}がありません</div>
       ) : (
         // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- onFocusはキーボード移動位置の追従用。フォーカスは子のボタンが受ける
         <div
@@ -272,9 +270,7 @@ export default function GroupValueQuickList({
                             style={{ paddingLeft: 8 + indent, paddingRight: onAdd ? 26 : 8 }}
                             title={row.depth > 0 ? row.item.value : undefined}
                             aria-pressed={on}
-                            onClick={(e) =>
-                              onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
-                            }
+                            onClick={() => onSelect(row.item)}
                           >
                             <span className="nm">{row.label}</span>
                             <span className="count">{row.item.count}</span>

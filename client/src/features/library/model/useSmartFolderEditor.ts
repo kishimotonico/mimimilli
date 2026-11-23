@@ -34,18 +34,18 @@ import { applyOrder } from "./smartFolderEditing";
 export interface SmartFolderEditor {
   /** 全件の順序を送る。先に画面へ反映し、失敗したら戻す。呼び出し側が保存中の重なりを防ぐ */
   reorder: (ids: string[]) => Promise<void>;
-  /** 作ったスマートフォルダー。成功したら、保存を始めたときから画面が動いていなければそこへ入る（履歴を積む）。失敗は null */
+  /** 作った行。成功したら、保存を始めたときから画面が動いていなければそこへ入る（履歴を積む）。失敗は null */
   create: (data: SmartFolderWrite) => Promise<SmartFolder | null>;
   /** 既定から追加する。作ったあとの動きは create と同じ */
   addFromTemplate: (templateId: string) => Promise<SmartFolder | null>;
   /** 送った列だけを更新する（定義の保存・検索の上書きとその取り消し・既定の並びの保存）。保存できたら true。
-   *  reenter（検索の上書き）は成功したら、保存を始めたときから画面が動いていなければ同じスマートフォルダーへ置き換えで入り直す */
+   *  reenter（検索の上書き）は成功したら、保存を始めたときから画面が動いていなければ同じ行へ置き換えで入り直す */
   patch: (
     id: string,
     change: SmartFolderPatch,
     options?: { failureMessage?: string; reenter?: boolean },
   ) => Promise<boolean>;
-  /** 削除して「元に戻す」を出す。開いているスマートフォルダーの退避は route の補正が行う */
+  /** 削除して「元に戻す」を出す。開いている行の退避は route の補正が行う */
   remove: (folder: SmartFolder) => Promise<void>;
 }
 
@@ -159,18 +159,23 @@ export function useSmartFolderEditor(): SmartFolderEditor {
         );
       },
       create: (data) =>
-        createAndEnter("スマートフォルダーを作れませんでした", () => createSmartFolder(data)),
-      addFromTemplate: (templateId) =>
-        createAndEnter("既定のスマートフォルダーを追加できませんでした", () => {
-          const template = findSmartFolderTemplate(templateId)!;
-          return createSmartFolder({ ...definitionOf(template), id: template.id });
-        }),
+        createAndEnter(`「${data.name}」を作れませんでした`, () => createSmartFolder(data)),
+      addFromTemplate: (templateId) => {
+        const template = findSmartFolderTemplate(templateId)!;
+        return createAndEnter(`「${template.name}」を追加できませんでした`, () =>
+          createSmartFolder({ ...definitionOf(template), id: template.id }),
+        );
+      },
       patch: async (id, change, { failureMessage, reenter = false } = {}) => {
         const started = store.get(appRouteAtom);
         const scope: Refresh =
           "condition" in change || "groupBy" in change ? { definitionOf: id } : "folders";
+        const name = queryClient
+          .getQueryData<SmartFolder[]>(SMART_FOLDER_QUERY_KEYS.all())
+          ?.find((folder) => folder.id === id)?.name;
         const saved = await commit(
-          failureMessage ?? "スマートフォルダーを保存できませんでした",
+          failureMessage ??
+            (name === undefined ? "保存できませんでした" : `「${name}」を保存できませんでした`),
           scope,
           () => updateSmartFolder(id, change),
           (row) => {
@@ -193,7 +198,7 @@ export function useSmartFolderEditor(): SmartFolderEditor {
       },
       remove: async (folder) => {
         await commit(
-          "スマートフォルダーを削除できませんでした",
+          `「${folder.name}」を削除できませんでした`,
           "folders",
           () => deleteSmartFolder(folder.id),
           () => {
