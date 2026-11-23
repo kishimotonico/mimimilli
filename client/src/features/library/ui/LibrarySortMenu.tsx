@@ -59,7 +59,7 @@ function ReadySortMenu({
       await editor.patch(
         view.folder.id,
         { groupSort: view.groupSort },
-        { failureMessage: "値のソートを既定にできませんでした" },
+        { failureMessage: "ソートを既定にできませんでした" },
       );
     } else {
       await editor.patch(
