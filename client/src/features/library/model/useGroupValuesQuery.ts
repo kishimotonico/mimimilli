@@ -1,7 +1,7 @@
 // 値の候補（GET /smart-folders/:id/groups）の共通フック。値一覧・クイックオーバーレイ・
 // パンくずの値・「＋絞り込み」が同じ取得ロジックを共有し、母集団が同じなら query キーも共有する。
 
-import { useQuery } from "@tanstack/react-query";
+import { partialMatchKey, useQuery } from "@tanstack/react-query";
 import {
   normalizeSearchQuery,
   type GroupBy,
@@ -44,8 +44,11 @@ export function useGroupValuesQuery(
     enabled: groupBy !== null && groupSort !== null,
     placeholderData: keepPrevious
       ? (previous, previousQuery) =>
-          previousQuery?.queryKey[1] === folderId &&
-          previousQuery.queryKey[2] === groupByKey(groupBy)
+          previousQuery &&
+          partialMatchKey(
+            previousQuery.queryKey,
+            SMART_FOLDER_QUERY_KEYS.groupsOf(folderId, groupByKey(groupBy)),
+          )
             ? previous
             : undefined
       : undefined,

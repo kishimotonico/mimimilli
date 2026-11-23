@@ -175,6 +175,7 @@ test("値一覧でも検索でき、同じ値一覧のまま値と件数が絞�
   await expect.poll(() => valueList.getByRole("button").count()).toBeLessThan(before);
 
   await valueList.getByRole("button", { name: /^霧島レイ(?!を)/ }).click();
+  await expect(page).toHaveURL(/group=/);
   expect(new URL(page.url()).searchParams.get("q")).toBe("霧島");
   await expect(search(page)).toHaveValue("霧島");
 

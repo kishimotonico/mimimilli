@@ -10,6 +10,8 @@ export const SMART_FOLDER_QUERY_KEYS = {
   works: (id: string, params: object = {}) => ["smartFolderWorks", id, params] as const,
   allGroups: () => ["smartFolderGroups"] as const,
   folderGroups: (id: string) => ["smartFolderGroups", id] as const,
+  /** 同じフォルダー・同じグループ分けの値一覧すべて（母集団の違いを含む） */
+  groupsOf: (id: string, groupByKey: string) => ["smartFolderGroups", id, groupByKey] as const,
   groups: (id: string, groupByKey: string, params: object = {}) =>
     ["smartFolderGroups", id, groupByKey, params] as const,
 } as const;

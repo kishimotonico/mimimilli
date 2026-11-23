@@ -149,6 +149,37 @@ describe("useGroupValuesQuery のスコープ素通し", () => {
     await waitFor(() => expect(result.current.isPlaceholderData).toBe(false));
   });
 
+  it("keepPrevious でも、別フォルダー・別グループ分けには前の結果を出さない", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    api = mockApi({
+      [KEY]: async (request) => {
+        if (request.params.id === "by-circle" || request.url.searchParams.get("groupBy") === "tag")
+          await gate;
+        return [buildGroupValueItem({ value: "藤田茜" })];
+      },
+    });
+    const { result, rerender } = renderHook(
+      ({ folderId, groupBy }: { folderId: string; groupBy: GroupBy }) =>
+        useGroupValuesQuery(groupBy, { folderId }, "count-desc", { keepPrevious: true }),
+      {
+        wrapper: wrapperFor(queryClient),
+        initialProps: { folderId: "by-cv", groupBy: { kind: "prefix", prefix: "cv" } as GroupBy },
+      },
+    );
+    await waitFor(() => expect(result.current.data).toHaveLength(1));
+
+    rerender({ folderId: "by-circle", groupBy: { kind: "prefix", prefix: "cv" } });
+    expect(result.current.data).toBeUndefined();
+
+    rerender({ folderId: "by-cv", groupBy: { kind: "tag" } });
+    expect(result.current.data).toBeUndefined();
+    release();
+  });
+
   it("値の並びが null のときは取得しない", () => {
     renderGroupValues({ kind: "prefix", prefix: "cv" }, { folderId: "by-cv" }, null);
 

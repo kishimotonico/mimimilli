@@ -104,7 +104,10 @@ export function useLibrarySupportingQueries(
 
   return {
     groupValueItems: groupValuesQuery.data ?? [],
-    isGroupValuesLoading: groupValuesQuery.isLoading,
+    // 前の結果を出している間の0件は、今の絞り込みの結果ではないので取得中として扱う
+    isGroupValuesLoading:
+      groupValuesQuery.isLoading ||
+      (groupValuesQuery.isPlaceholderData && groupValuesQuery.data?.length === 0),
     isGroupValuesError: groupValuesQuery.isError,
     refetchGroupValues: groupValuesQuery.refetch,
     selectedWork: workDetailQuery.data ?? null,
