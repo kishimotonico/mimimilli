@@ -184,6 +184,48 @@ describe("useHoverGroupCoordinator", () => {
     expect(result.current.openKey).toBe("b");
   });
 
+  it("トリガーが pointerenter を受けなくても、閉じた後の pointermove だけで遅延のあと開く", () => {
+    const { result } = renderCoordinator();
+    const elA = elAt({ left: 0, top: 90, bottom: 110 });
+    const handlers = result.current.getTriggerHandlers("a");
+
+    act(() => {
+      handlers.onPointerEnter({ currentTarget: elA } as never);
+      vi.advanceTimersByTime(200);
+    });
+    act(() => {
+      handlers.onPointerLeave({ clientX: 0, clientY: 100 } as never);
+      vi.advanceTimersByTime(150);
+    });
+    expect(result.current.openKey).toBeNull();
+
+    act(() => {
+      handlers.onPointerMove({ currentTarget: elA } as never);
+      vi.advanceTimersByTime(199);
+    });
+    expect(result.current.openKey).toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(result.current.openKey).toBe("a");
+  });
+
+  it("ホバー中に pointermove が続いても open のタイマーを延ばさない", () => {
+    const { result } = renderCoordinator();
+    const elA = elAt({ left: 0, top: 90, bottom: 110 });
+    const handlers = result.current.getTriggerHandlers("a");
+
+    act(() => {
+      handlers.onPointerMove({ currentTarget: elA } as never);
+      vi.advanceTimersByTime(100);
+    });
+    act(() => {
+      handlers.onPointerMove({ currentTarget: elA } as never);
+      vi.advanceTimersByTime(100);
+    });
+    expect(result.current.openKey).toBe("a");
+  });
+
   it("close() は遅延・セーフトライアングルを打ち切って即座に閉じる", () => {
     const { result } = renderCoordinator();
     const elA = elAt({ left: 0, top: 90, bottom: 110 });

@@ -82,7 +82,7 @@ function NowPlayingNormalBody({
   const { workTitle, trackTitle } = selectActiveTrackView(state);
 
   return (
-    <motion.div className="h-full min-h-0" inert={!isPresent} {...fade({ exitAbsolute: false })}>
+    <motion.div className="h-full min-h-0" inert={!isPresent} {...fade()}>
       <div className="mle-nowplaying__body">
         <div className="mle-nowplaying__left">
           <button

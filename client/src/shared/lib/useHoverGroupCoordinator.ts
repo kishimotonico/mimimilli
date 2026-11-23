@@ -22,6 +22,7 @@ const DEFAULT_TRIANGLE_PADDING_PX = 8;
 export interface HoverGroupTriggerHandlers {
   onPointerEnter: (event: ReactPointerEvent<HTMLElement>) => void;
   onPointerLeave: (event: ReactPointerEvent) => void;
+  onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
 }
 
 export interface HoverGroupPanelHandlers {
@@ -227,6 +228,12 @@ export function useHoverGroupCoordinator(
   const getTriggerHandlers = (key: string): HoverGroupTriggerHandlers => ({
     onPointerEnter: (event) => handleTriggerEnter(key, event.currentTarget),
     onPointerLeave: (event) => handleTriggerLeave(key, { x: event.clientX, y: event.clientY }),
+    // パネルがポインタ直下で消えた直後は、Reactがトリガーへの pointerenter を取りこぼす
+    // （消えたパネル側の pointerout が届かず、over だけでは enter にならない）。
+    // トリガー上の pointermove でホバー開始を補う。
+    onPointerMove: (event) => {
+      if (hoveredTriggerRef.current?.key !== key) handleTriggerEnter(key, event.currentTarget);
+    },
   });
 
   const registerPanelEl = (token: HoverGroupOwnerToken, el: HTMLElement | null) => {

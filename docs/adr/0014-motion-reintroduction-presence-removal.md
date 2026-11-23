@@ -72,12 +72,6 @@ motion を再導入し、出現・退出アニメーションの基盤を `Anima
 
 よって世代トークンは発火しないコールバックを守る死んだコードであり、「過度なフォールバック禁止」に照らして置かない。退出中の再表示時の見た目は「Aが退出アニメ途中でBの文言に差し替わり animate 状態へ戻る」中断クロスフェードになる。これは単一スロット契約（文言差し替えは即時反映）の帰結として受け入れる。
 
-### fade退出のabsoluteは祖先のpositionを要求する（TASK-239）
-
-`fade()` の `exitAbsolute`（既定true）が生成する `position:absolute; top:0; left:0; right:0` は、最も近い positioned ancestor を基準にする。旧CSSの `.ml-presence-fade[data-phase="exit"]`（`position:absolute; top:0; left:0; width:100%`）も同じ性質を持ちながら祖先の position を保証しておらず、`.mle-app` を含む祖先がいずれも static だったため viewport 基準になっていた。TopBarでは `.mll-bar` がページ最上段かつ全幅なので視覚的に一致し、問題が顕在化していなかった。
-
-TASK-239 で `.mll-bar` に `position: relative` を追加して修正した（z-index未指定のため新しい stacking context は生成されない）。**fade を使う各箇所で祖先が positioned かを個別に確認すること**。
-
 ### document pointermove はトークン照合ではなく動的参照で所有権を守る（TASK-240）
 
 「軸切替の並存」で「パネルref・`panelHandlers`・coordinator所有の document `pointermove` は現在openなownerのみに紐づけ、解除時はトークン一致を確認する」と決めていたが、実装では前二者のみトークン照合を行い、document `pointermove` はトークンを持たない。

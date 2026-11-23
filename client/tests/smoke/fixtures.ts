@@ -1,14 +1,30 @@
 // smoke用のworker単位サーバー起動とテスト間状態リセット。
 // fixtureアダプタはBunサーバー1インスタンスにつき可変状態を1つ持つため、workerごとに
 // 独立したBun+Viteのペアを立て、各テスト開始前にサーバー側の状態をリセットして分離する。
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, execFileSync, spawn } from "node:child_process";
+import { loadavg } from "node:os";
 import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
-import { chromium, test as base } from "@playwright/test";
+import { type Browser, chromium, test as base } from "@playwright/test";
+import { shutdown, withDeadline } from "./processSupport.ts";
 
 // fixture状態リセットのHTTP待ちがADR-0020のWSL blackhole（未使用ポートへの接続が
 // 約2分ハングする既知障害）を踏まないよう、明示的に短いタイムアウトで打ち切る。
 const RESET_FETCH_TIMEOUT_MS = 5_000;
+
+// 起動の各フェーズの上限。実測の最大は bun 1.3s・vite 4.1s・warmUp 34s（CPU負荷48本・Vite cache なし）。
+// fixture 全体の timeout は上限の合計から導き、各フェーズが診断付きで先に落ちるようにする。
+const BUN_LOG_TIMEOUT_MS = 60_000;
+const VITE_LOG_TIMEOUT_MS = 60_000;
+const WARM_UP_TIMEOUT_MS = 90_000;
+const BROWSER_CLOSE_TIMEOUT_MS = 5_000;
+const FIXTURE_SETUP_MARGIN_MS = 30_000;
+const WORKER_SERVERS_TIMEOUT_MS =
+  BUN_LOG_TIMEOUT_MS +
+  VITE_LOG_TIMEOUT_MS +
+  WARM_UP_TIMEOUT_MS +
+  BROWSER_CLOSE_TIMEOUT_MS +
+  FIXTURE_SETUP_MARGIN_MS;
 
 const SUPERVISE_SCRIPT = fileURLToPath(new URL("./superviseProcess.mjs", import.meta.url));
 
@@ -31,6 +47,47 @@ function acquireFreePort(): Promise<number> {
       probe.close(() => resolvePromise(address.port));
     });
   });
+}
+
+// 起動待ちで落ちたときの原因切り分け用。各フェーズの経過時間と、その時点のリッスン中ポート・
+// 負荷をエラーメッセージに添える（待っていたもの・待った時間・ポート衝突・負荷の区別がつくように）。
+class StartupTrace {
+  private readonly startedAt = Date.now();
+  private readonly phases: string[] = [];
+  private phase = "開始前";
+  private phaseStartedAt = Date.now();
+
+  begin(phase: string): void {
+    this.end();
+    this.phase = phase;
+    this.phaseStartedAt = Date.now();
+  }
+
+  end(): void {
+    if (this.phase !== "開始前") {
+      this.phases.push(`${this.phase}: ${Date.now() - this.phaseStartedAt}ms`);
+    }
+    this.phase = "完了";
+  }
+
+  report(extra: Record<string, string | number>): string {
+    const waitedMs = Date.now() - this.phaseStartedAt;
+    let listening: string;
+    try {
+      listening = execFileSync("ss", ["-ltnpH"], { encoding: "utf8", timeout: 3_000 }).trim();
+    } catch (error) {
+      listening = `ss の実行に失敗: ${String(error)}`;
+    }
+    return [
+      `[smoke起動診断] 待機中フェーズ: ${this.phase}（${waitedMs}ms 待機、開始から ${Date.now() - this.startedAt}ms）`,
+      `完了済み: ${this.phases.join(", ") || "なし"}`,
+      `ポート: ${JSON.stringify(extra)}`,
+      `loadavg: ${loadavg()
+        .map((v) => v.toFixed(1))
+        .join(" ")}`,
+      `ss -ltnp:\n${listening}`,
+    ].join("\n");
+  }
 }
 
 function waitForLog(
@@ -81,26 +138,30 @@ function waitForLog(
 // 実際にブラウザがモジュールグラフを辿って初回リクエストしたときに走る。workerが4並列で
 // 同時にコールドスタートすると、この事前バンドルが各テストのbootTimeout（20s）を圧迫し
 // 落ちうるため、worker起動時に一度だけ実ブラウザでページを開いて済ませておく。
+// launch・newPage・遷移・要素待ちを1つの期限（timeoutMs）で打ち切る。後始末（close）は別の短い上限で、
+// 期限切れでもブラウザーの終了待ちで診断が遅れないようにする。
 async function warmUp(baseURL: string, timeoutMs: number): Promise<void> {
-  const browser = await chromium.launch();
+  const deadline = Date.now() + timeoutMs;
+  const remaining = () => Math.max(1, deadline - Date.now());
+  let browser: Browser | undefined;
   try {
-    const page = await browser.newPage();
-    await page.goto(baseURL, { waitUntil: "domcontentloaded", timeout: timeoutMs });
-    await page.locator(".mll-sidebar").waitFor({ state: "visible", timeout: timeoutMs });
+    await withDeadline(
+      async () => {
+        browser = await chromium.launch({ timeout: remaining() });
+        const page = await browser.newPage();
+        await page.goto(baseURL, { waitUntil: "domcontentloaded", timeout: remaining() });
+        await page.locator(".mll-sidebar").waitFor({ state: "visible", timeout: remaining() });
+      },
+      timeoutMs,
+      "warmUp",
+    );
   } finally {
-    await browser.close();
-  }
-}
-
-// spawnしたコマンド（pnpm exec cross-env ... vite ... 等）はラッパー越しの子プロセスを持つため、
-// ラッパーのPIDだけをkillしても実体（vite・bun本体）が残り、次回起動時のポート衝突を招く。
-// detached: true でspawnし、プロセスグループごと（-pid）シグナルを送って確実に止める。
-function killGroup(proc: ChildProcess, signal: NodeJS.Signals): void {
-  if (proc.pid === undefined) return;
-  try {
-    process.kill(-proc.pid, signal);
-  } catch {
-    // グループが既に消えている場合は何もしない
+    const opened = browser;
+    if (opened) {
+      await withDeadline(() => opened.close(), BROWSER_CLOSE_TIMEOUT_MS, "browser.close").catch(
+        () => undefined,
+      );
+    }
   }
 }
 
@@ -114,19 +175,6 @@ function spawnSupervised(
     ...options,
     stdio: ["pipe", "pipe", "pipe"],
     detached: true,
-  });
-}
-
-async function shutdown(proc: ChildProcess, timeoutMs: number): Promise<void> {
-  if (proc.exitCode !== null) return;
-  killGroup(proc, "SIGTERM");
-  await new Promise<void>((resolvePromise) => {
-    const onExit = () => resolvePromise();
-    proc.once("exit", onExit);
-    setTimeout(() => {
-      killGroup(proc, "SIGKILL");
-      // SIGKILLは無視されないため、そのまま "exit" イベントを待ち続ければ確実に発火する。
-    }, timeoutMs);
   });
 }
 
@@ -148,61 +196,80 @@ export const test = base.extend<
     async ({ fixtureScenario, dlsiteFetchDelayMs }, use) => {
       let bunProc: ChildProcess | undefined;
       let viteProc: ChildProcess | undefined;
+      const trace = new StartupTrace();
+      const ports: Record<string, string | number> = {};
+      let servers: WorkerServers;
 
       try {
-        bunProc = spawnSupervised("bun", ["src/index.ts"], {
-          cwd: "../server",
-          env: {
-            ...process.env,
-            MIMIMILLI_ADAPTER: "fixture",
-            MIMIMILLI_MOCK_SCENARIO: fixtureScenario,
-            MIMIMILLI_MOCK_DLSITE_FETCH_DELAY_MS: String(dlsiteFetchDelayMs),
-            PORT: "0",
-          },
-        });
-        const [, bunPortText] = await waitForLog(
-          bunProc,
-          /サーバーを起動しました: http:\/\/localhost:(\d+)\s/,
-          120_000,
-        );
-        const bunPort = Number(bunPortText);
+        try {
+          trace.begin("bunサーバー起動ログ待ち");
+          bunProc = spawnSupervised("bun", ["src/index.ts"], {
+            cwd: "../server",
+            env: {
+              ...process.env,
+              MIMIMILLI_ADAPTER: "fixture",
+              MIMIMILLI_MOCK_SCENARIO: fixtureScenario,
+              MIMIMILLI_MOCK_DLSITE_FETCH_DELAY_MS: String(dlsiteFetchDelayMs),
+              PORT: "0",
+            },
+          });
+          const [, bunPortText] = await waitForLog(
+            bunProc,
+            /サーバーを起動しました: http:\/\/localhost:(\d+)\s/,
+            BUN_LOG_TIMEOUT_MS,
+          );
+          const bunPort = Number(bunPortText);
+          ports.bun = bunPort;
 
-        const startPort = await acquireFreePort();
-        // ポート番号を色付きのエスケープ無しで読めるよう、色を切って起動する
-        const { FORCE_COLOR: _forceColor, ...baseEnv } = process.env;
-        viteProc = spawnSupervised(
-          "pnpm",
-          [
-            "exec",
-            "cross-env",
-            "VITE_DISABLE_QUERY_DEVTOOLS=1",
-            `MIMIMILLI_BACKEND_URL=http://127.0.0.1:${bunPort}`,
-            "vite",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            String(startPort),
-          ],
-          { env: { ...baseEnv, NO_COLOR: "1" } },
-        );
-        const [, vitePortText] = await waitForLog(
-          viteProc,
-          /Local:\s+http:\/\/127\.0\.0\.1:(\d+)\//,
-          120_000,
-        );
-        const vitePort = Number(vitePortText);
-        await warmUp(`http://127.0.0.1:${vitePort}`, 60_000);
+          trace.begin("vite起動ログ待ち");
+          const startPort = await acquireFreePort();
+          ports.viteStart = startPort;
+          // ポート番号を色付きのエスケープ無しで読めるよう、色を切って起動する
+          const { FORCE_COLOR: _forceColor, ...baseEnv } = process.env;
+          viteProc = spawnSupervised(
+            "pnpm",
+            [
+              "exec",
+              "cross-env",
+              "VITE_DISABLE_QUERY_DEVTOOLS=1",
+              `MIMIMILLI_BACKEND_URL=http://127.0.0.1:${bunPort}`,
+              "vite",
+              "--host",
+              "127.0.0.1",
+              "--port",
+              String(startPort),
+            ],
+            { env: { ...baseEnv, NO_COLOR: "1" } },
+          );
+          const [, vitePortText] = await waitForLog(
+            viteProc,
+            /Local:\s+http:\/\/127\.0\.0\.1:(\d+)\//,
+            VITE_LOG_TIMEOUT_MS,
+          );
+          const vitePort = Number(vitePortText);
+          ports.vite = vitePort;
 
-        await use({
-          baseURL: `http://127.0.0.1:${vitePort}`,
-          bunBaseURL: `http://127.0.0.1:${bunPort}`,
-        });
+          trace.begin("warmUp（実ブラウザの初回表示）");
+          await warmUp(`http://127.0.0.1:${vitePort}`, WARM_UP_TIMEOUT_MS);
+          trace.end();
+          servers = {
+            baseURL: `http://127.0.0.1:${vitePort}`,
+            bunBaseURL: `http://127.0.0.1:${bunPort}`,
+          };
+        } catch (error) {
+          if (error instanceof Error) error.message += `\n${trace.report(ports)}`;
+          throw error;
+        }
+
+        await use(servers);
       } finally {
         if (viteProc) await shutdown(viteProc, 500);
         if (bunProc) await shutdown(bunProc, 5_000);
       }
     },
-    { scope: "worker" },
+    // 既定ではテストのタイムアウト（30s）が起動にも掛かり、4worker同時のコールドスタートで
+    // 打ち切られる。各フェーズの上限の合計より長く取り、診断付きの失敗を先に出す。
+    { scope: "worker", timeout: WORKER_SERVERS_TIMEOUT_MS },
   ],
 
   baseURL: async ({ workerServers }, use) => {

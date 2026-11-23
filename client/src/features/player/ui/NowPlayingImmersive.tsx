@@ -131,7 +131,7 @@ export default function NowPlayingImmersive({
       inert={!isPresent}
       data-idle={titleIdle || undefined}
       onClick={onTogglePlay}
-      {...fade({ exitAbsolute: false })}
+      {...fade()}
     >
       <div
         className="mle-nowplaying__immersive-ambient"

@@ -75,24 +75,13 @@ function timing(reduced: boolean, duration: number, ease?: Ease, delay = 0): Pro
   return reduced ? { duration: 0, delay: 0 } : { duration, ease, delay };
 }
 
-export interface FadeOptions {
-  /** 退出中に position:absolute で自身をレイアウトから外し、兄弟要素の詰まりを防ぐ。既定 true。 */
-  exitAbsolute?: boolean;
-}
-
-/** opacity のみのフェード。既定で退出中は absolute 配置になり、兄弟のレイアウト膨張を防ぐ。 */
-export function fadeVariant(reduced: boolean, opts: FadeOptions = {}): MotionVariant {
-  const { exitAbsolute = true } = opts;
+/** opacity のみのフェード。 */
+export function fadeVariant(reduced: boolean): MotionVariant {
   const t = timing(reduced, DUR.fade, EASE_STANDARD);
   return {
     initial: { opacity: 0 },
     animate: { opacity: 1, transition: { opacity: t } },
-    exit: {
-      opacity: 0,
-      pointerEvents: "none",
-      transition: { opacity: t },
-      ...(exitAbsolute ? { position: "absolute", top: 0, left: 0, right: 0 } : {}),
-    },
+    exit: { opacity: 0, transition: { opacity: t } },
   };
 }
 
@@ -103,7 +92,7 @@ export function fadeSlideUpVariant(reduced: boolean): MotionVariant {
   return {
     initial: { opacity: 0, y: -8 },
     animate: { opacity: 1, y: 0, transition: { opacity: opacityT, y: yT } },
-    exit: { opacity: 0, y: -8, pointerEvents: "none", transition: { opacity: opacityT, y: yT } },
+    exit: { opacity: 0, y: -8, transition: { opacity: opacityT, y: yT } },
   };
 }
 
@@ -113,7 +102,7 @@ export function collapseVariant(reduced: boolean): MotionVariant {
   return {
     initial: { height: 0, opacity: 0 },
     animate: { height: "auto", opacity: 1, transition: { height: t, opacity: t } },
-    exit: { height: 0, opacity: 0, pointerEvents: "none", transition: { height: t, opacity: t } },
+    exit: { height: 0, opacity: 0, transition: { height: t, opacity: t } },
   };
 }
 
@@ -138,7 +127,6 @@ export function dockBarSlideVariant(reduced: boolean): MotionVariant {
     exit: {
       y: "100%",
       opacity: 0,
-      pointerEvents: "none",
       transition: { y: yT, opacity: opacityT },
     },
   };
@@ -160,7 +148,6 @@ export function dockBarSwitchVariant(reduced: boolean, opts: WaitEnterOptions = 
     exit: {
       y: "100%",
       opacity: 0,
-      pointerEvents: "none",
       transition: { y: exitT, opacity: exitT },
     },
   };
@@ -187,7 +174,6 @@ export function dockPopupScaleVariant(
       opacity: 0,
       scale: 0.9,
       transformOrigin,
-      pointerEvents: "none",
       transition: { opacity: exitT, scale: exitT },
     },
   };
@@ -214,7 +200,6 @@ export function popoverScaleVariant(reduced: boolean, opts: PopoverScaleOptions)
       opacity: 0,
       scale: 0.96,
       transformOrigin: origin,
-      pointerEvents: "none",
       transition: { opacity: t, scale: t },
     },
   };
@@ -234,7 +219,7 @@ export function colstackWidthVariant(
   return {
     initial: { width: 0, opacity: 0 },
     animate: { width: widthPx, opacity: 1, transition: { width: t, opacity: t } },
-    exit: { width: 0, opacity: 0, pointerEvents: "none", transition: { width: t, opacity: t } },
+    exit: { width: 0, opacity: 0, transition: { width: t, opacity: t } },
   };
 }
 
@@ -244,7 +229,7 @@ export function previewSlideVariant(reduced: boolean): MotionVariant {
   return {
     initial: { x: "100%" },
     animate: { x: 0, transition: { x: t } },
-    exit: { x: "100%", pointerEvents: "none", transition: { x: t } },
+    exit: { x: "100%", transition: { x: t } },
   };
 }
 
@@ -257,7 +242,7 @@ export function useMotionVariants() {
   const reduced = useReducedMotion() ?? false;
   return {
     reduced,
-    fade: (opts?: FadeOptions) => fadeVariant(reduced, opts),
+    fade: () => fadeVariant(reduced),
     playbackBurst: () => playbackBurstVariant(reduced),
     fadeSlideUp: () => fadeSlideUpVariant(reduced),
     collapse: () => collapseVariant(reduced),
