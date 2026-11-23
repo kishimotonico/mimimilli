@@ -16,9 +16,9 @@ import { groupSortIdSchema, sortIdSchema } from "./library.ts";
 const smartFolderNameSchema = z.string().trim().min(1);
 
 /** URL のパスに入るので、形式だけを検査する */
-export const smartFolderIdSchema = z.string().regex(/^[a-z0-9-]{1,64}$/, {
-  message: "ID は半角小文字・数字・ハイフンの64文字までです",
-});
+export const smartFolderIdSchema = z
+  .string()
+  .regex(/^[a-z0-9-]{1,64}$/, { message: "ID は半角小文字・数字・ハイフンの64文字までです" });
 
 export const definitionShape = {
   name: smartFolderNameSchema,

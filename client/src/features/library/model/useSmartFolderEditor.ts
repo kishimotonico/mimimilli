@@ -144,7 +144,7 @@ export function useSmartFolderEditor(): SmartFolderEditor {
     return {
       reorder: async (ids) => {
         const key = SMART_FOLDER_QUERY_KEYS.all();
-        await queryClient.cancelQueries({ queryKey: key });
+        await queryClient.cancelQueries({ queryKey: key, exact: true });
         const before = queryClient.getQueryData<SmartFolder[]>(key);
         if (before) queryClient.setQueryData(key, applyOrder(before, ids));
         if (reorderQueue.running) {

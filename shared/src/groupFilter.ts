@@ -1,5 +1,5 @@
-// グループ分け（ADR-0040）の定義と、その値から、タグ・述語・チップへの変換。値の検証と正規化もここ1か所で行い、
-// shared の buildEffectiveCondition・server の値の検証・client のチップが同じ規則を使う。
+// グループ分け（ADR-0040）の定義と、その値から、タグ・述語・チップ・1本の木への変換。値の検証と正規化もここ1か所で行い、
+// server の評価・値の検証・client のチップと保存が同じ規則を使う。
 import { z } from "zod";
 import {
   EMPTY_CONDITION,

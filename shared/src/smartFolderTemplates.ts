@@ -17,10 +17,7 @@ export interface SmartFolderTemplate {
   seeded: boolean;
 }
 
-const and = (...children: Condition[]): Condition => ({
-  type: "and",
-  children,
-});
+const and = (...children: Condition[]): Condition => ({ type: "and", children });
 const grouped = (
   id: string,
   name: string,

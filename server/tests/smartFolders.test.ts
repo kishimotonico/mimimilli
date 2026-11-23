@@ -115,10 +115,7 @@ contract("作成は sf-<uuid> を採番して末尾に追加し、保存でき�
   });
   assert.match(created.id, /^sf-[0-9a-f-]{36}$/);
   assert.equal(created.position, SEEDED_IDS.length);
-  assert.deepEqual(created.condition, {
-    type: "and",
-    children: [{ type: "tag", tag: "cv/x" }],
-  });
+  assert.deepEqual(created.condition, { type: "and", children: [{ type: "tag", tag: "cv/x" }] });
   assert.equal((await counts(harness))[created.id], 1);
   assert.equal((await list(harness)).at(-1)!.id, created.id);
 
@@ -191,10 +188,7 @@ contract("位置が埋まっていれば、その位置以降を後ろへ送っ�
   await harness.request(`/api/smart-folders/${created.id}`, { method: "DELETE" });
   const added = await create(harness, "新");
   assert.equal(added.position, tail.position + 1);
-  const { createdAt: _createdAt, ...row } = {
-    ...created,
-    position: tail.position,
-  };
+  const { createdAt: _createdAt, ...row } = { ...created, position: tail.position };
   const restored = await harness.send<SmartFolder>("POST", "/api/smart-folders", row);
   assert.equal(restored.body.position, tail.position);
   const ids = (await list(harness)).map((f) => f.id);
@@ -610,31 +604,19 @@ groupsLibrary("値一覧はチップ・@year で母集団を絞る", async (harn
     ["ASMR", 1],
     ["耳かき", 1],
   ]);
+  assert.deepEqual(await groupPairs(harness, "all", { groupBy: "prefix:cv", tags: ["ASMR"] }), [
+    ["x", 1],
+    ["y", 1],
+  ]);
   assert.deepEqual(
-    await groupPairs(harness, "all", {
-      groupBy: "prefix:cv",
-      tags: ["ASMR"],
-    }),
-    [
-      ["x", 1],
-      ["y", 1],
-    ],
-  );
-  assert.deepEqual(
-    await groupPairs(harness, "all", {
-      groupBy: "prefix:cv",
-      tags: [`@year/${year}`],
-    }),
+    await groupPairs(harness, "all", { groupBy: "prefix:cv", tags: [`@year/${year}`] }),
     [
       ["y", 2],
       ["x", 1],
     ],
   );
   assert.deepEqual(
-    await groupPairs(harness, "all", {
-      groupBy: "tag",
-      tags: [`@year/${year - 1}`],
-    }),
+    await groupPairs(harness, "all", { groupBy: "tag", tags: [`@year/${year - 1}`] }),
     [],
   );
 });

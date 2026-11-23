@@ -286,6 +286,23 @@ describe("並べ替え", () => {
     expect(invalidated).toEqual([]);
   });
 
+  it("並べ替えは取得中の件数を取り消さない", async () => {
+    mockApi({ "PUT /api/smart-folders/order": () => defaultSmartFolders().reverse() });
+    const editor = setup();
+    queryClient.setQueryData(SMART_FOLDER_QUERY_KEYS.all(), defaultSmartFolders());
+    let resolveCounts!: (counts: Record<string, number>) => void;
+    const fetching = queryClient.prefetchQuery({
+      queryKey: SMART_FOLDER_QUERY_KEYS.counts(),
+      queryFn: () => new Promise<Record<string, number>>((resolve) => (resolveCounts = resolve)),
+    });
+
+    await editor.reorder(reversed);
+    resolveCounts({ recent: 3 });
+    await fetching;
+
+    expect(queryClient.getQueryData(SMART_FOLDER_QUERY_KEYS.counts())).toEqual({ recent: 3 });
+  });
+
   it("失敗したら一覧を取り直して戻し、トーストを出す", async () => {
     mockApi({
       "PUT /api/smart-folders/order": () => apiError(400, "invalid_request", "過不足があります"),
