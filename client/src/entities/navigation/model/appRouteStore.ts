@@ -80,7 +80,7 @@ export const setAppModeAtom = appRouteAction(switchAppMode);
 export const layerAtom = atom((get) => get(appRouteAtom).layer);
 
 /** 再生中の層を今の画面に重ねる。履歴を1件積み、閉じるときに1件戻れるようにする */
-export function openNowPlayingLayer(route: AppRoute): RouteTransition<AppRoute> | null {
+function openNowPlayingLayer(route: AppRoute): RouteTransition<AppRoute> | null {
   if (route.layer !== null) return null;
   return { route: { ...route, layer: { kind: "nowPlaying" } } };
 }

@@ -23,7 +23,7 @@ export class CoverSaveError extends Error {
   }
 }
 
-export interface UnreadableFolderRow {
+export interface UnreadableSmartFolderRow {
   id: string;
   name: string;
   problems: Array<{ column: string; reason: string }>;
@@ -32,10 +32,10 @@ export interface UnreadableFolderRow {
 /** 保存済みのスマートフォルダーの行が、保存と同じ検証を通らない。HTTP は 500 internal で、本文に行の ID・理由・直し方を出す。
  *  ユーザー向けの文言には総称を出さず、行を名前と ID で呼ぶ */
 export class UnreadableSmartFolderError extends Error {
-  readonly rows: UnreadableFolderRow[];
+  readonly rows: UnreadableSmartFolderRow[];
   readonly dbPath: string;
 
-  constructor(rows: UnreadableFolderRow[], dbPath: string) {
+  constructor(rows: UnreadableSmartFolderRow[], dbPath: string) {
     super(unreadableSmartFolderMessage(rows, dbPath));
     this.name = "UnreadableSmartFolderError";
     this.rows = rows;
@@ -49,7 +49,7 @@ function idCondition(id: string): string {
   return `id = CAST(x'${Buffer.from(id, "utf8").toString("hex")}' AS TEXT)`;
 }
 
-function unreadableSmartFolderMessage(rows: UnreadableFolderRow[], dbPath: string): string {
+function unreadableSmartFolderMessage(rows: UnreadableSmartFolderRow[], dbPath: string): string {
   const lines = rows.map((row) => {
     const reasons = row.problems.map((p) => `${p.column}: ${p.reason}`).join(" / ");
     const sql = `DELETE FROM smart_folders WHERE ${idCondition(row.id)}`;

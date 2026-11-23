@@ -36,7 +36,6 @@ export function createRandomSeed(): number {
 /** 値一覧の代表カバー1件。カバー画像配信（GET /media/cover/:id）が作品単位のルートしか
  *  持たないため、コラージュ描画に必要な workId を持たせる（coverValueSchema 単体には無い）。 */
 export const groupValueCoverSchema = coverValueSchema.extend({ workId: z.string() });
-export type GroupValueCover = z.infer<typeof groupValueCoverSchema>;
 
 /** 値一覧の並び（向き込み）。名前は読み（sortKey）の順 */
 export const groupSortIdSchema = z.enum([

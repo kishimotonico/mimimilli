@@ -5,14 +5,12 @@ import { useToast } from "../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { useUnregisterMissingWorksMutation } from "../../../entities/work/model/workMutations";
 
-interface ErrorViewBulkUnregisterBannerProps {
+interface HasErrorBulkUnregisterBannerProps {
   missingCount: number | undefined;
 }
 
-/** エラービュー表示中、missing作品が1件以上あるときだけ出す一括登録解除導線 */
-export function ErrorViewBulkUnregisterBanner({
-  missingCount,
-}: ErrorViewBulkUnregisterBannerProps) {
+/** エラーの行を開いていて、missing作品が1件以上あるときだけ出す一括登録解除導線 */
+export function HasErrorBulkUnregisterBanner({ missingCount }: HasErrorBulkUnregisterBannerProps) {
   const mutation = useUnregisterMissingWorksMutation();
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const toast = useToast();

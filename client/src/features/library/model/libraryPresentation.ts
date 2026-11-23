@@ -17,11 +17,6 @@ import { ApiRequestError } from "../../../shared/api/http";
 import { getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
 import { groupByKey } from "../../../entities/smart-folder/groupByKey";
 
-// 組み込みの擬似タグ（year 等、ADR-0012 §2）の構築・解析・検証は shared/pseudoTag.ts に
-// 集約している（client・server の両方が同じ実装を使うため）。isBuiltinPseudoTagKey /
-// buildBuiltinPseudoTag / parseBuiltinPseudoTag / splitSelectedTags は @mimimilli/shared から
-// 直接importする。
-
 /** グループ分けの値一覧で1項目を選んだときにチップへ足す完全なタグ文字列を組み立てる。
  *  tag は GroupValueItem.value が既に完全なタグ文字列（ADR-0005）、
  *  addedYear は擬似タグ（@year/値）、prefix は "prefix/値" の実タグとして表現する。 */

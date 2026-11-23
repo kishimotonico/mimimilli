@@ -124,7 +124,7 @@ export function withoutRootChild(condition: Condition, index: number): Condition
 
 // ── グループ分け ─────────────────────────────────────────────
 
-export interface GroupByOption {
+interface GroupByOption {
   key: GroupByKey;
   label: string;
 }

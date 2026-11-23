@@ -75,7 +75,7 @@ export function toNavigationUrlState(route: AppRoute): NavigationUrlState {
 }
 
 /** sort・groupSort・seed は library 画面のエントリーにだけ書く（読む側の applyEntryState と対称） */
-export function toEntryState(route: AppRoute): AppRouteEntryState {
+function toEntryState(route: AppRoute): AppRouteEntryState {
   if (route.mode !== "library") return { layer: route.layer };
   const { sort, groupSort, seed } = route.library;
   return { sort, groupSort, seed, layer: route.layer };

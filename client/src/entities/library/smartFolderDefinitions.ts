@@ -59,7 +59,7 @@ export function getSmartFolderIcon(folder: IconSubject): IconName {
   return (type && PREDICATE_FOLDER_ICONS[type]) ?? "funnel";
 }
 
-export interface GroupByRow {
+interface GroupByRow {
   groupBy: GroupBy;
   name: string;
 }

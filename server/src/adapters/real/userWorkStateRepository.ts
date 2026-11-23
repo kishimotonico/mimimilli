@@ -17,7 +17,7 @@ import type {
   TagPrefixUpdate,
   Work,
 } from "@mimimilli/shared";
-import { UnreadableSmartFolderError, type UnreadableFolderRow } from "../../errors.ts";
+import { UnreadableSmartFolderError, type UnreadableSmartFolderRow } from "../../errors.ts";
 import type { SmartFolderInsert, SmartFolderUpdateResult } from "../../adapter/smartFolder.ts";
 import type { Db } from "./db.ts";
 import {
@@ -403,7 +403,7 @@ const VIOLATION_COLUMNS = {
   groupSort: "group_sort",
 } as const;
 
-type ColumnProblem = UnreadableFolderRow["problems"][number];
+type ColumnProblem = UnreadableSmartFolderRow["problems"][number];
 type ColumnRead<T> = { ok: true; value: T } | { ok: false; problem: ColumnProblem };
 
 function describeIssues(error: z.ZodError): string {
@@ -436,7 +436,7 @@ function readJsonColumn<T>(column: string, raw: string, schema: z.ZodType<T>): C
 /** 保存と同じスキーマで厳密に読む。読めない列があれば問題を返す */
 function readSmartFolderRow(
   r: typeof smartFolders.$inferSelect,
-): { row: SmartFolder } | { unreadable: UnreadableFolderRow } {
+): { row: SmartFolder } | { unreadable: UnreadableSmartFolderRow } {
   const condition = readJsonColumn("condition_json", r.conditionJson, conditionSchema);
   const sort = readColumn("sort", r.sort, sortIdSchema.nullable());
   const groupBy =

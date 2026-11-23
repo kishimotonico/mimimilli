@@ -41,7 +41,7 @@ function renderPane(folderId: string) {
         isPending: false,
         showGrid: false,
         dockedBarActive: false,
-        isErrorView: isHasErrorOnly(
+        isErrorRow: isHasErrorOnly(
           (nav.view as Extract<typeof nav.view, { kind: "works" }>).condition,
         ),
         missingWorksCount: 0,

@@ -180,6 +180,26 @@ describe("保存中のダイアログ", () => {
     await waitFor(() => expect(store.get(smartFolderDialogAtom)).toBeNull());
   });
 
+  it("名前が空（空白だけを含む）のあいだは保存できず、入れると保存できる", async () => {
+    mockApi({
+      "GET /api/tag-prefixes": [],
+      "GET /api/smart-folders": [...defaultSmartFolders(), folderA],
+    });
+    const store = renderHost();
+    const user = userEvent.setup();
+
+    act(() => store.set(smartFolderDialogAtom, { kind: "edit", folder: folderA }));
+    const name = await screen.findByRole("textbox", { name: "名前" });
+    expect(screen.getByRole("button", { name: "保存" })).toBeEnabled();
+
+    await user.clear(name);
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+    await user.type(name, "   ");
+    expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+    await user.type(name, "丙");
+    expect(screen.getByRole("button", { name: "保存" })).toBeEnabled();
+  });
+
   it("名前だけ変えたら名前だけを送り、変更が無ければ何も送らず閉じる", async () => {
     const api = mockApi({
       "GET /api/tag-prefixes": [],

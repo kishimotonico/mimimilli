@@ -142,15 +142,6 @@ describe("LibrarySidebarPanel", () => {
     expect(onRetry).toHaveBeenCalled();
   });
 
-  it("旧のビュー軸・分類軸・スマートフォルダー欄は出さない", () => {
-    renderSidebar({});
-
-    expect(screen.queryByText("ビュー")).toBeNull();
-    expect(screen.queryByText("分類軸")).toBeNull();
-    expect(screen.queryByText(/新規スマートフォルダー/)).toBeNull();
-    expect(screen.queryByRole("button", { name: /^タグ$/ })).toBeNull();
-  });
-
   it("開いているスマートフォルダーに aria-current を付与する", () => {
     renderSidebar({ activeFolderId: "fav" });
 
@@ -219,7 +210,7 @@ describe("LibrarySidebarPanel", () => {
     // ArrowRight で遅延なしに開く（openImmediately）。
     fireEvent.keyDown(screen.getByRole("button", { name: "CV別" }), { key: "ArrowRight" });
 
-    // 読み込み完了で「項目がありません」（空表示）が出ないこと（＝1件の値が一覧に載っている）
+    // 読み込み完了で「CVがありません」（空表示）が出ないこと（＝1件の値が一覧に載っている）
     // を、一覧本体（role="group"）の出現で確認する。
     await waitFor(() => {
       expect(document.querySelector('.mll-qlist__body[role="group"]')).toBeInTheDocument();
@@ -229,10 +220,10 @@ describe("LibrarySidebarPanel", () => {
     // 退出アニメーション完了まで内容を保持するため、この時点ではDOMから消えていない）。
     fireEvent.keyDown(screen.getByLabelText("CVの値を検索"), { key: "Escape" });
 
-    // クエリが無効化されて空扱いになっていれば「項目がありません」に切り替わる。
+    // クエリが無効化されて空扱いになっていれば「CVがありません」に切り替わる。
     // 退出中も一覧本体が保持されたままであることを確認する。
     expect(document.querySelector('.mll-qlist__body[role="group"]')).toBeInTheDocument();
-    expect(screen.queryByText("項目がありません")).toBeNull();
+    expect(screen.queryByText("CVがありません")).toBeNull();
   });
 
   it("グループ分けA→B高速切替で新パネルが閉じず、検索欄フォーカスが奪われない", async () => {

@@ -111,7 +111,7 @@ export async function getAllWorks(
   );
 }
 
-export interface SmartFolderGroupsParams {
+interface SmartFolderGroupsParams {
   groupBy: GroupBy;
   groupSort: GroupSortId;
   /** 値を選んだあとの作品一覧の母集団で候補を数えるときの値 */
