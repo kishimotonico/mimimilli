@@ -30,8 +30,10 @@ export async function listSmartFolders(): Promise<SmartFolder[]> {
   return getParsed(smartFolderListSchema, "/smart-folders");
 }
 
-export async function getSmartFolderCounts(): Promise<SmartFolderCounts> {
-  return getParsed(smartFolderCountsSchema, "/smart-folders/counts");
+export async function getSmartFolderCounts(options?: {
+  signal?: AbortSignal;
+}): Promise<SmartFolderCounts> {
+  return getParsed(smartFolderCountsSchema, "/smart-folders/counts", options);
 }
 
 /** 通常の作成・既定から追加・削除の取り消しのすべてがこの口を通る。id と position を送ると、その行をその位置に作る */

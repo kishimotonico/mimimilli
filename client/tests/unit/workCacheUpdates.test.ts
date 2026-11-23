@@ -9,6 +9,7 @@ import {
   type WorkEditSnapshot,
   type WorkSourceMutationResult,
 } from "@mimimilli/shared";
+import { smartFolderCountsQueryOptions } from "../../src/entities/smart-folder/queryOptions";
 import { invalidateFresh } from "../../src/shared/api/invalidateFresh";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
@@ -248,6 +249,26 @@ describe("初回の取得の途中で作品が変わったとき", () => {
 
     expect(served).toBe(2);
     expect(queryClient.getQueryData(SMART_FOLDER_QUERY_KEYS.counts())).toEqual({ fav: 1 });
+  });
+});
+
+describe("件数の取得", () => {
+  it("最後の購読が外れたら進行中の取得を中断する（古い応答が件数に残らない）", async () => {
+    let signal: AbortSignal | undefined;
+    mockApi({
+      "GET /api/smart-folders/counts": (request) => {
+        signal = request.init?.signal ?? undefined;
+        return new Promise(() => {});
+      },
+    });
+    const queryClient = new QueryClient();
+    const observer = new QueryObserver(queryClient, smartFolderCountsQueryOptions);
+    const unsubscribe = observer.subscribe(() => {});
+    await vi.waitFor(() => expect(signal).toBeDefined());
+
+    unsubscribe();
+
+    expect(signal?.aborted).toBe(true);
   });
 });
 

@@ -84,6 +84,12 @@ export function useSmartFolderEditor(): SmartFolderEditor {
       ]);
     };
 
+    /** 同じ ID で作り直した行が、削除前の作品・値の一覧を再取得の間も見せないよう、キャッシュごと捨てる */
+    const discardFolderLists = (id: string) => {
+      queryClient.removeQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.folderWorks(id) });
+      queryClient.removeQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.folderGroups(id) });
+    };
+
     /** 作成・追加・定義の更新の成功応答の行を、一覧の再取得を待たず ID 単位で反映する。順序は続く再取得で取り直す */
     const upsertFolder = (row: SmartFolder) =>
       queryClient.setQueryData<SmartFolder[]>(SMART_FOLDER_QUERY_KEYS.all(), (prev) => {
@@ -101,7 +107,7 @@ export function useSmartFolderEditor(): SmartFolderEditor {
     /** 変更の唯一の実行路。成功なら onSuccess のあとに refresh、失敗ならトーストと一覧の取り直し */
     const commit = async <T>(
       failure: string,
-      scope: Refresh | ((result: T) => Refresh),
+      scope: Refresh,
       request: () => Promise<T>,
       onSuccess?: (result: T) => void,
     ): Promise<T | null> => {
@@ -118,16 +124,17 @@ export function useSmartFolderEditor(): SmartFolderEditor {
         return null;
       }
       onSuccess?.(result);
-      await refresh(typeof scope === "function" ? scope(result) : scope);
+      await refresh(scope);
       return result;
     };
 
     const restore = async (folder: SmartFolder) => {
       await commit(
         "元に戻せませんでした",
-        (row) => ({ definitionOf: row.id }),
+        "folders",
         () =>
           createSmartFolder({ ...definitionOf(folder), id: folder.id, position: folder.position }),
+        (row) => discardFolderLists(row.id),
       );
     };
 
@@ -153,15 +160,11 @@ export function useSmartFolderEditor(): SmartFolderEditor {
       request: () => Promise<SmartFolder>,
     ): Promise<SmartFolder | null> => {
       const started = store.get(appRouteAtom);
-      return commit(
-        failure,
-        (row) => ({ definitionOf: row.id }),
-        request,
-        (row) => {
-          settle(started, row.id);
-          upsertFolder(row);
-        },
-      );
+      return commit(failure, "folders", request, (row) => {
+        discardFolderLists(row.id);
+        settle(started, row.id);
+        upsertFolder(row);
+      });
     };
 
     return {
