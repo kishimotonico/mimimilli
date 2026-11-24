@@ -215,10 +215,11 @@ test("0件のとき「すべて」で探すと、同じチップと検索語で�
     .click();
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["cv/霧島レイ"]);
   await search(page).fill("存在しない検索語");
+  const valueList = page.locator(".is-group-values");
   await expect(
-    page.getByText("「存在しない検索語」と選択中の絞り込みに一致する作品はありません"),
+    valueList.getByText("「存在しない検索語」と選択中の絞り込みに一致する作品はありません"),
   ).toBeVisible();
-  await page.getByRole("button", { name: "「すべて」で探す" }).click();
+  await valueList.getByRole("button", { name: "「すべて」で探す" }).click();
 
   await expect(page).toHaveURL(/\/library\/all\?/);
   expect(new URL(page.url()).searchParams.get("q")).toBe("存在しない検索語");
