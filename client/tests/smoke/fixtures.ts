@@ -6,7 +6,11 @@ import { loadavg } from "node:os";
 import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { type Browser, chromium, test as base } from "@playwright/test";
-import { NETWORK_CHANGE_NOTICE, watchNetworkChange } from "./networkChange.ts";
+import {
+  appendNetworkChangeNotice,
+  NETWORK_CHANGE_NOTICE,
+  watchNetworkChange,
+} from "./networkChange.ts";
 import { shutdown, withDeadline } from "./processSupport.ts";
 
 // fixture状態リセットのHTTP待ちがADR-0020のWSL blackhole（未使用ポートへの接続が
@@ -287,8 +291,7 @@ export const test = base.extend<
       const sawNetworkChange = watchNetworkChange(page.context());
       await use();
       if (testInfo.status !== testInfo.expectedStatus && sawNetworkChange()) {
-        testInfo.annotations.push({ type: "環境", description: NETWORK_CHANGE_NOTICE });
-        console.error(`${testInfo.title}\n${NETWORK_CHANGE_NOTICE}`);
+        appendNetworkChangeNotice(testInfo.errors);
       }
     },
     { auto: true },

@@ -1,6 +1,6 @@
 // WSL2 のミラードネットワークでは eth0 のアドレスが付け直されることがあり、その瞬間に Chromium が
 // 進行中の通信を ERR_NETWORK_CHANGED で落とす。アプリの不具合ではないので、失敗の原因として見分けられるようにする。
-import type { BrowserContext } from "@playwright/test";
+import type { BrowserContext, TestInfoError } from "@playwright/test";
 
 const NETWORK_CHANGED = "ERR_NETWORK_CHANGED";
 
@@ -21,4 +21,9 @@ export function watchNetworkChange(context: BrowserContext): () => boolean {
     if (isNetworkChangeText(request.failure()?.errorText ?? "")) seen = true;
   });
   return () => seen;
+}
+
+/** 失敗の詳細（reporter の失敗一覧）に注記が出るよう、エラーを1件足す。合否は変えない。 */
+export function appendNetworkChangeNotice(errors: TestInfoError[]): void {
+  errors.push({ message: NETWORK_CHANGE_NOTICE });
 }
