@@ -1,7 +1,5 @@
 // smoke を実行する全 worktree・全セッションで 1 本ずつに直列化するロック。
-// 同時に走らせると CPU が飽和して待ちが超過し、互いに落とし合う（TASK-520）。
-// ロックは固定ポートの bind。bind できたプロセスが所有者で、死ねば OS が解放するので
-// 異常終了しても取り残されず、PID の判定も一時ファイルも要らない。bind だけで接続はしない（ADR-0020）。
+// ロックは固定ポートの bind。bind できたプロセスが所有者で、死ねば OS が解放する。bind だけで接続はしない（ADR-0020）。
 import { createServer, type Server } from "node:net";
 import { sleep } from "./processSupport.ts";
 
@@ -10,22 +8,25 @@ export const SMOKE_LOCK_PORT = 23417;
 
 const POLL_INTERVAL_MS = 2_000;
 
+const LOCK_HOST = "127.0.0.1";
+
 export interface SmokeLockOptions {
   port?: number;
+  host?: string;
   pollIntervalMs?: number;
   signal?: AbortSignal;
   log?: (message: string) => void;
 }
 
 /** 取得できれば保持中の server、使用中なら null。それ以外のエラーは投げる。 */
-function tryListen(port: number): Promise<Server | null> {
+function tryListen(host: string, port: number): Promise<Server | null> {
   return new Promise((resolvePromise, reject) => {
     const server = createServer();
     server.once("error", (error: NodeJS.ErrnoException) => {
       if (error.code === "EADDRINUSE") resolvePromise(null);
       else reject(error);
     });
-    server.listen(port, "127.0.0.1", () => {
+    server.listen(port, host, () => {
       server.unref();
       resolvePromise(server);
     });
@@ -37,13 +38,14 @@ export async function acquireSmokeLock(
   options: SmokeLockOptions = {},
 ): Promise<() => Promise<void>> {
   const port = options.port ?? SMOKE_LOCK_PORT;
+  const host = options.host ?? LOCK_HOST;
   const pollIntervalMs = options.pollIntervalMs ?? POLL_INTERVAL_MS;
   const log = options.log ?? ((message) => console.log(message));
 
   let announced = false;
   for (;;) {
     options.signal?.throwIfAborted();
-    const server = await tryListen(port);
+    const server = await tryListen(host, port);
     if (server) {
       return () =>
         new Promise<void>((resolvePromise) => {
@@ -52,7 +54,9 @@ export async function acquireSmokeLock(
     }
     if (!announced) {
       announced = true;
-      log(`別の smoke が実行中です（ポート ${port}）。終了を待っています`);
+      log(
+        `別の smoke が実行中です（ポート ${port}）。終了を待っています。長く続くなら持ち主を確認してください（Linux: ss -ltnp、Windows: netstat -ano）`,
+      );
     }
     await sleep(pollIntervalMs);
   }

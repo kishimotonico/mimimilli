@@ -151,7 +151,7 @@ async function warmUp(baseURL: string, timeoutMs: number): Promise<void> {
       async () => {
         browser = await chromium.launch({ timeout: remaining() });
         const page = await browser.newPage();
-        sawNetworkChange = watchNetworkChange(page);
+        sawNetworkChange = watchNetworkChange(page.context());
         await page.goto(baseURL, { waitUntil: "domcontentloaded", timeout: remaining() });
         await page.locator(".mll-sidebar").waitFor({ state: "visible", timeout: remaining() });
       },
@@ -284,7 +284,7 @@ export const test = base.extend<
 
   networkChangeNotice: [
     async ({ page }, use, testInfo) => {
-      const sawNetworkChange = watchNetworkChange(page);
+      const sawNetworkChange = watchNetworkChange(page.context());
       await use();
       if (testInfo.status !== testInfo.expectedStatus && sawNetworkChange()) {
         testInfo.annotations.push({ type: "環境", description: NETWORK_CHANGE_NOTICE });

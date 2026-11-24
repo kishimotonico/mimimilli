@@ -75,6 +75,8 @@ describe("acquireSmokeLock", () => {
   });
 
   it("使用中以外のエラーは待たずに投げる", async () => {
-    await expect(acquireSmokeLock({ port: -1, log: () => {} })).rejects.toThrow();
+    await expect(
+      acquireSmokeLock({ host: "192.0.2.1", port: await freePort(), log: () => {} }),
+    ).rejects.toMatchObject({ code: "EADDRNOTAVAIL" });
   });
 });
