@@ -75,7 +75,7 @@ smokeテストの注意:
 - 最終確認は目視で行う方針のため、スクリーンショット比較は行わない。smoke が赤いときは実際の不具合を意味する（見た目のズレでは落ちない設計）。ただし下記のネットワーク変化の注記が付いた失敗は環境起因の可能性がある
 - 並列度は `client/tests/smoke/workerCount.ts` の `SMOKE_WORKERS` が正。fixture の可変状態は worker ごとのサーバーペアに分離され、テストごとにリセットされる。リトライはしない（`playwright.config.ts` の `retries: 0`。リトライで不具合を隠さない）
 - smoke は全 worktree・セッションで1本ずつに直列化される。固定ポート（`client/tests/smoke/smokeLock.ts` の `SMOKE_LOCK_PORT`）を bind できたプロセスが実行でき、2本目は「別の smoke が実行中です」と出して待つ。所有者が死ねば OS が解放する。同時に走らせると待ちが超過して落ちることがある。同じ worktree で2本目を起動しない（Playwright が globalSetup の前に outputDir を消すため）。`--ui` と watch はロックを取らない
-- WSL2 のミラードネットワークでは eth0 のアドレスが数秒おきに付け直される時間帯があり、その瞬間に Chromium が進行中の通信を `net::ERR_NETWORK_CHANGED` で落とす。warmUp の期限切れ、`.mll-sidebar` が出ないといった失敗はこれが原因のことがある。失敗メッセージに「ホストのネットワーク変化」の失敗の詳細に注記が出ていれば該当し、`ip -ts monitor address` に同時刻の Deleted/再追加が残る。注記は「その可能性がある」という意味で、本物の不具合と重なることもあるので、時間を置いて流し直して確かめる（`client/tests/smoke/networkChange.ts`）
+- WSL2 のミラードネットワークでは eth0 のアドレスが数秒おきに付け直される時間帯があり、その瞬間に Chromium が進行中の通信を `net::ERR_NETWORK_CHANGED` で落とす。warmUp の期限切れ、`.mll-sidebar` が出ないといった失敗はこれが原因のことがある。失敗の詳細に「ホストのネットワーク変化」の注記が出ていれば該当し、`ip -ts monitor address` に同時刻の Deleted/再追加が残る。注記は「その可能性がある」という意味で、本物の不具合と重なることもあるので、時間を置いて流し直して確かめる（`client/tests/smoke/networkChange.ts`）
 - Codex のサンドボックスは Playwright（Chromium 起動・vite listen）が EPERM で動かないことがあるので、Codex に実装を委譲した場合も smoke の実行は別の環境で行う
 
 ## API 契約
