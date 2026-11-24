@@ -8,6 +8,7 @@ export default defineConfig({
   testDir: "./tests/smoke",
   outputDir: "./test-results/smoke",
   fullyParallel: true,
+  globalSetup: "./tests/smoke/globalSetup.ts",
   workers: SMOKE_WORKERS,
   // smokeは見た目のズレでは落ちず赤=実際の不具合なので、リトライで隠さず即座に検知する。
   retries: 0,

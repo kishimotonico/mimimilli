@@ -74,6 +74,7 @@ smokeテストの注意:
 
 - 最終確認は目視で行う方針のため、スクリーンショット比較は行わない。smoke が赤いときは常に実際の不具合を意味する（見た目のズレでは落ちない設計）
 - 並列度は `client/tests/smoke/workerCount.ts` の `SMOKE_WORKERS` が正。fixture の可変状態は worker ごとのサーバーペアに分離され、テストごとにリセットされる。リトライはしない（`playwright.config.ts` の `retries: 0`。リトライで不具合を隠さない）
+- smoke は全 worktree・セッションで1本ずつに直列化される。固定ポート（`client/tests/smoke/smokeLock.ts` の `SMOKE_LOCK_PORT`）を bind できたプロセスが実行でき、2本目は「別の smoke が実行中です」と出して待つ。所有者が死ねば OS が解放する。同時実行は CPU 飽和で互いに落とし合う。`--ui` と watch はロックを取らない
 - Codex のサンドボックスは Playwright（Chromium 起動・vite listen）が EPERM で動かないことがあるので、Codex に実装を委譲した場合も smoke の実行は別の環境で行う
 
 ## API 契約
