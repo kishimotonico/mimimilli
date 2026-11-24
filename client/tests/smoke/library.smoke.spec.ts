@@ -182,23 +182,6 @@ test("値一覧でも検索でき、同じ値一覧のまま値と件数が絞�
   assertNoErrors(tracker);
 });
 
-test("値一覧が絞り込みで0件のとき「すべて」で探すと、同じ検索語で「すべて」へ移る", async ({
-  page,
-}) => {
-  const tracker = trackErrors(page);
-  await openApp(page);
-
-  await railRow(page, "CV別").click();
-  await search(page).fill("存在しない検索語");
-  await expect(page.getByText("「存在しない検索語」に一致する作品はありません")).toBeVisible();
-  await page.getByRole("button", { name: "「すべて」で探す" }).click();
-
-  await expect(page).toHaveURL(/\/library\/all\?q=/);
-  expect(new URL(page.url()).searchParams.get("q")).toBe("存在しない検索語");
-
-  assertNoErrors(tracker);
-});
-
 test("スマートフォルダーを切り替えるとチップと検索語が消える", async ({ page }) => {
   const tracker = trackErrors(page);
   await openApp(page);
@@ -217,20 +200,32 @@ test("スマートフォルダーを切り替えるとチップと検索語が�
   assertNoErrors(tracker);
 });
 
-test("0件のとき「すべて」で探すと同じ検索語で「すべて」へ移る", async ({ page }) => {
+test("0件のとき「すべて」で探すと、同じチップと検索語で「すべて」へ移る", async ({ page }) => {
   const tracker = trackErrors(page);
   await openApp(page);
 
-  await rail(page)
-    .getByRole("button", { name: /^お気に入り/ })
+  const overlay = page.locator(".mll-qoverlay");
+  await railRow(page, "CV別").click();
+  await page.mouse.move(1200, 600);
+  await expect(overlay).toHaveCount(0);
+  await railRow(page, "CV別").hover();
+  await overlay
+    .getByRole("group", { name: "CVの一覧" })
+    .getByRole("button", { name: "霧島レイをAND追加" })
     .click();
+  await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["cv/霧島レイ"]);
   await search(page).fill("存在しない検索語");
-  const finder = page.getByRole("button", { name: "「すべて」で探す" });
-  await expect(finder).toBeVisible();
-  await finder.click();
+  const valueList = page.locator(".is-group-values");
+  await expect(
+    valueList.getByText("「存在しない検索語」と選択中の絞り込みに一致する作品はありません"),
+  ).toBeVisible();
+  await valueList.getByRole("button", { name: "「すべて」で探す" }).click();
 
-  await expect(page).toHaveURL(/\/library\/all\?q=/);
+  await expect(page).toHaveURL(/\/library\/all\?/);
+  expect(new URL(page.url()).searchParams.get("q")).toBe("存在しない検索語");
   await expect(search(page)).toHaveValue("存在しない検索語");
+  await expect(railRow(page, "すべて")).toHaveAttribute("aria-current", "true");
+  await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["cv/霧島レイ"]);
 
   assertNoErrors(tracker);
 });
