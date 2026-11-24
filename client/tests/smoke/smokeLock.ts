@@ -21,7 +21,7 @@ export interface SmokeLockOptions {
 /** 取得できれば保持中の server、使用中なら null。それ以外のエラーは投げる。 */
 function tryListen(host: string, port: number): Promise<Server | null> {
   return new Promise((resolvePromise, reject) => {
-    const server = createServer();
+    const server = createServer((socket) => socket.destroy());
     server.once("error", (error: NodeJS.ErrnoException) => {
       if (error.code === "EADDRINUSE") resolvePromise(null);
       else reject(error);

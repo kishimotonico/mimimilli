@@ -1,11 +1,10 @@
-// WSL2 のミラードネットワークでは eth0 のアドレスが付け直されることがあり、その瞬間に Chromium が
-// 進行中の通信を ERR_NETWORK_CHANGED で落とす。アプリの不具合ではないので、失敗の原因として見分けられるようにする。
+// Chromium はホストのネットワーク変化で進行中の通信を ERR_NETWORK_CHANGED で落とすことがある。失敗の原因として見分けられるようにする（環境の事情は docs/HANDOFF.md）。
 import type { BrowserContext, TestInfoError } from "@playwright/test";
 
 const NETWORK_CHANGED = "ERR_NETWORK_CHANGED";
 
 export const NETWORK_CHANGE_NOTICE =
-  "[smoke環境] ホストのネットワーク変化（WSL2 の eth0 アドレスの付け直し）で Chromium が通信を落としています。この失敗はそれが原因の可能性があります。時間を置いて流し直して確かめてください（`ip -ts monitor address` で同時刻の変化を確認できます）";
+  "[smoke環境] ホストのネットワーク変化で Chromium が通信を落としました（ERR_NETWORK_CHANGED）。この失敗はそれが原因の可能性があります。時間を置いて流し直して確かめてください。詳しくは docs/HANDOFF.md";
 
 export function isNetworkChangeText(text: string): boolean {
   return text.includes(NETWORK_CHANGED);

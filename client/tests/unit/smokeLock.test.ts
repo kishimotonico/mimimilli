@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { createServer } from "node:net";
+import { connect, createServer } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { acquireSmokeLock } from "../smoke/smokeLock";
 
@@ -72,6 +72,16 @@ describe("acquireSmokeLock", () => {
     const waiting = acquire(port, { signal: abort.signal });
     setTimeout(() => abort.abort(), 50);
     await expect(waiting).rejects.toThrow();
+  });
+
+  it("接続されたままでも解放が完了する", async () => {
+    const port = await freePort();
+    const release = await acquire(port);
+    const client = connect(port, "127.0.0.1");
+    client.on("error", () => {});
+    await new Promise((r) => client.once("connect", r));
+    await expect(release()).resolves.toBeUndefined();
+    client.destroy();
   });
 
   it("使用中以外のエラーは待たずに投げる", async () => {
