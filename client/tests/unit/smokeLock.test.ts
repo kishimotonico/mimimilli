@@ -75,8 +75,6 @@ describe("acquireSmokeLock", () => {
   });
 
   it("使用中以外のエラーは待たずに投げる", async () => {
-    await expect(
-      acquireSmokeLock({ port: -1, log: () => {} }),
-    ).rejects.toThrow();
+    await expect(acquireSmokeLock({ port: -1, log: () => {} })).rejects.toThrow();
   });
 });

@@ -6,6 +6,7 @@ import { loadavg } from "node:os";
 import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { type Browser, chromium, test as base } from "@playwright/test";
+import { NETWORK_CHANGE_NOTICE, watchNetworkChange } from "./networkChange.ts";
 import { shutdown, withDeadline } from "./processSupport.ts";
 
 // fixture状態リセットのHTTP待ちがADR-0020のWSL blackhole（未使用ポートへの接続が
@@ -144,17 +145,22 @@ async function warmUp(baseURL: string, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   const remaining = () => Math.max(1, deadline - Date.now());
   let browser: Browser | undefined;
+  let sawNetworkChange = () => false;
   try {
     await withDeadline(
       async () => {
         browser = await chromium.launch({ timeout: remaining() });
         const page = await browser.newPage();
+        sawNetworkChange = watchNetworkChange(page);
         await page.goto(baseURL, { waitUntil: "domcontentloaded", timeout: remaining() });
         await page.locator(".mll-sidebar").waitFor({ state: "visible", timeout: remaining() });
       },
       timeoutMs,
       "warmUp",
     );
+  } catch (error) {
+    if (error instanceof Error && sawNetworkChange()) error.message += `\n${NETWORK_CHANGE_NOTICE}`;
+    throw error;
   } finally {
     const opened = browser;
     if (opened) {
@@ -184,7 +190,7 @@ interface WorkerServers {
 }
 
 export const test = base.extend<
-  { resetFixtureState: void },
+  { resetFixtureState: void; networkChangeNotice: void },
   { workerServers: WorkerServers; fixtureScenario: string; dlsiteFetchDelayMs: number }
 >({
   // spec側で test.use({ fixtureScenario }) するとworkerのサーバーがそのシナリオで起動する
@@ -275,6 +281,18 @@ export const test = base.extend<
   baseURL: async ({ workerServers }, use) => {
     await use(workerServers.baseURL);
   },
+
+  networkChangeNotice: [
+    async ({ page }, use, testInfo) => {
+      const sawNetworkChange = watchNetworkChange(page);
+      await use();
+      if (testInfo.status !== testInfo.expectedStatus && sawNetworkChange()) {
+        testInfo.annotations.push({ type: "環境", description: NETWORK_CHANGE_NOTICE });
+        console.error(`${testInfo.title}\n${NETWORK_CHANGE_NOTICE}`);
+      }
+    },
+    { auto: true },
+  ],
 
   resetFixtureState: [
     async ({ workerServers }, use) => {
