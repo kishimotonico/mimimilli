@@ -94,6 +94,100 @@ test("parseDlsiteHtml: 正常HTMLフィクスチャから各情報を抽出す�
   assert.equal(info.url, "https://www.dlsite.com/maniax/work/=/product_id/RJ899999.html");
 });
 
+// 2026-11 時点の実ページ（Vue 構造）から必要部分を切り出し、CV・リンクなどを加工したもの
+const VUE_HTML = `
+<html><head>
+  <meta property="og:image" content="https://img.dlsite.jp/modpub/images2/work/doujin/RJ01128000/RJ01127138_img_main.jpg">
+</head><body>
+  <div class="popular-keywords-list"><a href="/home/fsr/=/genre/048/from/top.hotword">行外のジャンルリンク</a></div>
+  <h1 id="work_name" class="headline__title" data-v-b60c1239>  【CV:上田麗奈】初恋のお姉さん  </h1>
+  <dl class="c-productInfo__gridContext c-productInfoPc__list c-productInfoPc__list--maker">
+    <div class="c-productInfo__item c-productInfo__item--maker"><dt class="c-productInfo__key">サークル名</dt><dd class="c-productInfo__value"><div class="c-productInfo__maker"><a href="https://www.dlsite.com/maniax/circle/profile/=/maker_id/RG01010460.html" class="c-productInfo__makerName">Spica(スピカ)</a></div></dd></div>
+  </dl>
+  <dl class="c-productInfo__gridContext c-productInfoPc__list c-productInfoPc__list--outline">
+    <div class="c-productInfo__item"><dt class="c-productInfo__key">作者</dt><dd class="c-productInfo__value"><span><a href="/maniax/fsr/=/keyword_creater/%22a%22">式結祈</a></span></dd></div>
+    <div class="c-productInfo__item"><dt class="c-productInfo__key">声優</dt><dd class="c-productInfo__value"><span><a href="/maniax/fsr/=/keyword_creater/%22b%22">上田麗奈</a></span><span><a href="/maniax/fsr/=/keyword_creater/%22c%22">森瀬つぐみ</a></span></dd></div>
+    <div class="c-productInfo__item"><dt class="c-productInfo__key">年齢指定</dt><dd class="c-productInfo__value"><span class="label_all label_M">全年齢</span></dd></div>
+    <div class="c-productInfo__item"><dt class="c-productInfo__key">ジャンル</dt><dd class="c-productInfo__value"><div class="flex gap_elements flex_wrap"><a href="/home/fsr/=/genre/497/from/work.genre/ana_flg/all/" class="tag_general tag_M">ASMR</a><a href="/home/fsr/=/genre/220/from/work.genre/ana_flg/all/" class="tag_general tag_M">お姉さん</a><a href="/maniax/campaign/award" class="tag_general tag_M">特集</a></div></dd></div>
+  </dl>
+</body></html>`;
+
+test("parseDlsiteHtml: 新構造（Vue）のHTMLから各情報を抽出する", () => {
+  const result = parseDlsiteHtml(VUE_HTML, "RJ01127138");
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual(result.info, {
+    rjCode: "RJ01127138",
+    title: "【CV:上田麗奈】初恋のお姉さん",
+    circle: "Spica(スピカ)",
+    cvs: ["上田麗奈", "森瀬つぐみ"],
+    genreTags: ["ASMR", "お姉さん"],
+    ageRating: "全年齢",
+    coverUrl: "https://img.dlsite.jp/modpub/images2/work/doujin/RJ01128000/RJ01127138_img_main.jpg",
+    url: "https://www.dlsite.com/maniax/work/=/product_id/RJ01127138.html",
+  });
+});
+
+test("parseDlsiteHtml: 新旧どちらの構造か判別できないHTMLはparse_error", () => {
+  const unknown = parseDlsiteHtml(
+    '<html><body><h1 id="work_name">タイトル</h1></body></html>',
+    "RJ000002",
+  );
+  assert.deepEqual(unknown, {
+    ok: false,
+    kind: "parse_error",
+    message: "DLsite作品ページの構造を判別できませんでした（RJ000002）",
+  });
+  const both = parseDlsiteHtml(
+    SAMPLE_HTML.replace("</body>", '<dl class="c-productInfo__gridContext"></dl></body>'),
+    "RJ000003",
+  );
+  assert.deepEqual(both, {
+    ok: false,
+    kind: "parse_error",
+    message: "DLsite作品ページの構造を判別できませんでした（RJ000003）",
+  });
+});
+
+test("parseDlsiteHtml: サークルが取れないHTMLはparse_error（新旧どちらの構造でも）", () => {
+  const withoutCircle = {
+    legacy: SAMPLE_HTML.replace(/<span class="maker_name">.*?<\/span>/, ""),
+    vue: VUE_HTML.replace(/<a [^>]*c-productInfo__makerName[^>]*>.*?<\/a>/, ""),
+  };
+  for (const [name, html] of Object.entries(withoutCircle)) {
+    assert.deepEqual(
+      parseDlsiteHtml(html, "RJ000004"),
+      {
+        ok: false,
+        kind: "parse_error",
+        message: "DLsite作品ページからサークルを取得できませんでした（RJ000004）",
+      },
+      name,
+    );
+  }
+});
+
+test("parseDlsiteHtml: 年齢指定の行が無いHTMLはparse_error（新旧どちらの構造でも）", () => {
+  const withoutAgeRow = {
+    legacy: SAMPLE_HTML.replace(/<tr><th>年齢指定<\/th>.*?<\/tr>/, ""),
+    vue: VUE_HTML.replace(
+      /<div class="c-productInfo__item"><dt class="c-productInfo__key">年齢指定<\/dt>.*?<\/dd><\/div>/,
+      "",
+    ),
+  };
+  for (const [name, html] of Object.entries(withoutAgeRow)) {
+    assert.deepEqual(
+      parseDlsiteHtml(html, "RJ000005"),
+      {
+        ok: false,
+        kind: "parse_error",
+        message: "DLsite作品ページに年齢指定の行がありませんでした（RJ000005）",
+      },
+      name,
+    );
+  }
+});
+
 test("parseDlsiteHtml: タイトルが空のHTMLはparse_error", () => {
   const result = parseDlsiteHtml("<html><body>not found</body></html>", "RJ000001");
   assert.deepEqual(result, {
@@ -106,6 +200,7 @@ test("parseDlsiteHtml: タイトルが空のHTMLはparse_error", () => {
 function htmlWithAgeRating(raw: string): string {
   return `<html><body>
   <h1 id="work_name">タイトル</h1>
+  <span class="maker_name"><a href="#">サークル</a></span>
   <table>
     <tr><th>年齢指定</th><td><div class="work_genre">${raw}</div></td></tr>
   </table>
@@ -151,17 +246,14 @@ test("parseDlsiteHtml: 年齢指定のR-15・R18・18禁を正規化する", () 
   if (adult.ok) assert.equal(adult.info.ageRating, "R18");
 });
 
-test("parseDlsiteHtml: 年齢指定が無い・未知の表記はnullでparse_errorにしない", () => {
-  const missing = parseDlsiteHtml(
-    '<html><body><h1 id="work_name">タイトル</h1></body></html>',
-    "RJ000020",
-  );
-  assert.equal(missing.ok, true);
-  if (missing.ok) assert.equal(missing.info.ageRating, null);
+test("parseDlsiteHtml: 年齢指定の行はあるが表記が未知ならnullでparse_errorにしない", () => {
+  const legacy = parseDlsiteHtml(htmlWithAgeRating("指定なし"), "RJ000021");
+  assert.equal(legacy.ok, true);
+  if (legacy.ok) assert.equal(legacy.info.ageRating, null);
 
-  const unknown = parseDlsiteHtml(htmlWithAgeRating("指定なし"), "RJ000021");
-  assert.equal(unknown.ok, true);
-  if (unknown.ok) assert.equal(unknown.info.ageRating, null);
+  const vue = parseDlsiteHtml(VUE_HTML.replace("全年齢", "指定なし"), "RJ000022");
+  assert.equal(vue.ok, true);
+  if (vue.ok) assert.equal(vue.info.ageRating, null);
 });
 
 test("listDlsiteMissingFields: 任意フィールドの欠落を検出する", () => {
@@ -208,7 +300,9 @@ test("DLsite: パース成功時の欠落フィールドをwarnイベントと�
         logger: (event) => logs.push(event),
         ...mockDlsiteTransport({
           html: () =>
-            htmlResponse('<html><body><h1 id="work_name">タイトルのみ</h1></body></html>'),
+            htmlResponse(
+              '<html><body><h1 id="work_name">タイトルのみ</h1><span class="maker_name"><a href="#">サークル</a></span><table><tr><th>年齢指定</th><td></td></tr></table></body></html>',
+            ),
         }),
       },
     }),
@@ -219,13 +313,7 @@ test("DLsite: パース成功時の欠落フィールドをwarnイベントと�
   assert.equal(result.ok, true);
   const missing = logs.filter((event) => event.event === "dlsite_parse_fields_missing");
   assert.equal(missing.length, 1);
-  assert.deepEqual(missing[0]?.missingFields, [
-    "circle",
-    "cvs",
-    "genreTags",
-    "ageRating",
-    "coverUrl",
-  ]);
+  assert.deepEqual(missing[0]?.missingFields, ["cvs", "genreTags", "ageRating", "coverUrl"]);
   assert.equal(missing[0]?.productCode, "RJ900002");
 });
 
@@ -636,7 +724,7 @@ test("DLsite取得はタイトル・タグを自動適用せず、mimimilli.json
             sampleWorkHtml(code, {
               title: `DLsite取得タイトル ${code}`,
               genres: ["削除済み", "新着"],
-              circle: null,
+              circle: "サークル",
               cvs: false,
               cover: false,
             }),

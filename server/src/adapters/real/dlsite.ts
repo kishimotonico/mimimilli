@@ -1,7 +1,7 @@
 // DLsite スクレイパー（fetch + cheerio）。このファイルのセレクタとフィクスチャテストを正典とする。
 // HTML 構造変更を parse_error として検知したら、セレクタとテストを同時に更新する。
 // HTML パースは pure 関数に分離し、ネットワークなしでテストできるようにする。
-import { load } from "cheerio";
+import { load, type CheerioAPI } from "cheerio";
 import {
   normalizeDlsiteAgeRating,
   type DlsiteFetchResult,
@@ -96,7 +96,7 @@ export function listDlsiteMissingFields(info: DlsiteWorkInfo): DlsiteOptionalFie
 }
 
 /** parseDlsiteHtml の出力を変えたら上げる。キャッシュ済みの解析結果はこの版が違うと読み直される */
-export const DLSITE_PARSER_VERSION = 1;
+export const DLSITE_PARSER_VERSION = 2;
 
 /** 解析結果の版と、その版を作る解析。キャッシュ済みの解析結果の有効性と適用の照合値はこの版で決まる */
 export interface DlsiteParser {
@@ -104,22 +104,42 @@ export interface DlsiteParser {
   parse: (html: string, rjCode: string) => DlsiteFetchResult;
 }
 
-/** DLsite 作品ページの HTML から作品情報を抽出する（pure） */
-export function parseDlsiteHtml(html: string, rjCode: string): DlsiteFetchResult {
-  const $ = load(html);
+type DlsiteExtracted = Omit<DlsiteWorkInfo, "rjCode" | "title" | "url">;
+interface DlsiteExtraction {
+  fields: DlsiteExtracted;
+  hasAgeRatingRow: boolean;
+}
+type DlsitePageStructure = "legacy" | "vue";
 
-  const title = $("#work_name").first().text().trim();
-  if (!title) {
-    return {
-      ok: false,
-      kind: "parse_error",
-      message: `DLsite作品ページのタイトルを取得できませんでした（${rjCode}）`,
-    };
-  }
-  const circle = $("span.maker_name a").first().text().trim() || null;
+const GENRE_LINK = /\/fsr?\/=\/genre\//;
 
+// 旧構造は table（th/td）と専用 class、新構造（Vue）は dl.c-productInfo__gridContext。どちらか一方だけがあるときに判定する。
+function detectStructure($: CheerioAPI): DlsitePageStructure | null {
+  const legacy =
+    $("span.maker_name, div.main_genre, div.product-slider-data, #work_outline").length > 0;
+  const vue = $("dl.c-productInfo__gridContext").length > 0;
+  if (legacy === vue) return null;
+  return legacy ? "legacy" : "vue";
+}
+
+function toHttps(url: string | undefined): string | null {
+  const value = url?.trim();
+  if (!value) return null;
+  return value.startsWith("//") ? `https:${value}` : value;
+}
+
+function genreTagsOf($: CheerioAPI, links: ReturnType<CheerioAPI>): string[] {
+  return links
+    .filter((_, a) => GENRE_LINK.test($(a).attr("href") ?? ""))
+    .map((_, a) => $(a).text().trim())
+    .get()
+    .filter((t) => t.length > 0);
+}
+
+function extractLegacy($: CheerioAPI): DlsiteExtraction {
   const cvs: string[] = [];
   let ageRatingRaw = "";
+  let hasAgeRatingRow = false;
   $("th").each((_, th) => {
     const label = $(th).text().trim();
     if (label === "声優") {
@@ -133,32 +153,87 @@ export function parseDlsiteHtml(html: string, rjCode: string): DlsiteFetchResult
       return;
     }
     if (label !== "年齢指定") return;
+    hasAgeRatingRow = true;
     ageRatingRaw = $(th).parent().find("td").first().text().trim();
   });
 
-  // 作品ジャンルのリンク先は `/fs/=/genre/` または `/fsr/=/genre/` 形式。
-  // main_genre 内には特集・キャンペーンへの通常リンクも混在するため、リンク先で限定する。
-  const genreTags = $("div.main_genre a")
-    .filter((_, a) => /\/fsr?\/=\/genre\//.test($(a).attr("href") ?? ""))
-    .map((_, a) => $(a).text().trim())
-    .get()
-    .filter((t) => t.length > 0);
+  return {
+    hasAgeRatingRow,
+    fields: {
+      circle: $("span.maker_name a").first().text().trim() || null,
+      cvs,
+      // main_genre 内には特集・キャンペーンへの通常リンクも混在するため、リンク先で限定する。
+      genreTags: genreTagsOf($, $("div.main_genre a")),
+      ageRating: normalizeDlsiteAgeRating(ageRatingRaw),
+      coverUrl: toHttps($("div.product-slider-data div[data-src]").first().attr("data-src")),
+    },
+  };
+}
 
-  let coverUrl = $("div.product-slider-data div[data-src]").first().attr("data-src") ?? null;
-  if (coverUrl && coverUrl.startsWith("//")) coverUrl = `https:${coverUrl}`;
+function extractVue($: CheerioAPI): DlsiteExtraction {
+  const valueOf = (label: string) =>
+    $("dl.c-productInfo__gridContext .c-productInfo__item")
+      .filter((_, item) => $(item).children(".c-productInfo__key").text().trim() === label)
+      .first()
+      .children(".c-productInfo__value");
+
+  const ageRatingValue = valueOf("年齢指定");
+  return {
+    hasAgeRatingRow: ageRatingValue.length > 0,
+    fields: {
+      circle: $("a.c-productInfo__makerName").first().text().trim() || null,
+      cvs: valueOf("声優")
+        .find("a")
+        .map((_, a) => $(a).text().trim())
+        .get()
+        .filter((name) => name.length > 0),
+      genreTags: genreTagsOf($, valueOf("ジャンル").find("a")),
+      ageRating: normalizeDlsiteAgeRating(ageRatingValue.text().trim()),
+      coverUrl: toHttps($('meta[property="og:image"]').attr("content")),
+    },
+  };
+}
+
+/** DLsite 作品ページの HTML から作品情報を抽出する（pure）。構造を判定してから、構造ごとの抽出に分ける */
+export function parseDlsiteHtml(html: string, rjCode: string): DlsiteFetchResult {
+  const $ = load(html);
+
+  const title = $("#work_name").first().text().trim();
+  if (!title) {
+    return {
+      ok: false,
+      kind: "parse_error",
+      message: `DLsite作品ページのタイトルを取得できませんでした（${rjCode}）`,
+    };
+  }
+  const structure = detectStructure($);
+  if (!structure) {
+    return {
+      ok: false,
+      kind: "parse_error",
+      message: `DLsite作品ページの構造を判別できませんでした（${rjCode}）`,
+    };
+  }
+  const { fields, hasAgeRatingRow } = structure === "legacy" ? extractLegacy($) : extractVue($);
+  // サークルと年齢指定の行はどの作品にもある。欠けたらセレクタの追従漏れとして失敗にする
+  if (!fields.circle) {
+    return {
+      ok: false,
+      kind: "parse_error",
+      message: `DLsite作品ページからサークルを取得できませんでした（${rjCode}）`,
+    };
+  }
+  if (!hasAgeRatingRow) {
+    return {
+      ok: false,
+      kind: "parse_error",
+      message: `DLsite作品ページに年齢指定の行がありませんでした（${rjCode}）`,
+    };
+  }
 
   return {
     ok: true,
-    info: {
-      rjCode,
-      title,
-      circle,
-      cvs,
-      genreTags,
-      ageRating: normalizeDlsiteAgeRating(ageRatingRaw),
-      coverUrl,
-      url: dlsiteWorkUrl(rjCode),
-    },
+    info: { rjCode, title, ...fields, url: dlsiteWorkUrl(rjCode) },
   };
 }
 
