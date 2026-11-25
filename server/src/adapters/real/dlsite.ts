@@ -105,6 +105,10 @@ export interface DlsiteParser {
 }
 
 type DlsiteExtracted = Omit<DlsiteWorkInfo, "rjCode" | "title" | "url">;
+interface DlsiteExtraction {
+  fields: DlsiteExtracted;
+  hasAgeRatingRow: boolean;
+}
 type DlsitePageStructure = "legacy" | "vue";
 
 const GENRE_LINK = /\/fsr?\/=\/genre\//;
@@ -132,9 +136,10 @@ function genreTagsOf($: CheerioAPI, links: ReturnType<CheerioAPI>): string[] {
     .filter((t) => t.length > 0);
 }
 
-function extractLegacy($: CheerioAPI): DlsiteExtracted {
+function extractLegacy($: CheerioAPI): DlsiteExtraction {
   const cvs: string[] = [];
   let ageRatingRaw = "";
+  let hasAgeRatingRow = false;
   $("th").each((_, th) => {
     const label = $(th).text().trim();
     if (label === "声優") {
@@ -148,36 +153,44 @@ function extractLegacy($: CheerioAPI): DlsiteExtracted {
       return;
     }
     if (label !== "年齢指定") return;
+    hasAgeRatingRow = true;
     ageRatingRaw = $(th).parent().find("td").first().text().trim();
   });
 
   return {
-    circle: $("span.maker_name a").first().text().trim() || null,
-    cvs,
-    // main_genre 内には特集・キャンペーンへの通常リンクも混在するため、リンク先で限定する。
-    genreTags: genreTagsOf($, $("div.main_genre a")),
-    ageRating: normalizeDlsiteAgeRating(ageRatingRaw),
-    coverUrl: toHttps($("div.product-slider-data div[data-src]").first().attr("data-src")),
+    hasAgeRatingRow,
+    fields: {
+      circle: $("span.maker_name a").first().text().trim() || null,
+      cvs,
+      // main_genre 内には特集・キャンペーンへの通常リンクも混在するため、リンク先で限定する。
+      genreTags: genreTagsOf($, $("div.main_genre a")),
+      ageRating: normalizeDlsiteAgeRating(ageRatingRaw),
+      coverUrl: toHttps($("div.product-slider-data div[data-src]").first().attr("data-src")),
+    },
   };
 }
 
-function extractVue($: CheerioAPI): DlsiteExtracted {
+function extractVue($: CheerioAPI): DlsiteExtraction {
   const valueOf = (label: string) =>
     $("dl.c-productInfo__gridContext .c-productInfo__item")
       .filter((_, item) => $(item).children(".c-productInfo__key").text().trim() === label)
       .first()
       .children(".c-productInfo__value");
 
+  const ageRatingValue = valueOf("年齢指定");
   return {
-    circle: $("a.c-productInfo__makerName").first().text().trim() || null,
-    cvs: valueOf("声優")
-      .find("a")
-      .map((_, a) => $(a).text().trim())
-      .get()
-      .filter((name) => name.length > 0),
-    genreTags: genreTagsOf($, valueOf("ジャンル").find("a")),
-    ageRating: normalizeDlsiteAgeRating(valueOf("年齢指定").text().trim()),
-    coverUrl: toHttps($('meta[property="og:image"]').attr("content")),
+    hasAgeRatingRow: ageRatingValue.length > 0,
+    fields: {
+      circle: $("a.c-productInfo__makerName").first().text().trim() || null,
+      cvs: valueOf("声優")
+        .find("a")
+        .map((_, a) => $(a).text().trim())
+        .get()
+        .filter((name) => name.length > 0),
+      genreTags: genreTagsOf($, valueOf("ジャンル").find("a")),
+      ageRating: normalizeDlsiteAgeRating(ageRatingValue.text().trim()),
+      coverUrl: toHttps($('meta[property="og:image"]').attr("content")),
+    },
   };
 }
 
@@ -201,18 +214,26 @@ export function parseDlsiteHtml(html: string, rjCode: string): DlsiteFetchResult
       message: `DLsite作品ページの構造を判別できませんでした（${rjCode}）`,
     };
   }
-  const extracted = structure === "legacy" ? extractLegacy($) : extractVue($);
-  if (!extracted.circle && !extracted.coverUrl) {
+  const { fields, hasAgeRatingRow } = structure === "legacy" ? extractLegacy($) : extractVue($);
+  // サークルと年齢指定の行はどの作品にもある。欠けたらセレクタの追従漏れとして失敗にする
+  if (!fields.circle) {
     return {
       ok: false,
       kind: "parse_error",
-      message: `DLsite作品ページからサークルとカバーを取得できませんでした（${rjCode}）`,
+      message: `DLsite作品ページからサークルを取得できませんでした（${rjCode}）`,
+    };
+  }
+  if (!hasAgeRatingRow) {
+    return {
+      ok: false,
+      kind: "parse_error",
+      message: `DLsite作品ページに年齢指定の行がありませんでした（${rjCode}）`,
     };
   }
 
   return {
     ok: true,
-    info: { rjCode, title, ...extracted, url: dlsiteWorkUrl(rjCode) },
+    info: { rjCode, title, ...fields, url: dlsiteWorkUrl(rjCode) },
   };
 }
 

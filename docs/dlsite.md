@@ -17,9 +17,9 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 
 ## 取得する情報
 
-`parseDlsiteHtml` が作品ページのHTMLから抽出するのは、タイトル、サークル名、CV（声優）一覧、ジャンルタグ一覧、年齢指定、カバー画像URL、作品URL（`DlsiteWorkInfo`、`shared/src/dlsite.ts`）。DLsiteの作品ページには旧構造（`span.maker_name`・`div.main_genre`・`div.product-slider-data`・`#work_outline` の table）と新構造（Vue。`dl.c-productInfo__gridContext`）があり、先に構造を判定して、構造ごとの抽出に分ける（項目ごとに新旧を試さない。値が混ざるため）。どちらか一方の目印だけがあるときに判定でき、両方または無いときは判別不能。旧構造はサークル `span.maker_name`、CV・年齢指定は作品概要tableの「声優」「年齢指定」行、ジャンルは `div.main_genre`、カバーは `div.product-slider-data` の `data-src`。新構造はサークル `a.c-productInfo__makerName`、CV・年齢指定・ジャンルは `.c-productInfo__item` のキー（`dt`）が「声優」「年齢指定」「ジャンル」の行の値（`dd`）、カバーは `og:image`（メイン画像）。ジャンルタグはどちらもリンク先が `/fs/=/genre/` または `/fsr/=/genre/` のものだけを対象にし、特集・キャンペーンへの通常リンクを除外する。年齢指定は表示を `全年齢` / `R15` / `R18` に正規化する（`R-15` → `R15`、`18禁` → `R18`）。取れないときは `null` で、パース失敗にはしない。
+`parseDlsiteHtml` が作品ページのHTMLから抽出するのは、タイトル、サークル名、CV（声優）一覧、ジャンルタグ一覧、年齢指定、カバー画像URL、作品URL（`DlsiteWorkInfo`、`shared/src/dlsite.ts`）。DLsiteの作品ページには旧構造（`span.maker_name`・`div.main_genre`・`div.product-slider-data`・`#work_outline` の table）と新構造（Vue。`dl.c-productInfo__gridContext`）があり、先に構造を判定して、構造ごとの抽出に分ける（項目ごとに新旧を試さない。値が混ざるため）。どちらか一方の目印だけがあるときに判定でき、両方または無いときは判別不能。旧構造はサークル `span.maker_name`、CV・年齢指定は作品概要tableの「声優」「年齢指定」行、ジャンルは `div.main_genre`、カバーは `div.product-slider-data` の `data-src`。新構造はサークル `a.c-productInfo__makerName`、CV・年齢指定・ジャンルは `.c-productInfo__item` のキー（`dt`）が「声優」「年齢指定」「ジャンル」の行の値（`dd`）、カバーは `og:image`（メイン画像）。ジャンルタグはどちらもリンク先が `/fs/=/genre/` または `/fsr/=/genre/` のものだけを対象にし、特集・キャンペーンへの通常リンクを除外する。年齢指定は表示を `全年齢` / `R15` / `R18` に正規化する（`R-15` → `R15`、`18禁` → `R18`）。表記が未知のときは `null` で、パース失敗にはしない。
 
-`parse_error` にするのは、タイトルが取れない、構造を判別できない、サークルとカバーのどちらも取れない、のいずれか。メッセージにRJコードと理由を入れる。黙って一部だけ取れた結果を成功にしないことで、次の構造変化に気づけるようにする。
+`parse_error` にするのは、タイトルが取れない、構造を判別できない、サークルが取れない、判定した構造に「年齢指定」の行が無い、のいずれか。サークルと年齢指定の行はどの作品にもあるので、欠けたらセレクタの追従漏れとみなす。行はあるが表記が未知のときは `ageRating` が `null` の成功。カバー・CV・ジャンルは欠けても成功で、欠落は warn ログ（`dlsite_parse_fields_missing`）に出す。メッセージにRJコードと理由を入れる。黙って一部だけ取れた結果を成功にしないことで、次の構造変化に気づけるようにする。
 
 セレクタとフィクスチャテストは `dlsite.ts` を正典とする。DLsite側のHTML構造変更で `parse_error` が増えたら、セレクタとテストを同時に更新し、`DLSITE_PARSER_VERSION` を上げる。
 

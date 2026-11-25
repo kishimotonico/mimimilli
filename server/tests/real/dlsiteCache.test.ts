@@ -25,7 +25,8 @@ import {
 import { runDlsiteCacheCli } from "../../src/dlsiteCacheCli.ts";
 import { makeTestDirectory, makeTestScope } from "../helpers/sampleLibrary.ts";
 
-const VALID_HTML = "<h1 id=work_name>T</h1><span class=maker_name><a>A</a></span>";
+const VALID_HTML =
+  "<h1 id=work_name>T</h1><span class=maker_name><a>A</a></span><table><th>年齢指定</th></table>";
 
 function createCache(t: { after: (callback: () => void) => void }, now = 1_000) {
   const directory = makeTestDirectory("dlsite-cache");
@@ -229,7 +230,7 @@ test("DLsiteキャッシュ: 改ざんされた過大gzip BLOBを展開上限で
   t.after(directory.cleanup);
   const path = join(directory.path, "cache.sqlite");
   const cache = directory.own(
-    new DlsiteCache({ path, maxTransferBytes: 1_000, maxExpandedBytes: 64 }),
+    new DlsiteCache({ path, maxTransferBytes: 1_000, maxExpandedBytes: 256 }),
   );
   cache.recordSuccess({
     productCode: "RJ123456",
@@ -241,7 +242,7 @@ test("DLsiteキャッシュ: 改ざんされた過大gzip BLOBを展開上限で
   const sqlite = new Database(path);
   sqlite
     .query("UPDATE dlsite_html_snapshots SET html_gzip = ?, html_size = ? WHERE product_code = ?")
-    .run(gzipSync("x".repeat(128)), 128, "RJ123456");
+    .run(gzipSync("x".repeat(512)), 512, "RJ123456");
   sqlite.close();
   assert.throws(() => cache.resolve({ productCode: "RJ123456" }), /gzip展開に失敗/);
 });
@@ -492,11 +493,23 @@ test("DLsiteキャッシュCLI: ディレクトリを一括importし、成功・
 test("DLsiteキャッシュCLI: export --dir と import --dir の往復で全件を復元する", (t) => {
   const directory = makeTestDirectory("dlsite-cache-cli-export-dir");
   t.after(directory.cleanup);
-  const largeHtml = `<html><h1 id="work_name">大きい作品</h1><span class="maker_name"><a href="#">サークル</a></span><!--${"a".repeat(65536)}--></html>`;
+  const largeHtml = `<html><h1 id="work_name">大きい作品</h1><span class="maker_name"><a href="#">サークル</a></span><table><th>年齢指定</th></table><!--${"a".repeat(65536)}--></html>`;
   const sourceDir = join(directory.path, "source");
   mkdirSync(sourceDir);
   writeFileSync(join(sourceDir, "RJ123456.html"), VALID_HTML);
   writeFileSync(join(sourceDir, "RJ123457.html"), largeHtml);
+  assert.deepEqual(
+    JSON.parse(
+      runDlsiteCacheCli(
+        ["import", "--product-code", "RJ123457", "--file", join(sourceDir, "RJ123457.html")],
+        {
+          MIMIMILLI_DATA_DIR: directory.path,
+          MIMIMILLI_DLSITE_CACHE_DB: join(directory.path, "probe.sqlite"),
+        },
+      ),
+    ),
+    { productCode: "RJ123457", outcome: "ok" },
+  );
 
   const original = {
     MIMIMILLI_DATA_DIR: directory.path,

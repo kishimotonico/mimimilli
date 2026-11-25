@@ -70,7 +70,7 @@ export function sampleWorkHtml(
   code: string,
   options?: {
     title?: string;
-    circle?: string | null;
+    circle?: string;
     genres?: string[];
     cover?: boolean;
     cvs?: string[] | false;
@@ -78,10 +78,7 @@ export function sampleWorkHtml(
   },
 ): string {
   const title = options?.title ?? "耳元ささやきの夜";
-  const circleBlock =
-    options?.circle === null
-      ? ""
-      : `<span class="maker_name"><a href="#">${options?.circle ?? "夜想曲"}</a></span>`;
+  const circleBlock = `<span class="maker_name"><a href="#">${options?.circle ?? "夜想曲"}</a></span>`;
   const genres = options?.genres ?? ["耳かき", "バイノーラル"];
   const genreLinks = genres
     .map((genre) => `<a href="/maniax/fs/=/genre/123/from/work.genre">${genre}</a>`)
@@ -92,10 +89,7 @@ export function sampleWorkHtml(
       : `<tr><th>声優</th><td>${(options?.cvs ?? ["水瀬なずな"])
           .map((name) => `<a href="#">${name}</a>`)
           .join(" / ")}</td></tr>`;
-  const ageRatingBlock =
-    options?.ageRating === undefined || options.ageRating === null
-      ? ""
-      : `<tr><th>年齢指定</th><td><div class="work_genre"><span>${options.ageRating}</span></div></td></tr>`;
+  const ageRatingBlock = `<tr><th>年齢指定</th><td><div class="work_genre"><span>${options?.ageRating ?? ""}</span></div></td></tr>`;
   const coverBlock =
     options?.cover === false
       ? ""

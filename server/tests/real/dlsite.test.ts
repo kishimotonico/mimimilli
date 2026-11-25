@@ -149,25 +149,43 @@ test("parseDlsiteHtml: 新旧どちらの構造か判別できないHTMLはparse
   });
 });
 
-test("parseDlsiteHtml: サークルもカバーも取れないHTMLはparse_error", () => {
-  const legacy = parseDlsiteHtml(
-    '<html><body><h1 id="work_name">タイトル</h1><div class="main_genre"></div></body></html>',
-    "RJ000004",
-  );
-  const vue = parseDlsiteHtml(
-    '<html><body><h1 id="work_name">タイトル</h1><dl class="c-productInfo__gridContext"></dl></body></html>',
-    "RJ000005",
-  );
-  assert.deepEqual(legacy, {
-    ok: false,
-    kind: "parse_error",
-    message: "DLsite作品ページからサークルとカバーを取得できませんでした（RJ000004）",
-  });
-  assert.equal(vue.ok, false);
-  assert.equal(
-    !vue.ok && vue.message,
-    "DLsite作品ページからサークルとカバーを取得できませんでした（RJ000005）",
-  );
+test("parseDlsiteHtml: サークルが取れないHTMLはparse_error（新旧どちらの構造でも）", () => {
+  const withoutCircle = {
+    legacy: SAMPLE_HTML.replace(/<span class="maker_name">.*?<\/span>/, ""),
+    vue: VUE_HTML.replace(/<a [^>]*c-productInfo__makerName[^>]*>.*?<\/a>/, ""),
+  };
+  for (const [name, html] of Object.entries(withoutCircle)) {
+    assert.deepEqual(
+      parseDlsiteHtml(html, "RJ000004"),
+      {
+        ok: false,
+        kind: "parse_error",
+        message: "DLsite作品ページからサークルを取得できませんでした（RJ000004）",
+      },
+      name,
+    );
+  }
+});
+
+test("parseDlsiteHtml: 年齢指定の行が無いHTMLはparse_error（新旧どちらの構造でも）", () => {
+  const withoutAgeRow = {
+    legacy: SAMPLE_HTML.replace(/<tr><th>年齢指定<\/th>.*?<\/tr>/, ""),
+    vue: VUE_HTML.replace(
+      /<div class="c-productInfo__item"><dt class="c-productInfo__key">年齢指定<\/dt>.*?<\/dd><\/div>/,
+      "",
+    ),
+  };
+  for (const [name, html] of Object.entries(withoutAgeRow)) {
+    assert.deepEqual(
+      parseDlsiteHtml(html, "RJ000005"),
+      {
+        ok: false,
+        kind: "parse_error",
+        message: "DLsite作品ページに年齢指定の行がありませんでした（RJ000005）",
+      },
+      name,
+    );
+  }
 });
 
 test("parseDlsiteHtml: タイトルが空のHTMLはparse_error", () => {
@@ -228,17 +246,14 @@ test("parseDlsiteHtml: 年齢指定のR-15・R18・18禁を正規化する", () 
   if (adult.ok) assert.equal(adult.info.ageRating, "R18");
 });
 
-test("parseDlsiteHtml: 年齢指定が無い・未知の表記はnullでparse_errorにしない", () => {
-  const missing = parseDlsiteHtml(
-    '<html><body><h1 id="work_name">タイトル</h1><span class="maker_name"><a href="#">サークル</a></span></body></html>',
-    "RJ000020",
-  );
-  assert.equal(missing.ok, true);
-  if (missing.ok) assert.equal(missing.info.ageRating, null);
+test("parseDlsiteHtml: 年齢指定の行はあるが表記が未知ならnullでparse_errorにしない", () => {
+  const legacy = parseDlsiteHtml(htmlWithAgeRating("指定なし"), "RJ000021");
+  assert.equal(legacy.ok, true);
+  if (legacy.ok) assert.equal(legacy.info.ageRating, null);
 
-  const unknown = parseDlsiteHtml(htmlWithAgeRating("指定なし"), "RJ000021");
-  assert.equal(unknown.ok, true);
-  if (unknown.ok) assert.equal(unknown.info.ageRating, null);
+  const vue = parseDlsiteHtml(VUE_HTML.replace("全年齢", "指定なし"), "RJ000022");
+  assert.equal(vue.ok, true);
+  if (vue.ok) assert.equal(vue.info.ageRating, null);
 });
 
 test("listDlsiteMissingFields: 任意フィールドの欠落を検出する", () => {
@@ -286,7 +301,7 @@ test("DLsite: パース成功時の欠落フィールドをwarnイベントと�
         ...mockDlsiteTransport({
           html: () =>
             htmlResponse(
-              '<html><body><h1 id="work_name">タイトルのみ</h1><div class="product-slider-data"><div data-src="//img.dlsite.jp/modpub/images2/work/doujin/RJ900000/RJ900002_img_main.jpg"></div></div></body></html>',
+              '<html><body><h1 id="work_name">タイトルのみ</h1><span class="maker_name"><a href="#">サークル</a></span><table><tr><th>年齢指定</th><td></td></tr></table></body></html>',
             ),
         }),
       },
@@ -298,7 +313,7 @@ test("DLsite: パース成功時の欠落フィールドをwarnイベントと�
   assert.equal(result.ok, true);
   const missing = logs.filter((event) => event.event === "dlsite_parse_fields_missing");
   assert.equal(missing.length, 1);
-  assert.deepEqual(missing[0]?.missingFields, ["circle", "cvs", "genreTags", "ageRating"]);
+  assert.deepEqual(missing[0]?.missingFields, ["cvs", "genreTags", "ageRating", "coverUrl"]);
   assert.equal(missing[0]?.productCode, "RJ900002");
 });
 
