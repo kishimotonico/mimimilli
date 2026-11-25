@@ -25,7 +25,7 @@ import {
 import { runDlsiteCacheCli } from "../../src/dlsiteCacheCli.ts";
 import { makeTestDirectory, makeTestScope } from "../helpers/sampleLibrary.ts";
 
-const VALID_HTML = '<html><h1 id="work_name">テスト作品</h1></html>';
+const VALID_HTML = "<h1 id=work_name>T</h1><span class=maker_name><a>A</a></span>";
 
 function createCache(t: { after: (callback: () => void) => void }, now = 1_000) {
   const directory = makeTestDirectory("dlsite-cache");
@@ -492,7 +492,7 @@ test("DLsiteキャッシュCLI: ディレクトリを一括importし、成功・
 test("DLsiteキャッシュCLI: export --dir と import --dir の往復で全件を復元する", (t) => {
   const directory = makeTestDirectory("dlsite-cache-cli-export-dir");
   t.after(directory.cleanup);
-  const largeHtml = `<html><h1 id="work_name">大きい作品</h1><!--${"a".repeat(65536)}--></html>`;
+  const largeHtml = `<html><h1 id="work_name">大きい作品</h1><span class="maker_name"><a href="#">サークル</a></span><!--${"a".repeat(65536)}--></html>`;
   const sourceDir = join(directory.path, "source");
   mkdirSync(sourceDir);
   writeFileSync(join(sourceDir, "RJ123456.html"), VALID_HTML);
