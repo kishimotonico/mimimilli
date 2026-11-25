@@ -1,9 +1,10 @@
 ---
 id: TASK-524
 title: DLsite作品ページの新旧どちらの構造からも作品情報を読み取り、読み取れないときは解析失敗にする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-25 17:40'
+updated_date: '2026-11-25 19:30'
 labels:
   - dlsite
   - bug
@@ -21,10 +22,16 @@ DLsiteの作品ページが新しい構造（Vue。th に data-v-* 属性、div.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 旧構造のHTMLから、現行と同じ title・circle・cvs・genreTags・ageRating・coverUrl を取り出せる（既存のパーサーテストが通る）
-- [ ] #2 新構造のHTMLから title・circle・cvs・genreTags・ageRating・coverUrl を取り出せる。実ページから必要部分を切り出したフィクスチャでテストする
-- [ ] #3 構造を判定してから構造ごとに抽出し、新旧の値が混ざらない
-- [ ] #4 どちらの構造とも判定できないとき、またはサークルとカバーがどちらも取れないときは parse_error を返し、理由がわかるメッセージを持つ
-- [ ] #5 DLSITE_PARSER_VERSION を上げ、旧版で解析したキャッシュが追加・適用で使われず、取り直しで新しい解析結果になる
-- [ ] #6 docs/dlsite.md の解析の記述を現在の仕様に書き換える
+- [x] #1 旧構造のHTMLから、現行と同じ title・circle・cvs・genreTags・ageRating・coverUrl を取り出せる（既存のパーサーテストが通る）
+- [x] #2 新構造のHTMLから title・circle・cvs・genreTags・ageRating・coverUrl を取り出せる。実ページから必要部分を切り出したフィクスチャでテストする
+- [x] #3 構造を判定してから構造ごとに抽出し、新旧の値が混ざらない
+- [x] #4 DLSITE_PARSER_VERSION を上げ、旧版で解析したキャッシュが追加・適用で使われず、取り直しで新しい解析結果になる
+- [x] #5 docs/dlsite.md の解析の記述を現在の仕様に書き換える
+- [x] #6 タイトルが取れない、構造を判別できない、サークルが取れない、判定した構造に年齢指定の行が無い、のいずれかで parse_error を返し、理由がわかるメッセージを持つ。年齢指定の表記が未知なら null で成功とする
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+parseDlsiteHtml を構造判定（旧・新・判別不能）と構造ごとの抽出に分け、新構造（Vue）のサークル・声優・年齢指定・ジャンルを productInfo の行から、カバーを og:image から取るようにした。タイトル・構造・サークル・年齢指定の行が欠けたら parse_error。DLSITE_PARSER_VERSION=2。実ページ5件で全項目取得を確認、pnpm check/test 通過、Opus・Fable レビュー済み。登録済み作品の一括再適用は DRAFT-86。
+<!-- SECTION:FINAL_SUMMARY:END -->
