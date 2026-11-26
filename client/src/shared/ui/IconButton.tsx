@@ -43,6 +43,8 @@ export interface IconButtonProps extends Omit<
   variant?: IconButtonVariant;
   /** 有効時の文字色。`muted` は ink-2（hoverで ink-0）、`faint` は ink-3（hover/focusで ink-1）、`danger` は hoverで赤 */
   tone?: IconButtonTone;
+  /** フォーカスは残し、ボタンの実行だけを無効にする */
+  softDisabled?: boolean;
   ref?: Ref<HTMLButtonElement>;
 }
 
@@ -55,12 +57,16 @@ export default function IconButton({
   variant = "default",
   tone = "default",
   disabled = false,
+  softDisabled = false,
+  onClick,
+  onKeyDownCapture,
+  "aria-disabled": ariaDisabled,
   className,
   ref,
   type = "button",
   ...rest
 }: IconButtonProps) {
-  const stateClass = disabled
+  const stateClass = disabled || softDisabled
     ? "cursor-not-allowed text-ink-4"
     : active
       ? "text-acc-ink bg-acc-soft"
@@ -83,6 +89,20 @@ export default function IconButton({
         className,
       )}
       {...rest}
+      aria-disabled={softDisabled || ariaDisabled}
+      onClick={softDisabled ? (event) => event.preventDefault() : onClick}
+      onKeyDownCapture={
+        softDisabled
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                event.stopPropagation();
+              } else {
+                onKeyDownCapture?.(event);
+              }
+            }
+          : onKeyDownCapture
+      }
     >
       <Icon size={ICON_PX[size]} />
     </button>
