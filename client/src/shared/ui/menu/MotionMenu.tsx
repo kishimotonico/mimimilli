@@ -1,7 +1,7 @@
 import {
   createContext,
   useContext,
-  useEffect,
+  useCallback,
   useRef,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
@@ -10,17 +10,19 @@ import {
 import { Menu, useMenu, type UseMenuProps, type UseMenuReturn } from "@ark-ui/react/menu";
 import { Portal } from "@ark-ui/react/portal";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
+import { ignoreComposingKey, isComposingKey } from "../layer/keys";
+import { layerContainer } from "../layer/layerContainer";
+import { useCloseOnAnchorScroll } from "../layer/useCloseOnAnchorScroll";
+import { usePresenceLifetime } from "../layer/usePresenceLifetime";
 import { useMotionVariants } from "../useMotionVariants";
 import { menuPanelClass } from "./menuStyles";
-import { usePresenceLifetime } from "./usePresenceLifetime";
 
 const ExitCompleteContext = createContext<(() => void) | null>(null);
 /** フォーカスをトリガーへ戻さずにメニューを閉じる。別の層を開く項目（MenuLayerItem）が使う */
 export const CloseWithoutRestoreContext = createContext<(() => void) | null>(null);
 
-function isComposingKey(event: KeyboardEvent | ReactKeyboardEvent): boolean {
-  const native = "nativeEvent" in event ? event.nativeEvent : event;
-  return native.isComposing || native.keyCode === 229;
+function getMenuTrigger(contentId: string): Element | null {
+  return document.querySelector(`[aria-controls="${CSS.escape(contentId)}"]`);
 }
 
 /**
@@ -131,21 +133,12 @@ export function useMotionMenu(props: MotionMenuProps = {}) {
   serviceRef.current = menu.service;
   const lifetime = usePresenceLifetime(menu.api.open);
 
-  // トリガーを含む領域がスクロールしたら閉じる（アンカーが見えなくなったメニューを残さない）。フォーカスはトリガーへ戻る
-  const open = menu.api.open;
+  // スクロールで閉じるときもフォーカスはトリガーへ戻す
   const contentId = menu.api.getContentProps().id ?? "";
-  useEffect(() => {
-    if (!open) return;
-    const handleScroll = (event: Event) => {
-      const trigger = document.querySelector(`[aria-controls="${CSS.escape(contentId)}"]`);
-      const target = event.target;
-      if (trigger && target instanceof Node && target.contains(trigger)) {
-        serviceRef.current?.send({ type: "CLOSE" });
-      }
-    };
-    document.addEventListener("scroll", handleScroll, true);
-    return () => document.removeEventListener("scroll", handleScroll, true);
-  }, [open, contentId]);
+  const getAnchor = useCallback(() => getMenuTrigger(contentId), [contentId]);
+  const closeOnScroll = useCallback(() => serviceRef.current?.send({ type: "CLOSE" }), []);
+  useCloseOnAnchorScroll(menu.api.open, getAnchor, closeOnScroll);
+
   /** トリガーへ展開する。キーボードで開いたかどうかを覚え、disabled のときは開かせない */
   const triggerProps = {
     // data-disabled は Ark UI がポインター操作を無視する印。キーボードは defaultPrevented を見る
@@ -195,11 +188,6 @@ interface MenuPopupProps {
   children: ReactNode;
 }
 
-/** IME の変換中のキーは、項目の実行にも移動にも使わない */
-function ignoreComposingKey(event: ReactKeyboardEvent) {
-  if (isComposingKey(event)) event.stopPropagation();
-}
-
 /** AnimatePresence の直接の子。退出中は inert にして、中身を操作できないようにする */
 function Popup({
   container,
@@ -229,14 +217,6 @@ function Popup({
   );
 }
 
-/** ネイティブ dialog の中のトリガーから開いたメニューは、その dialog の中へ出す（top layer の外では見えないため） */
-function dialogOf(api: UseMenuReturn["api"]): HTMLDialogElement | null {
-  const trigger = document.querySelector(
-    `[aria-controls="${CSS.escape(api.getContentProps().id ?? "")}"]`,
-  );
-  return trigger?.closest("dialog") ?? null;
-}
-
 /** MotionMenuRoot の中に置く。開閉は Ark UI の状態、出入りの表示は AnimatePresence */
 export function MenuPopup(props: MenuPopupProps) {
   const onExitComplete = useContext(ExitCompleteContext);
@@ -244,7 +224,13 @@ export function MenuPopup(props: MenuPopupProps) {
     <Menu.Context>
       {(api) => (
         <AnimatePresence onExitComplete={onExitComplete ?? undefined}>
-          {api.open && <Popup key="popup" container={{ current: dialogOf(api) }} {...props} />}
+          {api.open && (
+            <Popup
+              key="popup"
+              container={{ current: layerContainer(getMenuTrigger(api.getContentProps().id ?? "")) }}
+              {...props}
+            />
+          )}
         </AnimatePresence>
       )}
     </Menu.Context>

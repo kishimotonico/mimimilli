@@ -5,7 +5,7 @@ import { resolveFocusReturnTarget } from "../lib/focusReturnTarget";
 import { getTabbableElements } from "./focusable";
 import { openModalDialogsAtom } from "../model/openModalDialogsAtom";
 
-const OPEN_MENU_SELECTOR = '[role="menu"]:not([inert])';
+import { OPEN_LAYER_SELECTOR } from "./layer/layerContainer";
 
 interface UseDialogModalOptions {
   /**
@@ -26,7 +26,7 @@ interface UseDialogModalOptions {
 export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptions) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const setOpenDialogs = useSetAtom(openModalDialogsAtom);
-  const pressedBackdropWithMenuOpen = useRef(false);
+  const pressedBackdropWithLayerOpen = useRef(false);
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
@@ -61,11 +61,11 @@ export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptio
     };
     dialog.addEventListener("keydown", handleTabKeyDown);
 
-    // Ark UI のメニューは、マウスでは pointerdown の次フレーム、タッチでは click で閉じる。
+    // Ark UI の層は、マウスでは pointerdown の次フレーム、タッチでは click で閉じる。
     // click の時点では開いていたか分からないので、押した時点で開いていたかを覚える
     const handlePointerDown = (event: PointerEvent) => {
-      pressedBackdropWithMenuOpen.current =
-        event.target === dialog && dialog.querySelector(OPEN_MENU_SELECTOR) !== null;
+      pressedBackdropWithLayerOpen.current =
+        event.target === dialog && dialog.querySelector(OPEN_LAYER_SELECTOR) !== null;
     };
     dialog.addEventListener("pointerdown", handlePointerDown, true);
 
@@ -95,15 +95,15 @@ export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptio
    * <dialog> のbackdropクリックは e.target === dialog自身として届く
    * （dialog は幅がcontentにfitするため、backdrop領域のクリックはdialog要素にヒットする）。
    * shouldClose で保存中などの条件を差し込める（省略時は常に閉じる）。
-   * メニューを開いたまま押した backdrop は、メニューだけを閉じて dialog は閉じない。
+   * 層を開いたまま押した backdrop は、層だけを閉じて dialog は閉じない。
    */
   const handleBackdropClick = (
     event: ReactMouseEvent<HTMLDialogElement>,
     shouldClose: () => boolean = () => true,
   ) => {
     if (event.target !== dialogRef.current) return;
-    if (pressedBackdropWithMenuOpen.current) {
-      pressedBackdropWithMenuOpen.current = false;
+    if (pressedBackdropWithLayerOpen.current) {
+      pressedBackdropWithLayerOpen.current = false;
       return;
     }
     if (shouldClose()) onClose();
