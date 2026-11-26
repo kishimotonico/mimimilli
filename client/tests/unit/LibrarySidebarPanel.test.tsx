@@ -171,7 +171,7 @@ describe("LibrarySidebarPanel", () => {
     fireEvent.pointerEnter(screen.getByRole("button", { name: "CV別" }));
 
     await waitFor(() => {
-      expect(document.querySelector(".mll-qoverlay")).toBeInTheDocument();
+      expect(screen.getByLabelText("CVを検索")).toHaveFocus();
     });
   });
 
@@ -207,8 +207,9 @@ describe("LibrarySidebarPanel", () => {
     });
     renderSidebar({});
 
-    // ArrowRight で遅延なしに開く（openImmediately）。
-    fireEvent.keyDown(screen.getByRole("button", { name: "CV別" }), { key: "ArrowRight" });
+    const trigger = screen.getByRole("button", { name: "CV別" });
+    act(() => trigger.focus());
+    fireEvent.keyDown(trigger, { key: "ArrowRight" });
 
     // 読み込み完了で「CVがありません」（空表示）が出ないこと（＝1件の値が一覧に載っている）
     // を、一覧本体（role="group"）の出現で確認する。
@@ -216,9 +217,10 @@ describe("LibrarySidebarPanel", () => {
       expect(document.querySelector('.mll-qlist__body[role="group"]')).toBeInTheDocument();
     });
 
-    // Escape で閉じる（コーディネーターの close() は遅延なし。閉鎖直後もAnimatePresenceが
-    // 退出アニメーション完了まで内容を保持するため、この時点ではDOMから消えていない）。
-    fireEvent.keyDown(screen.getByLabelText("CVを検索"), { key: "Escape" });
+    // Ark の Esc で閉じた直後も、退出アニメーションが一覧を保持する。
+    await waitFor(() => expect(screen.getByLabelText("CVを検索")).toHaveFocus());
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(trigger).toHaveAttribute("aria-expanded", "false"));
 
     // クエリが無効化されて空扱いになっていれば「CVがありません」に切り替わる。
     // 退出中も一覧本体が保持されたままであることを確認する。
@@ -232,7 +234,7 @@ describe("LibrarySidebarPanel", () => {
 
     fireEvent.keyDown(screen.getByRole("button", { name: "CV別" }), { key: "ArrowRight" });
     await waitFor(() => {
-      expect(screen.getByLabelText("CVを検索")).toBeInTheDocument();
+      expect(screen.getByLabelText("CVを検索")).toHaveFocus();
     });
 
     // 退出アニメーション完了を待たず、別のグループ分けへ即座に切り替える（openImmediately）。
@@ -242,7 +244,10 @@ describe("LibrarySidebarPanel", () => {
       expect(document.activeElement).toBe(screen.getByLabelText("追加年を検索"));
     });
     // 新パネルが開いたまま維持されている（閉じていない）。
-    expect(screen.getByLabelText("追加年を検索")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "追加年別" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
   });
 
   it("クイックオーバーレイの値は主クリックもCtrl+クリックもその値の作品一覧（onOpenGroupValue）へ進む", async () => {

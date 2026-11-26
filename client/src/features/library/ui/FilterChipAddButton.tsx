@@ -41,14 +41,12 @@ function GroupValueStage({
   scope,
   selectedTags,
   onSelect,
-  close,
 }: {
   groupBy: GroupBy;
   groupByLabel: string;
   scope: GroupValueScope;
   selectedTags: NormalizedTag[];
   onSelect: (tag: NormalizedTag) => void;
-  close: () => void;
 }) {
   const [sort, setSort] = useState(() => defaultGroupSort(groupBy));
   // いまの絞り込みにこの値を追加した場合の件数を出す。
@@ -58,7 +56,6 @@ function GroupValueStage({
     <GroupValueQuickList
       groupBy={groupBy}
       groupByLabel={groupByLabel}
-      isOpen
       items={values.data ?? []}
       sort={sort}
       onSortChange={setSort}
@@ -66,7 +63,6 @@ function GroupValueStage({
       isError={values.isError}
       isSelected={(value) => selectedTags.includes(buildFilterTag(groupBy, value))}
       onSelect={(item) => onSelect(buildFilterTag(groupBy, item.value))}
-      close={close}
     />
   );
 }
@@ -93,7 +89,10 @@ export default function FilterChipAddButton({
     initialFocusEl: () =>
       stageRef.current?.querySelector<HTMLElement>("input, [data-group-by-key]") ?? null,
     onEscapeKeyDown: (event) => {
-      if (pickedGroupBy !== null) event.preventDefault();
+      if (pickedGroupBy !== null) {
+        event.preventDefault();
+        backOrClose();
+      }
     },
   });
 
@@ -156,7 +155,6 @@ export default function FilterChipAddButton({
                 popover.closeAndReturn();
                 onAddValue(tag);
               }}
-              close={backOrClose}
             />
           )}
         </motion.div>

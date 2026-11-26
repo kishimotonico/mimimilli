@@ -271,8 +271,8 @@ export function useHoverGroupCoordinator(
   };
 
   // 毎レンダー作り直される処理を、依存配列を持たない effect からも最新の実体で呼ぶための参照
-  const latestRef = useRef({ handleTriggerEnter, close, clearTimers });
-  latestRef.current = { handleTriggerEnter, close, clearTimers };
+  const latestRef = useRef({ handleTriggerEnter, clearTimers });
+  latestRef.current = { handleTriggerEnter, clearTimers };
 
   useEffect(() => {
     return () => latestRef.current.clearTimers();
@@ -288,22 +288,6 @@ export function useHoverGroupCoordinator(
     document.addEventListener("pointermove", handleFirstPointerMove);
     return () => document.removeEventListener("pointermove", handleFirstPointerMove);
   }, []);
-
-  // トリガー・パネルの外への pointerdown はタイマーを待たず即座に閉じる
-  // （他のポップオーバー群のoutsidePress相当。usePopoverDismissal.ts参照）。
-  useEffect(() => {
-    if (!openState) return;
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      const panelEl = panelElRef.current;
-      const anchorEl = openStateRef.current?.anchorEl;
-      if (panelEl?.contains(target) || anchorEl?.contains(target)) return;
-      latestRef.current.close();
-    };
-    document.addEventListener("pointerdown", handlePointerDown, true);
-    return () => document.removeEventListener("pointerdown", handlePointerDown, true);
-  }, [openState]);
 
   return {
     openKey: openState?.key ?? null,

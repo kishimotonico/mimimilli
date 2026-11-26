@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { AnimatePresence } from "motion/react";
+import { useId, useRef, useState } from "react";
 import { ALL_SMART_FOLDER_ID } from "@mimimilli/shared";
 import Breadcrumbs from "../../../shared/ui/Breadcrumbs";
 import { getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
@@ -16,6 +15,8 @@ export default function LibraryBreadcrumbs() {
   const view = nav.foldersStatus === "ready" ? nav.view : null;
   const { tagPrefixes } = useTagPrefixes();
   const [siblingAnchor, setSiblingAnchor] = useState<HTMLElement | null>(null);
+  const triggerId = useId();
+  const crumbsRef = useRef<HTMLElement | null>(null);
   const group = view?.kind === "works" ? view.group : null;
   const groupBy = view?.kind === "works" ? view.groupBy : null;
   const groupSort = view?.kind === "works" ? view.groupSort : null;
@@ -27,25 +28,43 @@ export default function LibraryBreadcrumbs() {
         onNavigate={(index, anchor) => {
           if (index === 0) nav.openFolder(ALL_SMART_FOLDER_ID);
           else if (index === 1) nav.backToValueList();
-          else if (group !== null) setSiblingAnchor(anchor);
+          else if (group !== null) {
+            anchor.id = triggerId;
+            crumbsRef.current = anchor.closest(".mle-crumbs");
+            setSiblingAnchor((current) => (current === anchor ? null : anchor));
+          }
         }}
       />
-      <AnimatePresence>
-        {view && siblingAnchor && group !== null && groupBy !== null && groupSort !== null && (
-          <GroupValuePopover
-            key={`siblings:${view.folder.id}:${groupSort}`}
-            placement="below"
-            scope={{ folderId: view.folder.id, tags: view.selectedTags, q: view.q }}
-            groupBy={groupBy}
-            groupSort={groupSort}
-            groupByLabel={getGroupByLabel(groupBy, tagPrefixes)}
-            anchorEl={siblingAnchor}
-            selectedValue={group}
-            onSelectValue={nav.selectGroupValue}
-            onClose={() => setSiblingAnchor(null)}
-          />
-        )}
-      </AnimatePresence>
+      {view && (
+        <GroupValuePopover
+          placement="below"
+          open={siblingAnchor !== null}
+          triggerId={triggerId}
+          anchorEl={siblingAnchor}
+          list={
+            groupBy !== null && groupSort !== null
+              ? {
+                  scope: { folderId: view.folder.id, tags: view.selectedTags, q: view.q },
+                  groupBy,
+                  groupSort,
+                  groupByLabel: getGroupByLabel(groupBy, tagPrefixes),
+                  selectedValue: group,
+                  onSelectValue: nav.selectGroupValue,
+                }
+              : null
+          }
+          onClose={() => setSiblingAnchor((current) => (current === siblingAnchor ? null : current))}
+          onReturnTargetLost={() => {
+            const valueButton = crumbsRef.current?.querySelector<HTMLButtonElement>(
+              "button.mle-crumbs__seg.is-last",
+            );
+            if (valueButton) {
+              valueButton.id = triggerId;
+              valueButton.focus({ preventScroll: true });
+            }
+          }}
+        />
+      )}
     </>
   );
 }

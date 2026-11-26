@@ -1,96 +1,117 @@
-import { createPortal } from "react-dom";
-import { useIsPresent } from "motion/react";
-import type { GroupBy, GroupSortId, GroupValueItem } from "@mimimilli/shared";
-import { useAnchoredPopover } from "../../../shared/ui/useAnchoredPopover";
+import { useRef, useState } from "react";
+import type { GroupBy, GroupSortId } from "@mimimilli/shared";
+import {
+  MotionPopoverRoot,
+  PopoverPopup,
+  useMotionPopover,
+} from "../../../shared/ui/popover/MotionPopover";
 import type { HoverGroupPanelHandlers } from "../../../shared/lib/useHoverGroupCoordinator";
-import type { GroupValueScope } from "../model/useGroupValuesQuery";
-import GroupValuePopoverPanel, { GROUP_VALUE_PLACEMENTS } from "./GroupValuePopoverPanel";
+import { useGroupValuesQuery, type GroupValueScope } from "../model/useGroupValuesQuery";
+import GroupValueQuickList from "./GroupValueQuickList";
 
-// アンカーの横または下にグループの値の一覧を出す。サイドバーの列は overflow でクリップされるため、
-// document.body へポータルして位置決めを useAnchoredPopover に任せる。
-// right: サイドバーのグループ分けの行のクイックオーバーレイ（ADR-0012 §7・ADR-0041）。サイドバーは
-// 画面左端に固定なので、右に余白が無いケースは実質発生せず、左右の反転フォールバックは設けない。
-// below: パンくずの値から開く、同じグループ分けの兄弟の値のドロップダウン。
-//
-// 呼び出し側は AnimatePresence の子としてマウントする。退出アニメーション中もこのインスタンスは
-// マウントされ続けるため、groupBy / anchorEl は凍結した最後の props のまま渡り、クエリも
-// 常に有効な groupBy で購読され続ける。
-
-interface GroupValuePopoverProps {
-  placement: keyof typeof GROUP_VALUE_PLACEMENTS;
-  /** 値と件数を数える母集団 */
+interface GroupValueListProps {
   scope: GroupValueScope;
   groupBy: GroupBy;
   groupByLabel: string;
-  /** そのフォルダーの保存済みの値の並び。開いている間だけ列見出しで変えられる */
   groupSort: GroupSortId;
-  anchorEl: HTMLElement | null;
-  /** 選択中の値（チェック表示） */
   selectedValue: string | null;
-  /** 値を選ぶ。選んだあと一覧は閉じる */
   onSelectValue: (value: string) => void;
-  /** 行の＋ボタン。渡したときだけ出る */
   onAddValue?: (value: string) => void;
-  onClose: () => void;
-  /** ホバーで開くときの、一覧自体へのホバー・フォーカスの扱い */
-  panelHandlers?: HoverGroupPanelHandlers;
-  onPanelElChange?: (el: HTMLElement | null) => void;
 }
 
-export default function GroupValuePopover({
-  placement,
+interface GroupValuePopoverProps {
+  placement: "right" | "below";
+  open: boolean;
+  triggerId: string;
+  anchorEl: HTMLElement | null;
+  restoreFocus?: boolean;
+  list: GroupValueListProps | null;
+  onClose: () => void;
+  panelHandlers?: HoverGroupPanelHandlers;
+  onPanelElChange?: (el: HTMLElement | null) => void;
+  onReturnTargetLost?: () => void;
+}
+
+function GroupValueList({
   scope,
   groupBy,
   groupByLabel,
   groupSort,
-  anchorEl,
   selectedValue,
   onSelectValue,
   onAddValue,
+}: GroupValueListProps) {
+  const [sort, setSort] = useState(groupSort);
+  const values = useGroupValuesQuery(groupBy, scope, sort);
+  return (
+    <GroupValueQuickList
+      groupBy={groupBy}
+      groupByLabel={groupByLabel}
+      items={values.data ?? []}
+      sort={sort}
+      onSortChange={setSort}
+      isLoading={values.isLoading}
+      isError={values.isError}
+      isSelected={(value) => value === selectedValue}
+      onSelect={(item) => onSelectValue(item.value)}
+      onAdd={onAddValue && ((item) => onAddValue(item.value))}
+    />
+  );
+}
+
+export default function GroupValuePopover({
+  placement,
+  open,
+  triggerId,
+  anchorEl,
+  restoreFocus,
+  list,
   onClose,
   panelHandlers,
   onPanelElChange,
+  onReturnTargetLost,
 }: GroupValuePopoverProps) {
-  const isPresent = useIsPresent();
-  const { width } = GROUP_VALUE_PLACEMENTS[placement];
-  const { setFloating, floatingStyles, close } = useAnchoredPopover({
-    isOpen: isPresent,
-    preferredWidth: width,
-    onClose: () => onClose(),
-    getContainer: (el) => el.closest(".mle-app"),
-    placement,
-    referenceElement: anchorEl,
+  const panelRef = useRef<HTMLDivElement>(null);
+  const right = placement === "right";
+  const popover = useMotionPopover({
+    open,
+    ids: { trigger: triggerId },
+    restoreFocus,
+    positioning: {
+      placement: right ? "right-start" : "bottom-start",
+      flip: !right,
+      getAnchorRect: () => anchorEl?.getBoundingClientRect() ?? null,
+    },
+    initialFocusEl: () => panelRef.current?.querySelector("input") ?? null,
+    onOpenChange: ({ open: nextOpen }) => {
+      if (!nextOpen) onClose();
+    },
   });
 
-  const setPanelEl = (el: HTMLElement | null) => {
-    const cleanup = setFloating(el);
-    onPanelElChange?.(el);
-    return () => {
-      cleanup?.();
-      onPanelElChange?.(null);
-    };
-  };
-
-  if (!anchorEl) return null;
-
-  return createPortal(
-    <GroupValuePopoverPanel
-      groupBy={groupBy}
-      groupByLabel={groupByLabel}
-      scope={scope}
-      initialGroupSort={groupSort}
-      placement={placement}
-      setFloating={setPanelEl}
-      floatingStyles={floatingStyles}
-      panelHandlers={panelHandlers}
-      isSelected={(value) => value === selectedValue}
-      onSelect={(item: GroupValueItem) => {
-        onSelectValue(item.value);
-        close();
-      }}
-      onAdd={onAddValue && ((item) => onAddValue(item.value))}
-      close={close}
-    />,
-    document.body,
+  return (
+    <MotionPopoverRoot handle={popover}>
+      <PopoverPopup
+        ref={(el) => {
+          panelRef.current = el;
+          onPanelElChange?.(el);
+        }}
+        origin={right ? "left top" : "top left"}
+        className={right ? "w-[280px]" : "w-[240px]"}
+        aria-label={list?.groupByLabel}
+        {...panelHandlers}
+      >
+        {list && (
+          <GroupValueList
+            {...list}
+            onSelectValue={(value) => {
+              const returnTarget = popover.resolveReturnTarget();
+              popover.closeAndReturn();
+              list.onSelectValue(value);
+              if (!returnTarget?.isConnected) onReturnTargetLost?.();
+            }}
+          />
+        )}
+      </PopoverPopup>
+    </MotionPopoverRoot>
   );
 }

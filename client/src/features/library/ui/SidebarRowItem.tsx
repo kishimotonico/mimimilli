@@ -5,6 +5,7 @@ import type { SidebarRow } from "../model/sidebarRows";
 
 interface SidebarRowItemProps {
   row: SidebarRow;
+  id: string;
   isActive: boolean;
   isOverlayOpen: boolean;
   onSelect: () => void;
@@ -14,6 +15,7 @@ interface SidebarRowItemProps {
 
 export default function SidebarRowItem({
   row,
+  id,
   isActive,
   isOverlayOpen,
   onSelect,
@@ -34,6 +36,7 @@ export default function SidebarRowItem({
   return (
     <button
       ref={rowRef}
+      id={id}
       type="button"
       className={`mll-sbrow ${isActive ? "is-on" : ""}`}
       aria-current={isActive ? "true" : undefined}
