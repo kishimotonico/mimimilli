@@ -1,5 +1,6 @@
 import { createElement } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { describe, expect, it, vi } from "vitest";
 import type { Track, WorkSummary } from "../../src/entities/work/model";
@@ -107,28 +108,28 @@ describe("BarContent", () => {
     expect(onSwitchToPopup).not.toHaveBeenCalled();
   });
 
-  it("音量ポップオーバーは現在値を数値で表示する", () => {
+  it("音量ポップオーバーは現在値を数値で表示する", async () => {
     renderBar(0);
-    fireEvent.click(screen.getByRole("button", { name: "音量 75%" }));
+    await userEvent.click(screen.getByRole("button", { name: "音量 75%" }));
 
     expect(screen.getByText("75")).toBeInTheDocument();
   });
 
-  it("音量ボタンはデフォルトで単体表示され、クリックするとスライダーのポップオーバーが開く", () => {
+  it("音量ボタンはデフォルトで単体表示され、クリックするとスライダーのポップオーバーが開く", async () => {
     renderBar(0);
     const volumeButton = screen.getByRole("button", { name: "音量 75%" });
 
     expect(screen.queryByRole("slider", { name: "音量" })).toBeNull();
 
-    fireEvent.click(volumeButton);
+    await userEvent.click(volumeButton);
 
     expect(screen.getByRole("slider", { name: "音量" })).toBeInTheDocument();
   });
 
-  it("音量スライダーを操作すると onSetVolume が呼ばれる", () => {
+  it("音量スライダーを操作すると onSetVolume が呼ばれる", async () => {
     const { onSetVolume } = renderBar(0);
     const volumeButton = screen.getByRole("button", { name: "音量 75%" });
-    fireEvent.click(volumeButton);
+    await userEvent.click(volumeButton);
 
     const slider = screen.getByRole("slider", { name: "音量" });
     fireEvent.change(slider, { target: { value: "40" } });
@@ -136,14 +137,15 @@ describe("BarContent", () => {
     expect(onSetVolume).toHaveBeenCalledWith(40);
   });
 
-  it("Escapeキーで音量ポップオーバーを閉じる", () => {
+  it("Escapeキーで音量ポップオーバーを閉じる", async () => {
+    const user = userEvent.setup();
     renderBar(0);
     const volumeButton = screen.getByRole("button", { name: "音量 75%" });
-    fireEvent.click(volumeButton);
+    await user.click(volumeButton);
     expect(screen.getByRole("slider", { name: "音量" })).toBeInTheDocument();
 
-    fireEvent.keyDown(document, { key: "Escape" });
+    await user.keyboard("{Escape}");
 
-    expect(screen.queryByRole("slider", { name: "音量" })).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("slider", { name: "音量" })).toBeNull());
   });
 });
