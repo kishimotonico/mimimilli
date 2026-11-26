@@ -11,7 +11,6 @@ import WorksEmptyState from "./WorksEmptyState";
 import LoadMore from "./LoadMore";
 import { useVirtualList } from "../../../shared/ui/useVirtualList";
 import { useWorkResultsDismiss } from "./useWorkResultsDismiss";
-import { useFocusAfterSelectedWorkRemoved } from "./useFocusAfterSelectedWorkRemoved";
 import { useListKeyboardNav } from "../../../shared/ui/useListKeyboardNav";
 import { useRovingIndex } from "./useRovingIndex";
 import { useRevealSelectedWork } from "./useRevealSelectedWork";
@@ -66,7 +65,6 @@ export default function WorkListPane({
   });
 
   useWorkResultsDismiss(isWorkSelected, onDeselect, scrollRef, ".mll-wrow");
-  useFocusAfterSelectedWorkRemoved(works, selectedWorkId, scrollRef);
 
   const [listEl, setListEl] = useState<HTMLDivElement | null>(null);
   const setListContainer = useCallback(

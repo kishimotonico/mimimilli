@@ -11,7 +11,10 @@ interface SplitButtonProps {
   onClick: () => void;
   /** ▾のメニューの中身。`Menu.Item` などを置く */
   menu: ReactNode;
+  /** 無効。`disabled` 属性は付けず（押した後にフォーカスが落ちないよう）、見た目を無効にして押しても何もしない */
   disabled?: boolean;
+  /** 処理中。disabled と同じ扱い */
+  busy?: boolean;
   /** 主ボタンだけを無効にする。▾のメニューは使える */
   primaryDisabled?: boolean;
   variant?: ButtonVariant;
@@ -33,6 +36,7 @@ export default function SplitButton({
   onClick,
   menu,
   disabled = false,
+  busy = false,
   primaryDisabled = false,
   variant = "primary",
   size = "sm",
@@ -41,16 +45,20 @@ export default function SplitButton({
   className,
 }: SplitButtonProps) {
   const spec = PLACEMENT[placement];
+  const off = disabled || busy;
+  const primaryOff = off || primaryDisabled;
   const handle = useMotionMenu({ positioning: { placement: spec.placement, gutter: MENU_GUTTER } });
   return (
     <div className={cn("relative inline-flex", className)}>
       <MotionMenuRoot handle={handle}>
         <button
           type="button"
-          disabled={disabled || primaryDisabled}
-          onClick={onClick}
+          aria-disabled={primaryOff || undefined}
+          onClick={() => {
+            if (!primaryOff) onClick();
+          }}
           className={buttonClass(variant, size, {
-            disabled: disabled || primaryDisabled,
+            disabled: primaryOff,
             className: "flex-1 justify-center rounded-r-none pr-3",
           })}
         >
@@ -59,10 +67,10 @@ export default function SplitButton({
         <Menu.Trigger asChild>
           <button
             type="button"
-            disabled={disabled}
+            aria-disabled={off || undefined}
             aria-label={menuLabel}
             className={buttonClass(variant, size, {
-              disabled,
+              disabled: off,
               className: "ml-px rounded-l-none pr-[9px] pl-[7px]",
             })}
           >

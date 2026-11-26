@@ -21,7 +21,6 @@ import {
 } from "./workGrid/useWorkGridJustifiedLayout";
 import { useWorkGridWheelZoom } from "./workGrid/useWorkGridWheelZoom";
 import { useWorkResultsDismiss } from "./useWorkResultsDismiss";
-import { useFocusAfterSelectedWorkRemoved } from "./useFocusAfterSelectedWorkRemoved";
 import { useListKeyboardNav } from "../../../shared/ui/useListKeyboardNav";
 import { useRovingIndex } from "./useRovingIndex";
 import { useRevealSelectedWork } from "./useRevealSelectedWork";
@@ -98,7 +97,6 @@ export default function WorkGrid({
 
   useWorkGridWheelZoom(paneRef, safeTileSize, setTileSize);
   useWorkResultsDismiss(isWorkSelected, onDeselect, scrollRef, ".mll-grid-tile");
-  useFocusAfterSelectedWorkRemoved(works, selectedWorkId, scrollRef);
   const moveTileFocus = useListKeyboardNav({
     containerEl: gridEl,
     justifiedTiles: isJustified ? (justifiedLayout?.tiles ?? null) : null,

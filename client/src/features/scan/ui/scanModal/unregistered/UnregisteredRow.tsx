@@ -156,7 +156,7 @@ function UnregisteredRowView({
       <div role="cell" className="flex items-center justify-start">
         <RowMenu
           label={`「${title}」の操作`}
-          disabled={busy}
+          busy={busy}
           onOpenFolder={() => handlers.onOpenFolder(path)}
           onExclude={() => handlers.onExclude(path)}
         />

@@ -54,6 +54,7 @@ function WorkTile({
       type="button"
       className={`mll-grid-tile ${isSelected ? "is-on" : ""}`}
       data-flat-index={flatIndex}
+      data-work-id={work.id}
       tabIndex={tabIndex}
       aria-label={
         statusLabel

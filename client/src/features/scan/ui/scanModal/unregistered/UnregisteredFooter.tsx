@@ -111,7 +111,8 @@ export default function UnregisteredFooter({
           <SplitButton
             size="md"
             className="min-w-[200px]"
-            disabled={busy || selectedCount === 0}
+            disabled={selectedCount === 0}
+            busy={busy}
             primaryDisabled={rjCodeSaving || (plan.kind === "add" && !addable)}
             onClick={() => (plan.kind === "fetch" ? onFetch() : onRegister(REGISTER_APPLY_ALL))}
             menu={menu}

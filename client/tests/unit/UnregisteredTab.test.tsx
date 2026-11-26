@@ -1192,12 +1192,12 @@ describe("UnregisteredTab 追加", () => {
     fireEvent.click(addButton());
 
     await waitFor(() => expect(api.requestsTo("GET /api/scan/candidates")).toHaveLength(1));
-    expect(addButton()).toBeDisabled();
+    expect(addButton()).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByText(candidateA.inferredTitle)).toBeInTheDocument();
 
     releaseRefresh();
     await waitFor(() => expect(screen.queryByText(candidateA.inferredTitle)).toBeNull());
-    await waitFor(() => expect(addButton()).toBeEnabled());
+    await waitFor(() => expect(addButton()).not.toHaveAttribute("aria-disabled"));
   });
 
   it("追加リクエスト中にタブがアンマウントされても、候補が取り直されonRegisteredへ結果が届く", async () => {
@@ -1354,7 +1354,10 @@ describe("UnregisteredTab RJコード保存中の操作", () => {
 
     const other = await screen.findByTitle("クリックしてRJコードを編集");
     expect(other).toBeDisabled();
-    expect(screen.getByRole("button", { name: /DLsiteから取得|件を追加/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /DLsiteから取得|件を追加/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
     expect(screen.getByLabelText("すべて選択")).toBeEnabled();
     for (const checkbox of screen.getAllByRole("checkbox", { name: /を選択/ })) {
       expect(checkbox).toBeEnabled();
