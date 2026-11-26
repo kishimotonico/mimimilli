@@ -4,6 +4,7 @@ title: ネイティブdialogを閉じたあと、開いた元の要素が消え�
 status: To Do
 assignee: []
 created_date: '2026-11-26 03:14'
+updated_date: '2026-11-26 08:19'
 labels:
   - client
   - bug
@@ -25,3 +26,9 @@ UIプリミティブの置き換え（ADR-0043）でダイアログ・ポップ�
 - [ ] #2 復帰先が残っている場合は従来どおりその要素へ戻る
 - [ ] #3 復帰先が消えた場合のテストがある
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+複製ダイアログの『保存』で、dialog.close() の後の復帰とフォルダー遷移の再描画の間に約67ms BODY を経由する（TASK-529.1 の検証で観測）。このタスクで扱う
+<!-- SECTION:NOTES:END -->
