@@ -64,6 +64,7 @@ const DUR = {
   dockBarOpacity: 0.2,
   dockSwitch: 0.18,
   popoverScale: 0.18,
+  menuScale: 0.12,
   colstackWidth: 0.24,
   previewSlide: 0.22,
 } as const;
@@ -205,6 +206,27 @@ export function popoverScaleVariant(reduced: boolean, opts: PopoverScaleOptions)
   };
 }
 
+/** メニューの出入り。opacity と scale .96→1 を 0.12s */
+export function menuScaleVariant(reduced: boolean, opts: PopoverScaleOptions): MotionVariant {
+  const t = timing(reduced, DUR.menuScale, EASE_OUT);
+  const { origin } = opts;
+  return {
+    initial: { opacity: 0, scale: 0.96, transformOrigin: origin },
+    animate: {
+      opacity: 1,
+      scale: 1,
+      transformOrigin: origin,
+      transition: { opacity: t, scale: t },
+    },
+    exit: {
+      opacity: 0,
+      scale: 0.96,
+      transformOrigin: origin,
+      transition: { opacity: t, scale: t },
+    },
+  };
+}
+
 export interface ColstackWidthOptions {
   widthPx?: number;
 }
@@ -250,6 +272,7 @@ export function useMotionVariants() {
     dockBarSwitch: (opts?: WaitEnterOptions) => dockBarSwitchVariant(reduced, opts),
     dockPopupScale: (opts?: WaitEnterOptions) => dockPopupScaleVariant(reduced, opts),
     popoverScale: (opts: PopoverScaleOptions) => popoverScaleVariant(reduced, opts),
+    menuScale: (opts: PopoverScaleOptions) => menuScaleVariant(reduced, opts),
     colstackWidth: (opts?: ColstackWidthOptions) => colstackWidthVariant(reduced, opts),
     previewSlide: () => previewSlideVariant(reduced),
   };
