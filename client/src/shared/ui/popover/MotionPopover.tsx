@@ -171,7 +171,8 @@ export function useMotionPopover({
       onOpenChange({ open: false });
     },
     focusInitial() {
-      initialFocusEl?.()?.focus({ preventScroll: true });
+      const target = initialFocusEl?.();
+      if (target instanceof HTMLElement) target.focus({ preventScroll: true });
     },
   };
 }
