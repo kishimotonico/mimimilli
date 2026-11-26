@@ -67,6 +67,8 @@ describe("メニュー部品", () => {
     document.body.innerHTML = `
       <div id="mine" data-scope="menu" data-part="content"><div id="sub-trigger"></div></div>
       <div data-scope="menu" data-part="content" aria-labelledby="sub-trigger"><button id="in-sub"></button></div>
+      <div data-scope="menu" data-part="content" aria-labelledby="grand-trigger"><button id="in-grand"></button></div>
+      <div data-scope="menu" data-part="content" aria-labelledby="sub-trigger"><div id="grand-trigger"></div></div>
       <div id="other-trigger"></div>
       <div data-scope="menu" data-part="content" aria-labelledby="other-trigger"><button id="in-other"></button></div>
       <div id="ctx" data-scope="menu" data-part="context-trigger"><span id="in-ctx"></span></div>
@@ -74,6 +76,7 @@ describe("メニュー部品", () => {
       <button id="outside"></button>`;
     const inside = (id: string) => isInsideOwnMenuTree(document.getElementById(id), "mine", "ctx");
     expect(inside("in-sub")).toBe(true);
+    expect(inside("in-grand")).toBe(true);
     expect(inside("in-ctx")).toBe(true);
     expect(inside("in-other")).toBe(false);
     expect(inside("in-other-ctx")).toBe(false);

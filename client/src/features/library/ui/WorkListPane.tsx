@@ -65,7 +65,13 @@ export default function WorkListPane({
         : undefined,
   });
 
-  const listFocusable = useFocusListAfterReturn(works, isPending, virtualItems.length);
+  const listFocusable = useFocusListAfterReturn(
+    scrollRef,
+    works,
+    selectedWorkId,
+    isPending,
+    virtualItems.length,
+  );
   useWorkResultsDismiss(isWorkSelected, onDeselect, scrollRef, ".mll-wrow");
 
   const [listEl, setListEl] = useState<HTMLDivElement | null>(null);

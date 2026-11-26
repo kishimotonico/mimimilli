@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { act, cleanup, render } from "@testing-library/react";
 import { Provider, createStore } from "jotai";
 import type { WorkListItem } from "@mimimilli/shared";
@@ -10,9 +11,10 @@ afterEach(cleanup);
 const item = (id: string) => ({ id }) as WorkListItem;
 
 function List({ works }: { works: WorkListItem[] }) {
-  const focusable = useFocusListAfterReturn(works, false, works.length);
+  const ref = useRef<HTMLDivElement>(null);
+  const focusable = useFocusListAfterReturn(ref, works, null, false, works.length);
   return (
-    <div data-work-list tabIndex={works.length === 0 || focusable ? -1 : undefined}>
+    <div ref={ref} data-work-list tabIndex={works.length === 0 || focusable ? -1 : undefined}>
       {works.map((work, index) => (
         <button key={work.id} data-work-id={work.id} tabIndex={index === 0 ? 0 : -1}>
           {work.id}
@@ -43,7 +45,7 @@ function setup(works: WorkListItem[]) {
 describe("useFocusListAfterReturn", () => {
   it("解除した作品がまだ一覧にあるあいだはコンテナへ預け、無くなったら roving の行へ移して要求を消す", () => {
     const { store, rerender } = setup([item("a"), item("b")]);
-    act(() => store.set(listFocusRequestAtom, "a"));
+    act(() => store.set(listFocusRequestAtom, { removedId: "a", neighborId: "b" }));
     expect(document.activeElement).toBe(document.querySelector("[data-work-list]"));
 
     rerender([item("b")]);
@@ -55,7 +57,7 @@ describe("useFocusListAfterReturn", () => {
     const outside = document.createElement("button");
     document.body.append(outside);
     const { store, rerender } = setup([item("a"), item("b")]);
-    act(() => store.set(listFocusRequestAtom, "a"));
+    act(() => store.set(listFocusRequestAtom, { removedId: "a", neighborId: "b" }));
     outside.focus();
     rerender([item("b")]);
     expect(document.activeElement).toBe(outside);
@@ -64,8 +66,16 @@ describe("useFocusListAfterReturn", () => {
 
   it("一覧が空になったらコンテナに残る", () => {
     const { store, rerender } = setup([item("a")]);
-    act(() => store.set(listFocusRequestAtom, "a"));
+    act(() => store.set(listFocusRequestAtom, { removedId: "a", neighborId: "b" }));
     rerender([]);
     expect(document.activeElement).toBe(document.querySelector("[data-work-list]"));
+  });
+
+  it("失敗で要求が取り下げられたとき、預けたコンテナにフォーカスがあれば roving の行へ戻す", () => {
+    const { store } = setup([item("a"), item("b")]);
+    act(() => store.set(listFocusRequestAtom, { removedId: "a", neighborId: "b" }));
+    act(() => document.querySelector<HTMLElement>("[data-work-list]")?.focus());
+    act(() => store.set(listFocusRequestAtom, null));
+    expect(document.activeElement).toBe(document.querySelector('[data-work-id="a"]'));
   });
 });

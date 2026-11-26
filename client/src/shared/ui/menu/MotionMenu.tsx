@@ -30,11 +30,16 @@ export function isInsideOwnMenuTree(
   contextTriggerId: string | undefined,
 ): boolean {
   if (!(target instanceof Element)) return false;
-  const content = target.closest('[data-scope="menu"][data-part="content"]');
-  if (content) {
+  const own = document.getElementById(contentId);
+  // 移動先の中身のトリガーから親の中身へたどり、自分の中身に着くか（孫のサブメニューを含む）
+  let content = target.closest('[data-scope="menu"][data-part="content"]');
+  while (content) {
+    if (content === own) return true;
     const triggerId = content.getAttribute("aria-labelledby");
     const trigger = triggerId ? document.getElementById(triggerId) : null;
-    return trigger !== null && document.getElementById(contentId)?.contains(trigger) === true;
+    if (!trigger) return false;
+    if (own?.contains(trigger)) return true;
+    content = trigger.closest('[data-scope="menu"][data-part="content"]');
   }
   const contextTrigger = target.closest('[data-scope="menu"][data-part="context-trigger"]');
   return contextTrigger !== null && contextTrigger.id === contextTriggerId;

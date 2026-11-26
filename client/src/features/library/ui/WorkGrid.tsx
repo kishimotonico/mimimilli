@@ -97,7 +97,13 @@ export default function WorkGrid({
   );
 
   useWorkGridWheelZoom(paneRef, safeTileSize, setTileSize);
-  const listFocusable = useFocusListAfterReturn(works, isPending, virtualItems.length);
+  const listFocusable = useFocusListAfterReturn(
+    scrollRef,
+    works,
+    selectedWorkId,
+    isPending,
+    virtualItems.length,
+  );
   useWorkResultsDismiss(isWorkSelected, onDeselect, scrollRef, ".mll-grid-tile");
   const moveTileFocus = useListKeyboardNav({
     containerEl: gridEl,

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useSetAtom } from "jotai";
 import {
   getDefaultPlaylistTrackCount,
@@ -9,7 +9,7 @@ import {
 import { useToast } from "../../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import { listFocusRequestAtom } from "../../model/listFocusRequestAtom";
-import { focusWorkRowOrList, neighborWorkId } from "../neighborWorkId";
+import { neighborWorkId } from "../neighborWorkId";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import { openPathInFilesAtom } from "../../../../entities/file-system/model/navigationAtoms";
 import { usePlayerActions } from "../../../../entities/player/model/usePlayerActions";
@@ -89,7 +89,6 @@ export function WorkDetail({
   const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
   const setListFocusRequest = useSetAtom(listFocusRequestAtom);
   const statusLabel = getWorkStatusLabel(work.status);
   const toast = useToast();
@@ -104,7 +103,7 @@ export function WorkDetail({
       trackIndex,
     );
 
-  const handleDeleteConfirm = async (focusWorkId: string | null) => {
+  const handleDeleteConfirm = async () => {
     const title = work.title;
     try {
       await deleteMutation.mutateAsync(work.id);
@@ -113,8 +112,6 @@ export function WorkDetail({
       toast.error(apiErrorMessage(cause, "登録解除に失敗しました"));
       return;
     }
-    // 作品詳細ページには一覧が無い。ライブラリへ戻って一覧が描画されたときに、一覧が移す
-    if (layout !== "full") focusWorkRowOrList(focusWorkId, rootRef.current);
     toast.show({
       message: `「${title}」を登録解除しました`,
       variant: "success",
@@ -126,7 +123,7 @@ export function WorkDetail({
   };
 
   return (
-    <div ref={rootRef} className={layout === "full" ? "mle-prv__body is-full" : "mle-prv__body"}>
+    <div data-work-detail className={layout === "full" ? "mle-prv__body is-full" : "mle-prv__body"}>
       <div className="mle-prv__hero">
         <div className="mle-prv__coverwrap">
           <div className="mle-prv__cover">
@@ -291,10 +288,9 @@ export function WorkDetail({
           confirmLabel="解除する"
           onConfirm={() => {
             // 作品が消えると詳細ごと︙も消えるので、繰り上がる行（末尾なら前の行）を確定時に決めておく
-            const focusWorkId = neighborWorkId(work.id);
-            setListFocusRequest(work.id);
+            setListFocusRequest({ removedId: work.id, neighborId: neighborWorkId(work.id) });
             setIsDeleteConfirmOpen(false);
-            void handleDeleteConfirm(focusWorkId);
+            void handleDeleteConfirm();
           }}
           onCancel={() => setIsDeleteConfirmOpen(false)}
         />
