@@ -16,7 +16,7 @@ export function neighborWorkId(workId: string): string | null {
   return (rows[at + 1] ?? rows[at - 1])?.id ?? null;
 }
 
-/** 一覧の移し先: 指定した行（描画されていれば）、無ければ roving の行（tabindex=0）、行が無ければ（空の一覧）コンテナ */
+/** 一覧の移し先。一覧（[data-work-list]）は画面に1つだけ描画される前提で document から探す。指定した行（描画されていれば）、無ければ roving の行（tabindex=0）、行が無ければ（空の一覧）コンテナ */
 export function focusListEntry(workId: string | null = null) {
   const list = document.querySelector<HTMLElement>("[data-work-list]");
   const row =

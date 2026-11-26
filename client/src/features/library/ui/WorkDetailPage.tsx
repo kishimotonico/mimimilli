@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiRequestError } from "../../../shared/api/http";
 import type { NormalizedTag } from "@mimimilli/shared";
 import { workDetailIdAtom } from "../../../entities/work/model/navigationAtoms";
@@ -20,6 +20,7 @@ import { useLibraryWorkPatchMutations } from "../model/useLibraryQueries";
 import { useUnregisterWorkMutation } from "../../../entities/work/model/workMutations";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import { WorkDetail } from "./preview/WorkDetail";
+import { neighborInCachedWorks } from "../model/neighborInCachedWorks";
 
 export default function WorkDetailPage() {
   const workId = useAtomValue(workDetailIdAtom);
@@ -28,6 +29,7 @@ export default function WorkDetailPage() {
   const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
   const openNowPlaying = useSetAtom(openNowPlayingLayerAtom);
   const leaveMissingWorkDetail = useSetAtom(leaveMissingWorkDetailAtom);
+  const queryClient = useQueryClient();
   const nav = useLibraryNavigation();
   const { clickTag } = nav;
   const view = nav.foldersStatus === "ready" ? nav.view : null;
@@ -82,6 +84,7 @@ export default function WorkDetailPage() {
         deleteMutation={deleteMutation}
         onTagClick={handleTagClick}
         onGoToPlayingScreen={isCurrentWorkPlaying ? openNowPlaying : undefined}
+        neighborOf={(id) => neighborInCachedWorks(queryClient, view, searchQuery, id)}
       />
     </div>
   );

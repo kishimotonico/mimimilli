@@ -65,7 +65,7 @@ describe("登録解除後のフォーカス", () => {
         <Host pending />
       </Provider>,
     );
-    act(() => store.set(focusListOnReturnAtom, true));
+    act(() => store.set(focusListOnReturnAtom, { neighborId: "b" }));
     expect(document.activeElement).toBe(document.body);
     list(["a", "b"]);
     view.rerender(
@@ -73,7 +73,7 @@ describe("登録解除後のフォーカス", () => {
         <Host pending={false} />
       </Provider>,
     );
-    expect(document.activeElement).toBe(document.querySelector('[data-work-id="a"]'));
-    expect(store.get(focusListOnReturnAtom)).toBe(false);
+    expect(document.activeElement).toBe(document.querySelector('[data-work-id="b"]'));
+    expect(store.get(focusListOnReturnAtom)).toBeNull();
   });
 });

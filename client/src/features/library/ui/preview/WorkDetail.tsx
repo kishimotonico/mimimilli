@@ -54,6 +54,8 @@ interface WorkDetailProps {
   onExpand?: () => void;
   /** 表示中の作品が再生中の作品と一致するときだけ渡す。「再生画面へ」ボタンを表示する */
   onGoToPlayingScreen?: () => void;
+  /** 解除した作品の次（末尾なら前）の作品 ID を、解除の確定時に返す。一覧が描画されない画面で渡す。既定は描画中の一覧から探す */
+  neighborOf?: (workId: string) => string | null;
 }
 
 export function WorkDetail({
@@ -67,6 +69,7 @@ export function WorkDetail({
   layout = "pane",
   onExpand,
   onGoToPlayingScreen,
+  neighborOf = neighborWorkId,
 }: WorkDetailProps) {
   const playlist = work.playlists.find((p) => p.id === work.defaultPlaylistId) ?? work.playlists[0];
   const tracks = playlist?.tracks ?? [];
@@ -118,8 +121,9 @@ export function WorkDetail({
     // 解除で一覧は更新済み。詳細が消える前に、選択を外して一覧を描き直し、隣の行へフォーカスを移す。
     // 作品詳細ページには一覧が無いので、ライブラリへ戻って一覧が描画されたときに一覧が移す
     if (layout === "full") {
-      setFocusListOnReturn(true);
+      setFocusListOnReturn({ neighborId });
     } else {
+      // 404 起点の選択解除（useLibrarySelectionCleanup）は非同期に後から走る。ここでは成功の直後に同期して外し、フォーカスの移し先を確かにする
       flushSync(() => deselectUnregisteredWork(work.id));
       focusListAfterRemoval(neighborId, rootRef.current);
     }
@@ -299,7 +303,7 @@ export function WorkDetail({
           confirmLabel="解除する"
           onConfirm={() => {
             // 作品が消えると詳細ごと︙も消えるので、繰り上がる行（末尾なら前の行）を確定時に決めておく
-            const neighborId = neighborWorkId(work.id);
+            const neighborId = neighborOf(work.id);
             setIsDeleteConfirmOpen(false);
             void handleDeleteConfirm(neighborId);
           }}

@@ -124,12 +124,17 @@ describe("LibrarySortMenu", () => {
     const items = screen.getAllByRole("menuitemradio");
     const highlighted = () => menu.getAttribute("aria-activedescendant");
 
-    await userEvent.keyboard("{ArrowDown}");
-    expect(highlighted()).toBe(items[0]?.id);
-    await userEvent.keyboard("{ArrowDown}");
-    expect(highlighted()).toBe(items[1]?.id);
-    await userEvent.keyboard("{ArrowUp}{ArrowUp}{ArrowDown}");
-    await waitFor(() => expect(highlighted()).toBe(items[0]?.id));
+    // 1回の keyboard() に複数のキーを渡すと、Ark UI（zag）は React の描画前の状態を読むので、前のキーの結果を
+    // 見ずに次のキーを処理しうる。実際のキー入力のとおり、1キーずつ送って結果を確かめる
+    const press = async (key: string, expected: number) => {
+      await userEvent.keyboard(key);
+      expect(highlighted()).toBe(items[expected]?.id);
+    };
+    await press("{ArrowDown}", 0);
+    await press("{ArrowDown}", 1);
+    await press("{ArrowUp}", 0);
+    await press("{ArrowUp}", items.length - 1);
+    await press("{ArrowDown}", 0);
 
     await userEvent.keyboard("I");
     await waitFor(() =>
