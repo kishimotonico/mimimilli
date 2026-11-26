@@ -386,11 +386,6 @@ test("作品詳細ページから登録解除すると、ライブラリへ戻�
   await expect(page).toHaveURL(/\/library\//);
   await expect(page.locator(`[data-work-id="${neighborId}"]`)).toBeFocused();
 
-  // 戻り先の要求は一度で消費され、その後のフォーカスは奪わない
-  const other = page.locator("[data-work-id]").first();
-  await other.click();
-  await expect(other).toBeFocused();
-
   // 解除した作品の詳細の取り直しが404になることが、ライブラリへ戻る合図（詳細ページでは複数回起きうる）
   expect(tracker.failedResponses.length).toBeGreaterThan(0);
   for (const response of tracker.failedResponses) {

@@ -194,6 +194,37 @@ describe("WorkDetail: 登録解除", () => {
     expect(screen.queryByRole("alertdialog")).toBeNull();
   });
 
+  it("解除に成功すると、prepareUnregister が返した関数を1回呼ぶ。失敗したときは呼ばない", async () => {
+    const after = vi.fn();
+    const prepareUnregister = vi.fn(() => after);
+    const mutateAsync = vi.fn(async () => {});
+    const view = renderDetail({
+      deleteMutation: makeDeleteMutationStub({ mutateAsync }),
+      prepareUnregister,
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: "その他" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
+    fireEvent.click(screen.getByRole("button", { name: "解除する" }));
+    await waitFor(() => expect(after).toHaveBeenCalledTimes(1));
+    expect(prepareUnregister).toHaveBeenCalledWith("w1");
+    view.unmount();
+
+    const failingAfter = vi.fn();
+    const failing = vi.fn(async () => {
+      throw new Error("failed");
+    });
+    renderDetail({
+      deleteMutation: makeDeleteMutationStub({ mutateAsync: failing }),
+      prepareUnregister: () => failingAfter,
+    });
+    await userEvent.click(screen.getByRole("button", { name: "その他" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
+    fireEvent.click(screen.getByRole("button", { name: "解除する" }));
+    await waitFor(() => expect(failing).toHaveBeenCalled());
+    expect(failingAfter).not.toHaveBeenCalled();
+  });
+
   it("解除に成功するとuseToast経由でsuccessトーストの表示要求を出す", async () => {
     const mutateAsync = vi.fn(async () => {});
     const store = getDefaultStore();
