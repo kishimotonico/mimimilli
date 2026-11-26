@@ -73,4 +73,44 @@ describe("登録解除後のフォーカス", () => {
     view.rerender(wrap(false));
     expect(document.activeElement).toBe(document.body);
   });
+
+  it("行が描画されるまで（作品があるのに描画数が0のあいだ）は待ち、描画されたら移す", () => {
+    function Host({ rendered }: { rendered: number }) {
+      useFocusListOnReturn(false, 2, rendered);
+      return null;
+    }
+    const wrap = (rendered: number) => (
+      <Provider store={store}>
+        <Host rendered={rendered} />
+      </Provider>
+    );
+    list(["a", "b"]);
+    const store = createStore();
+    const view = render(wrap(0));
+    act(() => store.set(focusListOnReturnAtom, { neighborId: "b" }));
+    expect(document.activeElement).toBe(document.body);
+    expect(store.get(focusListOnReturnAtom)).not.toBeNull();
+
+    view.rerender(wrap(2));
+    expect(document.activeElement).toBe(document.querySelector('[data-work-id="b"]'));
+    expect(store.get(focusListOnReturnAtom)).toBeNull();
+  });
+
+  it("フォーカスが別の要素にあれば、描画されても移さず、要求は消す", () => {
+    function Host() {
+      useFocusListOnReturn(false, 2, 2);
+      return null;
+    }
+    list(["a", "b"]);
+    document.getElementById("other")?.focus();
+    const store = createStore();
+    render(
+      <Provider store={store}>
+        <Host />
+      </Provider>,
+    );
+    act(() => store.set(focusListOnReturnAtom, { neighborId: "b" }));
+    expect(document.activeElement).toBe(document.getElementById("other"));
+    expect(store.get(focusListOnReturnAtom)).toBeNull();
+  });
 });

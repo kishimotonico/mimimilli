@@ -221,7 +221,12 @@ describe("WorkDetail: 登録解除", () => {
     await userEvent.click(screen.getByRole("button", { name: "その他" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
     fireEvent.click(screen.getByRole("button", { name: "解除する" }));
-    await waitFor(() => expect(failing).toHaveBeenCalled());
+    // 失敗がエラーのトーストとして届いた（catch を通った）あとで、呼ばれていないことを見る
+    await waitFor(() =>
+      expect([...getDefaultStore().get(toastRequestsAtom).values()]).toContainEqual(
+        expect.objectContaining({ variant: "error" }),
+      ),
+    );
     expect(failingAfter).not.toHaveBeenCalled();
   });
 
