@@ -25,6 +25,8 @@ const KEYBOARD_OPEN_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", " "]);
 interface MotionMenuProps extends UseMenuProps {
   /** ラジオを持つメニューの現在値。キーボードで開いたとき、先頭ではなくこの項目をハイライトする */
   initialHighlight?: string | null;
+  /** 無効。トリガーに triggerProps を展開すると、開く操作（ポインター・キーボード）を受けなくなる */
+  disabled?: boolean;
 }
 
 export function useMotionMenu(props: MotionMenuProps = {}) {
@@ -33,6 +35,7 @@ export function useMotionMenu(props: MotionMenuProps = {}) {
     onFocusOutside,
     onHighlightChange,
     initialHighlight,
+    disabled = false,
     positioning,
     ...rest
   } = props;
@@ -70,8 +73,13 @@ export function useMotionMenu(props: MotionMenuProps = {}) {
   apiRef.current = menu.api;
   serviceRef.current = menu.service;
   const lifetime = usePresenceLifetime(menu.api.open);
-  /** トリガーへ展開する。キーボードで開いたかどうかを覚える */
+  /** トリガーへ展開する。キーボードで開いたかどうかを覚え、disabled のときは開かせない */
   const triggerProps = {
+    // data-disabled は Ark UI がポインター操作を無視する印。キーボードは defaultPrevented を見る
+    "data-disabled": disabled ? "" : undefined,
+    onKeyDownCapture: (event: ReactKeyboardEvent) => {
+      if (disabled) event.preventDefault();
+    },
     onKeyDown: (event: ReactKeyboardEvent) => {
       keyboardOpenPending.current = !menu.api.open && KEYBOARD_OPEN_KEYS.has(event.key);
     },

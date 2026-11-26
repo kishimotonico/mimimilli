@@ -10,8 +10,6 @@ interface ConfirmDialogProps {
   confirmLabel: string;
   onConfirm: () => void;
   onCancel: () => void;
-  /** 閉じたときのフォーカスの戻し先。無ければ開く前の要素 */
-  returnFocusTo?: () => HTMLElement | null;
 }
 
 export default function ConfirmDialog({
@@ -20,13 +18,11 @@ export default function ConfirmDialog({
   confirmLabel,
   onConfirm,
   onCancel,
-  returnFocusTo,
 }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null);
   const dialog = useDialogModal({
     onClose: onCancel,
     initialFocusRef: cancelRef,
-    returnFocusTo,
   });
 
   return (

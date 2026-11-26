@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useSetAtom } from "jotai";
 import {
   getDefaultPlaylistTrackCount,
@@ -8,7 +8,7 @@ import {
 } from "@mimimilli/shared";
 import { useToast } from "../../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
-import { findWorkRow, neighborWorkId } from "../neighborWorkId";
+import { focusWorkRowOrList, neighborWorkId } from "../neighborWorkId";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import { openPathInFilesAtom } from "../../../../entities/file-system/model/navigationAtoms";
 import { usePlayerActions } from "../../../../entities/player/model/usePlayerActions";
@@ -88,7 +88,6 @@ export function WorkDetail({
   const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const deleteFocusWorkIdRef = useRef<string | null>(null);
   const statusLabel = getWorkStatusLabel(work.status);
   const toast = useToast();
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
@@ -102,7 +101,7 @@ export function WorkDetail({
       trackIndex,
     );
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = async (focusWorkId: string | null) => {
     const title = work.title;
     try {
       await deleteMutation.mutateAsync(work.id);
@@ -110,6 +109,7 @@ export function WorkDetail({
       toast.error(apiErrorMessage(cause, "登録解除に失敗しました"));
       return;
     }
+    focusWorkRowOrList(focusWorkId);
     toast.show({
       message: `「${title}」を登録解除しました`,
       variant: "success",
@@ -284,15 +284,11 @@ export function WorkDetail({
           title="登録解除"
           message={`「${work.title}」をライブラリから外します。タグや再生履歴（mimimilli.json）は消え、音声などのファイルは残ります。`}
           confirmLabel="解除する"
-          returnFocusTo={() => {
-            const id = deleteFocusWorkIdRef.current;
-            return id === null ? null : findWorkRow(id);
-          }}
           onConfirm={() => {
-            // 作品が消えると詳細ごと︙も消えるので、繰り上がる行（末尾なら前の行）を確定時に決めて戻し先にする
-            deleteFocusWorkIdRef.current = neighborWorkId(work.id);
+            // 作品が消えると詳細ごと︙も消えるので、繰り上がる行（末尾なら前の行）を確定時に決めておく
+            const focusWorkId = neighborWorkId(work.id);
             setIsDeleteConfirmOpen(false);
-            void handleDeleteConfirm();
+            void handleDeleteConfirm(focusWorkId);
           }}
           onCancel={() => setIsDeleteConfirmOpen(false)}
         />

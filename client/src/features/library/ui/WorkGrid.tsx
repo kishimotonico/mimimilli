@@ -147,7 +147,7 @@ export default function WorkGrid({
       aria-label="作品グリッド"
     >
       <div className="mll-grid-body">
-        <div ref={scrollRef} className="mll-grid-scroll">
+        <div ref={scrollRef} data-work-list tabIndex={-1} className="mll-grid-scroll outline-none">
           {works.length === 0 ? (
             <WorksEmptyState
               variant="grid"

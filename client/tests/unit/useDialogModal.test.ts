@@ -222,20 +222,4 @@ describe("useDialogModal", () => {
     expect(document.activeElement).toBe(trigger);
     trigger.remove();
   });
-
-  it("returnFocusTo があれば、閉じたときは開く前の要素ではなくそこへフォーカスを戻す", () => {
-    const opener = document.createElement("button");
-    const other = document.createElement("button");
-    document.body.append(opener, other);
-    opener.focus();
-    function ReturnDialog() {
-      const { dialogRef } = useDialogModal({ onClose: vi.fn(), returnFocusTo: () => other });
-      return createElement("dialog", { ref: dialogRef });
-    }
-    const { unmount } = render(createElement(ReturnDialog));
-    unmount();
-    expect(document.activeElement).toBe(other);
-    opener.remove();
-    other.remove();
-  });
 });

@@ -134,7 +134,12 @@ export default function WorkListPane({
 
   return (
     <div className={`mle-col is-results ${isPending ? "is-pending" : ""}`}>
-      <div ref={setListContainer} className="mle-col__list">
+      <div
+        ref={setListContainer}
+        data-work-list
+        tabIndex={-1}
+        className="mle-col__list outline-none"
+      >
         {works.length === 0 ? (
           <WorksEmptyState
             variant="list"

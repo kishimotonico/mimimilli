@@ -14,6 +14,11 @@ export function neighborWorkId(workId: string): string | null {
   return (rows[at + 1] ?? rows[at - 1])?.id ?? null;
 }
 
-export function findWorkRow(workId: string): HTMLElement | null {
-  return document.querySelector<HTMLElement>(`[data-work-id="${CSS.escape(workId)}"]`);
+/** 作品が消えたあとのフォーカスの移し先: 決めておいた隣の行、無ければ（一覧が空になるときなど）一覧そのもの */
+export function focusWorkRowOrList(workId: string | null) {
+  const row =
+    workId === null
+      ? null
+      : document.querySelector<HTMLElement>(`[data-work-id="${CSS.escape(workId)}"]`);
+  (row ?? document.querySelector<HTMLElement>("[data-work-list]"))?.focus({ preventScroll: true });
 }

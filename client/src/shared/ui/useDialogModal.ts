@@ -1,7 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import type { MouseEvent as ReactMouseEvent, RefObject, SyntheticEvent } from "react";
 import { useSetAtom } from "jotai";
-import { useLatest } from "../lib/useLatest";
 import { resolveFocusReturnTarget } from "../lib/focusReturnTarget";
 import { getTabbableElements } from "./focusable";
 import { openModalDialogsAtom } from "../model/openModalDialogsAtom";
@@ -16,8 +15,6 @@ interface UseDialogModalOptions {
   onClose: () => void;
   /** マウント時にフォーカスする要素。省略時は dialog 自身にフォーカスする。 */
   initialFocusRef?: RefObject<HTMLElement | null>;
-  /** 閉じたときのフォーカスの戻し先。開く前の要素の代わりに使う（無ければ開く前の要素） */
-  returnFocusTo?: () => HTMLElement | null;
 }
 
 /**
@@ -26,8 +23,7 @@ interface UseDialogModalOptions {
  * フォーカストラップはネイティブ実装に加え、末尾/先頭でのTab循環を手動でも補完する
  * （編集モーダル末尾からのTabでBODYへフォーカスが落ちる欠陥があったため）。
  */
-export function useDialogModal({ onClose, initialFocusRef, returnFocusTo }: UseDialogModalOptions) {
-  const returnFocusToRef = useLatest(returnFocusTo);
+export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptions) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const setOpenDialogs = useSetAtom(openModalDialogsAtom);
   const pressedBackdropWithMenuOpen = useRef(false);
@@ -78,10 +74,8 @@ export function useDialogModal({ onClose, initialFocusRef, returnFocusTo }: UseD
       dialog.removeEventListener("pointerdown", handlePointerDown, true);
       dialog.close();
       setOpenDialogs((current) => current.filter((entry) => entry !== dialog));
-      // oxlint-disable-next-line react-hooks/exhaustive-deps -- 閉じる時点の最新の戻し先を読むための ref
-      const returnTarget = returnFocusToRef.current?.() ?? previousActiveElement;
-      if (returnTarget?.isConnected) {
-        returnTarget.focus({ preventScroll: true });
+      if (previousActiveElement?.isConnected) {
+        previousActiveElement.focus({ preventScroll: true });
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 開閉は一度きりのライフサイクルとして扱う

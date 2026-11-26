@@ -19,10 +19,13 @@ interface RowMenuProps {
 
 /** 行の右端の︙メニュー。 */
 export default function RowMenu({ label, busy, onOpenFolder, onExclude }: RowMenuProps) {
-  const menu = useMotionMenu({ positioning: { placement: "bottom-end", gutter: MENU_GUTTER } });
+  const menu = useMotionMenu({
+    positioning: { placement: "bottom-end", gutter: MENU_GUTTER },
+    disabled: busy,
+  });
   return (
     <MotionMenuRoot handle={menu}>
-      <Menu.Trigger asChild>
+      <Menu.Trigger asChild {...menu.triggerProps}>
         <IconButton
           icon={I.moreV}
           label={label}

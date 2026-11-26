@@ -47,7 +47,10 @@ export default function SplitButton({
   const spec = PLACEMENT[placement];
   const off = disabled || busy;
   const primaryOff = off || primaryDisabled;
-  const handle = useMotionMenu({ positioning: { placement: spec.placement, gutter: MENU_GUTTER } });
+  const handle = useMotionMenu({
+    positioning: { placement: spec.placement, gutter: MENU_GUTTER },
+    disabled: off,
+  });
   return (
     <div className={cn("relative inline-flex", className)}>
       <MotionMenuRoot handle={handle}>
@@ -64,7 +67,7 @@ export default function SplitButton({
         >
           {children}
         </button>
-        <Menu.Trigger asChild>
+        <Menu.Trigger asChild {...handle.triggerProps}>
           <button
             type="button"
             aria-disabled={off || undefined}

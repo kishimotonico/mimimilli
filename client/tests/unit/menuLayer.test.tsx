@@ -51,4 +51,14 @@ describe("メニュー部品", () => {
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
     await waitFor(() => expect(screen.getByLabelText("外の入力")).toHaveFocus());
   });
+
+  it("処理中（busy）はトリガーを押してもキーボードでも開かない", async () => {
+    render(<RowMenu label="メニュー" busy onOpenFolder={vi.fn()} onExclude={vi.fn()} />);
+    const trigger = screen.getByRole("button", { name: "メニュー" });
+    await userEvent.click(trigger);
+    expect(screen.queryByRole("menu")).toBeNull();
+    trigger.focus();
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
 });
