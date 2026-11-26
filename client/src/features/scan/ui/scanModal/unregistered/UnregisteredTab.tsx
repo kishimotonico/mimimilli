@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useAtom } from "jotai";
 import { useQueryClient } from "@tanstack/react-query";
@@ -138,7 +138,14 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
     );
     const titlesOf = (entries: readonly { path: ScanCandidate["path"] }[]) =>
       entries.map((entry) => titleByPath.get(entry.path) ?? entry.path);
-    const outcome = await registerMutation.mutateAsync({ paths, apply });
+    const nextPath = planFocusAfterRowsLeave(registerRows);
+    parkFocus();
+    let outcome;
+    try {
+      outcome = await registerMutation.mutateAsync({ paths, apply });
+    } finally {
+      setFocusRequest({ nextPath });
+    }
     const { interruptedBy } = outcome;
     if (interruptedBy) {
       setErrorMessage(
@@ -167,16 +174,61 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
 
   const busy = registerMutation.isPending || excluding;
 
+  // 行が消える操作（除外・追加）のあと、トリガーが無くなってフォーカスが body に落ちたら、
+  // 残った隣の行（次、無ければ前）の︙へ、行が無ければタブのパネルへ移す
+  const [focusRequest, setFocusRequest] = useState<{ nextPath: string | null } | null>(null);
+  const planFocusAfterRowsLeave = (leaving: readonly CandidateRowModel[]) => {
+    const gone = pathsOf(leaving);
+    const firstGone = visibleRows.findIndex(({ candidate }) => gone.has(candidate.path));
+    const survivor = (rows: readonly CandidateRowModel[]) =>
+      rows.find(({ candidate }) => !gone.has(candidate.path));
+    const next =
+      survivor(visibleRows.slice(firstGone + 1)) ??
+      survivor(visibleRows.slice(0, firstGone).reverse());
+    return next?.candidate.path ?? null;
+  };
+  // 処理中は行の︙・フッターの▾が無効になり、フォーカスが落ちる。メニューが閉じてトリガーへ戻った直後に、
+  // 無効になる前のパネルへ預ける（メニューの戻しは microtask で走るので、その後ろに入れる）
+  const parkFocus = () =>
+    queueMicrotask(() =>
+      queueMicrotask(() => {
+        const panel = panelRef.current;
+        const active = document.activeElement;
+        if (!panel || active === panel || !(panel.closest("dialog") ?? panel).contains(active)) {
+          return;
+        }
+        panel.focus({ preventScroll: true });
+      }),
+    );
+  useEffect(() => {
+    if (focusRequest === null || busy) return;
+    setFocusRequest(null);
+    const active = document.activeElement;
+    const lost = !active || active === document.body || !active.isConnected;
+    if (!lost && active !== panelRef.current) return;
+    const row = [
+      ...(scrollRef.current?.querySelectorAll<HTMLElement>("[data-candidate-path]") ?? []),
+    ].find((element) => element.dataset.candidatePath === focusRequest.nextPath);
+    const target = row?.querySelector<HTMLElement>('button[aria-haspopup="menu"]:not(:disabled)');
+    (target ?? panelRef.current)?.focus({ preventScroll: true });
+  }, [focusRequest, busy]);
+
   const excludeRows = useCallback(
     (rows: readonly CandidateRowModel[]) => {
       if (rows.length === 0) return;
       setErrorMessage(null);
-      exclude({
-        paths: rows.map(({ candidate }) => candidate.path),
-        titles: rows.map(rowTitle),
-      });
+      const nextPath = planFocusAfterRowsLeave(rows);
+      parkFocus();
+      exclude(
+        {
+          paths: rows.map(({ candidate }) => candidate.path),
+          titles: rows.map(rowTitle),
+        },
+        { onSettled: () => setFocusRequest({ nextPath }) },
+      );
     },
-    [exclude],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- planFocusAfterRowsLeave は visibleRows から作る
+    [exclude, visibleRows],
   );
 
   const toggleRow = useCallback(
@@ -284,6 +336,7 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
                 return (
                   <div
                     key={candidate.path}
+                    data-candidate-path={candidate.path}
                     style={{ ...getItemStyle(virtualRow), height: ROW_HEIGHT }}
                   >
                     <UnregisteredRow

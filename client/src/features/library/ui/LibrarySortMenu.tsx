@@ -78,13 +78,15 @@ function ReadySortMenu({
 
   const buttonTitle = currentSortLabel ? `ソート: ${currentSortLabel}` : "ソート";
 
-  const menu = useMotionMenu({ positioning: { placement: "bottom-end", gutter: MENU_GUTTER } });
-
   const options =
     view.kind === "value-list"
       ? groupSortOptions(view.groupBy).map((opt) => ({ id: opt.id as string, label: opt.label }))
       : SORT_OPTIONS.map((opt) => ({ id: opt.id as string, label: opt.label }));
   const currentValue = view.kind === "value-list" ? view.groupSort : sort;
+  const menu = useMotionMenu({
+    positioning: { placement: "bottom-end", gutter: MENU_GUTTER },
+    initialHighlight: currentValue,
+  });
   const selectOption = (id: string) => {
     if (view.kind === "value-list") setGroupSort(id as GroupSortId);
     else setSort(id as SortId);
@@ -98,7 +100,7 @@ function ReadySortMenu({
   return (
     <div className="flex items-center">
       <MotionMenuRoot handle={menu}>
-        <Menu.Trigger asChild>
+        <Menu.Trigger asChild {...menu.triggerProps}>
           <IconButton
             size="sm"
             icon={I.sort}

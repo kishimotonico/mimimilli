@@ -97,7 +97,15 @@ export default function ScanModal({
       variant: coverNote ? "warning" : "success",
       priority: "notice",
     });
-    if (remainingCandidates === 0) setActiveTab("newWorks");
+    if (remainingCandidates === 0) {
+      // 未登録のパネルごと消えるので、フォーカスを body へ落とさず、移る先のタブへ先に預ける
+      const active = document.activeElement;
+      const inPanel = document.getElementById("scan-tabpanel-unregistered")?.contains(active);
+      if (inPanel || active === document.body) {
+        document.getElementById("scan-tab-newWorks")?.focus({ preventScroll: true });
+      }
+      setActiveTab("newWorks");
+    }
   };
 
   const scanPending = recordQuery.data !== undefined && recordQuery.data.finishedAt === null;

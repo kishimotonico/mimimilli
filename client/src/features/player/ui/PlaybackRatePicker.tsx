@@ -41,8 +41,10 @@ export default function PlaybackRatePicker({
   onOpenChange,
 }: PlaybackRatePickerProps) {
   const isPresent = useIsPresent();
+  const selectedRate = RATE_PRESETS.find((rate) => isRateSelected(playbackRate, rate));
   const menu = useMotionMenu({
     positioning: { placement: "top-end", gutter: MENU_GUTTER },
+    initialHighlight: selectedRate === undefined ? null : String(selectedRate),
     onOpenChange: ({ open }) => onOpenChange?.(open),
   });
   const { open, setOpen } = menu.menu.api;
@@ -53,12 +55,11 @@ export default function PlaybackRatePicker({
   }, [isPresent, open, setOpen]);
 
   const rateLabel = RATE_LABELS[playbackRate] ?? `${playbackRate.toFixed(2)}×`;
-  const selectedRate = RATE_PRESETS.find((rate) => isRateSelected(playbackRate, rate));
 
   return (
     <div className={cn("mle-ratepick", className)}>
       <MotionMenuRoot handle={menu}>
-        <Menu.Trigger asChild>
+        <Menu.Trigger asChild {...menu.triggerProps}>
           <button
             type="button"
             className={cn("mle-ratepill", overlay && "is-overlay", playbackRate !== 1 && "is-on")}

@@ -20,12 +20,29 @@ function isComposingKey(event: KeyboardEvent | ReactKeyboardEvent): boolean {
   return native.isComposing || native.keyCode === 229;
 }
 
-export function useMotionMenu(props: UseMenuProps = {}) {
-  const { onEscapeKeyDown, onFocusOutside, ...rest } = props;
+const KEYBOARD_OPEN_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", " "]);
+
+interface MotionMenuProps extends UseMenuProps {
+  /** ラジオを持つメニューの現在値。キーボードで開いたとき、先頭ではなくこの項目をハイライトする */
+  initialHighlight?: string | null;
+}
+
+export function useMotionMenu(props: MotionMenuProps = {}) {
+  const { onEscapeKeyDown, onFocusOutside, onHighlightChange, initialHighlight, ...rest } = props;
   const apiRef = useRef<UseMenuReturn["api"] | null>(null);
+  const keyboardOpenPending = useRef(false);
   const menu = useMenu({
     loopFocus: true,
     ...rest,
+    onHighlightChange: (details) => {
+      onHighlightChange?.(details);
+      // キーボードで開くと Ark UI が先頭（または末尾）を選ぶ。その最初の1回だけ現在値へ置き換える
+      if (!keyboardOpenPending.current || details.highlightedValue === null) return;
+      keyboardOpenPending.current = false;
+      if (initialHighlight != null && details.highlightedValue !== initialHighlight) {
+        apiRef.current?.setHighlightedValue(initialHighlight);
+      }
+    },
     onFocusOutside: (event) => {
       onFocusOutside?.(event);
       // 外へ移ったフォーカス（Tab やプログラムの focus()）をトリガーへ奪い返さない。
@@ -47,7 +64,16 @@ export function useMotionMenu(props: UseMenuProps = {}) {
   });
   apiRef.current = menu.api;
   const lifetime = usePresenceLifetime(menu.api.open);
-  return { menu, ...lifetime };
+  /** トリガーへ展開する。キーボードで開いたかどうかを覚える */
+  const triggerProps = {
+    onKeyDown: (event: ReactKeyboardEvent) => {
+      keyboardOpenPending.current = !menu.api.open && KEYBOARD_OPEN_KEYS.has(event.key);
+    },
+    onPointerDown: () => {
+      keyboardOpenPending.current = false;
+    },
+  };
+  return { menu, triggerProps, ...lifetime };
 }
 
 export type MotionMenuHandle = ReturnType<typeof useMotionMenu>;

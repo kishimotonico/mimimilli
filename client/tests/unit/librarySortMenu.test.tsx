@@ -135,6 +135,22 @@ describe("LibrarySortMenu", () => {
     expect(highlighted()).toBe(items.find((item) => item.textContent === "ID順")?.id);
   });
 
+  it("キーボードで開くと現在の並びをハイライトし、マウスで開いたときは何もハイライトしない", async () => {
+    renderSortMenu({ sort: "title-asc" });
+    const button = screen.getByRole("button", { name: "ソート" });
+    const highlighted = () => screen.getByRole("menu").getAttribute("aria-activedescendant");
+
+    await userEvent.click(button);
+    expect(highlighted()).toBeNull();
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+
+    button.focus();
+    await userEvent.keyboard("{ArrowDown}");
+    const current = await screen.findByRole("menuitemradio", { name: /タイトル（A→Z）/ });
+    await waitFor(() => expect(highlighted()).toBe(current.id));
+  });
+
   it("項目選択後、Escapeで閉じた後の両方でトリガーへフォーカスが戻る", async () => {
     renderSortMenu({ sort: "added-desc" });
     const button = screen.getByRole("button", { name: "ソート" });

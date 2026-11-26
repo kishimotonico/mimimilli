@@ -730,6 +730,28 @@ describe("UnregisteredTab 除外", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "元に戻す" })).toBeNull());
   });
 
+  it("行を除外してトリガーが消えたら、フォーカスは残った隣の行の︙へ移り、行が無くなればパネルへ移る", async () => {
+    vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
+    let remaining: ScanCandidate[] = [candidateB];
+    const { queryClient } = await renderTab([candidateA, candidateB]);
+    vi.spyOn(scanCandidatesCache, "refreshScanCandidatesQuietly").mockImplementation(async () => {
+      const response = { scanCompleted: true, candidates: remaining };
+      queryClient.setQueryData(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY, response);
+      return response;
+    });
+
+    await openRowMenu(candidateA.inferredTitle);
+    await userEvent.click(screen.getByRole("menuitem", { name: "除外" }));
+    const next = await screen.findByRole("button", { name: /」の操作$/ });
+    await waitFor(() => expect(next).toHaveFocus());
+
+    remaining = [];
+    await userEvent.click(next);
+    await userEvent.click(screen.getByRole("menuitem", { name: "除外" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /」の操作$/ })).toBeNull());
+    await waitFor(() => expect(document.activeElement).not.toBe(document.body));
+  });
+
   it("行のメニューの除外は、選択ではなくその行だけに効く", async () => {
     const spy = vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
     await renderTab([candidateA, candidateB]);
