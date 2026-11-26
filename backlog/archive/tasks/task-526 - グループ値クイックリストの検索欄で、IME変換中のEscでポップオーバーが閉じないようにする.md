@@ -4,6 +4,7 @@ title: グループ値クイックリストの検索欄で、IME変換中のEsc�
 status: To Do
 assignee: []
 created_date: '2026-11-26 03:14'
+updated_date: '2026-11-26 03:38'
 labels:
   - client
   - bug
@@ -25,3 +26,9 @@ UIプリミティブの置き換え（ADR-0043）でダイアログ・ポップ�
 - [ ] #2 変換していない状態のEscは従来どおりポップオーバーを閉じる
 - [ ] #3 isComposing の keydown を送る単体テストがある
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Windows の実 IME では変換中の Esc は key=Process（keyCode 229）で届き、key === "Escape" の判定に掛からないため、実機では再現しない（TASK-525 の IME 確認ページで確認）。対応なしとしてアーカイブする。
+<!-- SECTION:NOTES:END -->

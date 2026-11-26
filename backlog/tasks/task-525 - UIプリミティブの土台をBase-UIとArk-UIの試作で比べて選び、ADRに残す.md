@@ -1,11 +1,11 @@
 ---
 id: TASK-525
 title: UIプリミティブの土台をBase UIとArk UIの試作で比べて選び、ADRに残す
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-25 20:40'
-updated_date: '2026-11-26 03:16'
+updated_date: '2026-11-26 03:38'
 labels:
   - ui
 dependencies: []
@@ -30,7 +30,7 @@ ordinal: 644000
 <!-- AC:BEGIN -->
 - [x] #1 Base UI と Ark UI のそれぞれで同じ試作（仮想化された作品一覧の右クリックメニュー〈サブメニューとチェック項目付き〉、ネイティブ dialog の中の行メニュー、自作ポップオーバーの中のメニュー）を作り、比較結果を backlog doc に残している
 - [x] #2 右クリックした作品（複数選択の中ならその全体）がメニューを開く前に確定し、開いたまま別の行を右クリック・スクロール・再描画しても表示と実行先がずれない。入力欄と選択中のテキストの上ではブラウザのメニューが出る
-- [ ] #3 Esc がレイヤーごとに一段だけ閉じ（サブメニュー → メニュー → ポップオーバー → dialog）、IME 変換中の Esc と Enter では閉じも実行もしないことを実ブラウザで確かめている
+- [x] #3 Esc がレイヤーごとに一段だけ閉じ（サブメニュー → メニュー → ポップオーバー → dialog）、IME 変換中の Esc と Enter では閉じも実行もしないことを実ブラウザで確かめている
 - [x] #4 motion の AnimatePresence（ADR-0014）で退出アニメーションを付けられ、退出中に中身が消えず、退出中の要素が操作を受けないことを確かめている
 - [x] #5 閉じた後のフォーカス復帰をライブラリに任せるか自前で持つかを、TASK-248 の決定（フォーカス復帰は自前、FloatingFocusManager 禁止）と照らして結論を出している
 - [x] #6 ダイアログをネイティブ dialog のまま残すかライブラリへ寄せるかの結論を出している
@@ -41,4 +41,12 @@ ordinal: 644000
 
 <!-- SECTION:NOTES:BEGIN -->
 比較は doc-10、決定は ADR-0043（承認、Ark UI）。ADR-0014 の原則3を改訂した。試作で見つけた不具合は TASK-526〜528 として起票した。置き換えは TASK-529。AC3 は IME 確認ページ（https://claude.ai/artifact/PM8Jxhp2xNG5UfJQ46mpCx）でユーザーが実機確認する予定。
+
+AC3: IME 確認ページで Windows の実 IME を確かめた。変換中の Esc・Enter は key=Process（keyCode 229, isComposing=true）として届き、メニュー・ポップオーバー・ダイアログ内コンボボックスとも閉じも実行もしなかった。確定後の Esc はコンボボックスの候補 → ダイアログの順に一段ずつ閉じた。試作の検証で使った CDP の合成（key=Escape かつ isComposing=true）は実機より厳しい条件だった。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Base UI と Ark UI で同じ題材の試作を作って比べ（doc-10）、UIプリミティブの土台に Ark UI を採用して ADR-0043 に残した。ADR-0014 の原則3（閉じたときの復帰）を改訂した。試作で見つけた不具合を TASK-526〜528 に起票し、置き換えを TASK-529 に起票した。Esc の層・IME・退出アニメーション・フォーカス復帰は実ブラウザと Windows の実 IME で確かめた。TASK-526・527 は実機で再現しないため対応なしとした。
+<!-- SECTION:FINAL_SUMMARY:END -->
