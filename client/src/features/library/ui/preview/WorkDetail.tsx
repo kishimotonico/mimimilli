@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useSetAtom } from "jotai";
 import {
   getDefaultPlaylistTrackCount,
@@ -8,8 +9,9 @@ import {
 } from "@mimimilli/shared";
 import { useToast } from "../../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
-import { listFocusRequestAtom } from "../../model/listFocusRequestAtom";
-import { neighborWorkId } from "../neighborWorkId";
+import { deselectUnregisteredWorkAtom } from "../../../../entities/library/model/navigationActions";
+import { focusListOnReturnAtom } from "../../model/focusListOnReturnAtom";
+import { focusListAfterRemoval, neighborWorkId } from "../neighborWorkId";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import { openPathInFilesAtom } from "../../../../entities/file-system/model/navigationAtoms";
 import { usePlayerActions } from "../../../../entities/player/model/usePlayerActions";
@@ -89,7 +91,9 @@ export function WorkDetail({
   const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const setListFocusRequest = useSetAtom(listFocusRequestAtom);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const setFocusListOnReturn = useSetAtom(focusListOnReturnAtom);
+  const deselectUnregisteredWork = useSetAtom(deselectUnregisteredWorkAtom);
   const statusLabel = getWorkStatusLabel(work.status);
   const toast = useToast();
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
@@ -103,14 +107,21 @@ export function WorkDetail({
       trackIndex,
     );
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = async (neighborId: string | null) => {
     const title = work.title;
     try {
       await deleteMutation.mutateAsync(work.id);
     } catch (cause) {
-      setListFocusRequest(null);
       toast.error(apiErrorMessage(cause, "登録解除に失敗しました"));
       return;
+    }
+    // 解除で一覧は更新済み。詳細が消える前に、選択を外して一覧を描き直し、隣の行へフォーカスを移す。
+    // 作品詳細ページには一覧が無いので、ライブラリへ戻って一覧が描画されたときに一覧が移す
+    if (layout === "full") {
+      setFocusListOnReturn(true);
+    } else {
+      flushSync(() => deselectUnregisteredWork(work.id));
+      focusListAfterRemoval(neighborId, rootRef.current);
     }
     toast.show({
       message: `「${title}」を登録解除しました`,
@@ -123,7 +134,7 @@ export function WorkDetail({
   };
 
   return (
-    <div data-work-detail className={layout === "full" ? "mle-prv__body is-full" : "mle-prv__body"}>
+    <div ref={rootRef} className={layout === "full" ? "mle-prv__body is-full" : "mle-prv__body"}>
       <div className="mle-prv__hero">
         <div className="mle-prv__coverwrap">
           <div className="mle-prv__cover">
@@ -288,9 +299,9 @@ export function WorkDetail({
           confirmLabel="解除する"
           onConfirm={() => {
             // 作品が消えると詳細ごと︙も消えるので、繰り上がる行（末尾なら前の行）を確定時に決めておく
-            setListFocusRequest({ removedId: work.id, neighborId: neighborWorkId(work.id) });
+            const neighborId = neighborWorkId(work.id);
             setIsDeleteConfirmOpen(false);
-            void handleDeleteConfirm();
+            void handleDeleteConfirm(neighborId);
           }}
           onCancel={() => setIsDeleteConfirmOpen(false)}
         />

@@ -947,7 +947,7 @@ describe("ScanModal", () => {
 
       expect(screen.getByText("中止しています…")).toBeInTheDocument();
       const button = screen.getByRole("button", { name: "スキャンを中止" });
-      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute("aria-disabled", "true");
       fireEvent.click(button);
       expect(onCancel).not.toHaveBeenCalled();
     });

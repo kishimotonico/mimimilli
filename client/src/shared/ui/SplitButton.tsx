@@ -21,15 +21,15 @@ interface SplitButtonProps {
   size?: ButtonSize;
   menuLabel?: string;
   /** メニューの開く向き。既定は上（下端に置く前提） */
-  placement?: "above" | "belowEnd";
-  /** メニューの揃え。end は▾の右端、start はボタン全体の左端（左端に置くボタンで、メニューがはみ出さないようにする） */
-  align?: "end" | "start";
+  /** above・belowEnd は▾の右端にそろえる。aboveStart はボタン全体の左端にそろえる（左端に置くボタンで、メニューがはみ出さないようにする） */
+  placement?: keyof typeof PLACEMENT;
   className?: string;
 }
 
 const PLACEMENT = {
-  above: { placement: "top-end", origin: "bottom right" },
-  belowEnd: { placement: "bottom-end", origin: "top right" },
+  above: { placement: "top-end", origin: "bottom right", anchorToRoot: false },
+  aboveStart: { placement: "top-start", origin: "bottom left", anchorToRoot: true },
+  belowEnd: { placement: "bottom-end", origin: "top right", anchorToRoot: false },
 } as const;
 
 /** 主ボタンと▾のメニューを並べた分割ボタン。 */
@@ -44,7 +44,6 @@ export default function SplitButton({
   size = "sm",
   menuLabel = "その他の操作",
   placement = "above",
-  align = "end",
   className,
 }: SplitButtonProps) {
   const spec = PLACEMENT[placement];
@@ -52,14 +51,13 @@ export default function SplitButton({
   const primaryOff = off || primaryDisabled;
   const rootRef = useRef<HTMLDivElement>(null);
   const handle = useMotionMenu({
-    positioning:
-      align === "start"
-        ? {
-            placement: spec.placement.replace("-end", "-start") as "top-start" | "bottom-start",
-            gutter: MENU_GUTTER,
-            getAnchorRect: () => rootRef.current?.getBoundingClientRect() ?? null,
-          }
-        : { placement: spec.placement, gutter: MENU_GUTTER },
+    positioning: {
+      placement: spec.placement,
+      gutter: MENU_GUTTER,
+      ...(spec.anchorToRoot && {
+        getAnchorRect: () => rootRef.current?.getBoundingClientRect() ?? null,
+      }),
+    },
     disabled: off,
   });
   return (
@@ -91,9 +89,7 @@ export default function SplitButton({
             <I.chevD size={14} />
           </button>
         </Menu.Trigger>
-        <MenuPopup origin={align === "start" ? spec.origin.replace("right", "left") : spec.origin}>
-          {menu}
-        </MenuPopup>
+        <MenuPopup origin={spec.origin}>{menu}</MenuPopup>
       </MotionMenuRoot>
     </div>
   );

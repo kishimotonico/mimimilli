@@ -11,7 +11,7 @@ import WorksEmptyState from "./WorksEmptyState";
 import LoadMore from "./LoadMore";
 import { useVirtualList } from "../../../shared/ui/useVirtualList";
 import { useWorkResultsDismiss } from "./useWorkResultsDismiss";
-import { useFocusListAfterReturn } from "./useFocusListAfterReturn";
+import { useFocusListOnReturn } from "./useFocusListOnReturn";
 import { useListKeyboardNav } from "../../../shared/ui/useListKeyboardNav";
 import { useRovingIndex } from "./useRovingIndex";
 import { useRevealSelectedWork } from "./useRevealSelectedWork";
@@ -68,13 +68,7 @@ export default function WorkListPane({
         : undefined,
   });
 
-  const listFocusable = useFocusListAfterReturn(
-    scrollRef,
-    works,
-    selectedWorkId,
-    isPending,
-    virtualItems.length,
-  );
+  useFocusListOnReturn(isPending, works.length, virtualItems.length);
   useWorkResultsDismiss(isWorkSelected, onDeselect, scrollRef, ".mll-wrow");
 
   const [listEl, setListEl] = useState<HTMLDivElement | null>(null);
@@ -148,7 +142,7 @@ export default function WorkListPane({
       <div
         ref={setListContainer}
         data-work-list
-        tabIndex={works.length === 0 || listFocusable ? -1 : undefined}
+        tabIndex={works.length === 0 ? -1 : undefined}
         className="mle-col__list outline-none"
       >
         {works.length === 0 ? (

@@ -21,7 +21,7 @@ import {
 } from "./workGrid/useWorkGridJustifiedLayout";
 import { useWorkGridWheelZoom } from "./workGrid/useWorkGridWheelZoom";
 import { useWorkResultsDismiss } from "./useWorkResultsDismiss";
-import { useFocusListAfterReturn } from "./useFocusListAfterReturn";
+import { useFocusListOnReturn } from "./useFocusListOnReturn";
 import { useListKeyboardNav } from "../../../shared/ui/useListKeyboardNav";
 import { useRovingIndex } from "./useRovingIndex";
 import { useRevealSelectedWork } from "./useRevealSelectedWork";
@@ -97,13 +97,7 @@ export default function WorkGrid({
   );
 
   useWorkGridWheelZoom(paneRef, safeTileSize, setTileSize);
-  const listFocusable = useFocusListAfterReturn(
-    scrollRef,
-    works,
-    selectedWorkId,
-    isPending,
-    virtualItems.length,
-  );
+  useFocusListOnReturn(isPending, works.length, virtualItems.length);
   useWorkResultsDismiss(isWorkSelected, onDeselect, scrollRef, ".mll-grid-tile");
   const moveTileFocus = useListKeyboardNav({
     containerEl: gridEl,
@@ -158,7 +152,7 @@ export default function WorkGrid({
         <div
           ref={scrollRef}
           data-work-list
-          tabIndex={works.length === 0 || listFocusable ? -1 : undefined}
+          tabIndex={works.length === 0 ? -1 : undefined}
           className="mll-grid-scroll outline-none"
         >
           {works.length === 0 ? (

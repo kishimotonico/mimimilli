@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
 import { Menu } from "@ark-ui/react/menu";
 import { useMotionVariants } from "../../../../shared/ui/useMotionVariants";
 import { cn } from "../../../../shared/lib/cn";
@@ -88,7 +88,7 @@ function ScanSidebarControls({
         </AnimatePresence>
       </div>
       <div className="relative h-[26px] shrink-0">
-        <AnimatePresence initial={false} mode="wait">
+        <AnimatePresence initial={false}>
           {inProgress ? (
             <SidebarCancelButton
               key="cancel"
@@ -108,6 +108,24 @@ function ScanSidebarControls({
       </div>
     </div>
   );
+}
+
+/**
+ * 開始と中止のボタンは入れ替わる（退出するボタンは inert になる）。現れた（退出を取り消して戻った）ボタンは、
+ * 退出中の隣のボタンがフォーカスを持っていたら引き継ぐ。body に落とさない
+ */
+function useTakeFocusFromExitingSibling() {
+  const ref = useRef<HTMLElement>(null);
+  const isPresent = useIsPresent();
+  useLayoutEffect(() => {
+    const root = ref.current;
+    const active = document.activeElement;
+    if (!isPresent || !root || !active || root.contains(active)) return;
+    if (!root.parentElement?.contains(active) || !active.closest("[inert]")) return;
+    const target = root.matches("button") ? root : root.querySelector("button");
+    target?.focus({ preventScroll: true });
+  }, [isPresent]);
+  return ref;
 }
 
 function ScanSidebarTab({
@@ -173,15 +191,21 @@ function SidebarStartButton({
 }) {
   const { fade } = useMotionVariants();
   const isPresent = useIsPresent();
+  const ref = useTakeFocusFromExitingSibling();
   const v = fade();
   return (
-    <motion.div className="absolute inset-0" inert={!isPresent} {...v}>
+    <motion.div
+      ref={ref as RefObject<HTMLDivElement>}
+      className="absolute inset-0"
+      inert={!isPresent}
+      {...v}
+    >
       <SplitButton
         variant={primary ? "primary" : "ghost"}
         size="sm"
         className="w-full"
         menuLabel="スキャンの方法"
-        align="start"
+        placement="aboveStart"
         onClick={onStart}
         menu={
           <Menu.Item value="full" onSelect={onFullScan} className={menuItemClass()}>
@@ -199,12 +223,16 @@ function SidebarStartButton({
 function SidebarCancelButton({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
   const { fade } = useMotionVariants();
   const isPresent = useIsPresent();
+  const ref = useTakeFocusFromExitingSibling();
   const v = fade();
   return (
     <motion.button
+      ref={ref as RefObject<HTMLButtonElement>}
       type="button"
-      onClick={onClick}
-      disabled={disabled}
+      onClick={() => {
+        if (!disabled) onClick();
+      }}
+      aria-disabled={disabled || undefined}
       inert={!isPresent}
       {...v}
       className={buttonClass("danger-quiet", "sm", {
