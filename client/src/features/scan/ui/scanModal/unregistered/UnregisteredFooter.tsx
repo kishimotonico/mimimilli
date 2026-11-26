@@ -1,7 +1,13 @@
 import { useRef, useState } from "react";
 import type { DlsiteRegistrationApply } from "@mimimilli/shared";
 import SplitButton from "../../../../../shared/ui/SplitButton";
-import type { MenuItemSpec } from "../../../../../shared/ui/Menu";
+import { Menu } from "@ark-ui/react/menu";
+import {
+  MENU_COUNT_CLASS,
+  MENU_LABEL_CLASS,
+  MENU_SEPARATOR_CLASS,
+  menuItemClass,
+} from "../../../../../shared/ui/menu/menuStyles";
 import { ModalFooter } from "../../../../../shared/ui/Modal";
 import type { FooterPlan } from "../../../model/unregisteredSelection";
 import DlsiteFetchProgress from "./DlsiteFetchProgress";
@@ -48,31 +54,38 @@ export default function UnregisteredFooter({
   const anchorRef = useRef<HTMLDivElement>(null);
 
   const addable = !busy && !rjCodeSaving && addCount > 0;
-  const items: MenuItemSpec[] = [];
-  if (plan.kind === "fetch") {
-    items.push({
-      key: "add-without-fetch",
-      label: "取得せずに追加",
-      onSelect: () => onRegister(REGISTER_APPLY_ALL),
-      disabled: !addable,
-      trailing: `${addCount}件`,
-    });
-  }
-  items.push(
-    {
-      key: "pick",
-      label: "項目を選んで追加…",
-      onSelect: () => setPickerOpen(true),
-      disabled: !addable,
-    },
-    {
-      key: "exclude",
-      label: "選択を除外",
-      onSelect: onExclude,
-      disabled: busy || selectedCount === 0,
-      danger: true,
-      trailing: `${selectedCount}件`,
-    },
+  const menu = (
+    <>
+      {plan.kind === "fetch" && (
+        <Menu.Item
+          value="add-without-fetch"
+          disabled={!addable}
+          onSelect={() => onRegister(REGISTER_APPLY_ALL)}
+          className={menuItemClass()}
+        >
+          <span className={MENU_LABEL_CLASS}>取得せずに追加</span>
+          <span aria-hidden="true" className={MENU_COUNT_CLASS}>{`${addCount}件`}</span>
+        </Menu.Item>
+      )}
+      <Menu.Item
+        value="pick"
+        disabled={!addable}
+        onSelect={() => setPickerOpen(true)}
+        className={menuItemClass()}
+      >
+        <span className={MENU_LABEL_CLASS}>項目を選んで追加…</span>
+      </Menu.Item>
+      <Menu.Separator className={MENU_SEPARATOR_CLASS} />
+      <Menu.Item
+        value="exclude"
+        disabled={busy || selectedCount === 0}
+        onSelect={onExclude}
+        className={menuItemClass({ danger: true })}
+      >
+        <span className={MENU_LABEL_CLASS}>選択を除外</span>
+        <span aria-hidden="true" className={MENU_COUNT_CLASS}>{`${selectedCount}件`}</span>
+      </Menu.Item>
+    </>
   );
 
   return (
@@ -101,7 +114,7 @@ export default function UnregisteredFooter({
             disabled={busy || selectedCount === 0}
             primaryDisabled={rjCodeSaving || (plan.kind === "add" && !addable)}
             onClick={() => (plan.kind === "fetch" ? onFetch() : onRegister(REGISTER_APPLY_ALL))}
-            items={items}
+            menu={menu}
           >
             {plan.kind === "fetch"
               ? `DLsiteから取得 ${plan.codes.length}件`

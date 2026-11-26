@@ -238,7 +238,7 @@ test("並び順メニュー: 今の並びはURLに出ず、戻る・進むで保
 
   const sortButton = page.getByRole("button", { name: "ソート", exact: true });
   await sortButton.click();
-  await page.getByRole("menuitemradio", { name: "タイトル（A→Z）" }).click();
+  await page.getByRole("menu").getByRole("menuitemradio", { name: "タイトル（A→Z）" }).click();
   expect(new URL(page.url()).searchParams.has("sort")).toBe(false);
 
   await railRow(page, "CV別").click();
@@ -246,19 +246,19 @@ test("並び順メニュー: 今の並びはURLに出ず、戻る・進むで保
   await page.goBack();
   await expect(page).toHaveURL(/\/library\/all/);
   await sortButton.click();
-  await expect(page.getByRole("menuitemradio", { name: "タイトル（A→Z）" })).toHaveAttribute(
-    "aria-checked",
-    "true",
-  );
-  await page.getByRole("menuitem", { name: "このソートを既定にする" }).click();
+  await expect(
+    page.getByRole("menu").getByRole("menuitemradio", { name: "タイトル（A→Z）" }),
+  ).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("menu").getByRole("menuitem", { name: "このソートを既定にする" }).click();
 
   // 保存後は今の並びが外れて既定に従い、メニューの保存項目も消える
   await sortButton.click();
-  await expect(page.getByRole("menuitemradio", { name: "タイトル（A→Z）" })).toHaveAttribute(
-    "aria-checked",
-    "true",
-  );
-  await expect(page.getByRole("menuitem", { name: "このソートを既定にする" })).toHaveCount(0);
+  await expect(
+    page.getByRole("menu").getByRole("menuitemradio", { name: "タイトル（A→Z）" }),
+  ).toHaveAttribute("aria-checked", "true");
+  await expect(
+    page.getByRole("menu").getByRole("menuitem", { name: "このソートを既定にする" }),
+  ).toHaveCount(0);
 
   // サイドバーから入り直しても、保存した既定の並びになる
   await page.keyboard.press("Escape");
@@ -267,10 +267,9 @@ test("並び順メニュー: 今の並びはURLに出ず、戻る・進むで保
     .click();
   await railRow(page, "すべて").click();
   await sortButton.click();
-  await expect(page.getByRole("menuitemradio", { name: "タイトル（A→Z）" })).toHaveAttribute(
-    "aria-checked",
-    "true",
-  );
+  await expect(
+    page.getByRole("menu").getByRole("menuitemradio", { name: "タイトル（A→Z）" }),
+  ).toHaveAttribute("aria-checked", "true");
 
   assertNoErrors(tracker);
 });
@@ -318,7 +317,7 @@ test("詳細パネルの「その他」メニューから登録解除できる�
   const panel = page.locator(".mle-prv");
   await expect(panel).toBeVisible();
   await panel.getByRole("button", { name: "その他" }).click();
-  await page.getByRole("menuitem", { name: "登録解除" }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "登録解除" }).click();
 
   const dialog = page.getByRole("alertdialog", { name: "登録解除" });
   await expect(dialog).toBeVisible();
@@ -365,7 +364,9 @@ test("詳細パネル: 再開ボタンが正しいアクセシブル名で表示
   await expect(panel.getByText("再開 3:21", { exact: true })).toBeVisible();
 
   await panel.getByRole("button", { name: "再生メニュー" }).click();
-  await expect(page.getByRole("menuitem", { name: "最初から再生" })).toBeVisible();
+  await expect(
+    page.getByRole("menu").getByRole("menuitem", { name: "最初から再生" }),
+  ).toBeVisible();
 
   assertNoErrors(tracker);
 });
@@ -454,7 +455,7 @@ test("作品編集: 関連URLを追加できる", async ({ page }) => {
   await dialog.locator("footer").getByRole("button", { name: "閉じる" }).click();
 
   await panel.getByRole("button", { name: "その他" }).click();
-  await expect(page.getByRole("menuitem", { name: "公式を開く" })).toBeVisible();
+  await expect(page.getByRole("menu").getByRole("menuitem", { name: "公式を開く" })).toBeVisible();
 
   assertNoErrors(tracker);
 });
@@ -602,7 +603,7 @@ test("未登録タブでRJコードを編集でき、選んだ候補を除外し
 
   const excludeRowName = /^「候補」を選択/;
   await unregistered.getByRole("button", { name: "「候補」の操作" }).click();
-  await page.getByRole("menuitem", { name: "除外", exact: true }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "除外", exact: true }).click();
   await expect(unregistered.getByRole("row", { name: excludeRowName })).toBeHidden();
 
   await expect(dialog.getByText("「候補」を除外しました")).toBeVisible();
@@ -613,7 +614,7 @@ test("未登録タブでRJコードを編集でき、選んだ候補を除外し
 
   await dialog.getByRole("tab", { name: /^未登録/ }).click();
   await unregistered.getByRole("button", { name: "「候補」の操作" }).click();
-  await page.getByRole("menuitem", { name: "除外", exact: true }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "除外", exact: true }).click();
   await expect(dialog.getByRole("tab", { name: "未登録（1件）" })).toBeVisible();
 
   await unregistered.getByRole("button", { name: /^除外済み/ }).click();

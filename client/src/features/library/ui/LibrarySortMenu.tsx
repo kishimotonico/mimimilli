@@ -11,7 +11,7 @@ import { getGroupSortLabel, groupSortOptions } from "../model/groupValueSort";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import { MenuPopup, MotionMenuRoot, useMotionMenu } from "../../../shared/ui/menu/MotionMenu";
-import { MenuCheckColumn } from "../../../shared/ui/menu/MenuCheckColumn";
+import { MenuCheckColumn, MenuCheckSpacer } from "../../../shared/ui/menu/MenuCheckColumn";
 import {
   MENU_GUTTER,
   MENU_LABEL_CLASS,
@@ -139,7 +139,7 @@ function ReadySortMenu({
                 onSelect={() => void saveAsDefault()}
                 className={menuItemClass()}
               >
-                <MenuCheckColumn />
+                <MenuCheckSpacer />
                 <span className={MENU_LABEL_CLASS}>このソートを既定にする</span>
               </Menu.Item>
             </>

@@ -1,23 +1,10 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { PopupMenu } from "../../src/shared/ui/Menu";
-import { Menu } from "@ark-ui/react/menu";
+import RowMenu from "../../src/features/scan/ui/scanModal/unregistered/RowMenu";
 
 function renderMenu(onSelect = vi.fn()) {
-  render(
-    <PopupMenu
-      placement="belowEnd"
-      items={[
-        { key: "a", label: "開く", onSelect },
-        { key: "b", label: "除外", onSelect: vi.fn(), danger: true },
-      ]}
-    >
-      <Menu.Trigger asChild>
-        <button type="button">メニュー</button>
-      </Menu.Trigger>
-    </PopupMenu>,
-  );
+  render(<RowMenu label="メニュー" disabled={false} onOpenFolder={onSelect} onExclude={vi.fn()} />);
   return { onSelect, trigger: screen.getByRole("button", { name: "メニュー" }) };
 }
 

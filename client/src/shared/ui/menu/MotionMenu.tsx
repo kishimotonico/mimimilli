@@ -28,12 +28,22 @@ interface MotionMenuProps extends UseMenuProps {
 }
 
 export function useMotionMenu(props: MotionMenuProps = {}) {
-  const { onEscapeKeyDown, onFocusOutside, onHighlightChange, initialHighlight, ...rest } = props;
+  const {
+    onEscapeKeyDown,
+    onFocusOutside,
+    onHighlightChange,
+    initialHighlight,
+    positioning,
+    ...rest
+  } = props;
   const apiRef = useRef<UseMenuReturn["api"] | null>(null);
+  const serviceRef = useRef<UseMenuReturn["service"] | null>(null);
   const keyboardOpenPending = useRef(false);
   const menu = useMenu({
     loopFocus: true,
     ...rest,
+    // fixed はダイアログの overflow に切り取られない。アンカーがスクロールで見えなくなったらメニューも隠す
+    positioning: { strategy: "fixed", hideWhenDetached: true, ...positioning },
     onHighlightChange: (details) => {
       onHighlightChange?.(details);
       // キーボードで開くと Ark UI が先頭（または末尾）を選ぶ。その最初の1回だけ現在値へ置き換える
@@ -45,16 +55,11 @@ export function useMotionMenu(props: MotionMenuProps = {}) {
     },
     onFocusOutside: (event) => {
       onFocusOutside?.(event);
-      // 外へ移ったフォーカス（Tab やプログラムの focus()）をトリガーへ奪い返さない。
-      // Ark UI の閉じ方はトリガーへ戻すので、閉じた後に移動先へ戻す
-      const target = event.detail.originalEvent.target;
+      if (event.defaultPrevented) return;
+      // 外へ移ったフォーカス（Tab やプログラムの focus()）をトリガーへ奪い返さず、そのまま閉じる。
+      // CLOSE の restoreFocus: false は zag の内部仕様（Ark UI 5.40.0 固定に依存）
       event.preventDefault();
-      apiRef.current?.setOpen(false);
-      setTimeout(() => {
-        if (target instanceof HTMLElement && target.isConnected) {
-          target.focus({ preventScroll: true });
-        }
-      }, 0);
+      serviceRef.current?.send({ type: "CLOSE", restoreFocus: false });
     },
     onEscapeKeyDown: (event) => {
       // IME の変換中の Esc は、変換の取消に使われるので閉じない
@@ -63,6 +68,7 @@ export function useMotionMenu(props: MotionMenuProps = {}) {
     },
   });
   apiRef.current = menu.api;
+  serviceRef.current = menu.service;
   const lifetime = usePresenceLifetime(menu.api.open);
   /** トリガーへ展開する。キーボードで開いたかどうかを覚える */
   const triggerProps = {
@@ -96,8 +102,6 @@ export function MotionMenuRoot({
 }
 
 interface MenuPopupProps {
-  /** ネイティブ dialog の中のメニューは、その dialog を渡す */
-  container?: RefObject<HTMLElement | null>;
   /** 出現の起点（transform-origin）。開く向きに合わせる */
   origin: string;
   narrow?: boolean;
@@ -111,7 +115,13 @@ function ignoreComposingKey(event: ReactKeyboardEvent) {
 }
 
 /** AnimatePresence の直接の子。退出中は inert にして、中身を操作できないようにする */
-function Popup({ container, origin, narrow, children, ...rest }: MenuPopupProps) {
+function Popup({
+  container,
+  origin,
+  narrow,
+  children,
+  ...rest
+}: MenuPopupProps & { container: RefObject<HTMLElement | null> }) {
   const isPresent = useIsPresent();
   const { menuScale } = useMotionVariants();
   return (
@@ -133,6 +143,14 @@ function Popup({ container, origin, narrow, children, ...rest }: MenuPopupProps)
   );
 }
 
+/** ネイティブ dialog の中のトリガーから開いたメニューは、その dialog の中へ出す（top layer の外では見えないため） */
+function dialogOf(api: UseMenuReturn["api"]): HTMLDialogElement | null {
+  const trigger = document.querySelector(
+    `[aria-controls="${CSS.escape(api.getContentProps().id ?? "")}"]`,
+  );
+  return trigger?.closest("dialog") ?? null;
+}
+
 /** MotionMenuRoot の中に置く。開閉は Ark UI の状態、出入りの表示は AnimatePresence */
 export function MenuPopup(props: MenuPopupProps) {
   const onExitComplete = useContext(ExitCompleteContext);
@@ -140,7 +158,7 @@ export function MenuPopup(props: MenuPopupProps) {
     <Menu.Context>
       {(api) => (
         <AnimatePresence onExitComplete={onExitComplete ?? undefined}>
-          {api.open && <Popup key="popup" {...props} />}
+          {api.open && <Popup key="popup" container={{ current: dialogOf(api) }} {...props} />}
         </AnimatePresence>
       )}
     </Menu.Context>

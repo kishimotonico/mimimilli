@@ -1,21 +1,11 @@
 import { useLayoutEffect, useRef } from "react";
 import type { MouseEvent as ReactMouseEvent, RefObject, SyntheticEvent } from "react";
 import { useSetAtom } from "jotai";
+import { resolveFocusReturnTarget } from "../lib/focusReturnTarget";
 import { getTabbableElements } from "./focusable";
 import { openModalDialogsAtom } from "../model/openModalDialogsAtom";
 
 const OPEN_MENU_SELECTOR = '[role="menu"]:not([inert])';
-
-/**
- * 閉じたときの戻し先。メニューの項目から開いたダイアログは、退出して消えるメニューではなく
- * そのトリガーへ戻す（メニューの中身には aria-labelledby でトリガーの id が付く）。
- */
-function resolveFocusReturnTarget(active: Element | null): HTMLElement | null {
-  if (!(active instanceof HTMLElement)) return null;
-  if (active.getAttribute("role") !== "menu") return active;
-  const triggerId = active.getAttribute("aria-labelledby");
-  return (triggerId && document.getElementById(triggerId)) || null;
-}
 
 interface UseDialogModalOptions {
   /**
@@ -71,8 +61,8 @@ export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptio
     };
     dialog.addEventListener("keydown", handleTabKeyDown);
 
-    // メニューは backdrop の pointerdown で閉じるので、click の時点では開いていたか分からない。
-    // Ark UI が閉じるより先の capture 段で、押した時点の状態を覚える
+    // Ark UI のメニューは、マウスでは pointerdown の次フレーム、タッチでは click で閉じる。
+    // click の時点では開いていたか分からないので、押した時点で開いていたかを覚える
     const handlePointerDown = (event: PointerEvent) => {
       pressedBackdropWithMenuOpen.current =
         event.target === dialog && dialog.querySelector(OPEN_MENU_SELECTOR) !== null;

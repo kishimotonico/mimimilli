@@ -1,7 +1,13 @@
 import { Menu } from "@ark-ui/react/menu";
-import { PopupMenu, type MenuItemSpec } from "../../../../../shared/ui/Menu";
 import IconButton from "../../../../../shared/ui/IconButton";
 import { I } from "../../../../../shared/ui/Icon";
+import { MenuPopup, MotionMenuRoot, useMotionMenu } from "../../../../../shared/ui/menu/MotionMenu";
+import {
+  MENU_GUTTER,
+  MENU_LABEL_CLASS,
+  MENU_SEPARATOR_CLASS,
+  menuItemClass,
+} from "../../../../../shared/ui/menu/menuStyles";
 
 interface RowMenuProps {
   label: string;
@@ -12,15 +18,21 @@ interface RowMenuProps {
 
 /** 行の右端の︙メニュー。 */
 export default function RowMenu({ label, disabled, onOpenFolder, onExclude }: RowMenuProps) {
-  const items: MenuItemSpec[] = [
-    { key: "open-folder", label: "フォルダーを開く", onSelect: onOpenFolder },
-    { key: "exclude", label: "除外", onSelect: onExclude, danger: true },
-  ];
+  const menu = useMotionMenu({ positioning: { placement: "bottom-end", gutter: MENU_GUTTER } });
   return (
-    <PopupMenu items={items} placement="belowEnd">
+    <MotionMenuRoot handle={menu}>
       <Menu.Trigger asChild>
         <IconButton icon={I.moreV} label={label} size="sm" tone="muted" disabled={disabled} />
       </Menu.Trigger>
-    </PopupMenu>
+      <MenuPopup origin="top right">
+        <Menu.Item value="open-folder" onSelect={onOpenFolder} className={menuItemClass()}>
+          <span className={MENU_LABEL_CLASS}>フォルダーを開く</span>
+        </Menu.Item>
+        <Menu.Separator className={MENU_SEPARATOR_CLASS} />
+        <Menu.Item value="exclude" onSelect={onExclude} className={menuItemClass({ danger: true })}>
+          <span className={MENU_LABEL_CLASS}>除外</span>
+        </Menu.Item>
+      </MenuPopup>
+    </MotionMenuRoot>
   );
 }

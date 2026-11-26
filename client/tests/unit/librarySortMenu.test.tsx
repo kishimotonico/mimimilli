@@ -129,10 +129,12 @@ describe("LibrarySortMenu", () => {
     await userEvent.keyboard("{ArrowDown}");
     expect(highlighted()).toBe(items[1]?.id);
     await userEvent.keyboard("{ArrowUp}{ArrowUp}{ArrowDown}");
-    expect(highlighted()).toBe(items[0]?.id);
+    await waitFor(() => expect(highlighted()).toBe(items[0]?.id));
 
     await userEvent.keyboard("I");
-    expect(highlighted()).toBe(items.find((item) => item.textContent === "ID順")?.id);
+    await waitFor(() =>
+      expect(highlighted()).toBe(items.find((item) => item.textContent === "ID順")?.id),
+    );
   });
 
   it("キーボードで開くと現在の並びをハイライトし、マウスで開いたときは何もハイライトしない", async () => {
@@ -280,7 +282,12 @@ describe("LibrarySortMenu", () => {
   it("今の並びが既定から外れているときだけ「このソートを既定にする」を出す", async () => {
     renderSortMenu({ folderId: "all", sort: "title-asc" });
     await userEvent.click(screen.getByRole("button", { name: "ソート" }));
-    expect(screen.getByRole("menuitem", { name: "このソートを既定にする" })).toBeInTheDocument();
+    const saveDefault = screen.getByRole("menuitem", { name: "このソートを既定にする" });
+    expect(saveDefault).toBeInTheDocument();
+    expect(saveDefault.querySelector("svg")).toBeNull();
+    expect(
+      screen.getByRole("menuitemradio", { name: /タイトル（A→Z）/ }).querySelector("svg"),
+    ).not.toBeNull();
   });
 
   it("押すとそのスマートフォルダーの既定として解決済みの並びを PATCH する。今の並びは外さない", async () => {

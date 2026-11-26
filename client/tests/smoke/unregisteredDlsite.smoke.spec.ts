@@ -68,14 +68,14 @@ test("▾の「選択を除外」で選択中の行が消え、「項目を選�
   const { dialog, panel } = await openUnregistered(page);
   await panel.getByRole("checkbox", { name: "「囁きの図書館」を選択" }).uncheck();
   await panel.getByRole("button", { name: "その他の操作" }).click();
-  await page.getByRole("menuitem", { name: "選択を除外" }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "選択を除外" }).click();
   await expect(page.getByText(/を除外しました/)).toBeVisible();
   await expect(panel.getByRole("row", { name: /囁きの図書館/ })).toBeVisible();
   await expect(panel.getByRole("row", { name: /カバーなし作品/ })).toBeHidden();
 
   await panel.getByRole("checkbox", { name: "「囁きの図書館」を選択" }).check();
   await panel.getByRole("button", { name: "その他の操作" }).click();
-  await page.getByRole("menuitem", { name: "項目を選んで追加…" }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "項目を選んで追加…" }).click();
   const picker = page.getByRole("dialog", { name: "追加する項目" });
   await picker.getByLabel("カバー").uncheck();
   await picker.getByRole("button").first().click();
@@ -112,7 +112,7 @@ test("先頭の行の︙メニューから除外でき、「元に戻す」で�
   const firstRow = panel.getByRole("row").nth(1);
   const firstName = (await firstRow.getByRole("checkbox").getAttribute("aria-label")) ?? "";
   await firstRow.getByRole("button", { name: /の操作$/ }).click();
-  await page.getByRole("menuitem", { name: "除外", exact: true }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "除外", exact: true }).click();
   await expect(page.getByText(/を除外しました/)).toBeVisible();
   await expect(panel.getByRole("checkbox", { name: firstName })).toBeHidden();
 
@@ -153,7 +153,7 @@ test("取得結果が該当なし・失敗の行は選択から外れ、追加�
   await panel.getByLabel("すべて選択").check();
   await expect(panel.getByRole("button", { name: FETCH_BUTTON })).toBeVisible();
   await panel.getByRole("button", { name: "その他の操作" }).click();
-  await page.getByRole("menuitem", { name: "取得せずに追加" }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "取得せずに追加" }).click();
   await expect(dialog.getByRole("tab", { name: /^新規作品/ })).toHaveAttribute(
     "aria-selected",
     "true",

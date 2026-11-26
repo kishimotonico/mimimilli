@@ -1,3 +1,4 @@
+import { resolveFocusReturnTarget } from "../../shared/lib/focusReturnTarget";
 import { useEffect, useRef, useState } from "react";
 import { NO_AUTOFILL_PROPS } from "../../shared/ui/noAutofill";
 import { I } from "../../shared/ui/Icon";
@@ -105,8 +106,7 @@ export default function TopBar() {
               if (!composingRef.current) onSearchChange(e.target.value);
             }}
             onFocus={(e) => {
-              previousFocusRef.current =
-                e.relatedTarget instanceof HTMLElement ? e.relatedTarget : null;
+              previousFocusRef.current = resolveFocusReturnTarget(e.relatedTarget);
             }}
             onCompositionStart={() => {
               composingRef.current = true;

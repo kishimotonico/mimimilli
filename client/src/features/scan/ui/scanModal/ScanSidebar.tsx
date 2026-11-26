@@ -1,11 +1,13 @@
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import type { ReactNode } from "react";
+import { Menu } from "@ark-ui/react/menu";
 import { useMotionVariants } from "../../../../shared/ui/useMotionVariants";
 import { cn } from "../../../../shared/lib/cn";
 import { formatScanDateTime } from "../../../../shared/lib/format";
 import { buttonClass } from "../../../../shared/ui/Button";
 import { I } from "../../../../shared/ui/Icon";
 import SplitButton from "../../../../shared/ui/SplitButton";
+import { MENU_LABEL_CLASS, menuItemClass } from "../../../../shared/ui/menu/menuStyles";
 import {
   scanPhaseLabel,
   type ScanProgress,
@@ -180,7 +182,11 @@ function SidebarStartButton({
         className="w-full"
         menuLabel="スキャンの方法"
         onClick={onStart}
-        items={[{ key: "full", label: "すべての作品を読み直す", onSelect: onFullScan }]}
+        menu={
+          <Menu.Item value="full" onSelect={onFullScan} className={menuItemClass()}>
+            <span className={MENU_LABEL_CLASS}>すべての作品を読み直す</span>
+          </Menu.Item>
+        }
       >
         <I.refresh size={14} />
         {status.kind === "failed" ? "再試行" : "スキャン"}
