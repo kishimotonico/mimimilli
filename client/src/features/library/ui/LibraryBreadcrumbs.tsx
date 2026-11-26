@@ -53,7 +53,9 @@ export default function LibraryBreadcrumbs() {
                 }
               : null
           }
-          onClose={() => setSiblingAnchor((current) => (current === siblingAnchor ? null : current))}
+          onClose={() =>
+            setSiblingAnchor((current) => (current === siblingAnchor ? null : current))
+          }
           onReturnTargetLost={() => {
             const valueButton = crumbsRef.current?.querySelector<HTMLButtonElement>(
               "button.mle-crumbs__seg.is-last",

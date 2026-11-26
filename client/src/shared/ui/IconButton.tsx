@@ -66,13 +66,14 @@ export default function IconButton({
   type = "button",
   ...rest
 }: IconButtonProps) {
-  const stateClass = disabled || softDisabled
-    ? "cursor-not-allowed text-ink-4"
-    : active
-      ? "text-acc-ink bg-acc-soft"
-      : variant === "bare"
-        ? TONE_CLASS[tone]
-        : `${TONE_CLASS[tone]} hover:bg-paper-2 active:bg-paper-3`;
+  const stateClass =
+    disabled || softDisabled
+      ? "cursor-not-allowed text-ink-4"
+      : active
+        ? "text-acc-ink bg-acc-soft"
+        : variant === "bare"
+          ? TONE_CLASS[tone]
+          : `${TONE_CLASS[tone]} hover:bg-paper-2 active:bg-paper-3`;
 
   return (
     <button

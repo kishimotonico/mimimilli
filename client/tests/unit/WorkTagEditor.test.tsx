@@ -117,7 +117,10 @@ describe("WorkTagEditor", () => {
     );
 
     expect(screen.getByRole("alert")).toHaveTextContent(message);
-    expect(screen.getByRole("button", { name: "タグを追加" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("button", { name: "タグを追加" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("作品が切り替わると disabled を解除する", () => {
@@ -146,7 +149,10 @@ describe("WorkTagEditor", () => {
       />,
     );
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.getByRole("button", { name: "タグを追加" })).not.toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("button", { name: "タグを追加" })).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("閲覧 Work が再取得されると disabled を解除する", () => {
@@ -175,7 +181,10 @@ describe("WorkTagEditor", () => {
       />,
     );
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.getByRole("button", { name: "タグを追加" })).not.toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("button", { name: "タグを追加" })).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("ペイン幅が320pxをまたいでも開いている入力欄は閉じるまで切り替わらない", async () => {

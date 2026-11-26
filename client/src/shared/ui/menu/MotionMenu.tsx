@@ -227,7 +227,9 @@ export function MenuPopup(props: MenuPopupProps) {
           {api.open && (
             <Popup
               key="popup"
-              container={{ current: layerContainer(getMenuTrigger(api.getContentProps().id ?? "")) }}
+              container={{
+                current: layerContainer(getMenuTrigger(api.getContentProps().id ?? "")),
+              }}
               {...props}
             />
           )}

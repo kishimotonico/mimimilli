@@ -90,20 +90,20 @@
 
 実装調査済みの値（正は実装）。
 
-| 要素                                                                                                                           | 層                    |
-| ------------------------------------------------------------------------------------------------------------------------------ | --------------------- |
-| プレイヤー（バー/ポップアップ）                                                                                                | z-index 32            |
-| 再生中の層（`.mle-layer`。中身の z-index は層の中で閉じる）                                                                    | z-index 34            |
-| 層の中・下部帯の背景（`.mle-nowplaying__bg`）                                                                                  | z-index 32            |
-| 層の中・トランスポート/AB行（`.mle-nowplaying__controls`）                                                                     | z-index 33            |
-| 層の中・没入モード面（`.mle-nowplaying__immersive`）                                                                           | z-index 40            |
-| 層の中・シーク行（`.mle-nowplaying__seek`、没入面より常に手前）                                                                | z-index 41            |
-| メニュー・ポップオーバー（`menuPanelClass` / `popoverPanelClass`。body または所属するネイティブ dialog へポータル）                   | z-index 50            |
-| 設定モーダル                                                                                                                   | top layer（下記）     |
-| スキャンモーダル                                                                                                               | top layer（下記）     |
-| スマートフォルダーのダイアログ                                                                                                 | top layer（下記）     |
-| 作品編集・DLsite適用プレビュー                                                                                                 | top layer（下記）     |
-| **グローバルトースト**（`Toast` / `GlobalToast`）                                                                              | **top layer（下記）** |
+| 要素                                                                                                                | 層                    |
+| ------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| プレイヤー（バー/ポップアップ）                                                                                     | z-index 32            |
+| 再生中の層（`.mle-layer`。中身の z-index は層の中で閉じる）                                                         | z-index 34            |
+| 層の中・下部帯の背景（`.mle-nowplaying__bg`）                                                                       | z-index 32            |
+| 層の中・トランスポート/AB行（`.mle-nowplaying__controls`）                                                          | z-index 33            |
+| 層の中・没入モード面（`.mle-nowplaying__immersive`）                                                                | z-index 40            |
+| 層の中・シーク行（`.mle-nowplaying__seek`、没入面より常に手前）                                                     | z-index 41            |
+| メニュー・ポップオーバー（`menuPanelClass` / `popoverPanelClass`。body または所属するネイティブ dialog へポータル） | z-index 50            |
+| 設定モーダル                                                                                                        | top layer（下記）     |
+| スキャンモーダル                                                                                                    | top layer（下記）     |
+| スマートフォルダーのダイアログ                                                                                      | top layer（下記）     |
+| 作品編集・DLsite適用プレビュー                                                                                      | top layer（下記）     |
+| **グローバルトースト**（`Toast` / `GlobalToast`）                                                                   | **top layer（下記）** |
 
 設定モーダル・スキャンモーダル・スマートフォルダーのダイアログ・作品編集・DLsite適用プレビューは
 ネイティブ `<dialog>` + `showModal()` で実装しており、z-index ではなくブラウザの

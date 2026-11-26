@@ -3,8 +3,7 @@ import { panelFrameClass } from "../layer/layerStyles";
 
 export const MENU_GUTTER = 6;
 
-const PANEL_BASE =
-  `z-50 grid w-max max-w-[280px] grid-cols-[minmax(0,1fr)] p-1 outline-none ${panelFrameClass}`;
+const PANEL_BASE = `z-50 grid w-max max-w-[280px] grid-cols-[minmax(0,1fr)] p-1 outline-none ${panelFrameClass}`;
 
 export function menuPanelClass(options: { narrow?: boolean } = {}): string {
   return cn(PANEL_BASE, options.narrow ? "min-w-[112px]" : "min-w-[180px]");
