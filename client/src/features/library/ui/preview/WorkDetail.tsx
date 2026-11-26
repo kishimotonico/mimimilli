@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useSetAtom } from "jotai";
 import {
   getDefaultPlaylistTrackCount,
@@ -88,6 +88,7 @@ export function WorkDetail({
   const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const statusLabel = getWorkStatusLabel(work.status);
   const toast = useToast();
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
@@ -109,7 +110,7 @@ export function WorkDetail({
       toast.error(apiErrorMessage(cause, "登録解除に失敗しました"));
       return;
     }
-    focusWorkRowOrList(focusWorkId);
+    focusWorkRowOrList(focusWorkId, rootRef.current);
     toast.show({
       message: `「${title}」を登録解除しました`,
       variant: "success",
@@ -121,7 +122,7 @@ export function WorkDetail({
   };
 
   return (
-    <div className={layout === "full" ? "mle-prv__body is-full" : "mle-prv__body"}>
+    <div ref={rootRef} className={layout === "full" ? "mle-prv__body is-full" : "mle-prv__body"}>
       <div className="mle-prv__hero">
         <div className="mle-prv__coverwrap">
           <div className="mle-prv__cover">

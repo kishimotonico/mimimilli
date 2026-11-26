@@ -749,7 +749,7 @@ describe("UnregisteredTab 除外", () => {
     await userEvent.click(next);
     await userEvent.click(screen.getByRole("menuitem", { name: "除外" }));
     await waitFor(() => expect(screen.queryByRole("button", { name: /」の操作$/ })).toBeNull());
-    await waitFor(() => expect(document.activeElement).not.toBe(document.body));
+    await waitFor(() => expect(document.activeElement).toHaveAttribute("tabindex", "-1"));
   });
 
   it("行のメニューの除外は、選択ではなくその行だけに効く", async () => {
@@ -868,7 +868,7 @@ describe("UnregisteredTab 除外", () => {
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
   });
 
-  it("行メニューはEscで閉じて︙へフォーカスが戻り、Tabで外へ出ても閉じる", async () => {
+  it("行メニューはEscで閉じて︙へフォーカスが戻り、プログラムのfocus()で外へ出ても閉じる", async () => {
     await renderTab([candidateA, candidateB]);
     const trigger = screen.getByRole("button", { name: `「${candidateA.inferredTitle}」の操作` });
     await userEvent.click(trigger);

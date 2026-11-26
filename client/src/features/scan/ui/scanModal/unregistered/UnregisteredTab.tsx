@@ -8,6 +8,7 @@ import {
   type ScanCandidate,
 } from "@mimimilli/shared";
 import { apiErrorMessage } from "../../../../../shared/lib/apiError";
+import { isFocusLost } from "../../../../../shared/lib/focusReturnTarget";
 import { useLatest } from "../../../../../shared/lib/useLatest";
 import { useVirtualList } from "../../../../../shared/ui/useVirtualList";
 import { isCandidatesStale, STALE_MESSAGE } from "../../../model/candidatesStale";
@@ -213,6 +214,8 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
       return;
     }
     focusRequestRef.current = null;
+    // 起点（フッターの▾や主ボタン）が残ってフォーカスもそこにあるとき、ユーザーが他へ移したときは動かさない
+    if (!isFocusLost()) return;
     const row = [
       ...(scrollRef.current?.querySelectorAll<HTMLElement>("[data-candidate-path]") ?? []),
     ].find((element) => element.dataset.candidatePath === request.nextPath);

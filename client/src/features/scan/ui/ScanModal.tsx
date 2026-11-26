@@ -1,3 +1,4 @@
+import { isFocusLost } from "../../../shared/lib/focusReturnTarget";
 import type { WorkspacePath } from "@mimimilli/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -99,9 +100,10 @@ export default function ScanModal({
     });
     if (remainingCandidates === 0) {
       // 未登録のパネルごと消えるので、フォーカスを body へ落とさず、移る先のタブへ先に預ける
-      const active = document.activeElement;
-      const inPanel = document.getElementById("scan-tabpanel-unregistered")?.contains(active);
-      if (inPanel || active === document.body) {
+      const inPanel = document
+        .getElementById("scan-tabpanel-unregistered")
+        ?.contains(document.activeElement);
+      if (inPanel || isFocusLost()) {
         document.getElementById("scan-tab-newWorks")?.focus({ preventScroll: true });
       }
       setActiveTab("newWorks");

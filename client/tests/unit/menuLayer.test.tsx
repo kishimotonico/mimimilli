@@ -1,10 +1,11 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { isInsideMenuTree } from "../../src/shared/ui/menu/MotionMenu";
 import RowMenu from "../../src/features/scan/ui/scanModal/unregistered/RowMenu";
 
 function renderMenu(onSelect = vi.fn()) {
-  render(<RowMenu label="メニュー" disabled={false} onOpenFolder={onSelect} onExclude={vi.fn()} />);
+  render(<RowMenu label="メニュー" busy={false} onOpenFolder={onSelect} onExclude={vi.fn()} />);
   return { onSelect, trigger: screen.getByRole("button", { name: "メニュー" }) };
 }
 
@@ -60,5 +61,20 @@ describe("メニュー部品", () => {
     trigger.focus();
     await userEvent.keyboard("{ArrowDown}{Enter}");
     expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("メニューの中身と右クリックのトリガーは、メニューツリーとして扱う", () => {
+    document.body.innerHTML = `
+      <div data-scope="menu" data-part="content"><button id="in-content"></button></div>
+      <div data-scope="menu" data-part="context-trigger"><span id="in-ctx"></span></div>
+      <div data-scope="menu" data-part="trigger"><button id="trigger"></button></div>
+      <button id="outside"></button>`;
+    const pick = (id: string) => document.getElementById(id);
+    expect(isInsideMenuTree(pick("in-content"))).toBe(true);
+    expect(isInsideMenuTree(pick("in-ctx"))).toBe(true);
+    expect(isInsideMenuTree(pick("trigger"))).toBe(false);
+    expect(isInsideMenuTree(pick("outside"))).toBe(false);
+    expect(isInsideMenuTree(null)).toBe(false);
+    document.body.innerHTML = "";
   });
 });

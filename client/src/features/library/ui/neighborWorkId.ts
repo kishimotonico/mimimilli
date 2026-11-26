@@ -1,3 +1,5 @@
+import { isFocusLost } from "../../../shared/lib/focusReturnTarget";
+
 /**
  * 一覧で、指定した作品の次の行（末尾なら前の行）の作品 ID。登録解除などで作品が消えるとき、
  * フォーカスの移し先を消える前に決めるために使う。描画中の行（data-work-id）から探す。
@@ -14,8 +16,13 @@ export function neighborWorkId(workId: string): string | null {
   return (rows[at + 1] ?? rows[at - 1])?.id ?? null;
 }
 
-/** 作品が消えたあとのフォーカスの移し先: 決めておいた隣の行、無ければ（一覧が空になるときなど）一覧そのもの */
-export function focusWorkRowOrList(workId: string | null) {
+/**
+ * 作品が消えたあとのフォーカスの移し先: 決めておいた隣の行、無ければ（一覧が空になるときなど）一覧そのもの。
+ * フォーカスが消える側の詳細（removedRoot）の中か、どこにも無いときだけ移す。
+ */
+export function focusWorkRowOrList(workId: string | null, removedRoot: HTMLElement | null) {
+  const active = document.activeElement;
+  if (!isFocusLost() && !(active && removedRoot?.contains(active))) return;
   const row =
     workId === null
       ? null

@@ -20,6 +20,16 @@ function isComposingKey(event: KeyboardEvent | ReactKeyboardEvent): boolean {
   return native.isComposing || native.keyCode === 229;
 }
 
+/** フォーカスの移動先が、メニューの中身か右クリックのトリガーか */
+export function isInsideMenuTree(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    target.closest(
+      '[data-scope="menu"][data-part="content"], [data-scope="menu"][data-part="context-trigger"]',
+    ) !== null
+  );
+}
+
 const KEYBOARD_OPEN_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", " "]);
 
 interface MotionMenuProps extends UseMenuProps {
@@ -35,6 +45,7 @@ export function useMotionMenu(props: MotionMenuProps = {}) {
     onFocusOutside,
     onHighlightChange,
     initialHighlight,
+    onOpenChange,
     disabled = false,
     positioning,
     ...rest
@@ -47,6 +58,10 @@ export function useMotionMenu(props: MotionMenuProps = {}) {
     ...rest,
     // fixed はダイアログの overflow に切り取られない。アンカーがスクロールで見えなくなったらメニューも隠す
     positioning: { strategy: "fixed", hideWhenDetached: true, ...positioning },
+    onOpenChange: (details) => {
+      onOpenChange?.(details);
+      if (!details.open) keyboardOpenPending.current = false;
+    },
     onHighlightChange: (details) => {
       onHighlightChange?.(details);
       // キーボードで開くと Ark UI が先頭（または末尾）を選ぶ。その最初の1回だけ現在値へ置き換える
@@ -59,7 +74,9 @@ export function useMotionMenu(props: MotionMenuProps = {}) {
     onFocusOutside: (event) => {
       onFocusOutside?.(event);
       if (event.defaultPrevented) return;
-      // 外へ移ったフォーカス（Tab やプログラムの focus()）をトリガーへ奪い返さず、そのまま閉じる。
+      // メニューツリー（サブメニュー・右クリックのトリガー）への移動は、zag の除外判定に任せる
+      if (isInsideMenuTree(event.detail.originalEvent.target)) return;
+      // 外へ移ったフォーカス（プログラムの focus()）をトリガーへ奪い返さず、そのまま閉じる。
       // CLOSE の restoreFocus: false は zag の内部仕様（Ark UI 5.40.0 固定に依存）
       event.preventDefault();
       serviceRef.current?.send({ type: "CLOSE", restoreFocus: false });
