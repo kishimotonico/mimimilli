@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach, beforeEach, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import FilterChipBand from "../../src/features/library/ui/FilterChipBand";
@@ -81,10 +81,32 @@ describe("FilterChipBand のチップ", () => {
     });
 
     await userEvent.click(screen.getByRole("button", { name: /絞り込み$/ }));
-    const groupByButtons = screen
-      .getAllByRole("button")
-      .filter((b) => b.className.includes("mll-qlist__item"));
+    const picker = screen.getByRole("listbox", { name: "絞り込みの種類" });
+    const groupByButtons = within(picker).getAllByRole("button");
     expect(groupByButtons.map((b) => b.textContent)).toEqual(["CV", "タグ", "追加年"]);
+  });
+
+  it("段を切り替えても同じポップオーバーを保ち、Esc で選んだ項目へ戻る", async () => {
+    const user = userEvent.setup();
+    renderFilterChipBand();
+    const trigger = screen.getByRole("button", { name: "絞り込み" });
+    await user.click(trigger);
+    const popup = screen.getByRole("dialog");
+    const picker = within(popup).getByRole("listbox", { name: "絞り込みの種類" });
+    const [first] = within(picker).getAllByRole("button");
+    await waitFor(() => expect(first).toHaveFocus());
+
+    await user.click(within(picker).getByRole("button", { name: "追加年" }));
+    expect(screen.getByRole("dialog")).toBe(popup);
+    expect(within(popup).getByRole("textbox", { name: "追加年を検索" })).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("dialog")).toBe(popup);
+    expect(within(popup).getByRole("button", { name: "追加年" })).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 });
 

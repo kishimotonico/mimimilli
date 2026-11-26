@@ -1,5 +1,7 @@
-import { useRef, useState, type CSSProperties } from "react";
-import { AnimatePresence, motion, useIsPresent } from "motion/react";
+import { Popover } from "@ark-ui/react/popover";
+import { motion } from "motion/react";
+import { useCallback, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   defaultGroupSort,
   type GroupBy,
@@ -10,26 +12,20 @@ import {
   buildGroupByRows,
   getGroupByLabel,
 } from "../../../entities/library/smartFolderDefinitions";
+import { MENU_LABEL_CLASS, menuItemClass } from "../../../shared/ui/menu/menuStyles";
 import {
-  useAnchoredPopover,
-  type AnchoredPopoverFloatingRefCallback,
-} from "../../../shared/ui/useAnchoredPopover";
+  MotionPopoverRoot,
+  PopoverPopup,
+  useMotionPopover,
+} from "../../../shared/ui/popover/MotionPopover";
 import { buildFilterTag } from "../model/libraryPresentation";
 import { groupByKey } from "../../../entities/smart-folder/groupByKey";
-import GroupValuePopoverPanel from "./GroupValuePopoverPanel";
-import type { GroupValueScope } from "../model/useGroupValuesQuery";
+import GroupValueQuickList from "./GroupValueQuickList";
+import { useGroupValuesQuery, type GroupValueScope } from "../model/useGroupValuesQuery";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { I } from "../../../shared/ui/Icon";
 
-const POPOVER_WIDTH = 240;
-
-// チップ列の「＋絞り込み」（ADR-0012 §2）。グループ分け→値の2段オーバーレイ。
-// 選んだ値はチップとして足す。候補は定義済みの prefix 全部・タグ・追加年（ADR-0041）。
-//
-// グループ分け選択ステージ・値ステージともに、それぞれ独立した `<AnimatePresence>` で
-// 条件レンダーする。グループ分けを選ぶとグループ分け選択ステージが退出し値ステージが入場する
-// クロスフェードは、AnimatePresence が退出側の最後の props を凍結することで
-// 成立し、呼び出し側でのpickedGroupByの手動退避は不要。
+// チップ列の「＋絞り込み」（ADR-0012 §2）。グループ分け→値の2段を同じ層に表示する。
 
 interface FilterChipAddButtonProps {
   tagPrefixes: TagPrefix[];
@@ -39,44 +35,39 @@ interface FilterChipAddButtonProps {
   onAddValue: (tag: NormalizedTag) => void;
 }
 
-function GroupByPickerStage({
-  floatingStyles,
-  setFloating,
-  groupByRows,
-  onPick,
+function GroupValueStage({
+  groupBy,
+  groupByLabel,
+  scope,
+  selectedTags,
+  onSelect,
+  close,
 }: {
-  floatingStyles: CSSProperties;
-  setFloating: AnchoredPopoverFloatingRefCallback;
-  groupByRows: ReturnType<typeof buildGroupByRows>;
-  onPick: (groupBy: GroupBy) => void;
+  groupBy: GroupBy;
+  groupByLabel: string;
+  scope: GroupValueScope;
+  selectedTags: NormalizedTag[];
+  onSelect: (tag: NormalizedTag) => void;
+  close: () => void;
 }) {
-  const isPresent = useIsPresent();
-  const { popoverScale } = useMotionVariants();
-  const variant = popoverScale({ origin: "top left" });
+  const [sort, setSort] = useState(() => defaultGroupSort(groupBy));
+  // いまの絞り込みにこの値を追加した場合の件数を出す。
+  const values = useGroupValuesQuery(groupBy, scope, sort);
 
   return (
-    <motion.div
-      ref={setFloating}
-      className="mll-qoverlay mll-qoverlay--inline"
-      style={floatingStyles}
-      inert={!isPresent}
-      {...variant}
-    >
-      {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- GroupValueQuickList の一覧と表現を揃えるため<select>ではなくボタン一覧にする */}
-      <div className="mll-qlist__body" role="listbox" aria-label="絞り込みの種類">
-        {groupByRows.map((ax) => (
-          <button
-            key={groupByKey(ax.groupBy)}
-            type="button"
-            className="mll-qlist__item"
-            onClick={() => onPick(ax.groupBy)}
-          >
-            <span className="nm">{ax.name}</span>
-            <I.chev size={11} />
-          </button>
-        ))}
-      </div>
-    </motion.div>
+    <GroupValueQuickList
+      groupBy={groupBy}
+      groupByLabel={groupByLabel}
+      isOpen
+      items={values.data ?? []}
+      sort={sort}
+      onSortChange={setSort}
+      isLoading={values.isLoading}
+      isError={values.isError}
+      isSelected={(value) => selectedTags.includes(buildFilterTag(groupBy, value))}
+      onSelect={(item) => onSelect(buildFilterTag(groupBy, item.value))}
+      close={close}
+    />
   );
 }
 
@@ -88,67 +79,88 @@ export default function FilterChipAddButton({
 }: FilterChipAddButtonProps) {
   const [open, setOpen] = useState(false);
   const [pickedGroupBy, setPickedGroupBy] = useState<GroupBy | null>(null);
-  const pickedGroupByRef = useRef(pickedGroupBy);
-  pickedGroupByRef.current = pickedGroupBy;
-
-  const { setReference, setFloating, floatingStyles, close } = useAnchoredPopover({
-    isOpen: open,
-    preferredWidth: POPOVER_WIDTH,
-    onClose: (reason) => {
-      if (reason === "escape" && pickedGroupByRef.current !== null) {
-        setPickedGroupBy(null);
-      } else {
-        setOpen(false);
-        setPickedGroupBy(null);
-      }
+  const stageRef = useRef<HTMLDivElement>(null);
+  const { fade } = useMotionVariants();
+  const { initial, animate } = fade();
+  const onOpenChange = useCallback(({ open: nextOpen }: { open: boolean }) => {
+    setOpen(nextOpen);
+    if (!nextOpen) setPickedGroupBy(null);
+  }, []);
+  const popover = useMotionPopover({
+    open,
+    onOpenChange,
+    positioning: { placement: "bottom-start" },
+    initialFocusEl: () =>
+      stageRef.current?.querySelector<HTMLElement>("input, [data-group-by-key]") ?? null,
+    onEscapeKeyDown: (event) => {
+      if (pickedGroupBy !== null) event.preventDefault();
     },
   });
 
-  const groupByRows = buildGroupByRows(tagPrefixes);
+  function backOrClose() {
+    if (pickedGroupBy === null) {
+      popover.closeAndReturn();
+      return;
+    }
+    const key = groupByKey(pickedGroupBy);
+    flushSync(() => setPickedGroupBy(null));
+    stageRef.current
+      ?.querySelector<HTMLElement>(`[data-group-by-key="${CSS.escape(key)}"]`)
+      ?.focus({ preventScroll: true });
+  }
 
   return (
-    <div ref={setReference} className="relative inline-flex">
-      <button
-        type="button"
-        className="mll-tagband__addbtn"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => (open ? close() : setOpen(true))}
-      >
-        <I.add size={11} />
-        絞り込み
-      </button>
-      <AnimatePresence>
-        {open && pickedGroupBy === null && (
-          <GroupByPickerStage
-            floatingStyles={floatingStyles}
-            setFloating={setFloating}
-            groupByRows={groupByRows}
-            onPick={setPickedGroupBy}
-          />
-        )}
-      </AnimatePresence>
-      <AnimatePresence>
-        {pickedGroupBy !== null && (
-          <GroupValuePopoverPanel
-            key={groupByKey(pickedGroupBy)}
-            groupBy={pickedGroupBy}
-            groupByLabel={getGroupByLabel(pickedGroupBy, tagPrefixes)}
-            // 件数は現在の絞り込み込みの集計にする（「追加したら何件になるか」を示す）
-            scope={scope}
-            initialGroupSort={defaultGroupSort(pickedGroupBy)}
-            placement="below"
-            floatingStyles={floatingStyles}
-            setFloating={setFloating}
-            isSelected={(value) => selectedTags.includes(buildFilterTag(pickedGroupBy, value))}
-            onSelect={(item) => {
-              onAddValue(buildFilterTag(pickedGroupBy, item.value));
-              close();
-            }}
-            close={close}
-          />
-        )}
-      </AnimatePresence>
-    </div>
+    <MotionPopoverRoot handle={popover}>
+      <Popover.Trigger asChild>
+        <button type="button" className="mll-tagband__addbtn">
+          <I.add size={11} />
+          絞り込み
+        </button>
+      </Popover.Trigger>
+      <PopoverPopup origin="top left" className="w-[240px]">
+        <motion.div
+          key={groupByKey(pickedGroupBy)}
+          ref={stageRef}
+          initial={initial}
+          animate={animate}
+        >
+          {pickedGroupBy === null ? (
+            // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- GroupValueQuickList に合わせたボタン一覧
+            <div role="listbox" aria-label="絞り込みの種類">
+              {buildGroupByRows(tagPrefixes).map(({ groupBy, name }) => {
+                const key = groupByKey(groupBy);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    data-group-by-key={key}
+                    className={`${menuItemClass()} hover:bg-paper-2 hover:text-ink-0 focus-visible:bg-paper-2 focus-visible:text-ink-0`}
+                    onClick={() => {
+                      flushSync(() => setPickedGroupBy(groupBy));
+                      popover.focusInitial();
+                    }}
+                  >
+                    <span className={MENU_LABEL_CLASS}>{name}</span>
+                    <I.chev size={11} />
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <GroupValueStage
+              groupBy={pickedGroupBy}
+              groupByLabel={getGroupByLabel(pickedGroupBy, tagPrefixes)}
+              scope={scope}
+              selectedTags={selectedTags}
+              onSelect={(tag) => {
+                popover.closeAndReturn();
+                onAddValue(tag);
+              }}
+              close={backOrClose}
+            />
+          )}
+        </motion.div>
+      </PopoverPopup>
+    </MotionPopoverRoot>
   );
 }
