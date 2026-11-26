@@ -45,25 +45,38 @@ function Panel({
       <Popover.Trigger>{name}を開く</Popover.Trigger>
       <PopoverPopup ref={contentRef} aria-label={name} onKeyDown={onKeyDown} className="w-60">
         <input ref={input} aria-label={`${name}の検索欄`} />
-        <button type="button" onClick={handle.closeAndReturn}>確定</button>
-        <button type="button" onClick={handle.focusInitial}>検索欄へ移動</button>
+        <button type="button" onClick={handle.closeAndReturn}>
+          確定
+        </button>
+        <button type="button" onClick={handle.focusInitial}>
+          検索欄へ移動
+        </button>
         {children}
       </PopoverPopup>
     </MotionPopoverRoot>
   );
 }
 
-function SinglePanel({ onChange, children, onKeyDown }: {
+function SinglePanel({
+  onChange,
+  children,
+  onKeyDown,
+}: {
   onChange?: (open: boolean) => void;
   children?: ReactNode;
   onKeyDown?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <Panel name="パネル" open={open} onChange={(next) => {
-      onChange?.(next);
-      setOpen(next);
-    }} onKeyDown={onKeyDown}>
+    <Panel
+      name="パネル"
+      open={open}
+      onChange={(next) => {
+        onChange?.(next);
+        setOpen(next);
+      }}
+      onKeyDown={onKeyDown}
+    >
       {children}
     </Panel>
   );
@@ -93,7 +106,9 @@ function DialogHost({ onClose }: { onClose: () => void }) {
       onCancel={handleCancel}
       onClick={(event) => handleBackdropClick(event)}
     >
-      <SinglePanel><NestedMenu /></SinglePanel>
+      <SinglePanel>
+        <NestedMenu />
+      </SinglePanel>
       <button type="button">外の操作</button>
     </dialog>
   );
@@ -104,8 +119,18 @@ function renderDialog(onClose = vi.fn()) {
   const showModal = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, "showModal");
   const close = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, "close");
   Object.defineProperties(HTMLDialogElement.prototype, {
-    showModal: { configurable: true, value(this: HTMLDialogElement) { this.open = true; } },
-    close: { configurable: true, value(this: HTMLDialogElement) { this.open = false; } },
+    showModal: {
+      configurable: true,
+      value(this: HTMLDialogElement) {
+        this.open = true;
+      },
+    },
+    close: {
+      configurable: true,
+      value(this: HTMLDialogElement) {
+        this.open = false;
+      },
+    },
   });
   const restore = () => {
     if (showModal) Object.defineProperty(HTMLDialogElement.prototype, "showModal", showModal);
@@ -114,7 +139,16 @@ function renderDialog(onClose = vi.fn()) {
     else Reflect.deleteProperty(HTMLDialogElement.prototype, "close");
   };
   const view = render(<DialogHost onClose={onClose} />);
-  return { onClose, unmount() { try { view.unmount(); } finally { restore(); } } };
+  return {
+    onClose,
+    unmount() {
+      try {
+        view.unmount();
+      } finally {
+        restore();
+      }
+    },
+  };
 }
 
 async function openNestedMenu(user: ReturnType<typeof userEvent.setup>) {
@@ -129,7 +163,12 @@ async function openNestedMenu(user: ReturnType<typeof userEvent.setup>) {
 describe("ポップオーバーのフォーカス", () => {
   it("外へ移して閉じたときは移動先からフォーカスを奪わない", async () => {
     const user = userEvent.setup();
-    render(<><SinglePanel /><input aria-label="外の入力" /></>);
+    render(
+      <>
+        <SinglePanel />
+        <input aria-label="外の入力" />
+      </>,
+    );
     await user.click(panelTrigger());
     await waitFor(() => expect(panelInput()).toHaveFocus());
     const outside = screen.getByRole("textbox", { name: "外の入力" });
@@ -139,24 +178,38 @@ describe("ポップオーバーのフォーカス", () => {
     expect(outside).toHaveFocus();
   });
 
-  it.each([true, false])("開く前の要素が接続中ならそこへ、切れていればトリガーへ戻す（接続中: %s）", async (connected) => {
-    function Host({ open, keepPrevious }: { open: boolean; keepPrevious: boolean }) {
-      return <>{keepPrevious && <button>元の要素</button>}<Panel name="パネル" open={open} onChange={() => {}} /></>;
-    }
-    const { rerender } = render(<Host open={false} keepPrevious />);
-    const previous = screen.getByRole("button", { name: "元の要素" });
-    previous.focus();
-    rerender(<Host open keepPrevious />);
-    await waitFor(() => expect(panelInput()).toHaveFocus());
-    rerender(<Host open keepPrevious={connected} />);
-    rerender(<Host open={false} keepPrevious={connected} />);
-    await waitFor(() => expect(connected ? previous : panelTrigger()).toHaveFocus());
-  });
+  it.each([true, false])(
+    "開く前の要素が接続中ならそこへ、切れていればトリガーへ戻す（接続中: %s）",
+    async (connected) => {
+      function Host({ open, keepPrevious }: { open: boolean; keepPrevious: boolean }) {
+        return (
+          <>
+            {keepPrevious && <button>元の要素</button>}
+            <Panel name="パネル" open={open} onChange={() => {}} />
+          </>
+        );
+      }
+      const { rerender } = render(<Host open={false} keepPrevious />);
+      const previous = screen.getByRole("button", { name: "元の要素" });
+      previous.focus();
+      rerender(<Host open keepPrevious />);
+      await waitFor(() => expect(panelInput()).toHaveFocus());
+      rerender(<Host open keepPrevious={connected} />);
+      rerender(<Host open={false} keepPrevious={connected} />);
+      await waitFor(() => expect(connected ? previous : panelTrigger()).toHaveFocus());
+    },
+  );
 
   it("確定はフォーカスを同期で戻してから閉じる", async () => {
     const user = userEvent.setup();
     const closedAt = vi.fn();
-    render(<SinglePanel onChange={(open) => { if (!open) closedAt(document.activeElement); }} />);
+    render(
+      <SinglePanel
+        onChange={(open) => {
+          if (!open) closedAt(document.activeElement);
+        }}
+      />,
+    );
     await user.click(panelTrigger());
     await waitFor(() => expect(panelInput()).toHaveFocus());
     await user.click(screen.getByRole("button", { name: "検索欄へ移動" }));
@@ -168,11 +221,13 @@ describe("ポップオーバーのフォーカス", () => {
 
   it("軸A→BではAが戻さず、BはAの開く前の要素を引き継ぐ", async () => {
     function Axes({ axis }: { axis: "A" | "B" | null }) {
-      return <>
-        <button>切替前</button>
-        <Panel name="A" open={axis === "A"} restoreFocus={axis !== "B"} onChange={() => {}} />
-        <Panel name="B" open={axis === "B"} onChange={() => {}} />
-      </>;
+      return (
+        <>
+          <button>切替前</button>
+          <Panel name="A" open={axis === "A"} restoreFocus={axis !== "B"} onChange={() => {}} />
+          <Panel name="B" open={axis === "B"} onChange={() => {}} />
+        </>
+      );
     }
     const { rerender } = render(<Axes axis={null} />);
     const previous = screen.getByRole("button", { name: "切替前" });
@@ -200,15 +255,26 @@ describe("ポップオーバーのフォーカス", () => {
       const [axis, setAxis] = useState<"A" | "B" | null>(null);
       return (
         <>
-          <Panel name="A" open={axis === "A"} restoreFocus={axis !== "B"} onChange={(open) => {
-            if (!open) closed("A");
-            setAxis(open ? "A" : null);
-          }} />
-          <button type="button" onClick={() => setAxis("B")}>Bへ切替</button>
-          <Panel name="B" open={axis === "B"} onChange={(open) => {
-            if (!open) closed("B");
-            setAxis(open ? "B" : null);
-          }} />
+          <Panel
+            name="A"
+            open={axis === "A"}
+            restoreFocus={axis !== "B"}
+            onChange={(open) => {
+              if (!open) closed("A");
+              setAxis(open ? "A" : null);
+            }}
+          />
+          <button type="button" onClick={() => setAxis("B")}>
+            Bへ切替
+          </button>
+          <Panel
+            name="B"
+            open={axis === "B"}
+            onChange={(open) => {
+              if (!open) closed("B");
+              setAxis(open ? "B" : null);
+            }}
+          />
         </>
       );
     }
@@ -261,7 +327,14 @@ describe("ポップオーバーのフォーカス", () => {
   it("開いている間だけアンカーを含むスクロールで閉じる", async () => {
     const user = userEvent.setup();
     const changed = vi.fn();
-    render(<><div data-testid="anchor-scroll"><SinglePanel onChange={changed} /></div><div data-testid="other-scroll" /></>);
+    render(
+      <>
+        <div data-testid="anchor-scroll">
+          <SinglePanel onChange={changed} />
+        </div>
+        <div data-testid="other-scroll" />
+      </>,
+    );
     fireEvent.scroll(screen.getByTestId("anchor-scroll"));
     expect(changed).not.toHaveBeenCalled();
     await user.click(panelTrigger());
@@ -294,7 +367,9 @@ describe("ポップオーバーとメニューの重なり", () => {
       expect(fireEvent.keyDown(panelTrigger(), { key: "Escape" })).toBe(true);
       fireEvent(dialog, new Event("cancel", { bubbles: true, cancelable: true }));
       expect(onClose).toHaveBeenCalledTimes(1);
-    } finally { unmount(); }
+    } finally {
+      unmount();
+    }
   });
 
   it("ポップオーバーの外をクリックするとメニューごと閉じる", async () => {
@@ -308,7 +383,9 @@ describe("ポップオーバーとメニューの重なり", () => {
       await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
       expect(outside).toHaveFocus();
       expect(onClose).not.toHaveBeenCalled();
-    } finally { unmount(); }
+    } finally {
+      unmount();
+    }
   });
 
   it("backdropは開いているポップオーバーだけを閉じる", async () => {
@@ -324,7 +401,9 @@ describe("ポップオーバーとメニューの重なり", () => {
       expect(onClose).not.toHaveBeenCalled();
       await user.click(dialog);
       expect(onClose).toHaveBeenCalledTimes(1);
-    } finally { unmount(); }
+    } finally {
+      unmount();
+    }
   });
 });
 
@@ -335,12 +414,22 @@ it("IconButtonのsoftDisabledはArk Triggerを無効にしてフォーカスを�
   function Host({ softDisabled, disabled }: { softDisabled?: boolean; disabled?: boolean }) {
     const [open, setOpen] = useState(false);
     const handle = useMotionPopover({ open, onOpenChange: (details) => setOpen(details.open) });
-    return <MotionPopoverRoot handle={handle}>
-      <Popover.Trigger asChild>
-        <IconButton icon={icon} label="追加" onClick={clicked} softDisabled={softDisabled} disabled={disabled} />
-      </Popover.Trigger>
-      <PopoverPopup aria-label="追加パネル"><input aria-label="追加項目" /></PopoverPopup>
-    </MotionPopoverRoot>;
+    return (
+      <MotionPopoverRoot handle={handle}>
+        <Popover.Trigger asChild>
+          <IconButton
+            icon={icon}
+            label="追加"
+            onClick={clicked}
+            softDisabled={softDisabled}
+            disabled={disabled}
+          />
+        </Popover.Trigger>
+        <PopoverPopup aria-label="追加パネル">
+          <input aria-label="追加項目" />
+        </PopoverPopup>
+      </MotionPopoverRoot>
+    );
   }
   const { rerender } = render(<Host />);
   const button = screen.getByRole("button", { name: "追加" });
@@ -361,7 +450,9 @@ it("IconButtonのsoftDisabledはArk Triggerを無効にしてフォーカスを�
 
 it("useElementWidthは要素の幅を監視し、監視先が無くなれば解除する", () => {
   const element = document.createElement("div");
-  const measure = vi.spyOn(element, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 300, 20));
+  const measure = vi
+    .spyOn(element, "getBoundingClientRect")
+    .mockReturnValue(new DOMRect(0, 0, 300, 20));
   function Width({ target }: { target: HTMLElement | null }) {
     return <output aria-label="幅">{useElementWidth(target) ?? "なし"}</output>;
   }

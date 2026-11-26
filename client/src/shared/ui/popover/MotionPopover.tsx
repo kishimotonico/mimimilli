@@ -104,7 +104,9 @@ export function useMotionPopover({
     ) {
       return active;
     }
-    return previousFocus.current?.isConnected ? previousFocus.current : getTrigger() ?? getAnchor();
+    return previousFocus.current?.isConnected
+      ? previousFocus.current
+      : (getTrigger() ?? getAnchor());
   }, [getTrigger, getAnchor]);
 
   const popover = usePopover({
@@ -112,7 +114,13 @@ export function useMotionPopover({
     open,
     modal: false,
     portalled: true,
-    positioning: { strategy: "fixed", gutter: 6, overflowPadding: 8, fitViewport: true, ...positioning },
+    positioning: {
+      strategy: "fixed",
+      gutter: 6,
+      overflowPadding: 8,
+      fitViewport: true,
+      ...positioning,
+    },
     initialFocusEl,
     finalFocusEl: resolveReturnTarget,
     onOpenChange: (details) => {
@@ -195,7 +203,10 @@ export function MotionPopoverRoot({
   );
 }
 
-type PopoverPopupProps = Omit<ComponentPropsWithRef<typeof motion.div>, "inert" | "onKeyDownCapture"> & {
+type PopoverPopupProps = Omit<
+  ComponentPropsWithRef<typeof motion.div>,
+  "inert" | "onKeyDownCapture"
+> & {
   origin?: string;
 };
 
