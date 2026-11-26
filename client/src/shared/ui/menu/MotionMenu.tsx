@@ -20,14 +20,24 @@ function isComposingKey(event: KeyboardEvent | ReactKeyboardEvent): boolean {
   return native.isComposing || native.keyCode === 229;
 }
 
-/** フォーカスの移動先が、メニューの中身か右クリックのトリガーか */
-export function isInsideMenuTree(target: EventTarget | null): boolean {
-  return (
-    target instanceof Element &&
-    target.closest(
-      '[data-scope="menu"][data-part="content"], [data-scope="menu"][data-part="context-trigger"]',
-    ) !== null
-  );
+/**
+ * フォーカスの移動先が、このメニューのツリー（自分の中身から開いたサブメニュー、自分の右クリックのトリガー）か。
+ * 別のメニューは含めない。別のメニューへの移動は外へ移ったものとして扱う
+ */
+export function isInsideOwnMenuTree(
+  target: EventTarget | null,
+  contentId: string,
+  contextTriggerId: string | undefined,
+): boolean {
+  if (!(target instanceof Element)) return false;
+  const content = target.closest('[data-scope="menu"][data-part="content"]');
+  if (content) {
+    const triggerId = content.getAttribute("aria-labelledby");
+    const trigger = triggerId ? document.getElementById(triggerId) : null;
+    return trigger !== null && document.getElementById(contentId)?.contains(trigger) === true;
+  }
+  const contextTrigger = target.closest('[data-scope="menu"][data-part="context-trigger"]');
+  return contextTrigger !== null && contextTrigger.id === contextTriggerId;
 }
 
 const KEYBOARD_OPEN_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", " "]);
@@ -43,6 +53,7 @@ export function useMotionMenu(props: MotionMenuProps = {}) {
   const {
     onEscapeKeyDown,
     onFocusOutside,
+    onPointerDownOutside,
     onHighlightChange,
     initialHighlight,
     onOpenChange,
@@ -75,11 +86,32 @@ export function useMotionMenu(props: MotionMenuProps = {}) {
       onFocusOutside?.(event);
       if (event.defaultPrevented) return;
       // メニューツリー（サブメニュー・右クリックのトリガー）への移動は、zag の除外判定に任せる
-      if (isInsideMenuTree(event.detail.originalEvent.target)) return;
-      // 外へ移ったフォーカス（プログラムの focus()）をトリガーへ奪い返さず、そのまま閉じる。
+      const api = apiRef.current;
+      if (
+        api &&
+        isInsideOwnMenuTree(
+          event.detail.originalEvent.target,
+          api.getContentProps().id ?? "",
+          api.getContextTriggerProps().id,
+        )
+      ) {
+        return;
+      }
+      // 外へ移ったフォーカス（プログラムの focus()、別のメニューのトリガー）をトリガーへ奪い返さず、そのまま閉じる。
       // CLOSE の restoreFocus: false は zag の内部仕様（Ark UI 5.40.0 固定に依存）
       event.preventDefault();
       serviceRef.current?.send({ type: "CLOSE", restoreFocus: false });
+    },
+    onPointerDownOutside: (event) => {
+      onPointerDownOutside?.(event);
+      // 別のメニューのトリガーは、押してもフォーカスを受けない（Ark UI が pointerdown を止める）。
+      // このメニューが閉じて中身が消えるときに body へ落ちないよう、先にそのトリガーへ移す
+      const target = event.detail.originalEvent.target;
+      const trigger =
+        target instanceof Element
+          ? target.closest('[data-scope="menu"][data-part="trigger"]')
+          : null;
+      if (trigger instanceof HTMLElement) trigger.focus({ preventScroll: true });
     },
     onEscapeKeyDown: (event) => {
       // IME の変換中の Esc は、変換の取消に使われるので閉じない
@@ -95,7 +127,8 @@ export function useMotionMenu(props: MotionMenuProps = {}) {
     // data-disabled は Ark UI がポインター操作を無視する印。キーボードは defaultPrevented を見る
     "data-disabled": disabled ? "" : undefined,
     onKeyDownCapture: (event: ReactKeyboardEvent) => {
-      if (disabled) event.preventDefault();
+      // 開くキーだけを止める。Tab や Esc は通す
+      if (disabled && KEYBOARD_OPEN_KEYS.has(event.key)) event.preventDefault();
     },
     onKeyDown: (event: ReactKeyboardEvent) => {
       keyboardOpenPending.current = !menu.api.open && KEYBOARD_OPEN_KEYS.has(event.key);

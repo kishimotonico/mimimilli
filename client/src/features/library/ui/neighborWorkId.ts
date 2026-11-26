@@ -16,8 +16,16 @@ export function neighborWorkId(workId: string): string | null {
   return (rows[at + 1] ?? rows[at - 1])?.id ?? null;
 }
 
+/** 一覧の移し先: roving の行（tabindex=0）、行が無ければ（一覧が空のとき）一覧そのもの */
+export function focusListEntry() {
+  const list = document.querySelector<HTMLElement>("[data-work-list]");
+  (list?.querySelector<HTMLElement>("[data-work-id][tabindex='0']") ?? list)?.focus({
+    preventScroll: true,
+  });
+}
+
 /**
- * 作品が消えたあとのフォーカスの移し先: 決めておいた隣の行、無ければ（一覧が空になるときなど）一覧そのもの。
+ * 作品が消えたあとのフォーカスの移し先: 決めておいた隣の行、無ければ一覧のコンテナ（解除の要求の間はフォーカスを受けられる）。
  * フォーカスが消える側の詳細（removedRoot）の中か、どこにも無いときだけ移す。
  */
 export function focusWorkRowOrList(workId: string | null, removedRoot: HTMLElement | null) {

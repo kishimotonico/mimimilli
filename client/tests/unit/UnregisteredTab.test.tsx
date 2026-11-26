@@ -749,7 +749,9 @@ describe("UnregisteredTab 除外", () => {
     await userEvent.click(next);
     await userEvent.click(screen.getByRole("menuitem", { name: "除外" }));
     await waitFor(() => expect(screen.queryByRole("button", { name: /」の操作$/ })).toBeNull());
-    await waitFor(() => expect(document.activeElement).toHaveAttribute("tabindex", "-1"));
+    await waitFor(() =>
+      expect(screen.getByText("未登録の候補はありません").closest('[tabindex="-1"]')).toHaveFocus(),
+    );
   });
 
   it("行のメニューの除外は、選択ではなくその行だけに効く", async () => {

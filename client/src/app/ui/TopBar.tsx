@@ -1,4 +1,3 @@
-import { resolveFocusReturnTarget } from "../../shared/lib/focusReturnTarget";
 import { useEffect, useRef, useState } from "react";
 import { NO_AUTOFILL_PROPS } from "../../shared/ui/noAutofill";
 import { I } from "../../shared/ui/Icon";
@@ -14,6 +13,7 @@ import {
   playingTrackTitleAtom,
 } from "../../entities/player/model/atoms";
 import { cn } from "../../shared/lib/cn";
+import { resolveFocusReturnTarget } from "../../shared/lib/focusReturnTarget";
 import { useScanEntryStatus } from "../../features/scan/model/useScanEntryStatus";
 import ScanEntryButton from "./ScanEntryButton";
 

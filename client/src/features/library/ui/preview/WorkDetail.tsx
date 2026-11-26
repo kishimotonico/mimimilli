@@ -8,6 +8,7 @@ import {
 } from "@mimimilli/shared";
 import { useToast } from "../../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
+import { listFocusRequestAtom } from "../../model/listFocusRequestAtom";
 import { focusWorkRowOrList, neighborWorkId } from "../neighborWorkId";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import { openPathInFilesAtom } from "../../../../entities/file-system/model/navigationAtoms";
@@ -89,6 +90,7 @@ export function WorkDetail({
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const setListFocusRequest = useSetAtom(listFocusRequestAtom);
   const statusLabel = getWorkStatusLabel(work.status);
   const toast = useToast();
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
@@ -107,10 +109,12 @@ export function WorkDetail({
     try {
       await deleteMutation.mutateAsync(work.id);
     } catch (cause) {
+      setListFocusRequest(null);
       toast.error(apiErrorMessage(cause, "登録解除に失敗しました"));
       return;
     }
-    focusWorkRowOrList(focusWorkId, rootRef.current);
+    // 作品詳細ページには一覧が無い。ライブラリへ戻って一覧が描画されたときに、一覧が移す
+    if (layout !== "full") focusWorkRowOrList(focusWorkId, rootRef.current);
     toast.show({
       message: `「${title}」を登録解除しました`,
       variant: "success",
@@ -288,6 +292,7 @@ export function WorkDetail({
           onConfirm={() => {
             // 作品が消えると詳細ごと︙も消えるので、繰り上がる行（末尾なら前の行）を確定時に決めておく
             const focusWorkId = neighborWorkId(work.id);
+            setListFocusRequest(work.id);
             setIsDeleteConfirmOpen(false);
             void handleDeleteConfirm(focusWorkId);
           }}

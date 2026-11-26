@@ -21,6 +21,7 @@ import {
 } from "./workGrid/useWorkGridJustifiedLayout";
 import { useWorkGridWheelZoom } from "./workGrid/useWorkGridWheelZoom";
 import { useWorkResultsDismiss } from "./useWorkResultsDismiss";
+import { useFocusListAfterReturn } from "./useFocusListAfterReturn";
 import { useListKeyboardNav } from "../../../shared/ui/useListKeyboardNav";
 import { useRovingIndex } from "./useRovingIndex";
 import { useRevealSelectedWork } from "./useRevealSelectedWork";
@@ -96,6 +97,7 @@ export default function WorkGrid({
   );
 
   useWorkGridWheelZoom(paneRef, safeTileSize, setTileSize);
+  const listFocusable = useFocusListAfterReturn(works, isPending, virtualItems.length);
   useWorkResultsDismiss(isWorkSelected, onDeselect, scrollRef, ".mll-grid-tile");
   const moveTileFocus = useListKeyboardNav({
     containerEl: gridEl,
@@ -147,7 +149,12 @@ export default function WorkGrid({
       aria-label="作品グリッド"
     >
       <div className="mll-grid-body">
-        <div ref={scrollRef} data-work-list tabIndex={-1} className="mll-grid-scroll outline-none">
+        <div
+          ref={scrollRef}
+          data-work-list
+          tabIndex={works.length === 0 || listFocusable ? -1 : undefined}
+          className="mll-grid-scroll outline-none"
+        >
           {works.length === 0 ? (
             <WorksEmptyState
               variant="grid"

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { isInsideMenuTree } from "../../src/shared/ui/menu/MotionMenu";
+import { isInsideOwnMenuTree } from "../../src/shared/ui/menu/MotionMenu";
 import RowMenu from "../../src/features/scan/ui/scanModal/unregistered/RowMenu";
 
 function renderMenu(onSelect = vi.fn()) {
@@ -63,18 +63,32 @@ describe("メニュー部品", () => {
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
-  it("メニューの中身と右クリックのトリガーは、メニューツリーとして扱う", () => {
+  it("自分のツリー（自分の中身から開いたサブメニュー、自分の右クリックのトリガー）だけを内側とする", () => {
     document.body.innerHTML = `
-      <div data-scope="menu" data-part="content"><button id="in-content"></button></div>
-      <div data-scope="menu" data-part="context-trigger"><span id="in-ctx"></span></div>
-      <div data-scope="menu" data-part="trigger"><button id="trigger"></button></div>
+      <div id="mine" data-scope="menu" data-part="content"><div id="sub-trigger"></div></div>
+      <div data-scope="menu" data-part="content" aria-labelledby="sub-trigger"><button id="in-sub"></button></div>
+      <div id="other-trigger"></div>
+      <div data-scope="menu" data-part="content" aria-labelledby="other-trigger"><button id="in-other"></button></div>
+      <div id="ctx" data-scope="menu" data-part="context-trigger"><span id="in-ctx"></span></div>
+      <div id="other-ctx" data-scope="menu" data-part="context-trigger"><span id="in-other-ctx"></span></div>
       <button id="outside"></button>`;
-    const pick = (id: string) => document.getElementById(id);
-    expect(isInsideMenuTree(pick("in-content"))).toBe(true);
-    expect(isInsideMenuTree(pick("in-ctx"))).toBe(true);
-    expect(isInsideMenuTree(pick("trigger"))).toBe(false);
-    expect(isInsideMenuTree(pick("outside"))).toBe(false);
-    expect(isInsideMenuTree(null)).toBe(false);
+    const inside = (id: string) => isInsideOwnMenuTree(document.getElementById(id), "mine", "ctx");
+    expect(inside("in-sub")).toBe(true);
+    expect(inside("in-ctx")).toBe(true);
+    expect(inside("in-other")).toBe(false);
+    expect(inside("in-other-ctx")).toBe(false);
+    expect(inside("outside")).toBe(false);
+    expect(isInsideOwnMenuTree(null, "mine", "ctx")).toBe(false);
     document.body.innerHTML = "";
+  });
+
+  it("処理中のトリガーで、開くキーだけを止め、Tab と Esc は止めない", async () => {
+    render(<RowMenu label="メニュー" busy onOpenFolder={vi.fn()} onExclude={vi.fn()} />);
+    const trigger = screen.getByRole("button", { name: "メニュー" });
+    trigger.focus();
+    expect(fireEvent.keyDown(trigger, { key: "ArrowDown" })).toBe(false);
+    expect(fireEvent.keyDown(trigger, { key: "Enter" })).toBe(false);
+    expect(fireEvent.keyDown(trigger, { key: "Tab" })).toBe(true);
+    expect(fireEvent.keyDown(trigger, { key: "Escape" })).toBe(true);
   });
 });

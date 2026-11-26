@@ -9,8 +9,8 @@ export function resolveFocusReturnTarget(active: EventTarget | Element | null): 
   return (triggerId && document.getElementById(triggerId)) || null;
 }
 
-/** フォーカスがどこにも無い（body、または DOM から外れた要素）。消えた行・トリガーからのフォーカスの移し替えの前提 */
+/** フォーカスがどこにも無い（body）。消えた行・トリガーからのフォーカスの移し替えの前提 */
 export function isFocusLost(): boolean {
   const active = document.activeElement;
-  return !active || active === document.body || !active.isConnected;
+  return !active || active === document.body;
 }
