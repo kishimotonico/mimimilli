@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Popover } from "@ark-ui/react/popover";
 import { normalizeTag } from "@mimimilli/shared";
 import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
 import { sortTagsForDisplay } from "../../../../entities/work/sortTagsForDisplay";
@@ -8,7 +9,11 @@ import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import IconButton from "../../../../shared/ui/IconButton";
 import { I } from "../../../../shared/ui/Icon";
 import TagCombobox from "../../../../shared/ui/TagCombobox";
-import { useAnchoredPopover } from "../../../../shared/ui/useAnchoredPopover";
+import {
+  MotionPopoverRoot,
+  PopoverPopup,
+  useMotionPopover,
+} from "../../../../shared/ui/popover/MotionPopover";
 import { useToast } from "../../../../shared/ui/useToast";
 
 const TAG_POPOVER_WIDTH = 260;
@@ -48,10 +53,15 @@ export function WorkEditTagsField({
   onDismissUndo,
 }: WorkEditTagsFieldProps) {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-  const { setReference, setFloating, floatingStyles, close } = useAnchoredPopover({
-    isOpen: isPopoverOpen,
-    preferredWidth: TAG_POPOVER_WIDTH,
-    onClose: () => setIsPopoverOpen(false),
+  const popupRef = useRef<HTMLDivElement>(null);
+  const popover = useMotionPopover({
+    open: isPopoverOpen,
+    onOpenChange: ({ open }) => {
+      if (!open || !disabled) setIsPopoverOpen(open);
+    },
+    positioning: { placement: "bottom-start" },
+    initialFocusEl: () => popupRef.current?.querySelector("input") ?? null,
+    onEscapeKeyDown: (event) => event.preventDefault(),
   });
 
   const { show: showToast, dismiss: dismissToast } = useToast();
@@ -84,41 +94,36 @@ export function WorkEditTagsField({
               onRemove={disabled ? undefined : () => onRequestRemoveTag(tag)}
             />
           ))}
-          <div ref={setReference} className="relative inline-flex">
-            <IconButton
-              icon={I.add}
-              label="タグを追加"
-              size="xs"
-              tone="muted"
-              className="bg-paper-2 hover:bg-paper-3"
-              disabled={disabled}
-              onClick={() => (isPopoverOpen ? close() : setIsPopoverOpen(true))}
-            />
-            {isPopoverOpen && (
-              <div
-                ref={setFloating}
-                className="absolute z-10 rounded-[6px] bg-paper-1 shadow-pop"
-                style={floatingStyles}
-              >
-                <TagCombobox
-                  focusOnMount
-                  width={
-                    typeof floatingStyles.width === "number"
-                      ? floatingStyles.width
-                      : TAG_POPOVER_WIDTH
-                  }
-                  suggestions={tagSuggestions}
-                  excludeTags={tags}
-                  canCreate={(tag) => normalizeTag(tag) !== null}
-                  onSelect={(tag) => {
-                    onAddTag(tag);
-                    close();
-                  }}
-                  onCancel={close}
-                />
-              </div>
-            )}
-          </div>
+          <MotionPopoverRoot handle={popover}>
+            <Popover.Trigger asChild>
+              <IconButton
+                icon={I.add}
+                label="タグを追加"
+                size="xs"
+                tone="muted"
+                className="bg-paper-2 hover:bg-paper-3"
+                softDisabled={disabled}
+              />
+            </Popover.Trigger>
+            <PopoverPopup
+              ref={popupRef}
+              aria-label="タグを追加"
+              origin="top left"
+              style={{ width: TAG_POPOVER_WIDTH }}
+            >
+              <TagCombobox
+                width="full"
+                suggestions={tagSuggestions}
+                excludeTags={tags}
+                canCreate={(tag) => normalizeTag(tag) !== null}
+                onSelect={(tag) => {
+                  popover.closeAndReturn();
+                  onAddTag(tag);
+                }}
+                onCancel={popover.closeAndReturn}
+              />
+            </PopoverPopup>
+          </MotionPopoverRoot>
         </div>
       </div>
       {confirmingRemoveTag && (

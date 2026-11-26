@@ -3,6 +3,7 @@
 // 競合しないことを確認する（WorkEditDialog.test.tsxはWorkTagEditorをモックしているため
 // この組み合わせだけはそちらではカバーできない）。
 import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
@@ -56,14 +57,14 @@ function renderDialog(onClose: () => void) {
 }
 
 describe("WorkEditDialog × WorkTagEditor: Escapeの契約統合", () => {
-  it("タグ候補が開いている状態でEscapeを押すと候補だけが閉じ、未保存確認プロンプトは出ない", () => {
+  it("タグ候補が開いている状態でEscapeを押すと候補だけが閉じ、未保存確認プロンプトは出ない", async () => {
     const onClose = vi.fn();
     const { container } = renderDialog(onClose);
 
     // dirtyにする（未保存確認プロンプトが出せる状態を作る）
     fireEvent.change(screen.getByLabelText("タイトル"), { target: { value: "編集途中" } });
 
-    fireEvent.click(screen.getByRole("button", { name: "タグを追加" }));
+    await userEvent.click(screen.getByRole("button", { name: "タグを追加" }));
     const tagInput = screen.getByRole("combobox", { name: "追加するタグ" });
     fireEvent.change(tagInput, { target: { value: "睡" } });
     expect(screen.getByRole("listbox")).toBeInTheDocument();
