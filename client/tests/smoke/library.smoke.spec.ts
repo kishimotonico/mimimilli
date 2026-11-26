@@ -125,8 +125,7 @@ test("サイドバーのクイックオーバーレイ: 値の主クリックで
   const tracker = trackErrors(page);
   await openApp(page);
 
-  const overlay = page.locator(".mll-qoverlay");
-  const quickList = overlay.getByRole("group", { name: "CVの一覧" });
+  const quickList = page.getByRole("group", { name: "CVの一覧" });
   await railRow(page, "CV別").hover();
   await quickList.getByRole("button", { name: /^霧島レイ(?!を)/ }).click();
   await expect(page).toHaveURL(/\/library\/by-cv\?group=/);
@@ -204,15 +203,12 @@ test("0件のとき「すべて」で探すと、同じチップと検索語で�
   const tracker = trackErrors(page);
   await openApp(page);
 
-  const overlay = page.locator(".mll-qoverlay");
+  const quickList = page.getByRole("group", { name: "CVの一覧" });
   await railRow(page, "CV別").click();
   await page.mouse.move(1200, 600);
-  await expect(overlay).toHaveCount(0);
+  await expect(quickList).toHaveCount(0);
   await railRow(page, "CV別").hover();
-  await overlay
-    .getByRole("group", { name: "CVの一覧" })
-    .getByRole("button", { name: "霧島レイをAND追加" })
-    .click();
+  await quickList.getByRole("button", { name: "霧島レイをAND追加" }).click();
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["cv/霧島レイ"]);
   await search(page).fill("存在しない検索語");
   const valueList = page.locator(".is-group-values");

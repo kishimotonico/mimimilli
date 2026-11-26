@@ -1,23 +1,5 @@
-/* グループ値のクイックオーバーレイと値ドロップダウン（.mll-qoverlay* / .mll-qlist*）。 */
+/* グループ値のクイックリスト（.mll-qlist*）。 */
 
-.mll-qoverlay {
-  z-index: 30;
-  display: flex;
-  flex-direction: column;
-  width: 280px;
-  max-height: 360px;
-  overflow: hidden;
-  background: var(--paper-1);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-2);
-  box-shadow: var(--shadow-pop);
-}
-.mll-qoverlay--fixed {
-  position: fixed;
-}
-.mll-qoverlay--inline {
-  position: absolute;
-}
 .mll-qlist {
   display: flex;
   flex-direction: column;
