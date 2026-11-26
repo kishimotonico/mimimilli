@@ -143,7 +143,7 @@ test("サイドバーのクイックオーバーレイ: 値の主クリックで
   await railRow(page, "CV別").click();
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveCount(0);
   await page.mouse.move(1200, 600);
-  await expect(overlay).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "CV", exact: true })).toHaveCount(0);
   await railRow(page, "CV別").hover();
   await quickList.getByRole("button", { name: "霧島レイをAND追加" }).click();
   await expect(page).toHaveURL(/\/library\/by-cv\?/);

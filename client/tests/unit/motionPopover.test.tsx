@@ -100,6 +100,7 @@ function NestedMenu() {
 function DialogHost({ onClose }: { onClose: () => void }) {
   const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({ onClose });
   return (
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- 背景クリックはuseDialogModalで判定する。EscapeはonCancel（useDialogModal）で処理する。
     <dialog
       aria-label="親ダイアログ"
       ref={dialogRef}
