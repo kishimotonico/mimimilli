@@ -1,19 +1,17 @@
-import { useState } from "react";
+import { Menu } from "@ark-ui/react/menu";
 import type { Work } from "@mimimilli/shared";
 import { toSafeExternalUrlHref } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import IconButton from "../../../../shared/ui/IconButton";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import type { BookmarkWorkMutation } from "../../../../entities/work/model/workMutations";
+import { MenuPopup, MotionMenuRoot, useMotionMenu } from "../../../../shared/ui/menu/MotionMenu";
 import {
-  useAnchoredPopover,
-  type PopoverContainerResolver,
-} from "../../../../shared/ui/useAnchoredPopover";
-
-const ACTION_POPOVER_WIDTH = 240;
-
-const actionPopoverContainerResolver: PopoverContainerResolver = (anchor) =>
-  anchor.closest(".mle-prv__body");
+  MENU_GUTTER,
+  MENU_LABEL_CLASS,
+  MENU_SEPARATOR_CLASS,
+  menuItemClass,
+} from "../../../../shared/ui/menu/menuStyles";
 
 interface WorkMetadataActionsProps {
   work: Work;
@@ -30,24 +28,11 @@ export function WorkMetadataActions({
   onShowInfo,
   onDelete,
 }: WorkMetadataActionsProps) {
-  const [isActionPopoverOpen, setIsActionPopoverOpen] = useState(false);
-
-  const closeActionPopover = () => setIsActionPopoverOpen(false);
-
-  const {
-    setReference: setActionPopoverRef,
-    setFloating: setActionPopoverFloating,
-    floatingStyles: actionPopoverStyles,
-    close,
-  } = useAnchoredPopover({
-    isOpen: isActionPopoverOpen,
-    preferredWidth: ACTION_POPOVER_WIDTH,
-    getContainer: actionPopoverContainerResolver,
-    onClose: (reason) => {
-      closeActionPopover();
-      if (reason === "escape") bookmarkMutation.reset();
-    },
+  const menu = useMotionMenu({
+    positioning: { placement: "bottom-end", gutter: MENU_GUTTER },
+    onEscapeKeyDown: () => bookmarkMutation.reset(),
   });
+  const open = menu.menu.api.open;
 
   const toggleBookmark = () => {
     if (bookmarkMutation.isPending) return;
@@ -74,92 +59,46 @@ export function WorkMetadataActions({
         onClick={toggleBookmark}
       />
       <IconButton icon={I.edit} label="作品を編集" size="sm" onClick={onEdit} />
-      <div ref={setActionPopoverRef} className="relative inline-flex">
-        <IconButton
-          icon={I.more}
-          label="その他"
-          size="sm"
-          aria-haspopup="menu"
-          aria-expanded={isActionPopoverOpen}
-          active={isActionPopoverOpen}
-          onClick={() => {
-            bookmarkMutation.reset();
-            if (isActionPopoverOpen) close();
-            else setIsActionPopoverOpen(true);
-          }}
-        />
-        {isActionPopoverOpen && (
-          <div
-            ref={setActionPopoverFloating}
-            className="absolute z-10 rounded-[6px] border border-line-soft bg-paper-1 p-1 shadow-pop"
-            style={actionPopoverStyles}
-          >
-            <div className="flex flex-col gap-1" role="menu">
-              <button
-                type="button"
-                role="menuitem"
-                className="flex min-h-7 w-full items-center gap-2 rounded-1 px-2 font-jp text-body text-ink-1 hover:bg-paper-2 hover:text-ink-0 focus:bg-paper-2"
-                onClick={() => {
-                  close();
-                  onShowInfo();
-                }}
-              >
-                <I.info size={13} />
-                <span className="min-w-0 flex-1 truncate">作品の情報</span>
-              </button>
-              {work.urls.length > 0 && (
-                <>
-                  <hr className="my-1 border-0 border-t border-t-line-soft" />
-                  {work.urls.map((u) => {
-                    const href = toSafeExternalUrlHref(u.url);
-                    const label = u.label === "DLsite" ? "DLsiteを開く" : `${u.label}を開く`;
-                    if (href) {
-                      return (
-                        <a
-                          key={u.url}
-                          role="menuitem"
-                          className="flex min-h-7 w-full items-center gap-2 rounded-1 px-2 font-jp text-body text-ink-1 hover:bg-paper-2 hover:text-ink-0 focus:bg-paper-2"
-                          href={href}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={() => close()}
-                        >
-                          <I.ext size={13} />
-                          <span className="min-w-0 flex-1 truncate">{label}</span>
-                        </a>
-                      );
-                    }
-                    return (
-                      <span
-                        key={u.url}
-                        role="menuitem"
-                        aria-disabled="true"
-                        className="flex min-h-7 w-full items-center gap-2 rounded-1 px-2 font-jp text-body text-ink-2"
-                      >
-                        <I.ext size={13} />
-                        <span className="min-w-0 flex-1 truncate">{label}</span>
-                      </span>
-                    );
-                  })}
-                </>
-              )}
-              <hr className="my-1 border-0 border-t border-t-line-soft" />
-              <button
-                type="button"
-                role="menuitem"
-                className="flex min-h-7 w-full items-center gap-2 rounded-1 px-2 font-jp text-body text-[color:var(--r-coral)] hover:bg-paper-2 focus:bg-paper-2"
-                onClick={() => {
-                  close();
-                  onDelete();
-                }}
-              >
-                <I.trash size={13} />
-                <span className="min-w-0 flex-1 truncate">登録解除</span>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+      <MotionMenuRoot handle={menu}>
+        <Menu.Trigger asChild>
+          <IconButton
+            icon={I.more}
+            label="その他"
+            size="sm"
+            active={open}
+            onClick={() => bookmarkMutation.reset()}
+          />
+        </Menu.Trigger>
+        <MenuPopup origin="top right">
+          <Menu.Item value="info" onSelect={onShowInfo} className={menuItemClass()}>
+            <span className={MENU_LABEL_CLASS}>作品の情報</span>
+          </Menu.Item>
+          {work.urls.length > 0 && (
+            <>
+              <Menu.Separator className={MENU_SEPARATOR_CLASS} />
+              {work.urls.map((u) => {
+                const href = toSafeExternalUrlHref(u.url);
+                const label = u.label === "DLsite" ? "DLsiteを開く" : `${u.label}を開く`;
+                return href ? (
+                  <Menu.Item key={u.url} value={u.url} asChild className={menuItemClass()}>
+                    <a href={href} target="_blank" rel="noreferrer">
+                      <span className={MENU_LABEL_CLASS}>{label}</span>
+                    </a>
+                  </Menu.Item>
+                ) : (
+                  <Menu.Item key={u.url} value={u.url} disabled className={menuItemClass()}>
+                    <span className={MENU_LABEL_CLASS}>{label}</span>
+                  </Menu.Item>
+                );
+              })}
+            </>
+          )}
+          <Menu.Separator className={MENU_SEPARATOR_CLASS} />
+          <Menu.Item value="delete" onSelect={onDelete} className={menuItemClass({ danger: true })}>
+            <span className={MENU_LABEL_CLASS}>登録解除</span>
+          </Menu.Item>
+        </MenuPopup>
+      </MotionMenuRoot>
       {bookmarkError && (
         <p className="mle-prv__edit-error" role="alert">
           {bookmarkError}

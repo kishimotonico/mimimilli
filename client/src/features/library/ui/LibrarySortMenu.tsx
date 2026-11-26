@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useState } from "react";
+import { Menu } from "@ark-ui/react/menu";
 import { useSetAtom } from "jotai";
 import type { ResolvedLibraryView } from "../../../entities/library/resolveLibraryView";
 import type { GroupSortId, SortId } from "@mimimilli/shared";
@@ -10,7 +10,14 @@ import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
 import { getGroupSortLabel, groupSortOptions } from "../model/groupValueSort";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
-import { usePopoverDismissal } from "../../../shared/ui/usePopoverDismissal";
+import { MenuPopup, MotionMenuRoot, useMotionMenu } from "../../../shared/ui/menu/MotionMenu";
+import { MenuCheckColumn } from "../../../shared/ui/menu/MenuCheckColumn";
+import {
+  MENU_GUTTER,
+  MENU_LABEL_CLASS,
+  MENU_SEPARATOR_CLASS,
+  menuItemClass,
+} from "../../../shared/ui/menu/menuStyles";
 
 function getSortLabel(sortId: SortId): string | undefined {
   return SORT_OPTIONS.find((opt) => opt.id === sortId)?.label;
@@ -24,7 +31,7 @@ export default function LibrarySortMenu() {
   if (nav.foldersStatus !== "ready") {
     // 一覧が無い間は既定の並びが分からないので操作させない
     return (
-      <div className="mle-sortmenu">
+      <div className="flex items-center">
         <IconButton size="sm" icon={I.sort} label="ソート" title="ソート" disabled />
       </div>
     );
@@ -43,8 +50,6 @@ function ReadySortMenu({
 }) {
   const editor = useSmartFolderEditor();
   const [savingDefault, setSavingDefault] = useState(false);
-  const [sortMenuOpen, setSortMenuOpen] = useState(false);
-  const sortRef = useRef<HTMLDivElement>(null);
   const reshuffle = useSetAtom(reshuffleLibrarySeedAtom);
 
   const sort = view.kind === "works" ? view.sort : null;
@@ -73,32 +78,16 @@ function ReadySortMenu({
 
   const buttonTitle = currentSortLabel ? `ソート: ${currentSortLabel}` : "ソート";
 
-  const { close: closeSortMenu } = usePopoverDismissal({
-    isOpen: sortMenuOpen,
-    onClose: () => setSortMenuOpen(false),
-    anchorRef: sortRef,
-  });
+  const menu = useMotionMenu({ positioning: { placement: "bottom-end", gutter: MENU_GUTTER } });
 
-  // role=menu の期待どおり、開いたら現在値（無ければ先頭）へ初期フォーカスする。
-  useEffect(() => {
-    if (!sortMenuOpen) return;
-    const items = sortRef.current?.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]');
-    if (!items || items.length === 0) return;
-    const checked = Array.from(items).find((item) => item.getAttribute("aria-checked") === "true");
-    (checked ?? items[0])?.focus({ preventScroll: true });
-  }, [sortMenuOpen]);
-
-  const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-    event.preventDefault();
-    const items = Array.from(
-      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role^="menuitem"]'),
-    );
-    if (items.length === 0) return;
-    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
-    const delta = event.key === "ArrowDown" ? 1 : -1;
-    const nextIndex = (currentIndex + delta + items.length) % items.length;
-    items[nextIndex]?.focus({ preventScroll: true });
+  const options =
+    view.kind === "value-list"
+      ? groupSortOptions(view.groupBy).map((opt) => ({ id: opt.id as string, label: opt.label }))
+      : SORT_OPTIONS.map((opt) => ({ id: opt.id as string, label: opt.label }));
+  const currentValue = view.kind === "value-list" ? view.groupSort : sort;
+  const selectOption = (id: string) => {
+    if (view.kind === "value-list") setGroupSort(id as GroupSortId);
+    else setSort(id as SortId);
   };
 
   const showReshuffle = view.kind === "works" && sort === "random";
@@ -107,89 +96,54 @@ function ReadySortMenu({
     (view.kind === "value-list" && view.groupSortDeviates);
 
   return (
-    <div className="mle-sortmenu" ref={sortRef}>
-      <IconButton
-        size="sm"
-        icon={I.sort}
-        label="ソート"
-        title={buttonTitle}
-        active={sortMenuOpen}
-        aria-haspopup="menu"
-        aria-expanded={sortMenuOpen}
-        onClick={() => {
-          if (sortMenuOpen) closeSortMenu();
-          else setSortMenuOpen(true);
-        }}
-      />
-      {showReshuffle && (
-        <IconButton
-          size="sm"
-          icon={I.refresh}
-          label="並べ直す"
-          title="別の順に並べ直す"
-          onClick={() => reshuffle()}
-        />
-      )}
-      {sortMenuOpen && (
-        <div
-          className="mle-sortmenu__pop"
-          role="menu"
-          aria-label="ソート"
-          tabIndex={-1}
-          onKeyDown={handleMenuKeyDown}
-        >
-          {view.kind === "value-list"
-            ? groupSortOptions(view.groupBy).map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={view.groupSort === opt.id}
-                  className={`mle-sortmenu__item ${view.groupSort === opt.id ? "is-checked" : ""}`}
-                  onClick={() => {
-                    setGroupSort(opt.id);
-                    closeSortMenu();
-                  }}
-                >
-                  <span className="check">
-                    {view.groupSort === opt.id && <I.check size={14} />}
-                  </span>
-                  <span className="label">{opt.label}</span>
-                </button>
-              ))
-            : SORT_OPTIONS.map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={sort === opt.id}
-                  className={`mle-sortmenu__item ${sort === opt.id ? "is-checked" : ""}`}
-                  onClick={() => {
-                    setSort(opt.id);
-                    closeSortMenu();
-                  }}
-                >
-                  <span className="check">{sort === opt.id && <I.check size={14} />}</span>
-                  <span className="label">{opt.label}</span>
-                </button>
-              ))}
+    <div className="flex items-center">
+      <MotionMenuRoot handle={menu}>
+        <Menu.Trigger asChild>
+          <IconButton
+            size="sm"
+            icon={I.sort}
+            label="ソート"
+            title={buttonTitle}
+            active={menu.menu.api.open}
+          />
+        </Menu.Trigger>
+        {showReshuffle && (
+          <IconButton
+            size="sm"
+            icon={I.refresh}
+            label="並べ直す"
+            title="別の順に並べ直す"
+            onClick={() => reshuffle()}
+          />
+        )}
+        <MenuPopup origin="top right" aria-label="ソート">
+          <Menu.RadioItemGroup
+            value={currentValue ?? undefined}
+            onValueChange={({ value }) => selectOption(value)}
+          >
+            {options.map((opt) => (
+              <Menu.RadioItem key={opt.id} value={opt.id} className={menuItemClass()}>
+                <MenuCheckColumn />
+                <span className={MENU_LABEL_CLASS}>{opt.label}</span>
+              </Menu.RadioItem>
+            ))}
+          </Menu.RadioItemGroup>
           {canSaveAsDefault && (
-            <button
-              type="button"
-              role="menuitem"
-              className="mle-sortmenu__item"
-              disabled={savingDefault}
-              onClick={() => {
-                void saveAsDefault();
-                closeSortMenu();
-              }}
-            >
-              <span className="check" />
-              <span className="label">このソートを既定にする</span>
-            </button>
+            <>
+              <Menu.Separator className={MENU_SEPARATOR_CLASS} />
+              <Menu.Item
+                value="save-default"
+                disabled={savingDefault}
+                onSelect={() => void saveAsDefault()}
+                className={menuItemClass()}
+              >
+                <MenuCheckColumn />
+                <span className={MENU_LABEL_CLASS}>このソートを既定にする</span>
+              </Menu.Item>
+            </>
           )}
-        </div>
-      )}
+        </MenuPopup>
+      </MotionMenuRoot>
     </div>
   );
 }

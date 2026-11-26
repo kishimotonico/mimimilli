@@ -9,7 +9,6 @@
 @import "./top-bar.css" layer(components);
 @import "./address-bar.css" layer(components);
 @import "./grid-controls.css" layer(components);
-@import "./sort-menu.css" layer(components);
 @import "./column.css" layer(components);
 @import "./library-results.css" layer(components);
 @import "./work-grid.css" layer(components);

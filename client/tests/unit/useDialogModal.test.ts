@@ -176,4 +176,50 @@ describe("useDialogModal", () => {
     fireEvent.click(getByTestId("dialog"));
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it("メニューを開いたまま押したbackdropは閉じず、メニューが無ければ閉じる", () => {
+    const onClose = vi.fn();
+    function WithMenu({ menu }: { menu: boolean }) {
+      const { dialogRef, handleBackdropClick } = useDialogModal({ onClose });
+      return createElement(
+        "dialog",
+        {
+          ref: dialogRef,
+          "data-testid": "dialog",
+          onClick: (e: React.MouseEvent<HTMLDialogElement>) => handleBackdropClick(e),
+        },
+        menu ? createElement("div", { role: "menu" }) : null,
+      );
+    }
+    const press = (dialog: HTMLElement) => {
+      fireEvent.pointerDown(dialog);
+      fireEvent.click(dialog);
+    };
+
+    const withMenu = render(createElement(WithMenu, { menu: true }));
+    press(withMenu.getByTestId("dialog"));
+    expect(onClose).not.toHaveBeenCalled();
+    withMenu.unmount();
+
+    const withoutMenu = render(createElement(WithMenu, { menu: false }));
+    press(withoutMenu.getByTestId("dialog"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("メニューの項目から開いたダイアログは、閉じたときそのメニューのトリガーへフォーカスを戻す", () => {
+    const trigger = document.createElement("button");
+    trigger.id = "menu-trigger";
+    const content = document.createElement("div");
+    content.setAttribute("role", "menu");
+    content.setAttribute("aria-labelledby", "menu-trigger");
+    content.tabIndex = 0;
+    document.body.append(trigger, content);
+    content.focus();
+
+    const { unmount } = render(createElement(TestDialog, { onClose: vi.fn() }));
+    content.remove();
+    unmount();
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
 });

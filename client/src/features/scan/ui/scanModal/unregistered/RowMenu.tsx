@@ -1,3 +1,4 @@
+import { Menu } from "@ark-ui/react/menu";
 import { PopupMenu, type MenuItemSpec } from "../../../../../shared/ui/Menu";
 import IconButton from "../../../../../shared/ui/IconButton";
 import { I } from "../../../../../shared/ui/Icon";
@@ -16,17 +17,10 @@ export default function RowMenu({ label, disabled, onOpenFolder, onExclude }: Ro
     { key: "exclude", label: "除外", onSelect: onExclude, danger: true },
   ];
   return (
-    <PopupMenu items={items} placement="belowEnd" closeOnScroll closeOnFocusOut>
-      {(trigger) => (
-        <IconButton
-          icon={I.moreV}
-          label={label}
-          size="sm"
-          tone="muted"
-          disabled={disabled}
-          {...trigger}
-        />
-      )}
+    <PopupMenu items={items} placement="belowEnd">
+      <Menu.Trigger asChild>
+        <IconButton icon={I.moreV} label={label} size="sm" tone="muted" disabled={disabled} />
+      </Menu.Trigger>
     </PopupMenu>
   );
 }

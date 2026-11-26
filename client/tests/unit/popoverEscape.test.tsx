@@ -1,25 +1,33 @@
 // ポップオーバーのEscapeは、アンカーが属するダイアログ（なければdocument）の範囲で受ける。
+import { useRef, useState } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createStore, Provider as JotaiProvider } from "jotai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { openModalDialogsAtom } from "../../src/shared/model/openModalDialogsAtom";
 import RegisterFieldsPopover from "../../src/features/scan/ui/scanModal/unregistered/RegisterFieldsPopover";
-import { PopupMenu } from "../../src/shared/ui/Menu";
+import { usePopoverEscape } from "../../src/shared/ui/usePopoverEscape";
 
 afterEach(cleanup);
 
 function TestMenu({ label }: { label: string }) {
+  const [open, setOpen] = useState(false);
+  const anchorRef = useRef<HTMLDivElement>(null);
+  usePopoverEscape(
+    open,
+    () => anchorRef.current,
+    () => setOpen(false),
+  );
   return (
-    <PopupMenu
-      items={[{ key: "a", label: `${label}の項目`, onSelect: () => {} }]}
-      placement="above"
-    >
-      {(trigger) => (
-        <button type="button" {...trigger}>
-          {label}
-        </button>
+    <div ref={anchorRef}>
+      <button type="button" onClick={() => setOpen(true)}>
+        {label}
+      </button>
+      {open && (
+        <div role="menu">
+          <div role="menuitem">{`${label}の項目`}</div>
+        </div>
       )}
-    </PopupMenu>
+    </div>
   );
 }
 

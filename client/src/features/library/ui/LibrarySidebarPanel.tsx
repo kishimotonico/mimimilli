@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
 import { AnimatePresence } from "motion/react";
@@ -16,7 +16,6 @@ import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import { MOBILE_MEDIA_QUERY, useMediaQuery } from "../../../shared/ui/useMediaQuery";
-import { usePopoverDismissal } from "../../../shared/ui/usePopoverDismissal";
 import { formatDuration } from "../../../shared/lib/format";
 import { smartFolderDialogAtom } from "../model/atoms";
 import { buildFilterTag, type CollectionStatsDisplay } from "../model/libraryPresentation";
@@ -69,9 +68,7 @@ export default function LibrarySidebarPanel({
   const editor = useSmartFolderEditor();
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY);
   const [editing, setEditing] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const setDialog = useSetAtom(smartFolderDialogAtom);
-  const headerRef = useRef<HTMLDivElement>(null);
   const {
     openKey: overlayFolderId,
     openAnchorEl,
@@ -88,12 +85,6 @@ export default function LibrarySidebarPanel({
   const overlayFolder = readyFolders.find((folder) => folder.id === overlayFolderId) ?? null;
   const overlayGrouping = overlayFolder ? folderGrouping(overlayFolder) : null;
 
-  usePopoverDismissal({
-    isOpen: menuOpen,
-    onClose: () => setMenuOpen(false),
-    anchorRef: headerRef,
-  });
-
   const { saving: reordering } = useSidebarReorder({
     enabled: editing,
     orderedIds: readyFolders.map((folder) => folder.id),
@@ -106,19 +97,13 @@ export default function LibrarySidebarPanel({
 
   const startEditing = () => {
     closeOverlay();
-    setMenuOpen(false);
     setEditing(true);
-  };
-
-  const addFromTemplate = async (templateId: string) => {
-    setMenuOpen(false);
-    await editor.addFromTemplate(templateId);
   };
 
   return (
     <nav className="mll-sidebar" aria-label="ライブラリ">
       <div className="mll-sidebar__scroll">
-        <div className="mll-sidebar__hd" ref={headerRef}>
+        <div className="mll-sidebar__hd">
           <span>ライブラリ</span>
           {editing ? (
             <button type="button" className="mll-sidebar__done" onClick={() => setEditing(false)}>
@@ -127,15 +112,16 @@ export default function LibrarySidebarPanel({
           ) : (
             folders.status === "ready" && (
               <>
-                <IconButton
-                  icon={I.add}
-                  label="追加"
-                  size="xs"
-                  tone="muted"
-                  active={menuOpen}
-                  aria-haspopup="menu"
-                  aria-expanded={menuOpen}
-                  onClick={() => setMenuOpen((open) => !open)}
+                <SidebarAddMenu
+                  duplicateName={duplicateSource?.name ?? null}
+                  canSaveSearch={filtered}
+                  templates={missingTemplates(readyFolders)}
+                  onDuplicate={() => {
+                    if (duplicateSource) setDialog({ kind: "duplicate", folder: duplicateSource });
+                  }}
+                  onSaveSearch={onSaveSearch}
+                  onAddGroup={() => setDialog({ kind: "group" })}
+                  onAddTemplate={(templateId) => void editor.addFromTemplate(templateId)}
                 />
                 <IconButton
                   icon={I.edit}
@@ -146,26 +132,6 @@ export default function LibrarySidebarPanel({
                 />
               </>
             )
-          )}
-          {menuOpen && (
-            <SidebarAddMenu
-              duplicateName={duplicateSource?.name ?? null}
-              canSaveSearch={filtered}
-              templates={missingTemplates(readyFolders)}
-              onDuplicate={() => {
-                setMenuOpen(false);
-                if (duplicateSource) setDialog({ kind: "duplicate", folder: duplicateSource });
-              }}
-              onSaveSearch={() => {
-                setMenuOpen(false);
-                onSaveSearch();
-              }}
-              onAddGroup={() => {
-                setMenuOpen(false);
-                setDialog({ kind: "group" });
-              }}
-              onAddTemplate={(templateId) => void addFromTemplate(templateId)}
-            />
           )}
         </div>
         {rows.map((row) => {

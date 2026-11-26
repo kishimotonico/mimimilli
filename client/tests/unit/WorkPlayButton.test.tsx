@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Track } from "@mimimilli/shared";
 import { WorkPlayButton } from "../../src/features/library/ui/preview/WorkPlayButton";
@@ -68,7 +68,9 @@ describe("WorkPlayButton", () => {
     await user.click(item);
     expect(onPlayFromStart).toHaveBeenCalledTimes(1);
     // メニューはクリックで閉じる
-    expect(screen.queryByRole("menuitem", { name: "最初から再生" })).toBeNull();
+    await waitFor(() =>
+      expect(screen.queryByRole("menuitem", { name: "最初から再生" })).toBeNull(),
+    );
   });
 
   it("再生中（ロード中かつisPlaying）: 主ボタンは一時停止トグルになる", async () => {
@@ -106,34 +108,26 @@ describe("WorkPlayButton", () => {
     expect(screen.queryByRole("button", { name: "再生メニュー" })).toBeNull();
   });
 
-  it("▾メニューは開くとメニュー項目へフォーカスし、Escapeで閉じてスプリットボタン内へフォーカスが戻る", async () => {
+  it("▾メニューはEscapeで閉じて▾へフォーカスが戻る", async () => {
     const user = userEvent.setup();
     renderButton({ hasResume: true, isLoaded: false });
 
     const trigger = screen.getByRole("button", { name: "再生メニュー" });
     await user.click(trigger);
-    const item = screen.getByRole("menuitem", { name: "最初から再生" });
-    expect(item).toHaveFocus();
+    expect(screen.getByRole("menuitem", { name: "最初から再生" })).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
-    expect(screen.queryByRole("menu")).toBeNull();
-    // usePopoverDismissalの共通仕様: bodyにフォーカスが落ちていればanchor内の
-    // 最初のフォーカス可能要素（=主ボタン）へ戻す
-    expect(screen.getByRole("button", { name: "続きから再生" })).toHaveFocus();
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    expect(trigger).toHaveFocus();
   });
 
-  it("初期フォーカス・ArrowキーによるフォーカスはpreventScroll:trueで祖先を自動スクロールしない", async () => {
+  it("▾メニューは矢印キーで項目をハイライトする", async () => {
     const user = userEvent.setup();
-    const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
     renderButton({ hasResume: true, isLoaded: false });
 
     await user.click(screen.getByRole("button", { name: "再生メニュー" }));
-    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
-
-    focusSpy.mockClear();
     await user.keyboard("{ArrowDown}");
-    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
-
-    focusSpy.mockRestore();
+    const item = screen.getByRole("menuitem", { name: "最初から再生" });
+    expect(screen.getByRole("menu")).toHaveAttribute("aria-activedescendant", item.id);
   });
 });

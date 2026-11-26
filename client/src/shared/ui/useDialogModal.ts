@@ -4,6 +4,19 @@ import { useSetAtom } from "jotai";
 import { getTabbableElements } from "./focusable";
 import { openModalDialogsAtom } from "../model/openModalDialogsAtom";
 
+const OPEN_MENU_SELECTOR = '[role="menu"]:not([inert])';
+
+/**
+ * 閉じたときの戻し先。メニューの項目から開いたダイアログは、退出して消えるメニューではなく
+ * そのトリガーへ戻す（メニューの中身には aria-labelledby でトリガーの id が付く）。
+ */
+function resolveFocusReturnTarget(active: Element | null): HTMLElement | null {
+  if (!(active instanceof HTMLElement)) return null;
+  if (active.getAttribute("role") !== "menu") return active;
+  const triggerId = active.getAttribute("aria-labelledby");
+  return (triggerId && document.getElementById(triggerId)) || null;
+}
+
 interface UseDialogModalOptions {
   /**
    * モーダルを閉じる（または内側の編集を先にキャンセルする）処理。
@@ -23,13 +36,13 @@ interface UseDialogModalOptions {
 export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptions) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const setOpenDialogs = useSetAtom(openModalDialogsAtom);
+  const pressedBackdropWithMenuOpen = useRef(false);
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
 
-    const previousActiveElement =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousActiveElement = resolveFocusReturnTarget(document.activeElement);
 
     dialog.showModal();
     (initialFocusRef?.current ?? dialog).focus({ preventScroll: true });
@@ -58,8 +71,17 @@ export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptio
     };
     dialog.addEventListener("keydown", handleTabKeyDown);
 
+    // メニューは backdrop の pointerdown で閉じるので、click の時点では開いていたか分からない。
+    // Ark UI が閉じるより先の capture 段で、押した時点の状態を覚える
+    const handlePointerDown = (event: PointerEvent) => {
+      pressedBackdropWithMenuOpen.current =
+        event.target === dialog && dialog.querySelector(OPEN_MENU_SELECTOR) !== null;
+    };
+    dialog.addEventListener("pointerdown", handlePointerDown, true);
+
     return () => {
       dialog.removeEventListener("keydown", handleTabKeyDown);
+      dialog.removeEventListener("pointerdown", handlePointerDown, true);
       dialog.close();
       setOpenDialogs((current) => current.filter((entry) => entry !== dialog));
       if (previousActiveElement?.isConnected) {
@@ -83,12 +105,18 @@ export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptio
    * <dialog> のbackdropクリックは e.target === dialog自身として届く
    * （dialog は幅がcontentにfitするため、backdrop領域のクリックはdialog要素にヒットする）。
    * shouldClose で保存中などの条件を差し込める（省略時は常に閉じる）。
+   * メニューを開いたまま押した backdrop は、メニューだけを閉じて dialog は閉じない。
    */
   const handleBackdropClick = (
     event: ReactMouseEvent<HTMLDialogElement>,
     shouldClose: () => boolean = () => true,
   ) => {
-    if (event.target === dialogRef.current && shouldClose()) onClose();
+    if (event.target !== dialogRef.current) return;
+    if (pressedBackdropWithMenuOpen.current) {
+      pressedBackdropWithMenuOpen.current = false;
+      return;
+    }
+    if (shouldClose()) onClose();
   };
 
   return { dialogRef, handleCancel, handleBackdropClick };

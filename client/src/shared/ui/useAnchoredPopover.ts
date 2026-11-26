@@ -59,22 +59,6 @@ const PLACEMENTS = {
     width: "preferred",
     trackContainerWidth: true,
   },
-  above: {
-    side: "top-end",
-    strategy: "fixed",
-    gap: 7,
-    flip: true,
-    width: "auto",
-    trackContainerWidth: false,
-  },
-  belowEnd: {
-    side: "bottom-end",
-    strategy: "fixed",
-    gap: 5,
-    flip: true,
-    width: "auto",
-    trackContainerWidth: false,
-  },
 } satisfies Record<string, PlacementSpec>;
 
 export type { PopoverCloseReason };
@@ -105,10 +89,6 @@ export interface UseAnchoredPopoverOptions {
   getContainer?: PopoverContainerResolver;
   placement?: PopoverPlacement;
   referenceElement?: HTMLElement | null;
-  /** スクロールで自動的に閉じる。既定は無効（呼び出し側が明示的に有効化する） */
-  closeOnScroll?: boolean;
-  /** フォーカスが境界外へ外れたら自動的に閉じる。既定は無効（呼び出し側が明示的に有効化する） */
-  closeOnFocusOut?: boolean;
 }
 
 export type AnchoredPopoverFloatingRefCallback = (node: HTMLElement | null) => (() => void) | void;
@@ -130,8 +110,6 @@ export function useAnchoredPopover({
   getContainer = defaultContainerResolver,
   placement = "below",
   referenceElement,
-  closeOnScroll = false,
-  closeOnFocusOut = false,
 }: UseAnchoredPopoverOptions): UseAnchoredPopoverResult {
   const referenceRef = useRef<HTMLElement | null>(null);
   const floatingNodeRef = useRef<HTMLElement | null>(null);
@@ -268,29 +246,6 @@ export function useAnchoredPopover({
     () => referenceElement ?? referenceRef.current,
     () => close("escape"),
   );
-
-  useEffect(() => {
-    if (!isOpen || !closeOnScroll) return;
-    const handleScroll = () => close("scroll");
-    window.addEventListener("scroll", handleScroll, true);
-    return () => window.removeEventListener("scroll", handleScroll, true);
-  }, [isOpen, closeOnScroll, close]);
-
-  useEffect(() => {
-    if (!isOpen || !closeOnFocusOut) return;
-    const handleFocusOut = (event: FocusEvent) => {
-      const next = event.relatedTarget;
-      if (
-        next instanceof Node &&
-        isInsideBoundaries(next, referenceRef, boundaryRef, dismissalBoundaryRefs)
-      ) {
-        return;
-      }
-      close("focus-out");
-    };
-    document.addEventListener("focusout", handleFocusOut);
-    return () => document.removeEventListener("focusout", handleFocusOut);
-  }, [isOpen, closeOnFocusOut, boundaryRef, dismissalBoundaryRefs, close]);
 
   useEffect(() => {
     if (!isOpen) return;

@@ -4,6 +4,7 @@
 // 再生ボタンまわりの配線だけを検証する。
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { getDefaultStore } from "jotai";
 import type { Work } from "@mimimilli/shared";
 import { emptyDlsiteState } from "@mimimilli/shared";
@@ -168,24 +169,24 @@ describe("WorkDetail: 再生ボタンの状態導出", () => {
 });
 
 describe("WorkDetail: 登録解除", () => {
-  it("その他メニューから解除を選び確認ダイアログで解除するとmutation.mutateAsyncを呼ぶ", () => {
+  it("その他メニューから解除を選び確認ダイアログで解除するとmutation.mutateAsyncを呼ぶ", async () => {
     const mutateAsync = vi.fn(() => new Promise<void>(() => {}));
     renderDetail({ deleteMutation: makeDeleteMutationStub({ mutateAsync }) });
 
-    fireEvent.click(screen.getByRole("button", { name: "その他" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
+    await userEvent.click(screen.getByRole("button", { name: "その他" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
     expect(screen.getByRole("alertdialog", { name: "登録解除" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "解除する" }));
     expect(mutateAsync).toHaveBeenCalledWith("w1");
   });
 
-  it("確認ダイアログをキャンセルするとmutation.mutateAsyncを呼ばない", () => {
+  it("確認ダイアログをキャンセルするとmutation.mutateAsyncを呼ばない", async () => {
     const mutateAsync = vi.fn();
     renderDetail({ deleteMutation: makeDeleteMutationStub({ mutateAsync }) });
 
-    fireEvent.click(screen.getByRole("button", { name: "その他" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
+    await userEvent.click(screen.getByRole("button", { name: "その他" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
     fireEvent.click(screen.getByRole("button", { name: "キャンセル" }));
 
     expect(mutateAsync).not.toHaveBeenCalled();
@@ -200,8 +201,8 @@ describe("WorkDetail: 登録解除", () => {
       deleteMutation: makeDeleteMutationStub({ mutateAsync }),
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "その他" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
+    await userEvent.click(screen.getByRole("button", { name: "その他" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
     fireEvent.click(screen.getByRole("button", { name: "解除する" }));
 
     await waitFor(() =>
@@ -228,8 +229,8 @@ describe("WorkDetail: 登録解除", () => {
       deleteMutation: makeDeleteMutationStub({ mutateAsync }),
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "その他" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
+    await userEvent.click(screen.getByRole("button", { name: "その他" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
     fireEvent.click(screen.getByRole("button", { name: "解除する" }));
     view.unmount();
     resolveDelete();

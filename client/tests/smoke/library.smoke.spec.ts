@@ -318,7 +318,7 @@ test("詳細パネルの「その他」メニューから登録解除できる�
   const panel = page.locator(".mle-prv");
   await expect(panel).toBeVisible();
   await panel.getByRole("button", { name: "その他" }).click();
-  await panel.getByRole("menuitem", { name: "登録解除" }).click();
+  await page.getByRole("menuitem", { name: "登録解除" }).click();
 
   const dialog = page.getByRole("alertdialog", { name: "登録解除" });
   await expect(dialog).toBeVisible();
@@ -365,7 +365,7 @@ test("詳細パネル: 再開ボタンが正しいアクセシブル名で表示
   await expect(panel.getByText("再開 3:21", { exact: true })).toBeVisible();
 
   await panel.getByRole("button", { name: "再生メニュー" }).click();
-  await expect(panel.getByRole("menuitem", { name: "最初から再生" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "最初から再生" })).toBeVisible();
 
   assertNoErrors(tracker);
 });
@@ -454,7 +454,7 @@ test("作品編集: 関連URLを追加できる", async ({ page }) => {
   await dialog.locator("footer").getByRole("button", { name: "閉じる" }).click();
 
   await panel.getByRole("button", { name: "その他" }).click();
-  await expect(panel.getByRole("menuitem", { name: "公式を開く" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "公式を開く" })).toBeVisible();
 
   assertNoErrors(tracker);
 });
