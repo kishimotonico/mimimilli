@@ -20,6 +20,7 @@ interface SplitButtonProps {
   variant?: ButtonVariant;
   size?: ButtonSize;
   menuLabel?: string;
+  menuTriggerId?: string;
   /** メニューの開く向き。既定は上（下端に置く前提） */
   /** above・belowEnd は▾の右端にそろえる。aboveStart はボタン全体の左端にそろえる（左端に置くボタンで、メニューがはみ出さないようにする） */
   placement?: keyof typeof PLACEMENT;
@@ -43,6 +44,7 @@ export default function SplitButton({
   variant = "primary",
   size = "sm",
   menuLabel = "その他の操作",
+  menuTriggerId,
   placement = "above",
   className,
 }: SplitButtonProps) {
@@ -51,6 +53,7 @@ export default function SplitButton({
   const primaryOff = off || primaryDisabled;
   const rootRef = useRef<HTMLDivElement>(null);
   const handle = useMotionMenu({
+    ids: menuTriggerId === undefined ? undefined : { trigger: menuTriggerId },
     positioning: {
       placement: spec.placement,
       gutter: MENU_GUTTER,

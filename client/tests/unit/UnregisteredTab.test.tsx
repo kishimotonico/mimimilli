@@ -1,5 +1,5 @@
 import { act, createElement, Fragment } from "react";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -1065,7 +1065,7 @@ describe("UnregisteredTab 追加", () => {
     await userEvent.click(screen.getByRole("menuitem", { name: "項目を選んで追加…" }));
     fireEvent.click(screen.getByLabelText("カバー"));
     const dialog = screen.getByRole("dialog", { name: "追加する項目" });
-    fireEvent.click(dialog.querySelector("button") as HTMLElement);
+    fireEvent.click(within(dialog).getByRole("button", { name: "1件を追加" }));
     await waitFor(() => expect(registerSpy).toHaveBeenCalled());
     expect(registerSpy.mock.calls[0]?.[1]).toEqual({
       title: true,

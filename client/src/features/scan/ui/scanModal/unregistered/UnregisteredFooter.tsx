@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import type { DlsiteRegistrationApply } from "@mimimilli/shared";
 import SplitButton from "../../../../../shared/ui/SplitButton";
 import { Menu } from "@ark-ui/react/menu";
@@ -53,6 +53,7 @@ export default function UnregisteredFooter({
     setPickerOpen(false);
   }
   const anchorRef = useRef<HTMLDivElement>(null);
+  const menuTriggerId = useId();
 
   const addable = !busy && !rjCodeSaving && addCount > 0;
   const menu = (
@@ -117,33 +118,23 @@ export default function UnregisteredFooter({
             primaryDisabled={rjCodeSaving || (plan.kind === "add" && !addable)}
             onClick={() => (plan.kind === "fetch" ? onFetch() : onRegister(REGISTER_APPLY_ALL))}
             menu={menu}
+            menuTriggerId={menuTriggerId}
           >
             {plan.kind === "fetch"
               ? `DLsiteから取得 ${plan.codes.length}件`
               : `${addCount}件を追加`}
           </SplitButton>
-          {pickerOpen && (
-            <RegisterFieldsPopover
-              count={addCount}
-              disabled={!addable}
-              anchorRef={anchorRef}
-              onClose={(reason) => {
-                setPickerOpen(false);
-                // 項目から開いた層なので、Esc で閉じたときはメニューのトリガー（▾）へ戻す
-                if (reason === "escape") {
-                  anchorRef.current
-                    ?.querySelector<HTMLElement>('[aria-haspopup="menu"]')
-                    ?.focus({ preventScroll: true });
-                }
-              }}
-              onSubmit={(apply) => {
-                setPickerOpen(false);
-                onRegister(apply);
-              }}
-            />
-          )}
         </div>
       )}
+      <RegisterFieldsPopover
+        open={pickerOpen}
+        count={addCount}
+        disabled={!addable}
+        anchorRef={anchorRef}
+        triggerId={menuTriggerId}
+        onClose={() => setPickerOpen(false)}
+        onSubmit={onRegister}
+      />
     </ModalFooter>
   );
 }
