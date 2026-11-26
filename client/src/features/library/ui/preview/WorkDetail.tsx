@@ -1,5 +1,4 @@
 import { useRef, useState } from "react";
-import { flushSync } from "react-dom";
 import { useSetAtom } from "jotai";
 import {
   getDefaultPlaylistTrackCount,
@@ -9,9 +8,6 @@ import {
 } from "@mimimilli/shared";
 import { useToast } from "../../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
-import { deselectUnregisteredWorkAtom } from "../../../../entities/library/model/navigationActions";
-import { focusListOnReturnAtom } from "../../model/focusListOnReturnAtom";
-import { focusListAfterRemoval } from "../focusListEntry";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import { openPathInFilesAtom } from "../../../../entities/file-system/model/navigationAtoms";
 import { usePlayerActions } from "../../../../entities/player/model/usePlayerActions";
@@ -54,8 +50,11 @@ interface WorkDetailProps {
   onExpand?: () => void;
   /** 表示中の作品が再生中の作品と一致するときだけ渡す。「再生画面へ」ボタンを表示する */
   onGoToPlayingScreen?: () => void;
-  /** 解除した作品の次（末尾なら前）の作品 ID を、解除の確定時に返す（一覧のクエリのキャッシュから探す） */
-  neighborOf: (workId: string) => string | null;
+  /**
+   * 解除の確定時に呼び、解除が成功したあとの振る舞いを返す（一覧の選択を外す、フォーカスを移す、など）。
+   * 返した関数には、この詳細のルート要素が渡る。確定時に決めておくこと（移し先など）は呼び出し側が持つ
+   */
+  prepareUnregister: (workId: string) => (detailRoot: HTMLElement | null) => void;
 }
 
 export function WorkDetail({
@@ -69,7 +68,7 @@ export function WorkDetail({
   layout = "pane",
   onExpand,
   onGoToPlayingScreen,
-  neighborOf,
+  prepareUnregister,
 }: WorkDetailProps) {
   const playlist = work.playlists.find((p) => p.id === work.defaultPlaylistId) ?? work.playlists[0];
   const tracks = playlist?.tracks ?? [];
@@ -95,8 +94,6 @@ export function WorkDetail({
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const setFocusListOnReturn = useSetAtom(focusListOnReturnAtom);
-  const deselectUnregisteredWork = useSetAtom(deselectUnregisteredWorkAtom);
   const statusLabel = getWorkStatusLabel(work.status);
   const toast = useToast();
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
@@ -110,7 +107,7 @@ export function WorkDetail({
       trackIndex,
     );
 
-  const handleDeleteConfirm = async (neighborId: string | null) => {
+  const handleDeleteConfirm = async (afterUnregister: (detailRoot: HTMLElement | null) => void) => {
     const title = work.title;
     try {
       await deleteMutation.mutateAsync(work.id);
@@ -118,15 +115,7 @@ export function WorkDetail({
       toast.error(apiErrorMessage(cause, "登録解除に失敗しました"));
       return;
     }
-    // 解除で一覧は更新済み。詳細が消える前に、選択を外して一覧を描き直し、隣の行へフォーカスを移す。
-    // 作品詳細ページには一覧が無いので、ライブラリへ戻って一覧が描画されたときに一覧が移す
-    if (layout === "full") {
-      setFocusListOnReturn({ neighborId });
-    } else {
-      // 404 起点の選択解除（useLibrarySelectionCleanup）は非同期に後から走る。ここでは成功の直後に同期して外し、フォーカスの移し先を確かにする
-      flushSync(() => deselectUnregisteredWork(work.id));
-      focusListAfterRemoval(neighborId, rootRef.current);
-    }
+    afterUnregister(rootRef.current);
     toast.show({
       message: `「${title}」を登録解除しました`,
       variant: "success",
@@ -302,10 +291,9 @@ export function WorkDetail({
           message={`「${work.title}」をライブラリから外します。タグや再生履歴（mimimilli.json）は消え、音声などのファイルは残ります。`}
           confirmLabel="解除する"
           onConfirm={() => {
-            // 作品が消えると詳細ごと︙も消えるので、繰り上がる行（末尾なら前の行）を確定時に決めておく
-            const neighborId = neighborOf(work.id);
+            const afterUnregister = prepareUnregister(work.id);
             setIsDeleteConfirmOpen(false);
-            void handleDeleteConfirm(neighborId);
+            void handleDeleteConfirm(afterUnregister);
           }}
           onCancel={() => setIsDeleteConfirmOpen(false)}
         />

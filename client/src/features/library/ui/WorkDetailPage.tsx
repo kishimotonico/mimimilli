@@ -21,6 +21,7 @@ import { useUnregisterWorkMutation } from "../../../entities/work/model/workMuta
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import { WorkDetail } from "./preview/WorkDetail";
 import { neighborInCachedWorks } from "../model/neighborInCachedWorks";
+import { focusListOnReturnAtom } from "../model/focusListOnReturnAtom";
 
 export default function WorkDetailPage() {
   const workId = useAtomValue(workDetailIdAtom);
@@ -30,6 +31,7 @@ export default function WorkDetailPage() {
   const openNowPlaying = useSetAtom(openNowPlayingLayerAtom);
   const leaveMissingWorkDetail = useSetAtom(leaveMissingWorkDetailAtom);
   const queryClient = useQueryClient();
+  const setFocusListOnReturn = useSetAtom(focusListOnReturnAtom);
   const nav = useLibraryNavigation();
   const { clickTag } = nav;
   const view = nav.foldersStatus === "ready" ? nav.view : null;
@@ -54,6 +56,12 @@ export default function WorkDetailPage() {
 
   const work = workQuery.data ?? null;
   const isCurrentWorkPlaying = work !== null && playingWorkId === work.id;
+
+  // 一覧が描画されない。隣の作品を確定時に決めて持ち帰り、ライブラリへ戻って一覧が描画されたときに一覧が移す
+  const prepareUnregister = (id: string) => {
+    const neighborId = neighborInCachedWorks(queryClient, view, searchQuery, id);
+    return () => setFocusListOnReturn({ neighborId });
+  };
 
   const handleTagClick = useCallback(
     (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => clickTag(tag, opts),
@@ -84,7 +92,7 @@ export default function WorkDetailPage() {
         deleteMutation={deleteMutation}
         onTagClick={handleTagClick}
         onGoToPlayingScreen={isCurrentWorkPlaying ? openNowPlaying : undefined}
-        neighborOf={(id) => neighborInCachedWorks(queryClient, view, searchQuery, id)}
+        prepareUnregister={prepareUnregister}
       />
     </div>
   );

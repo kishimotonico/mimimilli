@@ -306,13 +306,29 @@ test("作品を選ぶとプレビューが開く（行方不明の状態表示�
   assertNoErrors(tracker);
 });
 
-/** 一覧で、タイトルを含む行の次（末尾なら前）の作品 ID。登録解除でフォーカスが移る先 */
-async function neighborWorkIdOf(page: Page, titlePart: string): Promise<string> {
-  return page.evaluate((title) => {
-    const rows = [...document.querySelectorAll<HTMLElement>("[data-work-id]")];
-    const at = rows.findIndex((row) => row.getAttribute("aria-label")?.includes(title));
-    return (rows[at + 1] ?? rows[at - 1])?.dataset.workId ?? "";
+/**
+ * 一覧で、タイトルを含む行の作品 ID と、その次（末尾なら前）の作品 ID。登録解除でフォーカスが移る先。
+ * 解除する行が先頭でも末尾でもない（隣の候補が前後にある）ことを確かめ、隣の取り違えを検出できるようにする
+ */
+async function unregisterTargetOf(
+  page: Page,
+  titlePart: string,
+): Promise<{ id: string; neighborId: string }> {
+  const target = await page.evaluate((title) => {
+    const rows = [...document.querySelectorAll<HTMLElement>("[data-work-id][data-flat-index]")]
+      .map((row) => ({
+        id: row.dataset.workId ?? "",
+        index: Number(row.dataset.flatIndex),
+        label: row.getAttribute("aria-label") ?? "",
+      }))
+      .sort((a, b) => a.index - b.index);
+    const at = rows.findIndex((row) => row.label.includes(title));
+    return { at, last: rows.length - 1, id: rows[at]?.id ?? "", next: rows[at + 1]?.id ?? "" };
   }, titlePart);
+  expect(target.at).toBeGreaterThan(0);
+  expect(target.at).toBeLessThan(target.last);
+  expect(target.next).not.toBe("");
+  return { id: target.id, neighborId: target.next };
 }
 
 test("詳細パネルの「その他」メニューから登録解除できる（確認ダイアログ経由、パネルは閉じ一覧から消える）", async ({
@@ -322,7 +338,7 @@ test("詳細パネルの「その他」メニューから登録解除できる�
   await openApp(page);
 
   await page.getByText("添い寝カフェへようこそ", { exact: false }).click();
-  const neighborId = await neighborWorkIdOf(page, "添い寝カフェへようこそ");
+  const { neighborId } = await unregisterTargetOf(page, "添い寝カフェへようこそ");
 
   const panel = page.locator(".mle-prv");
   await expect(panel).toBeVisible();
@@ -356,7 +372,7 @@ test("作品詳細ページから登録解除すると、ライブラリへ戻�
   await openApp(page);
 
   await page.getByText("添い寝カフェへようこそ", { exact: false }).click();
-  const neighborId = await neighborWorkIdOf(page, "添い寝カフェへようこそ");
+  const { id, neighborId } = await unregisterTargetOf(page, "添い寝カフェへようこそ");
   await page.locator(".mle-prv").getByRole("button", { name: "全画面へ展開" }).click();
   await expect(page).toHaveURL(/\/work\//);
 
@@ -370,10 +386,15 @@ test("作品詳細ページから登録解除すると、ライブラリへ戻�
   await expect(page).toHaveURL(/\/library\//);
   await expect(page.locator(`[data-work-id="${neighborId}"]`)).toBeFocused();
 
+  // 戻り先の要求は一度で消費され、その後のフォーカスは奪わない
+  const other = page.locator("[data-work-id]").first();
+  await other.click();
+  await expect(other).toBeFocused();
+
   // 解除した作品の詳細の取り直しが404になることが、ライブラリへ戻る合図（詳細ページでは複数回起きうる）
   expect(tracker.failedResponses.length).toBeGreaterThan(0);
   for (const response of tracker.failedResponses) {
-    expect(response).toMatch(/^404 .*\/api\/works\//);
+    expect(response).toMatch(new RegExp(`^404 .*/api/works/${id}$`));
   }
   tracker.failedResponses.length = 0;
   for (const error of tracker.consoleErrors) expect(error).toContain("status of 404");

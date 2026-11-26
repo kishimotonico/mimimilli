@@ -119,7 +119,7 @@ function renderDetail(props: Partial<React.ComponentProps<typeof WorkDetail>> = 
       tagSuggestions={[]}
       workPatchMutations={makeWorkPatchMutationsStub()}
       deleteMutation={makeDeleteMutationStub()}
-      neighborOf={() => null}
+      prepareUnregister={() => () => {}}
       onTagClick={vi.fn()}
       {...props}
     />,
