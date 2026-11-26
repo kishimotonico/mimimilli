@@ -161,7 +161,7 @@ export function useHoverGroupCoordinator(
 
   const resolveAfterGuard = () => {
     const hovered = hoveredTriggerRef.current;
-    if (hovered && hovered.key !== openStateRef.current?.key) {
+    if (hovered) {
       handleTriggerEnter(hovered.key, hovered.el);
       return;
     }

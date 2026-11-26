@@ -320,6 +320,7 @@ describe("ポップオーバーとメニューの重なり", () => {
       const dialog = screen.getByRole("dialog", { name: "親ダイアログ" });
       await user.click(dialog);
       await waitFor(() => expect(panelTrigger()).toHaveAttribute("aria-expanded", "false"));
+      await waitFor(() => expect(panelTrigger()).toHaveFocus());
       expect(onClose).not.toHaveBeenCalled();
       await user.click(dialog);
       expect(onClose).toHaveBeenCalledTimes(1);

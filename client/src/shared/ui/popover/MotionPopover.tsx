@@ -97,6 +97,8 @@ export function useMotionPopover({
     if (
       active instanceof HTMLElement &&
       active !== document.body &&
+      // Chromium は backdrop や dialog 内の非フォーカス領域を押すと dialog にフォーカスする。
+      !(active instanceof HTMLDialogElement && active.contains(contentRef.current)) &&
       active.isConnected &&
       !contentRef.current?.contains(active)
     ) {

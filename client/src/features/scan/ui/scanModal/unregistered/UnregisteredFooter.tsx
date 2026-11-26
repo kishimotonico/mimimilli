@@ -54,6 +54,7 @@ export default function UnregisteredFooter({
   }
   const anchorRef = useRef<HTMLDivElement>(null);
   const menuTriggerId = useId();
+  const closedOnTriggerPress = useRef(false);
 
   const addable = !busy && !rjCodeSaving && addCount > 0;
   const menu = (
@@ -109,7 +110,33 @@ export default function UnregisteredFooter({
       )}
       <DlsiteFetchProgress onCancel={onCancelFetch} />
       {plan.kind !== "waiting" && (
-        <div ref={anchorRef} className="relative inline-flex">
+        <div
+          ref={anchorRef}
+          className="relative inline-flex"
+          onPointerDownCapture={(event) => {
+            closedOnTriggerPress.current = false;
+            if (!pickerOpen || event.button !== 0 || !(event.target instanceof Element)) return;
+            const trigger = event.target.closest("button");
+            if (trigger?.id !== menuTriggerId) return;
+            event.preventDefault();
+            event.stopPropagation();
+            closedOnTriggerPress.current = true;
+            trigger.focus({ preventScroll: true });
+            setPickerOpen(false);
+          }}
+          onClickCapture={(event) => {
+            if (event.detail === 0 || !closedOnTriggerPress.current) return;
+            closedOnTriggerPress.current = false;
+            event.stopPropagation();
+          }}
+          onKeyDownCapture={(event) => {
+            if (!pickerOpen || !(event.target instanceof Element)) return;
+            if (event.target.id !== menuTriggerId || !["Enter", " "].includes(event.key)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            setPickerOpen(false);
+          }}
+        >
           <SplitButton
             size="md"
             className="min-w-[200px]"

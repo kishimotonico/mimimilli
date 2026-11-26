@@ -74,9 +74,20 @@ test("▾の「選択を除外」で選択中の行が消え、「項目を選�
   await expect(panel.getByRole("row", { name: /カバーなし作品/ })).toBeHidden();
 
   await panel.getByRole("checkbox", { name: "「囁きの図書館」を選択" }).check();
-  await panel.getByRole("button", { name: "その他の操作" }).click();
-  await page.getByRole("menu").getByRole("menuitem", { name: "項目を選んで追加…" }).click();
+  const trigger = panel.getByRole("button", { name: "その他の操作" });
+  const menu = page.getByRole("menu");
+  const openPicker = async () => {
+    await trigger.click();
+    await menu.getByRole("menuitem", { name: "項目を選んで追加…" }).click();
+  };
+  await openPicker();
   const picker = page.getByRole("dialog", { name: "追加する項目" });
+  await expect(picker).toBeVisible();
+  await trigger.click();
+  await expect(picker).toBeHidden();
+  await expect(menu).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await openPicker();
   await picker.getByLabel("カバー").uncheck();
   await picker.getByRole("button").first().click();
   await expect(dialog.getByRole("tab", { name: "新規作品（1件）" })).toBeVisible();
