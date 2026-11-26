@@ -48,6 +48,8 @@ export default function WorkListPane({
 
   const measureElement = useCallback(() => WORK_ROW_ESTIMATE_SIZE, []);
 
+  const getItemKey = useCallback((index: number) => works[index]?.id ?? index, [works]);
+
   const { scrollRef, virtualizer, virtualItems, wrapperStyle, getItemStyle } = useVirtualList({
     count: works.length,
     estimateSize: WORK_ROW_ESTIMATE_SIZE,
@@ -55,6 +57,7 @@ export default function WorkListPane({
     padding: { start: LIST_PADDING_START, end: paddingEnd },
     overscan: 5,
     measureElement,
+    getItemKey,
     infiniteScroll:
       hasNextPage && onLoadMore
         ? {

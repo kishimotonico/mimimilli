@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { DlsiteRegistrationApply } from "@mimimilli/shared";
 import Button from "../../../../../shared/ui/Button";
-import { usePopoverDismissal } from "../../../../../shared/ui/usePopoverDismissal";
+import {
+  usePopoverDismissal,
+  type PopoverCloseReason,
+} from "../../../../../shared/ui/usePopoverDismissal";
 
 export const REGISTER_APPLY_ALL: DlsiteRegistrationApply = {
   title: true,
@@ -22,7 +25,7 @@ interface RegisterFieldsPopoverProps {
   disabled: boolean;
   anchorRef: React.RefObject<HTMLElement | null>;
   onSubmit: (apply: DlsiteRegistrationApply) => void;
-  onClose: () => void;
+  onClose: (reason: PopoverCloseReason) => void;
 }
 
 /** 追加で反映するDLsite情報の項目を選ぶ。開くたびに全項目ON。 */

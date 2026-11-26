@@ -1,4 +1,5 @@
 import { Menu } from "@ark-ui/react/menu";
+import { MenuLayerItem } from "../../../../shared/ui/menu/MenuLayerItem";
 import type { Work } from "@mimimilli/shared";
 import { toSafeExternalUrlHref } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
@@ -70,9 +71,9 @@ export function WorkMetadataActions({
           />
         </Menu.Trigger>
         <MenuPopup origin="top right">
-          <Menu.Item value="info" onSelect={onShowInfo} className={menuItemClass()}>
+          <MenuLayerItem value="info" onSelect={onShowInfo} className={menuItemClass()}>
             <span className={MENU_LABEL_CLASS}>作品の情報</span>
-          </Menu.Item>
+          </MenuLayerItem>
           {work.urls.length > 0 && (
             <>
               <Menu.Separator className={MENU_SEPARATOR_CLASS} />
@@ -94,9 +95,13 @@ export function WorkMetadataActions({
             </>
           )}
           <Menu.Separator className={MENU_SEPARATOR_CLASS} />
-          <Menu.Item value="delete" onSelect={onDelete} className={menuItemClass({ danger: true })}>
+          <MenuLayerItem
+            value="delete"
+            onSelect={onDelete}
+            className={menuItemClass({ danger: true })}
+          >
             <span className={MENU_LABEL_CLASS}>登録解除</span>
-          </Menu.Item>
+          </MenuLayerItem>
         </MenuPopup>
       </MotionMenuRoot>
       {bookmarkError && (

@@ -2,6 +2,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { isInsideOwnMenuTree } from "../../src/shared/ui/menu/MotionMenu";
+import { Menu } from "@ark-ui/react/menu";
+import { MenuLayerItem } from "../../src/shared/ui/menu/MenuLayerItem";
+import { MenuPopup, MotionMenuRoot, useMotionMenu } from "../../src/shared/ui/menu/MotionMenu";
+import { menuPanelClass } from "../../src/shared/ui/menu/menuStyles";
 import RowMenu from "../../src/features/scan/ui/scanModal/unregistered/RowMenu";
 
 function renderMenu(onSelect = vi.fn()) {
@@ -93,5 +97,47 @@ describe("メニュー部品", () => {
     expect(fireEvent.keyDown(trigger, { key: "Enter" })).toBe(false);
     expect(fireEvent.keyDown(trigger, { key: "Tab" })).toBe(true);
     expect(fireEvent.keyDown(trigger, { key: "Escape" })).toBe(true);
+  });
+
+  it("別の層を開く項目は、開いた層の初期フォーカスをトリガーへの復帰で奪わない", async () => {
+    function Host() {
+      const menu = useMotionMenu();
+      return (
+        <>
+          <MotionMenuRoot handle={menu}>
+            <Menu.Trigger asChild>
+              <button type="button">メニュー</button>
+            </Menu.Trigger>
+            <MenuPopup origin="top left">
+              <MenuLayerItem
+                value="layer"
+                onSelect={() => document.querySelector<HTMLElement>("#layer-input")?.focus()}
+              >
+                層を開く
+              </MenuLayerItem>
+            </MenuPopup>
+          </MotionMenuRoot>
+          <input id="layer-input" aria-label="層の入力" />
+        </>
+      );
+    }
+    render(<Host />);
+    await userEvent.click(screen.getByRole("button", { name: "メニュー" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "層を開く" }));
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    expect(screen.getByLabelText("層の入力")).toHaveFocus();
+  });
+
+  it("トリガーを含む領域がスクロールしたらメニューを閉じ、フォーカスはトリガーへ戻る", async () => {
+    const { trigger } = renderMenu();
+    await userEvent.click(trigger);
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    fireEvent.scroll(document);
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    expect(trigger).toHaveFocus();
+  });
+
+  it("パネルは長いラベルを省略できるよう、列の幅を内容に押し広げさせない", () => {
+    expect(menuPanelClass()).toContain("grid-cols-[minmax(0,1fr)]");
   });
 });

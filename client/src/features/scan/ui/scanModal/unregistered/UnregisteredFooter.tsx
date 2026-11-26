@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import type { DlsiteRegistrationApply } from "@mimimilli/shared";
 import SplitButton from "../../../../../shared/ui/SplitButton";
 import { Menu } from "@ark-ui/react/menu";
+import { MenuLayerItem } from "../../../../../shared/ui/menu/MenuLayerItem";
 import {
   MENU_COUNT_CLASS,
   MENU_LABEL_CLASS,
@@ -67,14 +68,14 @@ export default function UnregisteredFooter({
           <span aria-hidden="true" className={MENU_COUNT_CLASS}>{`${addCount}件`}</span>
         </Menu.Item>
       )}
-      <Menu.Item
+      <MenuLayerItem
         value="pick"
         disabled={!addable}
         onSelect={() => setPickerOpen(true)}
         className={menuItemClass()}
       >
         <span className={MENU_LABEL_CLASS}>項目を選んで追加…</span>
-      </Menu.Item>
+      </MenuLayerItem>
       <Menu.Separator className={MENU_SEPARATOR_CLASS} />
       <Menu.Item
         value="exclude"
@@ -126,7 +127,15 @@ export default function UnregisteredFooter({
               count={addCount}
               disabled={!addable}
               anchorRef={anchorRef}
-              onClose={() => setPickerOpen(false)}
+              onClose={(reason) => {
+                setPickerOpen(false);
+                // 項目から開いた層なので、Esc で閉じたときはメニューのトリガー（▾）へ戻す
+                if (reason === "escape") {
+                  anchorRef.current
+                    ?.querySelector<HTMLElement>('[aria-haspopup="menu"]')
+                    ?.focus({ preventScroll: true });
+                }
+              }}
               onSubmit={(apply) => {
                 setPickerOpen(false);
                 onRegister(apply);

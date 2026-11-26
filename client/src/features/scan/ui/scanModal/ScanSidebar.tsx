@@ -181,6 +181,7 @@ function SidebarStartButton({
         size="sm"
         className="w-full"
         menuLabel="スキャンの方法"
+        align="start"
         onClick={onStart}
         menu={
           <Menu.Item value="full" onSelect={onFullScan} className={menuItemClass()}>

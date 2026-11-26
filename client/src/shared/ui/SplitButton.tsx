@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { Menu } from "@ark-ui/react/menu";
 import { cn } from "../lib/cn";
 import { buttonClass, type ButtonSize, type ButtonVariant } from "./Button";
@@ -22,6 +22,8 @@ interface SplitButtonProps {
   menuLabel?: string;
   /** メニューの開く向き。既定は上（下端に置く前提） */
   placement?: "above" | "belowEnd";
+  /** メニューの揃え。end は▾の右端、start はボタン全体の左端（左端に置くボタンで、メニューがはみ出さないようにする） */
+  align?: "end" | "start";
   className?: string;
 }
 
@@ -42,17 +44,26 @@ export default function SplitButton({
   size = "sm",
   menuLabel = "その他の操作",
   placement = "above",
+  align = "end",
   className,
 }: SplitButtonProps) {
   const spec = PLACEMENT[placement];
   const off = disabled || busy;
   const primaryOff = off || primaryDisabled;
+  const rootRef = useRef<HTMLDivElement>(null);
   const handle = useMotionMenu({
-    positioning: { placement: spec.placement, gutter: MENU_GUTTER },
+    positioning:
+      align === "start"
+        ? {
+            placement: spec.placement.replace("-end", "-start") as "top-start" | "bottom-start",
+            gutter: MENU_GUTTER,
+            getAnchorRect: () => rootRef.current?.getBoundingClientRect() ?? null,
+          }
+        : { placement: spec.placement, gutter: MENU_GUTTER },
     disabled: off,
   });
   return (
-    <div className={cn("relative inline-flex", className)}>
+    <div ref={rootRef} className={cn("relative inline-flex", className)}>
       <MotionMenuRoot handle={handle}>
         <button
           type="button"
@@ -80,7 +91,9 @@ export default function SplitButton({
             <I.chevD size={14} />
           </button>
         </Menu.Trigger>
-        <MenuPopup origin={spec.origin}>{menu}</MenuPopup>
+        <MenuPopup origin={align === "start" ? spec.origin.replace("right", "left") : spec.origin}>
+          {menu}
+        </MenuPopup>
       </MotionMenuRoot>
     </div>
   );

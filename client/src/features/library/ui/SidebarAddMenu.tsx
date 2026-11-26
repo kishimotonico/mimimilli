@@ -1,4 +1,5 @@
 import { Menu } from "@ark-ui/react/menu";
+import { MenuLayerItem } from "../../../shared/ui/menu/MenuLayerItem";
 import type { SmartFolderTemplate } from "@mimimilli/shared";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
@@ -41,18 +42,18 @@ export default function SidebarAddMenu({
       </Menu.Trigger>
       <MenuPopup origin="top right">
         {canSaveSearch && (
-          <Menu.Item value="save-search" onSelect={onSaveSearch} className={menuItemClass()}>
+          <MenuLayerItem value="save-search" onSelect={onSaveSearch} className={menuItemClass()}>
             <span className={MENU_LABEL_CLASS}>今の検索を保存</span>
-          </Menu.Item>
+          </MenuLayerItem>
         )}
         {!canSaveSearch && duplicateName !== null && (
-          <Menu.Item value="duplicate" onSelect={onDuplicate} className={menuItemClass()}>
+          <MenuLayerItem value="duplicate" onSelect={onDuplicate} className={menuItemClass()}>
             <span className={MENU_LABEL_CLASS}>{`「${duplicateName}」を複製`}</span>
-          </Menu.Item>
+          </MenuLayerItem>
         )}
-        <Menu.Item value="add-group" onSelect={onAddGroup} className={menuItemClass()}>
+        <MenuLayerItem value="add-group" onSelect={onAddGroup} className={menuItemClass()}>
           <span className={MENU_LABEL_CLASS}>グループ分けを追加</span>
-        </Menu.Item>
+        </MenuLayerItem>
         <Menu.Separator className={MENU_SEPARATOR_CLASS} />
         <Menu.ItemGroup>
           <Menu.ItemGroupLabel className={MENU_HEADING_CLASS}>既定から追加</Menu.ItemGroupLabel>

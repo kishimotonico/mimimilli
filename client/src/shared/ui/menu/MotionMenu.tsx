@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useRef,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
@@ -14,6 +15,8 @@ import { menuPanelClass } from "./menuStyles";
 import { usePresenceLifetime } from "./usePresenceLifetime";
 
 const ExitCompleteContext = createContext<(() => void) | null>(null);
+/** フォーカスをトリガーへ戻さずにメニューを閉じる。別の層を開く項目（MenuLayerItem）が使う */
+export const CloseWithoutRestoreContext = createContext<(() => void) | null>(null);
 
 function isComposingKey(event: KeyboardEvent | ReactKeyboardEvent): boolean {
   const native = "nativeEvent" in event ? event.nativeEvent : event;
@@ -72,8 +75,8 @@ export function useMotionMenu(props: MotionMenuProps = {}) {
   const menu = useMenu({
     loopFocus: true,
     ...rest,
-    // fixed はダイアログの overflow に切り取られない。アンカーがスクロールで見えなくなったらメニューも隠す
-    positioning: { strategy: "fixed", hideWhenDetached: true, ...positioning },
+    // fixed はダイアログの overflow に切り取られない
+    positioning: { strategy: "fixed", ...positioning },
     onOpenChange: (details) => {
       onOpenChange?.(details);
       if (!details.open) keyboardOpenPending.current = false;
@@ -127,6 +130,22 @@ export function useMotionMenu(props: MotionMenuProps = {}) {
   apiRef.current = menu.api;
   serviceRef.current = menu.service;
   const lifetime = usePresenceLifetime(menu.api.open);
+
+  // トリガーを含む領域がスクロールしたら閉じる（アンカーが見えなくなったメニューを残さない）。フォーカスはトリガーへ戻る
+  const open = menu.api.open;
+  const contentId = menu.api.getContentProps().id ?? "";
+  useEffect(() => {
+    if (!open) return;
+    const handleScroll = (event: Event) => {
+      const trigger = document.querySelector(`[aria-controls="${CSS.escape(contentId)}"]`);
+      const target = event.target;
+      if (trigger && target instanceof Node && target.contains(trigger)) {
+        serviceRef.current?.send({ type: "CLOSE" });
+      }
+    };
+    document.addEventListener("scroll", handleScroll, true);
+    return () => document.removeEventListener("scroll", handleScroll, true);
+  }, [open, contentId]);
   /** トリガーへ展開する。キーボードで開いたかどうかを覚え、disabled のときは開かせない */
   const triggerProps = {
     // data-disabled は Ark UI がポインター操作を無視する印。キーボードは defaultPrevented を見る
@@ -142,7 +161,9 @@ export function useMotionMenu(props: MotionMenuProps = {}) {
       keyboardOpenPending.current = false;
     },
   };
-  return { menu, triggerProps, ...lifetime };
+  const closeWithoutRestoringFocus = () =>
+    serviceRef.current?.send({ type: "CLOSE", restoreFocus: false });
+  return { menu, triggerProps, closeWithoutRestoringFocus, ...lifetime };
 }
 
 export type MotionMenuHandle = ReturnType<typeof useMotionMenu>;
@@ -158,7 +179,9 @@ export function MotionMenuRoot({
   return (
     <Menu.RootProvider value={handle.menu} present={handle.present}>
       <ExitCompleteContext.Provider value={handle.onExitComplete}>
-        {children}
+        <CloseWithoutRestoreContext.Provider value={handle.closeWithoutRestoringFocus}>
+          {children}
+        </CloseWithoutRestoreContext.Provider>
       </ExitCompleteContext.Provider>
     </Menu.RootProvider>
   );
