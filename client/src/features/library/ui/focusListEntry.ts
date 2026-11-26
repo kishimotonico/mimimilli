@@ -1,21 +1,5 @@
 import { isFocusLost } from "../../../shared/lib/focusReturnTarget";
 
-/**
- * 一覧で、指定した作品の次の行（末尾なら前の行）の作品 ID。登録解除などで作品が消えるとき、
- * フォーカスの移し先を消える前に決めるために使う。描画中の行（data-work-id）から探す。
- */
-export function neighborWorkId(workId: string): string | null {
-  const rows = [...document.querySelectorAll<HTMLElement>("[data-work-id][data-flat-index]")]
-    .map((element) => ({
-      id: element.dataset.workId ?? "",
-      index: Number(element.dataset.flatIndex),
-    }))
-    .sort((a, b) => a.index - b.index);
-  const at = rows.findIndex((row) => row.id === workId);
-  if (at < 0) return null;
-  return (rows[at + 1] ?? rows[at - 1])?.id ?? null;
-}
-
 /** 一覧の移し先。一覧（[data-work-list]）は画面に1つだけ描画される前提で document から探す。指定した行（描画されていれば）、無ければ roving の行（tabindex=0）、行が無ければ（空の一覧）コンテナ */
 export function focusListEntry(workId: string | null = null) {
   const list = document.querySelector<HTMLElement>("[data-work-list]");

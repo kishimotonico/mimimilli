@@ -1,7 +1,9 @@
+import { useQueryClient } from "@tanstack/react-query";
 import type { NormalizedTag, Work } from "@mimimilli/shared";
 import type { ReadyLibraryViewState } from "../../model/useLibraryNavigation";
 import { useLibraryWorkPatchMutations } from "../../model/useLibraryQueries";
 import { useUnregisterWorkMutation } from "../../../../entities/work/model/workMutations";
+import { neighborInCachedWorks } from "../../model/neighborInCachedWorks";
 import { WorkDetail } from "./WorkDetail";
 
 interface WorkDetailPatchScopeProps {
@@ -26,11 +28,13 @@ export function WorkDetailPatchScope({
 }: WorkDetailPatchScopeProps) {
   const workPatchMutations = useLibraryWorkPatchMutations(nav.view, searchQuery);
   const deleteMutation = useUnregisterWorkMutation();
+  const queryClient = useQueryClient();
   return (
     <WorkDetail
       work={work}
       workPatchMutations={workPatchMutations}
       deleteMutation={deleteMutation}
+      neighborOf={(id) => neighborInCachedWorks(queryClient, nav.view, searchQuery, id)}
       {...rest}
     />
   );

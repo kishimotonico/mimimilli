@@ -124,8 +124,9 @@ describe("LibrarySortMenu", () => {
     const items = screen.getAllByRole("menuitemradio");
     const highlighted = () => menu.getAttribute("aria-activedescendant");
 
-    // 1回の keyboard() に複数のキーを渡すと、Ark UI（zag）は React の描画前の状態を読むので、前のキーの結果を
-    // 見ずに次のキーを処理しうる。実際のキー入力のとおり、1キーずつ送って結果を確かめる
+    // 同じタスクの中で連続して dispatch されたキーは、前のキーの結果が描画される前に処理される。
+    // zag（Ark UI）はハイライトを描画時点の値から読むので、前の結果を見ずに動く。実際のキー入力のとおり、
+    // 1キーずつ送って結果を確かめる
     const press = async (key: string, expected: number) => {
       await userEvent.keyboard(key);
       expect(highlighted()).toBe(items[expected]?.id);

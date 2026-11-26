@@ -306,6 +306,15 @@ test("作品を選ぶとプレビューが開く（行方不明の状態表示�
   assertNoErrors(tracker);
 });
 
+/** 一覧で、タイトルを含む行の次（末尾なら前）の作品 ID。登録解除でフォーカスが移る先 */
+async function neighborWorkIdOf(page: Page, titlePart: string): Promise<string> {
+  return page.evaluate((title) => {
+    const rows = [...document.querySelectorAll<HTMLElement>("[data-work-id]")];
+    const at = rows.findIndex((row) => row.getAttribute("aria-label")?.includes(title));
+    return (rows[at + 1] ?? rows[at - 1])?.dataset.workId ?? "";
+  }, titlePart);
+}
+
 test("詳細パネルの「その他」メニューから登録解除できる（確認ダイアログ経由、パネルは閉じ一覧から消える）", async ({
   page,
 }) => {
@@ -313,6 +322,7 @@ test("詳細パネルの「その他」メニューから登録解除できる�
   await openApp(page);
 
   await page.getByText("添い寝カフェへようこそ", { exact: false }).click();
+  const neighborId = await neighborWorkIdOf(page, "添い寝カフェへようこそ");
 
   const panel = page.locator(".mle-prv");
   await expect(panel).toBeVisible();
@@ -328,11 +338,45 @@ test("詳細パネルの「その他」メニューから登録解除できる�
     page.locator(".mll-results").getByText("添い寝カフェへようこそ", { exact: false }),
   ).toBeHidden();
   await expect(page.getByText("を登録解除しました", { exact: false })).toBeVisible();
+  // フォーカスは、繰り上がった隣の行へ移る
+  await expect(page.locator(`[data-work-id="${neighborId}"]`)).toBeFocused();
 
   // 解除した作品の詳細の取り直しが404になることが、選択解除の合図
   expect(tracker.failedResponses).toEqual([expect.stringMatching(/^404 .*\/api\/works\//)]);
   tracker.failedResponses.length = 0;
   expect(tracker.consoleErrors).toEqual([expect.stringContaining("status of 404")]);
+  tracker.consoleErrors.length = 0;
+  assertNoErrors(tracker);
+});
+
+test("作品詳細ページから登録解除すると、ライブラリへ戻って隣の行にフォーカスが移る", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await page.getByText("添い寝カフェへようこそ", { exact: false }).click();
+  const neighborId = await neighborWorkIdOf(page, "添い寝カフェへようこそ");
+  await page.locator(".mle-prv").getByRole("button", { name: "全画面へ展開" }).click();
+  await expect(page).toHaveURL(/\/work\//);
+
+  await page.getByRole("button", { name: "その他" }).last().click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "登録解除" }).click();
+  await page
+    .getByRole("alertdialog", { name: "登録解除" })
+    .getByRole("button", { name: "解除する" })
+    .click();
+
+  await expect(page).toHaveURL(/\/library\//);
+  await expect(page.locator(`[data-work-id="${neighborId}"]`)).toBeFocused();
+
+  // 解除した作品の詳細の取り直しが404になることが、ライブラリへ戻る合図（詳細ページでは複数回起きうる）
+  expect(tracker.failedResponses.length).toBeGreaterThan(0);
+  for (const response of tracker.failedResponses) {
+    expect(response).toMatch(/^404 .*\/api\/works\//);
+  }
+  tracker.failedResponses.length = 0;
+  for (const error of tracker.consoleErrors) expect(error).toContain("status of 404");
   tracker.consoleErrors.length = 0;
   assertNoErrors(tracker);
 });

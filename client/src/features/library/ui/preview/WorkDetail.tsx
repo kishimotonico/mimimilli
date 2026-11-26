@@ -11,7 +11,7 @@ import { useToast } from "../../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import { deselectUnregisteredWorkAtom } from "../../../../entities/library/model/navigationActions";
 import { focusListOnReturnAtom } from "../../model/focusListOnReturnAtom";
-import { focusListAfterRemoval, neighborWorkId } from "../neighborWorkId";
+import { focusListAfterRemoval } from "../focusListEntry";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import { openPathInFilesAtom } from "../../../../entities/file-system/model/navigationAtoms";
 import { usePlayerActions } from "../../../../entities/player/model/usePlayerActions";
@@ -54,8 +54,8 @@ interface WorkDetailProps {
   onExpand?: () => void;
   /** 表示中の作品が再生中の作品と一致するときだけ渡す。「再生画面へ」ボタンを表示する */
   onGoToPlayingScreen?: () => void;
-  /** 解除した作品の次（末尾なら前）の作品 ID を、解除の確定時に返す。一覧が描画されない画面で渡す。既定は描画中の一覧から探す */
-  neighborOf?: (workId: string) => string | null;
+  /** 解除した作品の次（末尾なら前）の作品 ID を、解除の確定時に返す（一覧のクエリのキャッシュから探す） */
+  neighborOf: (workId: string) => string | null;
 }
 
 export function WorkDetail({
@@ -69,7 +69,7 @@ export function WorkDetail({
   layout = "pane",
   onExpand,
   onGoToPlayingScreen,
-  neighborOf = neighborWorkId,
+  neighborOf,
 }: WorkDetailProps) {
   const playlist = work.playlists.find((p) => p.id === work.defaultPlaylistId) ?? work.playlists[0];
   const tracks = playlist?.tracks ?? [];
