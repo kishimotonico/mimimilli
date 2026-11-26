@@ -4,6 +4,7 @@ title: ポップオーバーを Ark UI へ置き換え、旧フックを削除�
 status: To Do
 assignee: []
 created_date: '2026-11-26 03:15'
+updated_date: '2026-11-26 03:42'
 labels:
   - ui
 dependencies:
@@ -31,3 +32,12 @@ ADR-0043 の帰結のうち、ポップオーバーの中のメニューで外�
 - [ ] #6 docs/design-system.md のメニュー・ポップオーバーのパネルの規定、z-index 表、Motion 節が実装と ADR-0043 に一致している
 - [ ] #7 pnpm check && pnpm test と pnpm test:smoke が通る
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+引き継ぎ資料（会話の文脈なしで読めるように書いてある）
+- 参照先: docs/adr/0043-ui-primitives-ark-ui.md（承認）、backlog doc-10（試作の比較）、見た目のモック https://claude.ai/artifact/RQNfTz8bxxPgvJgzChA5di 、試作ブランチ proto/task-525-ark-ui（最新 e10318e99d5dd969dadc3d6dddb4edc27b8f5142。client/src/proto/、完了まで残す）
+- 現状のポップオーバーの一覧と、試作で分かった注意（Esc の capture 段、userEvent.click、data-state、backdrop ガード）は TASK-529.1 の実装メモにある
+- 軸A→B切替は、試作の ProtoArkAxis.tsx で、ホバーとクリック、復帰の設定の違いを合わせた12通りの奪い合いなしを確認済み。本番の部品でも繰り返し測る
+<!-- SECTION:NOTES:END -->
