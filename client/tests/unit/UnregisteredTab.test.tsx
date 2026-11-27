@@ -1075,6 +1075,34 @@ describe("UnregisteredTab 追加", () => {
     });
   });
 
+  it("項目選択を開いたまま▾を押すと、ポインターでもどのキーでも項目選択を閉じるだけでメニューは開かない", async () => {
+    await renderTab([candidateA]);
+    const caret = () => screen.getByRole("button", { name: "その他の操作" });
+    const openPicker = async () => {
+      await userEvent.click(caret());
+      await userEvent.click(screen.getByRole("menuitem", { name: "項目を選んで追加…" }));
+      await screen.findByRole("dialog", { name: "追加する項目" });
+    };
+    const presses: (() => Promise<void>)[] = [
+      () => userEvent.click(caret()),
+      ...["{Enter}", "[Space]", "{ArrowDown}", "{ArrowUp}"].map((key) => async () => {
+        caret().focus();
+        await userEvent.keyboard(key);
+      }),
+    ];
+    for (const press of presses) {
+      await openPicker();
+      await press();
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "追加する項目" })).toBeNull(),
+      );
+      expect(screen.queryByRole("menu")).toBeNull();
+      expect(caret()).toHaveFocus();
+    }
+    await userEvent.click(caret());
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+  });
+
   it("サーバーの失敗理由をそのまま表示する", async () => {
     vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
       interruptedBy: null,

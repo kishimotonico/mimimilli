@@ -516,6 +516,40 @@ test("作品編集: 関連URLを追加できる", async ({ page }) => {
   assertNoErrors(tracker);
 });
 
+test("作品編集: タグ追加の Esc は候補、ポップオーバー、ダイアログの順に一段ずつ閉じる", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await page.getByText("夜更けの図書室で囁き朗読", { exact: false }).click();
+  await page.locator(".mle-prv").getByRole("button", { name: "作品を編集" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "作品を編集" });
+  await dialog.getByRole("button", { name: "タグを追加" }).click();
+  const popover = page.getByRole("dialog", { name: "タグを追加" });
+  const input = popover.getByRole("combobox", { name: "追加するタグ" });
+  await expect(input).toBeFocused();
+  await input.fill("癒");
+  const listbox = popover.getByRole("listbox");
+  await expect(listbox).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(listbox).toBeHidden();
+  await expect(popover).toBeVisible();
+  await expect(dialog).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(popover).toBeHidden();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "タグを追加" })).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+
+  assertNoErrors(tracker);
+});
+
 test("作品編集: タイトルとタグをまとめて1回の保存で確定できる（一括draft保存）", async ({
   page,
 }) => {
