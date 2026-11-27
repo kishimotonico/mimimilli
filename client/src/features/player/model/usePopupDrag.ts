@@ -8,6 +8,7 @@ import { animate, useDragControls, useMotionValue, type PanInfo } from "motion/r
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { playerPopupOffsetAtom, type PlayerPopupOffset } from "./playerPresentationAtoms";
 import { clamp } from "../../../shared/lib/clamp";
+import { isFromPortaledLayer } from "../../../shared/ui/layer/layerEvents";
 import { isPrimaryPointerButton } from "../../../shared/lib/pointerButton";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 
@@ -111,7 +112,7 @@ export function usePopupDrag(): PopupDragBind {
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
-      if (!isPrimaryPointerButton(e)) return;
+      if (!isPrimaryPointerButton(e) || isFromPortaledLayer(e)) return;
       if (e.target instanceof Element && e.target.closest(DRAG_IGNORE_SELECTOR)) return;
       dragControls.start(e);
     },
@@ -120,6 +121,7 @@ export function usePopupDrag(): PopupDragBind {
 
   const onDoubleClick = useCallback(
     (e: React.MouseEvent) => {
+      if (isFromPortaledLayer(e)) return;
       if (e.target instanceof Element && e.target.closest(DRAG_IGNORE_SELECTOR)) return;
       resetToOrigin();
     },

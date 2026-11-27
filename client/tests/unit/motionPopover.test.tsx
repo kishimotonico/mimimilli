@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import IconButton from "../../src/shared/ui/IconButton";
 import { I } from "../../src/shared/ui/Icon";
+import { isFromPortaledLayer } from "../../src/shared/ui/layer/layerEvents";
 import { resolveFocusReturnTarget } from "../../src/shared/ui/layer/focusReturnTarget";
 import {
   MenuPopup,
@@ -458,24 +459,55 @@ describe("無効なトリガー", () => {
 });
 
 describe("層の中のイベント", () => {
-  it("ポータルした層の中のクリック・キーは、React の祖先へ伝えない", async () => {
+  it("ネイティブの伝播は止めず、window のリスナー（⌘K・外側クリック）へ届く", async () => {
     const user = userEvent.setup();
-    const ancestor = vi.fn();
+    const keys: string[] = [];
+    const downs: string[] = [];
+    const onKey = (event: KeyboardEvent) => keys.push(event.key);
+    const onDown = (event: PointerEvent) => downs.push(event.type);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onDown);
+    try {
+      render(<SinglePanel />);
+      await user.click(panelTrigger());
+      await waitFor(() => expect(panelInput()).toHaveFocus());
+      keys.length = 0;
+      downs.length = 0;
+      await user.keyboard("{Meta>}k{/Meta}");
+      await user.pointer({ keys: "[MouseLeft]", target: panelInput() });
+      expect(keys).toContain("k");
+      expect(downs).toContain("pointerdown");
+    } finally {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onDown);
+    }
+  });
+
+  it("React の祖先には届くが、isFromPortaledLayer で層からのイベントと判定できる", async () => {
+    const user = userEvent.setup();
+    const seen: boolean[] = [];
     function Host() {
       const [open, setOpen] = useState(false);
       return (
         // oxlint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- 祖先への伝播を確かめる
-        <div onClick={ancestor} onKeyDown={ancestor} onPointerDown={ancestor}>
+        <div
+          onClick={(event) => seen.push(isFromPortaledLayer(event))}
+          onDoubleClick={(event) => seen.push(isFromPortaledLayer(event))}
+        >
           <Panel name="パネル" open={open} onChange={setOpen} />
+          <span>祖先の中</span>
         </div>
       );
     }
     render(<Host />);
     await user.click(panelTrigger());
     await waitFor(() => expect(panelInput()).toHaveFocus());
-    ancestor.mockClear();
-    await user.click(panelInput());
-    await user.keyboard("a");
-    expect(ancestor).not.toHaveBeenCalled();
+    seen.length = 0;
+    fireEvent.doubleClick(panelInput());
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every(Boolean)).toBe(true);
+    seen.length = 0;
+    await user.click(screen.getByText("祖先の中"));
+    expect(seen).toEqual([false]);
   });
 });

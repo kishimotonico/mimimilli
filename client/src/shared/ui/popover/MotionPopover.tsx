@@ -20,7 +20,6 @@ import { cn } from "../../lib/cn";
 import { resolveFocusReturnTarget } from "../layer/focusReturnTarget";
 import { ignoreComposingKey, isComposingKey } from "../layer/keys";
 import { layerContainer, registerPopoverReturnTarget } from "../layer/layerDom";
-import { layerEventBoundary } from "../layer/layerEvents";
 import { layerPositioning } from "../layer/layerPositioning";
 import { disabledTriggerProps, POPOVER_OPEN_KEYS } from "../layer/layerTrigger";
 import { useCloseOnAnchorScroll } from "../layer/useCloseOnAnchorScroll";
@@ -43,13 +42,22 @@ type MotionPopoverProps = Omit<
 
 const INTERNALS = Symbol("motionPopoverInternals");
 
+function findTrigger(popover: UsePopoverReturn | null): HTMLElement | null {
+  return popover ? document.getElementById(popover.getTriggerProps().id ?? "") : null;
+}
+
+function findAnchor(popover: UsePopoverReturn | null): HTMLElement | null {
+  const anchor = popover ? document.getElementById(popover.getAnchorProps().id ?? "") : null;
+  return anchor ?? findTrigger(popover);
+}
+
 interface PopoverInternals {
   popover: UsePopoverReturn;
   present: boolean;
   onExitComplete: () => void;
   getAnchor: () => HTMLElement | null;
   bindContent: (content: HTMLDivElement | null) => void;
-  triggerProps: Record<string, unknown>;
+  triggerProps: ReturnType<typeof disabledTriggerProps>;
 }
 
 export interface MotionPopoverHandle {
@@ -75,13 +83,7 @@ export function useMotionPopover({
 }: MotionPopoverProps): MotionPopoverHandle {
   const contentRef = useRef<HTMLDivElement | null>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
-  const triggerIdRef = useRef<string | undefined>(undefined);
-  const anchorIdRef = useRef<string | undefined>(undefined);
-  const getTrigger = useCallback(() => document.getElementById(triggerIdRef.current ?? ""), []);
-  const getAnchor = useCallback(
-    () => document.getElementById(anchorIdRef.current ?? "") ?? getTrigger(),
-    [getTrigger],
-  );
+  const popoverRef = useRef<UsePopoverReturn | null>(null);
   const resolveReturnTarget = useCallback(() => {
     const active = document.activeElement;
     if (
@@ -96,8 +98,8 @@ export function useMotionPopover({
     }
     return previousFocus.current?.isConnected
       ? previousFocus.current
-      : (getTrigger() ?? getAnchor());
-  }, [getTrigger, getAnchor]);
+      : (findTrigger(popoverRef.current) ?? findAnchor(popoverRef.current));
+  }, []);
 
   const popover = usePopover({
     ...rest,
@@ -116,17 +118,16 @@ export function useMotionPopover({
       else onEscapeKeyDown?.(event);
     },
   });
-  const triggerId = popover.getTriggerProps().id;
-  const anchorId = popover.getAnchorProps().id;
-  useLayoutEffect(() => {
-    triggerIdRef.current = triggerId;
-    anchorIdRef.current = anchorId;
-  });
 
   const bindContent = useCallback((content: HTMLDivElement | null) => {
     contentRef.current = content;
     if (content) registerPopoverReturnTarget(content, previousFocus);
   }, []);
+
+  useLayoutEffect(() => {
+    popoverRef.current = popover;
+  });
+  const getAnchor = () => findAnchor(popover);
 
   const wasOpen = useRef(false);
   useLayoutEffect(() => {
@@ -221,7 +222,6 @@ function Popup({
           <motion.div
             {...rest}
             {...layerScale()}
-            {...layerEventBoundary(rest)}
             onKeyDownCapture={ignoreComposingKey}
             inert={!isPresent}
             className={cn(popoverPanelClass, className)}

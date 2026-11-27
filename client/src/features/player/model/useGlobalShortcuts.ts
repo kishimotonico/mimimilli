@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from "react";
 import { useLatest } from "../../../shared/lib/useLatest";
+import { LAYER_CONTENT_SELECTOR } from "../../../shared/ui/layer/layerDom";
 
 /** ネイティブ操作を優先し、常に（全キー）グローバルショートカットの対象から外す要素。 */
 const SHORTCUT_EXEMPT_SELECTOR =
@@ -49,7 +50,8 @@ export function useGlobalShortcuts({
   const handleControlSpace = useCallback(
     (e: KeyboardEvent) => {
       if (e.code !== "Space" || isShortcutBlocked()) return;
-      if (!(e.target instanceof Element) || !e.target.closest(PLAYER_CONTROL_SELECTOR)) return;
+      if (!(e.target instanceof Element) || e.target.closest(LAYER_CONTENT_SELECTOR)) return;
+      if (!e.target.closest(PLAYER_CONTROL_SELECTOR)) return;
       e.preventDefault();
       e.stopPropagation();
       onTogglePlayRef.current();
@@ -62,7 +64,8 @@ export function useGlobalShortcuts({
       if (isShortcutBlocked()) return;
       const target = e.target;
       if (!(target instanceof Element)) return;
-      if (target.closest(SHORTCUT_EXEMPT_SELECTOR)) return;
+      if (target.closest(SHORTCUT_EXEMPT_SELECTOR) || target.closest(LAYER_CONTENT_SELECTOR))
+        return;
       if (SLIDER_OWNED_KEYS.has(e.code) && target.closest(SLIDER_SELECTOR)) return;
 
       if (e.code === "Space") {

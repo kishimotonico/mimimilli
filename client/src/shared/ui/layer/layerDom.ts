@@ -4,6 +4,9 @@ export const POPOVER_CONTENT_SELECTOR = '[data-scope="popover"][data-part="conte
 export const MENU_CONTENT_SELECTOR = '[data-scope="menu"][data-part="content"]';
 export const MENU_TRIGGER_SELECTOR = '[data-scope="menu"][data-part="trigger"]';
 
+/** メニュー・ポップオーバーの中身（開いている・退出中を問わない） */
+export const LAYER_CONTENT_SELECTOR = `${MENU_CONTENT_SELECTOR}, ${POPOVER_CONTENT_SELECTOR}`;
+
 export const OPEN_LAYER_SELECTOR = `${MENU_CONTENT_SELECTOR}:not([inert]), ${POPOVER_CONTENT_SELECTOR}:not([inert])`;
 
 /** content の id から、その層を開くトリガー（aria-controls）を探す */

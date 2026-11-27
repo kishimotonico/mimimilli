@@ -132,18 +132,4 @@ describe("メニュー部品", () => {
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
     expect(trigger).toHaveFocus();
   });
-
-  it("ポータルした中身のクリック・キーは、React の祖先へ伝えない", async () => {
-    const ancestor = vi.fn();
-    render(
-      // oxlint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- 祖先への伝播を確かめる
-      <div onClick={ancestor} onKeyDown={ancestor} onPointerDown={ancestor}>
-        <TestMenu onSelect={vi.fn()} />
-      </div>,
-    );
-    await userEvent.click(screen.getByRole("button", { name: "メニュー" }));
-    ancestor.mockClear();
-    await userEvent.click(screen.getByRole("menuitem", { name: "開く" }));
-    expect(ancestor).not.toHaveBeenCalled();
-  });
 });

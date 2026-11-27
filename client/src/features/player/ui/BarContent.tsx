@@ -8,6 +8,7 @@ import BarVolumePopover from "./BarVolumePopover";
 import PlaybackErrorNotice from "./PlaybackErrorNotice";
 import PlaybackArtwork from "./PlaybackArtwork";
 import { I } from "../../../shared/ui/Icon";
+import { isFromPortaledLayer } from "../../../shared/ui/layer/layerEvents";
 
 interface BarContentProps {
   state: PlayerState;
@@ -53,6 +54,7 @@ export default function BarContent({
       <div
         className="mle-bar1__body"
         onClick={(e) => {
+          if (isFromPortaledLayer(e)) return;
           if (e.target instanceof Element && e.target.closest("button")) return;
           onSwitchToPopup();
         }}

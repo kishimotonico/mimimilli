@@ -1,6 +1,6 @@
 import { useLayoutEffect } from "react";
 import { useAtom } from "jotai";
-import { isFocusLost } from "../../../shared/ui/layer/focusReturnTarget";
+import { isFocusLost } from "../../../shared/lib/isFocusLost";
 import { focusListEntry } from "./focusListEntry";
 import { focusListOnReturnAtom } from "../model/focusListOnReturnAtom";
 

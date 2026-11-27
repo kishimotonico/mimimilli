@@ -135,3 +135,30 @@ describe("useGlobalShortcuts", () => {
     expect(onSeekRelative).not.toHaveBeenCalled();
   });
 });
+
+describe("層の中のキー", () => {
+  it("メニュー・ポップオーバーの中で押したキーでは再生もシークもしない", () => {
+    const onTogglePlay = vi.fn();
+    const onSeekRelative = vi.fn();
+    const { getByText } = render(
+      createElement(
+        "div",
+        null,
+        createElement(TestHost, { onTogglePlay, onSeekRelative }),
+        createElement(
+          "div",
+          { "data-scope": "popover", "data-part": "content" },
+          createElement("div", null, "layer-body"),
+        ),
+      ),
+    );
+    const body = getByText("layer-body");
+    fireEvent.keyDown(body, { code: "Space" });
+    fireEvent.keyDown(body, { code: "ArrowLeft" });
+    fireEvent.keyDown(body, { code: "ArrowRight" });
+    expect(onTogglePlay).not.toHaveBeenCalled();
+    expect(onSeekRelative).not.toHaveBeenCalled();
+    fireEvent.keyDown(getByText("plain"), { code: "Space" });
+    expect(onTogglePlay).toHaveBeenCalledTimes(1);
+  });
+});

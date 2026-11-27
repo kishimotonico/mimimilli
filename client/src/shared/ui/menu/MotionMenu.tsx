@@ -12,7 +12,6 @@ import { Menu, useMenu, type UseMenuProps, type UseMenuReturn } from "@ark-ui/re
 import { Portal } from "@ark-ui/react/portal";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { findLayerTrigger, layerContainer, MENU_TRIGGER_SELECTOR } from "../layer/layerDom";
-import { layerEventBoundary } from "../layer/layerEvents";
 import { layerPositioning } from "../layer/layerPositioning";
 import { ignoreComposingKey, isComposingKey } from "../layer/keys";
 import { disabledTriggerProps, MENU_OPEN_KEYS } from "../layer/layerTrigger";
@@ -37,7 +36,10 @@ interface MenuInternals {
   menu: UseMenuReturn;
   present: boolean;
   onExitComplete: () => void;
-  triggerProps: Record<string, unknown>;
+  triggerProps: ReturnType<typeof disabledTriggerProps> & {
+    onKeyDown: (event: ReactKeyboardEvent) => void;
+    onPointerDown: () => void;
+  };
   closeWithoutRestoringFocus: () => void;
 }
 
@@ -200,7 +202,6 @@ function Popup({
           <motion.div
             {...layerScale()}
             {...rest}
-            {...layerEventBoundary({})}
             onKeyDownCapture={ignoreComposingKey}
             inert={!isPresent}
             className={menuPanelClass({ narrow })}
