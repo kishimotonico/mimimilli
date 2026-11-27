@@ -196,7 +196,12 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
     onRegistered({
       registeredTitles: titlesOf(outcome.registered),
       coverSkippedTitles: titlesOf(
-        outcome.registered.filter((entry) => entry.coverSkipped !== null),
+        outcome.registered.filter(
+          (entry) => entry.coverSkipped !== null && entry.coverSkipped !== "not_cached",
+        ),
+      ),
+      coverNotCachedTitles: titlesOf(
+        outcome.registered.filter((entry) => entry.coverSkipped === "not_cached"),
       ),
       failedCount: outcome.failures.length,
       remainingCandidates: outcome.refreshedCandidates?.candidates.length ?? null,

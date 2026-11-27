@@ -18,6 +18,12 @@ export default function DlsiteStateCell({
       ) : (
         <span className="font-jp text-secondary text-ink-3">—</span>
       );
+    case "cover_missing":
+      return (
+        <StatusLabel tone="none" className="text-ink-2">
+          カバー未取得
+        </StatusLabel>
+      );
     case "fetching":
       return (
         <StatusLabel tone="work" icon={I.refresh} spinning>

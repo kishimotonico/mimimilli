@@ -88,7 +88,8 @@ function UnregisteredRowView({
   handlers,
 }: UnregisteredRowProps) {
   const { path, rjCode } = candidate;
-  const dlsiteTitle = display.state === "fetched" ? display.title : null;
+  const dlsiteTitle =
+    display.state === "fetched" || display.state === "cover_missing" ? display.title : null;
   const title = rowTitle({ candidate, display });
   const chip = missingWorkChip(candidate, title);
 
@@ -167,6 +168,7 @@ function UnregisteredRowView({
 
 function sameDisplay(a: CandidateDlsiteDisplay, b: CandidateDlsiteDisplay): boolean {
   if (a.state !== b.state) return false;
+  if (a.state === "cover_missing" && b.state === "cover_missing") return a.title === b.title;
   if (a.state !== "fetched" || b.state !== "fetched") return true;
   return (
     a.title === b.title && a.cover?.key === b.cover?.key && a.cover?.version === b.cover?.version

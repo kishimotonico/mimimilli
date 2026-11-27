@@ -71,6 +71,7 @@ export default function ScanModal({
   const handleUnregisteredRegistered = ({
     registeredTitles,
     coverSkippedTitles,
+    coverNotCachedTitles,
     failedCount,
     remainingCandidates,
     interrupted,
@@ -78,9 +79,12 @@ export default function ScanModal({
     if (registeredTitles.length === 0) return;
     const names = formatWorkNames(registeredTitles);
     const coverNote =
-      coverSkippedTitles.length > 0
+      (coverNotCachedTitles.length > 0
+        ? `${formatWorkNames(coverNotCachedTitles)}はカバー画像を取得できていないため、カバーを適用できませんでした。`
+        : "") +
+      (coverSkippedTitles.length > 0
         ? `${formatWorkNames(coverSkippedTitles)}はカバーを適用できませんでした。`
-        : "";
+        : "");
     if (failedCount > 0 || interrupted) {
       toast.show({
         message:

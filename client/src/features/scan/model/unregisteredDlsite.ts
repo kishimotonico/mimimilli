@@ -10,15 +10,21 @@ export type CandidateDlsiteDisplay =
   | { state: "none" }
   | { state: "fetching" }
   | { state: "fetched"; title: string | null; cover: DlsiteCachedCover | null }
+  | { state: "cover_missing"; title: string }
   | { state: "not_found" }
   | { state: "failed" };
 
 type DisplayJobState = Pick<DlsiteJobState, "job" | "results">;
 
 function displayOf(summary: DlsiteProductSummary): CandidateDlsiteDisplay {
-  return summary.state === "fetched"
-    ? { state: "fetched", title: summary.title, cover: summary.cover }
-    : { state: summary.state };
+  switch (summary.state) {
+    case "fetched":
+      return { state: "fetched", title: summary.title, cover: summary.cover };
+    case "cover_missing":
+      return { state: "cover_missing", title: summary.title };
+    default:
+      return { state: summary.state };
+  }
 }
 
 /** 取得中はジョブの状態から、それ以外は候補の値とジョブで見た終端の結果のうち revision の大きい方から出す。

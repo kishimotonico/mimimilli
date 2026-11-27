@@ -199,13 +199,13 @@ export function fixtureDlsiteSummary(
   if (fetchState !== "fetched") return { state: fetchState };
   const fetched = state.dlsiteFetched.get(normalizeDlsiteCacheKey(rjCode));
   if (!fetched) return { state: "none" };
-  const key = fetched.info.coverUrl ? fixtureDlsiteCoverKey(fetched.info.coverUrl) : null;
-  const cover = key ? state.dlsiteCovers.get(key) : undefined;
-  return {
-    state: "fetched",
-    title: fetched.info.title,
-    cover: key && cover ? { key, version: cover.fetchedAt } : null,
-  };
+  const { title, coverUrl } = fetched.info;
+  if (!coverUrl) return { state: "fetched", title, cover: null };
+  const key = fixtureDlsiteCoverKey(coverUrl);
+  const cover = state.dlsiteCovers.get(key);
+  return cover
+    ? { state: "fetched", title, cover: { key, version: cover.fetchedAt } }
+    : { state: "cover_missing", title };
 }
 
 export function fixtureDlsiteCoverKey(coverUrl: string): string {

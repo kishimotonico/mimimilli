@@ -1219,7 +1219,7 @@ describe("ScanModal", () => {
     await waitFor(() =>
       expect(
         screen.getByText(
-          "「検出済みDLsiteタイトル」他1件を追加しました。「検出済みDLsiteタイトル」はカバーを適用できませんでした。",
+          "「検出済みDLsiteタイトル」他1件を追加しました。「検出済みDLsiteタイトル」はカバー画像を取得できていないため、カバーを適用できませんでした。",
         ),
       ).toBeInTheDocument(),
     );

@@ -16,7 +16,9 @@ export function rowTitle({
   candidate,
   display,
 }: Pick<CandidateRowModel, "candidate" | "display">): string {
-  return display.state === "fetched" && display.title ? display.title : candidate.inferredTitle;
+  return (display.state === "fetched" || display.state === "cover_missing") && display.title
+    ? display.title
+    : candidate.inferredTitle;
 }
 
 function isProblemDisplay(display: CandidateDlsiteDisplay): boolean {
@@ -73,7 +75,7 @@ export function selectionOverride(
   };
 }
 
-/** 取得の対象。選択中でRJコードの形式に合い、未取得・該当なし・失敗のものを、コードで重複なく数える。
+/** 取得の対象。選択中でRJコードの形式に合い、未取得・カバー未取得・該当なし・失敗のものを、コードで重複なく数える。
  *  該当なし・失敗の行を含むときは force で取り直す（ADR-0033）。 */
 export function fetchTarget(selectedRows: readonly CandidateRowModel[]): {
   codes: string[];
@@ -83,7 +85,8 @@ export function fetchTarget(selectedRows: readonly CandidateRowModel[]): {
   let force = false;
   for (const { candidate, display } of selectedRows) {
     if (candidate.rjCode === null) continue;
-    if (display.state === "none") codes.add(canonicalDlsiteProductCode(candidate.rjCode));
+    if (display.state === "none" || display.state === "cover_missing")
+      codes.add(canonicalDlsiteProductCode(candidate.rjCode));
     else if (isProblemDisplay(display)) {
       codes.add(canonicalDlsiteProductCode(candidate.rjCode));
       force = true;

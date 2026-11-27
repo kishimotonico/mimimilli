@@ -44,7 +44,7 @@ export async function fetchDlsiteOfWorks(
       ).state;
       outcomes.set(code, outcome);
     }
-    if (outcome === "fetched") counts.fetched += 1;
+    if (outcome === "fetched" || outcome === "cover_missing") counts.fetched += 1;
     else counts.failed += 1;
   }
   return counts;

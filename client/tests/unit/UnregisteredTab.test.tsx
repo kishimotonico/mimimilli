@@ -1134,6 +1134,7 @@ describe("UnregisteredTab 追加", () => {
     expect(onRegistered).toHaveBeenCalledWith({
       registeredTitles: [candidateA.inferredTitle],
       coverSkippedTitles: [],
+      coverNotCachedTitles: [],
       failedCount: 0,
       remainingCandidates: 0,
       interrupted: true,
@@ -1154,6 +1155,7 @@ describe("UnregisteredTab 追加", () => {
     expect(onRegistered).toHaveBeenCalledWith({
       registeredTitles: [],
       coverSkippedTitles: [],
+      coverNotCachedTitles: [],
       failedCount: 0,
       remainingCandidates: null,
       interrupted: true,
@@ -1172,6 +1174,7 @@ describe("UnregisteredTab 追加", () => {
     expect(onRegistered).toHaveBeenCalledWith({
       registeredTitles: [],
       coverSkippedTitles: [],
+      coverNotCachedTitles: [],
       failedCount: 1,
       remainingCandidates: null,
       interrupted: false,
@@ -1182,7 +1185,7 @@ describe("UnregisteredTab 追加", () => {
     vi.spyOn(workApi, "registerScanCandidates").mockResolvedValue({
       registered: [
         { path: candidateA.path, workId: "w-a", coverSkipped: "not_cached" },
-        { path: candidateB.path, workId: "w-b", coverSkipped: null },
+        { path: candidateB.path, workId: "w-b", coverSkipped: "unreadable" },
       ],
       failures: [],
       interruptedBy: null,
@@ -1192,7 +1195,8 @@ describe("UnregisteredTab 追加", () => {
     await waitFor(() =>
       expect(onRegistered).toHaveBeenCalledWith({
         registeredTitles: [candidateA.inferredTitle, "検出済みのDLsiteタイトル"],
-        coverSkippedTitles: [candidateA.inferredTitle],
+        coverSkippedTitles: ["検出済みのDLsiteタイトル"],
+        coverNotCachedTitles: [candidateA.inferredTitle],
         failedCount: 0,
         remainingCandidates: 0,
         interrupted: false,
@@ -1258,6 +1262,7 @@ describe("UnregisteredTab 追加", () => {
       expect(onRegistered).toHaveBeenCalledWith({
         registeredTitles: [candidateA.inferredTitle],
         coverSkippedTitles: [],
+        coverNotCachedTitles: [],
         failedCount: 1,
         remainingCandidates: 1,
         interrupted: false,

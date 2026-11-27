@@ -97,7 +97,9 @@ describe("Filesの作品登録の通知", () => {
     await register();
     await waitFor(() =>
       expect(
-        screen.getByText("作品を登録しました。カバーは適用できませんでした"),
+        screen.getByText(
+          "作品を登録しました。カバー画像を取得できていないため、カバーは適用できませんでした",
+        ),
       ).toBeInTheDocument(),
     );
   });

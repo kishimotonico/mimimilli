@@ -642,6 +642,7 @@ export const dlsiteJobCodeStateSchema = z.enum([
   "queued",
   "fetching",
   "fetched",
+  "cover_missing",
   "not_found",
   "failed",
 ]);
@@ -657,8 +658,13 @@ export type DlsiteJobStartBody = z.infer<typeof dlsiteJobStartBodySchema>;
 const dlsiteFetchedSummarySchema = z.object({
   state: z.literal("fetched"),
   title: z.string(),
-  /** null はカバーの先取りに失敗してキャッシュに無い */
+  /** null は解析結果に coverUrl が無い。coverUrl があればキャッシュ済み（無ければ cover_missing） */
   cover: dlsiteCachedCoverSchema.nullable(),
+});
+/** 解析結果に coverUrl があるが、カバー画像がキャッシュに無い */
+const dlsiteCoverMissingSummarySchema = z.object({
+  state: z.literal("cover_missing"),
+  title: z.string(),
 });
 const dlsiteNotFoundSummarySchema = z.object({ state: z.literal("not_found") });
 const dlsiteFailedSummarySchema = z.object({ state: z.literal("failed") });
@@ -668,6 +674,7 @@ export const dlsiteProductSummarySchema = z.discriminatedUnion("state", [
   /** 未取得（キャッシュに無い・TTL切れ・RJコードなし） */
   z.object({ state: z.literal("none") }),
   dlsiteFetchedSummarySchema,
+  dlsiteCoverMissingSummarySchema,
   dlsiteNotFoundSummarySchema,
   dlsiteFailedSummarySchema,
 ]);
@@ -696,6 +703,11 @@ export const dlsiteJobCodeSchema = z.discriminatedUnion("state", [
     ...dlsiteJobCodeBase,
     state: z.literal("fetched"),
     dlsite: dlsiteFetchedSummarySchema,
+  }),
+  z.object({
+    ...dlsiteJobCodeBase,
+    state: z.literal("cover_missing"),
+    dlsite: dlsiteCoverMissingSummarySchema,
   }),
   z.object({
     ...dlsiteJobCodeBase,
@@ -751,6 +763,11 @@ const dlsiteJobCodeEventSchema = z.discriminatedUnion("state", [
     ...dlsiteJobCodeEventBase,
     state: z.literal("fetched"),
     dlsite: dlsiteFetchedSummarySchema,
+  }),
+  z.object({
+    ...dlsiteJobCodeEventBase,
+    state: z.literal("cover_missing"),
+    dlsite: dlsiteCoverMissingSummarySchema,
   }),
   z.object({
     ...dlsiteJobCodeEventBase,

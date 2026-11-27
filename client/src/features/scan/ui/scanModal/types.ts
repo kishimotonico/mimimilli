@@ -21,8 +21,10 @@ export const SCAN_TAB_LABEL: Record<ScanTabKey, string> = {
 /** UnregisteredTab が候補登録の成否をScanModalへ伝える契約。タイトルは追加した作品の名前 */
 export interface CandidatesRegisteredResult {
   registeredTitles: string[];
-  /** 追加できた作品のうち、選んだカバーを適用できなかったもの */
+  /** 追加できた作品のうち、カバー画像のキャッシュ以外の理由でカバーを適用できなかったもの */
   coverSkippedTitles: string[];
+  /** 追加できた作品のうち、カバー画像がキャッシュに無くカバーを適用できなかったもの */
+  coverNotCachedTitles: string[];
   failedCount: number;
   /** 追加のあとに取り直した、未登録に残る候補の件数。取り直せなかった・追加できたものがないときは null */
   remainingCandidates: number | null;

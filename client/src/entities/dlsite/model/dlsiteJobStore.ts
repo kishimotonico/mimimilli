@@ -121,7 +121,9 @@ function errorMessage(error: unknown): string {
 }
 
 function isTerminalCodeState(state: DlsiteJobCodeState): boolean {
-  return state === "fetched" || state === "not_found" || state === "failed";
+  return (
+    state === "fetched" || state === "cover_missing" || state === "not_found" || state === "failed"
+  );
 }
 
 function toView(snapshot: DlsiteJobSnapshot): DlsiteJobView {

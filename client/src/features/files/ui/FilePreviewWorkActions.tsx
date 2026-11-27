@@ -213,7 +213,10 @@ export default function FilePreviewWorkActions({
             setPendingProjection(result);
             if (result.coverSkipped !== null) {
               toast.show({
-                message: "作品を登録しました。カバーは適用できませんでした",
+                message:
+                  result.coverSkipped === "not_cached"
+                    ? "作品を登録しました。カバー画像を取得できていないため、カバーは適用できませんでした"
+                    : "作品を登録しました。カバーは適用できませんでした",
                 variant: "warning",
                 priority: "action",
                 dismissOnUnmount: false,

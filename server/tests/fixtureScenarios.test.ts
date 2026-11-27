@@ -581,8 +581,7 @@ test("scan-review: 候補が取得状態ごとの表示になり、直した行�
     const after = await list();
     const stateOf = (code: string) => (after.get(code)!.dlsite as { state: string }).state;
     assert.equal(stateOf("RJ000401"), "fetched");
-    assert.equal(stateOf("RJ000402"), "fetched");
-    assert.equal((after.get("RJ000402")!.dlsite as { cover: unknown }).cover, null);
+    assert.equal(stateOf("RJ000402"), "cover_missing");
     assert.notEqual((after.get("RJ000401")!.dlsite as { cover: unknown }).cover, null);
     assert.equal(stateOf("RJ000403"), "not_found");
     assert.equal(stateOf("RJ000404"), "failed");

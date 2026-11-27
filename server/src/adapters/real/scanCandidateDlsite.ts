@@ -30,7 +30,18 @@ export function deriveDlsiteProductSummary(
   if (state !== "fetched") return { state };
   if (resolution.kind !== "html" || !resolution.result.ok) return { state: "failed" };
   const { title, coverUrl } = resolution.result.info;
-  return { state: "fetched", title, cover: cachedCoverOf(coverUrl, source.coverVersion) };
+  return summaryOfParsedInfo(title, coverUrl, source.coverVersion);
+}
+
+/** 解析済みの作品情報の要約。coverUrl があって画像がキャッシュに無いときは cover_missing */
+function summaryOfParsedInfo(
+  title: string,
+  coverUrl: string | null,
+  coverVersion: (coverKey: string) => number | null,
+): DlsiteProductSummary {
+  if (!coverUrl) return { state: "fetched", title, cover: null };
+  const cover = cachedCoverOf(coverUrl, coverVersion);
+  return cover ? { state: "fetched", title, cover } : { state: "cover_missing", title };
 }
 
 /** カバーURLに対応するキャッシュ済みカバー。キャッシュに無い・許可外のURLはnull */

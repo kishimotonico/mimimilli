@@ -33,6 +33,9 @@ describe("fetchTarget", () => {
     ];
     expect(fetchTarget(base)).toEqual({ codes: ["RJ000001"], force: false });
     expect(
+      fetchTarget([...base, row("h", "RJ000006", { state: "cover_missing", title: "t" })]),
+    ).toEqual({ codes: ["RJ000001", "RJ000006"], force: false });
+    expect(
       fetchTarget([
         ...base,
         row("c", "RJ000002", { state: "failed" }),
@@ -78,6 +81,15 @@ describe("footerPlan / addTargets", () => {
       force: false,
     });
     expect(footerPlan([fetched, noCode])).toEqual({ kind: "add" });
+  });
+
+  it("カバー未取得の行は、未取得と同じく force なしで取得になる", () => {
+    const coverMissing = row("f", "RJ000007", { state: "cover_missing", title: "t" });
+    expect(footerPlan([fetched, coverMissing])).toEqual({
+      kind: "fetch",
+      codes: ["RJ000007"],
+      force: false,
+    });
   });
 
   it("該当なし・失敗の行が選択にあれば、取得の対象に含めて force で取り直す", () => {

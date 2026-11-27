@@ -73,7 +73,7 @@ test("取得時に解析結果を保存すると、候補の導出は何度で�
     first,
     createDlsiteProductResolver(first, { version: DLSITE_PARSER_VERSION, parse }),
   );
-  const expected = { state: "fetched", title: info.title, cover: null };
+  const expected = { state: "cover_missing", title: info.title };
   assert.deepEqual(deriveDlsiteProductSummary(source, CODE), expected);
   assert.deepEqual(deriveDlsiteProductSummary(source, CODE), expected);
   assert.equal(state.calls, 0);
@@ -134,17 +134,16 @@ test("snapshotが取り直されると、古い解析結果は使われず新し
     createDlsiteProductResolver(cache, DLSITE_PARSER),
   );
   record(cache, { title: "前のタイトル" });
-  assert.equal(deriveDlsiteProductSummary(source, CODE).state, "fetched");
+  assert.equal(deriveDlsiteProductSummary(source, CODE).state, "cover_missing");
   setClock(1_010);
   record(cache, { title: "取り直したタイトル" });
   assert.deepEqual(deriveDlsiteProductSummary(source, CODE), {
-    state: "fetched",
+    state: "cover_missing",
     title: "取り直したタイトル",
-    cover: null,
   });
 });
 
-test("状態の導出: ok=取得済み、parse_error=失敗、失敗の記録、TTL切れ=未取得", (t) => {
+test("状態の導出: ok=カバー未取得（画像がキャッシュに無い）、parse_error=失敗、失敗の記録、TTL切れ=未取得", (t) => {
   const { open, setClock } = setup(t);
   const cache = open();
   const source = createCandidateDlsiteSource(
@@ -155,7 +154,7 @@ test("状態の導出: ok=取得済み、parse_error=失敗、失敗の記録、
 
   assert.equal(stateOf("RJ000009"), "none");
   record(cache);
-  assert.equal(stateOf(CODE), "fetched");
+  assert.equal(stateOf(CODE), "cover_missing");
 
   cache.recordSuccess({
     productCode: "RJ000002",
@@ -174,7 +173,7 @@ test("状態の導出: ok=取得済み、parse_error=失敗、失敗の記録、
   cache.recordFailure({ productCode: CODE, outcome: "error" });
   assert.equal(stateOf(CODE), "failed");
   setClock(1_041);
-  assert.equal(stateOf(CODE), "fetched");
+  assert.equal(stateOf(CODE), "cover_missing");
 
   setClock(1_101);
   assert.equal(stateOf(CODE), "none");
@@ -201,7 +200,7 @@ test("outcomeがokでも解析できなくなったsnapshotは失敗になる", 
   );
 });
 
-test("カバーはキャッシュにあれば版つきで載り、無ければnull、後から入れれば次の導出で載る", (t) => {
+test("カバーはキャッシュにあれば版つきで載り、無ければcover_missing、後から入れれば次の導出で載る", (t) => {
   const { open, setClock } = setup(t);
   const cache = open();
   const info = record(cache);
@@ -212,9 +211,8 @@ test("カバーはキャッシュにあれば版つきで載り、無ければnu
   );
 
   assert.deepEqual(deriveDlsiteProductSummary(source, CODE), {
-    state: "fetched",
+    state: "cover_missing",
     title: info.title,
-    cover: null,
   });
   setClock(1_005);
   cache.putCover(coverUrl, new Uint8Array([0xff, 0xd8, 0xff]), "image/jpeg");
@@ -222,6 +220,21 @@ test("カバーはキャッシュにあれば版つきで載り、無ければnu
     state: "fetched",
     title: info.title,
     cover: { key: DlsiteCache.coverKey(coverUrl), version: 1_005 },
+  });
+});
+
+test("解析結果にcoverUrlが無い作品は、画像が無くてもfetchedでcoverはnull", (t) => {
+  const { open } = setup(t);
+  const cache = open();
+  const info = record(cache, { html: sampleWorkHtml(CODE, { cover: false }) });
+  const source = createCandidateDlsiteSource(
+    cache,
+    createDlsiteProductResolver(cache, DLSITE_PARSER),
+  );
+  assert.deepEqual(deriveDlsiteProductSummary(source, CODE), {
+    state: "fetched",
+    title: info.title,
+    cover: null,
   });
 });
 

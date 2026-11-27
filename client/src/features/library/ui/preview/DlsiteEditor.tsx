@@ -325,7 +325,10 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
         result.coverSkipped === null
           ? { message: "DLsite情報を適用しました", variant: "success", priority: "notice" }
           : {
-              message: "DLsite情報を適用しました。カバーは適用できませんでした",
+              message:
+                result.coverSkipped === "not_cached"
+                  ? "DLsite情報を適用しました。カバー画像を取得できていないため、カバーは適用できませんでした"
+                  : "DLsite情報を適用しました。カバーは適用できませんでした",
               variant: "warning",
               priority: "notice",
             },

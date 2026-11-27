@@ -121,7 +121,9 @@ describe("DlsiteEditor", () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText("DLsite情報を適用しました。カバーは適用できませんでした"),
+        screen.getByText(
+          "DLsite情報を適用しました。カバー画像を取得できていないため、カバーは適用できませんでした",
+        ),
       ).toBeInTheDocument(),
     );
     expect(screen.queryByText("DLsite情報を適用しました")).not.toBeInTheDocument();

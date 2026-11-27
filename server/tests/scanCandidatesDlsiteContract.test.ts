@@ -13,6 +13,7 @@ import type { DataAdapter } from "../src/adapter/index.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import {
   FIXTURE_DLSITE_FETCH_FAILURE_RJ_CODE,
+  FIXTURE_DLSITE_COVERLESS_RJ_CODE,
   FIXTURE_DLSITE_NOT_FOUND_RJ_CODE,
   FIXTURE_DLSITE_NO_COVER_RJ_CODE,
 } from "../src/adapters/fixture/dlsiteMethods.ts";
@@ -44,7 +45,10 @@ interface Subject {
   app: ReturnType<typeof createApp>;
   notFoundCode: string;
   errorCode: string;
-  noCoverCode: string;
+  /** DLsiteに画像が無い（解析結果に coverUrl が無い） */
+  coverlessCode: string;
+  /** 解析結果に coverUrl があるが、画像を取得できない */
+  coverMissingCode: string;
   /** 取得を保留していたら解放する */
   release(): void;
   dispose(): Promise<void>;
@@ -105,7 +109,8 @@ async function createSubject(
       app,
       notFoundCode: FIXTURE_DLSITE_NOT_FOUND_RJ_CODE,
       errorCode: FIXTURE_DLSITE_FETCH_FAILURE_RJ_CODE,
-      noCoverCode: FIXTURE_DLSITE_NO_COVER_RJ_CODE,
+      coverlessCode: FIXTURE_DLSITE_COVERLESS_RJ_CODE,
+      coverMissingCode: FIXTURE_DLSITE_NO_COVER_RJ_CODE,
       release: () => {},
       dispose: () => app.shutdown(),
     };
@@ -138,7 +143,9 @@ async function createSubject(
           return htmlResponse(sampleWorkHtml(code, { title: `タイトル${code}` }));
         },
         cover: (url) =>
-          coverUrlFromRequest(url) ? jpegResponse(JPEG_BYTES) : htmlResponse("", 404),
+          coverUrlFromRequest(url) && !url.includes("RJ000405_img")
+            ? jpegResponse(JPEG_BYTES)
+            : htmlResponse("", 404),
       }),
     }),
   );
@@ -190,7 +197,8 @@ async function createSubject(
     app,
     notFoundCode: "RJ000403",
     errorCode: "RJ000404",
-    noCoverCode: "RJ000402",
+    coverlessCode: "RJ000402",
+    coverMissingCode: "RJ000405",
     release: () => gate.resolve(),
     dispose: async () => {
       gate.resolve();
@@ -292,12 +300,24 @@ for (const kind of ["fixture", "real"] as const) {
     },
   );
 
-  contract("カバーがキャッシュに無い取得済みの候補はcoverがnull", async (subject) => {
-    await fetchAndWait(subject, subject.noCoverCode);
-    const candidate = await setRjCode(subject, subject.noCoverCode);
+  contract("DLsiteに画像が無い取得済みの候補は、fetchedでcoverがnull", async (subject) => {
+    await fetchAndWait(subject, subject.coverlessCode);
+    const candidate = await setRjCode(subject, subject.coverlessCode);
     assert.equal(candidate.dlsite.state, "fetched");
     if (candidate.dlsite.state === "fetched") assert.equal(candidate.dlsite.cover, null);
   });
+
+  contract(
+    "coverUrlがあって画像がキャッシュに無い候補は、取得してもcover_missingのまま",
+    async (subject) => {
+      await fetchAndWait(subject, subject.coverMissingCode);
+      const candidate = await setRjCode(subject, subject.coverMissingCode);
+      assert.equal(candidate.dlsite.state, "cover_missing");
+      if (candidate.dlsite.state === "cover_missing") {
+        assert.ok(candidate.dlsite.title.length > 0);
+      }
+    },
+  );
 
   contract("カバーの配信はキャッシュに無いキー・不正なキーを拒否する", async (subject) => {
     const missing = await subject.app.request(`/api/media/dlsite-cover/${"0".repeat(64)}`);
@@ -318,7 +338,13 @@ for (const kind of ["fixture", "real"] as const) {
   contract(
     "取得ジョブの終端の結果は、その直後の候補のdlsiteと一致し、候補のrevisionは終端以上になる",
     async (subject) => {
-      for (const code of [OK_CODE, subject.noCoverCode, subject.notFoundCode, subject.errorCode]) {
+      for (const code of [
+        OK_CODE,
+        subject.coverlessCode,
+        subject.coverMissingCode,
+        subject.notFoundCode,
+        subject.errorCode,
+      ]) {
         await startJob(subject, code);
         await waitJobFinished(subject);
         const state = (await (await subject.app.request("/api/dlsite/jobs/current")).json()) as {

@@ -146,7 +146,10 @@ test("カバーの取得に失敗しても取得結果は成功のままで、�
     html: (code) => htmlResponse(sampleWorkHtml(code, { cover: true })),
     cover: () => Promise.reject(new Error("カバー取得失敗")),
   });
-  assert.equal((await adapter.fetchDlsiteProduct("RJ000001", { force: false })).state, "fetched");
+  assert.equal(
+    (await adapter.fetchDlsiteProduct("RJ000001", { force: false })).state,
+    "cover_missing",
+  );
   assert.equal(cache.getCover(coverUrlOf("RJ000001")), null);
   assert.equal((await adapter.dlsiteFetchByCode("RJ000002")).ok, true);
 });
@@ -272,7 +275,9 @@ test("forceは、解析できないsnapshot（parse_error）を取り直す", as
   const { adapter } = setup(t, {
     html: (code) => {
       htmlCalls += 1;
-      return broken ? htmlResponse("<html></html>") : htmlResponse(sampleWorkHtml(code));
+      return broken
+        ? htmlResponse("<html></html>")
+        : htmlResponse(sampleWorkHtml(code, { cover: false }));
     },
   });
   assert.equal((await adapter.fetchDlsiteProduct("RJ000001", { force: false })).state, "failed");
