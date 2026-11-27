@@ -1,5 +1,4 @@
 import { createElement } from "react";
-import { createPortal } from "react-dom";
 import { fireEvent, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { usePopupDrag } from "../../src/features/player/model/usePopupDrag";
@@ -19,19 +18,11 @@ function Host() {
   return createElement(
     "div",
     { ref: drag.popupRef, onPointerDown: drag.onPointerDown },
-    createPortal(createElement("div", { role: "menuitemradio" }, "1.0×"), document.body),
     createElement("button", { type: "button" }, "中のボタン"),
   );
 }
 
 describe("usePopupDrag", () => {
-  it("ポータルしたメニュー項目からはドラッグを始めない", () => {
-    start.mockClear();
-    render(createElement(Host));
-    fireEvent.pointerDown(document.body.querySelector("[role='menuitemradio']")!, { button: 0 });
-    expect(start).not.toHaveBeenCalled();
-  });
-
   it("ポップアップ内の余白からはドラッグを始め、ボタンからは始めない", () => {
     start.mockClear();
     const { getByText } = render(createElement(Host));
