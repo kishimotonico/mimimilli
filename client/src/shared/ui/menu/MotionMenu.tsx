@@ -90,7 +90,7 @@ export function useMotionMenu(props: MotionMenuProps = {}): MotionMenuHandle {
       if (event.defaultPrevented) return;
       if (event.detail.originalEvent.type !== "focusin") return;
       // 外へ移ったフォーカス（プログラムの focus()、別のメニューのトリガー）をトリガーへ奪い返さず、そのまま閉じる。
-      // CLOSE の restoreFocus: false は zag の内部仕様（Ark UI 5.40.0 固定に依存）
+      // CLOSE の restoreFocus: false は zag の内部仕様（Ark UI の版固定に依存）
       event.preventDefault();
       menuRef.current?.service.send({ type: "CLOSE", restoreFocus: false });
     },
