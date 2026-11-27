@@ -11,13 +11,14 @@ import {
   buildGroupByRows,
   getGroupByLabel,
 } from "../../../entities/library/smartFolderDefinitions";
-import { MENU_LABEL_CLASS, menuItemClass } from "../../../shared/ui/menu/menuStyles";
+import { MENU_LABEL_CLASS } from "../../../shared/ui/menu/menuStyles";
 import {
   MotionPopoverRoot,
   MotionPopoverTrigger,
   PopoverPopup,
   useMotionPopover,
 } from "../../../shared/ui/popover/MotionPopover";
+import { popoverListItemClass } from "../../../shared/ui/popover/popoverStyles";
 import { buildFilterTag } from "../model/libraryPresentation";
 import { groupByKey } from "../../../entities/smart-folder/groupByKey";
 import GroupValueQuickList from "./GroupValueQuickList";
@@ -90,17 +91,13 @@ export default function FilterChipAddButton({
     onEscapeKeyDown: (event) => {
       if (pickedGroupBy !== null) {
         event.preventDefault();
-        backOrClose();
+        backToGroupBy(pickedGroupBy);
       }
     },
   });
 
-  function backOrClose() {
-    if (pickedGroupBy === null) {
-      popover.closeAndReturn();
-      return;
-    }
-    const key = groupByKey(pickedGroupBy);
+  function backToGroupBy(groupBy: GroupBy) {
+    const key = groupByKey(groupBy);
     flushSync(() => setPickedGroupBy(null));
     stageRef.current
       ?.querySelector<HTMLElement>(`[data-group-by-key="${CSS.escape(key)}"]`)
@@ -123,11 +120,9 @@ export default function FilterChipAddButton({
           animate={animate}
         >
           {pickedGroupBy === null ? (
-            <div
-              // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 項目ボタン集合を名前付き集合として表す。fieldset等の代替タグは適合しない
-              role="group"
+            <fieldset
               aria-label="絞り込みの種類"
-              className="max-h-[260px] overflow-y-auto"
+              className="m-0 max-h-[260px] overflow-y-auto border-0 p-0"
             >
               {buildGroupByRows(tagPrefixes).map(({ groupBy, name }) => {
                 const key = groupByKey(groupBy);
@@ -136,7 +131,7 @@ export default function FilterChipAddButton({
                     key={key}
                     type="button"
                     data-group-by-key={key}
-                    className={`${menuItemClass()} hover:bg-paper-2 hover:text-ink-0 focus-visible:bg-paper-2 focus-visible:text-ink-0`}
+                    className={popoverListItemClass}
                     onClick={() => {
                       flushSync(() => setPickedGroupBy(groupBy));
                       popover.focusInitial();
@@ -147,7 +142,7 @@ export default function FilterChipAddButton({
                   </button>
                 );
               })}
-            </div>
+            </fieldset>
           ) : (
             <GroupValueStage
               groupBy={pickedGroupBy}

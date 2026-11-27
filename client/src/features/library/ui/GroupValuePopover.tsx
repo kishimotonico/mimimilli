@@ -23,13 +23,11 @@ interface GroupValuePopoverProps {
   placement: "right" | "below";
   open: boolean;
   triggerId: string;
-  anchorEl: HTMLElement | null;
   restoreFocus?: boolean;
   list: GroupValueListProps | null;
   onClose: () => void;
   panelHandlers?: HoverGroupPanelHandlers;
   onPanelElChange?: (el: HTMLElement | null) => void;
-  onReturnTargetLost?: () => void;
 }
 
 function GroupValueList({
@@ -63,13 +61,11 @@ export default function GroupValuePopover({
   placement,
   open,
   triggerId,
-  anchorEl,
   restoreFocus,
   list,
   onClose,
   panelHandlers,
   onPanelElChange,
-  onReturnTargetLost,
 }: GroupValuePopoverProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const right = placement === "right";
@@ -80,7 +76,6 @@ export default function GroupValuePopover({
     positioning: {
       placement: right ? "right-start" : "bottom-start",
       flip: !right,
-      getAnchorRect: () => anchorEl?.getBoundingClientRect() ?? null,
     },
     initialFocusEl: () => panelRef.current?.querySelector("input") ?? null,
     onOpenChange: ({ open: nextOpen }) => {
@@ -103,10 +98,8 @@ export default function GroupValuePopover({
           <GroupValueList
             {...list}
             onSelectValue={(value) => {
-              const returnTarget = popover.resolveReturnTarget();
               popover.closeAndReturn();
               list.onSelectValue(value);
-              if (!returnTarget?.isConnected) onReturnTargetLost?.();
             }}
           />
         )}

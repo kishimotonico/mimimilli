@@ -59,7 +59,12 @@ export default function TopBar() {
       const target = e.target instanceof HTMLElement ? e.target : null;
       const isEditable =
         target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
-      if (isEditable && target !== searchInputRef.current && !target?.closest(".mll-qlist")) return;
+      if (
+        isEditable &&
+        target !== searchInputRef.current &&
+        !target?.closest("[data-search-shortcut-scope]")
+      )
+        return;
       e.preventDefault();
       searchInputRef.current?.focus();
       searchInputRef.current?.select();

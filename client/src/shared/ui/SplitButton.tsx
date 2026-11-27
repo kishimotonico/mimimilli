@@ -1,6 +1,6 @@
-import { useRef, type ReactNode } from "react";
+import { useRef, type ReactNode, type Ref } from "react";
 import { cn } from "../lib/cn";
-import { buttonClass, type ButtonSize, type ButtonVariant } from "./Button";
+import Button, { buttonClass, type ButtonSize, type ButtonVariant } from "./Button";
 import { I } from "./Icon";
 import { MenuPopup, MotionMenuRoot, MotionMenuTrigger, useMotionMenu } from "./menu/MotionMenu";
 
@@ -19,6 +19,12 @@ interface SplitButtonProps {
   size?: ButtonSize;
   menuLabel?: string;
   menuTriggerId?: string;
+  /** 外枠の id。ポップオーバーの基準（ids.anchor）に結ぶ */
+  id?: string;
+  primaryRef?: Ref<HTMLButtonElement>;
+  /** メニューの開閉を呼び出し側が持つ。開く要求は onMenuOpenChange(true) で届き、受け入れるまで開かない */
+  menuOpen?: boolean;
+  onMenuOpenChange?: (open: boolean) => void;
   /** メニューの開く向き。既定は上（下端に置く前提）。above・belowEnd は▾の右端にそろえる。aboveStart はボタン全体の左端にそろえる（左端に置くボタンで、メニューがはみ出さないようにする） */
   placement?: keyof typeof PLACEMENT;
   className?: string;
@@ -42,6 +48,10 @@ export default function SplitButton({
   size = "sm",
   menuLabel = "その他の操作",
   menuTriggerId,
+  id,
+  primaryRef,
+  menuOpen,
+  onMenuOpenChange,
   placement = "above",
   className,
 }: SplitButtonProps) {
@@ -58,23 +68,22 @@ export default function SplitButton({
       }),
     },
     disabled: off,
+    open: menuOpen,
+    onOpenChange: onMenuOpenChange && (({ open }) => onMenuOpenChange(open)),
   });
   return (
-    <div ref={rootRef} className={cn("relative inline-flex", className)}>
+    <div ref={rootRef} id={id} className={cn("relative inline-flex", className)}>
       <MotionMenuRoot handle={handle}>
-        <button
-          type="button"
-          aria-disabled={primaryOff || undefined}
-          onClick={() => {
-            if (!primaryOff) onClick();
-          }}
-          className={buttonClass(variant, size, {
-            disabled: primaryOff,
-            className: "flex-1 justify-center rounded-r-none pr-3",
-          })}
+        <Button
+          ref={primaryRef}
+          variant={variant}
+          size={size}
+          softDisabled={primaryOff}
+          onClick={onClick}
+          className="flex-1 justify-center rounded-r-none pr-3"
         >
           {children}
-        </button>
+        </Button>
         <MotionMenuTrigger>
           <button
             type="button"

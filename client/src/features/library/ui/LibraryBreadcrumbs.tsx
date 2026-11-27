@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import { ALL_SMART_FOLDER_ID } from "@mimimilli/shared";
 import Breadcrumbs from "../../../shared/ui/Breadcrumbs";
 import { getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
@@ -14,35 +14,30 @@ export default function LibraryBreadcrumbs() {
   const nav = useLibraryNavigation();
   const view = nav.foldersStatus === "ready" ? nav.view : null;
   const { tagPrefixes } = useTagPrefixes();
-  const [siblingAnchor, setSiblingAnchor] = useState<HTMLElement | null>(null);
+  const [siblingOpen, setSiblingOpen] = useState(false);
   const triggerId = useId();
-  const crumbsRef = useRef<HTMLElement | null>(null);
   const group = view?.kind === "works" ? view.group : null;
   const groupBy = view?.kind === "works" ? view.groupBy : null;
   const groupSort = view?.kind === "works" ? view.groupSort : null;
   const canOpen = group !== null && groupBy !== null && groupSort !== null;
-  if (siblingAnchor !== null && !canOpen) setSiblingAnchor(null);
+  if (siblingOpen && !canOpen) setSiblingOpen(false);
 
   return (
     <>
       <Breadcrumbs
         path={[LIBRARY_ROOT_LABEL, ...(view?.breadcrumb ?? [])]}
-        onNavigate={(index, anchor) => {
+        lastSegmentId={triggerId}
+        onNavigate={(index) => {
           if (index === 0) nav.openFolder(ALL_SMART_FOLDER_ID);
           else if (index === 1) nav.backToValueList();
-          else if (group !== null) {
-            anchor.id = triggerId;
-            crumbsRef.current = anchor.closest(".mle-crumbs");
-            setSiblingAnchor((current) => (current === anchor ? null : anchor));
-          }
+          else if (group !== null) setSiblingOpen((current) => !current);
         }}
       />
       {view && (
         <GroupValuePopover
           placement="below"
-          open={canOpen && siblingAnchor !== null}
+          open={canOpen && siblingOpen}
           triggerId={triggerId}
-          anchorEl={siblingAnchor}
           list={
             groupBy !== null && groupSort !== null
               ? {
@@ -55,18 +50,7 @@ export default function LibraryBreadcrumbs() {
                 }
               : null
           }
-          onClose={() =>
-            setSiblingAnchor((current) => (current === siblingAnchor ? null : current))
-          }
-          onReturnTargetLost={() => {
-            const valueButton = crumbsRef.current?.querySelector<HTMLButtonElement>(
-              "button.mle-crumbs__seg.is-last",
-            );
-            if (valueButton) {
-              valueButton.id = triggerId;
-              valueButton.focus({ preventScroll: true });
-            }
-          }}
+          onClose={() => setSiblingOpen(false)}
         />
       )}
     </>

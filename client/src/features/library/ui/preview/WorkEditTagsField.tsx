@@ -1,22 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import { normalizeTag } from "@mimimilli/shared";
+import { useEffect } from "react";
 import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
 import { sortTagsForDisplay } from "../../../../entities/work/sortTagsForDisplay";
 import { tagPrefixDefinition } from "../../../../entities/tag/tagPrefixDefinition";
 import Tag from "../../../../entities/work/ui/Tag";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
-import IconButton from "../../../../shared/ui/IconButton";
-import { I } from "../../../../shared/ui/Icon";
-import TagCombobox from "../../../../shared/ui/TagCombobox";
-import {
-  MotionPopoverRoot,
-  MotionPopoverTrigger,
-  PopoverPopup,
-  useMotionPopover,
-} from "../../../../shared/ui/popover/MotionPopover";
 import { useToast } from "../../../../shared/ui/useToast";
-
-const TAG_POPOVER_WIDTH = 260;
+import { TagAddPopover } from "./TagAddPopover";
 
 interface WorkEditTagsFieldProps {
   tags: NormalizedTag[];
@@ -52,17 +41,6 @@ export function WorkEditTagsField({
   onUndoRemoveTag,
   onDismissUndo,
 }: WorkEditTagsFieldProps) {
-  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-  const popupRef = useRef<HTMLDivElement>(null);
-  const popover = useMotionPopover({
-    open: isPopoverOpen,
-    onOpenChange: ({ open }) => setIsPopoverOpen(open),
-    disabled,
-    positioning: { placement: "bottom-start" },
-    initialFocusEl: () => popupRef.current?.querySelector("input") ?? null,
-    onEscapeKeyDown: (event) => event.preventDefault(),
-  });
-
   const { show: showToast, dismiss: dismissToast } = useToast();
   useEffect(() => {
     if (!undoableTag) {
@@ -93,34 +71,12 @@ export function WorkEditTagsField({
               onRemove={disabled ? undefined : () => onRequestRemoveTag(tag)}
             />
           ))}
-          <MotionPopoverRoot handle={popover}>
-            <MotionPopoverTrigger>
-              <IconButton
-                icon={I.add}
-                label="タグを追加"
-                size="xs"
-                tone="muted"
-                className="bg-paper-2 hover:bg-paper-3"
-              />
-            </MotionPopoverTrigger>
-            <PopoverPopup
-              ref={popupRef}
-              aria-label="タグを追加"
-              style={{ width: TAG_POPOVER_WIDTH }}
-            >
-              <TagCombobox
-                width="full"
-                suggestions={tagSuggestions}
-                excludeTags={tags}
-                canCreate={(tag) => normalizeTag(tag) !== null}
-                onSelect={(tag) => {
-                  popover.closeAndReturn();
-                  onAddTag(tag);
-                }}
-                onCancel={popover.closeAndReturn}
-              />
-            </PopoverPopup>
-          </MotionPopoverRoot>
+          <TagAddPopover
+            suggestions={tagSuggestions}
+            excludeTags={tags}
+            disabled={disabled}
+            onSelect={onAddTag}
+          />
         </div>
       </div>
       {confirmingRemoveTag && (

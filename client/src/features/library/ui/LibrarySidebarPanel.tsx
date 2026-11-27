@@ -71,7 +71,6 @@ export default function LibrarySidebarPanel({
   const setDialog = useSetAtom(smartFolderDialogAtom);
   const {
     openKey: overlayFolderId,
-    openAnchorEl,
     ownerToken,
     registerPanelEl,
     getTriggerHandlers,
@@ -169,7 +168,6 @@ export default function LibrarySidebarPanel({
                   placement="right"
                   open={open}
                   triggerId={triggerId}
-                  anchorEl={ownsOverlay ? openAnchorEl : null}
                   restoreFocus={overlayFolderId === null || ownsOverlay}
                   list={{
                     // 値へ進むとチップと検索語が消えるので、絞り込み無しで数える。

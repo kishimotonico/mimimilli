@@ -14,6 +14,8 @@ import { groupByKey } from "../../../entities/smart-folder/groupByKey";
 import { buildGroupValueDisplayRows } from "../model/groupValueDisplayRows";
 import { isGroupValueRowArrowKey } from "../model/groupValueRowNav";
 import { I } from "../../../shared/ui/Icon";
+import { MENU_COUNT_CLASS, MENU_LABEL_CLASS } from "../../../shared/ui/menu/menuStyles";
+import { popoverListItemClass } from "../../../shared/ui/popover/popoverStyles";
 import IconButton from "../../../shared/ui/IconButton";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { useGroupValueListNav } from "./useGroupValueListNav";
@@ -27,7 +29,7 @@ import { useGroupValueListNav } from "./useGroupValueListNav";
 // 入れ子タグは名前順ソート時のみインデント表示にする（値一覧と同じ規則）。
 
 const INDENT_PER_DEPTH = 12;
-/** .mll-qlist__item / .mll-qlist__heading の高さに合わせる。 */
+/** popoverListItemClass / .mll-qlist__heading の高さに合わせる。 */
 const ROW_ESTIMATE_SIZE = 28;
 
 interface GroupValueQuickListProps {
@@ -162,7 +164,7 @@ export default function GroupValueQuickList({
 
   return (
     // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- 検索欄・ソート・一覧をまとめた矢印キー移動の委譲コンテナ（個々の子要素がフォーカス可能な実要素を持つ）
-    <div className="mll-qlist" onKeyDown={handleListKeyDown}>
+    <div className="mll-qlist" data-search-shortcut-scope onKeyDown={handleListKeyDown}>
       <div className="mll-qlist__search">
         <I.search size={12} />
         <input
@@ -238,7 +240,7 @@ export default function GroupValueQuickList({
                           <button
                             type="button"
                             data-quicklist-item
-                            className="mll-qlist__item"
+                            className={popoverListItemClass}
                             tabIndex={virtualRow.index === rovingIndex ? 0 : -1}
                             style={{ paddingLeft: 8 + indent, paddingRight: onAdd && !on ? 26 : 8 }}
                             title={row.depth > 0 ? row.item.value : undefined}
@@ -248,8 +250,8 @@ export default function GroupValueQuickList({
                             <span className="mll-qlist__check" aria-hidden="true">
                               {on && <I.check size={12} />}
                             </span>
-                            <span className="nm">{row.label}</span>
-                            <span className="count">{row.item.count}</span>
+                            <span className={MENU_LABEL_CLASS}>{row.label}</span>
+                            <span className={MENU_COUNT_CLASS}>{row.item.count}</span>
                           </button>
                           {onAdd && !on && (
                             <IconButton

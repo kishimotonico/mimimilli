@@ -1,4 +1,4 @@
-import { useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { HoverGroupTriggerHandlers } from "../../../shared/lib/useHoverGroupCoordinator";
 import { I } from "../../../shared/ui/Icon";
 import type { SidebarRow } from "../model/sidebarRows";
@@ -10,7 +10,7 @@ interface SidebarRowItemProps {
   isOverlayOpen: boolean;
   onSelect: () => void;
   getTriggerHandlers: (key: string) => HoverGroupTriggerHandlers;
-  openImmediately: (key: string, el: HTMLElement | null) => void;
+  openImmediately: (key: string) => void;
 }
 
 export default function SidebarRowItem({
@@ -22,20 +22,17 @@ export default function SidebarRowItem({
   getTriggerHandlers,
   openImmediately,
 }: SidebarRowItemProps) {
-  const rowRef = useRef<HTMLButtonElement>(null);
-
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
     if (!row.hasQuickOverlay || isOverlayOpen) return;
     if (event.key === "ArrowRight") {
       event.preventDefault();
-      openImmediately(row.id, rowRef.current);
+      openImmediately(row.id);
     }
   };
 
   const Icon = I[row.icon];
   return (
     <button
-      ref={rowRef}
       id={id}
       type="button"
       className={`mll-sbrow ${isActive ? "is-on" : ""}`}

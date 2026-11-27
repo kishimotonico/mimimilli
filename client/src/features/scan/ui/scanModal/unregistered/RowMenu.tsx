@@ -30,7 +30,7 @@ export default function RowMenu({ label, busy, onOpenFolder, onExclude }: RowMen
   return (
     <MotionMenuRoot handle={menu}>
       <MotionMenuTrigger>
-        <IconButton icon={I.moreV} label={label} size="sm" tone="muted" />
+        <IconButton icon={I.moreV} label={label} size="sm" tone="muted" data-row-menu />
       </MotionMenuTrigger>
       <MenuPopup>
         <Menu.Item

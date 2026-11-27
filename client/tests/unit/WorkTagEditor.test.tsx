@@ -201,7 +201,8 @@ describe("WorkTagEditor", () => {
     );
     const pane = screen.getByTestId("tag-pane");
     const measure = vi.spyOn(pane, "getBoundingClientRect");
-    const observer = getResizeObservers().find((item) => item.getObserved().includes(pane))!;
+    const observer = getResizeObservers().find((item) => item.getObserved().includes(pane));
+    if (!observer) throw new Error("tag-pane の ResizeObserver が見つからない");
     const resize = (width: number) => {
       const rect = new DOMRect(0, 0, width, 100);
       measure.mockReturnValue(rect);
@@ -211,14 +212,18 @@ describe("WorkTagEditor", () => {
     const input = () => screen.getByRole("combobox", { name: "追加するタグ" });
 
     resize(200);
-    await user.click(trigger());
+    const button = trigger();
+    await user.click(button);
     const inline = input();
     expect(pane).toContainElement(inline);
     expect(inline).toHaveFocus();
+    expect(button).toHaveAttribute("aria-expanded", "true");
     resize(400);
     expect(input()).toBe(inline);
+    expect(trigger()).toBe(button);
     await user.keyboard("{Escape}");
     expect(inline).not.toBeInTheDocument();
+    expect(button).toHaveAttribute("aria-expanded", "false");
     expect(trigger()).toHaveFocus();
 
     await user.click(trigger());

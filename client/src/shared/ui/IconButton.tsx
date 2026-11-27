@@ -1,6 +1,7 @@
 import type { ButtonHTMLAttributes, Ref } from "react";
 import { cn } from "../lib/cn";
 import type { IconFC } from "./Icon";
+import { softDisabledHandlers } from "./softDisabled";
 
 export type IconButtonSize = "xs" | "sm" | "md" | "lg";
 
@@ -91,20 +92,8 @@ export default function IconButton({
         className,
       )}
       {...rest}
-      aria-disabled={softDisabled || ariaDisabled}
-      onClick={softDisabled ? (event) => event.preventDefault() : onClick}
-      onKeyDownCapture={
-        softDisabled
-          ? (event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                event.stopPropagation();
-              } else {
-                onKeyDownCapture?.(event);
-              }
-            }
-          : onKeyDownCapture
-      }
+      aria-disabled={ariaDisabled}
+      {...softDisabledHandlers(softDisabled, { onClick, onKeyDownCapture })}
     >
       <Icon size={ICON_PX[size]} />
     </button>

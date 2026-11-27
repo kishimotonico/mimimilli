@@ -62,8 +62,6 @@ interface PopoverInternals {
 
 export interface MotionPopoverHandle {
   open: boolean;
-  /** 戻し先（開く前の要素、切れていればトリガー）。閉じる前に求めたいときに使う */
-  resolveReturnTarget: () => HTMLElement | null;
   /** フォーカスを戻し先へ移してから閉じる */
   closeAndReturn: () => void;
   /** initialFocusEl の要素へフォーカスを移す */
@@ -144,7 +142,6 @@ export function useMotionPopover({
 
   return {
     open,
-    resolveReturnTarget,
     closeAndReturn() {
       if (!open) return;
       resolveReturnTarget()?.focus({ preventScroll: true });

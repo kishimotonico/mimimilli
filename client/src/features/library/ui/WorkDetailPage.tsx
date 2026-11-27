@@ -57,8 +57,10 @@ export default function WorkDetailPage() {
   const work = workQuery.data ?? null;
   const isCurrentWorkPlaying = work !== null && playingWorkId === work.id;
 
-  // 一覧が描画されない。隣の作品を確定時に決めて持ち帰り、ライブラリへ戻って一覧が描画されたときに一覧が移す
+  // 一覧が描画されない。隣の作品を確定時に決めて持ち帰り、ライブラリへ戻って一覧が描画されたときに一覧が移す。
+  // 戻る先が作品一覧でなければ（値一覧など）移す先が無いので、要求を立てない
   const prepareUnregister = (id: string) => {
+    if (view?.kind !== "works") return () => {};
     const neighborId = neighborInCachedWorks(queryClient, view, searchQuery, id);
     return () => setFocusListOnReturn({ neighborId });
   };

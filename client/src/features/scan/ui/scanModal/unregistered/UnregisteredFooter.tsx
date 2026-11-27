@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import type { DlsiteRegistrationApply } from "@mimimilli/shared";
 import SplitButton from "../../../../../shared/ui/SplitButton";
 import { Menu } from "@ark-ui/react/menu";
@@ -52,9 +52,9 @@ export default function UnregisteredFooter({
     setPickerPlanKind(plan.kind);
     setPickerOpen(false);
   }
-  const anchorRef = useRef<HTMLDivElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const menuTriggerId = useId();
-  const closedOnTriggerPress = useRef(false);
+  const splitButtonId = useId();
 
   const addable = !busy && !rjCodeSaving && addCount > 0;
   const menu = (
@@ -113,55 +113,31 @@ export default function UnregisteredFooter({
       )}
       <DlsiteFetchProgress onCancel={onCancelFetch} />
       {plan.kind !== "waiting" && (
-        <div
-          ref={anchorRef}
-          className="relative inline-flex"
-          onPointerDownCapture={(event) => {
-            closedOnTriggerPress.current = false;
-            if (!pickerOpen || event.button !== 0 || !(event.target instanceof Element)) return;
-            const trigger = event.target.closest("button");
-            if (trigger?.id !== menuTriggerId) return;
-            event.preventDefault();
-            event.stopPropagation();
-            closedOnTriggerPress.current = true;
-            trigger.focus({ preventScroll: true });
-            setPickerOpen(false);
-          }}
-          onClickCapture={(event) => {
-            if (event.detail === 0 || !closedOnTriggerPress.current) return;
-            closedOnTriggerPress.current = false;
-            event.stopPropagation();
-          }}
-          onKeyDownCapture={(event) => {
-            if (!pickerOpen || !(event.target instanceof Element)) return;
-            if (event.target.id !== menuTriggerId || !["Enter", " "].includes(event.key)) return;
-            event.preventDefault();
-            event.stopPropagation();
-            setPickerOpen(false);
+        <SplitButton
+          id={splitButtonId}
+          size="md"
+          className="min-w-[200px]"
+          disabled={selectedCount === 0}
+          busy={busy}
+          primaryDisabled={rjCodeSaving || (plan.kind === "add" && !addable)}
+          onClick={() => (plan.kind === "fetch" ? onFetch() : onRegister(REGISTER_APPLY_ALL))}
+          menu={menu}
+          menuTriggerId={menuTriggerId}
+          menuOpen={menuOpen}
+          onMenuOpenChange={(open) => {
+            if (open && pickerOpen) setPickerOpen(false);
+            else setMenuOpen(open);
           }}
         >
-          <SplitButton
-            size="md"
-            className="min-w-[200px]"
-            disabled={selectedCount === 0}
-            busy={busy}
-            primaryDisabled={rjCodeSaving || (plan.kind === "add" && !addable)}
-            onClick={() => (plan.kind === "fetch" ? onFetch() : onRegister(REGISTER_APPLY_ALL))}
-            menu={menu}
-            menuTriggerId={menuTriggerId}
-          >
-            {plan.kind === "fetch"
-              ? `DLsiteから取得 ${plan.codes.length}件`
-              : `${addCount}件を追加`}
-          </SplitButton>
-        </div>
+          {plan.kind === "fetch" ? `DLsiteから取得 ${plan.codes.length}件` : `${addCount}件を追加`}
+        </SplitButton>
       )}
       <RegisterFieldsPopover
         open={pickerOpen}
         count={addCount}
         disabled={!addable}
-        anchorRef={anchorRef}
         triggerId={menuTriggerId}
+        anchorId={splitButtonId}
         onClose={() => setPickerOpen(false)}
         onSubmit={onRegister}
       />

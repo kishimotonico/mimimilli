@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useSetAtom } from "jotai";
 import {
   getDefaultPlaylistTrackCount,
@@ -54,7 +54,7 @@ interface WorkDetailProps {
    * 解除の確定時に呼び、解除が成功したあとの振る舞いを返す（一覧の選択を外す、フォーカスを移す、など）。
    * 返した関数には、この詳細のルート要素が渡る（使うかどうかは呼び出し側次第）。確定時に決めておくこと（移し先など）は呼び出し側が持つ
    */
-  prepareUnregister: (workId: string) => (detailRoot: HTMLElement | null) => void;
+  prepareUnregister: (workId: string) => () => void;
 }
 
 export function WorkDetail({
@@ -93,7 +93,6 @@ export function WorkDetail({
   const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
   const statusLabel = getWorkStatusLabel(work.status);
   const toast = useToast();
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
@@ -107,7 +106,7 @@ export function WorkDetail({
       trackIndex,
     );
 
-  const handleDeleteConfirm = async (afterUnregister: (detailRoot: HTMLElement | null) => void) => {
+  const handleDeleteConfirm = async (afterUnregister: () => void) => {
     const title = work.title;
     try {
       await deleteMutation.mutateAsync(work.id);
@@ -115,7 +114,7 @@ export function WorkDetail({
       toast.error(apiErrorMessage(cause, "登録解除に失敗しました"));
       return;
     }
-    afterUnregister(rootRef.current);
+    afterUnregister();
     toast.show({
       message: `「${title}」を登録解除しました`,
       variant: "success",
@@ -127,7 +126,7 @@ export function WorkDetail({
   };
 
   return (
-    <div ref={rootRef} className={layout === "full" ? "mle-prv__body is-full" : "mle-prv__body"}>
+    <div className={layout === "full" ? "mle-prv__body is-full" : "mle-prv__body"}>
       <div className="mle-prv__hero">
         <div className="mle-prv__coverwrap">
           <div className="mle-prv__cover">

@@ -1,10 +1,12 @@
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
-import { useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
+import { useRef, type ReactNode, type RefObject } from "react";
+import { flushSync } from "react-dom";
 import { Menu } from "@ark-ui/react/menu";
 import { useMotionVariants } from "../../../../shared/ui/useMotionVariants";
 import { cn } from "../../../../shared/lib/cn";
 import { formatScanDateTime } from "../../../../shared/lib/format";
-import { buttonClass } from "../../../../shared/ui/Button";
+import Button from "../../../../shared/ui/Button";
+import { isFocusLost } from "../../../../shared/lib/isFocusLost";
 import { I } from "../../../../shared/ui/Icon";
 import SplitButton from "../../../../shared/ui/SplitButton";
 import { MENU_LABEL_CLASS, menuItemClass } from "../../../../shared/ui/menu/menuStyles";
@@ -24,9 +26,9 @@ interface ScanSidebarProps {
   lastScanTime: string | null;
   /** 起動後にスキャンが完了していない。スキャンボタンを主ボタンにする */
   scanPending: boolean;
-  onStart: () => void;
-  onFullScan: () => void;
-  onCancel: () => void;
+  onStart: () => Promise<unknown>;
+  onFullScan: () => Promise<unknown>;
+  onCancel: () => Promise<unknown>;
 }
 
 const HEADING_CLASS = "h-[18px] font-jp text-secondary font-medium leading-[18px] text-ink-2";
@@ -80,6 +82,21 @@ function ScanSidebarControls({
 }: Pick<ScanSidebarProps, "lastScanTime" | "scanPending" | "onStart" | "onFullScan" | "onCancel">) {
   const status = useScanStatusView(lastScanTime);
   const inProgress = status.kind === "running" || status.kind === "cancelling";
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const startButtonRef = useRef<HTMLButtonElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+
+  // 開始と中止のボタンは入れ替わる。操作が済んで入れ替わったら、操作した側から新しい側へフォーカスを移す
+  const runAndMoveFocus = async (
+    action: () => Promise<unknown>,
+    next: RefObject<HTMLButtonElement | null>,
+  ) => {
+    await action();
+    flushSync(() => {});
+    const active = document.activeElement;
+    const inActions = active !== null && actionsRef.current?.contains(active);
+    if (inActions || isFocusLost()) next.current?.focus({ preventScroll: true });
+  };
   return (
     <div className="mt-auto flex h-[116px] shrink-0 flex-col border-t border-line-soft pt-2.5 pl-2.5">
       <div className="relative min-h-0 flex-1">
@@ -87,45 +104,29 @@ function ScanSidebarControls({
           <SidebarStatus key={status.kind} status={status} />
         </AnimatePresence>
       </div>
-      <div className="relative h-[26px] shrink-0">
+      <div ref={actionsRef} className="relative h-[26px] shrink-0">
         <AnimatePresence initial={false}>
           {inProgress ? (
             <SidebarCancelButton
               key="cancel"
+              ref={cancelButtonRef}
               disabled={status.kind === "cancelling"}
-              onClick={onCancel}
+              onClick={() => void runAndMoveFocus(onCancel, startButtonRef)}
             />
           ) : (
             <SidebarStartButton
               key="start"
               status={status}
               primary={scanPending}
-              onStart={onStart}
-              onFullScan={onFullScan}
+              buttonRef={startButtonRef}
+              onStart={() => void runAndMoveFocus(onStart, cancelButtonRef)}
+              onFullScan={() => void runAndMoveFocus(onFullScan, cancelButtonRef)}
             />
           )}
         </AnimatePresence>
       </div>
     </div>
   );
-}
-
-/**
- * 開始と中止のボタンは入れ替わる（退出するボタンは inert になる）。現れた（退出を取り消して戻った）ボタンは、
- * 退出中の隣のボタンがフォーカスを持っていたら引き継ぐ。body に落とさない
- */
-function useTakeFocusFromExitingSibling() {
-  const ref = useRef<HTMLElement>(null);
-  const isPresent = useIsPresent();
-  useLayoutEffect(() => {
-    const root = ref.current;
-    const active = document.activeElement;
-    if (!isPresent || !root || !active || root.contains(active)) return;
-    if (!root.parentElement?.contains(active) || !active.closest("[inert]")) return;
-    const target = root.matches("button") ? root : root.querySelector("button");
-    target?.focus({ preventScroll: true });
-  }, [isPresent]);
-  return ref;
 }
 
 function ScanSidebarTab({
@@ -181,29 +182,26 @@ function ScanSidebarTab({
 function SidebarStartButton({
   status,
   primary,
+  buttonRef,
   onStart,
   onFullScan,
 }: {
   status: ScanStatusView;
   primary: boolean;
+  buttonRef: RefObject<HTMLButtonElement | null>;
   onStart: () => void;
   onFullScan: () => void;
 }) {
   const { fade } = useMotionVariants();
   const isPresent = useIsPresent();
-  const ref = useTakeFocusFromExitingSibling();
   const v = fade();
   return (
-    <motion.div
-      ref={ref as RefObject<HTMLDivElement>}
-      className="absolute inset-0"
-      inert={!isPresent}
-      {...v}
-    >
+    <motion.div className="absolute inset-0" inert={!isPresent} {...v}>
       <SplitButton
         variant={primary ? "primary" : "ghost"}
         size="sm"
         className="w-full"
+        primaryRef={buttonRef}
         menuLabel="スキャンの方法"
         placement="aboveStart"
         onClick={onStart}
@@ -225,29 +223,32 @@ function SidebarStartButton({
   );
 }
 
-function SidebarCancelButton({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
+function SidebarCancelButton({
+  ref,
+  disabled,
+  onClick,
+}: {
+  ref: RefObject<HTMLButtonElement | null>;
+  disabled: boolean;
+  onClick: () => void;
+}) {
   const { fade } = useMotionVariants();
   const isPresent = useIsPresent();
-  const ref = useTakeFocusFromExitingSibling();
   const v = fade();
   return (
-    <motion.button
-      ref={ref as RefObject<HTMLButtonElement>}
-      type="button"
-      onClick={() => {
-        if (!disabled) onClick();
-      }}
-      aria-disabled={disabled || undefined}
-      inert={!isPresent}
-      {...v}
-      className={buttonClass("danger-quiet", "sm", {
-        disabled,
-        className: "absolute inset-0 w-full justify-center",
-      })}
-    >
-      <I.x size={12} />
-      スキャンを中止
-    </motion.button>
+    <motion.div className="absolute inset-0" inert={!isPresent} {...v}>
+      <Button
+        ref={ref}
+        variant="danger-quiet"
+        size="sm"
+        softDisabled={disabled}
+        onClick={onClick}
+        className="w-full justify-center"
+      >
+        <I.x size={12} />
+        スキャンを中止
+      </Button>
+    </motion.div>
   );
 }
 

@@ -47,8 +47,6 @@ export interface UseHoverGroupCoordinatorOptions {
 export interface UseHoverGroupCoordinatorResult {
   /** 現在開いているトリガーのキー */
   openKey: string | null;
-  /** 現在開いているトリガーの要素（GroupValuePopover の anchorEl に渡す） */
-  openAnchorEl: HTMLElement | null;
   /** 現在openなオーナーのトークン。openKeyがnullの間はnull。 */
   ownerToken: HoverGroupOwnerToken | null;
   /**
@@ -63,7 +61,7 @@ export interface UseHoverGroupCoordinatorResult {
   /** token が現在のオーナーと一致しない間は何もしないハンドラを返す。 */
   getPanelHandlers: (token: HoverGroupOwnerToken) => HoverGroupPanelHandlers;
   /** 遅延なしで即座に開く（キーボード操作用） */
-  openImmediately: (key: string, el: HTMLElement | null) => void;
+  openImmediately: (key: string) => void;
   /** 遅延・セーフトライアングルを打ち切って即座に閉じる */
   close: () => void;
 }
@@ -76,7 +74,6 @@ interface Triangle {
 
 interface OpenState {
   key: string;
-  anchorEl: HTMLElement | null;
   token: HoverGroupOwnerToken;
 }
 
@@ -135,9 +132,9 @@ export function useHoverGroupCoordinator(
     disengageTriangleGuard();
   };
 
-  const commitOpen = (key: string, el: HTMLElement | null) => {
+  const commitOpen = (key: string) => {
     clearOpenTimer();
-    const next: OpenState = { key, anchorEl: el, token: Symbol(key) };
+    const next: OpenState = { key, token: Symbol(key) };
     openStateRef.current = next;
     setOpenState(next);
   };
@@ -147,10 +144,10 @@ export function useHoverGroupCoordinator(
     setOpenState(null);
   };
 
-  const scheduleOpenTimer = (key: string, el: HTMLElement | null) => {
+  const scheduleOpenTimer = (key: string) => {
     clearOpenTimer();
     pendingOpenKeyRef.current = key;
-    openTimerRef.current = window.setTimeout(() => commitOpen(key, el), openDelayMs);
+    openTimerRef.current = window.setTimeout(() => commitOpen(key), openDelayMs);
   };
 
   const scheduleCloseTimer = () => {
@@ -208,7 +205,7 @@ export function useHoverGroupCoordinator(
       clearOpenTimer();
       return;
     }
-    scheduleOpenTimer(key, el);
+    scheduleOpenTimer(key);
   }
 
   const handleTriggerLeave = (key: string, point: Point) => {
@@ -259,9 +256,9 @@ export function useHoverGroupCoordinator(
     },
   });
 
-  const openImmediately = (key: string, el: HTMLElement | null) => {
+  const openImmediately = (key: string) => {
     clearTimers();
-    commitOpen(key, el);
+    commitOpen(key);
   };
 
   const close = () => {
@@ -291,7 +288,6 @@ export function useHoverGroupCoordinator(
 
   return {
     openKey: openState?.key ?? null,
-    openAnchorEl: openState?.anchorEl ?? null,
     ownerToken: openState?.token ?? null,
     registerPanelEl,
     getTriggerHandlers,

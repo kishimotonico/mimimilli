@@ -22,7 +22,7 @@
 @import "./collage.css" layer(components);
 @import "./value-list.css" layer(components);
 @import "./value-grid.css" layer(components);
-@import "./quick-overlay.css" layer(components);
+@import "./quick-list.css" layer(components);
 @import "./file-row.css" layer(components);
 @import "./file-work-badge.css" layer(components);
 @import "./column-stack.css" layer(components);

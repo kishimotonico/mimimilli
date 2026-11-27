@@ -54,8 +54,6 @@ function getMainAction(props: WorkPlayButtonProps): MainAction {
 
 export function WorkPlayButton(props: WorkPlayButtonProps) {
   const { isPlayable, isLoaded, hasResume, resumeTrack, resumeTime, onPlayFromStart } = props;
-  const menu = useMotionMenu({ positioning: { placement: "bottom-end" } });
-
   const main = getMainAction(props);
   const MainIcon = main.icon;
   // ▾は「最初から再生」が主ボタンと別の意味を持つときだけ出す。ロード中（再生/一時停止）
@@ -71,7 +69,6 @@ export function WorkPlayButton(props: WorkPlayButtonProps) {
         type="button"
         className={`mle-prv__playbtn ${showMenuTrigger ? "has-caret" : ""}`}
         disabled={!isPlayable}
-        aria-disabled={!isPlayable}
         aria-label={main.label}
         title={title}
         onClick={main.onClick}
@@ -79,25 +76,31 @@ export function WorkPlayButton(props: WorkPlayButtonProps) {
         <MainIcon size={12} />
         <span>{main.text}</span>
       </button>
-      {showMenuTrigger && (
-        <MotionMenuRoot handle={menu}>
-          <MotionMenuTrigger>
-            <button type="button" className="mle-prv__playcaret" aria-label="再生メニュー">
-              <I.chevD size={11} />
-            </button>
-          </MotionMenuTrigger>
-          <MenuPopup aria-label="再生メニュー">
-            <Menu.Item
-              value="play-from-start"
-              valueText="最初から再生"
-              onSelect={onPlayFromStart}
-              className={menuItemClass()}
-            >
-              <span className={MENU_LABEL_CLASS}>最初から再生</span>
-            </Menu.Item>
-          </MenuPopup>
-        </MotionMenuRoot>
-      )}
+      {showMenuTrigger && <PlayFromStartMenu onPlayFromStart={onPlayFromStart} />}
     </div>
+  );
+}
+
+/** ▾の「最初から再生」。▾が消えるとき開いた状態を持ち越さないよう、メニューの状態ごとこの部品に閉じる */
+function PlayFromStartMenu({ onPlayFromStart }: { onPlayFromStart: () => void }) {
+  const menu = useMotionMenu({ positioning: { placement: "bottom-end" } });
+  return (
+    <MotionMenuRoot handle={menu}>
+      <MotionMenuTrigger>
+        <button type="button" className="mle-prv__playcaret" aria-label="再生メニュー">
+          <I.chevD size={11} />
+        </button>
+      </MotionMenuTrigger>
+      <MenuPopup aria-label="再生メニュー">
+        <Menu.Item
+          value="play-from-start"
+          valueText="最初から再生"
+          onSelect={onPlayFromStart}
+          className={menuItemClass()}
+        >
+          <span className={MENU_LABEL_CLASS}>最初から再生</span>
+        </Menu.Item>
+      </MenuPopup>
+    </MotionMenuRoot>
   );
 }

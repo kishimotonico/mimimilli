@@ -25,8 +25,8 @@ interface RegisterFieldsPopoverProps {
   open: boolean;
   count: number;
   disabled: boolean;
-  anchorRef: React.RefObject<HTMLElement | null>;
   triggerId: string;
+  anchorId: string;
   onSubmit: (apply: DlsiteRegistrationApply) => void;
   onClose: () => void;
 }
@@ -36,8 +36,8 @@ export default function RegisterFieldsPopover({
   open,
   count,
   disabled,
-  anchorRef,
   triggerId,
+  anchorId,
   onSubmit,
   onClose,
 }: RegisterFieldsPopoverProps) {
@@ -53,11 +53,8 @@ export default function RegisterFieldsPopover({
     onOpenChange: ({ open }) => {
       if (!open) onClose();
     },
-    ids: { trigger: triggerId },
-    positioning: {
-      placement: "top-end",
-      getAnchorRect: () => anchorRef.current?.getBoundingClientRect() ?? null,
-    },
+    ids: { trigger: triggerId, anchor: anchorId },
+    positioning: { placement: "top-end" },
   });
 
   return (

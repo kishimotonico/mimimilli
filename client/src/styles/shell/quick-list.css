@@ -84,26 +84,6 @@
   max-height: 260px;
   overflow-y: auto;
 }
-.mll-qlist__item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  box-sizing: border-box;
-  height: 28px;
-  padding: 0 8px;
-  border-radius: 4px;
-  font-size: var(--fs-body);
-  line-height: var(--lh-body);
-  color: var(--ink-1);
-  text-align: left;
-  cursor: default;
-}
-.mll-qlist__item:hover,
-.mll-qlist__item:focus-visible {
-  background: var(--paper-2);
-  color: var(--ink-0);
-}
 .mll-qlist__check {
   display: grid;
   flex: none;
@@ -111,21 +91,6 @@
   height: 14px;
   place-items: center;
   color: var(--acc);
-}
-.mll-qlist__item .nm {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mll-qlist__item .count {
-  flex: none;
-  padding-left: 16px;
-  font-family: var(--font-mono);
-  font-size: var(--fs-mono);
-  line-height: var(--lh-mono);
-  color: var(--ink-3);
 }
 .mll-qlist__row {
   position: relative;
@@ -162,7 +127,7 @@
   font-weight: 600;
   letter-spacing: 0.03em;
   color: var(--ink-2);
-  /* .mll-qlist__item .nm と同じく折り返さない（仮想化の固定行高見積もりが崩れるため）。 */
+  /* 折り返さない（仮想化の固定行高見積もりが崩れるため）。 */
   white-space: nowrap;
   text-overflow: ellipsis;
 }

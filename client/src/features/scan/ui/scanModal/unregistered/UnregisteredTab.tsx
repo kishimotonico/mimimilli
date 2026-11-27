@@ -56,6 +56,33 @@ interface RowFilter {
 const pathsOf = (rows: readonly CandidateRowModel[]) =>
   new Set(rows.map(({ candidate }) => candidate.path));
 
+interface FocusRequest {
+  nextPath: string | null;
+  gone: ReadonlySet<string>;
+}
+
+/** 消える行のあとに残る、次（無ければ前）の行の path */
+function nextRowPathAfterLeaving(
+  visibleRows: readonly CandidateRowModel[],
+  leaving: readonly CandidateRowModel[],
+): string | null {
+  const gone = pathsOf(leaving);
+  const firstGone = visibleRows.findIndex(({ candidate }) => gone.has(candidate.path));
+  const survivor = (rows: readonly CandidateRowModel[]) =>
+    rows.find(({ candidate }) => !gone.has(candidate.path));
+  const next =
+    survivor(visibleRows.slice(firstGone + 1)) ??
+    survivor(visibleRows.slice(0, firstGone).reverse());
+  return next?.candidate.path ?? null;
+}
+
+function focusRequestFor(
+  visibleRows: readonly CandidateRowModel[],
+  leaving: readonly CandidateRowModel[],
+): FocusRequest {
+  return { nextPath: nextRowPathAfterLeaving(visibleRows, leaving), gone: pathsOf(leaving) };
+}
+
 export default function UnregisteredTab({ onRegistered, onOpenFiles }: UnregisteredTabProps) {
   const queryClient = useQueryClient();
   const candidatesState = useScanCandidatesState();
@@ -129,7 +156,9 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
   };
 
   const registerMutation = useRegisterScanCandidatesMutation();
+  const busy = registerMutation.isPending || excluding;
   const register = async (apply: DlsiteRegistrationApply) => {
+    if (busy) return;
     const paths = registerRows.map(({ candidate }) => candidate.path);
     const titleByPath = new Map(
       registerRows.map((row) => [
@@ -139,8 +168,7 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
     );
     const titlesOf = (entries: readonly { path: ScanCandidate["path"] }[]) =>
       entries.map((entry) => titleByPath.get(entry.path) ?? entry.path);
-    if (busy) return;
-    beginFocusRequest(nextRowPathAfterLeaving(registerRows), paths);
+    focusRequestRef.current = focusRequestFor(visibleRows, registerRows);
     let outcome;
     try {
       outcome = await registerMutation.mutateAsync({ paths, apply });
@@ -176,27 +204,10 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
     });
   };
 
-  const busy = registerMutation.isPending || excluding;
-
   // 行が消える操作（除外・追加）のあと、操作した要素（行の︙・フッターの▾・主ボタン）が消えるか無効になる。
   // 操作の前に移し先（残った隣の行の︙、次→前の順。無ければパネル）を決め、行が消えたコミットで移す
-  const focusRequestRef = useRef<{ nextPath: string | null; gone: ReadonlySet<string> } | null>(
-    null,
-  );
+  const focusRequestRef = useRef<FocusRequest | null>(null);
   const [focusRequestTick, setFocusRequestTick] = useState(0);
-  const nextRowPathAfterLeaving = (leaving: readonly CandidateRowModel[]) => {
-    const gone = pathsOf(leaving);
-    const firstGone = visibleRows.findIndex(({ candidate }) => gone.has(candidate.path));
-    const survivor = (rows: readonly CandidateRowModel[]) =>
-      rows.find(({ candidate }) => !gone.has(candidate.path));
-    const next =
-      survivor(visibleRows.slice(firstGone + 1)) ??
-      survivor(visibleRows.slice(0, firstGone).reverse());
-    return next?.candidate.path ?? null;
-  };
-  const beginFocusRequest = (nextPath: string | null, gonePaths: readonly string[]) => {
-    focusRequestRef.current = { nextPath, gone: new Set(gonePaths) };
-  };
   const narrowFocusRequest = (gonePaths: readonly string[]) => {
     const request = focusRequestRef.current;
     if (!request) return;
@@ -219,7 +230,7 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
     const row = [
       ...(scrollRef.current?.querySelectorAll<HTMLElement>("[data-candidate-path]") ?? []),
     ].find((element) => element.dataset.candidatePath === request.nextPath);
-    const target = row?.querySelector<HTMLElement>('button[aria-haspopup="menu"]');
+    const target = row?.querySelector<HTMLElement>("[data-row-menu]");
     (target ?? panelRef.current)?.focus({ preventScroll: true });
   }, [focusRequestTick, allRows]);
 
@@ -228,10 +239,7 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
       if (rows.length === 0) return;
       setErrorMessage(null);
       if (busy) return;
-      beginFocusRequest(
-        nextRowPathAfterLeaving(rows),
-        rows.map(({ candidate }) => candidate.path),
-      );
+      focusRequestRef.current = focusRequestFor(visibleRows, rows);
       exclude(
         {
           paths: rows.map(({ candidate }) => candidate.path),
@@ -240,7 +248,6 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
         { onError: () => (focusRequestRef.current = null) },
       );
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 移し先は visibleRows から決める
     [exclude, visibleRows, busy],
   );
 

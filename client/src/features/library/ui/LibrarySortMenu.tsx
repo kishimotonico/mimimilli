@@ -82,19 +82,19 @@ function ReadySortMenu({
 
   const buttonTitle = currentSortLabel ? `ソート: ${currentSortLabel}` : "ソート";
 
-  const options =
+  const options: { id: string; label: string; select: () => void }[] =
     view.kind === "value-list"
-      ? groupSortOptions(view.groupBy).map((opt) => ({ id: opt.id as string, label: opt.label }))
-      : SORT_OPTIONS.map((opt) => ({ id: opt.id as string, label: opt.label }));
+      ? groupSortOptions(view.groupBy).map(({ id, label }) => ({
+          id,
+          label,
+          select: () => setGroupSort(id),
+        }))
+      : SORT_OPTIONS.map(({ id, label }) => ({ id, label, select: () => setSort(id) }));
   const currentValue = view.kind === "value-list" ? view.groupSort : sort;
   const menu = useMotionMenu({
     positioning: { placement: "bottom-end" },
     initialHighlight: currentValue,
   });
-  const selectOption = (id: string) => {
-    if (view.kind === "value-list") setGroupSort(id as GroupSortId);
-    else setSort(id as SortId);
-  };
 
   const showReshuffle = view.kind === "works" && sort === "random";
   const canSaveAsDefault =
@@ -125,7 +125,7 @@ function ReadySortMenu({
         <MenuPopup aria-label="ソート">
           <Menu.RadioItemGroup
             value={currentValue ?? undefined}
-            onValueChange={({ value }) => selectOption(value)}
+            onValueChange={({ value }) => options.find((opt) => opt.id === value)?.select()}
           >
             {options.map((opt) => (
               <Menu.RadioItem

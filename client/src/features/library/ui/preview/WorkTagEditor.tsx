@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { normalizeTag } from "@mimimilli/shared";
+import { useCallback, useEffect, useState } from "react";
 import type { NormalizedTag, Work } from "@mimimilli/shared";
 import { sortTagsForDisplay } from "../../../../entities/work/sortTagsForDisplay";
 import Tag from "../../../../entities/work/ui/Tag";
 import { I } from "../../../../shared/ui/Icon";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import IconButton from "../../../../shared/ui/IconButton";
-import TagCombobox from "../../../../shared/ui/TagCombobox";
 import { useToast } from "../../../../shared/ui/useToast";
 import {
   sourceMutationErrorMessage,
@@ -17,20 +15,14 @@ import { useRootFolderOrNull } from "../../../../entities/settings/useSettingsQu
 import type { WorkTagMutation } from "../../../../entities/work/model/workMutations";
 import { useTagPrefixes } from "../../../../entities/tag/useTagPrefixes";
 import { tagPrefixDefinition } from "../../../../entities/tag/tagPrefixDefinition";
-import {
-  MotionPopoverRoot,
-  MotionPopoverTrigger,
-  PopoverPopup,
-  useMotionPopover,
-} from "../../../../shared/ui/popover/MotionPopover";
 import { useElementWidth } from "../../../../shared/ui/useElementWidth";
+import { TagAddPopover } from "./TagAddPopover";
 import { useWorkTagEditor } from "./useWorkTagEditor";
 import {
   sourceCommandBlockMessage,
   WorkSourcePatchBlockedNotice,
 } from "./WorkSourcePatchBlockedNotice";
 
-const TAG_POPOVER_WIDTH = 260;
 // 詳細ペインをタグで圧迫せず、優先度の高い分類を一目で確認できる表示上限。
 const COLLAPSED_TAG_LIMIT = 8;
 // 右ペインの実幅がこれを下回る場合、タグ追加UIは浮遊ポップオーバーではなく
@@ -59,38 +51,21 @@ export function WorkTagEditor({
   onTagClick,
 }: WorkTagEditorProps) {
   const rootFolder = useRootFolderOrNull();
-  const [openMode, setOpenMode] = useState<"inline" | "popover" | null>(null);
   const [areAllTagsVisible, setAreAllTagsVisible] = useState(false);
   // 削除✕ボタンは誤操作防止のため既定で非表示（追加の2段階フローと対称にする）。
   // expanded（編集ダイアログ）はそれ自体が明示的な編集操作のため常に編集中扱い
   const [isEditMode, setIsEditMode] = useState(false);
   const showRemoveButtons = expanded || isEditMode;
-  const tagEditorRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const popupRef = useRef<HTMLDivElement>(null);
-  const transferTriggerFocus = useRef(false);
   const [boundary, setBoundary] = useState<HTMLElement | null>(null);
   const bindTagEditor = useCallback((node: HTMLDivElement | null) => {
-    tagEditorRef.current = node;
     setBoundary(
       node?.closest<HTMLElement>(".mle-prv__meta") ??
         node?.closest<HTMLElement>(".mle-prv__body") ??
         null,
     );
   }, []);
-  const bindTrigger = useCallback((node: HTMLButtonElement | null) => {
-    if (!node) return;
-    triggerRef.current = node;
-    if (transferTriggerFocus.current) node.focus({ preventScroll: true });
-    transferTriggerFocus.current = false;
-    return () => {
-      transferTriggerFocus.current = node.ownerDocument.activeElement === node;
-      triggerRef.current = null;
-    };
-  }, []);
   const width = useElementWidth(boundary);
   const isNarrow = width !== null && width > 0 && width < NARROW_TAG_PANE_PX;
-  const mode = openMode ?? (isNarrow ? "inline" : "popover");
   const { tagPrefixes } = useTagPrefixes();
 
   const {
@@ -145,59 +120,12 @@ export function WorkTagEditor({
   const canEditTags = blockedMessage === null;
 
   const addDisabled = isTagSaving || !canEditTags;
-  const popover = useMotionPopover({
-    open: openMode === "popover",
-    onOpenChange: ({ open }) => {
-      if (open) resetPatchTagsError();
-      setOpenMode(open ? "popover" : null);
-    },
-    disabled: addDisabled,
-    positioning: { placement: "bottom-start", boundary: boundary ?? undefined },
-    initialFocusEl: () => popupRef.current?.querySelector("input") ?? null,
-    onEscapeKeyDown: (event) => event.preventDefault(),
-  });
-
-  const closeInline = useCallback(() => {
-    const editor = tagEditorRef.current;
-    if (editor && editor.contains(editor.ownerDocument.activeElement)) {
-      triggerRef.current?.focus({ preventScroll: true });
-    }
-    setOpenMode(null);
-  }, []);
-
-  useEffect(() => {
-    if (openMode !== "inline") return;
-    const editor = tagEditorRef.current;
-    if (!editor) return;
-    const dismissOutside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !editor.contains(event.target)) closeInline();
-    };
-    editor.ownerDocument.addEventListener("pointerdown", dismissOutside, true);
-    return () => editor.ownerDocument.removeEventListener("pointerdown", dismissOutside, true);
-  }, [openMode, closeInline]);
-
-  const closeAndReturn = mode === "inline" ? closeInline : popover.closeAndReturn;
   const sortedTags = sortTagsForDisplay(tags, tagPrefixes);
   const hiddenTagCount = Math.max(0, sortedTags.length - COLLAPSED_TAG_LIMIT);
   const visibleTags =
     expanded || areAllTagsVisible ? sortedTags : sortedTags.slice(0, COLLAPSED_TAG_LIMIT);
 
-  const selectTag = (tag: string) => {
-    closeAndReturn();
-    if (!canEditTags) return;
-    void addTag(tag);
-  };
-
   const definitionOf = (tag: string) => tagPrefixDefinition(tag, tagPrefixes);
-
-  const comboboxProps = {
-    suggestions,
-    excludeTags: tags,
-    disabled: addDisabled,
-    canCreate: (tag: string) => normalizeTag(tag) !== null,
-    onSelect: selectTag,
-    onCancel: closeAndReturn,
-  };
 
   const patchTagsErrorMessage =
     sourceCommandBlockMessage(patchTagsError) === null && patchTagsError
@@ -234,10 +162,6 @@ export function WorkTagEditor({
     showToast,
     dismissToast,
   ]);
-
-  useEffect(() => {
-    if (!canEditTags) setOpenMode(null);
-  }, [canEditTags]);
 
   return (
     <>
@@ -283,50 +207,15 @@ export function WorkTagEditor({
                 onClick={() => setIsEditMode((v) => !v)}
               />
             )}
-            <MotionPopoverRoot handle={popover}>
-              {mode === "inline" ? (
-                <IconButton
-                  ref={bindTrigger}
-                  icon={I.add}
-                  label="タグを追加"
-                  size="xs"
-                  tone="muted"
-                  className="bg-paper-2 hover:bg-paper-3"
-                  softDisabled={addDisabled}
-                  aria-expanded={openMode === "inline"}
-                  onClick={() => {
-                    if (openMode === "inline") closeInline();
-                    else {
-                      resetPatchTagsError();
-                      setOpenMode("inline");
-                    }
-                  }}
-                />
-              ) : (
-                <MotionPopoverTrigger>
-                  <IconButton
-                    ref={bindTrigger}
-                    icon={I.add}
-                    label="タグを追加"
-                    size="xs"
-                    tone="muted"
-                    className="bg-paper-2 hover:bg-paper-3"
-                  />
-                </MotionPopoverTrigger>
-              )}
-              <PopoverPopup
-                ref={popupRef}
-                aria-label="タグを追加"
-                style={{ width: TAG_POPOVER_WIDTH }}
-              >
-                <TagCombobox width="full" {...comboboxProps} />
-              </PopoverPopup>
-            </MotionPopoverRoot>
-            {openMode === "inline" && (
-              <div className="mt-1 basis-full rounded-[6px] bg-paper-1 shadow-pop">
-                <TagCombobox focusOnMount width="full" {...comboboxProps} />
-              </div>
-            )}
+            <TagAddPopover
+              suggestions={suggestions}
+              excludeTags={tags}
+              disabled={addDisabled}
+              boundary={boundary}
+              inlineWhenNarrow={isNarrow}
+              onOpen={resetPatchTagsError}
+              onSelect={(tag) => void addTag(tag)}
+            />
           </div>
         </div>
       </div>
