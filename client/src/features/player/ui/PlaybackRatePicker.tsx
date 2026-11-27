@@ -1,13 +1,16 @@
 // 再生速度ピル＋メニュー。PopupContent・PlayerTransportControls・
 // NowPlayingImmersiveMiniControlsで共用する。
 
-import { useEffect } from "react";
 import { Menu } from "@ark-ui/react/menu";
-import { useIsPresent } from "motion/react";
 import { cn } from "../../../shared/lib/cn";
-import { MenuPopup, MotionMenuRoot, useMotionMenu } from "../../../shared/ui/menu/MotionMenu";
+import {
+  MenuPopup,
+  MotionMenuRoot,
+  MotionMenuTrigger,
+  useMotionMenu,
+} from "../../../shared/ui/menu/MotionMenu";
 import { MenuCheckColumn } from "../../../shared/ui/menu/MenuCheckColumn";
-import { MENU_GUTTER, MENU_LABEL_CLASS, menuItemClass } from "../../../shared/ui/menu/menuStyles";
+import { MENU_LABEL_CLASS, menuItemClass } from "../../../shared/ui/menu/menuStyles";
 
 export const RATE_PRESETS = [0.75, 1, 1.25, 1.5, 2];
 
@@ -40,26 +43,20 @@ export default function PlaybackRatePicker({
   className,
   onOpenChange,
 }: PlaybackRatePickerProps) {
-  const isPresent = useIsPresent();
   const selectedRate = RATE_PRESETS.find((rate) => isRateSelected(playbackRate, rate));
   const menu = useMotionMenu({
-    positioning: { placement: "top-end", gutter: MENU_GUTTER },
+    positioning: { placement: "top-end" },
+    closeOnParentExit: true,
     initialHighlight: selectedRate === undefined ? null : String(selectedRate),
     onOpenChange: ({ open }) => onOpenChange?.(open),
   });
-  const { open, setOpen } = menu.menu.api;
-
-  // 親のポップアップが退出に入ったら、メニューも閉じる
-  useEffect(() => {
-    if (!isPresent && open) setOpen(false);
-  }, [isPresent, open, setOpen]);
 
   const rateLabel = RATE_LABELS[playbackRate] ?? `${playbackRate.toFixed(2)}×`;
 
   return (
     <div className={cn("mle-ratepick", className)}>
       <MotionMenuRoot handle={menu}>
-        <Menu.Trigger asChild {...menu.triggerProps}>
+        <MotionMenuTrigger>
           <button
             type="button"
             className={cn("mle-ratepill", overlay && "is-overlay", playbackRate !== 1 && "is-on")}
@@ -68,8 +65,8 @@ export default function PlaybackRatePicker({
           >
             {rateLabel}
           </button>
-        </Menu.Trigger>
-        <MenuPopup origin="bottom right" narrow>
+        </MotionMenuTrigger>
+        <MenuPopup narrow>
           <Menu.RadioItemGroup
             value={selectedRate === undefined ? undefined : String(selectedRate)}
             onValueChange={({ value }) => onSetPlaybackRate(Number(value))}

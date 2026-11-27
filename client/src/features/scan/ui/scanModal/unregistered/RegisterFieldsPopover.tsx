@@ -62,11 +62,7 @@ export default function RegisterFieldsPopover({
 
   return (
     <MotionPopoverRoot handle={handle}>
-      <PopoverPopup
-        origin="bottom right"
-        aria-label="追加する項目"
-        className="flex w-[220px] flex-col gap-2"
-      >
+      <PopoverPopup aria-label="追加する項目" className="flex w-[220px] flex-col gap-2">
         {FIELDS.map(({ key, label }) => (
           <label key={key} className="flex items-center gap-2 font-jp text-body text-ink-1">
             <input

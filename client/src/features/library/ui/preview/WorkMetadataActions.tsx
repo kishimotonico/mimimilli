@@ -6,9 +6,13 @@ import { I } from "../../../../shared/ui/Icon";
 import IconButton from "../../../../shared/ui/IconButton";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import type { BookmarkWorkMutation } from "../../../../entities/work/model/workMutations";
-import { MenuPopup, MotionMenuRoot, useMotionMenu } from "../../../../shared/ui/menu/MotionMenu";
 import {
-  MENU_GUTTER,
+  MenuPopup,
+  MotionMenuRoot,
+  MotionMenuTrigger,
+  useMotionMenu,
+} from "../../../../shared/ui/menu/MotionMenu";
+import {
   MENU_LABEL_CLASS,
   MENU_SEPARATOR_CLASS,
   menuItemClass,
@@ -30,10 +34,9 @@ export function WorkMetadataActions({
   onDelete,
 }: WorkMetadataActionsProps) {
   const menu = useMotionMenu({
-    positioning: { placement: "bottom-end", gutter: MENU_GUTTER },
+    positioning: { placement: "bottom-end" },
     onEscapeKeyDown: () => bookmarkMutation.reset(),
   });
-  const open = menu.menu.api.open;
 
   const toggleBookmark = () => {
     if (bookmarkMutation.isPending) return;
@@ -61,16 +64,16 @@ export function WorkMetadataActions({
       />
       <IconButton icon={I.edit} label="作品を編集" size="sm" onClick={onEdit} />
       <MotionMenuRoot handle={menu}>
-        <Menu.Trigger asChild>
+        <MotionMenuTrigger>
           <IconButton
             icon={I.more}
             label="その他"
             size="sm"
-            active={open}
+            active={menu.open}
             onClick={() => bookmarkMutation.reset()}
           />
-        </Menu.Trigger>
-        <MenuPopup origin="top right">
+        </MotionMenuTrigger>
+        <MenuPopup>
           <MenuLayerItem
             value="info"
             valueText="作品の情報"

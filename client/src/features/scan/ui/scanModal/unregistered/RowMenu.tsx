@@ -1,9 +1,13 @@
 import { Menu } from "@ark-ui/react/menu";
 import IconButton from "../../../../../shared/ui/IconButton";
 import { I } from "../../../../../shared/ui/Icon";
-import { MenuPopup, MotionMenuRoot, useMotionMenu } from "../../../../../shared/ui/menu/MotionMenu";
 import {
-  MENU_GUTTER,
+  MenuPopup,
+  MotionMenuRoot,
+  MotionMenuTrigger,
+  useMotionMenu,
+} from "../../../../../shared/ui/menu/MotionMenu";
+import {
   MENU_LABEL_CLASS,
   MENU_SEPARATOR_CLASS,
   menuItemClass,
@@ -11,7 +15,7 @@ import {
 
 interface RowMenuProps {
   label: string;
-  /** 処理中。トリガーは無効にせず（フォーカスを落とさない）、項目だけ無効にする */
+  /** 処理中。トリガーはフォーカスを残したまま開かなくし、項目も無効にする */
   busy: boolean;
   onOpenFolder: () => void;
   onExclude: () => void;
@@ -20,22 +24,15 @@ interface RowMenuProps {
 /** 行の右端の︙メニュー。 */
 export default function RowMenu({ label, busy, onOpenFolder, onExclude }: RowMenuProps) {
   const menu = useMotionMenu({
-    positioning: { placement: "bottom-end", gutter: MENU_GUTTER },
+    positioning: { placement: "bottom-end" },
     disabled: busy,
   });
   return (
     <MotionMenuRoot handle={menu}>
-      <Menu.Trigger asChild {...menu.triggerProps}>
-        <IconButton
-          icon={I.moreV}
-          label={label}
-          size="sm"
-          tone="muted"
-          aria-disabled={busy}
-          className="aria-disabled:text-ink-4"
-        />
-      </Menu.Trigger>
-      <MenuPopup origin="top right">
+      <MotionMenuTrigger>
+        <IconButton icon={I.moreV} label={label} size="sm" tone="muted" />
+      </MotionMenuTrigger>
+      <MenuPopup>
         <Menu.Item
           value="open-folder"
           valueText="フォルダーを開く"

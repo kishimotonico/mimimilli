@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Popover } from "@ark-ui/react/popover";
 import { normalizeTag } from "@mimimilli/shared";
 import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
 import { sortTagsForDisplay } from "../../../../entities/work/sortTagsForDisplay";
@@ -11,6 +10,7 @@ import { I } from "../../../../shared/ui/Icon";
 import TagCombobox from "../../../../shared/ui/TagCombobox";
 import {
   MotionPopoverRoot,
+  MotionPopoverTrigger,
   PopoverPopup,
   useMotionPopover,
 } from "../../../../shared/ui/popover/MotionPopover";
@@ -56,9 +56,8 @@ export function WorkEditTagsField({
   const popupRef = useRef<HTMLDivElement>(null);
   const popover = useMotionPopover({
     open: isPopoverOpen,
-    onOpenChange: ({ open }) => {
-      if (!open || !disabled) setIsPopoverOpen(open);
-    },
+    onOpenChange: ({ open }) => setIsPopoverOpen(open),
+    disabled,
     positioning: { placement: "bottom-start" },
     initialFocusEl: () => popupRef.current?.querySelector("input") ?? null,
     onEscapeKeyDown: (event) => event.preventDefault(),
@@ -95,20 +94,18 @@ export function WorkEditTagsField({
             />
           ))}
           <MotionPopoverRoot handle={popover}>
-            <Popover.Trigger asChild>
+            <MotionPopoverTrigger>
               <IconButton
                 icon={I.add}
                 label="タグを追加"
                 size="xs"
                 tone="muted"
                 className="bg-paper-2 hover:bg-paper-3"
-                softDisabled={disabled}
               />
-            </Popover.Trigger>
+            </MotionPopoverTrigger>
             <PopoverPopup
               ref={popupRef}
               aria-label="タグを追加"
-              origin="top left"
               style={{ width: TAG_POPOVER_WIDTH }}
             >
               <TagCombobox

@@ -5,8 +5,8 @@ import {
   useLayoutEffect,
   useRef,
   type ComponentPropsWithRef,
+  type ReactElement,
   type ReactNode,
-  type RefObject,
 } from "react";
 import {
   Popover,
@@ -17,43 +17,17 @@ import {
 import { Portal } from "@ark-ui/react/portal";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { cn } from "../../lib/cn";
-import {
-  POPOVER_CONTENT_SELECTOR,
-  registerPopoverReturnTarget,
-  resolveFocusReturnTarget,
-} from "../../lib/focusReturnTarget";
+import { resolveFocusReturnTarget } from "../layer/focusReturnTarget";
 import { ignoreComposingKey, isComposingKey } from "../layer/keys";
-import { layerContainer } from "../layer/layerContainer";
+import { layerContainer, registerPopoverReturnTarget } from "../layer/layerDom";
+import { layerEventBoundary } from "../layer/layerEvents";
+import { layerPositioning } from "../layer/layerPositioning";
+import { disabledTriggerProps, POPOVER_OPEN_KEYS } from "../layer/layerTrigger";
 import { useCloseOnAnchorScroll } from "../layer/useCloseOnAnchorScroll";
+import { useCloseOnParentExit } from "../layer/useCloseOnParentExit";
 import { usePresenceLifetime } from "../layer/usePresenceLifetime";
 import { useMotionVariants } from "../useMotionVariants";
 import { popoverPanelClass } from "./popoverStyles";
-
-const LAYER_CONTENT_SELECTOR = `${POPOVER_CONTENT_SELECTOR}, [data-scope="menu"][data-part="content"]`;
-const popoverTriggerIds = new WeakMap<Element, string>();
-
-function isInsideOwnLayerTree(target: EventTarget | null, own: HTMLElement): boolean {
-  if (!(target instanceof Element)) return false;
-  if (own.contains(target)) return true;
-
-  let content = target.closest(LAYER_CONTENT_SELECTOR);
-  const seen = new Set<Element>();
-  while (content && !seen.has(content)) {
-    seen.add(content);
-    const doc = content.ownerDocument;
-    const triggerId =
-      content.getAttribute("data-scope") === "menu"
-        ? content.getAttribute("aria-labelledby")
-        : popoverTriggerIds.get(content);
-    const trigger = triggerId
-      ? doc.getElementById(triggerId)
-      : doc.querySelector(`[aria-controls="${CSS.escape(content.id)}"]`);
-    if (!trigger) return false;
-    if (own.contains(trigger)) return true;
-    content = trigger.closest(LAYER_CONTENT_SELECTOR);
-  }
-  return false;
-}
 
 type MotionPopoverProps = Omit<
   UsePopoverProps,
@@ -61,17 +35,32 @@ type MotionPopoverProps = Omit<
 > & {
   open: boolean;
   onOpenChange: NonNullable<UsePopoverProps["onOpenChange"]>;
+  /** 無効。フォーカスを残したまま、開く操作（ポインター・キーボード）を受けなくする */
+  disabled?: boolean;
+  /** 親が AnimatePresence で退出に入ったら閉じる */
+  closeOnParentExit?: boolean;
 };
 
-export interface MotionPopoverHandle {
+const INTERNALS = Symbol("motionPopoverInternals");
+
+interface PopoverInternals {
   popover: UsePopoverReturn;
   present: boolean;
   onExitComplete: () => void;
   getAnchor: () => HTMLElement | null;
   bindContent: (content: HTMLDivElement | null) => void;
+  triggerProps: Record<string, unknown>;
+}
+
+export interface MotionPopoverHandle {
+  open: boolean;
+  /** 戻し先（開く前の要素、切れていればトリガー）。閉じる前に求めたいときに使う */
   resolveReturnTarget: () => HTMLElement | null;
+  /** フォーカスを戻し先へ移してから閉じる */
   closeAndReturn: () => void;
+  /** initialFocusEl の要素へフォーカスを移す */
   focusInitial: () => void;
+  readonly [INTERNALS]: PopoverInternals;
 }
 
 export function useMotionPopover({
@@ -79,8 +68,9 @@ export function useMotionPopover({
   onOpenChange,
   positioning,
   onEscapeKeyDown,
-  onFocusOutside,
   initialFocusEl,
+  disabled = false,
+  closeOnParentExit = false,
   ...rest
 }: MotionPopoverProps): MotionPopoverHandle {
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -114,48 +104,29 @@ export function useMotionPopover({
     open,
     modal: false,
     portalled: true,
-    positioning: {
-      strategy: "fixed",
-      gutter: 6,
-      overflowPadding: 8,
-      fitViewport: true,
-      ...positioning,
-    },
+    positioning: layerPositioning({ overflowPadding: 8, fitViewport: true, ...positioning }),
     initialFocusEl,
     finalFocusEl: resolveReturnTarget,
     onOpenChange: (details) => {
-      if (details.open !== open) onOpenChange(details);
+      if (details.open === open || (details.open && disabled)) return;
+      onOpenChange(details);
     },
     onEscapeKeyDown: (event) => {
       if (isComposingKey(event)) event.preventDefault();
       else onEscapeKeyDown?.(event);
     },
-    onFocusOutside: (event) => {
-      onFocusOutside?.(event);
-      if (
-        !event.defaultPrevented &&
-        contentRef.current &&
-        isInsideOwnLayerTree(event.detail.target, contentRef.current)
-      ) {
-        event.preventDefault();
-      }
-    },
   });
   const triggerId = popover.getTriggerProps().id;
   const anchorId = popover.getAnchorProps().id;
-  triggerIdRef.current = triggerId;
-  anchorIdRef.current = anchorId;
+  useLayoutEffect(() => {
+    triggerIdRef.current = triggerId;
+    anchorIdRef.current = anchorId;
+  });
 
-  const bindContent = useCallback(
-    (content: HTMLDivElement | null) => {
-      contentRef.current = content;
-      if (content) {
-        registerPopoverReturnTarget(content, previousFocus);
-        if (triggerId) popoverTriggerIds.set(content, triggerId);
-      }
-    },
-    [triggerId],
-  );
+  const bindContent = useCallback((content: HTMLDivElement | null) => {
+    contentRef.current = content;
+    if (content) registerPopoverReturnTarget(content, previousFocus);
+  }, []);
 
   const wasOpen = useRef(false);
   useLayoutEffect(() => {
@@ -165,15 +136,13 @@ export function useMotionPopover({
     wasOpen.current = open;
   }, [open]);
 
-  const closeOnScroll = useCallback(() => onOpenChange({ open: false }), [onOpenChange]);
-  useCloseOnAnchorScroll(open, getAnchor, closeOnScroll);
+  const close = () => onOpenChange({ open: false });
+  useCloseOnAnchorScroll(open, getAnchor, close);
+  useCloseOnParentExit(closeOnParentExit, open, close);
   const lifetime = usePresenceLifetime(popover.open);
 
   return {
-    popover,
-    ...lifetime,
-    getAnchor,
-    bindContent,
+    open,
     resolveReturnTarget,
     closeAndReturn() {
       if (!open) return;
@@ -184,10 +153,23 @@ export function useMotionPopover({
       const target = initialFocusEl?.();
       if (target instanceof HTMLElement) target.focus({ preventScroll: true });
     },
+    [INTERNALS]: {
+      popover,
+      ...lifetime,
+      getAnchor,
+      bindContent,
+      triggerProps: disabledTriggerProps(disabled, POPOVER_OPEN_KEYS),
+    },
   };
 }
 
-const PopupContext = createContext<MotionPopoverHandle | null>(null);
+const HandleContext = createContext<MotionPopoverHandle | null>(null);
+
+function usePopoverInternals(): PopoverInternals {
+  const handle = useContext(HandleContext);
+  if (!handle) throw new Error("ポップオーバーの部品は MotionPopoverRoot の中に置く");
+  return handle[INTERNALS];
+}
 
 export function MotionPopoverRoot({
   handle,
@@ -196,40 +178,50 @@ export function MotionPopoverRoot({
   handle: MotionPopoverHandle;
   children: ReactNode;
 }) {
+  const { popover, present } = handle[INTERNALS];
   return (
-    <Popover.RootProvider value={handle.popover} present={handle.present}>
-      <PopupContext.Provider value={handle}>{children}</PopupContext.Provider>
+    <Popover.RootProvider value={popover} present={present}>
+      <HandleContext.Provider value={handle}>{children}</HandleContext.Provider>
     </Popover.RootProvider>
+  );
+}
+
+/** Popover.Trigger asChild に、disabled の処理を合わせる */
+export function MotionPopoverTrigger({ children }: { children: ReactElement }) {
+  const { triggerProps } = usePopoverInternals();
+  return (
+    <Popover.Trigger asChild {...triggerProps}>
+      {children}
+    </Popover.Trigger>
   );
 }
 
 type PopoverPopupProps = Omit<
   ComponentPropsWithRef<typeof motion.div>,
   "inert" | "onKeyDownCapture"
-> & {
-  origin?: string;
-};
+>;
 
 function Popup({
   container,
   bindContent,
-  origin = "var(--transform-origin)",
   className,
   children,
   ...rest
 }: PopoverPopupProps & {
-  container: RefObject<HTMLElement | null>;
-  bindContent: MotionPopoverHandle["bindContent"];
+  container: HTMLElement | null;
+  bindContent: PopoverInternals["bindContent"];
 }) {
   const isPresent = useIsPresent();
-  const { menuScale } = useMotionVariants();
+  const { layerScale } = useMotionVariants();
+  const containerRef = useRef(container);
   return (
-    <Portal container={container}>
+    <Portal container={containerRef}>
       <Popover.Positioner>
         <Popover.Content asChild ref={bindContent}>
           <motion.div
             {...rest}
-            {...menuScale({ origin })}
+            {...layerScale()}
+            {...layerEventBoundary(rest)}
             onKeyDownCapture={ignoreComposingKey}
             inert={!isPresent}
             className={cn(popoverPanelClass, className)}
@@ -243,15 +235,14 @@ function Popup({
 }
 
 export function PopoverPopup(props: PopoverPopupProps) {
-  const handle = useContext(PopupContext);
-  if (!handle) throw new Error("PopoverPopup must be used inside MotionPopoverRoot");
+  const { popover, onExitComplete, getAnchor, bindContent } = usePopoverInternals();
   return (
-    <AnimatePresence onExitComplete={handle.onExitComplete}>
-      {handle.popover.open && (
+    <AnimatePresence onExitComplete={onExitComplete}>
+      {popover.open && (
         <Popup
           key="popup"
-          container={{ current: layerContainer(handle.getAnchor()) }}
-          bindContent={handle.bindContent}
+          container={layerContainer(getAnchor())}
+          bindContent={bindContent}
           {...props}
         />
       )}

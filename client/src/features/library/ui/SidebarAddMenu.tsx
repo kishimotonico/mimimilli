@@ -3,9 +3,13 @@ import { MenuLayerItem } from "../../../shared/ui/menu/MenuLayerItem";
 import type { SmartFolderTemplate } from "@mimimilli/shared";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
-import { MenuPopup, MotionMenuRoot, useMotionMenu } from "../../../shared/ui/menu/MotionMenu";
 import {
-  MENU_GUTTER,
+  MenuPopup,
+  MotionMenuRoot,
+  MotionMenuTrigger,
+  useMotionMenu,
+} from "../../../shared/ui/menu/MotionMenu";
+import {
   MENU_HEADING_CLASS,
   MENU_LABEL_CLASS,
   MENU_SEPARATOR_CLASS,
@@ -34,13 +38,13 @@ export default function SidebarAddMenu({
   onAddGroup,
   onAddTemplate,
 }: SidebarAddMenuProps) {
-  const menu = useMotionMenu({ positioning: { placement: "bottom-end", gutter: MENU_GUTTER } });
+  const menu = useMotionMenu({ positioning: { placement: "bottom-end" } });
   return (
     <MotionMenuRoot handle={menu}>
-      <Menu.Trigger asChild>
-        <IconButton icon={I.add} label="追加" size="xs" tone="muted" active={menu.menu.api.open} />
-      </Menu.Trigger>
-      <MenuPopup origin="top right">
+      <MotionMenuTrigger>
+        <IconButton icon={I.add} label="追加" size="xs" tone="muted" active={menu.open} />
+      </MotionMenuTrigger>
+      <MenuPopup>
         {canSaveSearch && (
           <MenuLayerItem
             value="save-search"

@@ -43,7 +43,7 @@ export interface IconButtonProps extends Omit<
   variant?: IconButtonVariant;
   /** 有効時の文字色。`muted` は ink-2（hoverで ink-0）、`faint` は ink-3（hover/focusで ink-1）、`danger` は hoverで赤 */
   tone?: IconButtonTone;
-  /** フォーカスは残し、ボタンの実行だけを無効にする */
+  /** フォーカスは残し、見た目と aria-disabled と自分の onClick だけを無効にする。Ark のトリガーを止めるには、フックの disabled を使う */
   softDisabled?: boolean;
   ref?: Ref<HTMLButtonElement>;
 }
@@ -66,14 +66,15 @@ export default function IconButton({
   type = "button",
   ...rest
 }: IconButtonProps) {
-  const stateClass =
-    disabled || softDisabled
-      ? "cursor-not-allowed text-ink-4"
-      : active
-        ? "text-acc-ink bg-acc-soft"
-        : variant === "bare"
-          ? TONE_CLASS[tone]
-          : `${TONE_CLASS[tone]} hover:bg-paper-2 active:bg-paper-3`;
+  const looksDisabled =
+    disabled || softDisabled || ariaDisabled === true || ariaDisabled === "true";
+  const stateClass = looksDisabled
+    ? "cursor-not-allowed text-ink-4"
+    : active
+      ? "text-acc-ink bg-acc-soft"
+      : variant === "bare"
+        ? TONE_CLASS[tone]
+        : `${TONE_CLASS[tone]} hover:bg-paper-2 active:bg-paper-3`;
 
   return (
     <button

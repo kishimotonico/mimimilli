@@ -1,6 +1,5 @@
-import { Popover } from "@ark-ui/react/popover";
 import { motion } from "motion/react";
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
   defaultGroupSort,
@@ -15,6 +14,7 @@ import {
 import { MENU_LABEL_CLASS, menuItemClass } from "../../../shared/ui/menu/menuStyles";
 import {
   MotionPopoverRoot,
+  MotionPopoverTrigger,
   PopoverPopup,
   useMotionPopover,
 } from "../../../shared/ui/popover/MotionPopover";
@@ -78,13 +78,12 @@ export default function FilterChipAddButton({
   const stageRef = useRef<HTMLDivElement>(null);
   const { fade } = useMotionVariants();
   const { initial, animate } = fade();
-  const onOpenChange = useCallback(({ open: nextOpen }: { open: boolean }) => {
-    setOpen(nextOpen);
-    if (!nextOpen) setPickedGroupBy(null);
-  }, []);
   const popover = useMotionPopover({
     open,
-    onOpenChange,
+    onOpenChange: ({ open: nextOpen }) => {
+      setOpen(nextOpen);
+      if (!nextOpen) setPickedGroupBy(null);
+    },
     positioning: { placement: "bottom-start" },
     initialFocusEl: () =>
       stageRef.current?.querySelector<HTMLElement>("input, [data-group-by-key]") ?? null,
@@ -110,13 +109,13 @@ export default function FilterChipAddButton({
 
   return (
     <MotionPopoverRoot handle={popover}>
-      <Popover.Trigger asChild>
+      <MotionPopoverTrigger>
         <button type="button" className="mll-tagband__addbtn">
           <I.add size={11} />
           絞り込み
         </button>
-      </Popover.Trigger>
-      <PopoverPopup origin="top left" className="w-[240px]" aria-label="絞り込み">
+      </MotionPopoverTrigger>
+      <PopoverPopup className="w-[240px]" aria-label="絞り込み">
         <motion.div
           key={groupByKey(pickedGroupBy)}
           ref={stageRef}
@@ -124,12 +123,7 @@ export default function FilterChipAddButton({
           animate={animate}
         >
           {pickedGroupBy === null ? (
-            // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- GroupValueQuickList に合わせたボタン一覧
-            <div
-              role="listbox"
-              aria-label="絞り込みの種類"
-              className="max-h-[260px] overflow-y-auto"
-            >
+            <fieldset aria-label="絞り込みの種類" className="max-h-[260px] overflow-y-auto">
               {buildGroupByRows(tagPrefixes).map(({ groupBy, name }) => {
                 const key = groupByKey(groupBy);
                 return (
@@ -148,7 +142,7 @@ export default function FilterChipAddButton({
                   </button>
                 );
               })}
-            </div>
+            </fieldset>
           ) : (
             <GroupValueStage
               groupBy={pickedGroupBy}

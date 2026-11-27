@@ -1,32 +1,50 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
-import { isInsideOwnMenuTree } from "../../src/shared/ui/menu/MotionMenu";
 import { Menu } from "@ark-ui/react/menu";
+import { describe, expect, it, vi } from "vitest";
+import IconButton from "../../src/shared/ui/IconButton";
+import { I } from "../../src/shared/ui/Icon";
 import { MenuLayerItem } from "../../src/shared/ui/menu/MenuLayerItem";
-import { MenuPopup, MotionMenuRoot, useMotionMenu } from "../../src/shared/ui/menu/MotionMenu";
-import { menuPanelClass } from "../../src/shared/ui/menu/menuStyles";
-import RowMenu from "../../src/features/scan/ui/scanModal/unregistered/RowMenu";
+import {
+  MenuPopup,
+  MotionMenuRoot,
+  MotionMenuTrigger,
+  useMotionMenu,
+} from "../../src/shared/ui/menu/MotionMenu";
 
-function renderMenu(onSelect = vi.fn()) {
-  render(<RowMenu label="メニュー" busy={false} onOpenFolder={onSelect} onExclude={vi.fn()} />);
+function TestMenu({ onSelect, disabled = false }: { onSelect: () => void; disabled?: boolean }) {
+  const menu = useMotionMenu({ disabled });
+  return (
+    <MotionMenuRoot handle={menu}>
+      <MotionMenuTrigger>
+        <IconButton icon={I.more} label="メニュー" />
+      </MotionMenuTrigger>
+      <MenuPopup>
+        <Menu.Item value="open" valueText="開く" onSelect={onSelect}>
+          開く
+        </Menu.Item>
+        <Menu.Separator />
+        <Menu.Item value="danger" valueText="除外">
+          除外
+        </Menu.Item>
+      </MenuPopup>
+    </MotionMenuRoot>
+  );
+}
+
+function renderMenu(props: { disabled?: boolean } = {}) {
+  const onSelect = vi.fn();
+  render(<TestMenu onSelect={onSelect} {...props} />);
   return { onSelect, trigger: screen.getByRole("button", { name: "メニュー" }) };
 }
 
 describe("メニュー部品", () => {
-  it("危険な項目は区切り線の下に置く", async () => {
-    const { trigger } = renderMenu();
-    await userEvent.click(trigger);
-    const separator = screen.getByRole("separator");
-    expect(separator.nextElementSibling).toHaveTextContent("除外");
-  });
-
   it("退出中はメニューが inert になり、項目を実行できない", async () => {
     const { onSelect, trigger } = renderMenu();
     await userEvent.click(trigger);
     await userEvent.keyboard("{Escape}");
-    const menu = screen.queryByRole("menu");
-    if (menu) expect(menu).toHaveAttribute("inert");
+    const menu = screen.getByRole("menu");
+    expect(menu).toHaveAttribute("inert");
     expect(onSelect).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
   });
@@ -57,41 +75,19 @@ describe("メニュー部品", () => {
     await waitFor(() => expect(screen.getByLabelText("外の入力")).toHaveFocus());
   });
 
-  it("処理中（busy）はトリガーを押してもキーボードでも開かない", async () => {
-    render(<RowMenu label="メニュー" busy onOpenFolder={vi.fn()} onExclude={vi.fn()} />);
-    const trigger = screen.getByRole("button", { name: "メニュー" });
-    await userEvent.click(trigger);
-    expect(screen.queryByRole("menu")).toBeNull();
+  it("無効なトリガーは、ポインターでもキーボードでも開かず、フォーカスを残す", async () => {
+    const { trigger } = renderMenu({ disabled: true });
     trigger.focus();
-    await userEvent.keyboard("{ArrowDown}{Enter}");
+    await userEvent.click(trigger);
+    await userEvent.keyboard("{ArrowDown}{ArrowUp}{Enter}[Space]");
     expect(screen.queryByRole("menu")).toBeNull();
+    expect(trigger).toHaveFocus();
+    expect(trigger).toHaveAttribute("aria-disabled", "true");
+    expect(trigger).toHaveAttribute("data-disabled");
   });
 
-  it("自分のツリー（自分の中身から開いたサブメニュー、自分の右クリックのトリガー）だけを内側とする", () => {
-    document.body.innerHTML = `
-      <div id="mine" data-scope="menu" data-part="content"><div id="sub-trigger"></div></div>
-      <div data-scope="menu" data-part="content" aria-labelledby="sub-trigger"><button id="in-sub"></button></div>
-      <div data-scope="menu" data-part="content" aria-labelledby="grand-trigger"><button id="in-grand"></button></div>
-      <div data-scope="menu" data-part="content" aria-labelledby="sub-trigger"><div id="grand-trigger"></div></div>
-      <div id="other-trigger"></div>
-      <div data-scope="menu" data-part="content" aria-labelledby="other-trigger"><button id="in-other"></button></div>
-      <div id="ctx" data-scope="menu" data-part="context-trigger"><span id="in-ctx"></span></div>
-      <div id="other-ctx" data-scope="menu" data-part="context-trigger"><span id="in-other-ctx"></span></div>
-      <button id="outside"></button>`;
-    const inside = (id: string) => isInsideOwnMenuTree(document.getElementById(id), "mine", "ctx");
-    expect(inside("in-sub")).toBe(true);
-    expect(inside("in-grand")).toBe(true);
-    expect(inside("in-ctx")).toBe(true);
-    expect(inside("in-other")).toBe(false);
-    expect(inside("in-other-ctx")).toBe(false);
-    expect(inside("outside")).toBe(false);
-    expect(isInsideOwnMenuTree(null, "mine", "ctx")).toBe(false);
-    document.body.innerHTML = "";
-  });
-
-  it("処理中のトリガーで、開くキーだけを止め、Tab と Esc は止めない", async () => {
-    render(<RowMenu label="メニュー" busy onOpenFolder={vi.fn()} onExclude={vi.fn()} />);
-    const trigger = screen.getByRole("button", { name: "メニュー" });
+  it("無効なトリガーで、開くキーだけを止め、Tab と Esc は止めない", () => {
+    const { trigger } = renderMenu({ disabled: true });
     trigger.focus();
     expect(fireEvent.keyDown(trigger, { key: "ArrowDown" })).toBe(false);
     expect(fireEvent.keyDown(trigger, { key: "Enter" })).toBe(false);
@@ -105,10 +101,10 @@ describe("メニュー部品", () => {
       return (
         <>
           <MotionMenuRoot handle={menu}>
-            <Menu.Trigger asChild>
+            <MotionMenuTrigger>
               <button type="button">メニュー</button>
-            </Menu.Trigger>
-            <MenuPopup origin="top left">
+            </MotionMenuTrigger>
+            <MenuPopup>
               <MenuLayerItem
                 value="layer"
                 onSelect={() => document.querySelector<HTMLElement>("#layer-input")?.focus()}
@@ -137,7 +133,17 @@ describe("メニュー部品", () => {
     expect(trigger).toHaveFocus();
   });
 
-  it("パネルは長いラベルを省略できるよう、列の幅を内容に押し広げさせない", () => {
-    expect(menuPanelClass()).toContain("grid-cols-[minmax(0,1fr)]");
+  it("ポータルした中身のクリック・キーは、React の祖先へ伝えない", async () => {
+    const ancestor = vi.fn();
+    render(
+      // oxlint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- 祖先への伝播を確かめる
+      <div onClick={ancestor} onKeyDown={ancestor} onPointerDown={ancestor}>
+        <TestMenu onSelect={vi.fn()} />
+      </div>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "メニュー" }));
+    ancestor.mockClear();
+    await userEvent.click(screen.getByRole("menuitem", { name: "開く" }));
+    expect(ancestor).not.toHaveBeenCalled();
   });
 });

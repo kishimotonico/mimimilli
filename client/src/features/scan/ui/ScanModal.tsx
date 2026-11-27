@@ -5,7 +5,7 @@ import { useAtomValue } from "jotai";
 import Modal, { ModalHeader } from "../../../shared/ui/Modal";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { cn } from "../../../shared/lib/cn";
-import { isFocusLost } from "../../../shared/lib/focusReturnTarget";
+import { isFocusLost } from "../../../shared/ui/layer/focusReturnTarget";
 import { I } from "../../../shared/ui/Icon";
 import { useToast } from "../../../shared/ui/useToast";
 import { useScanJobStore, useScanning } from "../../../entities/scan/useScanJob";

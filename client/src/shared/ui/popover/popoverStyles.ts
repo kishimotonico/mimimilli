@@ -1,3 +1,3 @@
-import { panelFrameClass } from "../layer/layerStyles";
+import { layerPanelClass } from "../layer/layerStyles";
 
-export const popoverPanelClass = `z-50 p-3 ${panelFrameClass}`;
+export const popoverPanelClass = `${layerPanelClass} p-3`;

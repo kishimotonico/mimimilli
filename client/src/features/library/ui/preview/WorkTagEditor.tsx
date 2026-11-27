@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Popover } from "@ark-ui/react/popover";
 import { normalizeTag } from "@mimimilli/shared";
 import type { NormalizedTag, Work } from "@mimimilli/shared";
 import { sortTagsForDisplay } from "../../../../entities/work/sortTagsForDisplay";
@@ -20,6 +19,7 @@ import { useTagPrefixes } from "../../../../entities/tag/useTagPrefixes";
 import { tagPrefixDefinition } from "../../../../entities/tag/tagPrefixDefinition";
 import {
   MotionPopoverRoot,
+  MotionPopoverTrigger,
   PopoverPopup,
   useMotionPopover,
 } from "../../../../shared/ui/popover/MotionPopover";
@@ -148,12 +148,10 @@ export function WorkTagEditor({
   const popover = useMotionPopover({
     open: openMode === "popover",
     onOpenChange: ({ open }) => {
-      if (open) {
-        if (addDisabled) return;
-        resetPatchTagsError();
-      }
+      if (open) resetPatchTagsError();
       setOpenMode(open ? "popover" : null);
     },
+    disabled: addDisabled,
     positioning: { placement: "bottom-start", boundary: boundary ?? undefined },
     initialFocusEl: () => popupRef.current?.querySelector("input") ?? null,
     onEscapeKeyDown: (event) => event.preventDefault(),
@@ -305,7 +303,7 @@ export function WorkTagEditor({
                   }}
                 />
               ) : (
-                <Popover.Trigger asChild>
+                <MotionPopoverTrigger>
                   <IconButton
                     ref={bindTrigger}
                     icon={I.add}
@@ -313,14 +311,12 @@ export function WorkTagEditor({
                     size="xs"
                     tone="muted"
                     className="bg-paper-2 hover:bg-paper-3"
-                    softDisabled={addDisabled}
                   />
-                </Popover.Trigger>
+                </MotionPopoverTrigger>
               )}
               <PopoverPopup
                 ref={popupRef}
                 aria-label="タグを追加"
-                origin="top left"
                 style={{ width: TAG_POPOVER_WIDTH }}
               >
                 <TagCombobox width="full" {...comboboxProps} />

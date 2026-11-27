@@ -1,84 +1,72 @@
 import {
   createContext,
-  useContext,
   useCallback,
+  useContext,
+  useLayoutEffect,
   useRef,
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactElement,
   type ReactNode,
-  type RefObject,
 } from "react";
 import { Menu, useMenu, type UseMenuProps, type UseMenuReturn } from "@ark-ui/react/menu";
 import { Portal } from "@ark-ui/react/portal";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
+import { findLayerTrigger, layerContainer, MENU_TRIGGER_SELECTOR } from "../layer/layerDom";
+import { layerEventBoundary } from "../layer/layerEvents";
+import { layerPositioning } from "../layer/layerPositioning";
 import { ignoreComposingKey, isComposingKey } from "../layer/keys";
-import { layerContainer } from "../layer/layerContainer";
+import { disabledTriggerProps, MENU_OPEN_KEYS } from "../layer/layerTrigger";
 import { useCloseOnAnchorScroll } from "../layer/useCloseOnAnchorScroll";
+import { useCloseOnParentExit } from "../layer/useCloseOnParentExit";
 import { usePresenceLifetime } from "../layer/usePresenceLifetime";
 import { useMotionVariants } from "../useMotionVariants";
 import { menuPanelClass } from "./menuStyles";
 
-const ExitCompleteContext = createContext<(() => void) | null>(null);
-/** フォーカスをトリガーへ戻さずにメニューを閉じる。別の層を開く項目（MenuLayerItem）が使う */
-export const CloseWithoutRestoreContext = createContext<(() => void) | null>(null);
-
-function getMenuTrigger(contentId: string): Element | null {
-  return document.querySelector(`[aria-controls="${CSS.escape(contentId)}"]`);
-}
-
-/**
- * フォーカスの移動先が、このメニューのツリー（自分の中身から開いたサブメニュー、自分の右クリックのトリガー）か。
- * 別のメニューは含めない。別のメニューへの移動は外へ移ったものとして扱う
- */
-export function isInsideOwnMenuTree(
-  target: EventTarget | null,
-  contentId: string,
-  contextTriggerId: string | undefined,
-): boolean {
-  if (!(target instanceof Element)) return false;
-  const own = document.getElementById(contentId);
-  // 移動先の中身のトリガーから親の中身へたどり、自分の中身に着くか（孫のサブメニューを含む）
-  let content = target.closest('[data-scope="menu"][data-part="content"]');
-  while (content) {
-    if (content === own) return true;
-    const triggerId = content.getAttribute("aria-labelledby");
-    const trigger = triggerId ? document.getElementById(triggerId) : null;
-    if (!trigger) return false;
-    if (own?.contains(trigger)) return true;
-    content = trigger.closest('[data-scope="menu"][data-part="content"]');
-  }
-  const contextTrigger = target.closest('[data-scope="menu"][data-part="context-trigger"]');
-  return contextTrigger !== null && contextTrigger.id === contextTriggerId;
-}
-
-const KEYBOARD_OPEN_KEYS = new Set(["ArrowDown", "ArrowUp", "Enter", " "]);
-
 interface MotionMenuProps extends UseMenuProps {
   /** ラジオを持つメニューの現在値。キーボードで開いたとき、先頭ではなくこの項目をハイライトする */
   initialHighlight?: string | null;
-  /** 無効。トリガーに triggerProps を展開すると、開く操作（ポインター・キーボード）を受けなくなる */
+  /** 無効。フォーカスを残したまま、開く操作（ポインター・キーボード）を受けなくする */
   disabled?: boolean;
+  /** 親が AnimatePresence で退出に入ったら閉じる */
+  closeOnParentExit?: boolean;
 }
 
-export function useMotionMenu(props: MotionMenuProps = {}) {
+const INTERNALS = Symbol("motionMenuInternals");
+
+interface MenuInternals {
+  menu: UseMenuReturn;
+  present: boolean;
+  onExitComplete: () => void;
+  triggerProps: Record<string, unknown>;
+  closeWithoutRestoringFocus: () => void;
+}
+
+export interface MotionMenuHandle {
+  open: boolean;
+  /** フォーカスをトリガーへ戻して閉じる */
+  closeAndReturn: () => void;
+  readonly [INTERNALS]: MenuInternals;
+}
+
+export function useMotionMenu(props: MotionMenuProps = {}): MotionMenuHandle {
   const {
     onEscapeKeyDown,
-    onFocusOutside,
+    onInteractOutside,
     onPointerDownOutside,
     onHighlightChange,
     initialHighlight,
     onOpenChange,
     disabled = false,
+    closeOnParentExit = false,
     positioning,
     ...rest
   } = props;
-  const apiRef = useRef<UseMenuReturn["api"] | null>(null);
-  const serviceRef = useRef<UseMenuReturn["service"] | null>(null);
   const keyboardOpenPending = useRef(false);
+  const menuRef = useRef<UseMenuReturn | null>(null);
   const menu = useMenu({
     loopFocus: true,
     ...rest,
-    // fixed はダイアログの overflow に切り取られない
-    positioning: { strategy: "fixed", ...positioning },
+    positioning: layerPositioning(positioning),
     onOpenChange: (details) => {
       onOpenChange?.(details);
       if (!details.open) keyboardOpenPending.current = false;
@@ -89,38 +77,25 @@ export function useMotionMenu(props: MotionMenuProps = {}) {
       if (!keyboardOpenPending.current || details.highlightedValue === null) return;
       keyboardOpenPending.current = false;
       if (initialHighlight != null && details.highlightedValue !== initialHighlight) {
-        apiRef.current?.setHighlightedValue(initialHighlight);
+        menuRef.current?.api.setHighlightedValue(initialHighlight);
       }
     },
-    onFocusOutside: (event) => {
-      onFocusOutside?.(event);
+    onInteractOutside: (event) => {
+      onInteractOutside?.(event);
+      // defaultPrevented は zag のツリー判定（サブメニュー・右クリックのトリガー）の結果
       if (event.defaultPrevented) return;
-      // メニューツリー（サブメニュー・右クリックのトリガー）への移動は、zag の除外判定に任せる
-      const api = apiRef.current;
-      if (
-        api &&
-        isInsideOwnMenuTree(
-          event.detail.originalEvent.target,
-          api.getContentProps().id ?? "",
-          api.getContextTriggerProps().id,
-        )
-      ) {
-        return;
-      }
+      if (event.detail.originalEvent.type !== "focusin") return;
       // 外へ移ったフォーカス（プログラムの focus()、別のメニューのトリガー）をトリガーへ奪い返さず、そのまま閉じる。
       // CLOSE の restoreFocus: false は zag の内部仕様（Ark UI 5.40.0 固定に依存）
       event.preventDefault();
-      serviceRef.current?.send({ type: "CLOSE", restoreFocus: false });
+      menuRef.current?.service.send({ type: "CLOSE", restoreFocus: false });
     },
     onPointerDownOutside: (event) => {
       onPointerDownOutside?.(event);
       // 別のメニューのトリガーは、押してもフォーカスを受けない（Ark UI が pointerdown を止める）。
       // このメニューが閉じて中身が消えるときに body へ落ちないよう、先にそのトリガーへ移す
       const target = event.detail.originalEvent.target;
-      const trigger =
-        target instanceof Element
-          ? target.closest('[data-scope="menu"][data-part="trigger"]')
-          : null;
+      const trigger = target instanceof Element ? target.closest(MENU_TRIGGER_SELECTOR) : null;
       if (trigger instanceof HTMLElement) trigger.focus({ preventScroll: true });
     },
     onEscapeKeyDown: (event) => {
@@ -129,37 +104,52 @@ export function useMotionMenu(props: MotionMenuProps = {}) {
       else onEscapeKeyDown?.(event);
     },
   });
-  apiRef.current = menu.api;
-  serviceRef.current = menu.service;
-  const lifetime = usePresenceLifetime(menu.api.open);
+  useLayoutEffect(() => {
+    menuRef.current = menu;
+  });
+  const { open } = menu.api;
+  const lifetime = usePresenceLifetime(open);
 
-  // スクロールで閉じるときもフォーカスはトリガーへ戻す
+  const closeAndReturn = useCallback(() => menuRef.current?.api.setOpen(false), []);
+  const closeWithoutRestoringFocus = useCallback(
+    () => menuRef.current?.service.send({ type: "CLOSE", restoreFocus: false }),
+    [],
+  );
   const contentId = menu.api.getContentProps().id ?? "";
-  const getAnchor = useCallback(() => getMenuTrigger(contentId), [contentId]);
-  const closeOnScroll = useCallback(() => serviceRef.current?.send({ type: "CLOSE" }), []);
-  useCloseOnAnchorScroll(menu.api.open, getAnchor, closeOnScroll);
+  const getAnchor = useCallback(() => findLayerTrigger(contentId), [contentId]);
+  useCloseOnAnchorScroll(open, getAnchor, closeAndReturn);
+  useCloseOnParentExit(closeOnParentExit, open, closeAndReturn);
 
-  /** トリガーへ展開する。キーボードで開いたかどうかを覚え、disabled のときは開かせない */
   const triggerProps = {
-    // data-disabled は Ark UI がポインター操作を無視する印。キーボードは defaultPrevented を見る
-    "data-disabled": disabled ? "" : undefined,
-    onKeyDownCapture: (event: ReactKeyboardEvent) => {
-      // 開くキーだけを止める。Tab や Esc は通す
-      if (disabled && KEYBOARD_OPEN_KEYS.has(event.key)) event.preventDefault();
-    },
+    ...disabledTriggerProps(disabled, MENU_OPEN_KEYS),
+    // キーボードで開いたかどうかを覚える
     onKeyDown: (event: ReactKeyboardEvent) => {
-      keyboardOpenPending.current = !menu.api.open && KEYBOARD_OPEN_KEYS.has(event.key);
+      keyboardOpenPending.current = !open && MENU_OPEN_KEYS.has(event.key);
     },
     onPointerDown: () => {
       keyboardOpenPending.current = false;
     },
   };
-  const closeWithoutRestoringFocus = () =>
-    serviceRef.current?.send({ type: "CLOSE", restoreFocus: false });
-  return { menu, triggerProps, closeWithoutRestoringFocus, ...lifetime };
+
+  return {
+    open,
+    closeAndReturn,
+    [INTERNALS]: { menu, ...lifetime, triggerProps, closeWithoutRestoringFocus },
+  };
 }
 
-export type MotionMenuHandle = ReturnType<typeof useMotionMenu>;
+const HandleContext = createContext<MotionMenuHandle | null>(null);
+
+function useMenuInternals(): MenuInternals {
+  const handle = useContext(HandleContext);
+  if (!handle) throw new Error("メニューの部品は MotionMenuRoot の中に置く");
+  return handle[INTERNALS];
+}
+
+/** フォーカスをトリガーへ戻さずにメニューを閉じる。別の層を開く項目（MenuLayerItem）が使う */
+export function useCloseMenuWithoutRestoringFocus(): () => void {
+  return useMenuInternals().closeWithoutRestoringFocus;
+}
 
 /** Menu.RootProvider の代わり。退出アニメーションの間、Ark UI の寿命を延ばす */
 export function MotionMenuRoot({
@@ -169,20 +159,25 @@ export function MotionMenuRoot({
   handle: MotionMenuHandle;
   children: ReactNode;
 }) {
+  const { menu, present } = handle[INTERNALS];
   return (
-    <Menu.RootProvider value={handle.menu} present={handle.present}>
-      <ExitCompleteContext.Provider value={handle.onExitComplete}>
-        <CloseWithoutRestoreContext.Provider value={handle.closeWithoutRestoringFocus}>
-          {children}
-        </CloseWithoutRestoreContext.Provider>
-      </ExitCompleteContext.Provider>
+    <Menu.RootProvider value={menu} present={present}>
+      <HandleContext.Provider value={handle}>{children}</HandleContext.Provider>
     </Menu.RootProvider>
   );
 }
 
+/** Menu.Trigger asChild に、開閉キーの記録と disabled の処理を合わせる */
+export function MotionMenuTrigger({ children }: { children: ReactElement }) {
+  const { triggerProps } = useMenuInternals();
+  return (
+    <Menu.Trigger asChild {...triggerProps}>
+      {children}
+    </Menu.Trigger>
+  );
+}
+
 interface MenuPopupProps {
-  /** 出現の起点（transform-origin）。開く向きに合わせる */
-  origin: string;
   narrow?: boolean;
   "aria-label"?: string;
   children: ReactNode;
@@ -191,20 +186,21 @@ interface MenuPopupProps {
 /** AnimatePresence の直接の子。退出中は inert にして、中身を操作できないようにする */
 function Popup({
   container,
-  origin,
   narrow,
   children,
   ...rest
-}: MenuPopupProps & { container: RefObject<HTMLElement | null> }) {
+}: MenuPopupProps & { container: HTMLElement | null }) {
   const isPresent = useIsPresent();
-  const { menuScale } = useMotionVariants();
+  const { layerScale } = useMotionVariants();
+  const containerRef = useRef(container);
   return (
-    <Portal container={container}>
+    <Portal container={containerRef}>
       <Menu.Positioner>
         <Menu.Content asChild>
           <motion.div
-            {...menuScale({ origin })}
+            {...layerScale()}
             {...rest}
+            {...layerEventBoundary({})}
             onKeyDownCapture={ignoreComposingKey}
             inert={!isPresent}
             className={menuPanelClass({ narrow })}
@@ -219,22 +215,17 @@ function Popup({
 
 /** MotionMenuRoot の中に置く。開閉は Ark UI の状態、出入りの表示は AnimatePresence */
 export function MenuPopup(props: MenuPopupProps) {
-  const onExitComplete = useContext(ExitCompleteContext);
+  const { menu, onExitComplete } = useMenuInternals();
+  const { api } = menu;
   return (
-    <Menu.Context>
-      {(api) => (
-        <AnimatePresence onExitComplete={onExitComplete ?? undefined}>
-          {api.open && (
-            <Popup
-              key="popup"
-              container={{
-                current: layerContainer(getMenuTrigger(api.getContentProps().id ?? "")),
-              }}
-              {...props}
-            />
-          )}
-        </AnimatePresence>
+    <AnimatePresence onExitComplete={onExitComplete}>
+      {api.open && (
+        <Popup
+          key="popup"
+          container={layerContainer(findLayerTrigger(api.getContentProps().id ?? ""))}
+          {...props}
+        />
       )}
-    </Menu.Context>
+    </AnimatePresence>
   );
 }

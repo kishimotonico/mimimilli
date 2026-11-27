@@ -1,4 +1,4 @@
-import { isFocusLost } from "../../../shared/lib/focusReturnTarget";
+import { isFocusLost } from "../../../shared/ui/layer/focusReturnTarget";
 
 /** 一覧の移し先。一覧（[data-work-list]）は画面に1つだけ描画される前提で document から探す。指定した行（描画されていれば）、無ければ roving の行（tabindex=0）、行が無ければ（空の一覧）コンテナ */
 export function focusListEntry(workId: string | null = null) {

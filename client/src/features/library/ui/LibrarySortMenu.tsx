@@ -10,10 +10,14 @@ import { useSmartFolderEditor } from "../model/useSmartFolderEditor";
 import { getGroupSortLabel, groupSortOptions } from "../model/groupValueSort";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
-import { MenuPopup, MotionMenuRoot, useMotionMenu } from "../../../shared/ui/menu/MotionMenu";
+import {
+  MenuPopup,
+  MotionMenuRoot,
+  MotionMenuTrigger,
+  useMotionMenu,
+} from "../../../shared/ui/menu/MotionMenu";
 import { MenuCheckColumn, MenuCheckSpacer } from "../../../shared/ui/menu/MenuCheckColumn";
 import {
-  MENU_GUTTER,
   MENU_LABEL_CLASS,
   MENU_SEPARATOR_CLASS,
   menuItemClass,
@@ -84,7 +88,7 @@ function ReadySortMenu({
       : SORT_OPTIONS.map((opt) => ({ id: opt.id as string, label: opt.label }));
   const currentValue = view.kind === "value-list" ? view.groupSort : sort;
   const menu = useMotionMenu({
-    positioning: { placement: "bottom-end", gutter: MENU_GUTTER },
+    positioning: { placement: "bottom-end" },
     initialHighlight: currentValue,
   });
   const selectOption = (id: string) => {
@@ -100,15 +104,15 @@ function ReadySortMenu({
   return (
     <div className="flex items-center">
       <MotionMenuRoot handle={menu}>
-        <Menu.Trigger asChild {...menu.triggerProps}>
+        <MotionMenuTrigger>
           <IconButton
             size="sm"
             icon={I.sort}
             label="ソート"
             title={buttonTitle}
-            active={menu.menu.api.open}
+            active={menu.open}
           />
-        </Menu.Trigger>
+        </MotionMenuTrigger>
         {showReshuffle && (
           <IconButton
             size="sm"
@@ -118,7 +122,7 @@ function ReadySortMenu({
             onClick={() => reshuffle()}
           />
         )}
-        <MenuPopup origin="top right" aria-label="ソート">
+        <MenuPopup aria-label="ソート">
           <Menu.RadioItemGroup
             value={currentValue ?? undefined}
             onValueChange={({ value }) => selectOption(value)}

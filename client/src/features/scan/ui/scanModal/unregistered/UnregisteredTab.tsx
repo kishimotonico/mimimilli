@@ -8,7 +8,7 @@ import {
   type ScanCandidate,
 } from "@mimimilli/shared";
 import { apiErrorMessage } from "../../../../../shared/lib/apiError";
-import { isFocusLost } from "../../../../../shared/lib/focusReturnTarget";
+import { isFocusLost } from "../../../../../shared/ui/layer/focusReturnTarget";
 import { useLatest } from "../../../../../shared/lib/useLatest";
 import { useVirtualList } from "../../../../../shared/ui/useVirtualList";
 import { isCandidatesStale, STALE_MESSAGE } from "../../../model/candidatesStale";

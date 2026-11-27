@@ -4,8 +4,13 @@ import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { useToast } from "../../../shared/ui/useToast";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
-import { MenuPopup, MotionMenuRoot, useMotionMenu } from "../../../shared/ui/menu/MotionMenu";
-import { MENU_GUTTER, MENU_LABEL_CLASS, menuItemClass } from "../../../shared/ui/menu/menuStyles";
+import {
+  MenuPopup,
+  MotionMenuRoot,
+  MotionMenuTrigger,
+  useMotionMenu,
+} from "../../../shared/ui/menu/MotionMenu";
+import { MENU_LABEL_CLASS, menuItemClass } from "../../../shared/ui/menu/menuStyles";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
 import { filesRelPathAtom } from "../../../entities/file-system/model/navigationAtoms";
 import { joinPath } from "../model/types";
@@ -16,7 +21,7 @@ export default function FilesAddressBarMenu() {
   const relPath = useAtomValue(filesRelPathAtom);
   const toast = useToast();
 
-  const menu = useMotionMenu({ positioning: { placement: "bottom-end", gutter: MENU_GUTTER } });
+  const menu = useMotionMenu({ positioning: { placement: "bottom-end" } });
 
   const copyCurrentFolderPath = async () => {
     const path = joinPath(rootFolder, relPath);
@@ -30,10 +35,10 @@ export default function FilesAddressBarMenu() {
 
   return (
     <MotionMenuRoot handle={menu}>
-      <Menu.Trigger asChild>
-        <IconButton size="sm" icon={I.more} label="その他" active={menu.menu.api.open} />
-      </Menu.Trigger>
-      <MenuPopup origin="top right">
+      <MotionMenuTrigger>
+        <IconButton size="sm" icon={I.more} label="その他" active={menu.open} />
+      </MotionMenuTrigger>
+      <MenuPopup>
         <Menu.Item
           value="copy-path"
           valueText="絶対パスをコピー"

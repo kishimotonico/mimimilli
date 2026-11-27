@@ -1,11 +1,10 @@
 import { useLayoutEffect, useRef } from "react";
 import type { MouseEvent as ReactMouseEvent, RefObject, SyntheticEvent } from "react";
 import { useSetAtom } from "jotai";
-import { resolveFocusReturnTarget } from "../lib/focusReturnTarget";
-import { getTabbableElements } from "./focusable";
 import { openModalDialogsAtom } from "../model/openModalDialogsAtom";
-
-import { OPEN_LAYER_SELECTOR } from "./layer/layerContainer";
+import { getTabbableElements } from "./focusable";
+import { resolveFocusReturnTarget } from "./layer/focusReturnTarget";
+import { OPEN_LAYER_SELECTOR } from "./layer/layerDom";
 
 interface UseDialogModalOptions {
   /**

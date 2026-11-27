@@ -1,10 +1,15 @@
 import { Menu } from "@ark-ui/react/menu";
-import { Popover } from "@ark-ui/react/popover";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
-import { MenuPopup, MotionMenuRoot, useMotionMenu } from "../../../src/shared/ui/menu/MotionMenu";
+import {
+  MenuPopup,
+  MotionMenuRoot,
+  MotionMenuTrigger,
+  useMotionMenu,
+} from "../../../src/shared/ui/menu/MotionMenu";
 import {
   MotionPopoverRoot,
+  MotionPopoverTrigger,
   PopoverPopup,
   useMotionPopover,
 } from "../../../src/shared/ui/popover/MotionPopover";
@@ -14,8 +19,10 @@ function NestedMenu() {
   const handle = useMotionMenu();
   return (
     <MotionMenuRoot handle={handle}>
-      <Menu.Trigger>メニューを開く</Menu.Trigger>
-      <MenuPopup origin="top left">
+      <MotionMenuTrigger>
+        <button type="button">メニューを開く</button>
+      </MotionMenuTrigger>
+      <MenuPopup>
         <Menu.Item value="item">メニュー項目</Menu.Item>
       </MenuPopup>
     </MotionMenuRoot>
@@ -29,7 +36,9 @@ function DialogHost({ onClose }: { onClose: () => void }) {
   return (
     <dialog ref={dialogRef} aria-label="親ダイアログ" onCancel={handleCancel}>
       <MotionPopoverRoot handle={handle}>
-        <Popover.Trigger>ポップオーバーを開く</Popover.Trigger>
+        <MotionPopoverTrigger>
+          <button type="button">ポップオーバーを開く</button>
+        </MotionPopoverTrigger>
         <PopoverPopup aria-label="ポップオーバー">
           <NestedMenu />
         </PopoverPopup>

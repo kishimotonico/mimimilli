@@ -4,12 +4,13 @@
 import { Menu } from "@ark-ui/react/menu";
 import type { Track } from "@mimimilli/shared";
 import { I, type IconFC } from "../../../../shared/ui/Icon";
-import { MenuPopup, MotionMenuRoot, useMotionMenu } from "../../../../shared/ui/menu/MotionMenu";
 import {
-  MENU_GUTTER,
-  MENU_LABEL_CLASS,
-  menuItemClass,
-} from "../../../../shared/ui/menu/menuStyles";
+  MenuPopup,
+  MotionMenuRoot,
+  MotionMenuTrigger,
+  useMotionMenu,
+} from "../../../../shared/ui/menu/MotionMenu";
+import { MENU_LABEL_CLASS, menuItemClass } from "../../../../shared/ui/menu/menuStyles";
 
 interface WorkPlayButtonProps {
   hasResume: boolean;
@@ -53,7 +54,7 @@ function getMainAction(props: WorkPlayButtonProps): MainAction {
 
 export function WorkPlayButton(props: WorkPlayButtonProps) {
   const { isPlayable, isLoaded, hasResume, resumeTrack, resumeTime, onPlayFromStart } = props;
-  const menu = useMotionMenu({ positioning: { placement: "bottom-end", gutter: MENU_GUTTER } });
+  const menu = useMotionMenu({ positioning: { placement: "bottom-end" } });
 
   const main = getMainAction(props);
   const MainIcon = main.icon;
@@ -80,12 +81,12 @@ export function WorkPlayButton(props: WorkPlayButtonProps) {
       </button>
       {showMenuTrigger && (
         <MotionMenuRoot handle={menu}>
-          <Menu.Trigger asChild>
+          <MotionMenuTrigger>
             <button type="button" className="mle-prv__playcaret" aria-label="再生メニュー">
               <I.chevD size={11} />
             </button>
-          </Menu.Trigger>
-          <MenuPopup origin="top right" aria-label="再生メニュー">
+          </MotionMenuTrigger>
+          <MenuPopup aria-label="再生メニュー">
             <Menu.Item
               value="play-from-start"
               valueText="最初から再生"

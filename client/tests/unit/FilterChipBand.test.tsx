@@ -81,7 +81,7 @@ describe("FilterChipBand のチップ", () => {
     });
 
     await userEvent.click(screen.getByRole("button", { name: /絞り込み$/ }));
-    const picker = screen.getByRole("listbox", { name: "絞り込みの種類" });
+    const picker = screen.getByRole("group", { name: "絞り込みの種類" });
     const groupByButtons = within(picker).getAllByRole("button");
     expect(groupByButtons.map((b) => b.textContent)).toEqual(["CV", "タグ", "追加年"]);
   });
@@ -92,7 +92,7 @@ describe("FilterChipBand のチップ", () => {
     const trigger = screen.getByRole("button", { name: "絞り込み" });
     await user.click(trigger);
     const popup = screen.getByRole("dialog");
-    const picker = within(popup).getByRole("listbox", { name: "絞り込みの種類" });
+    const picker = within(popup).getByRole("group", { name: "絞り込みの種類" });
     const [first] = within(picker).getAllByRole("button");
     await waitFor(() => expect(first).toHaveFocus());
 

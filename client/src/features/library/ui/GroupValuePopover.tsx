@@ -95,7 +95,6 @@ export default function GroupValuePopover({
           panelRef.current = el;
           onPanelElChange?.(el);
         }}
-        origin={right ? "left top" : "top left"}
         className={right ? "w-[280px]" : "w-[240px]"}
         aria-label={list?.groupByLabel}
         {...panelHandlers}

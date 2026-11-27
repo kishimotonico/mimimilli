@@ -1,10 +1,8 @@
 import { useRef, type ReactNode } from "react";
-import { Menu } from "@ark-ui/react/menu";
 import { cn } from "../lib/cn";
 import { buttonClass, type ButtonSize, type ButtonVariant } from "./Button";
 import { I } from "./Icon";
-import { MenuPopup, MotionMenuRoot, useMotionMenu } from "./menu/MotionMenu";
-import { MENU_GUTTER } from "./menu/menuStyles";
+import { MenuPopup, MotionMenuRoot, MotionMenuTrigger, useMotionMenu } from "./menu/MotionMenu";
 
 interface SplitButtonProps {
   children: ReactNode;
@@ -21,16 +19,15 @@ interface SplitButtonProps {
   size?: ButtonSize;
   menuLabel?: string;
   menuTriggerId?: string;
-  /** メニューの開く向き。既定は上（下端に置く前提） */
-  /** above・belowEnd は▾の右端にそろえる。aboveStart はボタン全体の左端にそろえる（左端に置くボタンで、メニューがはみ出さないようにする） */
+  /** メニューの開く向き。既定は上（下端に置く前提）。above・belowEnd は▾の右端にそろえる。aboveStart はボタン全体の左端にそろえる（左端に置くボタンで、メニューがはみ出さないようにする） */
   placement?: keyof typeof PLACEMENT;
   className?: string;
 }
 
 const PLACEMENT = {
-  above: { placement: "top-end", origin: "bottom right", anchorToRoot: false },
-  aboveStart: { placement: "top-start", origin: "bottom left", anchorToRoot: true },
-  belowEnd: { placement: "bottom-end", origin: "top right", anchorToRoot: false },
+  above: { placement: "top-end", anchorToRoot: false },
+  aboveStart: { placement: "top-start", anchorToRoot: true },
+  belowEnd: { placement: "bottom-end", anchorToRoot: false },
 } as const;
 
 /** 主ボタンと▾のメニューを並べた分割ボタン。 */
@@ -56,7 +53,6 @@ export default function SplitButton({
     ids: menuTriggerId === undefined ? undefined : { trigger: menuTriggerId },
     positioning: {
       placement: spec.placement,
-      gutter: MENU_GUTTER,
       ...(spec.anchorToRoot && {
         getAnchorRect: () => rootRef.current?.getBoundingClientRect() ?? null,
       }),
@@ -79,10 +75,9 @@ export default function SplitButton({
         >
           {children}
         </button>
-        <Menu.Trigger asChild {...handle.triggerProps}>
+        <MotionMenuTrigger>
           <button
             type="button"
-            aria-disabled={off || undefined}
             aria-label={menuLabel}
             className={buttonClass(variant, size, {
               disabled: off,
@@ -91,8 +86,8 @@ export default function SplitButton({
           >
             <I.chevD size={14} />
           </button>
-        </Menu.Trigger>
-        <MenuPopup origin={spec.origin}>{menu}</MenuPopup>
+        </MotionMenuTrigger>
+        <MenuPopup>{menu}</MenuPopup>
       </MotionMenuRoot>
     </div>
   );

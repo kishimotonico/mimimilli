@@ -12,8 +12,8 @@ interface LightboxProps {
  *  カバーサムネイル・ファイルモードの画像プレビューで共通に使う。 */
 export default function Lightbox({ src, alt, onClose }: LightboxProps) {
   const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({ onClose });
-  const { popoverScale } = useMotionVariants();
-  const v = popoverScale({ origin: "center" });
+  const { lightboxScale } = useMotionVariants();
+  const v = lightboxScale();
 
   return (
     // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックで閉じる。EscapeはonCancel（useDialogModal）で処理する。

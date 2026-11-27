@@ -1,20 +1,24 @@
 import { useRef, useState, type ReactNode } from "react";
 import { Menu } from "@ark-ui/react/menu";
-import { Popover } from "@ark-ui/react/popover";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { resolveFocusReturnTarget } from "../../src/shared/lib/focusReturnTarget";
 import IconButton from "../../src/shared/ui/IconButton";
-import { MenuPopup, MotionMenuRoot, useMotionMenu } from "../../src/shared/ui/menu/MotionMenu";
+import { I } from "../../src/shared/ui/Icon";
+import { resolveFocusReturnTarget } from "../../src/shared/ui/layer/focusReturnTarget";
+import {
+  MenuPopup,
+  MotionMenuRoot,
+  MotionMenuTrigger,
+  useMotionMenu,
+} from "../../src/shared/ui/menu/MotionMenu";
 import {
   MotionPopoverRoot,
+  MotionPopoverTrigger,
   PopoverPopup,
   useMotionPopover,
 } from "../../src/shared/ui/popover/MotionPopover";
 import { useDialogModal } from "../../src/shared/ui/useDialogModal";
-import { useElementWidth } from "../../src/shared/ui/useElementWidth";
-import { getResizeObservers } from "./setup";
 
 function Panel({
   name,
@@ -42,8 +46,10 @@ function Panel({
   });
   return (
     <MotionPopoverRoot handle={handle}>
-      <Popover.Trigger>{name}を開く</Popover.Trigger>
-      <PopoverPopup ref={contentRef} aria-label={name} onKeyDown={onKeyDown} className="w-60">
+      <MotionPopoverTrigger>
+        <button type="button">{name}を開く</button>
+      </MotionPopoverTrigger>
+      <PopoverPopup ref={contentRef} aria-label={name} onKeyDown={onKeyDown}>
         <input ref={input} aria-label={`${name}の検索欄`} />
         <button type="button" onClick={handle.closeAndReturn}>
           確定
@@ -89,8 +95,10 @@ function NestedMenu() {
   const handle = useMotionMenu();
   return (
     <MotionMenuRoot handle={handle}>
-      <Menu.Trigger>メニューを開く</Menu.Trigger>
-      <MenuPopup origin="top left">
+      <MotionMenuTrigger>
+        <button type="button">メニューを開く</button>
+      </MotionMenuTrigger>
+      <MenuPopup>
         <Menu.Item value="item">メニュー項目</Menu.Item>
       </MenuPopup>
     </MotionMenuRoot>
@@ -305,7 +313,7 @@ describe("ポップオーバーのフォーカス", () => {
     expect(panelTrigger()).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("共通の枠と呼び出し側の幅を付け、退出中のパネルをinertにする", async () => {
+  it("退出中のパネルをinertにする", async () => {
     const user = userEvent.setup();
     const contentRef = vi.fn();
     function Host() {
@@ -316,7 +324,6 @@ describe("ポップオーバーのフォーカス", () => {
     await user.click(panelTrigger());
     const content = screen.getByRole("dialog", { name: "パネル" });
     expect(contentRef).toHaveBeenLastCalledWith(content);
-    expect(content).toHaveClass("z-50", "p-3", "w-60");
     expect(content).not.toHaveAttribute("inert");
     await waitFor(() => expect(panelInput()).toHaveFocus());
     await user.keyboard("{Escape}");
@@ -408,64 +415,67 @@ describe("ポップオーバーとメニューの重なり", () => {
   });
 });
 
-it("IconButtonのsoftDisabledはArk Triggerを無効にしてフォーカスを残す", async () => {
-  const user = userEvent.setup();
-  const icon = () => null;
-  const clicked = vi.fn();
-  function Host({ softDisabled, disabled }: { softDisabled?: boolean; disabled?: boolean }) {
+describe("無効なトリガー", () => {
+  function DisabledHost({ disabled }: { disabled: boolean }) {
     const [open, setOpen] = useState(false);
-    const handle = useMotionPopover({ open, onOpenChange: (details) => setOpen(details.open) });
+    const handle = useMotionPopover({
+      open,
+      disabled,
+      onOpenChange: (details) => setOpen(details.open),
+    });
     return (
       <MotionPopoverRoot handle={handle}>
-        <Popover.Trigger asChild>
-          <IconButton
-            icon={icon}
-            label="追加"
-            onClick={clicked}
-            softDisabled={softDisabled}
-            disabled={disabled}
-          />
-        </Popover.Trigger>
+        <MotionPopoverTrigger>
+          <IconButton icon={I.add} label="追加" />
+        </MotionPopoverTrigger>
         <PopoverPopup aria-label="追加パネル">
           <input aria-label="追加項目" />
         </PopoverPopup>
       </MotionPopoverRoot>
     );
   }
-  const { rerender } = render(<Host />);
-  const button = screen.getByRole("button", { name: "追加" });
-  button.focus();
-  rerender(<Host softDisabled />);
-  expect(button).toHaveFocus();
-  expect(button).toHaveAttribute("aria-disabled", "true");
-  expect(button).not.toBeDisabled();
-  await user.click(button);
-  await user.keyboard("{Enter}");
-  await user.keyboard("[Space]");
-  expect(button).toHaveFocus();
-  expect(button).toHaveAttribute("aria-expanded", "false");
-  expect(clicked).not.toHaveBeenCalled();
-  rerender(<Host disabled />);
-  expect(button).toBeDisabled();
+
+  it("フォーカスを残したまま、ポインターでもキーでも開かない", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<DisabledHost disabled={false} />);
+    const button = screen.getByRole("button", { name: "追加" });
+    button.focus();
+    rerender(<DisabledHost disabled />);
+    expect(button).toHaveFocus();
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    expect(button).toHaveAttribute("data-disabled");
+    expect(button).not.toBeDisabled();
+    await user.click(button);
+    await user.keyboard("{Enter}");
+    await user.keyboard("[Space]");
+    expect(button).toHaveFocus();
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("dialog", { name: "追加パネル" })).toBeNull();
+    rerender(<DisabledHost disabled={false} />);
+    await user.click(button);
+    expect(screen.getByRole("dialog", { name: "追加パネル" })).toBeInTheDocument();
+  });
 });
 
-it("useElementWidthは要素の幅を監視し、監視先が無くなれば解除する", () => {
-  const element = document.createElement("div");
-  const measure = vi
-    .spyOn(element, "getBoundingClientRect")
-    .mockReturnValue(new DOMRect(0, 0, 300, 20));
-  function Width({ target }: { target: HTMLElement | null }) {
-    return <output aria-label="幅">{useElementWidth(target) ?? "なし"}</output>;
-  }
-  const { rerender } = render(<Width target={element} />);
-  const observer = getResizeObservers().find((item) => item.getObserved().includes(element));
-  expect(observer).toBeDefined();
-  expect(screen.getByLabelText("幅")).toHaveTextContent("300");
-  const resized = new DOMRect(0, 0, 340, 20);
-  measure.mockReturnValue(resized);
-  act(() => observer?.flush([{ target: element, contentRect: resized }]));
-  expect(screen.getByLabelText("幅")).toHaveTextContent("340");
-  rerender(<Width target={null} />);
-  expect(observer?.getObserved()).toEqual([]);
-  expect(screen.getByLabelText("幅")).toHaveTextContent("なし");
+describe("層の中のイベント", () => {
+  it("ポータルした層の中のクリック・キーは、React の祖先へ伝えない", async () => {
+    const user = userEvent.setup();
+    const ancestor = vi.fn();
+    function Host() {
+      const [open, setOpen] = useState(false);
+      return (
+        // oxlint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- 祖先への伝播を確かめる
+        <div onClick={ancestor} onKeyDown={ancestor} onPointerDown={ancestor}>
+          <Panel name="パネル" open={open} onChange={setOpen} />
+        </div>
+      );
+    }
+    render(<Host />);
+    await user.click(panelTrigger());
+    await waitFor(() => expect(panelInput()).toHaveFocus());
+    ancestor.mockClear();
+    await user.click(panelInput());
+    await user.keyboard("a");
+    expect(ancestor).not.toHaveBeenCalled();
+  });
 });

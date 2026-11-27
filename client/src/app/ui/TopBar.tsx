@@ -13,7 +13,7 @@ import {
   playingTrackTitleAtom,
 } from "../../entities/player/model/atoms";
 import { cn } from "../../shared/lib/cn";
-import { resolveFocusReturnTarget } from "../../shared/lib/focusReturnTarget";
+import { resolveFocusReturnTarget } from "../../shared/ui/layer/focusReturnTarget";
 import { useScanEntryStatus } from "../../features/scan/model/useScanEntryStatus";
 import ScanEntryButton from "./ScanEntryButton";
 
