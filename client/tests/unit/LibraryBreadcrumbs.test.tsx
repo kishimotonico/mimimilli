@@ -37,23 +37,25 @@ afterEach(() => {
   clearResizeObservers();
 });
 
-function renderBreadcrumbs(nav: LibraryViewState & LibraryViewActions) {
+function breadcrumbsElement(nav: LibraryViewState & LibraryViewActions) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  return createElement(
+    QueryClientProvider,
+    { client: queryClient },
     createElement(
-      QueryClientProvider,
-      { client: queryClient },
+      "div",
+      { className: "mle-app" },
       createElement(
-        "div",
-        { className: "mle-app" },
-        createElement(
-          LibraryNavigationContext.Provider,
-          { value: nav },
-          createElement(LibraryBreadcrumbs),
-        ),
+        LibraryNavigationContext.Provider,
+        { value: nav },
+        createElement(LibraryBreadcrumbs),
       ),
     ),
   );
+}
+
+function renderBreadcrumbs(nav: LibraryViewState & LibraryViewActions) {
+  return render(breadcrumbsElement(nav));
 }
 
 describe("LibraryBreadcrumbs", () => {
@@ -116,6 +118,21 @@ describe("LibraryBreadcrumbs", () => {
     expect(nav.selectGroupValue).toHaveBeenCalledWith("天音かなで");
     expect(trigger).toHaveFocus();
     sizeMock.restore();
+  });
+
+  it("値一覧へ戻ると兄弟のドロップダウンを閉じる", async () => {
+    mockApi({
+      "GET /api/tag-prefixes": [],
+      "GET /api/smart-folders/:id/groups": [buildGroupValueItem({ value: "藤田茜", count: 4 })],
+    });
+    const works = buildNav({ library: { folderId: "by-cv", group: "藤田茜" } });
+    const { rerender } = renderBreadcrumbs(works);
+
+    await userEvent.click(screen.getByRole("button", { name: "藤田茜" }));
+    await waitFor(() => expect(screen.getByLabelText("cvを検索")).toBeInTheDocument());
+
+    rerender(breadcrumbsElement(buildNav({ library: { folderId: "by-cv" } })));
+    expect(screen.queryByLabelText("cvを検索")).toBeNull();
   });
 
   it("兄弟の値のドロップダウンは、今のチップと検索語をかけた値と件数を取る", async () => {

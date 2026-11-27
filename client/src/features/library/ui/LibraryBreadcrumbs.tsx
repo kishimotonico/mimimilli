@@ -20,6 +20,8 @@ export default function LibraryBreadcrumbs() {
   const group = view?.kind === "works" ? view.group : null;
   const groupBy = view?.kind === "works" ? view.groupBy : null;
   const groupSort = view?.kind === "works" ? view.groupSort : null;
+  const canOpen = group !== null && groupBy !== null && groupSort !== null;
+  if (siblingAnchor !== null && !canOpen) setSiblingAnchor(null);
 
   return (
     <>
@@ -38,7 +40,7 @@ export default function LibraryBreadcrumbs() {
       {view && (
         <GroupValuePopover
           placement="below"
-          open={siblingAnchor !== null}
+          open={canOpen && siblingAnchor !== null}
           triggerId={triggerId}
           anchorEl={siblingAnchor}
           list={

@@ -46,6 +46,7 @@ export default function BarVolumePopover({ volume, onSetVolume }: BarVolumePopov
         </Popover.Trigger>
         <PopoverPopup
           className="mle-bar1__volpop"
+          aria-label="音量"
           origin="bottom center"
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}

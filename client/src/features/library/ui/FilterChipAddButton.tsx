@@ -116,7 +116,7 @@ export default function FilterChipAddButton({
           絞り込み
         </button>
       </Popover.Trigger>
-      <PopoverPopup origin="top left" className="w-[240px]">
+      <PopoverPopup origin="top left" className="w-[240px]" aria-label="絞り込み">
         <motion.div
           key={groupByKey(pickedGroupBy)}
           ref={stageRef}
@@ -125,7 +125,11 @@ export default function FilterChipAddButton({
         >
           {pickedGroupBy === null ? (
             // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- GroupValueQuickList に合わせたボタン一覧
-            <div role="listbox" aria-label="絞り込みの種類">
+            <div
+              role="listbox"
+              aria-label="絞り込みの種類"
+              className="max-h-[260px] overflow-y-auto"
+            >
               {buildGroupByRows(tagPrefixes).map(({ groupBy, name }) => {
                 const key = groupByKey(groupBy);
                 return (
