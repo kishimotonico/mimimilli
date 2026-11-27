@@ -203,7 +203,10 @@ test("0件のとき「すべて」で探すと、同じチップと検索語で�
   const tracker = trackErrors(page);
   await openApp(page);
 
-  const quickList = page.getByRole("group", { name: "CVの一覧" });
+  // 値一覧の本体も同じ名前のグループを持つので、ホバーのクイックリスト（ポップオーバーの中）に絞る
+  const quickList = page
+    .locator('[data-scope="popover"][data-part="content"]')
+    .getByRole("group", { name: "CVの一覧" });
   await railRow(page, "CV別").click();
   await page.mouse.move(1200, 600);
   await expect(quickList).toHaveCount(0);

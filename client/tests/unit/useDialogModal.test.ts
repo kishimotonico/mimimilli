@@ -147,6 +147,34 @@ describe("useDialogModal", () => {
     expect(document.activeElement).toBe(menu);
   });
 
+  it("ポータルされたメニューの中の Tab は、先頭でも Shift+Tab で循環させずメニューに任せる", () => {
+    function MenuInDialog({ onClose }: { onClose: () => void }) {
+      const { dialogRef } = useDialogModal({ onClose });
+      return createElement(
+        "dialog",
+        { ref: dialogRef },
+        createElement("div", {
+          "data-testid": "menu",
+          "data-scope": "menu",
+          "data-part": "content",
+          tabIndex: 0,
+        }),
+        createElement("button", { "data-testid": "last" }, "last"),
+      );
+    }
+    const { getByTestId } = render(createElement(MenuInDialog, { onClose: vi.fn() }));
+    const menu = getByTestId("menu");
+    menu.focus();
+    const notPrevented = fireEvent.keyDown(menu, {
+      key: "Tab",
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    expect(notPrevented).toBe(true);
+    expect(document.activeElement).toBe(menu);
+  });
+
   it("inertの中や非表示の要素は循環の末尾に数えず、最後に辿れる要素から先頭へ回る", () => {
     function InertTailDialog({ onClose }: { onClose: () => void }) {
       const { dialogRef } = useDialogModal({ onClose });

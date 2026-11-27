@@ -132,11 +132,11 @@ test("ダイアログの中の行の︙メニューと▾は、Tab を押して�
     await page.keyboard.press("Enter");
     const menu = page.getByRole("menu");
     await expect(menu).toBeVisible();
-    const focused = await page.evaluate(() => document.activeElement?.getAttribute("role"));
+    await expect(menu).toBeFocused();
     await page.keyboard.press("Tab");
     await page.waitForTimeout(300);
     await expect(menu).toBeVisible();
-    expect(await page.evaluate(() => document.activeElement?.getAttribute("role"))).toBe(focused);
+    await expect(menu).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(menu).toBeHidden();
     await expect(trigger).toBeFocused();
