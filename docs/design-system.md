@@ -194,7 +194,7 @@ focus中はタイマーを止め、離れると残り時間から再開する。
   - 見た目（全メニュー共通）: パネルは角6px・枠 `--line-soft`・`--shadow-pop`・内側余白4px、幅は内容幅で最小180px（再生速度だけ112px）・最大280px。項目は高さ28px・角4px・左右8px・`--fs-body`。ハイライトはホバーもキーボードも `--paper-2`、無効は `--ink-4`。アイコンは付けない
   - 項目の中身: 選択中は左のチェック列（14px）に `--acc` のチェックだけを出す（チェック・ラジオ項目を持つメニューだけ列を確保。背景・太字は使わない）。件数は右端に `--ink-3`・等幅11px。破壊的な項目は常に `--state-danger` で、区切り線（`--line-soft`）の下に置く。小見出しは10px・600・字間 .08em・`--ink-2`
   - 無効: フックの `disabled` を渡す。フォーカスを残したまま、開くキー・ポインターを受けず、`aria-disabled` と `data-disabled` が付く
-  - 開く操作の横取り: `useMotionMenu` の `interceptOpen`（`SplitButton` では `interceptMenuOpen`）。閉じているときの開く操作（ポインター・Enter・Space・ArrowDown・ArrowUp）で呼ばれ、true を返すと開かない。メニューの open は制御しない（制御モードは閉じるときにフォーカスをトリガーへ戻し、`restoreFocus: false` を失う）。未登録タブの▾が、項目選択を開いているときは閉じるだけにするのに使う
+  - 開く操作の横取り: `useMotionMenu` の `interceptOpen`（`SplitButton` では `interceptMenuOpen`）。閉じているときの開く操作（ポインター・Enter・Space・ArrowDown・ArrowUp）で呼ばれ、true を返すと開かない。メニューの open は制御しない（理由は ADR-0043）。未登録タブの▾が、項目選択を開いているときは閉じるだけにするのに使う
 - ポップオーバーは Ark UI の `Popover` を `shared/ui/popover/` で組む。外枠と出入りはメニューと同じで、内側の余白は12px。外枠・退出時の寿命・ポータル先・スクロール監視・IME のキー判定・セレクタと content の登録は `shared/ui/layer/` に集める
   - 部品: `useMotionPopover`・`MotionPopoverRoot`・`MotionPopoverTrigger`・`PopoverPopup`。トリガーは `MotionPopoverTrigger`、無効にするときはフックの `disabled`（メニューと同じ）。親の退出で閉じるときは `closeOnParentExit`
   - 基準: 既定はトリガー。別の要素を基準にするときは `ids.anchor` にその要素の id を渡す（項目選択は `SplitButton` の外枠 `id`）。トリガーの id を `ids.trigger` で渡すときは、要素側の id を宣言的に付ける（パンくずは `Breadcrumbs` の `lastSegmentId`。DOM の id を書き換えない）
