@@ -1,10 +1,10 @@
 ---
 id: TASK-529.2
 title: ポップオーバーを Ark UI へ置き換え、旧フックを削除し、design-system.md を更新する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-26 03:15'
-updated_date: '2026-11-26 09:34'
+updated_date: '2026-11-27 00:01'
 labels:
   - ui
 dependencies:
@@ -24,14 +24,26 @@ ADR-0043 の帰結のうち、ポップオーバーの中のメニューで外�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ポップオーバーの約12箇所が Ark のポップオーバーになり、見た目がメニューと同じ外枠（内側の余白 12px）になっている
-- [ ] #2 軸A→B切替（GroupValuePopover）で、旧Aの復帰が新Bのフォーカスを奪わない。繰り返し測る
-- [ ] #3 Esc でメニュー → ポップオーバー → dialog の順に一段ずつ閉じる。IME 変換中の Esc・Enter で閉じも実行もしない
-- [ ] #4 ポップオーバーの中のメニューで外をクリックしたときの動作を決め、その動作になっている（決定を ADR-0043 の帰結に反映する）
-- [ ] #5 usePopoverEscape・useAnchoredPopover・usePopoverDismissal が無くなり、@floating-ui/react への直接依存が不要なら外れている
-- [ ] #6 docs/design-system.md のメニュー・ポップオーバーのパネルの規定、z-index 表、Motion 節が実装と ADR-0043 に一致している
-- [ ] #7 pnpm check && pnpm test と pnpm test:smoke が通る
+- [x] #1 ポップオーバーの約12箇所が Ark のポップオーバーになり、見た目がメニューと同じ外枠（内側の余白 12px）になっている
+- [x] #2 軸A→B切替（GroupValuePopover）で、旧Aの復帰が新Bのフォーカスを奪わない。繰り返し測る
+- [x] #3 Esc でメニュー → ポップオーバー → dialog の順に一段ずつ閉じる。IME 変換中の Esc・Enter で閉じも実行もしない
+- [x] #4 ポップオーバーの中のメニューで外をクリックしたときの動作を決め、その動作になっている（決定を ADR-0043 の帰結に反映する）
+- [x] #5 usePopoverEscape・useAnchoredPopover・usePopoverDismissal が無くなり、@floating-ui/react への直接依存が不要なら外れている
+- [x] #6 docs/design-system.md のメニュー・ポップオーバーのパネルの規定、z-index 表、Motion 節が実装と ADR-0043 に一致している
+- [x] #7 pnpm check && pnpm test と pnpm test:smoke が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+doc-11 §12 の順。設計から外れる必要が出たら理由を実装メモに追記してから進める。
+
+1. layer/ への切り出しと useMotionMenu の書き換え（メニューのテストが通ること）。先に ids.trigger を #1・#2・#7 で §13 の合否表（3観点×5回）で判定する
+2. useMotionPopover・PopoverPopup・スタイルと単体テスト
+3. #8 音量 → #7 RegisterFields → #5・#6 タグ → #3・#4 「＋絞り込み」 → #1・#2 GroupValuePopover
+4. 旧フック・依存・CSS・テストの削除と docs（design-system.md と ADR-0043）
+5. §13 の測定、pnpm check && pnpm test、pnpm test:smoke
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
@@ -127,4 +139,36 @@ RegisterFieldsPopover の『N件を追加』で popover が unmount してフォ
 
 ## 関連
 - TASK-530（Ark を 5.40.1 へ上げる。2026-11-30 以降）、TASK-528（ネイティブ dialog を閉じた後の BODY）
+
+着手: メインツリーは backlog だけ。実装は worktree .worktrees/task-529.2（task-529.2-ark-popover）。先頭は omp の task ロール（modelRoles.task）へ、ids.trigger の合否表と layer/ 切り出しを委譲。
+
+ids.trigger の実測（Ark 5.40.0、fixture new-work、各5回）。URL は portless の変換で http://task-529-2-ark-popover.mimi.localhost:1355 。#1・#2 は Tab / 再クリック / 戻り先がすべて合格。#7 は再クリックと戻り先が合格、Tab の proxyTabFocus は不合格（確定ボタンから Tab すると dialog の「閉じる」へ出て閉じる）。§13 どおり #7 の Tab だけ「content の外へ出て閉じる」を採用。persistentElements と手動フォールバックは使わない。計測配線は残していない。共通層の切り出しは 36274c7064。
+
+共通層は 4f248406。useMotionPopover / PopoverPopup / popoverPanelClass / resolveFocusReturnTarget の連鎖 / useElementWidth / IconButton.softDisabled。unit は motionPopover・useDialogModal・menuLayer の 36 件成功。native dialog の 3 回目の Esc で cancel して閉じるところだけ、後のハーネスに残した。呼び出し 8 箇所は未着手。
+
+#8 音量は ad2c6537。バーの退出で閉じ、content の click / pointerdown を止め、外枠は共通クラス。barContent.test.ts は 8 件成功。
+
+#7 項目選択は f1f617d2。▾を ids.trigger、外枠を getAnchorRect、確定は closeAndReturn の後に登録。UnregisteredTab.test.tsx は 67 件成功。
+
+#5・#6 タグ追加は 825c08c4。Esc は TagCombobox、追加ボタンは softDisabled、右ペインは幅が 0 より大きく 320px 未満のときだけインラインで、開いた形式を閉じるまで維持。WorkTagEditor・WorkEditDialogTagEscape・WorkEditDialog の 30 件成功。追加ボタンの期待は native disabled から aria-disabled へ更新。
+
+#3・#4 絞り込みは e525ad77。1つのポップオーバーで段は中身だけ。FilterChipBand.test.tsx は 11 件成功。グループ一覧の取得は名前付き listbox のボタンへ変更し、CV・タグ・追加年と GET の期待は維持。
+
+#1・#2 グループ値は 71773e9e。行ごとの Root と、view の間マウントするパンくず。切替時は閉じる側だけ restoreFocus を切る。QuickList は 28px とチェック列。指定の unit 5 ファイル 64 件成功。初期フォーカスの preventScroll テストは呼び出し側のテストへ移した。
+
+旧フックと @floating-ui/react は a8587066 で削除。design-system.md と ADR-0043 を更新。focusInitial が false を focus しない修正は ba774f4b。client の tsc は修正後に通過。スモークと実ブラウザ測定は未実施。
+
+実測（Ark 5.40.0、fixture new-work、http://task-529-2-ark-popover.mimi.localhost:1355）。軸A→Bは修正後にホバー、ArrowRight、50ms往復が各方向20/20。Esc・閉じ方・#7確定・IME（CDP合成）は /tmp/task-529.2-verify.md。#7のTabはcontentの外へ出て閉じる。persistentElementsは未使用。pnpm check && pnpm test は最終回が成功。smokeは66成功8失敗。overlay未定義は1件再実行で成功。残り7件は20秒または30秒のタイムアウト（5件はERR_NETWORK_CHANGED）で未再実行。コミットは9cb9e192、f9fc3516、563b057e、20f7f24e。
+
+実測は /tmp/task-529.2-verify.md。軸A→Bは修正後に各方向20/20。pnpm check && pnpm test の最終回は成功。smokeは66成功8失敗。overlay未定義は1件再実行で成功。残り7件はタイムアウトで未再実行。コミットは9cb9e192、f9fc3516、563b057e、20f7f24e。
+
+smoke の残り7件は、対象ファイルだけ再実行して14件合格（34.6s）。前回のタイムアウトは再現せず、コード変更はない。全体 smoke の1回目は66成功8失敗。overlay 未定義は修正後の単独再実行で成功。7件の再実行も成功。
+
+レビュー4件は 14ac6a5b で対応。候補ボタンの Esc、作品一覧を離れたパンくず、絞り込み1段目のスクロール、絞り込みと音量のパネル名。対象 unit 4ファイル31件成功。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+ポップオーバー8箇所を Ark UI に置き換え、旧フックと @floating-ui/react を外した。戻し先は resolveReturnTarget と closeAndReturn にまとめ、#7 の Tab だけは content の外へ出て閉じる。実測は /tmp/task-529.2-verify.md。pnpm check && pnpm test は成功。smoke は1回目が66成功8失敗で、失敗8件は修正または再実行で通った。実機 IME は未確認。統合ブランチのレビューと master へのマージはしていない。
+<!-- SECTION:FINAL_SUMMARY:END -->

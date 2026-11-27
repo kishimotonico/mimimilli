@@ -1,10 +1,10 @@
 ---
 id: TASK-529
 title: メニューとポップオーバーを Ark UI へ置き換え、見た目をそろえる
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-26 03:15'
-updated_date: '2026-11-26 09:35'
+updated_date: '2026-11-27 13:57'
 labels:
   - ui
 dependencies: []
@@ -22,9 +22,9 @@ ADR-0043 の置き換え順の2。ボタン起点のメニュー（shared/ui/Men
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 子タスクがすべて完了している
-- [ ] #2 Esc がレイヤーごとに一段ずつ閉じる（メニュー、ポップオーバー、dialog、ネイティブ dialog の中のメニューを含む）
-- [ ] #3 pnpm check && pnpm test と pnpm test:smoke が通る
+- [x] #1 子タスクがすべて完了している
+- [x] #2 Esc がレイヤーごとに一段ずつ閉じる（メニュー、ポップオーバー、dialog、ネイティブ dialog の中のメニューを含む）
+- [x] #3 pnpm check && pnpm test と pnpm test:smoke が通る
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -35,4 +35,14 @@ ADR-0043 の置き換え順の2。ボタン起点のメニュー（shared/ui/Men
 - 529.2 の実装が終わったら: 作業ブランチを統合ブランチへ fast-forward で集約し、統合ブランチ全体（master..feat/task-529-ark-ui）の最終レビューを Claude で行う。そのうえで親の AC2・AC3（Esc の段の総合確認、pnpm check && pnpm test と pnpm test:smoke）を確かめる。master への --no-ff マージはユーザーの返事を待つ
 - 後片付け: TASK-529.1 の worktree .worktrees/task-529.1、.worktrees/task-529.1-fix、.worktrees/task-529.1-fix2（ブランチ task-529.1-ark-menu・task-529.1-fix・task-529.1-fix2。いずれも統合ブランチに取り込み済み）は不要。試作ブランチ proto/task-525-ark-ui と worktree .worktrees/task-525-ark-ui は TASK-529 の完了まで残す
 - 関連: TASK-530（@ark-ui/react を 5.40.1 へ。2026-11-30 以降に着手可）、TASK-528
+
+DRAFT-53（右クリックメニュー）で先に直すこと（2026-11-27 最終レビューより）: shared/ui/menu/MotionMenu.tsx の findLayerTrigger は aria-controls 頼みで、ContextTrigger は aria-controls を出さないため、dialog の中の右クリックメニューは body へポータルされて inert になる。shared/ui/layer/focusReturnTarget.ts は aria-labelledby からトリガーを引くため、右クリックメニューでは null になり、MenuLayerItem から開いたダイアログの戻し先が無くなる。
+
+同じ理由（findLayerTrigger が aria-controls 頼み）で、右クリックメニューではスクロールで閉じる監視も効かない。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+メニュー8か所・ポップオーバー8か所を @ark-ui/react 5.40.0 へ置き換え、旧フックと @floating-ui/react を外した（529.1・529.2）。統合ブランチの最終レビュー（doc-12）を受けて共通層と呼び出し側を整理した（529.3・529.4）。Esc の段は smoke（popoverMenu・作品編集のタグ追加・未登録のダイアログ内メニュー）で確認。check・test・smoke（76）成功、Fable の最終レビューで must なし。master へ 2df288d8 でマージ。
+<!-- SECTION:FINAL_SUMMARY:END -->
