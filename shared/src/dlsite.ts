@@ -655,7 +655,7 @@ export const dlsiteJobStartBodySchema = z.object({
 export type DlsiteJobStartBody = z.infer<typeof dlsiteJobStartBodySchema>;
 
 /** 取得済みの作品のカバー画像の状態。none は DLsite に画像が無い、missing はまだ取りに行っていない、
- *  failed は取りに行ったが取れなかった（失敗の記録が TTL 内） */
+ *  failed は取りに行ったが取れなかった（失敗の記録が TTL 内）、または許可外のURLで取りに行けない */
 export const dlsiteCoverStatusSchema = z.discriminatedUnion("state", [
   dlsiteCachedCoverSchema.extend({ state: z.literal("cached") }),
   z.object({ state: z.literal("missing") }),

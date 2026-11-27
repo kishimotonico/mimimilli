@@ -79,7 +79,6 @@ export function createDlsiteMethods(
 ): DlsiteAdapter {
   const fetchDelayMs = options.fetchDelayMs ?? 0;
 
-  /** realのDlsiteCacheと同じく、失敗の記録→取得済み→通信の順に判断する。forceは失敗の記録を無視して取り直す */
   async function fetchProduct(
     rjCode: string,
     force: boolean,
@@ -110,6 +109,7 @@ export function createDlsiteMethods(
     });
   }
 
+  /** realのDlsiteCacheと同じく、失敗の記録→取得済み→通信の順に判断する。forceは失敗の記録を無視して取り直す */
   async function fetchInfo(
     rjCode: string,
     force: boolean,

@@ -325,7 +325,8 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
   /**
    * 取得時にカバーをキャッシュへ先取りする。失敗は握り潰してログに出し、TTL付きで記録する。HTMLの取得結果には影響させない。
    * 失敗の記録がTTL内のときは、force でなければ取りに行かない。許可外のホストのURLは記録できず、取りに行かない。
-   * 中止（AbortError）は失敗として記録せず、呼び出し元のsignalがabort済みのときだけ再送出する。deadlineMsを過ぎたらカバーなしで戻る。
+   * 呼び出し元の中止は再送出し、deadlineMsの超過とアダプタの終了は記録せずカバーなしで戻る。オフライン設定で止めた取得も記録しない。
+   * スケジューラ自身の時間切れは今回の取得失敗として記録する。
    */
   async function prefetchCover(
     coverUrl: string | null,
@@ -352,12 +353,11 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     );
     const signal = signals.length > 0 ? AbortSignal.any(signals) : undefined;
     try {
-      await fetchCoverImage(coverUrl, signal);
+      await fetchCoverImage(normalizedUrl, signal);
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        if (options.signal?.aborted) throw error;
-        return;
-      }
+      if (options.signal?.aborted) throw error;
+      if (timeout?.aborted || shutdown.signal.aborted) return;
+      if (error instanceof DlsiteOfflineError) return;
       dlsiteCache.recordCoverFailure(normalizedUrl);
       dlsiteLogger.warn("DLsiteカバーの先取りに失敗しました", {
         coverUrl,

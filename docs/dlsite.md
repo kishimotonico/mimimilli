@@ -78,7 +78,7 @@ DLsiteの作品HTMLとカバー画像は、専用のSQLiteキャッシュ（`Dls
 
 作品HTMLは生のHTMLをgzip圧縮してBLOBで保存する。生HTMLを持つのは、パーサーを直したときに実HTTPを再度飛ばさず既存HTMLで検証できるようにするため。あわせて、取得時の解析結果（`DlsiteWorkInfo`のJSON）を「解析結果」（`dlsite_parsed_products`）に、snapshotの記録と同じ書き込みで保存する。行にはsnapshotの `content_fetched_at` とパーサーの版（`DLSITE_PARSER_VERSION`、`dlsite.ts`）を持ち、候補一覧・取得のキャッシュヒットはこの行を読む（`dlsiteProductResolve.ts`）。行が無い、`content_fetched_at` が違う、版が違うときだけ生HTMLを展開して解析し、書き戻す。`parseDlsiteHtml` の出力を変えたときは版を上げる。解析失敗（`parse_error`）のsnapshotは版を上げても解析し直さず、TTL（1時間）が切れてから取り直す。
 
-保存は「HTML snapshot」（`dlsite_html_snapshots`）と「取得失敗記録」（`dlsite_fetch_failures`）の2テーブルが基本で、取得時の解析結果が前述の `dlsite_parsed_products`。テーブルを分けているのは、取得が失敗しても直前に成功したHTMLを消さないため。カバー画像は正規化済みHTTPS URLのSHA-256をキーにした別テーブル（`dlsite_cover_entries`）に、非圧縮のBLOBで持つ。カバーの取得失敗は同じキーで `dlsite_cover_failures` に期限つきで記録する（HTMLの一時的な失敗と同じTTL。取得に成功すると消える）。
+保存は「HTML snapshot」（`dlsite_html_snapshots`）と「取得失敗記録」（`dlsite_fetch_failures`）の2テーブルが基本で、取得時の解析結果が前述の `dlsite_parsed_products`。テーブルを分けているのは、取得が失敗しても直前に成功したHTMLを消さないため。カバー画像は正規化済みHTTPS URLのSHA-256をキーにした別テーブル（`dlsite_cover_entries`）に、非圧縮のBLOBで持つ。カバーの取得失敗は同じキーで `dlsite_cover_failures` に期限つきで記録する（HTMLの一時的な失敗と同じTTL。取得に成功すると消える）。呼び出し元の中止・同期取得のdeadline超過・アダプタの終了・オフライン設定で止めた取得は記録しない。スケジューラ自身の待ち時間切れは今回の取得失敗として記録する。
 
 キャッシュキーはストア（RJは `maniax`、VJは `pro`）、大文字化したproduct code、`work-html-ja-adultchecked-v1`（`DLSITE_CACHE_REPRESENTATION`）の組み合わせ。representationは取得条件（言語・adultchecked Cookie・対象ページ）のバージョンで、取得の前提を変えたらこの文字列を上げてキャッシュを無効化する。
 

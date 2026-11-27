@@ -10,6 +10,9 @@ import {
   parseDlsiteHtml,
 } from "../../src/adapters/real/dlsite.ts";
 import { DlsiteCache } from "../../src/adapters/real/dlsiteCache.ts";
+import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../../src/adapters/real/dlsiteConfig.ts";
+import { createDlsiteFetch } from "../../src/adapters/real/dlsiteFetch.ts";
+import { DlsiteScheduler } from "../../src/adapters/real/dlsiteScheduler.ts";
 import {
   createDlsiteProductResolver,
   dlsiteFetchStateOfProductResolution,
@@ -295,4 +298,76 @@ test("parse_errorで取り直すと、前の解析結果は消える", (t) => {
     html: "<html></html>",
   });
   assert.equal(cache.readParsed({ productCode: CODE }), null);
+});
+
+test("カバーの状態: 許可外ホストのcoverUrlはfailedになる", (t) => {
+  const { open } = setup(t);
+  const cache = open();
+  const source = createCandidateDlsiteSource(
+    cache,
+    createDlsiteProductResolver(cache, DLSITE_PARSER),
+  );
+  record(cache, { html: sampleWorkHtml(CODE).replace("//img.dlsite.jp/", "//evil.example/") });
+  const summary = deriveDlsiteProductSummary(source, CODE);
+  assert.ok(summary.state === "fetched");
+  assert.deepEqual(summary.cover, { state: "failed" });
+});
+
+function prefetchSetup(
+  t: Parameters<typeof setup>[0],
+  options: { offline?: boolean; transport?: (init: RequestInit) => Promise<Response> } = {},
+) {
+  const { open } = setup(t);
+  const cache = open();
+  const config = {
+    ...DEFAULT_DLSITE_REQUEST_CONFIG,
+    offline: options.offline ?? false,
+    requestIntervalMs: 0,
+    retryCount: 0,
+    maxBackoffMs: 0,
+    timeoutMs: 1_000,
+  };
+  const scheduler = new DlsiteScheduler(config, {
+    transport: (_input, init) =>
+      options.transport?.(init ?? {}) ?? Promise.reject(new Error("unexpected request")),
+  });
+  const fetch = createDlsiteFetch({
+    dlsiteCache: cache,
+    dlsiteCacheOptions: { path: "unused" },
+    dlsiteRequestConfig: config,
+    dlsiteScheduler: scheduler,
+    parser: DLSITE_PARSER,
+  });
+  const info = record(cache, { html: sampleWorkHtml(CODE) });
+  return { cache, fetch, coverUrl: info.coverUrl!, key: normalizeDlsiteCoverUrl(info.coverUrl!) };
+}
+
+const waitsForAbort = (init: RequestInit) =>
+  new Promise<Response>((_resolve, reject) => {
+    init.signal?.addEventListener("abort", () => reject(new DOMException("t", "AbortError")), {
+      once: true,
+    });
+  });
+
+test("prefetchCover: スケジューラ自身の時間切れ（AbortError）は取得失敗として記録する", async (t) => {
+  const { cache, fetch, coverUrl, key } = prefetchSetup(t, {
+    transport: () => Promise.reject(new DOMException("timeout", "AbortError")),
+  });
+  await fetch.prefetchCover(coverUrl);
+  assert.equal(cache.hasCoverFailure(key), true);
+});
+
+test("prefetchCover: オフライン設定では失敗を記録しない", async (t) => {
+  const { cache, fetch, coverUrl, key } = prefetchSetup(t, { offline: true });
+  await fetch.prefetchCover(coverUrl);
+  assert.equal(cache.hasCoverFailure(key), false);
+});
+
+test("prefetchCover: 呼び出し元の中止は再送出し、失敗を記録しない", async (t) => {
+  const { cache, fetch, coverUrl, key } = prefetchSetup(t, { transport: waitsForAbort });
+  const controller = new AbortController();
+  const pending = fetch.prefetchCover(coverUrl, { signal: controller.signal });
+  controller.abort();
+  await assert.rejects(pending, { name: "AbortError" });
+  assert.equal(cache.hasCoverFailure(key), false);
 });

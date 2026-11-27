@@ -500,11 +500,12 @@ export class DlsiteCache {
       .run(DlsiteCache.coverKey(normalizedUrl), expiresAt);
   }
 
-  /** TTL内の取得失敗の記録があるか。 */
+  /** 正規化済みURLについて、TTL内の取得失敗の記録があるか。 */
   hasCoverFailure(normalizedUrl: string): boolean {
     return this.hasCoverFailureByKey(DlsiteCache.coverKey(normalizedUrl));
   }
 
+  /** `coverKey` で引く hasCoverFailure。 */
   hasCoverFailureByKey(coverKey: string): boolean {
     const row = this.sqlite
       .query("SELECT failure_expires_at FROM dlsite_cover_failures WHERE cache_key = ?")
