@@ -21,7 +21,7 @@ import {
   FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE,
   FIXTURE_DLSITE_FETCH_FAILURE_RJ_CODE,
   FIXTURE_DLSITE_NOT_FOUND_RJ_CODE,
-  FIXTURE_DLSITE_NO_COVER_RJ_CODE,
+  FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE,
 } from "../src/adapters/fixture/dlsiteMethods.ts";
 import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../src/adapters/real/dlsiteConfig.ts";
 import {
@@ -69,7 +69,7 @@ async function createSubject(kind: Subject["kind"]): Promise<Subject> {
       app,
       candidatePath: FOLDER_TITLE,
       filesPath: "未登録作品",
-      noCoverCode: FIXTURE_DLSITE_NO_COVER_RJ_CODE,
+      noCoverCode: FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE,
       unreadableCoverCode: FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE,
       coverlessCode: FIXTURE_DLSITE_COVERLESS_RJ_CODE,
       notFoundCode: FIXTURE_DLSITE_NOT_FOUND_RJ_CODE,
@@ -106,7 +106,8 @@ async function createSubject(kind: Subject["kind"]): Promise<Subject> {
         },
         cover: (url) => {
           if (!coverUrlFromRequest(url)) return htmlResponse("", 404);
-          if (url.includes(`${FIXTURE_DLSITE_NO_COVER_RJ_CODE}_img`)) return htmlResponse("", 404);
+          if (url.includes(`${FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE}_img`))
+            return htmlResponse("", 404);
           if (url.includes(`${FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE}_img`)) {
             return jpegResponse(new TextEncoder().encode("not an image"));
           }
@@ -123,7 +124,7 @@ async function createSubject(kind: Subject["kind"]): Promise<Subject> {
     app,
     candidatePath: FOLDER_TITLE,
     filesPath: "Files作品",
-    noCoverCode: FIXTURE_DLSITE_NO_COVER_RJ_CODE,
+    noCoverCode: FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE,
     unreadableCoverCode: FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE,
     coverlessCode: FIXTURE_DLSITE_COVERLESS_RJ_CODE,
     notFoundCode: "RJ000403",

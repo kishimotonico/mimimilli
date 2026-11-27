@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import {
   DEFAULT_TAG_PREFIXES,
   dlsiteFetchStateOfResolution,
+  dlsiteProductSummaryOf,
   projectDlsiteState,
   toDlsiteLinkageStatus,
 } from "@mimimilli/shared";
@@ -87,6 +88,8 @@ export interface FixtureState {
   dlsiteFetched: Map<string, FixtureDlsiteFetched>;
   /** カバーキャッシュのキーごとのカバー画像（realのdlsite_cover_entries相当）。 */
   dlsiteCovers: Map<string, FixtureDlsiteCover>;
+  /** カバーキャッシュのキーごとの取得失敗の記録の期限（realのdlsite_cover_failures相当）。 */
+  dlsiteCoverFailures: Map<string, number>;
   /** 編集用カバー列（表示用 cover と独立。unmeasured を表現する） */
   coverColumns: Map<string, FixtureCoverColumns>;
   tagPrefixes: TagPrefix[];
@@ -199,13 +202,14 @@ export function fixtureDlsiteSummary(
   if (fetchState !== "fetched") return { state: fetchState };
   const fetched = state.dlsiteFetched.get(normalizeDlsiteCacheKey(rjCode));
   if (!fetched) return { state: "none" };
-  const { title, coverUrl } = fetched.info;
-  if (!coverUrl) return { state: "fetched", title, cover: null };
-  const key = fixtureDlsiteCoverKey(coverUrl);
-  const cover = state.dlsiteCovers.get(key);
-  return cover
-    ? { state: "fetched", title, cover: { key, version: cover.fetchedAt } }
-    : { state: "cover_missing", title };
+  return dlsiteProductSummaryOf(fetched.info, (coverUrl) => {
+    const key = fixtureDlsiteCoverKey(coverUrl);
+    const cover = state.dlsiteCovers.get(key);
+    return {
+      cached: cover ? { key, version: cover.fetchedAt } : null,
+      failed: (state.dlsiteCoverFailures.get(key) ?? 0) > Date.now(),
+    };
+  });
 }
 
 export function fixtureDlsiteCoverKey(coverUrl: string): string {
@@ -330,6 +334,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     dlsiteFetchFailures,
     dlsiteFetched: new Map(),
     dlsiteCovers: new Map(),
+    dlsiteCoverFailures: new Map(),
     coverColumns,
     tagPrefixes: DEFAULT_TAG_PREFIXES.map((def) => ({ ...def })),
     smartFolders: initialSmartFolders(new Set(), false, now).map((folder, position) => ({

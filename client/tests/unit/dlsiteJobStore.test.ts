@@ -33,7 +33,11 @@ function code(productCode: string, state: DlsiteJobCodeState, revision: number):
     case "fetching":
       return { ...base, state };
     case "fetched":
-      return { ...base, state, dlsite: { state: "fetched", title: TITLE, cover: null } };
+      return {
+        ...base,
+        state,
+        dlsite: { state: "fetched", title: TITLE, cover: { state: "none" } },
+      };
     case "not_found":
     case "failed":
       return { ...base, state, dlsite: { state } };
@@ -359,7 +363,7 @@ describe("dlsiteJobStore", () => {
       expect(store.getState().results.get("RJ000001")?.revision).toBe(5);
       dispatch(last(), codeEvent("job-1", code("RJ000001", "fetched", 7)));
       expect(store.getState().results.get("RJ000001")).toEqual({
-        dlsite: { state: "fetched", title: TITLE, cover: null },
+        dlsite: { state: "fetched", title: TITLE, cover: { state: "none" } },
         revision: 7,
       });
     });

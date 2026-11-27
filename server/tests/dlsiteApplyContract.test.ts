@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { DEFAULT_DLSITE_REQUEST_CONFIG } from "../src/adapters/real/dlsiteConfig.ts";
 import {
   FIXTURE_DLSITE_COVERLESS_RJ_CODE,
-  FIXTURE_DLSITE_NO_COVER_RJ_CODE,
+  FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE,
   FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE,
 } from "../src/adapters/fixture/dlsiteMethods.ts";
 import { defineContract, type ContractHarness } from "./helpers/contractHarness.ts";
@@ -40,7 +40,8 @@ const contract = defineContract({
         ),
       cover: (url) => {
         if (!coverUrlFromRequest(url)) return htmlResponse("", 404);
-        if (url.includes(`${FIXTURE_DLSITE_NO_COVER_RJ_CODE}_img`)) return htmlResponse("", 404);
+        if (url.includes(`${FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE}_img`))
+          return htmlResponse("", 404);
         if (url.includes(`${FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE}_img`)) {
           return jpegResponse(new TextEncoder().encode("not an image"));
         }
@@ -84,7 +85,7 @@ contract("取得の応答に版とカバーのキャッシュ有無が付く", a
   const fetched = await fetchFor(h, id, OK_CODE);
   assert.equal(typeof fetched.infoRevision, "string");
   assert.ok(fetched.cachedCover);
-  const noCover = await fetchFor(h, id, FIXTURE_DLSITE_NO_COVER_RJ_CODE);
+  const noCover = await fetchFor(h, id, FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE);
   assert.equal(noCover.cachedCover, null);
 });
 
@@ -205,7 +206,7 @@ contract("取得していないコードの適用は409 dlsite_refetch_required"
 });
 
 for (const [name, code, reason] of [
-  ["キャッシュに無い", FIXTURE_DLSITE_NO_COVER_RJ_CODE, "not_cached"],
+  ["キャッシュに無い", FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE, "not_cached"],
   ["画像として読めない", FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE, "unreadable"],
   ["DLsiteにカバーが無い", FIXTURE_DLSITE_COVERLESS_RJ_CODE, null],
 ] as const) {
@@ -231,7 +232,7 @@ for (const [name, code, reason] of [
 
 contract("カバーを選ばない適用は、キャッシュに無くても理由を返さない", async (h) => {
   const id = h.workId("existing");
-  const fetched = await fetchFor(h, id, FIXTURE_DLSITE_NO_COVER_RJ_CODE);
+  const fetched = await fetchFor(h, id, FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE);
   const res = await apply(h, id, {
     sourceRevision: fetched.sourceRevision,
     infoRevision: fetched.infoRevision,

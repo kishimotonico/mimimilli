@@ -13,6 +13,7 @@ import { scanResultsRefreshedAtom } from "../../../entities/scan/model/atoms";
 import { scanRecordQueryOptions } from "../../../entities/scan/queryOptions";
 import { scanNewCountQueryOptions } from "../../../entities/work/scanNewCountQueryOptions";
 import { useScanCandidatesState } from "../model/useScanCandidatesCache";
+import { groupCoverSkipped } from "../../../entities/dlsite/coverSkip";
 import { formatWorkNames } from "../model/formatWorkNames";
 import ScanSidebar from "./scanModal/ScanSidebar";
 import UnregisteredTab from "./scanModal/unregistered/UnregisteredTab";
@@ -70,21 +71,18 @@ export default function ScanModal({
 
   const handleUnregisteredRegistered = ({
     registeredTitles,
-    coverSkippedTitles,
-    coverNotCachedTitles,
+    coverSkipped,
     failedCount,
     remainingCandidates,
     interrupted,
   }: CandidatesRegisteredResult) => {
     if (registeredTitles.length === 0) return;
     const names = formatWorkNames(registeredTitles);
-    const coverNote =
-      (coverNotCachedTitles.length > 0
-        ? `${formatWorkNames(coverNotCachedTitles)}はカバー画像を取得できていないため、カバーを適用できませんでした。`
-        : "") +
-      (coverSkippedTitles.length > 0
-        ? `${formatWorkNames(coverSkippedTitles)}はカバーを適用できませんでした。`
-        : "");
+    const coverNote = groupCoverSkipped(coverSkipped)
+      .map(
+        ({ cause, titles }) => `${formatWorkNames(titles)}は${cause}カバーを適用できませんでした。`,
+      )
+      .join("");
     if (failedCount > 0 || interrupted) {
       toast.show({
         message:

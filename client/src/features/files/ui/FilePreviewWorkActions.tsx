@@ -6,6 +6,7 @@ import { useToast } from "../../../shared/ui/useToast";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
+import { coverSkipCause } from "../../../entities/dlsite/coverSkip";
 import { updateCachesAfterRegistration } from "../../../entities/work/model/workCacheUpdates";
 import {
   useReassignWorkIdentityMutation,
@@ -213,10 +214,7 @@ export default function FilePreviewWorkActions({
             setPendingProjection(result);
             if (result.coverSkipped !== null) {
               toast.show({
-                message:
-                  result.coverSkipped === "not_cached"
-                    ? "作品を登録しました。カバー画像を取得できていないため、カバーは適用できませんでした"
-                    : "作品を登録しました。カバーは適用できませんでした",
+                message: `作品を登録しました。${coverSkipCause(result.coverSkipped)}カバーは適用できませんでした`,
                 variant: "warning",
                 priority: "action",
                 dismissOnUnmount: false,

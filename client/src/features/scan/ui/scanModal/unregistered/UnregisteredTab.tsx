@@ -195,13 +195,10 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
     if (isCandidatesStale(interruptedBy)) await refreshScanCandidatesQuietly(queryClient);
     onRegistered({
       registeredTitles: titlesOf(outcome.registered),
-      coverSkippedTitles: titlesOf(
-        outcome.registered.filter(
-          (entry) => entry.coverSkipped !== null && entry.coverSkipped !== "not_cached",
-        ),
-      ),
-      coverNotCachedTitles: titlesOf(
-        outcome.registered.filter((entry) => entry.coverSkipped === "not_cached"),
+      coverSkipped: outcome.registered.flatMap((entry) =>
+        entry.coverSkipped === null
+          ? []
+          : [{ title: titleByPath.get(entry.path) ?? entry.path, reason: entry.coverSkipped }],
       ),
       failedCount: outcome.failures.length,
       remainingCandidates: outcome.refreshedCandidates?.candidates.length ?? null,

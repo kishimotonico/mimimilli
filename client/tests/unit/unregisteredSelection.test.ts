@@ -28,12 +28,16 @@ describe("fetchTarget", () => {
       row("a", "RJ000001", { state: "none" }),
       row("b", "rj000001", { state: "none" }),
       row("d", "RJ000003", { state: "fetching" }),
-      row("f", "RJ000005", { state: "fetched", title: "t", cover: null }),
+      row("f", "RJ000005", { state: "fetched", title: "t", cover: { state: "none" } }),
       row("g", null, { state: "none" }),
     ];
     expect(fetchTarget(base)).toEqual({ codes: ["RJ000001"], force: false });
     expect(
-      fetchTarget([...base, row("h", "RJ000006", { state: "cover_missing", title: "t" })]),
+      fetchTarget([
+        ...base,
+        row("h", "RJ000006", { state: "fetched", title: "t", cover: { state: "missing" } }),
+        row("i", "RJ000007", { state: "fetched", title: "t", cover: { state: "failed" } }),
+      ]),
     ).toEqual({ codes: ["RJ000001", "RJ000006"], force: false });
     expect(
       fetchTarget([
@@ -47,7 +51,7 @@ describe("fetchTarget", () => {
 
 describe("missingDlsiteRows", () => {
   const rows = [
-    row("a", "RJ000001", { state: "fetched", title: "t", cover: null }),
+    row("a", "RJ000001", { state: "fetched", title: "t", cover: { state: "none" } }),
     row("b", "RJ000002", { state: "none" }),
     row("c", "RJ000003", { state: "failed" }),
     row("d", "RJ000004", { state: "not_found" }),
@@ -69,7 +73,7 @@ describe("missingDlsiteRows", () => {
 });
 
 describe("footerPlan / addTargets", () => {
-  const fetched = row("a", "RJ000001", { state: "fetched", title: "t", cover: null });
+  const fetched = row("a", "RJ000001", { state: "fetched", title: "t", cover: { state: "none" } });
   const unfetched = row("b", "RJ000002", { state: "none" });
   const fetching = row("c", "RJ000003", { state: "fetching" });
   const noCode = row("d", null, { state: "none" });
@@ -83,13 +87,23 @@ describe("footerPlan / addTargets", () => {
     expect(footerPlan([fetched, noCode])).toEqual({ kind: "add" });
   });
 
-  it("カバー未取得の行は、未取得と同じく force なしで取得になる", () => {
-    const coverMissing = row("f", "RJ000007", { state: "cover_missing", title: "t" });
+  it("カバー未取得の行は、未取得と同じく force なしで取得になり、カバー取得失敗の行は追加に進む", () => {
+    const coverMissing = row("f", "RJ000007", {
+      state: "fetched",
+      title: "t",
+      cover: { state: "missing" },
+    });
     expect(footerPlan([fetched, coverMissing])).toEqual({
       kind: "fetch",
       codes: ["RJ000007"],
       force: false,
     });
+    const coverFailed = row("g", "RJ000008", {
+      state: "fetched",
+      title: "t",
+      cover: { state: "failed" },
+    });
+    expect(footerPlan([fetched, coverFailed])).toEqual({ kind: "add" });
   });
 
   it("該当なし・失敗の行が選択にあれば、取得の対象に含めて force で取り直す", () => {
@@ -170,7 +184,11 @@ describe("judgmentCount", () => {
 
 describe("選択の上書き（判断の理由 × 操作 → 選択）", () => {
   const MISSING = [{ workId: "w", title: "旧", previousPath: "old/path" }];
-  const fetched: CandidateDlsiteDisplay = { state: "fetched", title: "題", cover: null };
+  const fetched: CandidateDlsiteDisplay = {
+    state: "fetched",
+    title: "題",
+    cover: { state: "none" },
+  };
   const make = (
     display: CandidateDlsiteDisplay,
     resultRevision: number | null,

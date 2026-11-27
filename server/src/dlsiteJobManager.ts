@@ -278,8 +278,6 @@ export class DlsiteJobManager {
     switch (result.state) {
       case "fetched":
         return { ...base, state: "fetched", dlsite: result };
-      case "cover_missing":
-        return { ...base, state: "cover_missing", dlsite: result };
       case "not_found":
         return { ...base, state: "not_found", dlsite: result };
       case "failed":

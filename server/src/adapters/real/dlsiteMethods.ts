@@ -66,7 +66,11 @@ export function createDlsiteMethods(deps: {
     const deadlineMs = options.synchronous ? Date.now() + fetchTimeoutMs : undefined;
     const result = await fetch.fetchCachedDlsite(productCode, force, options.signal);
     if (result.ok) {
-      await fetch.prefetchCover(result.info.coverUrl, { signal: options.signal, deadlineMs });
+      await fetch.prefetchCover(result.info.coverUrl, {
+        signal: options.signal,
+        deadlineMs,
+        force,
+      });
     }
     if (shouldRefreshDlsiteProjectionAfterFetch(result)) {
       for (const workId of query.listWorkIdsByRjCode(productCode)) {

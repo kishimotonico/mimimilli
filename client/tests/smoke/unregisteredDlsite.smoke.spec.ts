@@ -56,6 +56,7 @@ test("未取得があるあいだ主ボタンは取得で、進捗の出入り�
   });
   expect((await primary.boundingBox())?.x).toBe(primaryBefore?.x);
   await expect(reopened.getByText("取得済み").first()).toBeVisible();
+  await expect(reopened.getByText("カバー取得失敗")).toBeVisible();
   await expect(reopened.getByText("該当なし")).toBeVisible();
   await expect(reopened.getByText("失敗", { exact: true })).toBeVisible();
   assertNoErrors(tracker);
@@ -71,7 +72,7 @@ test("▾の「選択を除外」で選択中の行が消え、「項目を選�
   await page.getByRole("menu").getByRole("menuitem", { name: "選択を除外" }).click();
   await expect(page.getByText(/を除外しました/)).toBeVisible();
   await expect(panel.getByRole("row", { name: /囁きの図書館/ })).toBeVisible();
-  await expect(panel.getByRole("row", { name: /カバーなし作品/ })).toBeHidden();
+  await expect(panel.getByRole("row", { name: /カバー取得不可作品/ })).toBeHidden();
 
   await panel.getByRole("checkbox", { name: "「囁きの図書館」を選択" }).check();
   const trigger = panel.getByRole("button", { name: "その他の操作" });

@@ -323,15 +323,35 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     return image;
   }
 
+  function isCoverFailureRecorded(coverUrl: string): boolean {
+    try {
+      return dlsiteCache.hasCoverFailureByKey(
+        createHash("sha256").update(normalizeDlsiteCoverUrl(coverUrl)).digest("hex"),
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  function recordCoverFailure(coverUrl: string): void {
+    try {
+      dlsiteCache.recordCoverFailure(normalizeDlsiteCoverUrl(coverUrl));
+    } catch {
+      // 許可外のURLは記録できない
+    }
+  }
+
   /**
-   * 取得時にカバーをキャッシュへ先取りする。失敗は握り潰してログに出し、HTMLの取得結果には影響させない。
-   * 再送出するのは呼び出し元のsignalがabort済みのときだけ。deadlineMsを過ぎたらカバーなしで戻る。
+   * 取得時にカバーをキャッシュへ先取りする。失敗は握り潰してログに出し、TTL付きで記録する。HTMLの取得結果には影響させない。
+   * 失敗の記録がTTL内のときは、force でなければ取りに行かない。
+   * 再送出するのは呼び出し元のsignalがabort済みのときだけ。deadlineMsを過ぎたらカバーなしで戻る（失敗は記録しない）。
    */
   async function prefetchCover(
     coverUrl: string | null,
-    options: { signal?: AbortSignal; deadlineMs?: number } = {},
+    options: { signal?: AbortSignal; deadlineMs?: number; force?: boolean } = {},
   ): Promise<void> {
     if (!coverUrl) return;
+    if (!options.force && isCoverFailureRecorded(coverUrl)) return;
     const timeout =
       options.deadlineMs === undefined
         ? undefined
@@ -344,6 +364,7 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
       await fetchCoverImage(coverUrl, signal);
     } catch (error) {
       if (options.signal?.aborted) throw error;
+      if (!timeout?.aborted) recordCoverFailure(coverUrl);
       dlsiteLogger.warn("DLsiteカバーの先取りに失敗しました", {
         coverUrl,
         message: errorMessage(error),

@@ -1,6 +1,6 @@
 import {
   canonicalDlsiteProductCode,
-  type DlsiteCachedCover,
+  type DlsiteCoverStatus,
   type DlsiteProductSummary,
   type ScanCandidate,
 } from "@mimimilli/shared";
@@ -9,22 +9,16 @@ import type { DlsiteJobState } from "../../../entities/dlsite/model/dlsiteJobSto
 export type CandidateDlsiteDisplay =
   | { state: "none" }
   | { state: "fetching" }
-  | { state: "fetched"; title: string | null; cover: DlsiteCachedCover | null }
-  | { state: "cover_missing"; title: string }
+  | { state: "fetched"; title: string | null; cover: DlsiteCoverStatus }
   | { state: "not_found" }
   | { state: "failed" };
 
 type DisplayJobState = Pick<DlsiteJobState, "job" | "results">;
 
 function displayOf(summary: DlsiteProductSummary): CandidateDlsiteDisplay {
-  switch (summary.state) {
-    case "fetched":
-      return { state: "fetched", title: summary.title, cover: summary.cover };
-    case "cover_missing":
-      return { state: "cover_missing", title: summary.title };
-    default:
-      return { state: summary.state };
-  }
+  return summary.state === "fetched"
+    ? { state: "fetched", title: summary.title, cover: summary.cover }
+    : { state: summary.state };
 }
 
 /** 取得中はジョブの状態から、それ以外は候補の値とジョブで見た終端の結果のうち revision の大きい方から出す。

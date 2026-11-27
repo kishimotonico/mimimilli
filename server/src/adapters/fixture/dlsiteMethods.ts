@@ -37,10 +37,10 @@ export const FIXTURE_DLSITE_FETCH_FAILURE_RJ_CODE = "RJ000404";
 /** このRJコードは取得すると該当なし（not_found）になる */
 export const FIXTURE_DLSITE_NOT_FOUND_RJ_CODE = "RJ000403";
 
-/** このRJコードは取得済みになるが、カバーはキャッシュに置かれない（カバーの先取り失敗相当） */
-export const FIXTURE_DLSITE_NO_COVER_RJ_CODE = "RJ000402";
+/** このRJコードは取得済みになるが、カバーの取得に失敗する（カバーはキャッシュに置かれず、失敗が記録される） */
+export const FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE = "RJ000402";
 
-/** このRJコードはDLsite側にカバーが無い（coverUrl が null） */
+/** このRJコードはDLsite側にカバー画像が無い（coverUrl が null） */
 export const FIXTURE_DLSITE_COVERLESS_RJ_CODE = "RJ000400";
 
 /** このRJコードは取得済みになり、カバーキャッシュには画像として読めないバイト列が置かれる */
@@ -140,7 +140,13 @@ export function createDlsiteMethods(
       fetchedAt: now,
       expiresAt: now + DEFAULT_DLSITE_CACHE_TTLS_MS.ok,
     });
-    if (info.coverUrl !== null && key !== FIXTURE_DLSITE_NO_COVER_RJ_CODE) {
+    if (info.coverUrl !== null && key === FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE) {
+      state.dlsiteCoverFailures.set(
+        fixtureDlsiteCoverKey(info.coverUrl),
+        now + DEFAULT_DLSITE_CACHE_TTLS_MS.error,
+      );
+    } else if (info.coverUrl !== null) {
+      state.dlsiteCoverFailures.delete(fixtureDlsiteCoverKey(info.coverUrl));
       const unreadable = key === FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE;
       state.dlsiteCovers.set(fixtureDlsiteCoverKey(info.coverUrl), {
         body: unreadable ? new TextEncoder().encode("not an image") : fixtureCoverImage(key),

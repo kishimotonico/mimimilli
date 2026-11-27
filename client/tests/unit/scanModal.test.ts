@@ -210,7 +210,7 @@ const candidateDetected: ScanCandidate = buildScanCandidate({
   audioFileCount: 2,
   audioBreakdown: [{ extension: "mp3", count: 2 }],
   rjCode: "RJ100001",
-  dlsite: { state: "fetched", title: "検出済みDLsiteタイトル", cover: null },
+  dlsite: { state: "fetched", title: "検出済みDLsiteタイトル", cover: { state: "none" } },
 });
 const candidateUndetected: ScanCandidate = buildScanCandidate({
   path: "dlsite/未検出作品",

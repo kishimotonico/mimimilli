@@ -389,8 +389,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
           detectedRjCode: "RJ000401",
         },
         {
-          path: workspacePath("RJ000402_カバーなし作品"),
-          inferredTitle: "カバーなし作品",
+          path: workspacePath("RJ000402_カバー取得不可作品"),
+          inferredTitle: "カバー取得不可作品",
           audioFileCount: 2,
           audioBreakdown: [{ extension: "mp3", count: 2 }],
           detectedRjCode: "RJ000402",

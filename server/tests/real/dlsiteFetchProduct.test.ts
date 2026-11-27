@@ -142,15 +142,24 @@ test("取得は取得ジョブ・fetch-by-code・作品の取得の3経路で、
 });
 
 test("カバーの取得に失敗しても取得結果は成功のままで、同期経路もそのまま成功を返す", async (t) => {
+  let coverCalls = 0;
   const { adapter, cache } = setup(t, {
     html: (code) => htmlResponse(sampleWorkHtml(code, { cover: true })),
-    cover: () => Promise.reject(new Error("カバー取得失敗")),
+    cover: () => {
+      coverCalls += 1;
+      return Promise.reject(new Error("カバー取得失敗"));
+    },
   });
-  assert.equal(
-    (await adapter.fetchDlsiteProduct("RJ000001", { force: false })).state,
-    "cover_missing",
-  );
+  assert.equal((await adapter.fetchDlsiteProduct("RJ000001", { force: false })).state, "fetched");
   assert.equal(cache.getCover(coverUrlOf("RJ000001")), null);
+  const key = DlsiteCache.coverKey(coverUrlOf("RJ000001"));
+  assert.equal(cache.hasCoverFailureByKey(key), true);
+  assert.equal(coverCalls, 1);
+
+  await adapter.fetchDlsiteProduct("RJ000001", { force: false });
+  assert.equal(coverCalls, 1);
+  await adapter.fetchDlsiteProduct("RJ000001", { force: true });
+  assert.equal(coverCalls, 2);
   assert.equal((await adapter.dlsiteFetchByCode("RJ000002")).ok, true);
 });
 
@@ -275,9 +284,7 @@ test("forceは、解析できないsnapshot（parse_error）を取り直す", as
   const { adapter } = setup(t, {
     html: (code) => {
       htmlCalls += 1;
-      return broken
-        ? htmlResponse("<html></html>")
-        : htmlResponse(sampleWorkHtml(code, { cover: false }));
+      return broken ? htmlResponse("<html></html>") : htmlResponse(sampleWorkHtml(code));
     },
   });
   assert.equal((await adapter.fetchDlsiteProduct("RJ000001", { force: false })).state, "failed");

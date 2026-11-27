@@ -49,7 +49,7 @@ const candidateB = buildScanCandidate({
   inferredTitle: "検出済み作品",
   audioFileCount: 2,
   rjCode: "RJ100001",
-  dlsite: { state: "fetched", title: "検出済みのDLsiteタイトル", cover: null },
+  dlsite: { state: "fetched", title: "検出済みのDLsiteタイトル", cover: { state: "none" } },
 });
 
 async function renderUnmountableTab(candidates: ScanCandidate[]) {
@@ -466,7 +466,7 @@ describe("UnregisteredTab DLsite列と行の操作", () => {
     dlsite: {
       state: "fetched",
       title: "DLsiteのタイトル",
-      cover: { key: "a".repeat(64), version: 1 },
+      cover: { state: "cached", key: "a".repeat(64), version: 1 },
     },
   });
 
@@ -476,11 +476,27 @@ describe("UnregisteredTab DLsite列と行の操作", () => {
       inferredTitle: "未取得作品",
       rjCode: "RJ000402",
     });
-    await renderTab([notFound, failed, fetched, unfetched, candidateA]);
+    const coverMissing = buildScanCandidate({
+      path: "d/cm",
+      inferredTitle: "フォルダー名2",
+      rjCode: "RJ000403",
+      dlsite: { state: "fetched", title: "カバー未取得のタイトル", cover: { state: "missing" } },
+    });
+    const coverFailed = buildScanCandidate({
+      path: "d/cf",
+      inferredTitle: "フォルダー名3",
+      rjCode: "RJ000405",
+      dlsite: { state: "fetched", title: "カバー失敗のタイトル", cover: { state: "failed" } },
+    });
+    await renderTab([notFound, failed, fetched, unfetched, coverMissing, coverFailed, candidateA]);
     expect(screen.getByText("該当なし")).not.toBeNull();
     expect(screen.getByText("失敗")).not.toBeNull();
     expect(screen.getByText("取得済み")).not.toBeNull();
     expect(screen.getByText("未取得")).not.toBeNull();
+    expect(screen.getByText("カバー未取得")).not.toBeNull();
+    expect(screen.getByText("カバー取得失敗")).not.toBeNull();
+    expect(screen.getByText("カバー未取得のタイトル")).not.toBeNull();
+    expect(screen.getByText("カバー失敗のタイトル")).not.toBeNull();
     expect(screen.getByText("—", { selector: "span.text-ink-3" })).not.toBeNull();
     expect(screen.getByText("DLsiteのタイトル")).not.toBeNull();
     expect(screen.queryByText("フォルダー名")).toBeNull();
@@ -1023,7 +1039,7 @@ describe("UnregisteredTab 追加", () => {
       path: "d/ok",
       inferredTitle: "取得済み作品",
       rjCode: "RJ000401",
-      dlsite: { state: "fetched", title: "t", cover: null },
+      dlsite: { state: "fetched", title: "t", cover: { state: "none" } },
     });
     await renderTab([fetchedRow, candidateA]);
     expect(screen.getByText(/DLsite情報なし/)).not.toBeNull();
@@ -1036,7 +1052,7 @@ describe("UnregisteredTab 追加", () => {
       path: "d/ok",
       inferredTitle: "取得済み作品",
       rjCode: "RJ000401",
-      dlsite: { state: "fetched", title: "t", cover: null },
+      dlsite: { state: "fetched", title: "t", cover: { state: "none" } },
     });
     await renderTab([fetchedRow, candidateA]);
     fireEvent.click(screen.getByRole("button", { name: "1" }));
@@ -1133,8 +1149,7 @@ describe("UnregisteredTab 追加", () => {
     );
     expect(onRegistered).toHaveBeenCalledWith({
       registeredTitles: [candidateA.inferredTitle],
-      coverSkippedTitles: [],
-      coverNotCachedTitles: [],
+      coverSkipped: [],
       failedCount: 0,
       remainingCandidates: 0,
       interrupted: true,
@@ -1154,8 +1169,7 @@ describe("UnregisteredTab 追加", () => {
     );
     expect(onRegistered).toHaveBeenCalledWith({
       registeredTitles: [],
-      coverSkippedTitles: [],
-      coverNotCachedTitles: [],
+      coverSkipped: [],
       failedCount: 0,
       remainingCandidates: null,
       interrupted: true,
@@ -1173,8 +1187,7 @@ describe("UnregisteredTab 追加", () => {
     await waitFor(() => expect(screen.getByText("配下に登録済み作品が1件あります")).not.toBeNull());
     expect(onRegistered).toHaveBeenCalledWith({
       registeredTitles: [],
-      coverSkippedTitles: [],
-      coverNotCachedTitles: [],
+      coverSkipped: [],
       failedCount: 1,
       remainingCandidates: null,
       interrupted: false,
@@ -1195,8 +1208,10 @@ describe("UnregisteredTab 追加", () => {
     await waitFor(() =>
       expect(onRegistered).toHaveBeenCalledWith({
         registeredTitles: [candidateA.inferredTitle, "検出済みのDLsiteタイトル"],
-        coverSkippedTitles: ["検出済みのDLsiteタイトル"],
-        coverNotCachedTitles: [candidateA.inferredTitle],
+        coverSkipped: [
+          { title: candidateA.inferredTitle, reason: "not_cached" },
+          { title: "検出済みのDLsiteタイトル", reason: "unreadable" },
+        ],
         failedCount: 0,
         remainingCandidates: 0,
         interrupted: false,
@@ -1261,8 +1276,7 @@ describe("UnregisteredTab 追加", () => {
     await waitFor(() =>
       expect(onRegistered).toHaveBeenCalledWith({
         registeredTitles: [candidateA.inferredTitle],
-        coverSkippedTitles: [],
-        coverNotCachedTitles: [],
+        coverSkipped: [],
         failedCount: 1,
         remainingCandidates: 1,
         interrupted: false,
@@ -1302,7 +1316,11 @@ describe("UnregisteredTab 終端表示", () => {
         [
           "RJ000777",
           {
-            dlsite: { state: "fetched" as const, title: "取得したタイトル", cover: null },
+            dlsite: {
+              state: "fetched" as const,
+              title: "取得したタイトル",
+              cover: { state: "none" },
+            },
             revision: 30,
           },
         ],

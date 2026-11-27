@@ -289,7 +289,7 @@ test("GET /api/dlsite/jobs/current は実行中・終了後のジョブをPOST�
   adapter.fetchDlsiteProduct = async (_code, options) => {
     await gate;
     options.signal?.throwIfAborted();
-    return { state: "fetched", title: "タイトル", cover: null };
+    return { state: "fetched", title: "タイトル", cover: { state: "none" } };
   };
   const gatedApp = createApp(adapter);
 
@@ -317,7 +317,7 @@ test("GET /api/dlsite/jobs/current は実行中・終了後のジョブをPOST�
       productCode: "RJ000001",
       state: "fetched",
       revision: finished.job.codes[0].revision,
-      dlsite: { state: "fetched", title: "タイトル", cover: null },
+      dlsite: { state: "fetched", title: "タイトル", cover: { state: "none" } },
     },
   ]);
   assert.ok(finished.revision > running.revision);
@@ -356,7 +356,7 @@ test("DELETE /api/dlsite/jobs/:jobId は待機中のまとめてだけを外し�
   const adapter = createFixtureAdapter();
   adapter.fetchDlsiteProduct = async () => {
     await gate;
-    return { state: "fetched", title: "タイトル", cover: null };
+    return { state: "fetched", title: "タイトル", cover: { state: "none" } };
   };
   const app = createApp(adapter);
   const start = await postJob(app, {

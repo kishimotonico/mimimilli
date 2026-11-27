@@ -223,6 +223,10 @@ export class DlsiteCache {
         body BLOB NOT NULL,
         fetched_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS dlsite_cover_failures (
+        cache_key TEXT PRIMARY KEY,
+        failure_expires_at INTEGER NOT NULL
+      );
     `);
     this.ttlsMs = { ...DEFAULT_DLSITE_CACHE_TTLS_MS, ...options.ttlsMs };
     for (const [outcome, ttl] of Object.entries(this.ttlsMs))
@@ -482,6 +486,26 @@ export class DlsiteCache {
     return row ? row.fetched_at : null;
   }
 
+  /** カバー画像の取得失敗を、HTMLの一時的な失敗（error）と同じTTLで記録する。 */
+  recordCoverFailure(normalizedUrl: string): void {
+    const expiresAt = this.clock() + this.ttlsMs.error;
+    requirePositiveSafeInteger(expiresAt, "attempted_at + TTL");
+    this.sqlite
+      .query(
+        `INSERT INTO dlsite_cover_failures (cache_key, failure_expires_at) VALUES (?, ?)
+         ON CONFLICT(cache_key) DO UPDATE SET failure_expires_at = excluded.failure_expires_at`,
+      )
+      .run(DlsiteCache.coverKey(normalizedUrl), expiresAt);
+  }
+
+  /** TTL内の取得失敗の記録があるか。 */
+  hasCoverFailureByKey(coverKey: string): boolean {
+    const row = this.sqlite
+      .query("SELECT failure_expires_at FROM dlsite_cover_failures WHERE cache_key = ?")
+      .get(coverKey) as { failure_expires_at: number } | null;
+    return row !== null && row.failure_expires_at > this.clock();
+  }
+
   getCoverByKey(coverKey: string): { body: Uint8Array; fetchedAt: number } | null {
     const row = this.sqlite
       .query("SELECT body, fetched_at FROM dlsite_cover_entries WHERE cache_key = ?")
@@ -503,13 +527,17 @@ export class DlsiteCache {
     if (!/^image\/(?:jpeg|png|webp|gif)(?:\s*;|$)/i.test(contentType ?? "")) {
       throw new Error(`DLsiteカバー画像のContent-Typeが不正です: ${contentType ?? ""}`);
     }
-    this.sqlite
-      .query(
-        `INSERT INTO dlsite_cover_entries (cache_key, body, fetched_at)
-         VALUES (?, ?, ?)
-         ON CONFLICT(cache_key) DO UPDATE SET body = excluded.body, fetched_at = excluded.fetched_at`,
-      )
-      .run(DlsiteCache.coverKey(normalizedUrl), body, this.clock());
+    const cacheKey = DlsiteCache.coverKey(normalizedUrl);
+    this.sqlite.transaction(() => {
+      this.sqlite
+        .query(
+          `INSERT INTO dlsite_cover_entries (cache_key, body, fetched_at)
+           VALUES (?, ?, ?)
+           ON CONFLICT(cache_key) DO UPDATE SET body = excluded.body, fetched_at = excluded.fetched_at`,
+        )
+        .run(cacheKey, body, this.clock());
+      this.sqlite.query("DELETE FROM dlsite_cover_failures WHERE cache_key = ?").run(cacheKey);
+    })();
   }
 
   /** cleanup 前の HTML snapshot を読み出す（診断用。TTL は見ない）。 */
@@ -551,6 +579,9 @@ export class DlsiteCache {
       .run(now).changes;
     deleted += this.sqlite
       .query("DELETE FROM dlsite_fetch_failures WHERE failure_expires_at <= ?")
+      .run(now).changes;
+    deleted += this.sqlite
+      .query("DELETE FROM dlsite_cover_failures WHERE failure_expires_at <= ?")
       .run(now).changes;
     deleted += this.sqlite
       .query(

@@ -14,7 +14,11 @@ function gatedManager() {
     fetchDlsiteProduct: (_code, options) =>
       new Promise<DlsiteTerminalProductSummary>((resolve, reject) => {
         gates.push((state) =>
-          resolve(state === "fetched" ? { state, title: "タイトル", cover: null } : { state }),
+          resolve(
+            state === "fetched"
+              ? { state, title: "タイトル", cover: { state: "none" } }
+              : { state },
+          ),
         );
         options.signal?.addEventListener(
           "abort",
@@ -157,7 +161,7 @@ test("createApp経由で開始したジョブの進捗をSSEで全部受信す�
     ...createFixtureAdapter(),
     fetchDlsiteProduct: async () => {
       await gate;
-      return { state: "fetched", title: "タイトル", cover: null };
+      return { state: "fetched", title: "タイトル", cover: { state: "none" } };
     },
   };
   const app = createApp(adapter);

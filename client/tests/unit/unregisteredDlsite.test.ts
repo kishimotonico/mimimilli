@@ -38,7 +38,11 @@ function view(input: CodeInput): DlsiteJobCodeView {
     case "fetching":
       return { ...base, state: input.state };
     case "fetched":
-      return { ...base, state: "fetched", dlsite: { state: "fetched", title: "題", cover: null } };
+      return {
+        ...base,
+        state: "fetched",
+        dlsite: { state: "fetched", title: "題", cover: { state: "none" } },
+      };
     case "not_found":
     case "failed":
       return { ...base, state: input.state, dlsite: { state: input.state } };
@@ -132,10 +136,10 @@ describe("candidateDlsiteDisplay", () => {
     });
     expect(
       candidateDlsiteDisplay(
-        candidate("RJ000009", { state: "fetched", title: "題", cover: null }),
+        candidate("RJ000009", { state: "fetched", title: "題", cover: { state: "none" } }),
         empty,
       ),
-    ).toEqual({ state: "fetched", title: "題", cover: null });
+    ).toEqual({ state: "fetched", title: "題", cover: { state: "none" } });
   });
 
   it("終端後に同じコードが再キューされると fetching に戻る", () => {

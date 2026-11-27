@@ -12,11 +12,7 @@ interface Call {
 }
 
 const summaryOf = (state: DlsiteTerminalProductSummary["state"]): DlsiteTerminalProductSummary =>
-  state === "fetched"
-    ? { state, title: "タイトル", cover: null }
-    : state === "cover_missing"
-      ? { state, title: "タイトル" }
-      : { state };
+  state === "fetched" ? { state, title: "タイトル", cover: { state: "none" } } : { state };
 
 function controlled(now?: () => number) {
   const calls: Call[] = [];

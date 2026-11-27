@@ -59,7 +59,8 @@ function missingWorkChip(
 }
 
 function RowCover({ display }: { display: CandidateDlsiteDisplay }) {
-  const cover = display.state === "fetched" ? display.cover : null;
+  const cover =
+    display.state === "fetched" && display.cover.state === "cached" ? display.cover : null;
   return (
     <ScanCover>
       {cover && (
@@ -88,8 +89,7 @@ function UnregisteredRowView({
   handlers,
 }: UnregisteredRowProps) {
   const { path, rjCode } = candidate;
-  const dlsiteTitle =
-    display.state === "fetched" || display.state === "cover_missing" ? display.title : null;
+  const dlsiteTitle = display.state === "fetched" ? display.title : null;
   const title = rowTitle({ candidate, display });
   const chip = missingWorkChip(candidate, title);
 
@@ -168,10 +168,13 @@ function UnregisteredRowView({
 
 function sameDisplay(a: CandidateDlsiteDisplay, b: CandidateDlsiteDisplay): boolean {
   if (a.state !== b.state) return false;
-  if (a.state === "cover_missing" && b.state === "cover_missing") return a.title === b.title;
   if (a.state !== "fetched" || b.state !== "fetched") return true;
+  if (a.title !== b.title || a.cover.state !== b.cover.state) return false;
   return (
-    a.title === b.title && a.cover?.key === b.cover?.key && a.cover?.version === b.cover?.version
+    a.cover.state !== "cached" ||
+    (b.cover.state === "cached" &&
+      a.cover.key === b.cover.key &&
+      a.cover.version === b.cover.version)
   );
 }
 

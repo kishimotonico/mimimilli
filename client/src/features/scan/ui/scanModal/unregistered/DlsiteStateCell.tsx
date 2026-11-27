@@ -18,12 +18,6 @@ export default function DlsiteStateCell({
       ) : (
         <span className="font-jp text-secondary text-ink-3">—</span>
       );
-    case "cover_missing":
-      return (
-        <StatusLabel tone="none" className="text-ink-2">
-          カバー未取得
-        </StatusLabel>
-      );
     case "fetching":
       return (
         <StatusLabel tone="work" icon={I.refresh} spinning>
@@ -31,11 +25,26 @@ export default function DlsiteStateCell({
         </StatusLabel>
       );
     case "fetched":
-      return (
-        <StatusLabel tone="done" icon={I.checkC}>
-          取得済み
-        </StatusLabel>
-      );
+      switch (display.cover.state) {
+        case "missing":
+          return (
+            <StatusLabel tone="none" className="text-ink-2">
+              カバー未取得
+            </StatusLabel>
+          );
+        case "failed":
+          return (
+            <StatusLabel tone="none" className="text-ink-2">
+              カバー取得失敗
+            </StatusLabel>
+          );
+        default:
+          return (
+            <StatusLabel tone="done" icon={I.checkC}>
+              取得済み
+            </StatusLabel>
+          );
+      }
     case "not_found":
       return (
         <StatusLabel tone="attention" icon={I.searchX}>
