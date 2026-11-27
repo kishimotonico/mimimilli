@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useAtom } from "jotai";
 import { useQueryClient } from "@tanstack/react-query";
@@ -8,6 +8,7 @@ import {
   type ScanCandidate,
 } from "@mimimilli/shared";
 import { apiErrorMessage } from "../../../../../shared/lib/apiError";
+import { isFocusLost } from "../../../../../shared/lib/isFocusLost";
 import { useLatest } from "../../../../../shared/lib/useLatest";
 import { useVirtualList } from "../../../../../shared/ui/useVirtualList";
 import { isCandidatesStale, STALE_MESSAGE } from "../../../model/candidatesStale";
@@ -54,6 +55,33 @@ interface RowFilter {
 
 const pathsOf = (rows: readonly CandidateRowModel[]) =>
   new Set(rows.map(({ candidate }) => candidate.path));
+
+interface FocusRequest {
+  nextPath: string | null;
+  gone: ReadonlySet<string>;
+}
+
+/** 消える行のあとに残る、次（無ければ前）の行の path */
+function nextRowPathAfterLeaving(
+  visibleRows: readonly CandidateRowModel[],
+  leaving: readonly CandidateRowModel[],
+): string | null {
+  const gone = pathsOf(leaving);
+  const firstGone = visibleRows.findIndex(({ candidate }) => gone.has(candidate.path));
+  const survivor = (rows: readonly CandidateRowModel[]) =>
+    rows.find(({ candidate }) => !gone.has(candidate.path));
+  const next =
+    survivor(visibleRows.slice(firstGone + 1)) ??
+    survivor(visibleRows.slice(0, firstGone).reverse());
+  return next?.candidate.path ?? null;
+}
+
+function focusRequestFor(
+  visibleRows: readonly CandidateRowModel[],
+  leaving: readonly CandidateRowModel[],
+): FocusRequest {
+  return { nextPath: nextRowPathAfterLeaving(visibleRows, leaving), gone: pathsOf(leaving) };
+}
 
 export default function UnregisteredTab({ onRegistered, onOpenFiles }: UnregisteredTabProps) {
   const queryClient = useQueryClient();
@@ -128,7 +156,9 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
   };
 
   const registerMutation = useRegisterScanCandidatesMutation();
+  const busy = registerMutation.isPending || excluding;
   const register = async (apply: DlsiteRegistrationApply) => {
+    if (busy) return;
     const paths = registerRows.map(({ candidate }) => candidate.path);
     const titleByPath = new Map(
       registerRows.map((row) => [
@@ -138,7 +168,16 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
     );
     const titlesOf = (entries: readonly { path: ScanCandidate["path"] }[]) =>
       entries.map((entry) => titleByPath.get(entry.path) ?? entry.path);
-    const outcome = await registerMutation.mutateAsync({ paths, apply });
+    focusRequestRef.current = focusRequestFor(visibleRows, registerRows);
+    let outcome;
+    try {
+      outcome = await registerMutation.mutateAsync({ paths, apply });
+    } catch (error) {
+      focusRequestRef.current = null;
+      throw error;
+    }
+    // 追加できた行だけが消える
+    narrowFocusRequest(outcome.registered.map((entry) => entry.path));
     const { interruptedBy } = outcome;
     if (interruptedBy) {
       setErrorMessage(
@@ -165,18 +204,51 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
     });
   };
 
-  const busy = registerMutation.isPending || excluding;
+  // 行が消える操作（除外・追加）のあと、操作した要素（行の︙・フッターの▾・主ボタン）が消えるか無効になる。
+  // 操作の前に移し先（残った隣の行の︙、次→前の順。無ければパネル）を決め、行が消えたコミットで移す
+  const focusRequestRef = useRef<FocusRequest | null>(null);
+  const [focusRequestTick, setFocusRequestTick] = useState(0);
+  const narrowFocusRequest = (gonePaths: readonly string[]) => {
+    const request = focusRequestRef.current;
+    if (!request) return;
+    focusRequestRef.current =
+      gonePaths.length === 0 ? null : { ...request, gone: new Set(gonePaths) };
+    setFocusRequestTick((tick) => tick + 1);
+  };
+  useLayoutEffect(() => {
+    const request = focusRequestRef.current;
+    if (
+      !request ||
+      request.gone.size === 0 ||
+      allRows.some(({ candidate }) => request.gone.has(candidate.path))
+    ) {
+      return;
+    }
+    focusRequestRef.current = null;
+    // 起点（フッターの▾や主ボタン）が残ってフォーカスもそこにあるとき、ユーザーが他へ移したときは動かさない
+    if (!isFocusLost()) return;
+    const row = [
+      ...(scrollRef.current?.querySelectorAll<HTMLElement>("[data-candidate-path]") ?? []),
+    ].find((element) => element.dataset.candidatePath === request.nextPath);
+    const target = row?.querySelector<HTMLElement>("[data-row-menu]");
+    (target ?? panelRef.current)?.focus({ preventScroll: true });
+  }, [focusRequestTick, allRows]);
 
   const excludeRows = useCallback(
     (rows: readonly CandidateRowModel[]) => {
       if (rows.length === 0) return;
       setErrorMessage(null);
-      exclude({
-        paths: rows.map(({ candidate }) => candidate.path),
-        titles: rows.map(rowTitle),
-      });
+      if (busy) return;
+      focusRequestRef.current = focusRequestFor(visibleRows, rows);
+      exclude(
+        {
+          paths: rows.map(({ candidate }) => candidate.path),
+          titles: rows.map(rowTitle),
+        },
+        { onError: () => (focusRequestRef.current = null) },
+      );
     },
-    [exclude],
+    [exclude, visibleRows, busy],
   );
 
   const toggleRow = useCallback(
@@ -284,6 +356,7 @@ export default function UnregisteredTab({ onRegistered, onOpenFiles }: Unregiste
                 return (
                   <div
                     key={candidate.path}
+                    data-candidate-path={candidate.path}
                     style={{ ...getItemStyle(virtualRow), height: ROW_HEIGHT }}
                   >
                     <UnregisteredRow

@@ -1,7 +1,6 @@
-import { useRef, useState } from "react";
+import { Fragment, useId, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
-import { AnimatePresence } from "motion/react";
 import {
   ALL_SMART_FOLDER_ID,
   type NormalizedTag,
@@ -16,7 +15,6 @@ import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import { MOBILE_MEDIA_QUERY, useMediaQuery } from "../../../shared/ui/useMediaQuery";
-import { usePopoverDismissal } from "../../../shared/ui/usePopoverDismissal";
 import { formatDuration } from "../../../shared/lib/format";
 import { smartFolderDialogAtom } from "../model/atoms";
 import { buildFilterTag, type CollectionStatsDisplay } from "../model/libraryPresentation";
@@ -69,12 +67,10 @@ export default function LibrarySidebarPanel({
   const editor = useSmartFolderEditor();
   const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY);
   const [editing, setEditing] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const triggerIdPrefix = useId();
   const setDialog = useSetAtom(smartFolderDialogAtom);
-  const headerRef = useRef<HTMLDivElement>(null);
   const {
     openKey: overlayFolderId,
-    openAnchorEl,
     ownerToken,
     registerPanelEl,
     getTriggerHandlers,
@@ -85,14 +81,6 @@ export default function LibrarySidebarPanel({
   const readyFolders = folders.status === "ready" ? folders.folders : [];
   const { data: counts } = useQuery(smartFolderCountsQueryOptions);
   const rows = buildSidebarRows(readyFolders, counts);
-  const overlayFolder = readyFolders.find((folder) => folder.id === overlayFolderId) ?? null;
-  const overlayGrouping = overlayFolder ? folderGrouping(overlayFolder) : null;
-
-  usePopoverDismissal({
-    isOpen: menuOpen,
-    onClose: () => setMenuOpen(false),
-    anchorRef: headerRef,
-  });
 
   const { saving: reordering } = useSidebarReorder({
     enabled: editing,
@@ -106,19 +94,13 @@ export default function LibrarySidebarPanel({
 
   const startEditing = () => {
     closeOverlay();
-    setMenuOpen(false);
     setEditing(true);
-  };
-
-  const addFromTemplate = async (templateId: string) => {
-    setMenuOpen(false);
-    await editor.addFromTemplate(templateId);
   };
 
   return (
     <nav className="mll-sidebar" aria-label="ライブラリ">
       <div className="mll-sidebar__scroll">
-        <div className="mll-sidebar__hd" ref={headerRef}>
+        <div className="mll-sidebar__hd">
           <span>ライブラリ</span>
           {editing ? (
             <button type="button" className="mll-sidebar__done" onClick={() => setEditing(false)}>
@@ -127,15 +109,16 @@ export default function LibrarySidebarPanel({
           ) : (
             folders.status === "ready" && (
               <>
-                <IconButton
-                  icon={I.add}
-                  label="追加"
-                  size="xs"
-                  tone="muted"
-                  active={menuOpen}
-                  aria-haspopup="menu"
-                  aria-expanded={menuOpen}
-                  onClick={() => setMenuOpen((open) => !open)}
+                <SidebarAddMenu
+                  duplicateName={duplicateSource?.name ?? null}
+                  canSaveSearch={filtered}
+                  templates={missingTemplates(readyFolders)}
+                  onDuplicate={() => {
+                    if (duplicateSource) setDialog({ kind: "duplicate", folder: duplicateSource });
+                  }}
+                  onSaveSearch={onSaveSearch}
+                  onAddGroup={() => setDialog({ kind: "group" })}
+                  onAddTemplate={(templateId) => void editor.addFromTemplate(templateId)}
                 />
                 <IconButton
                   icon={I.edit}
@@ -147,57 +130,63 @@ export default function LibrarySidebarPanel({
               </>
             )
           )}
-          {menuOpen && (
-            <SidebarAddMenu
-              duplicateName={duplicateSource?.name ?? null}
-              canSaveSearch={filtered}
-              templates={missingTemplates(readyFolders)}
-              onDuplicate={() => {
-                setMenuOpen(false);
-                if (duplicateSource) setDialog({ kind: "duplicate", folder: duplicateSource });
-              }}
-              onSaveSearch={() => {
-                setMenuOpen(false);
-                onSaveSearch();
-              }}
-              onAddGroup={() => {
-                setMenuOpen(false);
-                setDialog({ kind: "group" });
-              }}
-              onAddTemplate={(templateId) => void addFromTemplate(templateId)}
-            />
-          )}
         </div>
-        {rows.map((row) => {
-          if (!editing) {
-            return (
-              <SidebarRowItem
-                key={row.id}
-                row={row}
-                isActive={activeFolderId === row.id}
-                isOverlayOpen={overlayFolderId === row.id}
-                onSelect={() => {
-                  closeOverlay();
-                  onOpenFolder(row.id);
-                }}
-                getTriggerHandlers={getTriggerHandlers}
-                openImmediately={openImmediately}
-              />
-            );
-          }
-          const folder = readyFolders.find((item) => item.id === row.id)!;
+        {rows.map((row, index) => {
+          const folder = readyFolders[index]!;
+          const grouping = folderGrouping(folder);
+          const triggerId = `${triggerIdPrefix}-${row.id}`;
+          const ownsOverlay = overlayFolderId === row.id;
+          const open = ownsOverlay && !editing;
+          const token = ownsOverlay ? ownerToken : null;
           return (
-            <SidebarEditRow
-              key={row.id}
-              row={row}
-              canRemove={folder.id !== ALL_SMART_FOLDER_ID}
-              draggableEnabled={!isMobile}
-              dragLocked={reordering}
-              onEdit={() => {
-                setDialog({ kind: "edit", folder });
-              }}
-              onRemove={() => void editor.remove(folder)}
-            />
+            <Fragment key={row.id}>
+              {editing ? (
+                <SidebarEditRow
+                  row={row}
+                  canRemove={folder.id !== ALL_SMART_FOLDER_ID}
+                  draggableEnabled={!isMobile}
+                  dragLocked={reordering}
+                  onEdit={() => setDialog({ kind: "edit", folder })}
+                  onRemove={() => void editor.remove(folder)}
+                />
+              ) : (
+                <SidebarRowItem
+                  row={row}
+                  id={triggerId}
+                  isActive={activeFolderId === row.id}
+                  isOverlayOpen={open}
+                  onSelect={() => {
+                    closeOverlay();
+                    onOpenFolder(row.id);
+                  }}
+                  getTriggerHandlers={getTriggerHandlers}
+                  openImmediately={openImmediately}
+                />
+              )}
+              {grouping && (
+                <GroupValuePopover
+                  placement="right"
+                  open={open}
+                  triggerId={triggerId}
+                  restoreFocus={overlayFolderId === null || ownsOverlay}
+                  list={{
+                    // 値へ進むとチップと検索語が消えるので、絞り込み無しで数える。
+                    scope: { folderId: row.id },
+                    groupBy: grouping.groupBy,
+                    groupSort: grouping.groupSort,
+                    groupByLabel: getGroupByLabel(grouping.groupBy, tagPrefixes),
+                    selectedValue: row.id === activeFolderId ? activeGroup : null,
+                    onSelectValue: (value) => onOpenGroupValue(row.id, value),
+                    onAddValue: (value) => onAddTag(buildFilterTag(grouping.groupBy, value)),
+                  }}
+                  onClose={() => {
+                    if (ownsOverlay) closeOverlay();
+                  }}
+                  panelHandlers={token ? getPanelHandlers(token) : undefined}
+                  onPanelElChange={token ? (el) => registerPanelEl(token, el) : undefined}
+                />
+              )}
+            </Fragment>
           );
         })}
         {folders.status === "error" && (
@@ -220,27 +209,6 @@ export default function LibrarySidebarPanel({
       {stats.status === "error" && (
         <div className="mll-sidebar__foot">統計の取得に失敗しました</div>
       )}
-
-      <AnimatePresence>
-        {!editing && overlayFolder && overlayGrouping && ownerToken && (
-          <GroupValuePopover
-            key={overlayFolder.id}
-            placement="right"
-            // そこから入るとチップと検索語は消えるので、絞り込み無しで数える
-            scope={{ folderId: overlayFolder.id }}
-            groupBy={overlayGrouping.groupBy}
-            groupSort={overlayGrouping.groupSort}
-            groupByLabel={getGroupByLabel(overlayGrouping.groupBy, tagPrefixes)}
-            anchorEl={openAnchorEl}
-            selectedValue={overlayFolder.id === activeFolderId ? activeGroup : null}
-            onSelectValue={(value) => onOpenGroupValue(overlayFolder.id, value)}
-            onAddValue={(value) => onAddTag(buildFilterTag(overlayGrouping.groupBy, value))}
-            onClose={closeOverlay}
-            panelHandlers={getPanelHandlers(ownerToken)}
-            onPanelElChange={(el) => registerPanelEl(ownerToken, el)}
-          />
-        )}
-      </AnimatePresence>
     </nav>
   );
 }

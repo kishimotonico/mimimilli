@@ -11,6 +11,7 @@ import WorksEmptyState from "./WorksEmptyState";
 import LoadMore from "./LoadMore";
 import { useVirtualList } from "../../../shared/ui/useVirtualList";
 import { useWorkResultsDismiss } from "./useWorkResultsDismiss";
+import { useFocusListOnReturn } from "./useFocusListOnReturn";
 import { useListKeyboardNav } from "../../../shared/ui/useListKeyboardNav";
 import { useRovingIndex } from "./useRovingIndex";
 import { useRevealSelectedWork } from "./useRevealSelectedWork";
@@ -47,6 +48,8 @@ export default function WorkListPane({
 
   const measureElement = useCallback(() => WORK_ROW_ESTIMATE_SIZE, []);
 
+  const getItemKey = useCallback((index: number) => works[index]?.id ?? index, [works]);
+
   const { scrollRef, virtualizer, virtualItems, wrapperStyle, getItemStyle } = useVirtualList({
     count: works.length,
     estimateSize: WORK_ROW_ESTIMATE_SIZE,
@@ -54,6 +57,7 @@ export default function WorkListPane({
     padding: { start: LIST_PADDING_START, end: paddingEnd },
     overscan: 5,
     measureElement,
+    getItemKey,
     infiniteScroll:
       hasNextPage && onLoadMore
         ? {
@@ -64,6 +68,7 @@ export default function WorkListPane({
         : undefined,
   });
 
+  useFocusListOnReturn(isPending, works.length, virtualItems.length);
   useWorkResultsDismiss(isWorkSelected, onDeselect, scrollRef, ".mll-wrow");
 
   const [listEl, setListEl] = useState<HTMLDivElement | null>(null);
@@ -134,7 +139,12 @@ export default function WorkListPane({
 
   return (
     <div className={`mle-col is-results ${isPending ? "is-pending" : ""}`}>
-      <div ref={setListContainer} className="mle-col__list">
+      <div
+        ref={setListContainer}
+        data-work-list
+        tabIndex={works.length === 0 ? -1 : undefined}
+        className="mle-col__list outline-none"
+      >
         {works.length === 0 ? (
           <WorksEmptyState
             variant="list"

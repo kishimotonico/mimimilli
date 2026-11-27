@@ -1,5 +1,6 @@
 import { createElement } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import PopupContent from "../../src/features/player/ui/PopupContent";
 import {
@@ -125,43 +126,36 @@ describe("PopupContent", () => {
     expect(handlers.onSetVolume).toHaveBeenCalledWith(80);
   });
 
-  it("再生速度ピルでメニューを開き選択できる", () => {
+  it("再生速度ピルでメニューを開き選択できる", async () => {
     const handlers = renderPopup({ playbackRate: 1 });
-    fireEvent.click(screen.getByTitle("再生速度"));
-    fireEvent.click(screen.getByRole("menuitemradio", { name: "1.5×" }));
+    await userEvent.click(screen.getByTitle("再生速度"));
+    await userEvent.click(screen.getByRole("menuitemradio", { name: "1.5×" }));
     expect(handlers.onSetPlaybackRate).toHaveBeenCalledWith(1.5);
   });
 
-  it("速度メニューを開いている間は±10秒ボタンを隠し、閉じると戻す", () => {
+  it("速度メニューを開いている間は±10秒ボタンを隠し、閉じると戻す", async () => {
     renderPopup({ playbackRate: 1 });
     expect(screen.getByTitle("10秒戻る")).toBeInTheDocument();
     expect(screen.getByTitle("10秒進む")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTitle("再生速度"));
+    await userEvent.click(screen.getByTitle("再生速度"));
     expect(screen.queryByTitle("10秒戻る")).not.toBeInTheDocument();
     expect(screen.queryByTitle("10秒進む")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("menuitemradio", { name: "1.5×" }));
+    await userEvent.click(screen.getByRole("menuitemradio", { name: "1.5×" }));
     expect(screen.getByTitle("10秒戻る")).toBeInTheDocument();
     expect(screen.getByTitle("10秒進む")).toBeInTheDocument();
   });
 
-  it("再生速度メニューはスクロールで閉じる", () => {
+  it("再生速度メニューは、フォーカスが外へ移っても移動先のフォーカスを保って閉じる", async () => {
     renderPopup({ playbackRate: 1 });
-    fireEvent.click(screen.getByTitle("再生速度"));
-    expect(screen.getByRole("menu", { name: "再生速度" })).toBeInTheDocument();
+    await userEvent.click(screen.getByTitle("再生速度"));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
 
-    fireEvent.scroll(window);
-    expect(screen.queryByRole("menu", { name: "再生速度" })).not.toBeInTheDocument();
-  });
-
-  it("再生速度メニューはフォーカスが外へ移ると閉じる", () => {
-    renderPopup({ playbackRate: 1 });
-    fireEvent.click(screen.getByTitle("再生速度"));
-    expect(screen.getByRole("menu", { name: "再生速度" })).toBeInTheDocument();
-
-    fireEvent.focusOut(screen.getByTitle("再生速度"), { relatedTarget: document.body });
-    expect(screen.queryByRole("menu", { name: "再生速度" })).not.toBeInTheDocument();
+    const back = screen.getByRole("button", { name: "再生を停止" });
+    back.focus();
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    expect(back).toHaveFocus();
   });
 
   it("停止ボタンでonStopを、バーへ戻るでonFoldを、⤢でonOpenNowPlayingを呼ぶ", () => {

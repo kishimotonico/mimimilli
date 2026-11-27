@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { Work } from "@mimimilli/shared";
 import { emptyDlsiteState } from "@mimimilli/shared";
@@ -78,7 +79,7 @@ describe("WorkMetadataActions", () => {
     });
   });
 
-  it("その他メニューから登録解除を選ぶと onDelete を呼ぶ", () => {
+  it("その他メニューから登録解除を選ぶと onDelete を呼ぶ", async () => {
     const onDelete = vi.fn();
     render(
       <WorkMetadataActions
@@ -90,12 +91,12 @@ describe("WorkMetadataActions", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "その他" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
+    await userEvent.click(screen.getByRole("button", { name: "その他" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "登録解除" }));
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 
-  it("http(s)の外部リンクはメニューでhref付きリンクとして表示する", () => {
+  it("http(s)の外部リンクはメニューでhref付きリンクとして表示する", async () => {
     render(
       <WorkMetadataActions
         work={makeWork({
@@ -108,12 +109,12 @@ describe("WorkMetadataActions", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "その他" }));
+    await userEvent.click(screen.getByRole("button", { name: "その他" }));
     const link = screen.getByRole("menuitem", { name: "DLsiteを開く" });
     expect(link).toHaveAttribute("href", "https://www.dlsite.com/work/123");
   });
 
-  it("危険スキームの外部リンクはメニューでリンク化しない", () => {
+  it("危険スキームの外部リンクはメニューでリンク化しない", async () => {
     render(
       <WorkMetadataActions
         work={makeWork({
@@ -126,7 +127,7 @@ describe("WorkMetadataActions", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "その他" }));
+    await userEvent.click(screen.getByRole("button", { name: "その他" }));
     const item = screen.getByRole("menuitem", { name: "Evilを開く" });
     expect(item).not.toHaveAttribute("href");
     expect(item).toHaveAttribute("aria-disabled", "true");

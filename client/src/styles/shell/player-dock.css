@@ -123,18 +123,8 @@
   display: flex;
 }
 .mle-bar1__volpop {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 33;
   display: flex;
   align-items: center;
-  padding: 8px 10px;
-  background: var(--paper-1);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-2);
-  box-shadow: var(--shadow-pop);
 }
 .mle-bar1__volpop input[type="range"] {
   width: 96px;

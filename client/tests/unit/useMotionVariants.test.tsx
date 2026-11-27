@@ -9,7 +9,8 @@ import {
   dockPopupScaleVariant,
   fadeSlideUpVariant,
   fadeVariant,
-  popoverScaleVariant,
+  layerScaleVariant,
+  lightboxScaleVariant,
   previewSlideVariant,
   useMotionVariants,
 } from "../../src/shared/ui/useMotionVariants";
@@ -23,7 +24,8 @@ describe("motion variant builders: reduced=false は duration>0", () => {
     ["dockBarSlide", () => dockBarSlideVariant(false)],
     ["dockBarSwitch", () => dockBarSwitchVariant(false, { waitEnter: true })],
     ["dockPopupScale", () => dockPopupScaleVariant(false, { waitEnter: true })],
-    ["popoverScale", () => popoverScaleVariant(false, { origin: "top left" })],
+    ["lightboxScale", () => lightboxScaleVariant(false)],
+    ["layerScale", () => layerScaleVariant(false)],
     ["colstackWidth", () => colstackWidthVariant(false)],
     ["previewSlide", () => previewSlideVariant(false)],
   ])("%s", (_name, build) => {
@@ -45,7 +47,8 @@ describe("motion variant builders: exit に pointerEvents を置かない（退�
     ["dockBarSlide", () => dockBarSlideVariant(false)],
     ["dockBarSwitch", () => dockBarSwitchVariant(false)],
     ["dockPopupScale", () => dockPopupScaleVariant(false)],
-    ["popoverScale", () => popoverScaleVariant(false, { origin: "top left" })],
+    ["lightboxScale", () => lightboxScaleVariant(false)],
+    ["layerScale", () => layerScaleVariant(false)],
     ["colstackWidth", () => colstackWidthVariant(false)],
     ["previewSlide", () => previewSlideVariant(false)],
   ])("%s", (_name, build) => {
@@ -63,7 +66,8 @@ describe("motion variant builders: reduced=true は全variantのduration/delay�
     ["dockBarSlide", () => dockBarSlideVariant(true)],
     ["dockBarSwitch", () => dockBarSwitchVariant(true, { waitEnter: true })],
     ["dockPopupScale", () => dockPopupScaleVariant(true, { waitEnter: true })],
-    ["popoverScale", () => popoverScaleVariant(true, { origin: "top left" })],
+    ["lightboxScale", () => lightboxScaleVariant(true)],
+    ["layerScale", () => layerScaleVariant(true)],
     ["colstackWidth", () => colstackWidthVariant(true)],
     ["previewSlide", () => previewSlideVariant(true)],
   ])("%s", (_name, build) => {

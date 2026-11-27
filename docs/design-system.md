@@ -59,7 +59,7 @@
   - 意図的に付与しなかった対象: 停止・展開・折りたたみ・「再生中の作品を表示」等のナビゲーション系ボタン（再生状態を切り替える操作ではないため）、`ABRepeatBar`のA/B地点設定ボタン（再生状態を切り替える連続操作ではなく、その場で状態を確定させる一回限りのアクションのため、標準のSpace活性化のままでよい）
 - 再生中の層はEscで閉じる（通常・没入のどちらでも。没入の切り替えはボタンだけ）。開いているポップオーバーとモーダルが先にEscを受け、層はそれらが無いときだけ閉じる。
 - Escapeはレイヤーごとに一段だけ閉じる（`TagCombobox`）。候補表示中のEscapeは候補だけを閉じ、ダイアログのcancelや親popoverのdismissへは伝播させない。候補が閉じているときのEscapeは、呼び出し元が渡した`onCancel`があればそれ（編集キャンセル等）を呼び、`onCancel`が無ければ何もせずネイティブ`<dialog>`のcancelへ素通しする
-- ポップオーバー（メニュー・`RegisterFieldsPopover` を含む）は、開いている間、アンカーと同じダイアログ（なければダイアログの外）のEscapeをダイアログのcancelより先に受けて自分だけを閉じる（`usePopoverEscape`。`useAnchoredPopover`・`usePopoverDismissal` の既定）。フォーカスがポップオーバーの外でも同じダイアログの中なら閉じ、フォーカスが body にあるときは最前面のモーダルの中のものが閉じる。背面のダイアログで開いたままのポップオーバーは、前面のダイアログのEscapeを受けない。入力欄など内側の要素が先に処理したEscapeは受けない。同じ範囲に複数開いていれば、あとから開いたものから閉じる
+- メニューとポップオーバーは、Ark UI が document の capture 段で Escape を受け、最前面の層から一段ずつ閉じる。タグのポップオーバーでは Ark UI の Escape による閉じを止め、`TagCombobox` に処理を任せる。
 - IME変換中（`event.nativeEvent.isComposing`）はEscapeもEnterも無視する。変換の取り消し・確定はIME自身に任せ、候補の開閉・タグ確定・onCancelは発火させない
 
 ## 作品一覧・トラック一覧のキーボード操作
@@ -90,22 +90,20 @@
 
 実装調査済みの値（正は実装）。
 
-| 要素                                                                                                                           | 層                    |
-| ------------------------------------------------------------------------------------------------------------------------------ | --------------------- |
-| ソートメニューのポップアップ                                                                                                   | z-index 30            |
-| グループ値のクイックオーバーレイ・パンくずの値ドロップダウン（`.mll-qoverlay`）・「＋絞り込み」の候補（`FilterChipAddButton`） | z-index 30            |
-| プレイヤー（バー/ポップアップ）                                                                                                | z-index 32            |
-| 再生中の層（`.mle-layer`。中身の z-index は層の中で閉じる）                                                                    | z-index 34            |
-| 層の中・下部帯の背景（`.mle-nowplaying__bg`）                                                                                  | z-index 32            |
-| 層の中・トランスポート/AB行（`.mle-nowplaying__controls`）                                                                     | z-index 33            |
-| 層の中・没入モード面（`.mle-nowplaying__immersive`）                                                                           | z-index 40            |
-| 層の中・シーク行（`.mle-nowplaying__seek`、没入面より常に手前）                                                                | z-index 41            |
-| 再生速度メニュー（`.mle-ratepick__pop`、`document.body`へポータル）                                                            | z-index 50            |
-| 設定モーダル                                                                                                                   | top layer（下記）     |
-| スキャンモーダル                                                                                                               | top layer（下記）     |
-| スマートフォルダーのダイアログ                                                                                                 | top layer（下記）     |
-| 作品編集・DLsite適用プレビュー                                                                                                 | top layer（下記）     |
-| **グローバルトースト**（`Toast` / `GlobalToast`）                                                                              | **top layer（下記）** |
+| 要素                                                                                                                | 層                    |
+| ------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| プレイヤー（バー/ポップアップ）                                                                                     | z-index 32            |
+| 再生中の層（`.mle-layer`。中身の z-index は層の中で閉じる）                                                         | z-index 34            |
+| 層の中・下部帯の背景（`.mle-nowplaying__bg`）                                                                       | z-index 32            |
+| 層の中・トランスポート/AB行（`.mle-nowplaying__controls`）                                                          | z-index 33            |
+| 層の中・没入モード面（`.mle-nowplaying__immersive`）                                                                | z-index 40            |
+| 層の中・シーク行（`.mle-nowplaying__seek`、没入面より常に手前）                                                     | z-index 41            |
+| メニュー・ポップオーバー（`menuPanelClass` / `popoverPanelClass`。body または所属するネイティブ dialog へポータル） | z-index 50            |
+| 設定モーダル                                                                                                        | top layer（下記）     |
+| スキャンモーダル                                                                                                    | top layer（下記）     |
+| スマートフォルダーのダイアログ                                                                                      | top layer（下記）     |
+| 作品編集・DLsite適用プレビュー                                                                                      | top layer（下記）     |
+| **グローバルトースト**（`Toast` / `GlobalToast`）                                                                   | **top layer（下記）** |
 
 設定モーダル・スキャンモーダル・スマートフォルダーのダイアログ・作品編集・DLsite適用プレビューは
 ネイティブ `<dialog>` + `showModal()` で実装しており、z-index ではなくブラウザの
@@ -189,7 +187,22 @@ focus中はタイマーを止め、離れると残り時間から再開する。
 - 画像がないカバー枠は `ScanCover`（`--cover-none` の斜線）に統一する。画像があるときも同じ枠でトリミングし、行ごとに大きさを変えない
 - 縦タブの件数は枠を常に確保し、件数の有無で行の高さを変えない。要対応のバッジだけ `--state-danger` 系の色にする
 - 一覧の上の帯（未登録のツールバー、更新済みの変化の種類のチップ行）は、載せるものがあるときだけ出し、空の帯は出さない。未登録は「問題あり」チップか「除外済み」があるときに出し、一覧が未スキャンや読み込み失敗でも除外済みがあれば出す。更新済みは件数が分かるとき（スキャンの記録が読めているとき）に出す。読み込み中は件数が分からないので、除外済みのある未登録の帯だけを出す
-- メニュー（行の⋮・主ボタンの▾）は共有の `PopupMenu`（項目の配列を受け、トリガーは呼び出し側が描く。所属するダイアログの中へ出す）で組む。破壊的な項目だけ赤、件数は項目の右端に添える。行のメニューはボタンの下に開き、入らないときだけ上へ反転する（`placement: "belowEnd"`）。開いている行のボタンに背景は付けない
+- ボタン起点のメニューは Ark UI の `Menu` を `shared/ui/menu/` で組む。行の⋮（`RowMenu`）と主ボタンの▾（`SplitButton`）も同じ層の上に組む
+  - 部品: `MotionMenu.tsx` の `useMotionMenu`・`MotionMenuRoot`・`MotionMenuTrigger`・`MenuPopup`、`menuStyles.ts` のクラス、`MenuCheckColumn`。別の層を開く項目は `MenuLayerItem`。トリガーは必ず `MotionMenuTrigger` で描く。フックのハンドルが公開するのは `open`・`closeAndReturn` だけ
+  - 位置: 常に `strategy: "fixed"`。トリガーを含む領域がスクロールしたら閉じる。ネイティブ dialog の中のトリガーから開くメニューは、`MenuPopup` がその dialog の中へ出す。ボタンの下（`bottom-end`）か上（`top-end`）に開き、アンカーとの間は6px（`LAYER_GUTTER`。呼び出し側で gutter を書かない）
+  - 出入り: 不透明度と scale .96→1 の0.12秒（`layerScale`）。起点は zag が placement から決める `--transform-origin` で、flip しても向きに合う（呼び出し側で origin を書かない）。退出中は `inert`。`data-state` は退出中も `open` のまま
+  - 見た目（全メニュー共通）: パネルは角6px・枠 `--line-soft`・`--shadow-pop`・内側余白4px、幅は内容幅で最小180px（再生速度だけ112px）・最大280px。項目は高さ28px・角4px・左右8px・`--fs-body`。ハイライトはホバーもキーボードも `--paper-2`、無効は `--ink-4`。アイコンは付けない
+  - 項目の中身: 選択中は左のチェック列（14px）に `--acc` のチェックだけを出す（チェック・ラジオ項目を持つメニューだけ列を確保。背景・太字は使わない）。件数は右端に `--ink-3`・等幅11px。破壊的な項目は常に `--state-danger` で、区切り線（`--line-soft`）の下に置く。小見出しは10px・600・字間 .08em・`--ink-2`
+  - 無効: フックの `disabled` を渡す。フォーカスを残したまま、開くキー・ポインターを受けず、`aria-disabled` と `data-disabled` が付く
+  - 開く操作の横取り: `useMotionMenu` の `interceptOpen`（`SplitButton` では `interceptMenuOpen`）。閉じているときの開く操作（ポインター・Enter・Space・ArrowDown・ArrowUp）で呼ばれ、true を返すと開かない。メニューの open は制御しない（制御モードは閉じるときにフォーカスをトリガーへ戻し、`restoreFocus: false` を失う）。未登録タブの▾が、項目選択を開いているときは閉じるだけにするのに使う
+- ポップオーバーは Ark UI の `Popover` を `shared/ui/popover/` で組む。外枠と出入りはメニューと同じで、内側の余白は12px。外枠・退出時の寿命・ポータル先・スクロール監視・IME のキー判定・セレクタと content の登録は `shared/ui/layer/` に集める
+  - 部品: `useMotionPopover`・`MotionPopoverRoot`・`MotionPopoverTrigger`・`PopoverPopup`。トリガーは `MotionPopoverTrigger`、無効にするときはフックの `disabled`（メニューと同じ）。親の退出で閉じるときは `closeOnParentExit`
+  - 基準: 既定はトリガー。別の要素を基準にするときは `ids.anchor` にその要素の id を渡す（項目選択は `SplitButton` の外枠 `id`）。トリガーの id を `ids.trigger` で渡すときは、要素側の id を宣言的に付ける（パンくずは `Breadcrumbs` の `lastSegmentId`。DOM の id を書き換えない）
+  - フォーカス: 戻し先は開く前の要素、切れていればトリガー。確定時は `closeAndReturn` でフォーカスを移してから閉じる。ポップオーバーの中から開くメニューはその Content 内にポータルする
+  - タグ追加: `TagAddPopover`（`WorkTagEditor` と `WorkEditTagsField` が共有）。幅260px・`bottom-start`・開いたら入力欄にフォーカス。Esc は止めて `TagCombobox` に任せる。狭い幅（`WorkTagEditor`）では開く時点でインライン展開に切り替え、トリガーは1つのまま。インラインのパネルは層と同じ枠で、外側の pointerdown と外へのフォーカス移動で閉じる（`useDismissOnOutsideInteraction`）
+  - 項目のボタン一覧: ポップオーバーの中に並べるボタン（「＋絞り込み」の1段目、`GroupValueQuickList` の値）は `popoverListItemClass`（高さ28px、ホバーとフォーカスで `--paper-2`）で描く。メニューの項目とは別に持つ
+  - ポータルした層の中のイベント: React の木をたどって祖先のハンドラへ届く。層の側では止めない（stopPropagation はネイティブの伝播まで止め、⌘K・Ctrl+B・外側クリックなど window・document のリスナーに届かなくなる）。pointerdown・click・dblclick・keydown のハンドラを持つ層の祖先は `isFromPortaledLayer(event)`（`shared/ui/layer/layerEvents.ts`）で弾く（例: `PlayerDock` の `usePopupDrag`、`BarContent` の本体）。没入表示の面は、`NowPlayingImmersiveMiniControls` のラッパーが自前の stopPropagation（速度ピル自身のクリックにも要る既存の処理）で守っている。グローバルなキー（`useGlobalShortcuts` の Space・矢印）は層の中（`LAYER_CONTENT_SELECTOR`）では動かさない
+- フォーカスを残したまま無効にするボタン: `Button` の `softDisabled`（見た目、`aria-disabled`、自分の onClick と Enter・Space だけを無効にする。`disabled` 属性は付けない）。`SplitButton` の主ボタンとスキャンの中止ボタンが使う。Ark のトリガーは `softDisabled` では止まらないので、メニュー・ポップオーバーのトリガーはフックの `disabled` を使う
 - フッターは共有の `ModalFooter` に、高さと上線の色（`--line`）だけを上書きする。主ボタンは `md`
 
 要対応は種類・対象・起きていること・推奨アクションの4列。直す種類は `--state-danger`、行方不明は `ink-1` で出す。操作ボタンは推奨アクションの列にだけ置き、対象や起きていることの列には置かない。ID重複の対象は固定幅のラベル（登録済み・未登録）とパスを1行に並べ、ボタンは1つだけで、未登録のパスの先頭の1つを取り込む。パスやファイル名は等幅で出す。
@@ -213,14 +226,14 @@ focus中はタイマーを止め、離れると残り時間から再開する。
 - 最下部の統計（`.mll-sidebar__foot`）は「{N}作品 · {N}トラック · {合計時間}」。JetBrains Mono 10.5px・`--ink-2`・上辺に `--line-soft`。取得に失敗したときは「統計の取得に失敗しました」
 - 開閉の状態は端末の `localStorage`（`mimimilli:librarySidebarOpen`）に保存し、画面幅では自動で切り替えない。作品詳細でも同じ状態を使う。切り替えはアドレスバー左端のボタン（`SidebarToggleButton`）と Ctrl+B（Mac は ⌘B）。入力欄・テキストエリア・セレクト・contenteditable にフォーカスがあるときは Ctrl+B を奪わない
 - 作品詳細では、選択中の行は元のスマートフォルダー。その行を押すと、保持しているライブラリの状態（スマートフォルダー・グループの値・チップ・検索語・今のソート・seed）のまま一覧へ戻る。別の行を押すと入り直す（チップ・検索語・今のソートを捨てる）
-- グループ分けを持つ行は、ホバー約200ms・フォーカス中の ArrowRight でクイックオーバーレイを右に出す（`GroupValuePopover` の `placement="right"`、値の操作は後述）
+- グループ分けを持つ行はそれぞれ Ark UI の `Popover.Root` を持つ。ホバー約200ms・フォーカス中の ArrowRight で、その行のクイックオーバーレイを右に出す（`GroupValuePopover` の `placement="right"`、値の操作は後述）。
 
 サイドバーの編集（構成と挙動の正は ADR-0041・ADR-0042、見た目は[構想モック v13](https://claude.ai/artifact/7a3AkWuZisApFV6SZAnkg4)を参照して決めた。正は実装）:
 
 - 編集の状態: 見出しの ✎ で入り、見出し右端の「完了」（Geist 10.5px・600・`--acc-ink`）で抜ける。入っている間は ＋・✎ を出さない。行は選択できず、グループ分けの行のクイックオーバーレイも出さない
 - 編集の行（`.mll-sbrow.is-editing`、`SidebarEditRow`）: 左からグリップ（`.grip`、`--ink-3`、grab）・アイコン・名前・編集 `.act`・削除 `.act`（22px 角・角丸 4px、hover は `--paper-3`）。「すべて」の削除は同じ幅の空きにする。モバイル幅（768px 未満、`useMediaQuery`）ではグリップを出さずドラッグも登録しない
 - 並べ替え: 行全体がドラッグ元で、行の上半分・下半分で前後を決める（hitbox の list-item）。ドロップ位置は自前の線で示す（前: `.is-drop-before` は上辺、後: `.is-drop-after` は下辺に `--acc` の 2px の `inset box-shadow`）。ドラッグ中の行は `.is-dragging`（opacity .35）。ドロップ後に全件の順序を PUT し、画面には先に反映する（失敗したら一覧を取り直す）。保存中は次のドラッグを受け付けない（グリップは残す）
-- 追加メニュー（`.mll-sbmenu`、`SidebarAddMenu`）: 見出しの下に左右 4px 空けて全幅で出す。上から「「〇〇」を複製」（開いているスマートフォルダー名。絞り込みが無いときだけ）、「グループ分けを追加」、区切り線、小見出し「既定から追加」と今ない既定のテンプレート（無ければ `.none`「すべて追加済み」）。外側のクリック・Escape で閉じる。選ぶとダイアログを開く（既定から追加は即作成）。作ったらそのスマートフォルダーを開く
+- 追加メニュー（`SidebarAddMenu`）: ＋ の下（`bottom-end`）に出す。上から「「〇〇」を複製」（開いているスマートフォルダー名。絞り込みが無いときだけ）、「グループ分けを追加」、区切り線、小見出し「既定から追加」と今ない既定のテンプレート（無ければ「すべて追加済み」）。外側のクリック・Escape で閉じる。選ぶとダイアログを開く（既定から追加は即作成）。作ったらそのスマートフォルダーを開く
 - 編集のダイアログ（`SmartFolderDialog`、`Modal` 620）: 見出し「「〇〇」を編集」「「〇〇」を複製」「グループ分けを追加」と閉じるボタン、名前・条件・グループ分け・（グループ分けがあれば）「〇〇のソート」（〇〇はグループ分けの名前）・作品のソート（なければ既定のソート）、フッターにキャンセル（`Button` の `quiet`）と保存（`primary`）。条件はルート直下の子ごとに `.mll-condrow`（`--paper-2` 地、12px）で、まとまり（or・not(or)）は1行。行の × で外せ、グループ分けも選べる。「すべて」だけは名前・条件・グループ分けを変えられず（× も出さない）、既定のソートに「「すべて」と同じ」を出さない。条件が空のときは「なし（すべての作品）」。保存中は入力欄もすべて無効にし、閉じる・キャンセル・Esc・背景クリックでも閉じられない。保存に失敗したらサーバーの文言をトーストで見せ、同じ下書きのままダイアログを開いておく
 - 削除: 確認なしで削除し、トースト「「〇〇」を削除しました」の「元に戻す」で同じ ID・位置に作り直す（作成日時は作り直した時刻）。トーストは既存の `useToast`（単一ホスト）を使う
 
@@ -258,9 +271,11 @@ focus中はタイマーを止め、離れると残り時間から再開する。
 
 入れ子タグ（スラッシュ複数）の階層表示は名前順ソートのときだけ有効で、件数・総時間ソートではフルパスの平坦表示にフォールバックする（`groupValueHierarchy.ts`）。中間ノードは実際にタグとして存在する場合だけ選択可能な値行（配下の見出しを兼ねる）になり、存在しない場合は選択不可の見出し行になる。「配下を含む絞り込み」は作らない（ADR-0005 §6 の完全一致セマンティクスと衝突するため）。グリッド表示ではタイルの正方形の都合上インデントは付けず、代わりに葉ラベルの上に親パスを小さく添える。
 
-サイドバーのクイックオーバーレイはサイドバー（`overflow-y: auto`）の外にはみ出すため `document.body` へポータルする。「＋絞り込み」はクリップされない領域にあるため非ポータルの絶対配置で済ませる。パンくずの兄弟値は `document.body` へポータルする。両者とも横方向のクランプは `client/src/shared/ui/useAnchoredPopover` の `getContainer` オプションでクランプ対象コンテナ（floating-ui の `shift` / `size` の `boundary`）を差し替える。複数のトリガーが1つのポータル越しパネルを共有し常に高々1つだけ開くホバーUI（サイドバーのクイックオーバーレイ等）は `useHoverGroupCoordinator`（`shared/lib/`）を使う。開閉タイマーの共有に加え、トリガーからパネルへの斜め移動が他のトリガー行の上を通過してもセーフトライアングル判定で開閉が横取りされない。
+サイドバーのクイックオーバーレイとパンくずの兄弟値は Ark UI の `Popover` で、既存の行ボタンやパンくずの値を `ids.trigger` でトリガーとして登録し、body へポータルする。どちらも開いたら検索欄にフォーカスする。「＋絞り込み」も body へポータルし、グループ分けと値の二段階を一つの `Popover.Root` と `Content` の中で切り替える。初期フォーカスはグループ分けの先頭項目、値を選ぶ段では検索欄に移す。この段で Escape を押すと、層を閉じず直前に選んだグループ分けへ戻る。
 
-クイックオーバーレイ（`GroupValueQuickList`）は結果面の値一覧（`GroupValueRows` / `GroupValueGrid`）と同じデータ取得・ソートの規則・階層化ロジックを共有するが、表示密度は意図的に異なる。オーバーレイはポップオーバーで横幅が限られ、行の padding・行高も独自定数（`.mll-qlist__item` の 6px + 12px 行）で詰めている。入れ子タグの階層インデントもメイン一覧（14px/段）より狭い 12px/段にして、狭いパネル内でラベルが読める横幅を確保する。値のソートは、メイン一覧では route の今の値のソート（アドレスバーのソートメニューと list 列見出しが同じ状態を変える）、オーバーレイではそのスマートフォルダーの保存済みの値のソート、パンくずの兄弟値のポップオーバーでは開いているスマートフォルダーの今の値のソートで開き、中の列見出しでの変更は開いている間だけの一時状態である。並べ替えはサーバーで、入れ子タグの階層インデントは名前順のときだけ付け、各階層の順はサーバーの順のままにする。
+サイドバーの `useHoverGroupCoordinator`（`shared/lib/`）は、どの行を開くかとホバーのタイマーを管理する。行からパネルへの斜め移動が別の行を横切っても、セーフトライアングル判定で開閉を横取りしない。外側クリックで閉じる処理は Ark UI に任せ、各行の Root は自分の行が開いているときだけ閉じる通知を反映する。
+
+クイックオーバーレイ（`GroupValueQuickList`）は結果面の値一覧（`GroupValueRows` / `GroupValueGrid`）とデータ取得・ソート・階層化の規則を共有する。パネル内の値行は高さ28pxで、入れ子タグの階層インデントはメイン一覧（14px/段）より狭い12px/段にする。値のソートは、メイン一覧では route の今の値のソート（アドレスバーのソートメニューと list 列見出しが同じ状態を変える）、サイドバーではそのスマートフォルダーの保存済みの値のソート、パンくずの兄弟値では開いているスマートフォルダーの今の値のソートで開く。ポップオーバー内の列見出しでの変更は開いている間だけの一時状態とする。並べ替えはサーバーで行い、入れ子タグのインデントは名前順のときだけ付け、各階層の順はサーバーの順のままにする。
 
 ## 作品編集ダイアログ
 
@@ -277,9 +292,10 @@ focus中はタイマーを止め、離れると残り時間から再開する。
 - 既存ルート要素は直接 `motion.div` 等に置き換える（ラッパー DOM を被せない）。ただし collapse でルート要素に padding/border がある場合は、`overflow: hidden` だけを持つ無地のラッパーを 1 枚だけ被せる
 - `layout` / `layoutId` は使わない（カバーが歪むため）。スコープは出退場・opacity・transform・width・height(0↔auto) に限定する
 - fade の退出 `position: absolute` は最も近い positioned ancestor を基準にする。fade を使う箇所ごとに祖先が positioned かを確認する
-- AP 境界の子は必ずコンポーネントとして切り出し、内部で `useIsPresent()` を呼ぶ。用途は (a) ルート要素への `inert={!isPresent}`、(b) document/window レベルのリスナー（outside click・Escape 等）の退出中解除、(c) 再オープン時の初期フォーカス（退出アニメ中に同じ対象が開き直されたときに入力欄へフォーカスし直す）の 3 つに限定する。**閉じたときのフォーカス復帰には使わない** — 復帰は `activeElement` を検査して reason を渡す close ハンドラ側の責務。`isPresent` で復帰させると、対象を素早く切り替えたときに退出中の旧要素が新要素からフォーカスを奪う
+- AP 境界の子はコンポーネントとして切り出し、内部で `useIsPresent()` を呼ぶ。用途は (a) ルート要素への `inert={!isPresent}`、(b) document/window レベルのリスナー（outside click・Escape 等）の退出中解除に限る。フォーカスの戻し先はアプリが決め、Ark UI のポップオーバーとダイアログでは `finalFocusEl` で渡して Ark UI が復帰を実行する。`useIsPresent()` をフォーカス復帰に使わない。
 - クエリ購読は開閉状態に連動させない（`useXxxQuery(isOpen ? a : null)` のような引数の null 切替をしない）。子がマウントされている間は常に有効な引数で購読する
 - `MotionConfig reducedMotion="user"` は transform/layout のみ抑止し、opacity アニメは止まらない。`useMotionVariants` が reduce 時に全 variant の duration/delay を 0 にすることで opacity アニメも実質即完了させる
+- メニューとポップオーバーの出入りは `layerScale` を使う。`lightboxScale` を使うのは Lightbox だけ。
 - hover は短い transition のみで十分。派手な演出は避ける
 - 操作不能な要素は `cursor: not-allowed` にする
 - 長時間ループするアニメーション（パルス等）は reduced motion 対応を原則とする

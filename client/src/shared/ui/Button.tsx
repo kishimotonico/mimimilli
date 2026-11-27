@@ -1,6 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode, Ref } from "react";
 import { cn } from "../lib/cn";
 import type { IconFC } from "./Icon";
+import { softDisabledHandlers } from "./softDisabled";
 
 export type ButtonVariant = "primary" | "ghost" | "quiet" | "danger" | "danger-quiet";
 export type ButtonSize = "sm" | "md" | "lg";
@@ -11,6 +12,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** 先頭に置くアイコン */
   icon?: IconFC;
   active?: boolean;
+  /** フォーカスは残し、見た目と aria-disabled と自分の onClick だけを無効にする。Ark のトリガーを止めるには、フックの disabled を使う */
+  softDisabled?: boolean;
   children?: ReactNode;
   ref?: Ref<HTMLButtonElement>;
 }
@@ -72,20 +75,25 @@ export default function Button({
   icon: Icon,
   active = false,
   disabled = false,
+  softDisabled = false,
   className,
   children,
   type = "button",
   ref,
+  onClick,
+  onKeyDownCapture,
   ...rest
 }: ButtonProps) {
+  const looksDisabled = disabled || softDisabled;
   return (
     <button
       ref={ref}
       type={type}
       aria-pressed={active || undefined}
       disabled={disabled}
-      className={buttonClass(variant, size, { active, disabled, className })}
+      className={buttonClass(variant, size, { active, disabled: looksDisabled, className })}
       {...rest}
+      {...softDisabledHandlers(softDisabled, { onClick, onKeyDownCapture })}
     >
       {Icon && <Icon size={12} />}
       {children}

@@ -2,6 +2,7 @@
 // happy-dom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
 import { createElement, Fragment } from "react";
 import { cleanup, render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider, type InfiniteData } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
@@ -469,11 +470,11 @@ describe("ScanModal", () => {
     expect(onStart).toHaveBeenCalledWith();
   });
 
-  it("▾のメニューの「すべての作品を読み直す」で全件スキャンを始める", () => {
+  it("▾のメニューの「すべての作品を読み直す」で全件スキャンを始める", async () => {
     const { onStart } = renderModal({ record: scanRecord });
 
-    fireEvent.click(screen.getByRole("button", { name: "スキャンの方法" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "すべての作品を読み直す" }));
+    await userEvent.click(screen.getByRole("button", { name: "スキャンの方法" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "すべての作品を読み直す" }));
     expect(onStart).toHaveBeenCalledExactlyOnceWith({ full: true });
   });
 
@@ -946,7 +947,7 @@ describe("ScanModal", () => {
 
       expect(screen.getByText("中止しています…")).toBeInTheDocument();
       const button = screen.getByRole("button", { name: "スキャンを中止" });
-      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute("aria-disabled", "true");
       fireEvent.click(button);
       expect(onCancel).not.toHaveBeenCalled();
     });
@@ -1370,12 +1371,12 @@ describe("ScanModal", () => {
     await showUnregisteredList();
     const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
     await expect.poll(() => unregistered.textContent).toContain(candidateUndetected.inferredTitle);
-    fireEvent.click(
+    await userEvent.click(
       within(unregistered).getByRole("button", {
         name: `「${candidateUndetected.inferredTitle}」の操作`,
       }),
     );
-    fireEvent.click(screen.getByRole("menuitem", { name: "除外" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "除外" }));
 
     await waitFor(() =>
       expect(invalidateSpy).toHaveBeenCalledWith({
@@ -1421,8 +1422,8 @@ describe("ScanModal", () => {
     expect(
       within(unregistered).getByRole("button", { name: "DLsiteから取得 1件" }),
     ).toBeInTheDocument();
-    fireEvent.click(within(unregistered).getByRole("button", { name: "その他の操作" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "取得せずに追加" }));
+    await userEvent.click(within(unregistered).getByRole("button", { name: "その他の操作" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "取得せずに追加" }));
 
     await waitFor(() =>
       expect(api.requestsTo("POST /api/scan/candidates/register")).toHaveLength(1),
@@ -1442,12 +1443,12 @@ describe("ScanModal", () => {
     const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
     await expect.poll(() => unregistered.textContent).toContain(candidateUndetected.inferredTitle);
 
-    fireEvent.click(
+    await userEvent.click(
       within(unregistered).getByRole("button", {
         name: `「${candidateUndetected.inferredTitle}」の操作`,
       }),
     );
-    fireEvent.click(screen.getByRole("menuitem", { name: "除外" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "除外" }));
 
     await waitFor(() =>
       expect(api.requestsTo("POST /api/scan/candidates/exclude")[0]?.body).toEqual({

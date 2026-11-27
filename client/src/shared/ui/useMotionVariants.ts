@@ -63,7 +63,9 @@ const DUR = {
   dockBarTransform: 0.32,
   dockBarOpacity: 0.2,
   dockSwitch: 0.18,
-  popoverScale: 0.18,
+  dockPopupScale: 0.18,
+  lightboxScale: 0.18,
+  layerScale: 0.12,
   colstackWidth: 0.24,
   previewSlide: 0.22,
 } as const;
@@ -159,8 +161,8 @@ export function dockPopupScaleVariant(
   opts: WaitEnterOptions = {},
 ): MotionVariant {
   const enterDelay = opts.waitEnter ? DOCK_WAIT_ENTER_DELAY_S : 0;
-  const enterT = timing(reduced, DUR.popoverScale, EASE_OUT, enterDelay);
-  const exitT = timing(reduced, DUR.popoverScale, EASE_OUT);
+  const enterT = timing(reduced, DUR.dockPopupScale, EASE_OUT, enterDelay);
+  const exitT = timing(reduced, DUR.dockPopupScale, EASE_OUT);
   const transformOrigin = "bottom right";
   return {
     initial: { opacity: 0, scale: 0.85, transformOrigin },
@@ -179,30 +181,38 @@ export function dockPopupScaleVariant(
   };
 }
 
-export interface PopoverScaleOptions {
-  /** 出現方向に応じた transform-origin（例: "top left"）。呼び出し側の意匠で決まるため必須。 */
-  origin: string;
-}
-
-/** 汎用ポップオーバーの拡大縮小＋フェード。origin は呼び出し側が指定する。 */
-export function popoverScaleVariant(reduced: boolean, opts: PopoverScaleOptions): MotionVariant {
-  const t = timing(reduced, DUR.popoverScale, EASE_OUT);
-  const { origin } = opts;
+function scaleVariant(
+  duration: number,
+  from: number,
+  reduced: boolean,
+  transformOrigin: string,
+): MotionVariant {
+  const t = timing(reduced, duration, EASE_OUT);
   return {
-    initial: { opacity: 0, scale: 0.92, transformOrigin: origin },
+    initial: { opacity: 0, scale: from, transformOrigin },
     animate: {
       opacity: 1,
       scale: 1,
-      transformOrigin: origin,
+      transformOrigin,
       transition: { opacity: t, scale: t },
     },
     exit: {
       opacity: 0,
       scale: 0.96,
-      transformOrigin: origin,
+      transformOrigin,
       transition: { opacity: t, scale: t },
     },
   };
+}
+
+/** 画面中央の画像拡大（Lightbox）の拡大縮小＋フェード */
+export function lightboxScaleVariant(reduced: boolean): MotionVariant {
+  return scaleVariant(DUR.lightboxScale, 0.92, reduced, "center");
+}
+
+/** メニュー・ポップオーバーの出入り。起点は zag が placement から決める `--transform-origin` */
+export function layerScaleVariant(reduced: boolean): MotionVariant {
+  return scaleVariant(DUR.layerScale, 0.96, reduced, "var(--transform-origin)");
 }
 
 export interface ColstackWidthOptions {
@@ -249,7 +259,8 @@ export function useMotionVariants() {
     dockBarSlide: () => dockBarSlideVariant(reduced),
     dockBarSwitch: (opts?: WaitEnterOptions) => dockBarSwitchVariant(reduced, opts),
     dockPopupScale: (opts?: WaitEnterOptions) => dockPopupScaleVariant(reduced, opts),
-    popoverScale: (opts: PopoverScaleOptions) => popoverScaleVariant(reduced, opts),
+    lightboxScale: () => lightboxScaleVariant(reduced),
+    layerScale: () => layerScaleVariant(reduced),
     colstackWidth: (opts?: ColstackWidthOptions) => colstackWidthVariant(reduced, opts),
     previewSlide: () => previewSlideVariant(reduced),
   };

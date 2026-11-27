@@ -1,12 +1,11 @@
-// 画面下張り付きバーの音量ボタン。単体のミュートボタンはこのアプリの利用場面では
-// ほぼ不要なため、クリックで小さなポップオーバーを開き、その中のスライダーで
-// 音量を直接調整する形にする（ミュートしたければスライダーを0まで下げればよい）。
-// 開閉・外側クリック/Escape・フォーカス復帰は他のポップオーバーと同じ
-// usePopoverDismissal を使って揃える。
-
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { I } from "../../../shared/ui/Icon";
-import { usePopoverDismissal } from "../../../shared/ui/usePopoverDismissal";
+import {
+  MotionPopoverRoot,
+  MotionPopoverTrigger,
+  PopoverPopup,
+  useMotionPopover,
+} from "../../../shared/ui/popover/MotionPopover";
 
 interface BarVolumePopoverProps {
   volume: number;
@@ -15,40 +14,32 @@ interface BarVolumePopoverProps {
 
 export default function BarVolumePopover({ volume, onSetVolume }: BarVolumePopoverProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<HTMLInputElement>(null);
 
-  const { close } = usePopoverDismissal({
-    isOpen,
-    onClose: () => setIsOpen(false),
-    anchorRef: rootRef,
+  const popover = useMotionPopover({
+    open: isOpen,
+    onOpenChange: ({ open }) => setIsOpen(open),
+    positioning: { placement: "top" },
+    initialFocusEl: () => sliderRef.current,
+    closeOnParentExit: true,
   });
 
-  // 開いたらスライダーへ初期フォーカスする（他のポップオーバーと同じ「開いたら中身へ」規約）
-  useEffect(() => {
-    if (isOpen) sliderRef.current?.focus();
-  }, [isOpen]);
-
   return (
-    <div className="mle-bar1__vol" ref={rootRef}>
-      <button
-        type="button"
-        className={`mle-bar1__track-button ${volume === 0 ? "is-muted" : ""}`}
-        aria-label={`音量 ${volume}%`}
-        title={`音量 ${volume}%`}
-        aria-haspopup="true"
-        aria-expanded={isOpen}
-        data-player-control
-        onClick={(e) => {
-          e.stopPropagation();
-          if (isOpen) close();
-          else setIsOpen(true);
-        }}
-      >
-        <I.volume size={16} />
-      </button>
-      {isOpen && (
-        <div className="mle-bar1__volpop">
+    <div className="mle-bar1__vol">
+      <MotionPopoverRoot handle={popover}>
+        <MotionPopoverTrigger>
+          <button
+            type="button"
+            className={`mle-bar1__track-button ${volume === 0 ? "is-muted" : ""}`}
+            aria-label={`音量 ${volume}%`}
+            title={`音量 ${volume}%`}
+            data-player-control
+            onClick={(e) => e.stopPropagation()}
+          >
+            <I.volume size={16} />
+          </button>
+        </MotionPopoverTrigger>
+        <PopoverPopup className="mle-bar1__volpop" aria-label="音量">
           <input
             ref={sliderRef}
             type="range"
@@ -57,12 +48,10 @@ export default function BarVolumePopover({ volume, onSetVolume }: BarVolumePopov
             value={volume}
             aria-label="音量"
             onChange={(e) => onSetVolume(Number(e.target.value))}
-            // バー本体のonClick（ポップアップ展開）へスライダー操作を伝播させないためのガード
-            onClick={(e) => e.stopPropagation()}
           />
           <span className="mle-bar1__volval">{volume}</span>
-        </div>
-      )}
+        </PopoverPopup>
+      </MotionPopoverRoot>
     </div>
   );
 }

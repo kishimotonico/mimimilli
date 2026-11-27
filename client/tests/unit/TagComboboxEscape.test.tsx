@@ -26,6 +26,28 @@ describe("TagCombobox Escape", () => {
     expect(onCancel).not.toHaveBeenCalled();
   });
 
+  it("候補ボタンにフォーカスがあるEscapeは候補を閉じ、入力欄へ戻す", () => {
+    const onCancel = vi.fn();
+    const { getByRole, queryByRole } = render(
+      createElement(TagCombobox, {
+        suggestions: ["ASMR", "睡眠用"],
+        onSelect: vi.fn(),
+        onCancel,
+      }),
+    );
+    const input = getByRole("combobox");
+
+    fireEvent.change(input, { target: { value: "ASMR" } });
+    const option = getByRole("option", { name: "ASMR" });
+    option.focus();
+
+    const result = fireEvent.keyDown(option, { key: "Escape" });
+    expect(result).toBe(false);
+    expect(queryByRole("listbox")).toBeNull();
+    expect(input).toHaveFocus();
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
   it("候補が閉じている時のEscapeはonCancelを呼び、既定動作を止める", () => {
     const onCancel = vi.fn();
     const { getByRole } = render(

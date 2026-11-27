@@ -186,6 +186,16 @@ export function deselectLibraryWork(route: AppRoute): LibraryRoute | null {
   return library.selectedWorkId === null ? null : { ...library, selectedWorkId: null };
 }
 
+/** 指定した作品が選択中のときだけ選択を外す（補正）。解除中に別の作品を選んでいたら動かさない */
+export function deselectLibraryWorkIfSelected(
+  route: AppRoute,
+  workId: string,
+): LibraryRoute | null {
+  return route.library.selectedWorkId === workId
+    ? { ...route.library, selectedWorkId: null }
+    : null;
+}
+
 export function reshuffleLibrarySeed(route: AppRoute): Transition {
   return { route: withLibrary(route, { seed: createRandomSeed() }), replace: true };
 }

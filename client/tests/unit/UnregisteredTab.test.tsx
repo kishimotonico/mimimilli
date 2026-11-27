@@ -1,5 +1,6 @@
 import { act, createElement, Fragment } from "react";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ApiRequestError } from "../../src/shared/api/http";
@@ -703,7 +704,7 @@ describe("UnregisteredTab 取得と進捗", () => {
 
 describe("UnregisteredTab 除外", () => {
   const openRowMenu = (title: string) =>
-    fireEvent.click(screen.getByRole("button", { name: `「${title}」の操作` }));
+    userEvent.click(screen.getByRole("button", { name: `「${title}」の操作` }));
 
   it("ツールバーに除外ボタンは無く、行のメニューから除外して元に戻せる", async () => {
     vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
@@ -717,8 +718,8 @@ describe("UnregisteredTab 除外", () => {
     await renderTab([candidateA, candidateB]);
 
     expect(screen.queryByRole("button", { name: "除外" })).toBeNull();
-    openRowMenu(candidateA.inferredTitle);
-    fireEvent.click(screen.getByRole("menuitem", { name: "除外" }));
+    await openRowMenu(candidateA.inferredTitle);
+    await userEvent.click(screen.getByRole("menuitem", { name: "除外" }));
 
     await waitFor(() =>
       expect(scanApi.excludeScanCandidates).toHaveBeenCalledWith([candidateA.path]),
@@ -729,11 +730,35 @@ describe("UnregisteredTab 除外", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "元に戻す" })).toBeNull());
   });
 
+  it("行を除外してトリガーが消えたら、フォーカスは残った隣の行の︙へ移り、行が無くなればパネルへ移る", async () => {
+    vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
+    let remaining: ScanCandidate[] = [candidateB];
+    const { queryClient } = await renderTab([candidateA, candidateB]);
+    vi.spyOn(scanCandidatesCache, "refreshScanCandidatesQuietly").mockImplementation(async () => {
+      const response = { scanCompleted: true, candidates: remaining };
+      queryClient.setQueryData(scanCandidatesCache.SCAN_CANDIDATES_QUERY_KEY, response);
+      return response;
+    });
+
+    await openRowMenu(candidateA.inferredTitle);
+    await userEvent.click(screen.getByRole("menuitem", { name: "除外" }));
+    const next = await screen.findByRole("button", { name: /」の操作$/ });
+    await waitFor(() => expect(next).toHaveFocus());
+
+    remaining = [];
+    await userEvent.click(next);
+    await userEvent.click(screen.getByRole("menuitem", { name: "除外" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /」の操作$/ })).toBeNull());
+    await waitFor(() =>
+      expect(screen.getByText("未登録の候補はありません").closest('[tabindex="-1"]')).toHaveFocus(),
+    );
+  });
+
   it("行のメニューの除外は、選択ではなくその行だけに効く", async () => {
     const spy = vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
     await renderTab([candidateA, candidateB]);
-    openRowMenu(candidateA.inferredTitle);
-    fireEvent.click(screen.getByRole("menuitem", { name: "除外" }));
+    await openRowMenu(candidateA.inferredTitle);
+    await userEvent.click(screen.getByRole("menuitem", { name: "除外" }));
     await waitFor(() => expect(spy).toHaveBeenCalledWith([candidateA.path]));
   });
 
@@ -748,8 +773,8 @@ describe("UnregisteredTab 除外", () => {
     await renderTab([problem, candidateB]);
     fireEvent.click(screen.getByRole("button", { name: /問題あり/ }));
     fireEvent.click(screen.getByLabelText("すべて選択"));
-    fireEvent.click(screen.getByRole("button", { name: "その他の操作" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "選択を除外" }));
+    await userEvent.click(screen.getByRole("button", { name: "その他の操作" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "選択を除外" }));
     await waitFor(() => expect(spy).toHaveBeenCalledWith([problem.path]));
     await waitFor(() => expect(screen.getByText("「問題作品」を除外しました")).not.toBeNull());
   });
@@ -757,8 +782,8 @@ describe("UnregisteredTab 除外", () => {
   it("複数を除外したトーストは「A」他N件で出す", async () => {
     vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
     await renderTab([candidateA, candidateB]);
-    fireEvent.click(screen.getByRole("button", { name: "その他の操作" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "選択を除外" }));
+    await userEvent.click(screen.getByRole("button", { name: "その他の操作" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "選択を除外" }));
     await waitFor(() => expect(screen.getByText(/他1件を除外しました/)).not.toBeNull());
   });
 
@@ -825,46 +850,45 @@ describe("UnregisteredTab 除外", () => {
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "未登録" }));
   });
 
-  it("フォーカスがメニューの外にあっても、Escはメニューだけを閉じて親のダイアログへ届かない", async () => {
+  it("Escはメニューだけを閉じて親のダイアログへ届かず、IME変換中のEscでは閉じない", async () => {
     await renderTab([candidateA, candidateB]);
     const trigger = screen.getByRole("button", { name: `「${candidateA.inferredTitle}」の操作` });
-    fireEvent.click(trigger);
+    await userEvent.click(trigger);
     expect(screen.getByRole("menu")).not.toBeNull();
-    (document.activeElement as HTMLElement | null)?.blur();
-    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(false);
-    expect(screen.queryByRole("menu")).toBeNull();
+    expect(fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" })).toBe(
+      false,
+    );
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
     expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(true);
 
-    fireEvent.click(screen.getByRole("button", { name: "その他の操作" }));
+    await userEvent.click(screen.getByRole("button", { name: "その他の操作" }));
+    const menu = screen.getByRole("menu");
+    expect(fireEvent.keyDown(menu, { key: "Escape", isComposing: true })).toBe(true);
+    expect(fireEvent.keyDown(menu, { key: "Escape", keyCode: 229 })).toBe(false);
     expect(screen.getByRole("menu")).not.toBeNull();
-    (document.activeElement as HTMLElement | null)?.blur();
-    expect(fireEvent.keyDown(document.body, { key: "Escape", isComposing: true })).toBe(true);
-    expect(screen.getByRole("menu")).not.toBeNull();
-    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(false);
-    expect(screen.queryByRole("menu")).toBeNull();
-    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(true);
+    expect(fireEvent.keyDown(menu, { key: "Escape" })).toBe(false);
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
   });
 
-  it("行メニューはEscで閉じて︙へフォーカスが戻り、Tabで外へ出ても閉じる", async () => {
+  it("行メニューはEscで閉じて︙へフォーカスが戻り、プログラムのfocus()で外へ出ても閉じる", async () => {
     await renderTab([candidateA, candidateB]);
     const trigger = screen.getByRole("button", { name: `「${candidateA.inferredTitle}」の操作` });
-    fireEvent.click(trigger);
-    const item = screen.getByRole("menuitem", { name: "除外" });
-    item.focus();
-    fireEvent.keyDown(item, { key: "Escape" });
+    await userEvent.click(trigger);
+    expect(screen.getByRole("menu")).not.toBeNull();
+    await userEvent.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
     expect(document.activeElement).toBe(trigger);
 
-    fireEvent.click(trigger);
-    screen.getByRole("menuitem", { name: "除外" }).focus();
+    await userEvent.click(trigger);
+    expect(screen.getByRole("menu")).not.toBeNull();
     screen.getByLabelText("すべて選択").focus();
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
   });
 
   it("行メニューの「フォルダーを開く」はその候補のパスでFilesを開く", async () => {
     const { onOpenFiles } = await renderTab([candidateA]);
-    openRowMenu(candidateA.inferredTitle);
-    fireEvent.click(screen.getByRole("menuitem", { name: "フォルダーを開く" }));
+    await openRowMenu(candidateA.inferredTitle);
+    await userEvent.click(screen.getByRole("menuitem", { name: "フォルダーを開く" }));
     expect(onOpenFiles).toHaveBeenCalledWith(candidateA.path);
   });
 
@@ -879,8 +903,8 @@ describe("UnregisteredTab 除外", () => {
         candidates: [],
       });
     await renderTab([candidateA]);
-    openRowMenu(candidateA.inferredTitle);
-    fireEvent.click(screen.getByRole("menuitem", { name: "除外" }));
+    await openRowMenu(candidateA.inferredTitle);
+    await userEvent.click(screen.getByRole("menuitem", { name: "除外" }));
     await waitFor(() =>
       expect(screen.getByRole("alert").textContent).toContain("候補が更新されたため"),
     );
@@ -905,8 +929,8 @@ describe("UnregisteredTab 除外", () => {
       candidates: [],
     });
     const { rerender } = await renderUnmountableTab([candidateA]);
-    openRowMenu(candidateA.inferredTitle);
-    fireEvent.click(screen.getByRole("menuitem", { name: "除外" }));
+    await openRowMenu(candidateA.inferredTitle);
+    await userEvent.click(screen.getByRole("menuitem", { name: "除外" }));
     await waitFor(() => expect(screen.getByText("「未検出作品」を除外しました")).not.toBeNull());
 
     rerender(false);
@@ -977,10 +1001,10 @@ describe("UnregisteredTab 追加", () => {
     });
     await renderTab([unfetched, candidateB]);
     expect(screen.queryByRole("button", { name: /件を追加/ })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "その他の操作" }));
+    await userEvent.click(screen.getByRole("button", { name: "その他の操作" }));
     expect(screen.getByRole("menuitem", { name: "項目を選んで追加…" })).toBeEnabled();
     expect(screen.getByRole("menuitem", { name: "選択を除外" })).toBeEnabled();
-    fireEvent.click(screen.getByRole("menuitem", { name: "取得せずに追加" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "取得せずに追加" }));
     await waitFor(() => expect(registerSpy).toHaveBeenCalled());
     expect(registerSpy.mock.calls[0]?.[0]).toEqual([unfetched.path, candidateB.path]);
   });
@@ -989,8 +1013,8 @@ describe("UnregisteredTab 追加", () => {
     const spy = vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
     await renderTab([candidateA, candidateB]);
     fireEvent.click(screen.getByLabelText(`「${candidateB.dlsite.title}」を選択`));
-    fireEvent.click(screen.getByRole("button", { name: "その他の操作" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "選択を除外" }));
+    await userEvent.click(screen.getByRole("button", { name: "その他の操作" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "選択を除外" }));
     await waitFor(() => expect(spy).toHaveBeenCalledWith([candidateA.path]));
   });
 
@@ -1037,11 +1061,11 @@ describe("UnregisteredTab 追加", () => {
       interruptedBy: null,
     });
     await renderTab([candidateA]);
-    fireEvent.click(screen.getByRole("button", { name: "その他の操作" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "項目を選んで追加…" }));
+    await userEvent.click(screen.getByRole("button", { name: "その他の操作" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "項目を選んで追加…" }));
     fireEvent.click(screen.getByLabelText("カバー"));
     const dialog = screen.getByRole("dialog", { name: "追加する項目" });
-    fireEvent.click(dialog.querySelector("button") as HTMLElement);
+    fireEvent.click(within(dialog).getByRole("button", { name: "1件を追加" }));
     await waitFor(() => expect(registerSpy).toHaveBeenCalled());
     expect(registerSpy.mock.calls[0]?.[1]).toEqual({
       title: true,
@@ -1049,6 +1073,34 @@ describe("UnregisteredTab 追加", () => {
       tags: true,
       url: true,
     });
+  });
+
+  it("項目選択を開いたまま▾を押すと、ポインターでもどのキーでも項目選択を閉じるだけでメニューは開かない", async () => {
+    await renderTab([candidateA]);
+    const caret = () => screen.getByRole("button", { name: "その他の操作" });
+    const openPicker = async () => {
+      await userEvent.click(caret());
+      await userEvent.click(screen.getByRole("menuitem", { name: "項目を選んで追加…" }));
+      await screen.findByRole("dialog", { name: "追加する項目" });
+    };
+    const presses: (() => Promise<void>)[] = [
+      () => userEvent.click(caret()),
+      ...["{Enter}", "[Space]", "{ArrowDown}", "{ArrowUp}"].map((key) => async () => {
+        caret().focus();
+        await userEvent.keyboard(key);
+      }),
+    ];
+    for (const press of presses) {
+      await openPicker();
+      await press();
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: "追加する項目" })).toBeNull(),
+      );
+      expect(screen.queryByRole("menu")).toBeNull();
+      expect(caret()).toHaveFocus();
+    }
+    await userEvent.click(caret());
+    expect(screen.getByRole("menu")).toBeInTheDocument();
   });
 
   it("サーバーの失敗理由をそのまま表示する", async () => {
@@ -1170,12 +1222,12 @@ describe("UnregisteredTab 追加", () => {
     fireEvent.click(addButton());
 
     await waitFor(() => expect(api.requestsTo("GET /api/scan/candidates")).toHaveLength(1));
-    expect(addButton()).toBeDisabled();
+    expect(addButton()).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByText(candidateA.inferredTitle)).toBeInTheDocument();
 
     releaseRefresh();
     await waitFor(() => expect(screen.queryByText(candidateA.inferredTitle)).toBeNull());
-    await waitFor(() => expect(addButton()).toBeEnabled());
+    await waitFor(() => expect(addButton()).not.toHaveAttribute("aria-disabled"));
   });
 
   it("追加リクエスト中にタブがアンマウントされても、候補が取り直されonRegisteredへ結果が届く", async () => {
@@ -1332,7 +1384,10 @@ describe("UnregisteredTab RJコード保存中の操作", () => {
 
     const other = await screen.findByTitle("クリックしてRJコードを編集");
     expect(other).toBeDisabled();
-    expect(screen.getByRole("button", { name: /DLsiteから取得|件を追加/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /DLsiteから取得|件を追加/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
     expect(screen.getByLabelText("すべて選択")).toBeEnabled();
     for (const checkbox of screen.getAllByRole("checkbox", { name: /を選択/ })) {
       expect(checkbox).toBeEnabled();

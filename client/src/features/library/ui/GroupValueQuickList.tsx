@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { NO_AUTOFILL_PROPS } from "../../../shared/ui/noAutofill";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import type { GroupBy, GroupSortId, GroupValueItem } from "@mimimilli/shared";
@@ -14,6 +14,8 @@ import { groupByKey } from "../../../entities/smart-folder/groupByKey";
 import { buildGroupValueDisplayRows } from "../model/groupValueDisplayRows";
 import { isGroupValueRowArrowKey } from "../model/groupValueRowNav";
 import { I } from "../../../shared/ui/Icon";
+import { MENU_COUNT_CLASS, MENU_LABEL_CLASS } from "../../../shared/ui/menu/menuStyles";
+import { popoverListItemClass } from "../../../shared/ui/popover/popoverStyles";
 import IconButton from "../../../shared/ui/IconButton";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { useGroupValueListNav } from "./useGroupValueListNav";
@@ -27,19 +29,14 @@ import { useGroupValueListNav } from "./useGroupValueListNav";
 // 入れ子タグは名前順ソート時のみインデント表示にする（値一覧と同じ規則）。
 
 const INDENT_PER_DEPTH = 12;
-/** 行の概算高さ（.mll-qlist__item / .mll-qlist__heading の padding 6px + 12px行 に一致） */
-const ROW_ESTIMATE_SIZE = 29;
-const LIST_PADDING = 4;
+/** popoverListItemClass / .mll-qlist__heading の高さに合わせる。 */
+const ROW_ESTIMATE_SIZE = 28;
 
 interface GroupValueQuickListProps {
   groupBy: GroupBy;
   /** 表示用のグループ分けのラベル。呼び出し側が tagPrefixes を解決して渡す
    *  （getGroupByLabel(groupBy) を tagPrefixes なしで呼ぶと未登録prefixでIDがそのまま出るため） */
   groupByLabel: string;
-  /** 呼び出し側の開閉状態。AnimatePresence の退出アニメーション中に isOpen=false のまま
-   *  グループ分けが変わらず再オープンされるケース（Escapeで閉じてすぐ同じグループ分けを開き直す等）でも
-   *  検索欄へフォーカスし直すため、groupBy 単体ではなくこの値の変化も見る */
-  isOpen: boolean;
   items: GroupValueItem[];
   /** 今の並び。サーバーがこの順で返す。開いている間だけの一時状態で、保存はしない */
   sort: GroupSortId;
@@ -52,8 +49,6 @@ interface GroupValueQuickListProps {
   /** ホバー/フォーカス時に出る＋ボタン（冪等なAND追加。選択済み行には出さない）。
    *  省略時はボタンを出さない（ADR-0013） */
   onAdd?: (item: GroupValueItem) => void;
-  /** useAnchoredPopover / usePopoverDismissal が返す close をそのまま渡す */
-  close: () => void;
 }
 
 interface SortMenuProps {
@@ -102,7 +97,6 @@ function SortMenu({ sort, onToggle }: SortMenuProps) {
 export default function GroupValueQuickList({
   groupBy,
   groupByLabel,
-  isOpen,
   items,
   sort,
   onSortChange,
@@ -111,23 +105,17 @@ export default function GroupValueQuickList({
   isSelected,
   onSelect,
   onAdd,
-  close,
 }: GroupValueQuickListProps) {
   const groupKey = groupByKey(groupBy);
   const [query, setQuery] = useState("");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
-  const searchRef = useRef<HTMLInputElement>(null);
-  const sortToggleRef = useRef<HTMLButtonElement>(null);
+  const isPresent = useIsPresent();
 
   useEffect(() => {
-    // 退出中（isOpen=false）は何もしない。closeDelay中に isOpen が再び true に
-    // なったときは グループ分けが変わっていなくても改めて発火させたいので、依存配列に
-    // groupBy だけでなく isOpen も含める。
-    if (!isOpen) return;
-    searchRef.current?.focus({ preventScroll: true });
+    if (!isPresent) return;
     setQuery("");
     setSortMenuOpen(false);
-  }, [groupKey, isOpen]);
+  }, [groupKey, isPresent]);
 
   const currentSortLabel = getGroupSortLabel(sort, groupBy);
 
@@ -151,18 +139,12 @@ export default function GroupValueQuickList({
       // （ADR-0013: AND追加はオーバーレイを開いたまま連続で行える）。
       resetKey,
       gap: 1,
-      padding: { start: LIST_PADDING, end: LIST_PADDING },
       overscan: 8,
     },
     itemSelector: (index) => `[data-index="${index}"] [data-quicklist-item]`,
   });
 
   const handleListKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      close();
-      return;
-    }
     const key = event.key;
     if (!isGroupValueRowArrowKey(key)) return;
     // Home/Endは検索入力欄のカーソル移動（ネイティブ動作）を横取りしない。矢印キーは
@@ -173,11 +155,6 @@ export default function GroupValueQuickList({
   };
 
   const handleSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      close();
-      return;
-    }
     if (event.key === "ArrowDown") {
       event.preventDefault();
       event.stopPropagation();
@@ -187,12 +164,11 @@ export default function GroupValueQuickList({
 
   return (
     // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- 検索欄・ソート・一覧をまとめた矢印キー移動の委譲コンテナ（個々の子要素がフォーカス可能な実要素を持つ）
-    <div className="mll-qlist" onKeyDown={handleListKeyDown}>
+    <div className="mll-qlist" data-search-shortcut-scope onKeyDown={handleListKeyDown}>
       <div className="mll-qlist__search">
         <I.search size={12} />
         <input
           {...NO_AUTOFILL_PROPS}
-          ref={searchRef}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -201,7 +177,6 @@ export default function GroupValueQuickList({
           aria-label={`${groupByLabel}を検索`}
         />
         <button
-          ref={sortToggleRef}
           type="button"
           className={`mll-qlist__sorttoggle ${sortMenuOpen ? "is-open" : ""}`}
           aria-haspopup="true"
@@ -254,26 +229,29 @@ export default function GroupValueQuickList({
                   style={getItemStyle(virtualRow)}
                 >
                   {row.kind === "heading" ? (
-                    <div className="mll-qlist__heading" style={{ paddingLeft: indent }}>
+                    <div className="mll-qlist__heading" style={{ paddingLeft: 8 + indent }}>
                       {row.label}
                     </div>
                   ) : (
                     (() => {
                       const on = isSelected(row.item.value);
                       return (
-                        <div className={`mll-qlist__row ${on ? "is-on" : ""}`}>
+                        <div className="mll-qlist__row">
                           <button
                             type="button"
                             data-quicklist-item
-                            className={`mll-qlist__item ${on ? "is-on" : ""}`}
+                            className={popoverListItemClass}
                             tabIndex={virtualRow.index === rovingIndex ? 0 : -1}
-                            style={{ paddingLeft: 8 + indent, paddingRight: onAdd ? 26 : 8 }}
+                            style={{ paddingLeft: 8 + indent, paddingRight: onAdd && !on ? 26 : 8 }}
                             title={row.depth > 0 ? row.item.value : undefined}
                             aria-pressed={on}
                             onClick={() => onSelect(row.item)}
                           >
-                            <span className="nm">{row.label}</span>
-                            <span className="count">{row.item.count}</span>
+                            <span className="mll-qlist__check" aria-hidden="true">
+                              {on && <I.check size={12} />}
+                            </span>
+                            <span className={MENU_LABEL_CLASS}>{row.label}</span>
+                            <span className={MENU_COUNT_CLASS}>{row.item.count}</span>
                           </button>
                           {onAdd && !on && (
                             <IconButton

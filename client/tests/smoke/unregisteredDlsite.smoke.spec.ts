@@ -68,15 +68,26 @@ test("▾の「選択を除外」で選択中の行が消え、「項目を選�
   const { dialog, panel } = await openUnregistered(page);
   await panel.getByRole("checkbox", { name: "「囁きの図書館」を選択" }).uncheck();
   await panel.getByRole("button", { name: "その他の操作" }).click();
-  await page.getByRole("menuitem", { name: "選択を除外" }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "選択を除外" }).click();
   await expect(page.getByText(/を除外しました/)).toBeVisible();
   await expect(panel.getByRole("row", { name: /囁きの図書館/ })).toBeVisible();
   await expect(panel.getByRole("row", { name: /カバーなし作品/ })).toBeHidden();
 
   await panel.getByRole("checkbox", { name: "「囁きの図書館」を選択" }).check();
-  await panel.getByRole("button", { name: "その他の操作" }).click();
-  await page.getByRole("menuitem", { name: "項目を選んで追加…" }).click();
+  const trigger = panel.getByRole("button", { name: "その他の操作" });
+  const menu = page.getByRole("menu");
+  const openPicker = async () => {
+    await trigger.click();
+    await menu.getByRole("menuitem", { name: "項目を選んで追加…" }).click();
+  };
+  await openPicker();
   const picker = page.getByRole("dialog", { name: "追加する項目" });
+  await expect(picker).toBeVisible();
+  await trigger.click();
+  await expect(picker).toBeHidden();
+  await expect(menu).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await openPicker();
   await picker.getByLabel("カバー").uncheck();
   await picker.getByRole("button").first().click();
   await expect(dialog.getByRole("tab", { name: "新規作品（1件）" })).toBeVisible();
@@ -106,13 +117,40 @@ test("行の︙メニューはEscapeでメニューだけが閉じ、スキャ�
   assertNoErrors(tracker);
 });
 
+test("ダイアログの中の行の︙メニューと▾は、Tab を押しても開いたまま動かない", async ({ page }) => {
+  const tracker = trackErrors(page);
+  const { dialog, panel } = await openUnregistered(page);
+  const triggers = [
+    panel
+      .getByRole("row")
+      .nth(1)
+      .getByRole("button", { name: /の操作$/ }),
+    dialog.getByRole("button", { name: "その他の操作" }),
+  ];
+  for (const trigger of triggers) {
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    const menu = page.getByRole("menu");
+    await expect(menu).toBeVisible();
+    await expect(menu).toBeFocused();
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(300);
+    await expect(menu).toBeVisible();
+    await expect(menu).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+    await expect(trigger).toBeFocused();
+  }
+  assertNoErrors(tracker);
+});
+
 test("先頭の行の︙メニューから除外でき、「元に戻す」で戻るとトーストも消える", async ({ page }) => {
   const tracker = trackErrors(page);
   const { panel } = await openUnregistered(page);
   const firstRow = panel.getByRole("row").nth(1);
   const firstName = (await firstRow.getByRole("checkbox").getAttribute("aria-label")) ?? "";
   await firstRow.getByRole("button", { name: /の操作$/ }).click();
-  await page.getByRole("menuitem", { name: "除外", exact: true }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "除外", exact: true }).click();
   await expect(page.getByText(/を除外しました/)).toBeVisible();
   await expect(panel.getByRole("checkbox", { name: firstName })).toBeHidden();
 
@@ -153,7 +191,7 @@ test("取得結果が該当なし・失敗の行は選択から外れ、追加�
   await panel.getByLabel("すべて選択").check();
   await expect(panel.getByRole("button", { name: FETCH_BUTTON })).toBeVisible();
   await panel.getByRole("button", { name: "その他の操作" }).click();
-  await page.getByRole("menuitem", { name: "取得せずに追加" }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "取得せずに追加" }).click();
   await expect(dialog.getByRole("tab", { name: /^新規作品/ })).toHaveAttribute(
     "aria-selected",
     "true",

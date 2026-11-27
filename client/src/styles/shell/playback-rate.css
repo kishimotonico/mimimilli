@@ -12,61 +12,6 @@
   bottom: 8px;
   z-index: 4;
 }
-/* document.body へポータル（useAnchoredPopover placement:"above"）。z-indexはdocs/design-system.md参照 */
-.mle-ratepick__pop {
-  z-index: 50;
-  min-width: 112px;
-  padding: 4px;
-  background: var(--paper-1);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-2);
-  box-shadow: var(--shadow-pop);
-  animation: mle-ratepick-pop 0.12s ease-out both;
-}
-.mle-ratepick__item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 8px;
-  border-radius: 4px;
-  font-family: var(--font-mono);
-  font-size: var(--fs-mono);
-  line-height: var(--lh-mono);
-  font-weight: 600;
-  color: var(--ink-1);
-  text-align: left;
-  white-space: nowrap;
-}
-.mle-ratepick__item:hover {
-  background: var(--paper-2);
-  color: var(--ink-0);
-}
-.mle-ratepick__item.is-checked {
-  color: var(--ink-0);
-}
-.mle-ratepick__item .check {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  color: var(--paper-1);
-}
-.mle-ratepick__item.is-checked .check {
-  background: var(--ink-0);
-}
-@keyframes mle-ratepick-pop {
-  from {
-    opacity: 0;
-    transform: translateY(4px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
 .mle-ratepill.is-overlay {
   position: relative;
   background: color-mix(in oklch, var(--shadow-ink) 55%, transparent);

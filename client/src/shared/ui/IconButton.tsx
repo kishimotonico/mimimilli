@@ -55,12 +55,14 @@ export default function IconButton({
   variant = "default",
   tone = "default",
   disabled = false,
+  "aria-disabled": ariaDisabled,
   className,
   ref,
   type = "button",
   ...rest
 }: IconButtonProps) {
-  const stateClass = disabled
+  const looksDisabled = disabled || ariaDisabled === true || ariaDisabled === "true";
+  const stateClass = looksDisabled
     ? "cursor-not-allowed text-ink-4"
     : active
       ? "text-acc-ink bg-acc-soft"
@@ -83,6 +85,7 @@ export default function IconButton({
         className,
       )}
       {...rest}
+      aria-disabled={ariaDisabled}
     >
       <Icon size={ICON_PX[size]} />
     </button>

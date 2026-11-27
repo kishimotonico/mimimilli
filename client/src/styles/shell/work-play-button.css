@@ -1,4 +1,4 @@
-/* 作品詳細の再生スプリットボタン（.mle-prv__playsplit / playbtn / playcaret / playmenu*）。 */
+/* 作品詳細の再生スプリットボタン（.mle-prv__playsplit / playbtn / playcaret）。 */
 
 /* 再生スプリットボタン（WorkPlayButton）。カバー幅いっぱいに広げ、主セグメントが
      伸びて▾は右端の固定幅に収まる。主ボタン+▾は隙間なく並べて1つのピルに見せる
@@ -58,35 +58,4 @@
 }
 .mle-prv__playcaret:hover {
   background: var(--acc);
-}
-.mle-prv__playmenu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 10;
-  min-width: 160px;
-  padding: 4px;
-  background: var(--paper-1);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-2);
-  box-shadow: var(--shadow-pop);
-}
-.mle-prv__playmenu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 8px;
-  border-radius: var(--r-1);
-  font-family: var(--font-jp);
-  font-size: var(--fs-body);
-  line-height: var(--lh-body);
-  color: var(--ink-1);
-  text-align: left;
-  white-space: nowrap;
-}
-.mle-prv__playmenu-item:hover,
-.mle-prv__playmenu-item:focus-visible {
-  background: var(--paper-2);
-  color: var(--ink-0);
 }

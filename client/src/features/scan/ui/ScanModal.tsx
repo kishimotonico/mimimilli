@@ -5,6 +5,7 @@ import { useAtomValue } from "jotai";
 import Modal, { ModalHeader } from "../../../shared/ui/Modal";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { cn } from "../../../shared/lib/cn";
+import { isFocusLost } from "../../../shared/lib/isFocusLost";
 import { I } from "../../../shared/ui/Icon";
 import { useToast } from "../../../shared/ui/useToast";
 import { useScanJobStore, useScanning } from "../../../entities/scan/useScanJob";
@@ -97,7 +98,16 @@ export default function ScanModal({
       variant: coverNote ? "warning" : "success",
       priority: "notice",
     });
-    if (remainingCandidates === 0) setActiveTab("newWorks");
+    if (remainingCandidates === 0) {
+      // 未登録のパネルごと消えるので、フォーカスを body へ落とさず、移る先のタブへ先に預ける
+      const inPanel = document
+        .getElementById("scan-tabpanel-unregistered")
+        ?.contains(document.activeElement);
+      if (inPanel || isFocusLost()) {
+        document.getElementById("scan-tab-newWorks")?.focus({ preventScroll: true });
+      }
+      setActiveTab("newWorks");
+    }
   };
 
   const scanPending = recordQuery.data !== undefined && recordQuery.data.finishedAt === null;

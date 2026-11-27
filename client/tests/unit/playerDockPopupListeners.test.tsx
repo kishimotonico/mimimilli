@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { describe, expect, it, vi } from "vitest";
@@ -9,8 +10,8 @@ import { playerUiModeAtom } from "../../src/features/player/model/playerPresenta
 import { createSmartFolderQueryClient } from "../helpers/smartFolders";
 import { buildPlayerDockProps } from "./fixtures/playerDock";
 
-// PopupContent はモックしない: 再生速度メニュー（usePopoverDismissal 経由）のリスナーが
-// 退出中（useIsPresent() === false）に解除されることを実物のコンポーネントで検証する。
+// PopupContent はモックしない: 退出中に開いていた再生速度メニューが
+// 閉じることを実物のコンポーネントで検証する。
 vi.mock("../../src/features/player/ui/BarContent", () => ({
   default: ({ onSwitchToPopup }: { onSwitchToPopup: () => void }) => (
     <button type="button" onClick={onSwitchToPopup}>
@@ -67,25 +68,23 @@ function renderPlayerDock() {
 }
 
 describe("PlayerDock popup: 再生速度メニューの閉じ操作", () => {
-  it("表示中はEscapeで再生速度メニューが閉じる", () => {
+  it("表示中はEscapeで再生速度メニューが閉じる", async () => {
     renderPlayerDock();
-    fireEvent.click(screen.getByTitle("再生速度"));
-    expect(screen.getByRole("menu", { name: "再生速度" })).toBeInTheDocument();
+    await userEvent.click(screen.getByTitle("再生速度"));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
 
-    fireEvent.keyDown(document, { key: "Escape" });
+    await userEvent.keyboard("{Escape}");
 
-    expect(screen.queryByRole("menu", { name: "再生速度" })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
   });
 
-  it("バーへ戻る退出中は、Escapeや外側クリックに再生速度メニューが反応しない", () => {
+  it("バーへ戻ると、開いていた再生速度メニューも閉じる", async () => {
     renderPlayerDock();
-    fireEvent.click(screen.getByTitle("再生速度"));
-    expect(screen.getByRole("menu", { name: "再生速度" })).toBeInTheDocument();
+    await userEvent.click(screen.getByTitle("再生速度"));
+    expect(screen.getByRole("menu")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "バーへ戻る" }));
-    fireEvent.keyDown(document, { key: "Escape" });
-    fireEvent.pointerDown(document.body);
+    await userEvent.click(screen.getByRole("button", { name: "バーへ戻る" }));
 
-    expect(screen.getByRole("menu", { name: "再生速度" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
   });
 });

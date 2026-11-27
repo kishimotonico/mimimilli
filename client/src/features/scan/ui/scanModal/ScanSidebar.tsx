@@ -1,11 +1,14 @@
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
+import { Menu } from "@ark-ui/react/menu";
 import { useMotionVariants } from "../../../../shared/ui/useMotionVariants";
 import { cn } from "../../../../shared/lib/cn";
 import { formatScanDateTime } from "../../../../shared/lib/format";
-import { buttonClass } from "../../../../shared/ui/Button";
+import Button from "../../../../shared/ui/Button";
+import { isFocusLost } from "../../../../shared/lib/isFocusLost";
 import { I } from "../../../../shared/ui/Icon";
 import SplitButton from "../../../../shared/ui/SplitButton";
+import { MENU_LABEL_CLASS, menuItemClass } from "../../../../shared/ui/menu/menuStyles";
 import {
   scanPhaseLabel,
   type ScanProgress,
@@ -78,6 +81,25 @@ function ScanSidebarControls({
 }: Pick<ScanSidebarProps, "lastScanTime" | "scanPending" | "onStart" | "onFullScan" | "onCancel">) {
   const status = useScanStatusView(lastScanTime);
   const inProgress = status.kind === "running" || status.kind === "cancelling";
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const startButtonRef = useRef<HTMLButtonElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+
+  // 開始と中止のボタンは入れ替わる。この入れ物にフォーカスがあったなら、入れ替わった新しいボタンへ引き継ぐ。
+  // 操作の直後でも自然な完了でも同じ。フォーカスが外へ移ったときだけ下ろす（relatedTarget が null のときは、
+  // 退出するボタンが inert になって外れただけなので下ろさない）
+  const hadFocusRef = useRef(false);
+  const wasInProgressRef = useRef(inProgress);
+  useLayoutEffect(() => {
+    if (wasInProgressRef.current === inProgress) return;
+    wasInProgressRef.current = inProgress;
+    const active = document.activeElement;
+    const leaving = active !== null && !!actionsRef.current?.contains(active);
+    if (hadFocusRef.current && (leaving || isFocusLost())) {
+      (inProgress ? cancelButtonRef : startButtonRef).current?.focus({ preventScroll: true });
+    }
+  }, [inProgress]);
+
   return (
     <div className="mt-auto flex h-[116px] shrink-0 flex-col border-t border-line-soft pt-2.5 pl-2.5">
       <div className="relative min-h-0 flex-1">
@@ -85,11 +107,22 @@ function ScanSidebarControls({
           <SidebarStatus key={status.kind} status={status} />
         </AnimatePresence>
       </div>
-      <div className="relative h-[26px] shrink-0">
-        <AnimatePresence initial={false} mode="wait">
+      <div
+        ref={actionsRef}
+        className="relative h-[26px] shrink-0"
+        onFocus={() => {
+          hadFocusRef.current = true;
+        }}
+        onBlur={(event) => {
+          const next = event.relatedTarget;
+          if (next !== null && !event.currentTarget.contains(next)) hadFocusRef.current = false;
+        }}
+      >
+        <AnimatePresence initial={false}>
           {inProgress ? (
             <SidebarCancelButton
               key="cancel"
+              ref={cancelButtonRef}
               disabled={status.kind === "cancelling"}
               onClick={onCancel}
             />
@@ -98,6 +131,7 @@ function ScanSidebarControls({
               key="start"
               status={status}
               primary={scanPending}
+              buttonRef={startButtonRef}
               onStart={onStart}
               onFullScan={onFullScan}
             />
@@ -161,11 +195,13 @@ function ScanSidebarTab({
 function SidebarStartButton({
   status,
   primary,
+  buttonRef,
   onStart,
   onFullScan,
 }: {
   status: ScanStatusView;
   primary: boolean;
+  buttonRef: RefObject<HTMLButtonElement | null>;
   onStart: () => void;
   onFullScan: () => void;
 }) {
@@ -178,9 +214,20 @@ function SidebarStartButton({
         variant={primary ? "primary" : "ghost"}
         size="sm"
         className="w-full"
+        primaryRef={buttonRef}
         menuLabel="スキャンの方法"
+        placement="aboveStart"
         onClick={onStart}
-        items={[{ key: "full", label: "すべての作品を読み直す", onSelect: onFullScan }]}
+        menu={
+          <Menu.Item
+            value="full"
+            valueText="すべての作品を読み直す"
+            onSelect={onFullScan}
+            className={menuItemClass()}
+          >
+            <span className={MENU_LABEL_CLASS}>すべての作品を読み直す</span>
+          </Menu.Item>
+        }
       >
         <I.refresh size={14} />
         {status.kind === "failed" ? "再試行" : "スキャン"}
@@ -189,25 +236,32 @@ function SidebarStartButton({
   );
 }
 
-function SidebarCancelButton({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
+function SidebarCancelButton({
+  ref,
+  disabled,
+  onClick,
+}: {
+  ref: RefObject<HTMLButtonElement | null>;
+  disabled: boolean;
+  onClick: () => void;
+}) {
   const { fade } = useMotionVariants();
   const isPresent = useIsPresent();
   const v = fade();
   return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      inert={!isPresent}
-      {...v}
-      className={buttonClass("danger-quiet", "sm", {
-        disabled,
-        className: "absolute inset-0 w-full justify-center",
-      })}
-    >
-      <I.x size={12} />
-      スキャンを中止
-    </motion.button>
+    <motion.div className="absolute inset-0" inert={!isPresent} {...v}>
+      <Button
+        ref={ref}
+        variant="danger-quiet"
+        size="sm"
+        softDisabled={disabled}
+        onClick={onClick}
+        className="w-full justify-center"
+      >
+        <I.x size={12} />
+        スキャンを中止
+      </Button>
+    </motion.div>
   );
 }
 

@@ -110,7 +110,10 @@ test("自作のスマートフォルダーにチップを足して上書きし�
   await expect(page.getByLabel("CVを検索")).toHaveCount(0);
 
   await page.getByRole("button", { name: "ソート", exact: true }).click();
-  await page.getByRole("menuitemradio", { name: /^タイトル（Z→A）/ }).click();
+  await page
+    .getByRole("menu")
+    .getByRole("menuitemradio", { name: /^タイトル（Z→A）/ })
+    .click();
   await expect(page.getByTitle("ソート: タイトル（Z→A）")).toBeVisible();
   await expect.poll(async () => (await workTitles(page)).length).toBeGreaterThan(0);
   const sorted = await workTitles(page);

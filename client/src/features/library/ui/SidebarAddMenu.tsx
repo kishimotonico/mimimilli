@@ -1,6 +1,20 @@
-import { getSmartFolderIcon } from "../../../entities/library/smartFolderDefinitions";
-import { I } from "../../../shared/ui/Icon";
+import { Menu } from "@ark-ui/react/menu";
+import { MenuLayerItem } from "../../../shared/ui/menu/MenuLayerItem";
 import type { SmartFolderTemplate } from "@mimimilli/shared";
+import { I } from "../../../shared/ui/Icon";
+import IconButton from "../../../shared/ui/IconButton";
+import {
+  MenuPopup,
+  MotionMenuRoot,
+  MotionMenuTrigger,
+  useMotionMenu,
+} from "../../../shared/ui/menu/MotionMenu";
+import {
+  MENU_HEADING_CLASS,
+  MENU_LABEL_CLASS,
+  MENU_SEPARATOR_CLASS,
+  menuItemClass,
+} from "../../../shared/ui/menu/menuStyles";
 
 interface SidebarAddMenuProps {
   /** 絞り込みが無いときの「複製」の対象。無ければ出さない */
@@ -14,7 +28,7 @@ interface SidebarAddMenuProps {
   onAddTemplate: (templateId: string) => void;
 }
 
-/** 見出しの ＋ のメニュー。見出しの下に全幅で出す */
+/** 見出しの ＋ とそのメニュー */
 export default function SidebarAddMenu({
   duplicateName,
   canSaveSearch,
@@ -24,44 +38,61 @@ export default function SidebarAddMenu({
   onAddGroup,
   onAddTemplate,
 }: SidebarAddMenuProps) {
+  const menu = useMotionMenu({ positioning: { placement: "bottom-end" } });
   return (
-    <div className="mll-sbmenu" role="menu">
-      {canSaveSearch && (
-        <button type="button" role="menuitem" onClick={onSaveSearch}>
-          <I.bookmark size={13} />
-          今の検索を保存
-        </button>
-      )}
-      {!canSaveSearch && duplicateName !== null && (
-        <button type="button" role="menuitem" onClick={onDuplicate}>
-          <I.bookmark size={13} />
-          {`「${duplicateName}」を複製`}
-        </button>
-      )}
-      <button type="button" role="menuitem" onClick={onAddGroup}>
-        <I.tag size={13} />
-        グループ分けを追加
-      </button>
-      <hr />
-      <div className="mh">既定から追加</div>
-      {templates.length > 0 ? (
-        templates.map((template) => {
-          const Icon = I[getSmartFolderIcon(template)];
-          return (
-            <button
-              key={template.id}
-              type="button"
-              role="menuitem"
-              onClick={() => onAddTemplate(template.id)}
-            >
-              <Icon size={13} />
-              {template.name}
-            </button>
-          );
-        })
-      ) : (
-        <div className="none">すべて追加済み</div>
-      )}
-    </div>
+    <MotionMenuRoot handle={menu}>
+      <MotionMenuTrigger>
+        <IconButton icon={I.add} label="追加" size="xs" tone="muted" active={menu.open} />
+      </MotionMenuTrigger>
+      <MenuPopup>
+        {canSaveSearch && (
+          <MenuLayerItem
+            value="save-search"
+            valueText="今の検索を保存"
+            onSelect={onSaveSearch}
+            className={menuItemClass()}
+          >
+            <span className={MENU_LABEL_CLASS}>今の検索を保存</span>
+          </MenuLayerItem>
+        )}
+        {!canSaveSearch && duplicateName !== null && (
+          <MenuLayerItem
+            value="duplicate"
+            valueText={`「${duplicateName}」を複製`}
+            onSelect={onDuplicate}
+            className={menuItemClass()}
+          >
+            <span className={MENU_LABEL_CLASS}>{`「${duplicateName}」を複製`}</span>
+          </MenuLayerItem>
+        )}
+        <MenuLayerItem
+          value="add-group"
+          valueText="グループ分けを追加"
+          onSelect={onAddGroup}
+          className={menuItemClass()}
+        >
+          <span className={MENU_LABEL_CLASS}>グループ分けを追加</span>
+        </MenuLayerItem>
+        <Menu.Separator className={MENU_SEPARATOR_CLASS} />
+        <Menu.ItemGroup>
+          <Menu.ItemGroupLabel className={MENU_HEADING_CLASS}>既定から追加</Menu.ItemGroupLabel>
+          {templates.length > 0 ? (
+            templates.map((template) => (
+              <Menu.Item
+                key={template.id}
+                value={template.id}
+                valueText={template.name}
+                onSelect={() => onAddTemplate(template.id)}
+                className={menuItemClass()}
+              >
+                <span className={MENU_LABEL_CLASS}>{template.name}</span>
+              </Menu.Item>
+            ))
+          ) : (
+            <div className="px-2 pt-1 pb-1.5 text-ink-3">すべて追加済み</div>
+          )}
+        </Menu.ItemGroup>
+      </MenuPopup>
+    </MotionMenuRoot>
   );
 }

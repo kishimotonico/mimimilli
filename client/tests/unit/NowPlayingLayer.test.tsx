@@ -1,5 +1,6 @@
 import { StrictMode, useRef } from "react";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { buildWork } from "../helpers/builders";
 import { mockApi } from "../helpers/api";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -148,18 +149,18 @@ describe("NowPlayingLayer", () => {
     expect(back).not.toHaveBeenCalled();
   });
 
-  it("速度メニューを開いたEscはメニューだけを閉じ、2回目のEscで層が閉じる", () => {
+  it("速度メニューを開いたEscはメニューだけを閉じ、2回目のEscで層が閉じる", async () => {
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
     setup({ playing: true });
 
-    fireEvent.click(screen.getByTitle("再生速度"));
+    await userEvent.click(screen.getByTitle("再生速度"));
     expect(screen.getByRole("menu")).toBeInTheDocument();
 
-    fireEvent.keyDown(document.body, { key: "Escape" });
-    expect(screen.queryByRole("menu")).toBeNull();
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
     expect(back).not.toHaveBeenCalled();
 
-    fireEvent.keyDown(document.body, { key: "Escape" });
+    await userEvent.keyboard("{Escape}");
     expect(back).toHaveBeenCalledOnce();
   });
 

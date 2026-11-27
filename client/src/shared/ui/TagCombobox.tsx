@@ -121,6 +121,7 @@ function TagComboboxImpl(
   const listboxId = `${baseId}-listbox`;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const suppressOpenOnFocus = useRef(false);
   const [input, setInput] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -231,7 +232,13 @@ function TagComboboxImpl(
         font="jp"
         surface={1}
         onChange={(event) => openWithInput(event.target.value)}
-        onFocus={() => setIsOpen(input.trim().length > 0)}
+        onFocus={() => {
+          if (suppressOpenOnFocus.current) {
+            suppressOpenOnFocus.current = false;
+            return;
+          }
+          setIsOpen(input.trim().length > 0);
+        }}
         onKeyDown={(event) => {
           if (event.key === "ArrowDown") {
             event.preventDefault();
@@ -284,7 +291,16 @@ function TagComboboxImpl(
         <div
           id={listboxId}
           role="listbox"
+          tabIndex={-1}
           className="absolute left-0 right-0 top-[calc(100%+4px)] z-20 overflow-hidden rounded-[6px] border border-line bg-paper-1 py-1 shadow-pop"
+          onKeyDown={(event) => {
+            if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
+            event.preventDefault();
+            event.stopPropagation();
+            setIsOpen(false);
+            suppressOpenOnFocus.current = true;
+            inputRef.current?.focus({ preventScroll: true });
+          }}
         >
           {options.map((option, index) => {
             const isActive = index === activeIndex;

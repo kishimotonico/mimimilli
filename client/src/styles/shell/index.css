@@ -9,7 +9,6 @@
 @import "./top-bar.css" layer(components);
 @import "./address-bar.css" layer(components);
 @import "./grid-controls.css" layer(components);
-@import "./sort-menu.css" layer(components);
 @import "./column.css" layer(components);
 @import "./library-results.css" layer(components);
 @import "./work-grid.css" layer(components);
@@ -23,7 +22,7 @@
 @import "./collage.css" layer(components);
 @import "./value-list.css" layer(components);
 @import "./value-grid.css" layer(components);
-@import "./quick-overlay.css" layer(components);
+@import "./quick-list.css" layer(components);
 @import "./file-row.css" layer(components);
 @import "./file-work-badge.css" layer(components);
 @import "./column-stack.css" layer(components);

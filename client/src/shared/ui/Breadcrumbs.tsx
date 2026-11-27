@@ -2,8 +2,9 @@ import { useLayoutEffect, useRef, useState } from "react";
 
 interface BreadcrumbsProps {
   path: string[];
-  /** anchor はクリックされたセグメントのボタン（ポップオーバーの基準位置に使える） */
-  onNavigate: (index: number, anchor: HTMLElement) => void;
+  onNavigate: (index: number) => void;
+  /** 最後のセグメントのボタンの id。ポップオーバーなどのトリガーに結ぶ */
+  lastSegmentId?: string;
 }
 
 /** 中間階層を省略した表示に切り替えるべきか判定する。コンテナ幅は狭幅化・ペイン
@@ -34,7 +35,7 @@ function useNeedsCollapse(path: string[]) {
 
 type CrumbItem = { kind: "segment"; index: number } | { kind: "ellipsis" };
 
-export default function Breadcrumbs({ path, onNavigate }: BreadcrumbsProps) {
+export default function Breadcrumbs({ path, onNavigate, lastSegmentId }: BreadcrumbsProps) {
   const { containerRef, measureRef, needsCollapse } = useNeedsCollapse(path);
   // 先頭・直近（現在地の1つ上）・現在地の3つは省略しても意味が失われるので必ず残す。
   // 3セグメント以下なら中間が無く省略の余地が無い。
@@ -57,8 +58,9 @@ export default function Breadcrumbs({ path, onNavigate }: BreadcrumbsProps) {
             <span className="mle-crumbs__ellipsis">…</span>
           ) : (
             <button
+              id={item.index === path.length - 1 ? lastSegmentId : undefined}
               className={`mle-crumbs__seg ${item.index === path.length - 1 ? "is-last" : ""}`}
-              onClick={(event) => onNavigate(item.index, event.currentTarget)}
+              onClick={() => onNavigate(item.index)}
             >
               {path[item.index]}
             </button>

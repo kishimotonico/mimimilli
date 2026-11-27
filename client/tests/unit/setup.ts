@@ -226,3 +226,9 @@ export function mockElementSize(width = 800, height = 600): { restore: () => voi
     },
   };
 }
+
+// happy-dom は要素の矩形が常に0で、位置決めがアンカーを「見えない」と判断して Ark UI のメニューを visibility:hidden にする。
+// テストでは隠さない。
+const showPositionersStyle = document.createElement("style");
+showPositionersStyle.textContent = "[data-part='positioner'] { visibility: visible !important; }";
+document.head.append(showPositionersStyle);

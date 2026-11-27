@@ -1,13 +1,16 @@
 // 詳細パネルの再生スプリットボタン。主ボタン1つに再生アクションを集約し、
 // 隣の▾から「最初から再生」を選べる（履歴あり/再生中のときのみ意味を持つ）。
-// ▾メニューはLibrarySortMenuと同じパターン（外側クリック/Escape/フォーカス復帰は
-// usePopoverDismissal、矢印キーでの項目移動は自前実装）に揃える。
 
-import { useEffect, useRef, useState } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import { Menu } from "@ark-ui/react/menu";
 import type { Track } from "@mimimilli/shared";
 import { I, type IconFC } from "../../../../shared/ui/Icon";
-import { usePopoverDismissal } from "../../../../shared/ui/usePopoverDismissal";
+import {
+  MenuPopup,
+  MotionMenuRoot,
+  MotionMenuTrigger,
+  useMotionMenu,
+} from "../../../../shared/ui/menu/MotionMenu";
+import { MENU_LABEL_CLASS, menuItemClass } from "../../../../shared/ui/menu/menuStyles";
 
 interface WorkPlayButtonProps {
   hasResume: boolean;
@@ -51,35 +54,6 @@ function getMainAction(props: WorkPlayButtonProps): MainAction {
 
 export function WorkPlayButton(props: WorkPlayButtonProps) {
   const { isPlayable, isLoaded, hasResume, resumeTrack, resumeTime, onPlayFromStart } = props;
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  const { close: closeMenu } = usePopoverDismissal({
-    isOpen: isMenuOpen,
-    onClose: () => setIsMenuOpen(false),
-    anchorRef: rootRef,
-  });
-
-  useEffect(() => {
-    if (!isMenuOpen) return;
-    rootRef.current
-      ?.querySelector<HTMLButtonElement>('[role="menuitem"]')
-      ?.focus({ preventScroll: true });
-  }, [isMenuOpen]);
-
-  const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-    event.preventDefault();
-    const items = Array.from(
-      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
-    );
-    if (items.length === 0) return;
-    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
-    const delta = event.key === "ArrowDown" ? 1 : -1;
-    const nextIndex = (currentIndex + delta + items.length) % items.length;
-    items[nextIndex]?.focus({ preventScroll: true });
-  };
-
   const main = getMainAction(props);
   const MainIcon = main.icon;
   // ▾は「最初から再生」が主ボタンと別の意味を持つときだけ出す。ロード中（再生/一時停止）
@@ -90,12 +64,11 @@ export function WorkPlayButton(props: WorkPlayButtonProps) {
     resumeTrack && hasResume ? `${resumeTrack.title} · ${resumeTime} から再開` : main.label;
 
   return (
-    <div className="mle-prv__playsplit" ref={rootRef}>
+    <div className="mle-prv__playsplit">
       <button
         type="button"
         className={`mle-prv__playbtn ${showMenuTrigger ? "has-caret" : ""}`}
         disabled={!isPlayable}
-        aria-disabled={!isPlayable}
         aria-label={main.label}
         title={title}
         onClick={main.onClick}
@@ -103,40 +76,31 @@ export function WorkPlayButton(props: WorkPlayButtonProps) {
         <MainIcon size={12} />
         <span>{main.text}</span>
       </button>
-      {showMenuTrigger && (
-        <button
-          type="button"
-          className="mle-prv__playcaret"
-          aria-label="再生メニュー"
-          aria-haspopup="menu"
-          aria-expanded={isMenuOpen}
-          onClick={() => setIsMenuOpen((open) => !open)}
-        >
+      {showMenuTrigger && <PlayFromStartMenu onPlayFromStart={onPlayFromStart} />}
+    </div>
+  );
+}
+
+/** ▾の「最初から再生」。▾が消えるとき開いた状態を持ち越さないよう、メニューの状態ごとこの部品に閉じる */
+function PlayFromStartMenu({ onPlayFromStart }: { onPlayFromStart: () => void }) {
+  const menu = useMotionMenu({ positioning: { placement: "bottom-end" } });
+  return (
+    <MotionMenuRoot handle={menu}>
+      <MotionMenuTrigger>
+        <button type="button" className="mle-prv__playcaret" aria-label="再生メニュー">
           <I.chevD size={11} />
         </button>
-      )}
-      {isMenuOpen && (
-        <div
-          className="mle-prv__playmenu"
-          role="menu"
-          aria-label="再生メニュー"
-          tabIndex={-1}
-          onKeyDown={handleMenuKeyDown}
+      </MotionMenuTrigger>
+      <MenuPopup aria-label="再生メニュー">
+        <Menu.Item
+          value="play-from-start"
+          valueText="最初から再生"
+          onSelect={onPlayFromStart}
+          className={menuItemClass()}
         >
-          <button
-            type="button"
-            role="menuitem"
-            className="mle-prv__playmenu-item"
-            onClick={() => {
-              closeMenu();
-              onPlayFromStart();
-            }}
-          >
-            <I.refresh size={12} />
-            <span>最初から再生</span>
-          </button>
-        </div>
-      )}
-    </div>
+          <span className={MENU_LABEL_CLASS}>最初から再生</span>
+        </Menu.Item>
+      </MenuPopup>
+    </MotionMenuRoot>
   );
 }

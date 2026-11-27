@@ -50,6 +50,11 @@ interface WorkDetailProps {
   onExpand?: () => void;
   /** 表示中の作品が再生中の作品と一致するときだけ渡す。「再生画面へ」ボタンを表示する */
   onGoToPlayingScreen?: () => void;
+  /**
+   * 解除の確定時に呼び、解除が成功したあとの振る舞いを返す（一覧の選択を外す、フォーカスを移す、など）。
+   * 確定時に決めておくこと（移し先など）は呼び出し側が持つ
+   */
+  prepareUnregister: (workId: string) => () => void;
 }
 
 export function WorkDetail({
@@ -63,6 +68,7 @@ export function WorkDetail({
   layout = "pane",
   onExpand,
   onGoToPlayingScreen,
+  prepareUnregister,
 }: WorkDetailProps) {
   const playlist = work.playlists.find((p) => p.id === work.defaultPlaylistId) ?? work.playlists[0];
   const tracks = playlist?.tracks ?? [];
@@ -100,7 +106,7 @@ export function WorkDetail({
       trackIndex,
     );
 
-  const handleDeleteConfirm = async () => {
+  const handleDeleteConfirm = async (afterUnregister: () => void) => {
     const title = work.title;
     try {
       await deleteMutation.mutateAsync(work.id);
@@ -108,6 +114,7 @@ export function WorkDetail({
       toast.error(apiErrorMessage(cause, "登録解除に失敗しました"));
       return;
     }
+    afterUnregister();
     toast.show({
       message: `「${title}」を登録解除しました`,
       variant: "success",
@@ -283,8 +290,9 @@ export function WorkDetail({
           message={`「${work.title}」をライブラリから外します。タグや再生履歴（mimimilli.json）は消え、音声などのファイルは残ります。`}
           confirmLabel="解除する"
           onConfirm={() => {
+            const afterUnregister = prepareUnregister(work.id);
             setIsDeleteConfirmOpen(false);
-            void handleDeleteConfirm();
+            void handleDeleteConfirm(afterUnregister);
           }}
           onCancel={() => setIsDeleteConfirmOpen(false)}
         />

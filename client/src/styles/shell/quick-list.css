@@ -1,38 +1,26 @@
-/* グループ値のクイックオーバーレイと値ドロップダウン（.mll-qoverlay* / .mll-qlist*）。 */
+/* グループ値のクイックリスト（.mll-qlist*）。 */
 
-.mll-qoverlay {
-  z-index: 30;
-  display: flex;
-  flex-direction: column;
-  width: 280px;
-  max-height: 360px;
-  overflow: hidden;
-  background: var(--paper-1);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-2);
-  box-shadow: var(--shadow-pop);
-}
-.mll-qoverlay--fixed {
-  position: fixed;
-}
-.mll-qoverlay--inline {
-  position: absolute;
-}
 .mll-qlist {
   display: flex;
   flex-direction: column;
+  gap: 8px;
   min-height: 0;
 }
 .mll-qlist__search {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--line-soft);
+  box-sizing: border-box;
+  flex: none;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-1);
+  background: var(--paper-0);
   color: var(--ink-3);
 }
 .mll-qlist__search:focus-within {
-  border-bottom-color: var(--line-strong);
+  border-color: var(--line-strong);
 }
 .mll-qlist__search input {
   flex: 1;
@@ -41,6 +29,7 @@
   font-size: var(--fs-body);
   line-height: var(--lh-body);
   color: var(--ink-0);
+  caret-color: var(--acc);
   background: transparent;
 }
 .mll-qlist__sorttoggle {
@@ -60,7 +49,7 @@
 .mll-qlist__sort {
   display: flex;
   gap: 4px;
-  padding: 4px 8px;
+  padding-bottom: 4px;
   border-bottom: 1px solid var(--line-soft);
 }
 .mll-qlist__sortbtn {
@@ -95,40 +84,13 @@
   max-height: 260px;
   overflow-y: auto;
 }
-.mll-qlist__item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 6px 8px;
-  border-radius: 4px;
-  font-size: var(--fs-body);
-  line-height: var(--lh-body);
-  color: var(--ink-1);
-  text-align: left;
-}
-.mll-qlist__item:hover {
-  background: var(--paper-2);
-}
-.mll-qlist__item.is-on {
-  background: var(--paper-4);
-  color: var(--ink-0);
-  font-weight: 600;
-}
-.mll-qlist__item .nm {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mll-qlist__item .count {
-  flex-shrink: 0;
-  font-family: var(--font-mono);
-  font-size: var(--fs-mono);
-  line-height: var(--lh-mono);
-  color: var(--ink-2);
+.mll-qlist__check {
+  display: grid;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  place-items: center;
+  color: var(--acc);
 }
 .mll-qlist__row {
   position: relative;
@@ -136,9 +98,6 @@
 }
 .mll-qlist__row:hover {
   background: var(--paper-2);
-}
-.mll-qlist__row.is-on {
-  background: var(--paper-4);
 }
 /* ホバーせずとも見え、押せる。AND追加は非hover時・キーボードでも使える。
      マウスもフォーカスも無い間は目立たせず、hover/focus-withinで完全に見せる。 */
@@ -158,7 +117,9 @@
 }
 /* 入れ子タグの選択不可の見出し行（名前順ソート時のみ。値一覧の .mll-vrow-heading と対）。 */
 .mll-qlist__heading {
-  padding: 6px 8px;
+  box-sizing: border-box;
+  height: 28px;
+  padding: 6px 8px 2px;
   overflow: hidden;
   font-family: var(--font-sans);
   font-size: var(--fs-caption);
@@ -166,7 +127,7 @@
   font-weight: 600;
   letter-spacing: 0.03em;
   color: var(--ink-2);
-  /* .mll-qlist__item .nm と同じく折り返さない（仮想化の固定行高見積もりが崩れるため）。 */
+  /* 折り返さない（仮想化の固定行高見積もりが崩れるため）。 */
   white-space: nowrap;
   text-overflow: ellipsis;
 }

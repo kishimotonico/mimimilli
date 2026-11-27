@@ -9,6 +9,7 @@ import {
   addLibraryTag,
   clearLibraryTags,
   deselectLibraryWork,
+  deselectLibraryWorkIfSelected,
   dropLibraryGroup,
   backToLibraryValueList,
   openLibraryFolder,
@@ -58,3 +59,5 @@ export const normalizeLibraryFolderAtom = appRouteCorrection(normalizeLibraryFol
 export const dropLibraryGroupAtom = appRouteCorrection(dropLibraryGroup);
 /** 選択中の作品が絞り込みから外れた・存在しないときの選択解除 */
 export const deselectLibraryWorkAtom = appRouteCorrection(deselectLibraryWork);
+/** 登録解除した作品が選択中のときだけ選択を外す */
+export const deselectUnregisteredWorkAtom = appRouteCorrection(deselectLibraryWorkIfSelected);

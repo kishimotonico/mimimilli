@@ -13,6 +13,7 @@ import {
   playingTrackTitleAtom,
 } from "../../entities/player/model/atoms";
 import { cn } from "../../shared/lib/cn";
+import { resolveFocusReturnTarget } from "../../shared/ui/layer/focusReturnTarget";
 import { useScanEntryStatus } from "../../features/scan/model/useScanEntryStatus";
 import ScanEntryButton from "./ScanEntryButton";
 
@@ -50,7 +51,7 @@ export default function TopBar() {
     setDraft(searchQuery);
   }, [searchQuery]);
 
-  // ⌘K / Ctrl+K で検索ボックスへフォーカスする。テキスト入力中は横取りしない。
+  // ⌘K / Ctrl+K で検索ボックスへ移す。グループ値の検索欄以外ではテキスト入力を横取りしない。
   useEffect(() => {
     if (mode !== "library" && mode !== "workDetail") return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -58,7 +59,12 @@ export default function TopBar() {
       const target = e.target instanceof HTMLElement ? e.target : null;
       const isEditable =
         target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
-      if (isEditable && target !== searchInputRef.current) return;
+      if (
+        isEditable &&
+        target !== searchInputRef.current &&
+        !target?.closest("[data-search-shortcut-scope]")
+      )
+        return;
       e.preventDefault();
       searchInputRef.current?.focus();
       searchInputRef.current?.select();
@@ -105,8 +111,7 @@ export default function TopBar() {
               if (!composingRef.current) onSearchChange(e.target.value);
             }}
             onFocus={(e) => {
-              previousFocusRef.current =
-                e.relatedTarget instanceof HTMLElement ? e.relatedTarget : null;
+              previousFocusRef.current = resolveFocusReturnTarget(e.relatedTarget);
             }}
             onCompositionStart={() => {
               composingRef.current = true;

@@ -72,7 +72,6 @@ describe("useHoverGroupCoordinator", () => {
       vi.advanceTimersByTime(200);
     });
     expect(result.current.openKey).toBe("a");
-    expect(result.current.openAnchorEl).toBe(elA);
   });
 
   it("パネル未登録のままトリガーを離れると150msで閉じる", () => {
@@ -184,6 +183,25 @@ describe("useHoverGroupCoordinator", () => {
     expect(result.current.openKey).toBe("b");
   });
 
+  it("セーフトライアングル解除時にポインターが元の行へ戻っていれば閉じない", () => {
+    const { result } = renderCoordinator();
+    const elA = elAt({ left: 0, top: 90, bottom: 110 });
+    const panelEl = elAt({ left: 200, top: 50, bottom: 150 });
+
+    act(() => result.current.openImmediately("a"));
+    result.current.registerPanelEl(result.current.ownerToken!, panelEl);
+
+    act(() => {
+      const trigger = result.current.getTriggerHandlers("a");
+      trigger.onPointerLeave({ clientX: 0, clientY: 100 } as never);
+      trigger.onPointerEnter({ currentTarget: elA } as never);
+      fireEvent.pointerMove(document, { clientX: 0, clientY: 80 });
+      vi.advanceTimersByTime(200);
+    });
+
+    expect(result.current.openKey).toBe("a");
+  });
+
   it("トリガーが pointerenter を受けなくても、閉じた後の pointermove だけで遅延のあと開く", () => {
     const { result } = renderCoordinator();
     const elA = elAt({ left: 0, top: 90, bottom: 110 });
@@ -284,19 +302,17 @@ describe("useHoverGroupCoordinator", () => {
 
   it("旧オーナーのトークンでの登録解除は新オーナーの登録を壊さない（グループ分けA→B切替）", () => {
     const { result } = renderHook(() => useHoverGroupCoordinator());
-    const elA = elAt({ left: 0, top: 90, bottom: 110 });
-    const elB = elAt({ left: 0, top: 130, bottom: 150 });
     const panelElA = elAt({ left: 200, top: 50, bottom: 150 });
     const panelElB = elAt({ left: 200, top: 50, bottom: 150 });
 
     act(() => {
-      result.current.openImmediately("a", elA);
+      result.current.openImmediately("a");
     });
     const tokenA = result.current.ownerToken!;
     result.current.registerPanelEl(tokenA, panelElA);
 
     act(() => {
-      result.current.openImmediately("b", elB);
+      result.current.openImmediately("b");
     });
     const tokenB = result.current.ownerToken!;
     expect(tokenB).not.toBe(tokenA);
@@ -320,10 +336,9 @@ describe("useHoverGroupCoordinator", () => {
 
   it("openImmediately は遅延なしで即座に開く", () => {
     const { result } = renderHook(() => useHoverGroupCoordinator());
-    const elA = elAt({ left: 0, top: 90, bottom: 110 });
 
     act(() => {
-      result.current.openImmediately("a", elA);
+      result.current.openImmediately("a");
     });
 
     expect(result.current.openKey).toBe("a");

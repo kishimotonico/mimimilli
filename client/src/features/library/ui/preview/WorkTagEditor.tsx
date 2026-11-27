@@ -1,12 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import { normalizeTag } from "@mimimilli/shared";
+import { useCallback, useEffect, useState } from "react";
 import type { NormalizedTag, Work } from "@mimimilli/shared";
 import { sortTagsForDisplay } from "../../../../entities/work/sortTagsForDisplay";
 import Tag from "../../../../entities/work/ui/Tag";
 import { I } from "../../../../shared/ui/Icon";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import IconButton from "../../../../shared/ui/IconButton";
-import TagCombobox from "../../../../shared/ui/TagCombobox";
 import { useToast } from "../../../../shared/ui/useToast";
 import {
   sourceMutationErrorMessage,
@@ -17,14 +15,14 @@ import { useRootFolderOrNull } from "../../../../entities/settings/useSettingsQu
 import type { WorkTagMutation } from "../../../../entities/work/model/workMutations";
 import { useTagPrefixes } from "../../../../entities/tag/useTagPrefixes";
 import { tagPrefixDefinition } from "../../../../entities/tag/tagPrefixDefinition";
-import { useAnchoredPopover } from "../../../../shared/ui/useAnchoredPopover";
+import { useElementWidth } from "../../../../shared/ui/useElementWidth";
+import { TagAddPopover } from "./TagAddPopover";
 import { useWorkTagEditor } from "./useWorkTagEditor";
 import {
   sourceCommandBlockMessage,
   WorkSourcePatchBlockedNotice,
 } from "./WorkSourcePatchBlockedNotice";
 
-const TAG_POPOVER_WIDTH = 260;
 // 詳細ペインをタグで圧迫せず、優先度の高い分類を一目で確認できる表示上限。
 const COLLAPSED_TAG_LIMIT = 8;
 // 右ペインの実幅がこれを下回る場合、タグ追加UIは浮遊ポップオーバーではなく
@@ -53,13 +51,21 @@ export function WorkTagEditor({
   onTagClick,
 }: WorkTagEditorProps) {
   const rootFolder = useRootFolderOrNull();
-  const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
   const [areAllTagsVisible, setAreAllTagsVisible] = useState(false);
   // 削除✕ボタンは誤操作防止のため既定で非表示（追加の2段階フローと対称にする）。
   // expanded（編集ダイアログ）はそれ自体が明示的な編集操作のため常に編集中扱い
   const [isEditMode, setIsEditMode] = useState(false);
   const showRemoveButtons = expanded || isEditMode;
-  const tagEditorRef = useRef<HTMLDivElement | null>(null);
+  const [boundary, setBoundary] = useState<HTMLElement | null>(null);
+  const bindTagEditor = useCallback((node: HTMLDivElement | null) => {
+    setBoundary(
+      node?.closest<HTMLElement>(".mle-prv__meta") ??
+        node?.closest<HTMLElement>(".mle-prv__body") ??
+        null,
+    );
+  }, []);
+  const width = useElementWidth(boundary);
+  const isNarrow = width !== null && width > 0 && width < NARROW_TAG_PANE_PX;
   const { tagPrefixes } = useTagPrefixes();
 
   const {
@@ -113,41 +119,13 @@ export function WorkTagEditor({
 
   const canEditTags = blockedMessage === null;
 
-  const closeTagPopover = () => setIsTagPopoverOpen(false);
-  const {
-    setReference: setTagPopoverAnchorRef,
-    setFloating: setTagPopoverFloating,
-    floatingStyles: tagPopoverStyles,
-    containerWidth: tagPopoverContainerWidth,
-    close,
-  } = useAnchoredPopover({
-    isOpen: isTagPopoverOpen,
-    preferredWidth: TAG_POPOVER_WIDTH,
-    onClose: () => closeTagPopover(),
-    boundaryRef: tagEditorRef,
-  });
-  const isNarrowTagPane = tagPopoverContainerWidth < NARROW_TAG_PANE_PX;
+  const addDisabled = isTagSaving || !canEditTags;
   const sortedTags = sortTagsForDisplay(tags, tagPrefixes);
   const hiddenTagCount = Math.max(0, sortedTags.length - COLLAPSED_TAG_LIMIT);
   const visibleTags =
     expanded || areAllTagsVisible ? sortedTags : sortedTags.slice(0, COLLAPSED_TAG_LIMIT);
 
-  const selectTag = (tag: string) => {
-    close();
-    if (!canEditTags) return;
-    void addTag(tag);
-  };
-
   const definitionOf = (tag: string) => tagPrefixDefinition(tag, tagPrefixes);
-
-  const comboboxProps = {
-    suggestions,
-    excludeTags: tags,
-    disabled: isTagSaving || !canEditTags,
-    canCreate: (tag: string) => normalizeTag(tag) !== null,
-    onSelect: selectTag,
-    onCancel: close,
-  };
 
   const patchTagsErrorMessage =
     sourceCommandBlockMessage(patchTagsError) === null && patchTagsError
@@ -185,10 +163,6 @@ export function WorkTagEditor({
     dismissToast,
   ]);
 
-  useEffect(() => {
-    if (!canEditTags) setIsTagPopoverOpen(false);
-  }, [canEditTags]);
-
   return (
     <>
       <div className="mle-prv__tag-row">
@@ -222,7 +196,7 @@ export function WorkTagEditor({
               onClick={() => setAreAllTagsVisible(true)}
             />
           )}
-          <div ref={tagEditorRef} className="contents">
+          <div ref={bindTagEditor} className="contents">
             {!expanded && (
               <IconButton
                 icon={I.edit}
@@ -233,46 +207,15 @@ export function WorkTagEditor({
                 onClick={() => setIsEditMode((v) => !v)}
               />
             )}
-            <div ref={setTagPopoverAnchorRef} className="relative inline-flex">
-              <IconButton
-                icon={I.add}
-                label="タグを追加"
-                size="xs"
-                tone="muted"
-                className="bg-paper-2 hover:bg-paper-3"
-                disabled={isTagSaving || !canEditTags}
-                onClick={() => {
-                  resetPatchTagsError();
-                  if (isTagPopoverOpen) close();
-                  else setIsTagPopoverOpen(true);
-                }}
-              />
-              {isTagPopoverOpen && !isNarrowTagPane && (
-                <div
-                  ref={setTagPopoverFloating}
-                  className="absolute z-10 rounded-[6px] bg-paper-1 shadow-pop"
-                  style={tagPopoverStyles}
-                >
-                  <TagCombobox
-                    focusOnMount
-                    width={
-                      typeof tagPopoverStyles.width === "number"
-                        ? tagPopoverStyles.width
-                        : TAG_POPOVER_WIDTH
-                    }
-                    {...comboboxProps}
-                  />
-                </div>
-              )}
-            </div>
-            {isTagPopoverOpen &&
-              isNarrowTagPane && (
-                // 右ペインが狭く浮遊ポップオーバーを展開する余地がないため、
-                // チップ列の下にフル幅の行として展開する（flex-wrap の basis-full で改行させる）。
-                <div className="mt-1 basis-full rounded-[6px] bg-paper-1 shadow-pop">
-                  <TagCombobox focusOnMount width="full" {...comboboxProps} />
-                </div>
-              )}
+            <TagAddPopover
+              suggestions={suggestions}
+              excludeTags={tags}
+              disabled={addDisabled}
+              boundary={boundary}
+              inlineWhenNarrow={isNarrow}
+              onOpen={resetPatchTagsError}
+              onSelect={(tag) => void addTag(tag)}
+            />
           </div>
         </div>
       </div>

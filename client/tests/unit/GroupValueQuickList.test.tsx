@@ -36,7 +36,7 @@ type QuickListProps = Omit<
   "sort" | "onSortChange"
 > & { sort?: GroupSortId; onSortChange?: (sort: GroupSortId) => void };
 
-/** 並びは呼び出し側（GroupValuePopoverPanel）が持つので、テストでも状態を持つ側を用意する */
+/** 並びは呼び出し側が持つので、テストでも状態を持つ側を用意する */
 function QuickListHarness({
   sort: initialSort = "count-desc",
   onSortChange,
@@ -65,7 +65,6 @@ function renderQuickList(props: Partial<QuickListProps> = {}) {
         items={[]}
         isSelected={() => false}
         onSelect={vi.fn()}
-        close={vi.fn()}
         {...props}
       />
     </JotaiProvider>,
@@ -91,18 +90,6 @@ describe("GroupValueQuickList の仮想化", () => {
 });
 
 describe("GroupValueQuickList のキーボード移動", () => {
-  it("開いたときの検索欄への初期フォーカスはpreventScroll:trueで祖先を自動スクロールしない", async () => {
-    const sizeMock = mockElementSize(260, 260);
-    const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
-    renderQuickList({ items: makeItems(5), isOpen: true });
-    await flushVirtualizer();
-
-    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
-
-    focusSpy.mockRestore();
-    sizeMock.restore();
-  });
-
   it("矢印キーによる値行間のフォーカス移動もpreventScroll:trueで祖先を自動スクロールしない", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
@@ -318,7 +305,6 @@ describe("GroupValueQuickList のキーボード移動", () => {
           items={makeItems(3)}
           isSelected={() => false}
           onSelect={vi.fn()}
-          close={vi.fn()}
         />
       </JotaiProvider>,
     );
@@ -344,7 +330,6 @@ describe("GroupValueQuickList のキーボード移動", () => {
           items={makeItems(3).map((item) => ({ ...item, value: `別${item.value}` }))}
           isSelected={() => false}
           onSelect={vi.fn()}
-          close={vi.fn()}
         />
       </JotaiProvider>,
     );

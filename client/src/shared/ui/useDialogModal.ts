@@ -1,8 +1,10 @@
 import { useLayoutEffect, useRef } from "react";
 import type { MouseEvent as ReactMouseEvent, RefObject, SyntheticEvent } from "react";
 import { useSetAtom } from "jotai";
-import { getTabbableElements } from "./focusable";
 import { openModalDialogsAtom } from "../model/openModalDialogsAtom";
+import { getTabbableElements } from "./focusable";
+import { resolveFocusReturnTarget } from "./layer/focusReturnTarget";
+import { isInsideMenuContent, OPEN_LAYER_SELECTOR } from "./layer/layerDom";
 
 interface UseDialogModalOptions {
   /**
@@ -23,13 +25,13 @@ interface UseDialogModalOptions {
 export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptions) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const setOpenDialogs = useSetAtom(openModalDialogsAtom);
+  const pressedBackdropWithLayerOpen = useRef(false);
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
 
-    const previousActiveElement =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousActiveElement = resolveFocusReturnTarget(document.activeElement);
 
     dialog.showModal();
     (initialFocusRef?.current ?? dialog).focus({ preventScroll: true });
@@ -40,6 +42,8 @@ export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptio
     // dialog直下の要素（fixed配置のToastなど）も含めて対象にするため querySelector で毎回集める。
     const handleTabKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Tab") return;
+      // dialog の中へポータルされたメニューの Tab は、メニュー（Ark UI）が開いたまま止める
+      if (isInsideMenuContent(event.target)) return;
       const focusable = getTabbableElements(dialog);
       if (focusable.length === 0) return;
       const first = focusable[0];
@@ -58,8 +62,17 @@ export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptio
     };
     dialog.addEventListener("keydown", handleTabKeyDown);
 
+    // Ark UI の層は、マウスでは pointerdown の次フレーム、タッチでは click で閉じる。
+    // click の時点では開いていたか分からないので、押した時点で開いていたかを覚える
+    const handlePointerDown = (event: PointerEvent) => {
+      pressedBackdropWithLayerOpen.current =
+        event.target === dialog && dialog.querySelector(OPEN_LAYER_SELECTOR) !== null;
+    };
+    dialog.addEventListener("pointerdown", handlePointerDown, true);
+
     return () => {
       dialog.removeEventListener("keydown", handleTabKeyDown);
+      dialog.removeEventListener("pointerdown", handlePointerDown, true);
       dialog.close();
       setOpenDialogs((current) => current.filter((entry) => entry !== dialog));
       if (previousActiveElement?.isConnected) {
@@ -83,12 +96,18 @@ export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptio
    * <dialog> のbackdropクリックは e.target === dialog自身として届く
    * （dialog は幅がcontentにfitするため、backdrop領域のクリックはdialog要素にヒットする）。
    * shouldClose で保存中などの条件を差し込める（省略時は常に閉じる）。
+   * 層を開いたまま押した backdrop は、層だけを閉じて dialog は閉じない。
    */
   const handleBackdropClick = (
     event: ReactMouseEvent<HTMLDialogElement>,
     shouldClose: () => boolean = () => true,
   ) => {
-    if (event.target === dialogRef.current && shouldClose()) onClose();
+    if (event.target !== dialogRef.current) return;
+    if (pressedBackdropWithLayerOpen.current) {
+      pressedBackdropWithLayerOpen.current = false;
+      return;
+    }
+    if (shouldClose()) onClose();
   };
 
   return { dialogRef, handleCancel, handleBackdropClick };

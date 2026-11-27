@@ -22,6 +22,8 @@ export interface UseVirtualListOptions {
   padding?: VirtualListPadding;
   overscan?: number;
   measureElement?: (element: Element) => number;
+  /** 行の key。既定は index。行の中身が入れ替わる一覧は、行を表す ID を返す */
+  getItemKey?: (index: number) => string | number;
   scrollRef?: RefObject<HTMLDivElement | null>;
   /** resetKey 変化時に scrollTop も 0 に戻す（グループ値リスト系） */
   resetScrollTop?: boolean;
@@ -58,6 +60,7 @@ export function useVirtualList({
   padding,
   overscan = 5,
   measureElement,
+  getItemKey,
   scrollRef: scrollRefProp,
   resetScrollTop = false,
   infiniteScroll,
@@ -79,6 +82,7 @@ export function useVirtualList({
     paddingStart: padding?.start,
     paddingEnd: padding?.end,
     measureElement,
+    getItemKey,
   });
 
   const prevResetKeyRef = useRef(resetKey);

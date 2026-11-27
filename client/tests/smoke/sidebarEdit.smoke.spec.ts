@@ -95,7 +95,7 @@ test("＋メニュー: 既定から追加・グループ分けの追加・複製
 
   // 既定から追加（最初に入らない既定が候補に出る）
   await rail(page).getByRole("button", { name: "追加", exact: true }).click();
-  await rail(page).getByRole("menuitem", { name: "シリーズ別" }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "シリーズ別" }).click();
   await expect(page).toHaveURL(/\/library\/by-series$/);
   await expect(folderRow(page, "by-series")).toHaveCount(0);
   await expect(rail(page).getByRole("button", { name: /^シリーズ別/ })).toHaveAttribute(
@@ -108,12 +108,12 @@ test("＋メニュー: 既定から追加・グループ分けの追加・複製
   await folderRow(page, "by-year").getByRole("button", { name: "削除" }).click();
   await rail(page).getByRole("button", { name: "完了" }).click();
   await rail(page).getByRole("button", { name: "追加", exact: true }).click();
-  await expect(rail(page).getByRole("menuitem", { name: "追加年別" })).toBeVisible();
+  await expect(page.getByRole("menu").getByRole("menuitem", { name: "追加年別" })).toBeVisible();
   await page.keyboard.press("Escape");
 
   // グループ分けを追加
   await rail(page).getByRole("button", { name: "追加", exact: true }).click();
-  await rail(page).getByRole("menuitem", { name: "グループ分けを追加" }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "グループ分けを追加" }).click();
   await expect(dialog(page).getByText("グループ分けを追加", { exact: true })).toBeVisible();
   await dialog(page).getByLabel("名前").fill("作曲者別");
   await dialog(page).getByLabel("グループ分け").selectOption({ label: "タグ" });
@@ -129,7 +129,7 @@ test("＋メニュー: 既定から追加・グループ分けの追加・複製
     .getByRole("button", { name: /^ランダム/ })
     .click();
   await rail(page).getByRole("button", { name: "追加", exact: true }).click();
-  await rail(page).getByRole("menuitem", { name: "「ランダム」を複製" }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "「ランダム」を複製" }).click();
   await expect(dialog(page).getByLabel("名前")).toHaveValue("ランダム（コピー）");
   await expect(dialog(page).getByLabel("既定のソート")).toHaveValue("random");
   await dialog(page).getByRole("button", { name: "保存" }).click();

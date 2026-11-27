@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { AnimatePresence } from "motion/react";
+import { useId, useState } from "react";
 import { ALL_SMART_FOLDER_ID } from "@mimimilli/shared";
 import Breadcrumbs from "../../../shared/ui/Breadcrumbs";
 import { getGroupByLabel } from "../../../entities/library/smartFolderDefinitions";
@@ -15,37 +14,45 @@ export default function LibraryBreadcrumbs() {
   const nav = useLibraryNavigation();
   const view = nav.foldersStatus === "ready" ? nav.view : null;
   const { tagPrefixes } = useTagPrefixes();
-  const [siblingAnchor, setSiblingAnchor] = useState<HTMLElement | null>(null);
+  const [siblingOpen, setSiblingOpen] = useState(false);
+  const triggerId = useId();
   const group = view?.kind === "works" ? view.group : null;
   const groupBy = view?.kind === "works" ? view.groupBy : null;
   const groupSort = view?.kind === "works" ? view.groupSort : null;
+  const canOpen = group !== null && groupBy !== null && groupSort !== null;
+  if (siblingOpen && !canOpen) setSiblingOpen(false);
 
   return (
     <>
       <Breadcrumbs
         path={[LIBRARY_ROOT_LABEL, ...(view?.breadcrumb ?? [])]}
-        onNavigate={(index, anchor) => {
+        lastSegmentId={triggerId}
+        onNavigate={(index) => {
           if (index === 0) nav.openFolder(ALL_SMART_FOLDER_ID);
           else if (index === 1) nav.backToValueList();
-          else if (group !== null) setSiblingAnchor(anchor);
+          else if (group !== null) setSiblingOpen((current) => !current);
         }}
       />
-      <AnimatePresence>
-        {view && siblingAnchor && group !== null && groupBy !== null && groupSort !== null && (
-          <GroupValuePopover
-            key={`siblings:${view.folder.id}:${groupSort}`}
-            placement="below"
-            scope={{ folderId: view.folder.id, tags: view.selectedTags, q: view.q }}
-            groupBy={groupBy}
-            groupSort={groupSort}
-            groupByLabel={getGroupByLabel(groupBy, tagPrefixes)}
-            anchorEl={siblingAnchor}
-            selectedValue={group}
-            onSelectValue={nav.selectGroupValue}
-            onClose={() => setSiblingAnchor(null)}
-          />
-        )}
-      </AnimatePresence>
+      {view && (
+        <GroupValuePopover
+          placement="below"
+          open={canOpen && siblingOpen}
+          triggerId={triggerId}
+          list={
+            groupBy !== null && groupSort !== null
+              ? {
+                  scope: { folderId: view.folder.id, tags: view.selectedTags, q: view.q },
+                  groupBy,
+                  groupSort,
+                  groupByLabel: getGroupByLabel(groupBy, tagPrefixes),
+                  selectedValue: group,
+                  onSelectValue: nav.selectGroupValue,
+                }
+              : null
+          }
+          onClose={() => setSiblingOpen(false)}
+        />
+      )}
     </>
   );
 }

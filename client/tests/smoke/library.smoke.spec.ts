@@ -104,7 +104,7 @@ test("値の作品一覧で「＋絞り込み」からチップを足せる", as
 
   await page.getByRole("button", { name: "絞り込み" }).click();
   await page
-    .getByRole("listbox", { name: "絞り込みの種類" })
+    .getByRole("group", { name: "絞り込みの種類" })
     .getByRole("button", { name: "サークル" })
     .click();
   await page
@@ -125,8 +125,7 @@ test("サイドバーのクイックオーバーレイ: 値の主クリックで
   const tracker = trackErrors(page);
   await openApp(page);
 
-  const overlay = page.locator(".mll-qoverlay");
-  const quickList = overlay.getByRole("group", { name: "CVの一覧" });
+  const quickList = page.getByRole("group", { name: "CVの一覧" });
   await railRow(page, "CV別").hover();
   await quickList.getByRole("button", { name: /^霧島レイ(?!を)/ }).click();
   await expect(page).toHaveURL(/\/library\/by-cv\?group=/);
@@ -144,7 +143,7 @@ test("サイドバーのクイックオーバーレイ: 値の主クリックで
   await railRow(page, "CV別").click();
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveCount(0);
   await page.mouse.move(1200, 600);
-  await expect(overlay).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "CV", exact: true })).toHaveCount(0);
   await railRow(page, "CV別").hover();
   await quickList.getByRole("button", { name: "霧島レイをAND追加" }).click();
   await expect(page).toHaveURL(/\/library\/by-cv\?/);
@@ -204,15 +203,15 @@ test("0件のとき「すべて」で探すと、同じチップと検索語で�
   const tracker = trackErrors(page);
   await openApp(page);
 
-  const overlay = page.locator(".mll-qoverlay");
+  // 値一覧の本体も同じ名前のグループを持つので、ホバーのクイックリスト（ポップオーバーの中）に絞る
+  const quickList = page
+    .locator('[data-scope="popover"][data-part="content"]')
+    .getByRole("group", { name: "CVの一覧" });
   await railRow(page, "CV別").click();
   await page.mouse.move(1200, 600);
-  await expect(overlay).toHaveCount(0);
+  await expect(quickList).toHaveCount(0);
   await railRow(page, "CV別").hover();
-  await overlay
-    .getByRole("group", { name: "CVの一覧" })
-    .getByRole("button", { name: "霧島レイをAND追加" })
-    .click();
+  await quickList.getByRole("button", { name: "霧島レイをAND追加" }).click();
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["cv/霧島レイ"]);
   await search(page).fill("存在しない検索語");
   const valueList = page.locator(".is-group-values");
@@ -238,7 +237,7 @@ test("並び順メニュー: 今の並びはURLに出ず、戻る・進むで保
 
   const sortButton = page.getByRole("button", { name: "ソート", exact: true });
   await sortButton.click();
-  await page.getByRole("menuitemradio", { name: "タイトル（A→Z）" }).click();
+  await page.getByRole("menu").getByRole("menuitemradio", { name: "タイトル（A→Z）" }).click();
   expect(new URL(page.url()).searchParams.has("sort")).toBe(false);
 
   await railRow(page, "CV別").click();
@@ -246,19 +245,19 @@ test("並び順メニュー: 今の並びはURLに出ず、戻る・進むで保
   await page.goBack();
   await expect(page).toHaveURL(/\/library\/all/);
   await sortButton.click();
-  await expect(page.getByRole("menuitemradio", { name: "タイトル（A→Z）" })).toHaveAttribute(
-    "aria-checked",
-    "true",
-  );
-  await page.getByRole("menuitem", { name: "このソートを既定にする" }).click();
+  await expect(
+    page.getByRole("menu").getByRole("menuitemradio", { name: "タイトル（A→Z）" }),
+  ).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("menu").getByRole("menuitem", { name: "このソートを既定にする" }).click();
 
   // 保存後は今の並びが外れて既定に従い、メニューの保存項目も消える
   await sortButton.click();
-  await expect(page.getByRole("menuitemradio", { name: "タイトル（A→Z）" })).toHaveAttribute(
-    "aria-checked",
-    "true",
-  );
-  await expect(page.getByRole("menuitem", { name: "このソートを既定にする" })).toHaveCount(0);
+  await expect(
+    page.getByRole("menu").getByRole("menuitemradio", { name: "タイトル（A→Z）" }),
+  ).toHaveAttribute("aria-checked", "true");
+  await expect(
+    page.getByRole("menu").getByRole("menuitem", { name: "このソートを既定にする" }),
+  ).toHaveCount(0);
 
   // サイドバーから入り直しても、保存した既定の並びになる
   await page.keyboard.press("Escape");
@@ -267,10 +266,9 @@ test("並び順メニュー: 今の並びはURLに出ず、戻る・進むで保
     .click();
   await railRow(page, "すべて").click();
   await sortButton.click();
-  await expect(page.getByRole("menuitemradio", { name: "タイトル（A→Z）" })).toHaveAttribute(
-    "aria-checked",
-    "true",
-  );
+  await expect(
+    page.getByRole("menu").getByRole("menuitemradio", { name: "タイトル（A→Z）" }),
+  ).toHaveAttribute("aria-checked", "true");
 
   assertNoErrors(tracker);
 });
@@ -307,6 +305,31 @@ test("作品を選ぶとプレビューが開く（行方不明の状態表示�
   assertNoErrors(tracker);
 });
 
+/**
+ * 一覧で、タイトルを含む行の作品 ID と、その次（末尾なら前）の作品 ID。登録解除でフォーカスが移る先。
+ * 解除する行が先頭でも末尾でもない（隣の候補が前後にある）ことを確かめ、隣の取り違えを検出できるようにする
+ */
+async function unregisterTargetOf(
+  page: Page,
+  titlePart: string,
+): Promise<{ id: string; neighborId: string }> {
+  const target = await page.evaluate((title) => {
+    const rows = [...document.querySelectorAll<HTMLElement>("[data-work-id][data-flat-index]")]
+      .map((row) => ({
+        id: row.dataset.workId ?? "",
+        index: Number(row.dataset.flatIndex),
+        label: row.getAttribute("aria-label") ?? "",
+      }))
+      .sort((a, b) => a.index - b.index);
+    const at = rows.findIndex((row) => row.label.includes(title));
+    return { at, last: rows.length - 1, id: rows[at]?.id ?? "", next: rows[at + 1]?.id ?? "" };
+  }, titlePart);
+  expect(target.at).toBeGreaterThan(0);
+  expect(target.at).toBeLessThan(target.last);
+  expect(target.next).not.toBe("");
+  return { id: target.id, neighborId: target.next };
+}
+
 test("詳細パネルの「その他」メニューから登録解除できる（確認ダイアログ経由、パネルは閉じ一覧から消える）", async ({
   page,
 }) => {
@@ -314,11 +337,12 @@ test("詳細パネルの「その他」メニューから登録解除できる�
   await openApp(page);
 
   await page.getByText("添い寝カフェへようこそ", { exact: false }).click();
+  const { neighborId } = await unregisterTargetOf(page, "添い寝カフェへようこそ");
 
   const panel = page.locator(".mle-prv");
   await expect(panel).toBeVisible();
   await panel.getByRole("button", { name: "その他" }).click();
-  await panel.getByRole("menuitem", { name: "登録解除" }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "登録解除" }).click();
 
   const dialog = page.getByRole("alertdialog", { name: "登録解除" });
   await expect(dialog).toBeVisible();
@@ -329,11 +353,45 @@ test("詳細パネルの「その他」メニューから登録解除できる�
     page.locator(".mll-results").getByText("添い寝カフェへようこそ", { exact: false }),
   ).toBeHidden();
   await expect(page.getByText("を登録解除しました", { exact: false })).toBeVisible();
+  // フォーカスは、繰り上がった隣の行へ移る
+  await expect(page.locator(`[data-work-id="${neighborId}"]`)).toBeFocused();
 
   // 解除した作品の詳細の取り直しが404になることが、選択解除の合図
   expect(tracker.failedResponses).toEqual([expect.stringMatching(/^404 .*\/api\/works\//)]);
   tracker.failedResponses.length = 0;
   expect(tracker.consoleErrors).toEqual([expect.stringContaining("status of 404")]);
+  tracker.consoleErrors.length = 0;
+  assertNoErrors(tracker);
+});
+
+test("作品詳細ページから登録解除すると、ライブラリへ戻って隣の行にフォーカスが移る", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await page.getByText("添い寝カフェへようこそ", { exact: false }).click();
+  const { id, neighborId } = await unregisterTargetOf(page, "添い寝カフェへようこそ");
+  await page.locator(".mle-prv").getByRole("button", { name: "全画面へ展開" }).click();
+  await expect(page).toHaveURL(/\/work\//);
+
+  await page.getByRole("button", { name: "その他" }).last().click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "登録解除" }).click();
+  await page
+    .getByRole("alertdialog", { name: "登録解除" })
+    .getByRole("button", { name: "解除する" })
+    .click();
+
+  await expect(page).toHaveURL(/\/library\//);
+  await expect(page.locator(`[data-work-id="${neighborId}"]`)).toBeFocused();
+
+  // 解除した作品の詳細の取り直しが404になることが、ライブラリへ戻る合図（詳細ページでは複数回起きうる）
+  expect(tracker.failedResponses.length).toBeGreaterThan(0);
+  for (const response of tracker.failedResponses) {
+    expect(response).toMatch(new RegExp(`^404 .*/api/works/${id}$`));
+  }
+  tracker.failedResponses.length = 0;
+  for (const error of tracker.consoleErrors) expect(error).toContain("status of 404");
   tracker.consoleErrors.length = 0;
   assertNoErrors(tracker);
 });
@@ -365,7 +423,9 @@ test("詳細パネル: 再開ボタンが正しいアクセシブル名で表示
   await expect(panel.getByText("再開 3:21", { exact: true })).toBeVisible();
 
   await panel.getByRole("button", { name: "再生メニュー" }).click();
-  await expect(panel.getByRole("menuitem", { name: "最初から再生" })).toBeVisible();
+  await expect(
+    page.getByRole("menu").getByRole("menuitem", { name: "最初から再生" }),
+  ).toBeVisible();
 
   assertNoErrors(tracker);
 });
@@ -454,7 +514,41 @@ test("作品編集: 関連URLを追加できる", async ({ page }) => {
   await dialog.locator("footer").getByRole("button", { name: "閉じる" }).click();
 
   await panel.getByRole("button", { name: "その他" }).click();
-  await expect(panel.getByRole("menuitem", { name: "公式を開く" })).toBeVisible();
+  await expect(page.getByRole("menu").getByRole("menuitem", { name: "公式を開く" })).toBeVisible();
+
+  assertNoErrors(tracker);
+});
+
+test("作品編集: タグ追加の Esc は候補、ポップオーバー、ダイアログの順に一段ずつ閉じる", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await page.getByText("夜更けの図書室で囁き朗読", { exact: false }).click();
+  await page.locator(".mle-prv").getByRole("button", { name: "作品を編集" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "作品を編集" });
+  await dialog.getByRole("button", { name: "タグを追加" }).click();
+  const popover = page.getByRole("dialog", { name: "タグを追加" });
+  const input = popover.getByRole("combobox", { name: "追加するタグ" });
+  await expect(input).toBeFocused();
+  await input.fill("癒");
+  const listbox = popover.getByRole("listbox");
+  await expect(listbox).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(listbox).toBeHidden();
+  await expect(popover).toBeVisible();
+  await expect(dialog).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(popover).toBeHidden();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "タグを追加" })).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
 
   assertNoErrors(tracker);
 });
@@ -602,7 +696,7 @@ test("未登録タブでRJコードを編集でき、選んだ候補を除外し
 
   const excludeRowName = /^「候補」を選択/;
   await unregistered.getByRole("button", { name: "「候補」の操作" }).click();
-  await page.getByRole("menuitem", { name: "除外", exact: true }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "除外", exact: true }).click();
   await expect(unregistered.getByRole("row", { name: excludeRowName })).toBeHidden();
 
   await expect(dialog.getByText("「候補」を除外しました")).toBeVisible();
@@ -613,7 +707,7 @@ test("未登録タブでRJコードを編集でき、選んだ候補を除外し
 
   await dialog.getByRole("tab", { name: /^未登録/ }).click();
   await unregistered.getByRole("button", { name: "「候補」の操作" }).click();
-  await page.getByRole("menuitem", { name: "除外", exact: true }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "除外", exact: true }).click();
   await expect(dialog.getByRole("tab", { name: "未登録（1件）" })).toBeVisible();
 
   await unregistered.getByRole("button", { name: /^除外済み/ }).click();

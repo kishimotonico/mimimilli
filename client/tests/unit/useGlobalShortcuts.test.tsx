@@ -107,9 +107,11 @@ describe("useGlobalShortcuts", () => {
     const playerControl = getByText("player-control");
 
     const spaceResult = fireEvent.keyDown(playerControl, { code: "Space" });
-    expect(onTogglePlay).toHaveBeenCalledTimes(1);
-    // preventDefaultされた（=false）ことで、ボタン自身のネイティブSpace活性化（click相当）が
-    // 抑止され、グローバル側のトグルとの二重発火が起きない。
+    const seenByButton = vi.fn();
+    playerControl.addEventListener("keydown", seenByButton);
+    fireEvent.keyDown(playerControl, { code: "Space" });
+    expect(onTogglePlay).toHaveBeenCalledTimes(2);
+    expect(seenByButton).not.toHaveBeenCalled();
     expect(spaceResult).toBe(false);
 
     // Spaceだけが特別扱いの対象。矢印キーは通常のボタンと同じくネイティブ動作優先のまま。
@@ -131,5 +133,32 @@ describe("useGlobalShortcuts", () => {
 
     expect(onTogglePlay).not.toHaveBeenCalled();
     expect(onSeekRelative).not.toHaveBeenCalled();
+  });
+});
+
+describe("層の中のキー", () => {
+  it("メニュー・ポップオーバーの中で押したキーでは再生もシークもしない", () => {
+    const onTogglePlay = vi.fn();
+    const onSeekRelative = vi.fn();
+    const { getByText } = render(
+      createElement(
+        "div",
+        null,
+        createElement(TestHost, { onTogglePlay, onSeekRelative }),
+        createElement(
+          "div",
+          { "data-scope": "popover", "data-part": "content" },
+          createElement("div", null, "layer-body"),
+        ),
+      ),
+    );
+    const body = getByText("layer-body");
+    fireEvent.keyDown(body, { code: "Space" });
+    fireEvent.keyDown(body, { code: "ArrowLeft" });
+    fireEvent.keyDown(body, { code: "ArrowRight" });
+    expect(onTogglePlay).not.toHaveBeenCalled();
+    expect(onSeekRelative).not.toHaveBeenCalled();
+    fireEvent.keyDown(getByText("plain"), { code: "Space" });
+    expect(onTogglePlay).toHaveBeenCalledTimes(1);
   });
 });

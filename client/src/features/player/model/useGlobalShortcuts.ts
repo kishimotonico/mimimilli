@@ -1,4 +1,6 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useCallback } from "react";
+import { useLatest } from "../../../shared/lib/useLatest";
+import { LAYER_CONTENT_SELECTOR } from "../../../shared/ui/layer/layerDom";
 
 /** ネイティブ操作を優先し、常に（全キー）グローバルショートカットの対象から外す要素。 */
 const SHORTCUT_EXEMPT_SELECTOR =
@@ -35,40 +37,57 @@ export function useGlobalShortcuts({
   onSeekRelative,
   isActive,
 }: UseGlobalShortcutsOptions) {
-  const onTogglePlayRef = useRef(onTogglePlay);
-  const onSeekRelativeRef = useRef(onSeekRelative);
-  const isActiveRef = useRef(isActive);
-  onTogglePlayRef.current = onTogglePlay;
-  onSeekRelativeRef.current = onSeekRelative;
-  isActiveRef.current = isActive;
+  const onTogglePlayRef = useLatest(onTogglePlay);
+  const onSeekRelativeRef = useLatest(onSeekRelative);
+  const isActiveRef = useLatest(isActive);
 
-  const handler = useCallback((e: KeyboardEvent) => {
+  const isShortcutBlocked = useCallback(() => {
     // モーダルdialogが開いている間は、フォーカス位置に関わらず背後の再生を操作しない。
-    if (document.querySelector("dialog[open]")) return;
+    return document.querySelector("dialog[open]") !== null || !isActiveRef.current;
+  }, [isActiveRef]);
 
-    const target = e.target;
-    if (!(target instanceof Element)) return;
-    // Spaceに限り、プレイヤー操作ボタン自身の活性化より常にグローバルの再生/一時停止を優先する。
-    const isPlayerControlSpace = e.code === "Space" && !!target.closest(PLAYER_CONTROL_SELECTOR);
-    if (!isPlayerControlSpace && target.closest(SHORTCUT_EXEMPT_SELECTOR)) return;
-    if (SLIDER_OWNED_KEYS.has(e.code) && target.closest(SLIDER_SELECTOR)) return;
-    if (!isActiveRef.current) return;
-
-    if (e.code === "Space") {
-      // preventDefaultでボタン自身のSpace活性化（クリック相当）を止め、二重トグルを防ぐ。
+  // プレイヤー操作ボタンの Space は、keydown で開く Ark のトリガーより先に止める必要があるので capture で扱う。
+  const handleControlSpace = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.code !== "Space" || isShortcutBlocked()) return;
+      if (!(e.target instanceof Element) || e.target.closest(LAYER_CONTENT_SELECTOR)) return;
+      if (!e.target.closest(PLAYER_CONTROL_SELECTOR)) return;
       e.preventDefault();
+      e.stopPropagation();
       onTogglePlayRef.current();
-    } else if (e.code === "ArrowLeft") {
-      e.preventDefault();
-      onSeekRelativeRef.current(-10);
-    } else if (e.code === "ArrowRight") {
-      e.preventDefault();
-      onSeekRelativeRef.current(10);
-    }
-  }, []);
+    },
+    [isShortcutBlocked, onTogglePlayRef],
+  );
+
+  const handler = useCallback(
+    (e: KeyboardEvent) => {
+      if (isShortcutBlocked()) return;
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest(SHORTCUT_EXEMPT_SELECTOR) || target.closest(LAYER_CONTENT_SELECTOR))
+        return;
+      if (SLIDER_OWNED_KEYS.has(e.code) && target.closest(SLIDER_SELECTOR)) return;
+
+      if (e.code === "Space") {
+        e.preventDefault();
+        onTogglePlayRef.current();
+      } else if (e.code === "ArrowLeft") {
+        e.preventDefault();
+        onSeekRelativeRef.current(-10);
+      } else if (e.code === "ArrowRight") {
+        e.preventDefault();
+        onSeekRelativeRef.current(10);
+      }
+    },
+    [isShortcutBlocked, onTogglePlayRef, onSeekRelativeRef],
+  );
 
   useEffect(() => {
+    window.addEventListener("keydown", handleControlSpace, true);
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [handler]);
+    return () => {
+      window.removeEventListener("keydown", handleControlSpace, true);
+      window.removeEventListener("keydown", handler);
+    };
+  }, [handleControlSpace, handler]);
 }

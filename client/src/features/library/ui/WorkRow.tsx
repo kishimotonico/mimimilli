@@ -54,6 +54,7 @@ export default function WorkRow({
       type="button"
       className={`mll-wrow ${isSelected ? "is-on" : ""}`}
       data-flat-index={flatIndex}
+      data-work-id={work.id}
       tabIndex={tabIndex}
       aria-label={
         statusLabel

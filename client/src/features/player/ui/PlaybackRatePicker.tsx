@@ -1,12 +1,16 @@
 // 再生速度ピル＋メニュー。PopupContent・PlayerTransportControls・
 // NowPlayingImmersiveMiniControlsで共用する。
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { useIsPresent } from "motion/react";
-import { I } from "../../../shared/ui/Icon";
+import { Menu } from "@ark-ui/react/menu";
 import { cn } from "../../../shared/lib/cn";
-import { useAnchoredPopover } from "../../../shared/ui/useAnchoredPopover";
+import {
+  MenuPopup,
+  MotionMenuRoot,
+  MotionMenuTrigger,
+  useMotionMenu,
+} from "../../../shared/ui/menu/MotionMenu";
+import { MenuCheckColumn } from "../../../shared/ui/menu/MenuCheckColumn";
+import { MENU_LABEL_CLASS, menuItemClass } from "../../../shared/ui/menu/menuStyles";
 
 export const RATE_PRESETS = [0.75, 1, 1.25, 1.5, 2];
 
@@ -39,91 +43,48 @@ export default function PlaybackRatePicker({
   className,
   onOpenChange,
 }: PlaybackRatePickerProps) {
-  const [isOpen, setIsOpenState] = useState(false);
-  const isPresent = useIsPresent();
-
-  const setIsOpen = useCallback(
-    (next: boolean | ((prev: boolean) => boolean)) => {
-      setIsOpenState((prev) => {
-        const value = typeof next === "function" ? next(prev) : next;
-        onOpenChange?.(value);
-        return value;
-      });
-    },
-    [onOpenChange],
-  );
-
-  const { setReference, setFloating, floatingStyles } = useAnchoredPopover({
-    isOpen: isOpen && isPresent,
-    preferredWidth: 0,
-    placement: "above",
-    onClose: () => setIsOpen(false),
-    closeOnScroll: true,
-    closeOnFocusOut: true,
+  const selectedRate = RATE_PRESETS.find((rate) => isRateSelected(playbackRate, rate));
+  const menu = useMotionMenu({
+    positioning: { placement: "top-end" },
+    closeOnParentExit: true,
+    initialHighlight: selectedRate === undefined ? null : String(selectedRate),
+    onOpenChange: ({ open }) => onOpenChange?.(open),
   });
-
-  const floatingRef = useRef<HTMLDivElement | null>(null);
-  const setFloatingRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      floatingRef.current = node;
-      return setFloating(node);
-    },
-    [setFloating],
-  );
-
-  // ポータル化したメニューはDOM上でボタンと隣接しないため、開いたら選択中の項目へ
-  // 明示的にフォーカスを移す（Tab/Shift+Tabでメニューへ入れるようにする）
-  useEffect(() => {
-    if (!isOpen) return;
-    floatingRef.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus();
-  }, [isOpen]);
 
   const rateLabel = RATE_LABELS[playbackRate] ?? `${playbackRate.toFixed(2)}×`;
 
   return (
     <div className={cn("mle-ratepick", className)}>
-      {isOpen &&
-        createPortal(
-          <div
-            ref={setFloatingRef}
-            style={floatingStyles}
-            className="mle-ratepick__pop"
-            role="menu"
-            aria-label="再生速度"
+      <MotionMenuRoot handle={menu}>
+        <MotionMenuTrigger>
+          <button
+            type="button"
+            className={cn("mle-ratepill", overlay && "is-overlay", playbackRate !== 1 && "is-on")}
+            title="再生速度"
+            data-player-control
           >
-            {RATE_PRESETS.map((rate) => {
-              const checked = isRateSelected(playbackRate, rate);
-              return (
-                <button
-                  key={rate}
-                  role="menuitemradio"
-                  aria-checked={checked}
-                  className={cn("mle-ratepick__item", checked && "is-checked")}
-                  onClick={() => {
-                    onSetPlaybackRate(rate);
-                    setIsOpen(false);
-                  }}
-                >
-                  <span className="check">{checked && <I.check size={10} />}</span>
-                  <span className="label">{RATE_LABELS[rate]}</span>
-                </button>
-              );
-            })}
-          </div>,
-          document.body,
-        )}
-      <button
-        ref={setReference}
-        type="button"
-        className={cn("mle-ratepill", overlay && "is-overlay", playbackRate !== 1 && "is-on")}
-        title="再生速度"
-        aria-haspopup="menu"
-        aria-expanded={isOpen}
-        data-player-control
-        onClick={() => setIsOpen((v) => !v)}
-      >
-        {rateLabel}
-      </button>
+            {rateLabel}
+          </button>
+        </MotionMenuTrigger>
+        <MenuPopup narrow>
+          <Menu.RadioItemGroup
+            value={selectedRate === undefined ? undefined : String(selectedRate)}
+            onValueChange={({ value }) => onSetPlaybackRate(Number(value))}
+          >
+            {RATE_PRESETS.map((rate) => (
+              <Menu.RadioItem
+                key={rate}
+                value={String(rate)}
+                valueText={RATE_LABELS[rate]}
+                className={menuItemClass()}
+              >
+                <MenuCheckColumn />
+                <span className={MENU_LABEL_CLASS}>{RATE_LABELS[rate]}</span>
+              </Menu.RadioItem>
+            ))}
+          </Menu.RadioItemGroup>
+        </MenuPopup>
+      </MotionMenuRoot>
     </div>
   );
 }

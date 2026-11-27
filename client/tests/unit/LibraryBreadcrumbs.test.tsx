@@ -1,5 +1,6 @@
 import { createElement } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import LibraryBreadcrumbs from "../../src/features/library/ui/LibraryBreadcrumbs";
@@ -36,23 +37,25 @@ afterEach(() => {
   clearResizeObservers();
 });
 
-function renderBreadcrumbs(nav: LibraryViewState & LibraryViewActions) {
+function breadcrumbsElement(nav: LibraryViewState & LibraryViewActions) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  return createElement(
+    QueryClientProvider,
+    { client: queryClient },
     createElement(
-      QueryClientProvider,
-      { client: queryClient },
+      "div",
+      { className: "mle-app" },
       createElement(
-        "div",
-        { className: "mle-app" },
-        createElement(
-          LibraryNavigationContext.Provider,
-          { value: nav },
-          createElement(LibraryBreadcrumbs),
-        ),
+        LibraryNavigationContext.Provider,
+        { value: nav },
+        createElement(LibraryBreadcrumbs),
       ),
     ),
   );
+}
+
+function renderBreadcrumbs(nav: LibraryViewState & LibraryViewActions) {
+  return render(breadcrumbsElement(nav));
 }
 
 describe("LibraryBreadcrumbs", () => {
@@ -93,7 +96,8 @@ describe("LibraryBreadcrumbs", () => {
     const nav = buildNav({ library: { folderId: "by-cv", group: "藤田茜" } });
     renderBreadcrumbs(nav);
 
-    fireEvent.click(screen.getByRole("button", { name: "藤田茜" }));
+    const trigger = screen.getByRole("button", { name: "藤田茜" });
+    await userEvent.click(trigger);
     await waitFor(() => {
       expect(document.querySelector('.mll-qlist__body[role="group"]')).toBeInTheDocument();
     });
@@ -104,14 +108,31 @@ describe("LibraryBreadcrumbs", () => {
       groupBy: "prefix:cv",
       groupSort: "count-desc",
     });
+    await waitFor(() => expect(screen.getByLabelText("cvを検索")).toHaveFocus());
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
       flushAllResizeObservers({ width: 260, height: 260 });
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: /^天音かなで ?3/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^天音かなで ?3/ }));
     expect(nav.selectGroupValue).toHaveBeenCalledWith("天音かなで");
+    expect(trigger).toHaveFocus();
     sizeMock.restore();
+  });
+
+  it("値一覧へ戻ると兄弟のドロップダウンを閉じる", async () => {
+    mockApi({
+      "GET /api/tag-prefixes": [],
+      "GET /api/smart-folders/:id/groups": [buildGroupValueItem({ value: "藤田茜", count: 4 })],
+    });
+    const works = buildNav({ library: { folderId: "by-cv", group: "藤田茜" } });
+    const { rerender } = renderBreadcrumbs(works);
+
+    await userEvent.click(screen.getByRole("button", { name: "藤田茜" }));
+    await waitFor(() => expect(screen.getByLabelText("cvを検索")).toBeInTheDocument());
+
+    rerender(breadcrumbsElement(buildNav({ library: { folderId: "by-cv" } })));
+    expect(screen.queryByLabelText("cvを検索")).toBeNull();
   });
 
   it("兄弟の値のドロップダウンは、今のチップと検索語をかけた値と件数を取る", async () => {
@@ -125,7 +146,7 @@ describe("LibraryBreadcrumbs", () => {
     });
     renderBreadcrumbs(nav);
 
-    fireEvent.click(screen.getByRole("button", { name: "藤田茜" }));
+    await userEvent.click(screen.getByRole("button", { name: "藤田茜" }));
     await waitFor(() =>
       expect(api.requestsTo("GET /api/smart-folders/:id/groups")).toHaveLength(1),
     );

@@ -20,9 +20,9 @@ const DEFAULT_TRIANGLE_IDLE_MS = 300;
 const DEFAULT_TRIANGLE_PADDING_PX = 8;
 
 export interface HoverGroupTriggerHandlers {
-  onPointerEnter: (event: ReactPointerEvent<HTMLElement>) => void;
+  onPointerEnter: () => void;
   onPointerLeave: (event: ReactPointerEvent) => void;
-  onPointerMove: (event: ReactPointerEvent<HTMLElement>) => void;
+  onPointerMove: () => void;
 }
 
 export interface HoverGroupPanelHandlers {
@@ -47,8 +47,6 @@ export interface UseHoverGroupCoordinatorOptions {
 export interface UseHoverGroupCoordinatorResult {
   /** 現在開いているトリガーのキー */
   openKey: string | null;
-  /** 現在開いているトリガーの要素（GroupValuePopover の anchorEl に渡す） */
-  openAnchorEl: HTMLElement | null;
   /** 現在openなオーナーのトークン。openKeyがnullの間はnull。 */
   ownerToken: HoverGroupOwnerToken | null;
   /**
@@ -56,14 +54,11 @@ export interface UseHoverGroupCoordinatorResult {
    * token が現在のオーナーと一致しない呼び出しは無視する。
    */
   registerPanelEl: (token: HoverGroupOwnerToken, el: HTMLElement | null) => void;
-  /** トリガー要素は呼び出し時（render時ではなくpointerイベント発火時）に
-   *  event.currentTarget から取得する。renderの時点ではrefがまだDOM要素を
-   *  指していない可能性があるため、要素を先渡しにしない。 */
   getTriggerHandlers: (key: string) => HoverGroupTriggerHandlers;
   /** token が現在のオーナーと一致しない間は何もしないハンドラを返す。 */
   getPanelHandlers: (token: HoverGroupOwnerToken) => HoverGroupPanelHandlers;
   /** 遅延なしで即座に開く（キーボード操作用） */
-  openImmediately: (key: string, el: HTMLElement | null) => void;
+  openImmediately: (key: string) => void;
   /** 遅延・セーフトライアングルを打ち切って即座に閉じる */
   close: () => void;
 }
@@ -76,7 +71,6 @@ interface Triangle {
 
 interface OpenState {
   key: string;
-  anchorEl: HTMLElement | null;
   token: HoverGroupOwnerToken;
 }
 
@@ -94,7 +88,7 @@ export function useHoverGroupCoordinator(
   const openStateRef = useRef<OpenState | null>(null);
   const panelElRef = useRef<HTMLElement | null>(null);
   const panelHoveredRef = useRef(false);
-  const hoveredTriggerRef = useRef<{ key: string; el: HTMLElement | null } | null>(null);
+  const hoveredTriggerRef = useRef<{ key: string } | null>(null);
   const triangleRef = useRef<Triangle | null>(null);
   const openTimerRef = useRef<number | undefined>(undefined);
   const pendingOpenKeyRef = useRef<string | null>(null);
@@ -135,9 +129,9 @@ export function useHoverGroupCoordinator(
     disengageTriangleGuard();
   };
 
-  const commitOpen = (key: string, el: HTMLElement | null) => {
+  const commitOpen = (key: string) => {
     clearOpenTimer();
-    const next: OpenState = { key, anchorEl: el, token: Symbol(key) };
+    const next: OpenState = { key, token: Symbol(key) };
     openStateRef.current = next;
     setOpenState(next);
   };
@@ -147,10 +141,10 @@ export function useHoverGroupCoordinator(
     setOpenState(null);
   };
 
-  const scheduleOpenTimer = (key: string, el: HTMLElement | null) => {
+  const scheduleOpenTimer = (key: string) => {
     clearOpenTimer();
     pendingOpenKeyRef.current = key;
-    openTimerRef.current = window.setTimeout(() => commitOpen(key, el), openDelayMs);
+    openTimerRef.current = window.setTimeout(() => commitOpen(key), openDelayMs);
   };
 
   const scheduleCloseTimer = () => {
@@ -161,8 +155,8 @@ export function useHoverGroupCoordinator(
 
   const resolveAfterGuard = () => {
     const hovered = hoveredTriggerRef.current;
-    if (hovered && hovered.key !== openStateRef.current?.key) {
-      handleTriggerEnter(hovered.key, hovered.el);
+    if (hovered) {
+      handleTriggerEnter(hovered.key);
       return;
     }
     if (!panelHoveredRef.current) scheduleCloseTimer();
@@ -199,8 +193,8 @@ export function useHoverGroupCoordinator(
     document.addEventListener("pointermove", stableOnDocumentPointerMove);
   };
 
-  function handleTriggerEnter(key: string, el: HTMLElement | null) {
-    hoveredTriggerRef.current = { key, el };
+  function handleTriggerEnter(key: string) {
+    hoveredTriggerRef.current = { key };
     if (!hasGenuinePointerMovedRef.current) return;
     if (triangleRef.current && key !== openStateRef.current?.key) return; // 抑止: 他行の open 要求
     clearCloseTimer();
@@ -208,7 +202,7 @@ export function useHoverGroupCoordinator(
       clearOpenTimer();
       return;
     }
-    scheduleOpenTimer(key, el);
+    scheduleOpenTimer(key);
   }
 
   const handleTriggerLeave = (key: string, point: Point) => {
@@ -226,13 +220,13 @@ export function useHoverGroupCoordinator(
   };
 
   const getTriggerHandlers = (key: string): HoverGroupTriggerHandlers => ({
-    onPointerEnter: (event) => handleTriggerEnter(key, event.currentTarget),
+    onPointerEnter: () => handleTriggerEnter(key),
     onPointerLeave: (event) => handleTriggerLeave(key, { x: event.clientX, y: event.clientY }),
     // パネルがポインタ直下で消えた直後は、Reactがトリガーへの pointerenter を取りこぼす
     // （消えたパネル側の pointerout が届かず、over だけでは enter にならない）。
     // トリガー上の pointermove でホバー開始を補う。
-    onPointerMove: (event) => {
-      if (hoveredTriggerRef.current?.key !== key) handleTriggerEnter(key, event.currentTarget);
+    onPointerMove: () => {
+      if (hoveredTriggerRef.current?.key !== key) handleTriggerEnter(key);
     },
   });
 
@@ -259,9 +253,9 @@ export function useHoverGroupCoordinator(
     },
   });
 
-  const openImmediately = (key: string, el: HTMLElement | null) => {
+  const openImmediately = (key: string) => {
     clearTimers();
-    commitOpen(key, el);
+    commitOpen(key);
   };
 
   const close = () => {
@@ -271,8 +265,8 @@ export function useHoverGroupCoordinator(
   };
 
   // 毎レンダー作り直される処理を、依存配列を持たない effect からも最新の実体で呼ぶための参照
-  const latestRef = useRef({ handleTriggerEnter, close, clearTimers });
-  latestRef.current = { handleTriggerEnter, close, clearTimers };
+  const latestRef = useRef({ handleTriggerEnter, clearTimers });
+  latestRef.current = { handleTriggerEnter, clearTimers };
 
   useEffect(() => {
     return () => latestRef.current.clearTimers();
@@ -283,31 +277,14 @@ export function useHoverGroupCoordinator(
       hasGenuinePointerMovedRef.current = true;
       document.removeEventListener("pointermove", handleFirstPointerMove);
       const hovered = hoveredTriggerRef.current;
-      if (hovered) latestRef.current.handleTriggerEnter(hovered.key, hovered.el);
+      if (hovered) latestRef.current.handleTriggerEnter(hovered.key);
     };
     document.addEventListener("pointermove", handleFirstPointerMove);
     return () => document.removeEventListener("pointermove", handleFirstPointerMove);
   }, []);
 
-  // トリガー・パネルの外への pointerdown はタイマーを待たず即座に閉じる
-  // （他のポップオーバー群のoutsidePress相当。usePopoverDismissal.ts参照）。
-  useEffect(() => {
-    if (!openState) return;
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      const panelEl = panelElRef.current;
-      const anchorEl = openStateRef.current?.anchorEl;
-      if (panelEl?.contains(target) || anchorEl?.contains(target)) return;
-      latestRef.current.close();
-    };
-    document.addEventListener("pointerdown", handlePointerDown, true);
-    return () => document.removeEventListener("pointerdown", handlePointerDown, true);
-  }, [openState]);
-
   return {
     openKey: openState?.key ?? null,
-    openAnchorEl: openState?.anchorEl ?? null,
     ownerToken: openState?.token ?? null,
     registerPanelEl,
     getTriggerHandlers,

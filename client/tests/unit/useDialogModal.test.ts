@@ -124,6 +124,57 @@ describe("useDialogModal", () => {
     expect(document.activeElement).toBe(getByTestId("first"));
   });
 
+  it("ポータルされたメニューの中の Tab は、末尾でも循環させずメニューに任せる", () => {
+    function MenuInDialog({ onClose }: { onClose: () => void }) {
+      const { dialogRef } = useDialogModal({ onClose });
+      return createElement(
+        "dialog",
+        { ref: dialogRef },
+        createElement("button", { "data-testid": "first" }, "first"),
+        createElement("div", {
+          "data-testid": "menu",
+          "data-scope": "menu",
+          "data-part": "content",
+          tabIndex: 0,
+        }),
+      );
+    }
+    const { getByTestId } = render(createElement(MenuInDialog, { onClose: vi.fn() }));
+    const menu = getByTestId("menu");
+    menu.focus();
+    const notPrevented = fireEvent.keyDown(menu, { key: "Tab", bubbles: true, cancelable: true });
+    expect(notPrevented).toBe(true);
+    expect(document.activeElement).toBe(menu);
+  });
+
+  it("ポータルされたメニューの中の Tab は、先頭でも Shift+Tab で循環させずメニューに任せる", () => {
+    function MenuInDialog({ onClose }: { onClose: () => void }) {
+      const { dialogRef } = useDialogModal({ onClose });
+      return createElement(
+        "dialog",
+        { ref: dialogRef },
+        createElement("div", {
+          "data-testid": "menu",
+          "data-scope": "menu",
+          "data-part": "content",
+          tabIndex: 0,
+        }),
+        createElement("button", { "data-testid": "last" }, "last"),
+      );
+    }
+    const { getByTestId } = render(createElement(MenuInDialog, { onClose: vi.fn() }));
+    const menu = getByTestId("menu");
+    menu.focus();
+    const notPrevented = fireEvent.keyDown(menu, {
+      key: "Tab",
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    expect(notPrevented).toBe(true);
+    expect(document.activeElement).toBe(menu);
+  });
+
   it("inertの中や非表示の要素は循環の末尾に数えず、最後に辿れる要素から先頭へ回る", () => {
     function InertTailDialog({ onClose }: { onClose: () => void }) {
       const { dialogRef } = useDialogModal({ onClose });
@@ -175,5 +226,52 @@ describe("useDialogModal", () => {
     const { getByTestId } = render(createElement(ShouldNotClose));
     fireEvent.click(getByTestId("dialog"));
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("メニューを開いたまま押したbackdropは閉じず、メニューが無ければ閉じる", () => {
+    const onClose = vi.fn();
+    function WithMenu({ menu }: { menu: boolean }) {
+      const { dialogRef, handleBackdropClick } = useDialogModal({ onClose });
+      return createElement(
+        "dialog",
+        {
+          ref: dialogRef,
+          "data-testid": "dialog",
+          onClick: (e: React.MouseEvent<HTMLDialogElement>) => handleBackdropClick(e),
+        },
+        menu ? createElement("div", { "data-scope": "menu", "data-part": "content" }) : null,
+      );
+    }
+    const press = (dialog: HTMLElement) => {
+      fireEvent.pointerDown(dialog);
+      fireEvent.click(dialog);
+    };
+
+    const withMenu = render(createElement(WithMenu, { menu: true }));
+    press(withMenu.getByTestId("dialog"));
+    expect(onClose).not.toHaveBeenCalled();
+    withMenu.unmount();
+
+    const withoutMenu = render(createElement(WithMenu, { menu: false }));
+    press(withoutMenu.getByTestId("dialog"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("メニューの項目から開いたダイアログは、閉じたときそのメニューのトリガーへフォーカスを戻す", () => {
+    const trigger = document.createElement("button");
+    trigger.id = "menu-trigger";
+    const content = document.createElement("div");
+    content.setAttribute("data-scope", "menu");
+    content.setAttribute("data-part", "content");
+    content.setAttribute("aria-labelledby", "menu-trigger");
+    content.tabIndex = 0;
+    document.body.append(trigger, content);
+    content.focus();
+
+    const { unmount } = render(createElement(TestDialog, { onClose: vi.fn() }));
+    content.remove();
+    unmount();
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
   });
 });

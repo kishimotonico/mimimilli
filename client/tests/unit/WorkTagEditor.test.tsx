@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Work } from "@mimimilli/shared";
@@ -9,6 +10,7 @@ import GlobalToast from "../../src/app/ui/GlobalToast";
 import { ApiRequestError } from "../../src/shared/api/http";
 import { mockApi } from "../helpers/api";
 import { buildSettings, buildWork } from "../helpers/builders";
+import { getResizeObservers } from "./setup";
 
 function renderWithToast(ui: ReactElement) {
   const queryClient = new QueryClient({
@@ -74,7 +76,7 @@ describe("WorkTagEditor", () => {
     expect(screen.getByText("タグを保存できませんでした。")).toBeInTheDocument();
   });
 
-  it("parse_error のあと role=alert を出し追加入力を disabled にする", () => {
+  it("parse_error のあと role=alert を出し追加入力を無効にする", async () => {
     renderWithToast(
       <WorkTagEditor
         work={makeWork()}
@@ -88,7 +90,15 @@ describe("WorkTagEditor", () => {
     );
 
     expect(screen.getByRole("alert")).toHaveTextContent(BROKEN_SOURCE_MESSAGE);
-    expect(screen.getByRole("button", { name: "タグを追加" })).toBeDisabled();
+    const button = screen.getByRole("button", { name: "タグを追加" });
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    expect(button).not.toBeDisabled();
+    const user = userEvent.setup();
+    await user.click(button);
+    await user.keyboard("{Enter}");
+    await user.keyboard("[Space]");
+    expect(button).toHaveFocus();
+    expect(screen.queryByRole("combobox", { name: "追加するタグ" })).toBeNull();
     expect(screen.queryByText("タグを保存できませんでした。")).toBeNull();
   });
 
@@ -107,7 +117,10 @@ describe("WorkTagEditor", () => {
     );
 
     expect(screen.getByRole("alert")).toHaveTextContent(message);
-    expect(screen.getByRole("button", { name: "タグを追加" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "タグを追加" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("作品が切り替わると disabled を解除する", () => {
@@ -136,7 +149,10 @@ describe("WorkTagEditor", () => {
       />,
     );
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.getByRole("button", { name: "タグを追加" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "タグを追加" })).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("閲覧 Work が再取得されると disabled を解除する", () => {
@@ -165,6 +181,92 @@ describe("WorkTagEditor", () => {
       />,
     );
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.getByRole("button", { name: "タグを追加" })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "タグを追加" })).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  });
+
+  it("ペイン幅が320pxをまたいでも開いている入力欄は閉じるまで切り替わらない", async () => {
+    const user = userEvent.setup();
+    renderWithToast(
+      <div className="mle-prv__meta" data-testid="tag-pane">
+        <WorkTagEditor
+          work={makeWork()}
+          tagSuggestions={[]}
+          addTagMutation={makeTagMutation()}
+          removeTagMutation={makeTagMutation()}
+        />
+      </div>,
+    );
+    const pane = screen.getByTestId("tag-pane");
+    const measure = vi.spyOn(pane, "getBoundingClientRect");
+    const observer = getResizeObservers().find((item) => item.getObserved().includes(pane));
+    if (!observer) throw new Error("tag-pane の ResizeObserver が見つからない");
+    const resize = (width: number) => {
+      const rect = new DOMRect(0, 0, width, 100);
+      measure.mockReturnValue(rect);
+      act(() => observer.flush([{ target: pane, contentRect: rect }]));
+    };
+    const trigger = () => screen.getByRole("button", { name: "タグを追加" });
+    const input = () => screen.getByRole("combobox", { name: "追加するタグ" });
+
+    resize(200);
+    const button = trigger();
+    await user.click(button);
+    const inline = input();
+    expect(pane).toContainElement(inline);
+    expect(inline).toHaveFocus();
+    expect(button).toHaveAttribute("aria-expanded", "true");
+    resize(400);
+    expect(input()).toBe(inline);
+    expect(trigger()).toBe(button);
+    await user.keyboard("{Escape}");
+    expect(inline).not.toBeInTheDocument();
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    expect(trigger()).toHaveFocus();
+
+    await user.click(trigger());
+    const floating = input();
+    expect(pane).not.toContainElement(floating);
+    await waitFor(() => expect(floating).toHaveFocus());
+    resize(200);
+    expect(input()).toBe(floating);
+  });
+
+  it("インラインの入力欄は、外へのフォーカス移動と外の pointerdown で閉じる", async () => {
+    const user = userEvent.setup();
+    renderWithToast(
+      <>
+        <div className="mle-prv__meta" data-testid="tag-pane">
+          <WorkTagEditor
+            work={makeWork()}
+            tagSuggestions={[]}
+            addTagMutation={makeTagMutation()}
+            removeTagMutation={makeTagMutation()}
+          />
+        </div>
+        <button type="button">外</button>
+      </>,
+    );
+    const pane = screen.getByTestId("tag-pane");
+    const measure = vi.spyOn(pane, "getBoundingClientRect");
+    const observer = getResizeObservers().find((item) => item.getObserved().includes(pane));
+    if (!observer) throw new Error("tag-pane の ResizeObserver が見つからない");
+    const rect = new DOMRect(0, 0, 200, 100);
+    measure.mockReturnValue(rect);
+    act(() => observer.flush([{ target: pane, contentRect: rect }]));
+    const input = () => screen.queryByRole("combobox", { name: "追加するタグ" });
+
+    await user.click(screen.getByRole("button", { name: "タグを追加" }));
+    expect(input()).toBeInTheDocument();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "外" })).toHaveFocus();
+    expect(input()).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "タグを追加" }));
+    expect(input()).toBeInTheDocument();
+    await user.pointer({ keys: "[MouseLeft]", target: document.body });
+    expect(input()).toBeNull();
   });
 });

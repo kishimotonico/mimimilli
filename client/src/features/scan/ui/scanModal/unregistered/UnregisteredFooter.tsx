@@ -1,7 +1,14 @@
-import { useRef, useState } from "react";
+import { useId, useState } from "react";
 import type { DlsiteRegistrationApply } from "@mimimilli/shared";
 import SplitButton from "../../../../../shared/ui/SplitButton";
-import type { MenuItemSpec } from "../../../../../shared/ui/Menu";
+import { Menu } from "@ark-ui/react/menu";
+import { MenuLayerItem } from "../../../../../shared/ui/menu/MenuLayerItem";
+import {
+  MENU_COUNT_CLASS,
+  MENU_LABEL_CLASS,
+  MENU_SEPARATOR_CLASS,
+  menuItemClass,
+} from "../../../../../shared/ui/menu/menuStyles";
 import { ModalFooter } from "../../../../../shared/ui/Modal";
 import type { FooterPlan } from "../../../model/unregisteredSelection";
 import DlsiteFetchProgress from "./DlsiteFetchProgress";
@@ -45,34 +52,45 @@ export default function UnregisteredFooter({
     setPickerPlanKind(plan.kind);
     setPickerOpen(false);
   }
-  const anchorRef = useRef<HTMLDivElement>(null);
+  const menuTriggerId = useId();
+  const splitButtonId = useId();
 
   const addable = !busy && !rjCodeSaving && addCount > 0;
-  const items: MenuItemSpec[] = [];
-  if (plan.kind === "fetch") {
-    items.push({
-      key: "add-without-fetch",
-      label: "取得せずに追加",
-      onSelect: () => onRegister(REGISTER_APPLY_ALL),
-      disabled: !addable,
-      trailing: `${addCount}件`,
-    });
-  }
-  items.push(
-    {
-      key: "pick",
-      label: "項目を選んで追加…",
-      onSelect: () => setPickerOpen(true),
-      disabled: !addable,
-    },
-    {
-      key: "exclude",
-      label: "選択を除外",
-      onSelect: onExclude,
-      disabled: busy || selectedCount === 0,
-      danger: true,
-      trailing: `${selectedCount}件`,
-    },
+  const menu = (
+    <>
+      {plan.kind === "fetch" && (
+        <Menu.Item
+          value="add-without-fetch"
+          valueText="取得せずに追加"
+          disabled={!addable}
+          onSelect={() => onRegister(REGISTER_APPLY_ALL)}
+          className={menuItemClass()}
+        >
+          <span className={MENU_LABEL_CLASS}>取得せずに追加</span>
+          <span aria-hidden="true" className={MENU_COUNT_CLASS}>{`${addCount}件`}</span>
+        </Menu.Item>
+      )}
+      <MenuLayerItem
+        value="pick"
+        valueText="項目を選んで追加…"
+        disabled={!addable}
+        onSelect={() => setPickerOpen(true)}
+        className={menuItemClass()}
+      >
+        <span className={MENU_LABEL_CLASS}>項目を選んで追加…</span>
+      </MenuLayerItem>
+      <Menu.Separator className={MENU_SEPARATOR_CLASS} />
+      <Menu.Item
+        value="exclude"
+        valueText="選択を除外"
+        disabled={busy || selectedCount === 0}
+        onSelect={onExclude}
+        className={menuItemClass({ danger: true })}
+      >
+        <span className={MENU_LABEL_CLASS}>選択を除外</span>
+        <span aria-hidden="true" className={MENU_COUNT_CLASS}>{`${selectedCount}件`}</span>
+      </Menu.Item>
+    </>
   );
 
   return (
@@ -94,33 +112,34 @@ export default function UnregisteredFooter({
       )}
       <DlsiteFetchProgress onCancel={onCancelFetch} />
       {plan.kind !== "waiting" && (
-        <div ref={anchorRef} className="relative inline-flex">
-          <SplitButton
-            size="md"
-            className="min-w-[200px]"
-            disabled={busy || selectedCount === 0}
-            primaryDisabled={rjCodeSaving || (plan.kind === "add" && !addable)}
-            onClick={() => (plan.kind === "fetch" ? onFetch() : onRegister(REGISTER_APPLY_ALL))}
-            items={items}
-          >
-            {plan.kind === "fetch"
-              ? `DLsiteから取得 ${plan.codes.length}件`
-              : `${addCount}件を追加`}
-          </SplitButton>
-          {pickerOpen && (
-            <RegisterFieldsPopover
-              count={addCount}
-              disabled={!addable}
-              anchorRef={anchorRef}
-              onClose={() => setPickerOpen(false)}
-              onSubmit={(apply) => {
-                setPickerOpen(false);
-                onRegister(apply);
-              }}
-            />
-          )}
-        </div>
+        <SplitButton
+          id={splitButtonId}
+          size="md"
+          className="min-w-[200px]"
+          disabled={selectedCount === 0}
+          busy={busy}
+          primaryDisabled={rjCodeSaving || (plan.kind === "add" && !addable)}
+          onClick={() => (plan.kind === "fetch" ? onFetch() : onRegister(REGISTER_APPLY_ALL))}
+          menu={menu}
+          menuTriggerId={menuTriggerId}
+          interceptMenuOpen={() => {
+            if (!pickerOpen) return false;
+            setPickerOpen(false);
+            return true;
+          }}
+        >
+          {plan.kind === "fetch" ? `DLsiteから取得 ${plan.codes.length}件` : `${addCount}件を追加`}
+        </SplitButton>
       )}
+      <RegisterFieldsPopover
+        open={pickerOpen}
+        count={addCount}
+        disabled={!addable}
+        triggerId={menuTriggerId}
+        anchorId={splitButtonId}
+        onClose={() => setPickerOpen(false)}
+        onSubmit={onRegister}
+      />
     </ModalFooter>
   );
 }
