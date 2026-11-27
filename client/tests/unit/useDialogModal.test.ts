@@ -188,7 +188,7 @@ describe("useDialogModal", () => {
           "data-testid": "dialog",
           onClick: (e: React.MouseEvent<HTMLDialogElement>) => handleBackdropClick(e),
         },
-        menu ? createElement("div", { role: "menu" }) : null,
+        menu ? createElement("div", { "data-scope": "menu", "data-part": "content" }) : null,
       );
     }
     const press = (dialog: HTMLElement) => {
@@ -210,7 +210,8 @@ describe("useDialogModal", () => {
     const trigger = document.createElement("button");
     trigger.id = "menu-trigger";
     const content = document.createElement("div");
-    content.setAttribute("role", "menu");
+    content.setAttribute("data-scope", "menu");
+    content.setAttribute("data-part", "content");
     content.setAttribute("aria-labelledby", "menu-trigger");
     content.tabIndex = 0;
     document.body.append(trigger, content);
