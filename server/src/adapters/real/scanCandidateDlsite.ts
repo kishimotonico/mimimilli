@@ -55,12 +55,10 @@ function coverKeyOf(coverUrl: string): string | null {
 
 function lookupCover(coverUrl: string, source: CandidateDlsiteSource): DlsiteCoverLookup {
   const key = coverKeyOf(coverUrl);
-  if (key === null) return { cached: null, failed: false };
+  if (key === null) return { cached: null, failed: true };
   const version = source.coverVersion(key);
-  return {
-    cached: version === null ? null : { key, version },
-    failed: source.coverFailed(key),
-  };
+  if (version !== null) return { cached: { key, version }, failed: false };
+  return { cached: null, failed: source.coverFailed(key) };
 }
 
 /** カバーURLに対応するキャッシュ済みカバー。キャッシュに無い・許可外のURLはnull */

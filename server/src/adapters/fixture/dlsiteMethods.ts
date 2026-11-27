@@ -85,6 +85,36 @@ export function createDlsiteMethods(
     force: boolean,
     signal?: AbortSignal,
   ): Promise<DlsiteFetchResult> {
+    const result = await fetchInfo(rjCode, force, signal);
+    if (result.ok) prefetchCover(normalizeDlsiteCacheKey(rjCode), result.info, force);
+    return result;
+  }
+
+  /** realのprefetchCoverと同じ規則。キャッシュ済み・失敗の記録がTTL内（forceなら無視）なら何もせず、取得不可コードは失敗を記録し、それ以外はカバーを置く */
+  function prefetchCover(key: string, info: DlsiteWorkInfo, force: boolean): void {
+    if (info.coverUrl === null) return;
+    const coverKey = fixtureDlsiteCoverKey(info.coverUrl);
+    const now = Date.now();
+    if (state.dlsiteCovers.has(coverKey)) return;
+    if (!force && (state.dlsiteCoverFailures.get(coverKey) ?? 0) > now) return;
+    if (key === FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE) {
+      state.dlsiteCoverFailures.set(coverKey, now + DEFAULT_DLSITE_CACHE_TTLS_MS.error);
+      return;
+    }
+    state.dlsiteCoverFailures.delete(coverKey);
+    const unreadable = key === FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE;
+    state.dlsiteCovers.set(coverKey, {
+      body: unreadable ? new TextEncoder().encode("not an image") : fixtureCoverImage(key),
+      contentType: unreadable ? "application/octet-stream" : "image/svg+xml",
+      fetchedAt: now,
+    });
+  }
+
+  async function fetchInfo(
+    rjCode: string,
+    force: boolean,
+    signal?: AbortSignal,
+  ): Promise<DlsiteFetchResult> {
     const key = normalizeDlsiteCacheKey(rjCode);
     if (!force) {
       const failure = dlsiteFetchFailureFor(state, key);
@@ -140,20 +170,6 @@ export function createDlsiteMethods(
       fetchedAt: now,
       expiresAt: now + DEFAULT_DLSITE_CACHE_TTLS_MS.ok,
     });
-    if (info.coverUrl !== null && key === FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE) {
-      state.dlsiteCoverFailures.set(
-        fixtureDlsiteCoverKey(info.coverUrl),
-        now + DEFAULT_DLSITE_CACHE_TTLS_MS.error,
-      );
-    } else if (info.coverUrl !== null) {
-      state.dlsiteCoverFailures.delete(fixtureDlsiteCoverKey(info.coverUrl));
-      const unreadable = key === FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE;
-      state.dlsiteCovers.set(fixtureDlsiteCoverKey(info.coverUrl), {
-        body: unreadable ? new TextEncoder().encode("not an image") : fixtureCoverImage(key),
-        contentType: unreadable ? "application/octet-stream" : "image/svg+xml",
-        fetchedAt: now,
-      });
-    }
     return { ok: true, info };
   }
 

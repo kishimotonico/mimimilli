@@ -51,7 +51,7 @@ interface Subject {
   candidatePath: string;
   /** Filesの作品登録の対象 */
   filesPath: string;
-  noCoverCode: string;
+  coverUnfetchableCode: string;
   unreadableCoverCode: string;
   coverlessCode: string;
   notFoundCode: string;
@@ -69,7 +69,7 @@ async function createSubject(kind: Subject["kind"]): Promise<Subject> {
       app,
       candidatePath: FOLDER_TITLE,
       filesPath: "未登録作品",
-      noCoverCode: FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE,
+      coverUnfetchableCode: FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE,
       unreadableCoverCode: FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE,
       coverlessCode: FIXTURE_DLSITE_COVERLESS_RJ_CODE,
       notFoundCode: FIXTURE_DLSITE_NOT_FOUND_RJ_CODE,
@@ -124,7 +124,7 @@ async function createSubject(kind: Subject["kind"]): Promise<Subject> {
     app,
     candidatePath: FOLDER_TITLE,
     filesPath: "Files作品",
-    noCoverCode: FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE,
+    coverUnfetchableCode: FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE,
     unreadableCoverCode: FIXTURE_DLSITE_UNREADABLE_COVER_RJ_CODE,
     coverlessCode: FIXTURE_DLSITE_COVERLESS_RJ_CODE,
     notFoundCode: "RJ000403",
@@ -254,9 +254,9 @@ for (const kind of ["fixture", "real"] as const) {
   }
 
   contract("カバーがキャッシュに無い候補は、カバー以外を反映して追加される", async (subject) => {
-    const info = await cacheDlsite(subject, subject.noCoverCode);
+    const info = await cacheDlsite(subject, subject.coverUnfetchableCode);
     assert.ok(info);
-    await setCandidateRjCode(subject, subject.noCoverCode);
+    await setCandidateRjCode(subject, subject.coverUnfetchableCode);
     const work = await registerCandidate(subject, ALL);
     assert.equal(work.title, info.title);
     assert.equal(work.cover ?? null, null);
@@ -293,8 +293,8 @@ for (const kind of ["fixture", "real"] as const) {
 
     const fresh = await createSubject(subject.kind);
     try {
-      assert.ok(await cacheDlsite(fresh, fresh.noCoverCode));
-      await setCandidateRjCode(fresh, fresh.noCoverCode);
+      assert.ok(await cacheDlsite(fresh, fresh.coverUnfetchableCode));
+      await setCandidateRjCode(fresh, fresh.coverUnfetchableCode);
       const work = await registerCandidate(fresh, { ...ALL, cover: false });
       assert.equal(work.coverSkipped, null);
     } finally {
@@ -413,10 +413,10 @@ for (const kind of ["fixture", "real"] as const) {
   contract(
     "Filesの作品登録は、カバーがキャッシュに無ければカバーだけ反映せず成功する",
     async (subject) => {
-      const info = await cacheDlsite(subject, subject.noCoverCode);
+      const info = await cacheDlsite(subject, subject.coverUnfetchableCode);
       assert.ok(info);
       const work = await registerFiles(subject, {
-        rjCode: subject.noCoverCode,
+        rjCode: subject.coverUnfetchableCode,
         applyCover: true,
         applyUrl: true,
       });
@@ -427,9 +427,9 @@ for (const kind of ["fixture", "real"] as const) {
   );
 
   contract("Filesの作品登録は、カバーを選ばなければ理由を返さない", async (subject) => {
-    assert.ok(await cacheDlsite(subject, subject.noCoverCode));
+    assert.ok(await cacheDlsite(subject, subject.coverUnfetchableCode));
     const work = await registerFiles(subject, {
-      rjCode: subject.noCoverCode,
+      rjCode: subject.coverUnfetchableCode,
       applyCover: false,
       applyUrl: true,
     });

@@ -404,14 +404,14 @@ test("終端イベントとsnapshotはコードごとのrevisionと取得結果�
   assert.deepEqual(terminal && "dlsite" in terminal ? terminal.dlsite : null, {
     state: "fetched",
     title: "タイトル",
-    cover: null,
+    cover: { state: "none" },
   });
   const code = manager.getState().job!.codes.find((entry) => entry.productCode === "RJ000001")!;
   assert.equal(code.revision, terminal && "revision" in terminal ? terminal.revision : -1);
   assert.deepEqual("dlsite" in code ? code.dlsite : null, {
     state: "fetched",
     title: "タイトル",
-    cover: null,
+    cover: { state: "none" },
   });
   await manager.cancelActiveAndAwait();
 });

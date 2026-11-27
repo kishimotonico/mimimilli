@@ -304,7 +304,7 @@ for (const kind of ["fixture", "real"] as const) {
     },
   );
 
-  contract("DLsiteに画像が無い取得済みの候補は、fetchedでcoverがnull", async (subject) => {
+  contract("DLsiteに画像が無い取得済みの候補は、fetchedでcoverのstateがnone", async (subject) => {
     await fetchAndWait(subject, subject.coverlessCode);
     const candidate = await setRjCode(subject, subject.coverlessCode);
     assert.equal(candidate.dlsite.state, "fetched");

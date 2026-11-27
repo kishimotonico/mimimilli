@@ -38,7 +38,8 @@ export default function DlsiteStateCell({
               カバー取得失敗
             </StatusLabel>
           );
-        default:
+        case "cached":
+        case "none":
           return (
             <StatusLabel tone="done" icon={I.checkC}>
               取得済み

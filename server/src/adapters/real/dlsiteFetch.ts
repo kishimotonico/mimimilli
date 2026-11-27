@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { errorMessage } from "@mimimilli/shared";
 import type { DlsiteFetchResult } from "@mimimilli/shared";
 import { DlsiteOfflineError } from "../../errors.ts";
@@ -13,7 +12,7 @@ import {
 import {
   DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES,
   DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES,
-  type DlsiteCache,
+  DlsiteCache,
   type DlsiteCacheOptions,
 } from "./dlsiteCache.ts";
 import { type DlsiteRequestConfig } from "./dlsiteConfig.ts";
@@ -279,7 +278,7 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
   ): Promise<{ body: Uint8Array; normalizedUrl: string }> {
     throwIfAborted(signal, "DLsite取得は中止されました");
     const normalizedUrl = normalizeDlsiteCoverUrl(coverUrl);
-    const key = `cover:${createHash("sha256").update(normalizedUrl).digest("hex")}`;
+    const key = `cover:${DlsiteCache.coverKey(normalizedUrl)}`;
     const cached = dlsiteCache.getCover(normalizedUrl);
     if (cached) {
       logDlsiteEvent({
@@ -323,35 +322,27 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     return image;
   }
 
-  function isCoverFailureRecorded(coverUrl: string): boolean {
-    try {
-      return dlsiteCache.hasCoverFailureByKey(
-        createHash("sha256").update(normalizeDlsiteCoverUrl(coverUrl)).digest("hex"),
-      );
-    } catch {
-      return false;
-    }
-  }
-
-  function recordCoverFailure(coverUrl: string): void {
-    try {
-      dlsiteCache.recordCoverFailure(normalizeDlsiteCoverUrl(coverUrl));
-    } catch {
-      // 許可外のURLは記録できない
-    }
-  }
-
   /**
    * 取得時にカバーをキャッシュへ先取りする。失敗は握り潰してログに出し、TTL付きで記録する。HTMLの取得結果には影響させない。
-   * 失敗の記録がTTL内のときは、force でなければ取りに行かない。
-   * 再送出するのは呼び出し元のsignalがabort済みのときだけ。deadlineMsを過ぎたらカバーなしで戻る（失敗は記録しない）。
+   * 失敗の記録がTTL内のときは、force でなければ取りに行かない。許可外のホストのURLは記録できず、取りに行かない。
+   * 中止（AbortError）は失敗として記録せず、呼び出し元のsignalがabort済みのときだけ再送出する。deadlineMsを過ぎたらカバーなしで戻る。
    */
   async function prefetchCover(
     coverUrl: string | null,
     options: { signal?: AbortSignal; deadlineMs?: number; force?: boolean } = {},
   ): Promise<void> {
     if (!coverUrl) return;
-    if (!options.force && isCoverFailureRecorded(coverUrl)) return;
+    let normalizedUrl: string;
+    try {
+      normalizedUrl = normalizeDlsiteCoverUrl(coverUrl);
+    } catch (error) {
+      dlsiteLogger.warn("DLsiteカバーのURLが許可されていません", {
+        coverUrl,
+        message: errorMessage(error),
+      });
+      return;
+    }
+    if (!options.force && dlsiteCache.hasCoverFailure(normalizedUrl)) return;
     const timeout =
       options.deadlineMs === undefined
         ? undefined
@@ -363,8 +354,11 @@ export function createDlsiteFetch(deps: DlsiteFetchDeps) {
     try {
       await fetchCoverImage(coverUrl, signal);
     } catch (error) {
-      if (options.signal?.aborted) throw error;
-      if (!timeout?.aborted) recordCoverFailure(coverUrl);
+      if (error instanceof DOMException && error.name === "AbortError") {
+        if (options.signal?.aborted) throw error;
+        return;
+      }
+      dlsiteCache.recordCoverFailure(normalizedUrl);
       dlsiteLogger.warn("DLsiteカバーの先取りに失敗しました", {
         coverUrl,
         message: errorMessage(error),

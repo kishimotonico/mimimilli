@@ -227,6 +227,8 @@ export class DlsiteCache {
         cache_key TEXT PRIMARY KEY,
         failure_expires_at INTEGER NOT NULL
       );
+      CREATE INDEX IF NOT EXISTS dlsite_cover_failures_expires_at
+        ON dlsite_cover_failures (failure_expires_at);
     `);
     this.ttlsMs = { ...DEFAULT_DLSITE_CACHE_TTLS_MS, ...options.ttlsMs };
     for (const [outcome, ttl] of Object.entries(this.ttlsMs))
@@ -489,7 +491,7 @@ export class DlsiteCache {
   /** カバー画像の取得失敗を、HTMLの一時的な失敗（error）と同じTTLで記録する。 */
   recordCoverFailure(normalizedUrl: string): void {
     const expiresAt = this.clock() + this.ttlsMs.error;
-    requirePositiveSafeInteger(expiresAt, "attempted_at + TTL");
+    requirePositiveSafeInteger(expiresAt, "cover failure_expires_at");
     this.sqlite
       .query(
         `INSERT INTO dlsite_cover_failures (cache_key, failure_expires_at) VALUES (?, ?)
@@ -499,6 +501,10 @@ export class DlsiteCache {
   }
 
   /** TTL内の取得失敗の記録があるか。 */
+  hasCoverFailure(normalizedUrl: string): boolean {
+    return this.hasCoverFailureByKey(DlsiteCache.coverKey(normalizedUrl));
+  }
+
   hasCoverFailureByKey(coverKey: string): boolean {
     const row = this.sqlite
       .query("SELECT failure_expires_at FROM dlsite_cover_failures WHERE cache_key = ?")

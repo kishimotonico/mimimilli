@@ -24,7 +24,7 @@ import Button from "../../../../shared/ui/Button";
 import TextInput from "../../../../shared/ui/TextInput";
 import Modal, { ModalFooter, ModalHeader } from "../../../../shared/ui/Modal";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
-import { coverSkipCause } from "../../../../entities/dlsite/coverSkip";
+import { coverSkipMessage } from "../../../../entities/dlsite/coverSkip";
 import { DLSITE_LINKAGE_STATUS_LABEL } from "../../../../entities/work/workStatusLabel";
 import { SourceProjectionNotice } from "../../../../entities/work/ui/SourceProjectionNotice";
 import {
@@ -326,7 +326,7 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
         result.coverSkipped === null
           ? { message: "DLsite情報を適用しました", variant: "success", priority: "notice" }
           : {
-              message: `DLsite情報を適用しました。${coverSkipCause(result.coverSkipped)}カバーは適用できませんでした`,
+              message: `DLsite情報を適用しました。${coverSkipMessage(result.coverSkipped)}`,
               variant: "warning",
               priority: "notice",
             },

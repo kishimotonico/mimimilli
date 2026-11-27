@@ -50,7 +50,7 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 
 実行中に受けた取得は同じジョブのキューの末尾へ合流する。リクエストの `force` が true のコードは、キャッシュの失敗の記録を無視して取り直す。取得中のコードに force で取り直しを求めたときは、走行中の試行が終わりしだい取り直し、取得を終えたコードの再取得は force を引き継いで再キューする。取り直したコードも進捗の分母と中止の対象になる。中止は待機中のコードをすべて外し、取得中のコードは止めない。root再設定の開始時は、キューを捨てて取得中の処理を打ち切る。ジョブは永続化せず、サーバー再起動では再開しない。
 
-未登録の候補一覧（`GET /scan/candidates`）の `dlsite` はキャッシュ由来の状態（`none` / `fetched` / `not_found` / `failed`）だけで、取得中は含めない。`fetched` は作品情報を取得済みの意味で、タイトルと、カバー画像の状態 `cover`（`cached` はキー・版つき / `missing` / `failed` / `none`）を持つ。`none` は DLsite に画像が無い（`coverUrl` が無い）、`missing` は画像をまだ取りに行っていない、`failed` は取りに行ったが取れず、失敗の記録がTTL内にある。失敗の記録はHTMLの一時的な失敗と同じTTLで、画像の取得に成功すると消える。パーサー版の違いによる読み直しは通信しないので、画像を持たない旧版の作品は `cover` が `missing` になり、取得の対象になる。取り直して失敗するとTTLのあいだは `failed` になり、取得の対象にならず、そのまま追加に進める（追加ではカバーが `not_cached` の理由で適用されない）。作品詳細の「取得結果を確認」は失敗の記録があっても画像を取りに行く。取得ジョブの終端も同じ導出を通る。取得中の行はクライアントがジョブのsnapshotとSSEから出す。
+未登録の候補一覧（`GET /scan/candidates`）の `dlsite` はキャッシュ由来の状態（`none` / `fetched` / `not_found` / `failed`）だけで、取得中は含めない。`fetched` は作品情報を取得済みの意味で、タイトルと、カバー画像の状態 `cover`（`cached` はキー・版つき / `missing` / `failed` / `none`）を持つ。`none` は DLsite に画像が無い（`coverUrl` が無い）、`missing` は画像をまだ取りに行っていない、`failed` は取りに行ったが取れず、失敗の記録がTTL内にある。失敗の記録はHTMLの一時的な失敗と同じTTLで、画像の取得に成功すると消える。許可外のホストのカバーURLは取りに行けず、記録もできないので常に `failed` になる。パーサー版の違いによる読み直しは通信しないので、画像を持たない旧版の作品は `cover` が `missing` になり、取得の対象になる。取り直して失敗するとTTLのあいだは `failed` になり、取得の対象にならず、そのまま追加に進める（追加ではカバーが `not_cached` の理由で適用されない）。作品詳細の「取得結果を確認」は失敗の記録があっても画像を取りに行く。取得ジョブの終端も同じ導出を通る。取得中の行はクライアントがジョブのsnapshotとSSEから出す。
 
 **新旧の判定**: ジョブの状態には単調増加の `revision` が付く（プロセス全体で1つ。`max(前の値 + 1, 現在時刻のマイクロ秒)` で、クライアントに見える変化の直前に進める）。ジョブの終端は、候補と同じ導出関数（`deriveDlsiteProductSummary`）でキャッシュから導いた取得結果 `dlsite` を運ぶ。候補GETと `POST /scan/candidates/rj-code` の応答は、候補を組み立てる前に読んだ revision を各候補の `dlsiteRevision` に持つ。クライアントはサーバー状態を revision が進むものだけ取り込み、行の表示は候補の値と終端の結果のうち revision が大きい方（同じなら候補）を出す。ジョブの終端で候補を取り直さない。想定外の例外とオフラインで `failed` になった取得はキャッシュを書き換えないので、次の候補GETで表示がキャッシュの状態に戻る（[ADR-0038](adr/0038-dlsite-job-state-revision.md)）。
 
@@ -78,7 +78,7 @@ DLsiteの作品HTMLとカバー画像は、専用のSQLiteキャッシュ（`Dls
 
 作品HTMLは生のHTMLをgzip圧縮してBLOBで保存する。生HTMLを持つのは、パーサーを直したときに実HTTPを再度飛ばさず既存HTMLで検証できるようにするため。あわせて、取得時の解析結果（`DlsiteWorkInfo`のJSON）を「解析結果」（`dlsite_parsed_products`）に、snapshotの記録と同じ書き込みで保存する。行にはsnapshotの `content_fetched_at` とパーサーの版（`DLSITE_PARSER_VERSION`、`dlsite.ts`）を持ち、候補一覧・取得のキャッシュヒットはこの行を読む（`dlsiteProductResolve.ts`）。行が無い、`content_fetched_at` が違う、版が違うときだけ生HTMLを展開して解析し、書き戻す。`parseDlsiteHtml` の出力を変えたときは版を上げる。解析失敗（`parse_error`）のsnapshotは版を上げても解析し直さず、TTL（1時間）が切れてから取り直す。
 
-保存は「HTML snapshot」（`dlsite_html_snapshots`）と「取得失敗記録」（`dlsite_fetch_failures`）の2テーブルが基本で、取得時の解析結果が前述の `dlsite_parsed_products`。テーブルを分けているのは、取得が失敗しても直前に成功したHTMLを消さないため。カバー画像は正規化済みHTTPS URLのSHA-256をキーにした別テーブル（`dlsite_cover_entries`）に、非圧縮のBLOBで持つ。
+保存は「HTML snapshot」（`dlsite_html_snapshots`）と「取得失敗記録」（`dlsite_fetch_failures`）の2テーブルが基本で、取得時の解析結果が前述の `dlsite_parsed_products`。テーブルを分けているのは、取得が失敗しても直前に成功したHTMLを消さないため。カバー画像は正規化済みHTTPS URLのSHA-256をキーにした別テーブル（`dlsite_cover_entries`）に、非圧縮のBLOBで持つ。カバーの取得失敗は同じキーで `dlsite_cover_failures` に期限つきで記録する（HTMLの一時的な失敗と同じTTL。取得に成功すると消える）。
 
 キャッシュキーはストア（RJは `maniax`、VJは `pro`）、大文字化したproduct code、`work-html-ja-adultchecked-v1`（`DLSITE_CACHE_REPRESENTATION`）の組み合わせ。representationは取得条件（言語・adultchecked Cookie・対象ページ）のバージョンで、取得の前提を変えたらこの文字列を上げてキャッシュを無効化する。
 
@@ -96,7 +96,7 @@ failure_kind（失敗記録側）と既定TTL。
 | `not_found`  | HTTP 404               | 3日   |
 | `error`      | 一時的なHTTP・通信障害 | 1時間 |
 
-TTLは `DEFAULT_DLSITE_CACHE_TTLS_MS`（`shared/src/dlsite.ts`）の定数で固定されている。通常取得の判断順序は、有効な失敗記録があればそれを返し（ネットワークへ出ない）、なければ有効なHTML snapshotを（保存済みの解析結果を使って）返し、どちらもなければネットワークへ出る。force（`?force=true`、取得ジョブの `force: true`）は、有効な失敗記録と解析できないsnapshot（`parse_error`、またはokでも今のパーサーで解析できないもの）をmissとして扱い、ネットワークへ取り直す。TTL内で解析できるokのsnapshotはforceでもそのまま使い、ネットワークへ出ない。書き込みは通常時と同じ規則に従う。
+TTLは `DEFAULT_DLSITE_CACHE_TTLS_MS`（`shared/src/dlsite.ts`）の定数で固定されている。通常取得の判断順序は、有効な失敗記録があればそれを返し（ネットワークへ出ない）、なければ有効なHTML snapshotを（保存済みの解析結果を使って）返し、どちらもなければネットワークへ出る。force（`?force=true`、取得ジョブの `force: true`）は、カバーの失敗記録も含めて、有効な失敗記録と解析できないsnapshot（`parse_error`、またはokでも今のパーサーで解析できないもの）をmissとして扱い、ネットワークへ取り直す。TTL内で解析できるokのsnapshotはforceでもそのまま使い、ネットワークへ出ない。書き込みは通常時と同じ規則に従う。
 
 HTMLの転送・展開サイズには上限があり（既定2 MiB / 8 MiB、`DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES` / `DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES`）、gzip展開時にも `zlib` の `maxOutputLength` で同じ上限を渡してgzip bombを防ぐ。転送サイズの上限はHTTP応答にだけ課す。CLIのローカルファイルimportは転送を伴わないため、展開後サイズの上限だけで判定する。
 
@@ -196,7 +196,7 @@ importはHTML snapshotを成功記録として書き直すため、取り込ん�
 復元できるのはHTML snapshotだけで、次のものは対象外。復元後も実HTTPが発生しうる。
 
 - 取得失敗記録（`dlsite_fetch_failures`）。404・通信失敗はTTLが3日・1時間と短く、アーカイブしてもすぐ期限切れになる
-- カバー画像（`dlsite_cover_entries`）。ローカルにカバーがない作品は、HTMLがcache hitしてもカバー取得へ進む。適用済み作品のカバーは作品フォルダーへ保存されるため通常は再取得されない
+- カバー画像（`dlsite_cover_entries`）。HTMLがcache hitしても、カバーがキャッシュに無く、失敗の記録がTTL内でない（またはforce）ならカバー取得へ進む。適用済み作品のカバーは作品フォルダーへ保存されるため通常は再取得されない
 
 失敗の記録を無視して取り直したい場合は、`POST /dlsite/:id/fetch?force=true` や `POST /dlsite/fetch-by-code?force=true` を使う（TTL内で解析できるokのsnapshotは使うので、オフライン設定でも成功する）。作品詳細の「取得」とFilesの「取得」は、ユーザーが1件の結果を待って押す取り直しなので、クライアントは常にforce付きで呼ぶ（失敗の記録を無視して取り直す）。キャッシュの行自体を消したい場合は、TTLが切れるのを待って `cleanup` する。
 

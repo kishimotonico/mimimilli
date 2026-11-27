@@ -13,7 +13,7 @@ import { scanResultsRefreshedAtom } from "../../../entities/scan/model/atoms";
 import { scanRecordQueryOptions } from "../../../entities/scan/queryOptions";
 import { scanNewCountQueryOptions } from "../../../entities/work/scanNewCountQueryOptions";
 import { useScanCandidatesState } from "../model/useScanCandidatesCache";
-import { groupCoverSkipped } from "../../../entities/dlsite/coverSkip";
+import { coverSkipSummary } from "../../../entities/dlsite/coverSkip";
 import { formatWorkNames } from "../model/formatWorkNames";
 import ScanSidebar from "./scanModal/ScanSidebar";
 import UnregisteredTab from "./scanModal/unregistered/UnregisteredTab";
@@ -78,11 +78,7 @@ export default function ScanModal({
   }: CandidatesRegisteredResult) => {
     if (registeredTitles.length === 0) return;
     const names = formatWorkNames(registeredTitles);
-    const coverNote = groupCoverSkipped(coverSkipped)
-      .map(
-        ({ cause, titles }) => `${formatWorkNames(titles)}は${cause}カバーを適用できませんでした。`,
-      )
-      .join("");
+    const coverNote = coverSkipSummary(coverSkipped, formatWorkNames);
     if (failedCount > 0 || interrupted) {
       toast.show({
         message:

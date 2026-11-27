@@ -21,6 +21,10 @@ import {
 } from "../src/adapters/fixture/scenarios.ts";
 import { createWorkMethods } from "../src/adapters/fixture/works.ts";
 import { createSettingsScanMethods } from "../src/adapters/fixture/settingsScan.ts";
+import {
+  createDlsiteMethods,
+  FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE,
+} from "../src/adapters/fixture/dlsiteMethods.ts";
 import { createInitialState } from "../src/adapters/fixture/state.ts";
 import type { ScanCandidateFolder } from "@mimimilli/shared";
 import { buildFixtureAdapterWithCandidates } from "./helpers/fixtureCandidates.ts";
@@ -625,4 +629,29 @@ test("needs-attention: スキャン後に要対応の5種類が揃い、読み�
 
   assert.equal(await adapter.reloadWork("RJ501099"), true);
   assert.deepEqual((await adapter.listScanDiagnostics()).dataIntegrityWorks, []);
+});
+
+test("fixtureのカバー取得不可コードは、失敗の記録がTTL切れで取り直しても再び failed に収束する", async () => {
+  const state = createInitialState({ scenario: "empty" });
+  const dlsite = createDlsiteMethods(state);
+  const code = FIXTURE_DLSITE_COVER_UNFETCHABLE_RJ_CODE;
+  const summaryOf = async (force: boolean) => {
+    const terminal = await dlsite.fetchDlsiteProduct(code, { force });
+    return terminal.state === "fetched" ? terminal.cover : terminal;
+  };
+  const realNow = Date.now;
+  let now = realNow();
+  Date.now = () => now;
+  try {
+    assert.deepEqual(await summaryOf(false), { state: "failed" });
+    const [failedUntil] = state.dlsiteCoverFailures.values();
+    assert.ok(failedUntil! > now);
+
+    now = failedUntil! + 1;
+    assert.deepEqual(await summaryOf(false), { state: "failed" });
+    const [renewedUntil] = state.dlsiteCoverFailures.values();
+    assert.ok(renewedUntil! > failedUntil!);
+  } finally {
+    Date.now = realNow;
+  }
 });
