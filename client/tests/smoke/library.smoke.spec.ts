@@ -104,7 +104,7 @@ test("値の作品一覧で「＋絞り込み」からチップを足せる", as
 
   await page.getByRole("button", { name: "絞り込み" }).click();
   await page
-    .getByRole("listbox", { name: "絞り込みの種類" })
+    .getByRole("group", { name: "絞り込みの種類" })
     .getByRole("button", { name: "サークル" })
     .click();
   await page
