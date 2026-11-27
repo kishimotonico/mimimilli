@@ -4,7 +4,7 @@ import { useSetAtom } from "jotai";
 import { openModalDialogsAtom } from "../model/openModalDialogsAtom";
 import { getTabbableElements } from "./focusable";
 import { resolveFocusReturnTarget } from "./layer/focusReturnTarget";
-import { MENU_CONTENT_SELECTOR, OPEN_LAYER_SELECTOR } from "./layer/layerDom";
+import { isInsideMenuContent, OPEN_LAYER_SELECTOR } from "./layer/layerDom";
 
 interface UseDialogModalOptions {
   /**
@@ -43,7 +43,7 @@ export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptio
     const handleTabKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Tab") return;
       // dialog の中へポータルされたメニューの Tab は、メニュー（Ark UI）が開いたまま止める
-      if (event.target instanceof Element && event.target.closest(MENU_CONTENT_SELECTOR)) return;
+      if (isInsideMenuContent(event.target)) return;
       const focusable = getTabbableElements(dialog);
       if (focusable.length === 0) return;
       const first = focusable[0];

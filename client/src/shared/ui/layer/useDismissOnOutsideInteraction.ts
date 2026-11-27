@@ -4,7 +4,7 @@ import { LAYER_CONTENT_SELECTOR } from "./layerDom";
 
 /**
  * 層ではない展開部分（インラインのパネル）を、ポップオーバーと同じ規則で閉じる。
- * 内側（トリガーとパネル、パネルから開いた層）の外への pointerdown（capture）と、外へのフォーカス移動で閉じる。
+ * 内側（トリガーとパネル、層の中＝メニュー・ポップオーバーの中身）の外への pointerdown（capture）と、外へのフォーカス移動で閉じる。
  * pointerdown は止めず、押された要素の操作は通す。
  */
 export function useDismissOnOutsideInteraction(

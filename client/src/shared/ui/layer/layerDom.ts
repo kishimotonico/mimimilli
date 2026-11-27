@@ -9,6 +9,11 @@ export const LAYER_CONTENT_SELECTOR = `${MENU_CONTENT_SELECTOR}, ${POPOVER_CONTE
 
 export const OPEN_LAYER_SELECTOR = `${MENU_CONTENT_SELECTOR}:not([inert]), ${POPOVER_CONTENT_SELECTOR}:not([inert])`;
 
+/** メニューの中身（ポータルされた先を含む）の中の要素か */
+export function isInsideMenuContent(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(MENU_CONTENT_SELECTOR) !== null;
+}
+
 /** content の id から、その層を開くトリガー（aria-controls）を探す */
 export function findLayerTrigger(contentId: string): Element | null {
   return document.querySelector(`[aria-controls="${CSS.escape(contentId)}"]`);
