@@ -1,7 +1,6 @@
 import type { ButtonHTMLAttributes, Ref } from "react";
 import { cn } from "../lib/cn";
 import type { IconFC } from "./Icon";
-import { softDisabledHandlers } from "./softDisabled";
 
 export type IconButtonSize = "xs" | "sm" | "md" | "lg";
 
@@ -44,8 +43,6 @@ export interface IconButtonProps extends Omit<
   variant?: IconButtonVariant;
   /** 有効時の文字色。`muted` は ink-2（hoverで ink-0）、`faint` は ink-3（hover/focusで ink-1）、`danger` は hoverで赤 */
   tone?: IconButtonTone;
-  /** フォーカスは残し、見た目と aria-disabled と自分の onClick だけを無効にする。Ark のトリガーを止めるには、フックの disabled を使う */
-  softDisabled?: boolean;
   ref?: Ref<HTMLButtonElement>;
 }
 
@@ -58,17 +55,13 @@ export default function IconButton({
   variant = "default",
   tone = "default",
   disabled = false,
-  softDisabled = false,
-  onClick,
-  onKeyDownCapture,
   "aria-disabled": ariaDisabled,
   className,
   ref,
   type = "button",
   ...rest
 }: IconButtonProps) {
-  const looksDisabled =
-    disabled || softDisabled || ariaDisabled === true || ariaDisabled === "true";
+  const looksDisabled = disabled || ariaDisabled === true || ariaDisabled === "true";
   const stateClass = looksDisabled
     ? "cursor-not-allowed text-ink-4"
     : active
@@ -93,7 +86,6 @@ export default function IconButton({
       )}
       {...rest}
       aria-disabled={ariaDisabled}
-      {...softDisabledHandlers(softDisabled, { onClick, onKeyDownCapture })}
     >
       <Icon size={ICON_PX[size]} />
     </button>
