@@ -208,7 +208,12 @@ function SidebarStartButton({
         placement="aboveStart"
         onClick={onStart}
         menu={
-          <Menu.Item value="full" onSelect={onFullScan} className={menuItemClass()}>
+          <Menu.Item
+            value="full"
+            valueText="すべての作品を読み直す"
+            onSelect={onFullScan}
+            className={menuItemClass()}
+          >
             <span className={MENU_LABEL_CLASS}>すべての作品を読み直す</span>
           </Menu.Item>
         }

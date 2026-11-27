@@ -112,6 +112,7 @@ export function usePopupDrag(): PopupDragBind {
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (!isPrimaryPointerButton(e)) return;
+      if (!(e.target instanceof Node) || popupRef.current?.contains(e.target) !== true) return;
       if (e.target instanceof Element && e.target.closest(DRAG_IGNORE_SELECTOR)) return;
       dragControls.start(e);
     },
@@ -120,6 +121,7 @@ export function usePopupDrag(): PopupDragBind {
 
   const onDoubleClick = useCallback(
     (e: React.MouseEvent) => {
+      if (!(e.target instanceof Node) || popupRef.current?.contains(e.target) !== true) return;
       if (e.target instanceof Element && e.target.closest(DRAG_IGNORE_SELECTOR)) return;
       resetToOrigin();
     },

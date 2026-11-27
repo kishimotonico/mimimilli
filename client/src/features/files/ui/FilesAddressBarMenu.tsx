@@ -34,7 +34,12 @@ export default function FilesAddressBarMenu() {
         <IconButton size="sm" icon={I.more} label="その他" active={menu.menu.api.open} />
       </Menu.Trigger>
       <MenuPopup origin="top right">
-        <Menu.Item value="copy-path" onSelect={copyCurrentFolderPath} className={menuItemClass()}>
+        <Menu.Item
+          value="copy-path"
+          valueText="絶対パスをコピー"
+          onSelect={copyCurrentFolderPath}
+          className={menuItemClass()}
+        >
           <span className={MENU_LABEL_CLASS}>絶対パスをコピー</span>
         </Menu.Item>
       </MenuPopup>

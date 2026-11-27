@@ -88,6 +88,7 @@ export function WorkPlayButton(props: WorkPlayButtonProps) {
           <MenuPopup origin="top right" aria-label="再生メニュー">
             <Menu.Item
               value="play-from-start"
+              valueText="最初から再生"
               onSelect={onPlayFromStart}
               className={menuItemClass()}
             >

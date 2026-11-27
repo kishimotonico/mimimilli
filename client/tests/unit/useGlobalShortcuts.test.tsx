@@ -107,9 +107,11 @@ describe("useGlobalShortcuts", () => {
     const playerControl = getByText("player-control");
 
     const spaceResult = fireEvent.keyDown(playerControl, { code: "Space" });
-    expect(onTogglePlay).toHaveBeenCalledTimes(1);
-    // preventDefaultされた（=false）ことで、ボタン自身のネイティブSpace活性化（click相当）が
-    // 抑止され、グローバル側のトグルとの二重発火が起きない。
+    const seenByButton = vi.fn();
+    playerControl.addEventListener("keydown", seenByButton);
+    fireEvent.keyDown(playerControl, { code: "Space" });
+    expect(onTogglePlay).toHaveBeenCalledTimes(2);
+    expect(seenByButton).not.toHaveBeenCalled();
     expect(spaceResult).toBe(false);
 
     // Spaceだけが特別扱いの対象。矢印キーは通常のボタンと同じくネイティブ動作優先のまま。

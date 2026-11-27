@@ -75,7 +75,12 @@ export default function PlaybackRatePicker({
             onValueChange={({ value }) => onSetPlaybackRate(Number(value))}
           >
             {RATE_PRESETS.map((rate) => (
-              <Menu.RadioItem key={rate} value={String(rate)} className={menuItemClass()}>
+              <Menu.RadioItem
+                key={rate}
+                value={String(rate)}
+                valueText={RATE_LABELS[rate]}
+                className={menuItemClass()}
+              >
                 <MenuCheckColumn />
                 <span className={MENU_LABEL_CLASS}>{RATE_LABELS[rate]}</span>
               </Menu.RadioItem>

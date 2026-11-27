@@ -71,7 +71,12 @@ export function WorkMetadataActions({
           />
         </Menu.Trigger>
         <MenuPopup origin="top right">
-          <MenuLayerItem value="info" onSelect={onShowInfo} className={menuItemClass()}>
+          <MenuLayerItem
+            value="info"
+            valueText="作品の情報"
+            onSelect={onShowInfo}
+            className={menuItemClass()}
+          >
             <span className={MENU_LABEL_CLASS}>作品の情報</span>
           </MenuLayerItem>
           {work.urls.length > 0 && (
@@ -81,13 +86,25 @@ export function WorkMetadataActions({
                 const href = toSafeExternalUrlHref(u.url);
                 const label = u.label === "DLsite" ? "DLsiteを開く" : `${u.label}を開く`;
                 return href ? (
-                  <Menu.Item key={u.url} value={u.url} asChild className={menuItemClass()}>
+                  <Menu.Item
+                    key={u.url}
+                    value={u.url}
+                    valueText={label}
+                    asChild
+                    className={menuItemClass()}
+                  >
                     <a href={href} target="_blank" rel="noreferrer">
                       <span className={MENU_LABEL_CLASS}>{label}</span>
                     </a>
                   </Menu.Item>
                 ) : (
-                  <Menu.Item key={u.url} value={u.url} disabled className={menuItemClass()}>
+                  <Menu.Item
+                    key={u.url}
+                    value={u.url}
+                    valueText={label}
+                    disabled
+                    className={menuItemClass()}
+                  >
                     <span className={MENU_LABEL_CLASS}>{label}</span>
                   </Menu.Item>
                 );
@@ -97,6 +114,7 @@ export function WorkMetadataActions({
           <Menu.Separator className={MENU_SEPARATOR_CLASS} />
           <MenuLayerItem
             value="delete"
+            valueText="登録解除"
             onSelect={onDelete}
             className={menuItemClass({ danger: true })}
           >

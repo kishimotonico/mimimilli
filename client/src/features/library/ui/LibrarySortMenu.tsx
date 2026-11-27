@@ -124,7 +124,12 @@ function ReadySortMenu({
             onValueChange={({ value }) => selectOption(value)}
           >
             {options.map((opt) => (
-              <Menu.RadioItem key={opt.id} value={opt.id} className={menuItemClass()}>
+              <Menu.RadioItem
+                key={opt.id}
+                value={opt.id}
+                valueText={opt.label}
+                className={menuItemClass()}
+              >
                 <MenuCheckColumn />
                 <span className={MENU_LABEL_CLASS}>{opt.label}</span>
               </Menu.RadioItem>
@@ -135,6 +140,7 @@ function ReadySortMenu({
               <Menu.Separator className={MENU_SEPARATOR_CLASS} />
               <Menu.Item
                 value="save-default"
+                valueText="このソートを既定にする"
                 disabled={savingDefault}
                 onSelect={() => void saveAsDefault()}
                 className={menuItemClass()}

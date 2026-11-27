@@ -55,8 +55,9 @@ export function useGlobalShortcuts({
     if (!isActiveRef.current) return;
 
     if (e.code === "Space") {
-      // preventDefaultでボタン自身のSpace活性化（クリック相当）を止め、二重トグルを防ぐ。
+      // keydown で開く Ark のトリガーより先に止める。preventDefault だけではメニューも開く。
       e.preventDefault();
+      if (isPlayerControlSpace) e.stopPropagation();
       onTogglePlayRef.current();
     } else if (e.code === "ArrowLeft") {
       e.preventDefault();
@@ -68,7 +69,7 @@ export function useGlobalShortcuts({
   }, []);
 
   useEffect(() => {
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
   }, [handler]);
 }

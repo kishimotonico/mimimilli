@@ -62,6 +62,7 @@ export default function UnregisteredFooter({
       {plan.kind === "fetch" && (
         <Menu.Item
           value="add-without-fetch"
+          valueText="取得せずに追加"
           disabled={!addable}
           onSelect={() => onRegister(REGISTER_APPLY_ALL)}
           className={menuItemClass()}
@@ -72,6 +73,7 @@ export default function UnregisteredFooter({
       )}
       <MenuLayerItem
         value="pick"
+        valueText="項目を選んで追加…"
         disabled={!addable}
         onSelect={() => setPickerOpen(true)}
         className={menuItemClass()}
@@ -81,6 +83,7 @@ export default function UnregisteredFooter({
       <Menu.Separator className={MENU_SEPARATOR_CLASS} />
       <Menu.Item
         value="exclude"
+        valueText="選択を除外"
         disabled={busy || selectedCount === 0}
         onSelect={onExclude}
         className={menuItemClass({ danger: true })}

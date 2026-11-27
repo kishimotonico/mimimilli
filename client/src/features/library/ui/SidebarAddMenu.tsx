@@ -42,16 +42,31 @@ export default function SidebarAddMenu({
       </Menu.Trigger>
       <MenuPopup origin="top right">
         {canSaveSearch && (
-          <MenuLayerItem value="save-search" onSelect={onSaveSearch} className={menuItemClass()}>
+          <MenuLayerItem
+            value="save-search"
+            valueText="今の検索を保存"
+            onSelect={onSaveSearch}
+            className={menuItemClass()}
+          >
             <span className={MENU_LABEL_CLASS}>今の検索を保存</span>
           </MenuLayerItem>
         )}
         {!canSaveSearch && duplicateName !== null && (
-          <MenuLayerItem value="duplicate" onSelect={onDuplicate} className={menuItemClass()}>
+          <MenuLayerItem
+            value="duplicate"
+            valueText={`「${duplicateName}」を複製`}
+            onSelect={onDuplicate}
+            className={menuItemClass()}
+          >
             <span className={MENU_LABEL_CLASS}>{`「${duplicateName}」を複製`}</span>
           </MenuLayerItem>
         )}
-        <MenuLayerItem value="add-group" onSelect={onAddGroup} className={menuItemClass()}>
+        <MenuLayerItem
+          value="add-group"
+          valueText="グループ分けを追加"
+          onSelect={onAddGroup}
+          className={menuItemClass()}
+        >
           <span className={MENU_LABEL_CLASS}>グループ分けを追加</span>
         </MenuLayerItem>
         <Menu.Separator className={MENU_SEPARATOR_CLASS} />
@@ -62,6 +77,7 @@ export default function SidebarAddMenu({
               <Menu.Item
                 key={template.id}
                 value={template.id}
+                valueText={template.name}
                 onSelect={() => onAddTemplate(template.id)}
                 className={menuItemClass()}
               >

@@ -38,6 +38,7 @@ export default function RowMenu({ label, busy, onOpenFolder, onExclude }: RowMen
       <MenuPopup origin="top right">
         <Menu.Item
           value="open-folder"
+          valueText="フォルダーを開く"
           disabled={busy}
           onSelect={onOpenFolder}
           className={menuItemClass()}
@@ -47,6 +48,7 @@ export default function RowMenu({ label, busy, onOpenFolder, onExclude }: RowMen
         <Menu.Separator className={MENU_SEPARATOR_CLASS} />
         <Menu.Item
           value="exclude"
+          valueText="除外"
           disabled={busy}
           onSelect={onExclude}
           className={menuItemClass({ danger: true })}
