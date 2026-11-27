@@ -117,6 +117,33 @@ test("行の︙メニューはEscapeでメニューだけが閉じ、スキャ�
   assertNoErrors(tracker);
 });
 
+test("ダイアログの中の行の︙メニューと▾は、Tab を押しても開いたまま動かない", async ({ page }) => {
+  const tracker = trackErrors(page);
+  const { dialog, panel } = await openUnregistered(page);
+  const triggers = [
+    panel
+      .getByRole("row")
+      .nth(1)
+      .getByRole("button", { name: /の操作$/ }),
+    dialog.getByRole("button", { name: "その他の操作" }),
+  ];
+  for (const trigger of triggers) {
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    const menu = page.getByRole("menu");
+    await expect(menu).toBeVisible();
+    const focused = await page.evaluate(() => document.activeElement?.getAttribute("role"));
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(300);
+    await expect(menu).toBeVisible();
+    expect(await page.evaluate(() => document.activeElement?.getAttribute("role"))).toBe(focused);
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+    await expect(trigger).toBeFocused();
+  }
+  assertNoErrors(tracker);
+});
+
 test("先頭の行の︙メニューから除外でき、「元に戻す」で戻るとトーストも消える", async ({ page }) => {
   const tracker = trackErrors(page);
   const { panel } = await openUnregistered(page);
