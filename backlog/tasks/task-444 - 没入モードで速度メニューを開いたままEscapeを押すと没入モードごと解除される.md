@@ -1,9 +1,10 @@
 ---
 id: TASK-444
 title: 没入モードで速度メニューを開いたままEscapeを押すと没入モードごと解除される
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-09 16:12'
+updated_date: '2026-11-27 14:09'
 labels:
   - ui
   - player
@@ -34,7 +35,19 @@ TASK-428.13 が定めた Escape の階層契約（docs/design-system.md の「�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 没入モードで速度メニューを開いた状態の Escape が、速度メニューだけを閉じる
-- [ ] #2 速度メニューを開いていない状態の Escape は従来どおり没入モードを解除する
-- [ ] #3 Escape の階層の扱いが docs/design-system.md の記述と一致している
+- [x] #1 没入モードで速度メニューを開いた状態の Escape が、速度メニューだけを閉じる
+- [x] #2 速度メニューを開いていない状態の Escape は従来どおり没入モードを解除する
+- [x] #3 Escape の階層の扱いが docs/design-system.md の記述と一致している
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+TASK-529（Ark UI のメニュー）の後の master（88549452）で、フィクスチャ new-work・CDP 合成キーで実測。没入モードで速度メニューを開いたまま Esc: クリック開き・キーボード開きとも 10/10 でメニューだけ閉じ、没入モードと層は残り、フォーカスは速度ピルへ戻った。続けて Esc、またはメニューなしの Esc は 10/10 で層ごと閉じ、フォーカスは再生バーの「再生中を開く」へ戻った（body を経由しない）。AC#2 の「没入モードを解除する」は、現行仕様（design-system.md: Esc は通常・没入のどちらでも層ごと閉じ、没入の切り替えはボタンだけ）どおり層ごと閉じることで満たす。起票時の原因（useNowPlayingImmersiveShell の document の Esc リスナー）は現コードに無い
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+コード変更なし。TASK-529 で速度メニューが Ark UI のメニューになり、Esc を capture 段で先に受けて preventDefault するため、層側（NowPlayingLayer の defaultPrevented 判定）が反応しなくなって解消していた。master で各10回の実測で確認。
+<!-- SECTION:FINAL_SUMMARY:END -->
