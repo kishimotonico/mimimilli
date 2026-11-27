@@ -131,9 +131,9 @@ export default function ScanModal({
           counts={counts}
           lastScanTime={lastScanTime}
           scanPending={scanPending}
-          onStart={() => start()}
-          onFullScan={() => start({ full: true })}
-          onCancel={() => cancel()}
+          onStart={() => void start()}
+          onFullScan={() => void start({ full: true })}
+          onCancel={() => void cancel()}
         />
         <div
           role="tabpanel"

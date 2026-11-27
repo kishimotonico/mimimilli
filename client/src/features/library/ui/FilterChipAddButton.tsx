@@ -120,9 +120,11 @@ export default function FilterChipAddButton({
           animate={animate}
         >
           {pickedGroupBy === null ? (
-            <fieldset
+            <div
+              // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 項目ボタン集合を名前付き集合として表す。fieldset等の代替タグは適合しない
+              role="group"
               aria-label="絞り込みの種類"
-              className="m-0 max-h-[260px] overflow-y-auto border-0 p-0"
+              className="max-h-[260px] overflow-y-auto"
             >
               {buildGroupByRows(tagPrefixes).map(({ groupBy, name }) => {
                 const key = groupByKey(groupBy);
@@ -142,7 +144,7 @@ export default function FilterChipAddButton({
                   </button>
                 );
               })}
-            </fieldset>
+            </div>
           ) : (
             <GroupValueStage
               groupBy={pickedGroupBy}

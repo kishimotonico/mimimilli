@@ -1,6 +1,5 @@
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
-import { useRef, type ReactNode, type RefObject } from "react";
-import { flushSync } from "react-dom";
+import { useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
 import { Menu } from "@ark-ui/react/menu";
 import { useMotionVariants } from "../../../../shared/ui/useMotionVariants";
 import { cn } from "../../../../shared/lib/cn";
@@ -26,9 +25,9 @@ interface ScanSidebarProps {
   lastScanTime: string | null;
   /** 起動後にスキャンが完了していない。スキャンボタンを主ボタンにする */
   scanPending: boolean;
-  onStart: () => Promise<unknown>;
-  onFullScan: () => Promise<unknown>;
-  onCancel: () => Promise<unknown>;
+  onStart: () => void;
+  onFullScan: () => void;
+  onCancel: () => void;
 }
 
 const HEADING_CLASS = "h-[18px] font-jp text-secondary font-medium leading-[18px] text-ink-2";
@@ -86,17 +85,21 @@ function ScanSidebarControls({
   const startButtonRef = useRef<HTMLButtonElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
 
-  // 開始と中止のボタンは入れ替わる。操作が済んで入れ替わったら、操作した側から新しい側へフォーカスを移す
-  const runAndMoveFocus = async (
-    action: () => Promise<unknown>,
-    next: RefObject<HTMLButtonElement | null>,
-  ) => {
-    await action();
-    flushSync(() => {});
+  // 開始と中止のボタンは入れ替わる。この入れ物にフォーカスがあったなら、入れ替わった新しいボタンへ引き継ぐ。
+  // 操作の直後でも自然な完了でも同じ。フォーカスが外へ移ったときだけ下ろす（relatedTarget が null のときは、
+  // 退出するボタンが inert になって外れただけなので下ろさない）
+  const hadFocusRef = useRef(false);
+  const wasInProgressRef = useRef(inProgress);
+  useLayoutEffect(() => {
+    if (wasInProgressRef.current === inProgress) return;
+    wasInProgressRef.current = inProgress;
     const active = document.activeElement;
-    const inActions = active !== null && actionsRef.current?.contains(active);
-    if (inActions || isFocusLost()) next.current?.focus({ preventScroll: true });
-  };
+    const leaving = active !== null && !!actionsRef.current?.contains(active);
+    if (hadFocusRef.current && (leaving || isFocusLost())) {
+      (inProgress ? cancelButtonRef : startButtonRef).current?.focus({ preventScroll: true });
+    }
+  }, [inProgress]);
+
   return (
     <div className="mt-auto flex h-[116px] shrink-0 flex-col border-t border-line-soft pt-2.5 pl-2.5">
       <div className="relative min-h-0 flex-1">
@@ -104,14 +107,24 @@ function ScanSidebarControls({
           <SidebarStatus key={status.kind} status={status} />
         </AnimatePresence>
       </div>
-      <div ref={actionsRef} className="relative h-[26px] shrink-0">
+      <div
+        ref={actionsRef}
+        className="relative h-[26px] shrink-0"
+        onFocus={() => {
+          hadFocusRef.current = true;
+        }}
+        onBlur={(event) => {
+          const next = event.relatedTarget;
+          if (next !== null && !event.currentTarget.contains(next)) hadFocusRef.current = false;
+        }}
+      >
         <AnimatePresence initial={false}>
           {inProgress ? (
             <SidebarCancelButton
               key="cancel"
               ref={cancelButtonRef}
               disabled={status.kind === "cancelling"}
-              onClick={() => void runAndMoveFocus(onCancel, startButtonRef)}
+              onClick={onCancel}
             />
           ) : (
             <SidebarStartButton
@@ -119,8 +132,8 @@ function ScanSidebarControls({
               status={status}
               primary={scanPending}
               buttonRef={startButtonRef}
-              onStart={() => void runAndMoveFocus(onStart, cancelButtonRef)}
-              onFullScan={() => void runAndMoveFocus(onFullScan, cancelButtonRef)}
+              onStart={onStart}
+              onFullScan={onFullScan}
             />
           )}
         </AnimatePresence>
