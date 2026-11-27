@@ -4,7 +4,7 @@ title: 段階4の設計を決め、ダイアログ・コンボボックス・ト
 status: To Do
 assignee: []
 created_date: '2026-11-27 13:58'
-updated_date: '2026-11-27 13:58'
+updated_date: '2026-11-27 15:15'
 labels:
   - ui
 dependencies:
@@ -152,3 +152,9 @@ S4.3 のあと、native dialog のために TASK-529 で入れた分岐は到達
 - 段階4の後の単発タスク（タブ・セレクト）は `ScanModal.tsx`・`ScanSidebar.tsx`・`SmartFolderDialog.tsx` を触る。S4 が済んでから着手する
 - TASK-444 は S4 の依存にしない（other-task-updates.md）
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-28 ユーザー回答（決めること）: 1. 層を開いたまま backdrop を押したら層だけ閉じる（全層共通）。2. 確認ダイアログ（alertdialog）は backdrop で閉じない（Ark の既定）。4. ダイアログ内コンボボックスの IME は S4.2 の実装後にユーザーが Windows 実機でキー記録アーティファクトを使って確かめる。3 は S4.1 の結果が出てから判断する
+<!-- SECTION:NOTES:END -->
