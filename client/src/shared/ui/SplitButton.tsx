@@ -22,9 +22,8 @@ interface SplitButtonProps {
   /** 外枠の id。ポップオーバーの基準（ids.anchor）に結ぶ */
   id?: string;
   primaryRef?: Ref<HTMLButtonElement>;
-  /** メニューの開閉を呼び出し側が持つ。開く要求は onMenuOpenChange(true) で届き、受け入れるまで開かない */
-  menuOpen?: boolean;
-  onMenuOpenChange?: (open: boolean) => void;
+  /** ▾の開く操作で呼ぶ。true を返すと開かない */
+  interceptMenuOpen?: () => boolean;
   /** メニューの開く向き。既定は上（下端に置く前提）。above・belowEnd は▾の右端にそろえる。aboveStart はボタン全体の左端にそろえる（左端に置くボタンで、メニューがはみ出さないようにする） */
   placement?: keyof typeof PLACEMENT;
   className?: string;
@@ -50,8 +49,7 @@ export default function SplitButton({
   menuTriggerId,
   id,
   primaryRef,
-  menuOpen,
-  onMenuOpenChange,
+  interceptMenuOpen,
   placement = "above",
   className,
 }: SplitButtonProps) {
@@ -68,8 +66,7 @@ export default function SplitButton({
       }),
     },
     disabled: off,
-    open: menuOpen,
-    onOpenChange: onMenuOpenChange && (({ open }) => onMenuOpenChange(open)),
+    interceptOpen: interceptMenuOpen,
   });
   return (
     <div ref={rootRef} id={id} className={cn("relative inline-flex", className)}>

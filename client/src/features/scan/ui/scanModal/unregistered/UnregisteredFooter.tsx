@@ -52,7 +52,6 @@ export default function UnregisteredFooter({
     setPickerPlanKind(plan.kind);
     setPickerOpen(false);
   }
-  const [menuOpen, setMenuOpen] = useState(false);
   const menuTriggerId = useId();
   const splitButtonId = useId();
 
@@ -123,10 +122,10 @@ export default function UnregisteredFooter({
           onClick={() => (plan.kind === "fetch" ? onFetch() : onRegister(REGISTER_APPLY_ALL))}
           menu={menu}
           menuTriggerId={menuTriggerId}
-          menuOpen={menuOpen}
-          onMenuOpenChange={(open) => {
-            if (open && pickerOpen) setPickerOpen(false);
-            else setMenuOpen(open);
+          interceptMenuOpen={() => {
+            if (!pickerOpen) return false;
+            setPickerOpen(false);
+            return true;
           }}
         >
           {plan.kind === "fetch" ? `DLsiteから取得 ${plan.codes.length}件` : `${addCount}件を追加`}

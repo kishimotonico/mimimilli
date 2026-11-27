@@ -5,7 +5,7 @@ import IconButton from "../../../../shared/ui/IconButton";
 import TagCombobox from "../../../../shared/ui/TagCombobox";
 import { cn } from "../../../../shared/lib/cn";
 import { layerPanelClass } from "../../../../shared/ui/layer/layerStyles";
-import { useDismissOnOutsidePress } from "../../../../shared/ui/layer/useDismissOnOutsidePress";
+import { useDismissOnOutsideInteraction } from "../../../../shared/ui/layer/useDismissOnOutsideInteraction";
 import {
   MotionPopoverRoot,
   MotionPopoverTrigger,
@@ -74,7 +74,7 @@ export function TagAddPopover({
     setMode(null);
   };
 
-  useDismissOnOutsidePress(
+  useDismissOnOutsideInteraction(
     mode === "inline",
     (target) => !!(inlineRef.current?.contains(target) || triggerRef.current?.contains(target)),
     closeInline,

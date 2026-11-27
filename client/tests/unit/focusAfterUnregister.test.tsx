@@ -26,17 +26,24 @@ function list(ids: string[]) {
 describe("登録解除後のフォーカス", () => {
   it("フォーカスが失われていれば、隣の行が無いとき roving の行へ、空ならコンテナへ移す", () => {
     list(["a", "b"]);
-    focusListAfterRemoval(null, null);
+    focusListAfterRemoval(null, false);
     expect(document.activeElement).toBe(document.querySelector('[data-work-id="a"]'));
     list([]);
-    focusListAfterRemoval(null, null);
+    focusListAfterRemoval(null, false);
     expect(document.activeElement).toBe(document.querySelector("[data-work-list]"));
+  });
+
+  it("フォーカスが詳細の中にあったなら、まだ body に落ちていなくても隣の行へ移す", () => {
+    list(["a", "b"]);
+    document.getElementById("more")?.focus();
+    focusListAfterRemoval("b", true);
+    expect(document.activeElement).toBe(document.querySelector('[data-work-id="b"]'));
   });
 
   it("ユーザーが他へ移していたら動かさない", () => {
     list(["a", "b"]);
     document.getElementById("other")?.focus();
-    focusListAfterRemoval("b", document.getElementById("detail"));
+    focusListAfterRemoval("b", false);
     expect(document.activeElement).toBe(document.getElementById("other"));
   });
 

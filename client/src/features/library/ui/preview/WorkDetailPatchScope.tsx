@@ -42,8 +42,11 @@ export function WorkDetailPatchScope({
   const prepareUnregister = (workId: string) => {
     const neighborId = neighborInCachedWorks(queryClient, nav.view, searchQuery, workId);
     return () => {
+      // 描き直すと詳細は外れるので、フォーカスが詳細の中にあったかは描き直す前に求める
+      const active = document.activeElement;
+      const wasInDetail = active !== null && !!detailRootRef.current?.contains(active);
       flushSync(() => deselectUnregisteredWork(workId));
-      focusListAfterRemoval(neighborId, detailRootRef.current);
+      focusListAfterRemoval(neighborId, wasInDetail);
     };
   };
 

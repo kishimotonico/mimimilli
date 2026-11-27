@@ -4,7 +4,9 @@ import {
   useContext,
   useLayoutEffect,
   useRef,
+  type HTMLAttributes,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type ReactElement,
   type ReactNode,
 } from "react";
@@ -28,6 +30,8 @@ interface MotionMenuProps extends UseMenuProps {
   disabled?: boolean;
   /** 親が AnimatePresence で退出に入ったら閉じる */
   closeOnParentExit?: boolean;
+  /** 閉じているときの開く操作（ポインター・Enter・Space・ArrowDown・ArrowUp）で呼ぶ。true を返すと開かない */
+  interceptOpen?: () => boolean;
 }
 
 const INTERNALS = Symbol("motionMenuInternals");
@@ -36,10 +40,7 @@ interface MenuInternals {
   menu: UseMenuReturn;
   present: boolean;
   onExitComplete: () => void;
-  triggerProps: ReturnType<typeof disabledTriggerProps> & {
-    onKeyDown: (event: ReactKeyboardEvent) => void;
-    onPointerDown: () => void;
-  };
+  triggerProps: HTMLAttributes<HTMLElement>;
   closeWithoutRestoringFocus: () => void;
 }
 
@@ -60,6 +61,7 @@ export function useMotionMenu(props: MotionMenuProps = {}): MotionMenuHandle {
     onOpenChange,
     disabled = false,
     closeOnParentExit = false,
+    interceptOpen,
     positioning,
     ...rest
   } = props;
@@ -123,10 +125,21 @@ export function useMotionMenu(props: MotionMenuProps = {}): MotionMenuHandle {
   useCloseOnParentExit(closeOnParentExit, open, closeAndReturn);
 
   const triggerProps = {
+    ...(interceptOpen && {
+      onKeyDownCapture: (event: ReactKeyboardEvent) => {
+        if (!open && MENU_OPEN_KEYS.has(event.key) && interceptOpen()) event.preventDefault();
+      },
+      onClickCapture: (event: ReactMouseEvent) => {
+        if (open || !interceptOpen()) return;
+        event.preventDefault();
+        event.stopPropagation();
+      },
+    }),
     ...disabledTriggerProps(disabled, MENU_OPEN_KEYS),
     // キーボードで開いたかどうかを覚える
     onKeyDown: (event: ReactKeyboardEvent) => {
-      keyboardOpenPending.current = !open && MENU_OPEN_KEYS.has(event.key);
+      keyboardOpenPending.current =
+        !event.defaultPrevented && !open && MENU_OPEN_KEYS.has(event.key);
     },
     onPointerDown: () => {
       keyboardOpenPending.current = false;

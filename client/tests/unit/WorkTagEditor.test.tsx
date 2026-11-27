@@ -233,4 +233,40 @@ describe("WorkTagEditor", () => {
     resize(200);
     expect(input()).toBe(floating);
   });
+
+  it("インラインの入力欄は、外へのフォーカス移動と外の pointerdown で閉じる", async () => {
+    const user = userEvent.setup();
+    renderWithToast(
+      <>
+        <div className="mle-prv__meta" data-testid="tag-pane">
+          <WorkTagEditor
+            work={makeWork()}
+            tagSuggestions={[]}
+            addTagMutation={makeTagMutation()}
+            removeTagMutation={makeTagMutation()}
+          />
+        </div>
+        <button type="button">外</button>
+      </>,
+    );
+    const pane = screen.getByTestId("tag-pane");
+    const measure = vi.spyOn(pane, "getBoundingClientRect");
+    const observer = getResizeObservers().find((item) => item.getObserved().includes(pane));
+    if (!observer) throw new Error("tag-pane の ResizeObserver が見つからない");
+    const rect = new DOMRect(0, 0, 200, 100);
+    measure.mockReturnValue(rect);
+    act(() => observer.flush([{ target: pane, contentRect: rect }]));
+    const input = () => screen.queryByRole("combobox", { name: "追加するタグ" });
+
+    await user.click(screen.getByRole("button", { name: "タグを追加" }));
+    expect(input()).toBeInTheDocument();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "外" })).toHaveFocus();
+    expect(input()).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "タグを追加" }));
+    expect(input()).toBeInTheDocument();
+    await user.pointer({ keys: "[MouseLeft]", target: document.body });
+    expect(input()).toBeNull();
+  });
 });

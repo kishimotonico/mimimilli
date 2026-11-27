@@ -13,11 +13,9 @@ export function focusListEntry(workId: string | null = null) {
 }
 
 /**
- * 作品が一覧から消えたあと、フォーカスが消えた詳細（removedRoot）の中か失われているときだけ、
+ * 作品が一覧から消えたあと、フォーカスが消えた詳細の中にあった（消える前に求める）か失われているときだけ、
  * 隣の行（無ければ roving の行、空ならコンテナ）へ移す。ユーザーが他へ移していたら動かさない。
  */
-export function focusListAfterRemoval(workId: string | null, removedRoot: HTMLElement | null) {
-  const active = document.activeElement;
-  if (!isFocusLost() && !(active && removedRoot?.contains(active))) return;
-  focusListEntry(workId);
+export function focusListAfterRemoval(workId: string | null, wasInRemovedRoot: boolean) {
+  if (wasInRemovedRoot || isFocusLost()) focusListEntry(workId);
 }
