@@ -202,7 +202,7 @@ focus中はタイマーを止め、離れると残り時間から再開する。
   - タグ追加: `TagAddPopover`（`WorkTagEditor` と `WorkEditTagsField` が共有）。幅260px・`bottom-start`・開いたら入力欄にフォーカス。Esc は止めて `TagCombobox` に任せる。狭い幅（`WorkTagEditor`）では開く時点でインライン展開に切り替え、トリガーは1つのまま。インラインのパネルは層と同じ枠で、外側の pointerdown と外へのフォーカス移動で閉じる（`useDismissOnOutsideInteraction`）
   - 項目のボタン一覧: ポップオーバーの中に並べるボタン（「＋絞り込み」の1段目、`GroupValueQuickList` の値）は `popoverListItemClass`（高さ28px、ホバーとフォーカスで `--paper-2`）で描く。メニューの項目とは別に持つ
   - ポータルした層の中のイベント: React の木をたどって祖先のハンドラへ届く。層の側では止めない（stopPropagation はネイティブの伝播まで止め、⌘K・Ctrl+B・外側クリックなど window・document のリスナーに届かなくなる）。pointerdown・click・dblclick・keydown のハンドラを持つ層の祖先は `isFromPortaledLayer(event)`（`shared/ui/layer/layerEvents.ts`）で弾く（例: `PlayerDock` の `usePopupDrag`、`BarContent` の本体）。没入表示の面は、`NowPlayingImmersiveMiniControls` のラッパーが自前の stopPropagation（速度ピル自身のクリックにも要る既存の処理）で守っている。グローバルなキー（`useGlobalShortcuts` の Space・矢印）は層の中（`LAYER_CONTENT_SELECTOR`）では動かさない
-- フォーカスを残したまま無効にするボタン: `Button` と `IconButton` の `softDisabled`（見た目、`aria-disabled`、自分の onClick と Enter・Space だけを無効にする。`disabled` 属性は付けない）。`SplitButton` の主ボタンとスキャンの中止ボタンが使う。Ark のトリガーは `softDisabled` では止まらないので、メニュー・ポップオーバーのトリガーはフックの `disabled` を使う
+- フォーカスを残したまま無効にするボタン: `Button` の `softDisabled`（見た目、`aria-disabled`、自分の onClick と Enter・Space だけを無効にする。`disabled` 属性は付けない）。`SplitButton` の主ボタンとスキャンの中止ボタンが使う。Ark のトリガーは `softDisabled` では止まらないので、メニュー・ポップオーバーのトリガーはフックの `disabled` を使う
 - フッターは共有の `ModalFooter` に、高さと上線の色（`--line`）だけを上書きする。主ボタンは `md`
 
 要対応は種類・対象・起きていること・推奨アクションの4列。直す種類は `--state-danger`、行方不明は `ink-1` で出す。操作ボタンは推奨アクションの列にだけ置き、対象や起きていることの列には置かない。ID重複の対象は固定幅のラベル（登録済み・未登録）とパスを1行に並べ、ボタンは1つだけで、未登録のパスの先頭の1つを取り込む。パスやファイル名は等幅で出す。
